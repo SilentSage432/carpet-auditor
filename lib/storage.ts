@@ -16,8 +16,9 @@ function readLocal(): CarpetAudit[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return [];
-    const parsed = JSON.parse(raw) as CarpetAudit[];
-    return Array.isArray(parsed) ? parsed : [];
+    const parsed = JSON.parse(raw) as unknown[];
+    if (!Array.isArray(parsed)) return [];
+    return parsed.map((row) => mapRow(row as Record<string, unknown>));
   } catch {
     return [];
   }
@@ -47,18 +48,27 @@ export function getLocalAudits(): CarpetAudit[] {
   return readLocal();
 }
 
+/** Normalize new schema + legacy local/remote rows. */
 function mapRow(row: Record<string, unknown>): CarpetAudit {
+  const locationType = (row.location_type ?? row.location ?? "sales_floor") as LocationType;
+
+  const fraction = Number(row.measurement_fraction ?? row.fraction ?? 0);
+  // New schema: measurement_inches = whole inches. Legacy: whole_inches.
+  const whole = Number(row.whole_inches ?? row.measurement_inches ?? 0);
+
+  const clf = Number(row.calculated_clf ?? row.clf ?? 0);
+
   return {
     id: String(row.id),
-    sku: String(row.sku),
-    location: row.location as LocationType,
-    whole_inches: Number(row.whole_inches),
-    fraction: Number(row.fraction),
-    measurement_inches: Number(row.measurement_inches),
-    rounds: Number(row.rounds),
-    clf: Number(row.clf),
-    created_at: String(row.created_at),
-    offline: false,
+    sku: String(row.sku ?? ""),
+    carpet_name: String(row.carpet_name ?? row.notes ?? ""),
+    location_type: locationType === "top_stock" ? "top_stock" : "sales_floor",
+    measurement_inches: whole,
+    measurement_fraction: fraction,
+    rounds: Number(row.rounds ?? 0),
+    calculated_clf: clf,
+    created_at: String(row.created_at ?? new Date().toISOString()),
+    offline: Boolean(row.offline),
   };
 }
 
@@ -76,7 +86,9 @@ export async function fetchAudits(): Promise<CarpetAudit[]> {
 
     if (error) throw error;
 
-    const remote = (data ?? []).map((row) => mapRow(row as Record<string, unknown>));
+    const remote = (data ?? []).map((row) =>
+      mapRow({ ...(row as Record<string, unknown>), offline: false })
+    );
     const remoteIds = new Set(remote.map((r) => r.id));
     const offlineOnly = local.filter((r) => r.offline && !remoteIds.has(r.id));
 
@@ -96,12 +108,12 @@ export async function saveAudit(input: CarpetAuditInsert): Promise<{
   const record: CarpetAudit = {
     id: input.id ?? uid(),
     sku: input.sku,
-    location: input.location,
-    whole_inches: input.whole_inches,
-    fraction: input.fraction,
+    carpet_name: input.carpet_name,
+    location_type: input.location_type,
     measurement_inches: input.measurement_inches,
+    measurement_fraction: input.measurement_fraction,
     rounds: input.rounds,
-    clf: input.clf,
+    calculated_clf: input.calculated_clf,
     created_at: input.created_at ?? now,
     offline: false,
   };
@@ -120,12 +132,12 @@ export async function saveAudit(input: CarpetAuditInsert): Promise<{
       .insert({
         id: record.id,
         sku: record.sku,
-        location: record.location,
-        whole_inches: record.whole_inches,
-        fraction: record.fraction,
+        carpet_name: record.carpet_name,
+        location_type: record.location_type,
         measurement_inches: record.measurement_inches,
+        measurement_fraction: record.measurement_fraction,
         rounds: record.rounds,
-        clf: record.clf,
+        calculated_clf: record.calculated_clf,
         created_at: record.created_at,
       })
       .select("*")
@@ -133,8 +145,8 @@ export async function saveAudit(input: CarpetAuditInsert): Promise<{
 
     if (error) throw error;
 
-    const saved = mapRow(data as Record<string, unknown>);
-    upsertLocal({ ...saved, offline: false });
+    const saved = mapRow({ ...(data as Record<string, unknown>), offline: false });
+    upsertLocal(saved);
     return { record: saved, offline: false };
   } catch {
     const offlineRecord = { ...record, offline: true };
@@ -164,4 +176,40 @@ export function isToday(iso: string): boolean {
     d.getMonth() === now.getMonth() &&
     d.getDate() === now.getDate()
   );
+}
+
+export function auditsToCsv(audits: CarpetAudit[]): string {
+  const header = [
+    "created_at",
+    "sku",
+    "carpet_name",
+    "location_type",
+    "measurement_inches",
+    "measurement_fraction",
+    "rounds",
+    "calculated_clf",
+  ];
+
+  const escape = (value: string | number) => {
+    const s = String(value);
+    if (/[",\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+    return s;
+  };
+
+  const rows = audits.map((a) =>
+    [
+      a.created_at,
+      a.sku,
+      a.carpet_name,
+      a.location_type,
+      a.measurement_inches,
+      a.measurement_fraction,
+      a.rounds,
+      a.calculated_clf,
+    ]
+      .map(escape)
+      .join(",")
+  );
+
+  return [header.join(","), ...rows].join("\n");
 }

@@ -12,12 +12,12 @@ export const FRACTION_OPTIONS = [
   { label: '7/8"', value: 0.875 },
 ] as const;
 
-export function toMeasurementInches(wholeInches: number, fraction: number): number {
+export function toTotalInches(wholeInches: number, fraction: number): number {
   return wholeInches + fraction;
 }
 
-export function calculateClf(measurementInches: number, rounds: number): number {
-  return measurementInches * rounds * CLF_FACTOR;
+export function calculateClf(totalInches: number, rounds: number): number {
+  return totalInches * rounds * CLF_FACTOR;
 }
 
 export function formatClf(clf: number): string {
@@ -31,6 +31,14 @@ export function formatMeasurementDisplay(wholeInches: number, fraction: number):
   return `${wholeInches} ${fractionLabel}"`;
 }
 
-export function formatDecimalInches(measurementInches: number): string {
-  return `${measurementInches.toFixed(2)}"`;
+export function formatDecimalInches(totalInches: number): string {
+  return `${totalInches.toFixed(2)}"`;
+}
+
+export function formatFormulaBreakdown(
+  totalInches: number,
+  rounds: number,
+  clf: number
+): string {
+  return `${totalInches.toFixed(2)}" × ${rounds} rounds × ${CLF_FACTOR} = ${formatClf(clf)} CLF`;
 }

@@ -15,15 +15,16 @@ const jetbrains = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Carpet Roll Auditor",
-  description: "Mobile-first carpet roll auditing with calculated linear feet (CLF).",
+  title: "Carpet Cycle Count Auditor",
+  description:
+    "Mobile-first carpet cycle count auditor with calculated linear feet (CLF).",
 };
 
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
-  themeColor: "#0f172a",
+  themeColor: "#020617",
 };
 
 export default function RootLayout({
