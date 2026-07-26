@@ -26,11 +26,19 @@ create table if not exists public.carpet_catalog (
   carpet_name text not null,
   vendor text not null default '',
   roll_width_ft numeric(6, 2) not null default 12.00,
+  upc_barcode text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
 
+-- Migration for existing projects
+alter table public.carpet_catalog
+  add column if not exists upc_barcode text;
+
 create index if not exists carpet_catalog_sku_idx on public.carpet_catalog (sku);
+create index if not exists carpet_catalog_upc_barcode_idx
+  on public.carpet_catalog (upc_barcode)
+  where upc_barcode is not null;
 
 -- Remnant rack inventory
 create table if not exists public.carpet_remnants (

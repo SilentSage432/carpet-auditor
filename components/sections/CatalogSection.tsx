@@ -1,13 +1,21 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { MarryBarcodeModal } from "@/components/barcode/MarryBarcodeModal";
+import { NumberField, TextField } from "@/components/ui/NumberField";
 import {
+  findCatalogBySkuOrBarcode,
+  resolveScan,
+  sanitizeBarcodeScan,
+} from "@/lib/barcode";
+import {
+  clearCatalogBarcode,
   deleteCatalogItem,
   saveCatalogItem,
 } from "@/lib/catalog";
 import { toNumber } from "@/lib/number-input";
+import { playSuccessChime } from "@/lib/scan-feedback";
 import type { CatalogItem } from "@/lib/types";
-import { NumberField, TextField } from "@/components/ui/NumberField";
 
 type Props = {
   catalog: CatalogItem[];
@@ -22,19 +30,44 @@ export function CatalogSection({ catalog, onCatalogChange }: Props) {
   const [name, setName] = useState("");
   const [vendor, setVendor] = useState("");
   const [width, setWidth] = useState("12");
+  const [upc, setUpc] = useState("");
   const [status, setStatus] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [scanFlash, setScanFlash] = useState(false);
+  const [marryBarcode, setMarryBarcode] = useState<string | null>(null);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return catalog;
-    return catalog.filter(
-      (item) =>
+    const qDigits = sanitizeBarcodeScan(query);
+    return catalog.filter((item) => {
+      if (
         item.sku.toLowerCase().includes(q) ||
         item.carpet_name.toLowerCase().includes(q) ||
         item.vendor.toLowerCase().includes(q)
-    );
+      ) {
+        return true;
+      }
+      if (!qDigits) return false;
+      return (
+        sanitizeBarcodeScan(item.sku).includes(qDigits) ||
+        (item.upc_barcode != null &&
+          sanitizeBarcodeScan(item.upc_barcode).includes(qDigits))
+      );
+    });
   }, [catalog, query]);
+
+  function flash(msg: string) {
+    setStatus(msg);
+    window.setTimeout(() => setStatus(null), 2500);
+  }
+
+  function upsertLocalList(record: CatalogItem) {
+    return [
+      record,
+      ...catalog.filter((c) => c.id !== record.id && c.sku !== record.sku),
+    ].sort((a, b) => a.sku.localeCompare(b.sku));
+  }
 
   function openAdd() {
     setEditing(null);
@@ -42,6 +75,7 @@ export function CatalogSection({ catalog, onCatalogChange }: Props) {
     setName("");
     setVendor("");
     setWidth("12");
+    setUpc("");
     setShowForm(true);
   }
 
@@ -51,7 +85,28 @@ export function CatalogSection({ catalog, onCatalogChange }: Props) {
     setName(item.carpet_name);
     setVendor(item.vendor);
     setWidth(String(item.roll_width_ft));
+    setUpc(item.upc_barcode ?? "");
     setShowForm(true);
+  }
+
+  function handleSearchScan(sanitized: string) {
+    const resolution = resolveScan(catalog, sanitized);
+    if (resolution.kind === "matched") {
+      setQuery(resolution.item.sku);
+      setScanFlash(true);
+      playSuccessChime();
+      window.setTimeout(() => setScanFlash(false), 900);
+      flash(`Found ${resolution.item.sku}`);
+      return;
+    }
+    if (resolution.kind === "unlinked_barcode") {
+      setQuery(resolution.scanned);
+      setMarryBarcode(resolution.scanned);
+      return;
+    }
+    if (resolution.kind === "unknown_sku") {
+      setQuery(resolution.scanned);
+    }
   }
 
   async function handleSave() {
@@ -64,15 +119,11 @@ export function CatalogSection({ catalog, onCatalogChange }: Props) {
         carpet_name: name.trim(),
         vendor: vendor.trim(),
         roll_width_ft: toNumber(width, 12),
+        upc_barcode: upc.trim() ? sanitizeBarcodeScan(upc) : null,
       });
-      const next = [
-        record,
-        ...catalog.filter((c) => c.id !== record.id && c.sku !== record.sku),
-      ].sort((a, b) => a.sku.localeCompare(b.sku));
-      onCatalogChange(next);
+      onCatalogChange(upsertLocalList(record));
       setShowForm(false);
-      setStatus(offline ? "Saved offline" : "Catalog updated");
-      window.setTimeout(() => setStatus(null), 2500);
+      flash(offline ? "Saved offline" : "Catalog updated");
     } finally {
       setSaving(false);
     }
@@ -81,18 +132,40 @@ export function CatalogSection({ catalog, onCatalogChange }: Props) {
   async function handleDelete(id: string) {
     await deleteCatalogItem(id);
     onCatalogChange(catalog.filter((c) => c.id !== id));
-    setStatus("Removed from catalog");
-    window.setTimeout(() => setStatus(null), 2500);
+    flash("Removed from catalog");
+  }
+
+  async function handleClearBarcode(item: CatalogItem) {
+    const { record, offline } = await clearCatalogBarcode(item);
+    onCatalogChange(upsertLocalList(record));
+    flash(offline ? "Barcode cleared offline" : "Barcode unlinked");
+  }
+
+  function handleMarried(item: CatalogItem) {
+    onCatalogChange(upsertLocalList(item));
+    setMarryBarcode(null);
+    setQuery(item.sku);
+    flash(`Barcode linked to ${item.sku}`);
   }
 
   return (
     <div className="space-y-4">
+      <MarryBarcodeModal
+        open={marryBarcode != null}
+        scannedBarcode={marryBarcode ?? ""}
+        catalog={catalog}
+        onClose={() => setMarryBarcode(null)}
+        onLinked={handleMarried}
+      />
+
       <div className="flex gap-2">
         <TextField
           className="min-w-0 flex-1"
           value={query}
           onChange={setQuery}
-          placeholder="Search SKU, name, vendor…"
+          onScanCommit={handleSearchScan}
+          flash={scanFlash}
+          placeholder="Search SKU, barcode, name…"
           aria-label="Search catalog"
         />
         <button
@@ -135,6 +208,13 @@ export function CatalogSection({ catalog, onCatalogChange }: Props) {
             onChange={setWidth}
             placeholder="12"
           />
+          <NumberField
+            label="UPC / Vendor Barcode (optional)"
+            mode="digits"
+            value={upc}
+            onChange={(v) => setUpc(sanitizeBarcodeScan(v))}
+            placeholder="Scan or paste barcode"
+          />
           <div className="grid grid-cols-2 gap-2">
             <button
               type="button"
@@ -168,17 +248,27 @@ export function CatalogSection({ catalog, onCatalogChange }: Props) {
               key={item.id}
               className="rounded-2xl border border-slate-800 bg-slate-900/90 p-3"
             >
-              <div className="flex items-start justify-between gap-2">
-                <div className="min-w-0">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
                   <p className="font-mono text-base font-bold text-slate-50">
                     SKU {item.sku}
                   </p>
-                  <p className="truncate text-sm text-slate-200">{item.carpet_name}</p>
-                  <p className="mt-1 text-xs text-slate-500">
-                    {item.vendor || "No vendor"} · {item.roll_width_ft} ft
-                    {item.offline ? " · Offline" : ""}
-                  </p>
+                  {item.upc_barcode ? (
+                    <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-300">
+                      🏷️ Barcode Linked
+                    </span>
+                  ) : null}
                 </div>
+                <p className="truncate text-sm text-slate-200">{item.carpet_name}</p>
+                <p className="mt-1 text-xs text-slate-500">
+                  {item.vendor || "No vendor"} · {item.roll_width_ft} ft
+                  {item.offline ? " · Offline" : ""}
+                </p>
+                {item.upc_barcode ? (
+                  <p className="mt-1 font-mono text-xs text-emerald-400/90">
+                    UPC {item.upc_barcode}
+                  </p>
+                ) : null}
               </div>
               <div className="mt-3 grid grid-cols-2 gap-2">
                 <button
@@ -195,6 +285,48 @@ export function CatalogSection({ catalog, onCatalogChange }: Props) {
                 >
                   Remove
                 </button>
+                {item.upc_barcode ? (
+                  <button
+                    type="button"
+                    onClick={() => void handleClearBarcode(item)}
+                    className="col-span-2 flex min-h-12 items-center justify-center rounded-xl border border-amber-500/40 text-sm font-semibold text-amber-300"
+                  >
+                    Unlink Barcode
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const code = window.prompt(
+                        "Scan or paste vendor barcode to link:",
+                        ""
+                      );
+                      if (!code) return;
+                      const cleaned = sanitizeBarcodeScan(code);
+                      if (!cleaned) return;
+                      const existing = findCatalogBySkuOrBarcode(catalog, cleaned);
+                      if (existing && existing.id !== item.id) {
+                        flash(`Barcode already on SKU ${existing.sku}`);
+                        return;
+                      }
+                      void saveCatalogItem({
+                        id: item.id,
+                        sku: item.sku,
+                        carpet_name: item.carpet_name,
+                        vendor: item.vendor,
+                        roll_width_ft: item.roll_width_ft,
+                        upc_barcode: cleaned,
+                      }).then(({ record }) => {
+                        onCatalogChange(upsertLocalList(record));
+                        playSuccessChime();
+                        flash("Barcode linked");
+                      });
+                    }}
+                    className="col-span-2 flex min-h-12 items-center justify-center rounded-xl border border-emerald-500/40 text-sm font-semibold text-emerald-300"
+                  >
+                    Link Barcode
+                  </button>
+                )}
               </div>
             </li>
           ))}

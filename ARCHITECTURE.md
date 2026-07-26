@@ -22,6 +22,7 @@ supabase/schema.sql               → Audits + catalog + remnants tables
 | CLF math | `lib/calc.ts` |
 | Number typing UX | `lib/number-input.ts` + `NumberField` |
 | Catalog knowledge | `lib/catalog.ts` |
+| Barcode resolve / marry | `lib/barcode.ts`, `MarryBarcodeModal` |
 | Remnant inventory | `lib/remnants.ts` |
 | Audit log | `lib/storage.ts` |
 

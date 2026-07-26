@@ -1,12 +1,13 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { findCatalogBySku } from "@/lib/catalog";
+import { findCatalogBySkuOrBarcode } from "@/lib/catalog";
 import {
   calculateSquareFeet,
   calculateSquareYards,
   formatSqYd,
 } from "@/lib/calc";
+import { sanitizeBarcodeScan } from "@/lib/barcode";
 import { toNumber } from "@/lib/number-input";
 import { deleteRemnant, saveRemnant } from "@/lib/remnants";
 import type { CatalogItem, Remnant, RemnantStatus } from "@/lib/types";
@@ -101,8 +102,9 @@ export function RemnantSection({ catalog, remnants, onRemnantsChange }: Props) {
   }
 
   function handleSkuChange(next: string) {
-    setSku(next);
-    const hit = findCatalogBySku(catalog, next);
+    const cleaned = sanitizeBarcodeScan(next);
+    setSku(cleaned);
+    const hit = findCatalogBySkuOrBarcode(catalog, cleaned);
     if (hit) setCarpetName(hit.carpet_name);
   }
 

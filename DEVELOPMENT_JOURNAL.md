@@ -1,5 +1,24 @@
 # Carpet Hub — Development Journal
 
+## 2026-07-25 — Handheld barcode + Marry Barcode workflow
+
+### Shipped
+- `carpet_catalog.upc_barcode` (nullable, indexed) + local/offline support.
+- Scanner-friendly inputs: strip leading zeros, Enter commit, rapid-key heuristic.
+- Smart resolve: SKU/UPC match → chime + flash + auto-fill; unlinked vendor barcode → Marry modal.
+- Marry modal: link existing catalog row or create new Item # with UPC attached.
+- Catalog cards show **Barcode Linked** badge; link / unlink / edit UPC.
+
+### Ownership
+| Concern | Owner |
+|---|---|
+| Scan sanitize / resolve | `lib/barcode.ts` |
+| Success chime | `lib/scan-feedback.ts` |
+| Marry UI | `components/barcode/MarryBarcodeModal.tsx` |
+| Catalog persistence | `lib/catalog.ts` |
+
+---
+
 ## 2026-07-25 — Carpet Management Hub overhaul
 
 ### Shipped

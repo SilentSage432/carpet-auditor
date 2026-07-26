@@ -1,6 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { MarryBarcodeModal } from "@/components/barcode/MarryBarcodeModal";
+import { NumberField, TextField } from "@/components/ui/NumberField";
+import {
+  resolveScan,
+  sanitizeBarcodeScan,
+} from "@/lib/barcode";
 import {
   CLF_FACTOR,
   FRACTION_OPTIONS,
@@ -12,11 +18,12 @@ import {
   toTotalInches,
 } from "@/lib/calc";
 import {
-  findCatalogBySku,
+  findCatalogBySkuOrBarcode,
   fetchCatalog,
   saveCatalogItem,
 } from "@/lib/catalog";
 import { toNumber } from "@/lib/number-input";
+import { playSuccessChime } from "@/lib/scan-feedback";
 import {
   auditsToCsv,
   deleteAudit,
@@ -25,7 +32,6 @@ import {
   saveAudit,
 } from "@/lib/storage";
 import type { CarpetAudit, CatalogItem, LocationType } from "@/lib/types";
-import { NumberField, TextField } from "@/components/ui/NumberField";
 
 function locationLabel(location: LocationType): string {
   return location === "sales_floor" ? "Sales Floor" : "Top Stock";
@@ -67,6 +73,7 @@ type Props = {
 export function CycleAuditSection({ catalog, onCatalogChange }: Props) {
   const [sku, setSku] = useState("");
   const [carpetName, setCarpetName] = useState("");
+  const [rollWidth, setRollWidth] = useState<number | null>(null);
   const [nameFromCatalog, setNameFromCatalog] = useState(false);
   const [location, setLocation] = useState<LocationType>("sales_floor");
   const [wholeInches, setWholeInches] = useState("");
@@ -78,6 +85,8 @@ export function CycleAuditSection({ catalog, onCatalogChange }: Props) {
   const [copied, setCopied] = useState(false);
   const [showAll, setShowAll] = useState(false);
   const [loaded, setLoaded] = useState(false);
+  const [scanFlash, setScanFlash] = useState(false);
+  const [marryBarcode, setMarryBarcode] = useState<string | null>(null);
 
   const wholeNum = toNumber(wholeInches, 0);
   const roundsNum = toNumber(rounds, 0);
@@ -110,7 +119,7 @@ export function CycleAuditSection({ catalog, onCatalogChange }: Props) {
   );
 
   const catalogMatch = useMemo(
-    () => findCatalogBySku(catalog, sku),
+    () => findCatalogBySkuOrBarcode(catalog, sku),
     [catalog, sku]
   );
 
@@ -130,15 +139,29 @@ export function CycleAuditSection({ catalog, onCatalogChange }: Props) {
     };
   }, []);
 
+  const applyCatalogItem = useCallback((item: CatalogItem) => {
+    setSku(item.sku);
+    setCarpetName(item.carpet_name);
+    setRollWidth(item.roll_width_ft);
+    setNameFromCatalog(true);
+    setScanFlash(true);
+    playSuccessChime();
+    window.setTimeout(() => setScanFlash(false), 900);
+  }, []);
+
   useEffect(() => {
-    const hit = findCatalogBySku(catalog, sku);
+    const hit = findCatalogBySkuOrBarcode(catalog, sku);
     if (hit) {
       setCarpetName(hit.carpet_name);
+      setRollWidth(hit.roll_width_ft);
       setNameFromCatalog(true);
       return;
     }
     setNameFromCatalog((wasFromCatalog) => {
-      if (wasFromCatalog) setCarpetName("");
+      if (wasFromCatalog) {
+        setCarpetName("");
+        setRollWidth(null);
+      }
       return false;
     });
   }, [sku, catalog]);
@@ -148,9 +171,44 @@ export function CycleAuditSection({ catalog, onCatalogChange }: Props) {
     window.setTimeout(() => setStatusMsg(null), 2800);
   }, []);
 
+  function handleSkuChange(raw: string) {
+    setSku(sanitizeBarcodeScan(raw));
+  }
+
+  function handleScanCommit(sanitized: string) {
+    const resolution = resolveScan(catalog, sanitized);
+    if (resolution.kind === "empty") return;
+
+    if (resolution.kind === "matched") {
+      applyCatalogItem(resolution.item);
+      flashStatus(`Matched ${resolution.item.sku}`);
+      return;
+    }
+
+    if (resolution.kind === "unlinked_barcode") {
+      setSku(resolution.scanned);
+      setMarryBarcode(resolution.scanned);
+      return;
+    }
+
+    setSku(resolution.scanned);
+  }
+
+  function handleMarried(item: CatalogItem) {
+    const next = [
+      item,
+      ...catalog.filter((c) => c.id !== item.id && c.sku !== item.sku),
+    ].sort((a, b) => a.sku.localeCompare(b.sku));
+    onCatalogChange(next);
+    applyCatalogItem(item);
+    setMarryBarcode(null);
+    flashStatus(`Barcode linked to ${item.sku}`);
+  }
+
   function resetForm() {
     setSku("");
     setCarpetName("");
+    setRollWidth(null);
     setNameFromCatalog(false);
     setLocation("sales_floor");
     setWholeInches("");
@@ -189,11 +247,15 @@ export function CycleAuditSection({ catalog, onCatalogChange }: Props) {
       sku: sku.trim(),
       carpet_name: carpetName.trim(),
       vendor: "",
-      roll_width_ft: 12,
+      roll_width_ft: rollWidth ?? 12,
+      upc_barcode: null,
     });
     const next = await fetchCatalog();
-    onCatalogChange(next.length ? next : [record, ...catalog.filter((c) => c.sku !== record.sku)]);
+    onCatalogChange(
+      next.length ? next : [record, ...catalog.filter((c) => c.sku !== record.sku)]
+    );
     setNameFromCatalog(true);
+    setRollWidth(record.roll_width_ft);
     flashStatus(offline ? "Catalog saved offline" : "Saved to catalog");
   }
 
@@ -243,6 +305,14 @@ export function CycleAuditSection({ catalog, onCatalogChange }: Props) {
 
   return (
     <div className="space-y-4">
+      <MarryBarcodeModal
+        open={marryBarcode != null}
+        scannedBarcode={marryBarcode ?? ""}
+        catalog={catalog}
+        onClose={() => setMarryBarcode(null)}
+        onLinked={handleMarried}
+      />
+
       <section aria-label="Shift summary" className={cardClass}>
         <div className="grid grid-cols-3 gap-2">
           <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-3">
@@ -321,8 +391,10 @@ export function CycleAuditSection({ catalog, onCatalogChange }: Props) {
           label="Item # / SKU"
           mode="digits"
           value={sku}
-          onChange={setSku}
-          placeholder="Scan or type item #"
+          onChange={handleSkuChange}
+          onScanCommit={handleScanCommit}
+          flash={scanFlash}
+          placeholder="Scan barcode or type item #"
           leftIcon={<BarcodeIcon className="h-5 w-5" />}
         />
 
@@ -336,8 +408,19 @@ export function CycleAuditSection({ catalog, onCatalogChange }: Props) {
             }}
             placeholder="e.g. Stainmaster Hearthstone 12ft"
           />
+          {rollWidth != null && (
+            <p className="rounded-lg border border-slate-800 bg-slate-950/70 px-3 py-2 text-sm text-slate-300">
+              Roll width:{" "}
+              <span className="font-mono font-semibold text-emerald-400">
+                {rollWidth} ft
+              </span>
+            </p>
+          )}
           {catalogMatch ? (
-            <p className="text-xs text-emerald-400">Matched from catalog</p>
+            <p className="text-xs text-emerald-400">
+              Matched from catalog
+              {catalogMatch.upc_barcode ? " · barcode linked" : ""}
+            </p>
           ) : sku.trim() && carpetName.trim() ? (
             <button
               type="button"

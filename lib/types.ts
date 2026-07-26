@@ -26,6 +26,8 @@ export type CatalogItem = {
   carpet_name: string;
   vendor: string;
   roll_width_ft: number;
+  /** Vendor / handheld UPC linked to this Lowe's Item #. */
+  upc_barcode: string | null;
   created_at: string;
   updated_at: string;
   offline?: boolean;
