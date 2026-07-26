@@ -7,6 +7,7 @@ export type SpecialistRole = "Associate" | "Supervisor";
 /** Flooring / SIMS catalog categories. */
 export const FLOORING_CATEGORIES = [
   "Carpet",
+  "Sheet Vinyl",
   "Vinyl Plank",
   "Tile & Stone",
   "Hardwood",
@@ -18,9 +19,12 @@ export type FlooringCategory = (typeof FLOORING_CATEGORIES)[number];
 
 export type AuditMode = "roll" | "carton";
 
-/** Carpet & vinyl roll goods use CLF measurement; everything else uses unit/carton counts. */
+/** Standard roll widths for Carpet & Sheet Vinyl. */
+export const ROLL_WIDTH_OPTIONS_FT = [6, 12] as const;
+
+/** Carpet & Sheet Vinyl (resilient roll) use CLF measurement; everything else uses unit/carton counts. */
 export function isRollGoodsCategory(category: FlooringCategory | string): boolean {
-  return category === "Carpet";
+  return category === "Carpet" || category === "Sheet Vinyl";
 }
 
 export function auditModeForCategory(
@@ -30,7 +34,14 @@ export function auditModeForCategory(
 }
 
 export function normalizeCategory(raw: unknown): FlooringCategory {
-  const value = String(raw ?? "Carpet");
+  const value = String(raw ?? "Carpet").trim();
+  // Accept longer display aliases from older notes / imports
+  if (
+    /^sheet\s*vinyl/i.test(value) ||
+    /resilient\s*roll/i.test(value)
+  ) {
+    return "Sheet Vinyl";
+  }
   return (FLOORING_CATEGORIES as readonly string[]).includes(value)
     ? (value as FlooringCategory)
     : "Carpet";

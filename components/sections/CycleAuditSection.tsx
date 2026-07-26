@@ -46,6 +46,7 @@ import {
 } from "@/lib/storage";
 import {
   FLOORING_CATEGORIES,
+  ROLL_WIDTH_OPTIONS_FT,
   auditModeForCategory,
   normalizeCategory,
   type CarpetAudit,
@@ -648,9 +649,13 @@ export function CycleAuditSection({
             <span className="text-sm font-medium text-slate-200">Category</span>
             <select
               value={category}
-              onChange={(e) =>
-                setCategory(normalizeCategory(e.target.value))
-              }
+              onChange={(e) => {
+                const next = normalizeCategory(e.target.value);
+                setCategory(next);
+                if (auditModeForCategory(next) === "roll") {
+                  setRollWidth((w) => w ?? 12);
+                }
+              }}
               className="min-h-12 w-full rounded-xl border border-slate-800 bg-slate-950 px-3 text-base text-slate-100"
             >
               {FLOORING_CATEGORIES.map((c) => (
@@ -666,15 +671,35 @@ export function CycleAuditSection({
             onChange={setSimsLocation}
             placeholder="e.g. Aisle 14 - Bay 012"
           />
-          {auditMode === "roll" && rollWidth != null && (
-            <p className="rounded-lg border border-slate-800 bg-slate-950/70 px-3 py-2 text-sm text-slate-300">
-              Roll width:{" "}
-              <span className="font-mono font-semibold text-emerald-400">
-                {rollWidth} ft
-              </span>
-            </p>
-          )}
-          {catalogMatch ? (
+          {auditMode === "roll" ? (
+            <fieldset>
+              <legend className="mb-1.5 text-sm font-medium text-slate-200">
+                Roll Width
+              </legend>
+              <div
+                role="group"
+                className="grid grid-cols-2 gap-1 rounded-xl border border-slate-800 bg-slate-950 p-1"
+              >
+                {ROLL_WIDTH_OPTIONS_FT.map((ft) => {
+                  const active = (rollWidth ?? 12) === ft;
+                  return (
+                    <button
+                      key={ft}
+                      type="button"
+                      onClick={() => setRollWidth(ft)}
+                      className={`flex min-h-12 items-center justify-center rounded-lg font-mono text-sm font-semibold transition ${
+                        active
+                          ? "bg-emerald-500 text-slate-950 shadow"
+                          : "text-slate-400 hover:text-slate-100"
+                      }`}
+                    >
+                      {ft} ft
+                    </button>
+                  );
+                })}
+              </div>
+            </fieldset>
+          ) : null}          {catalogMatch ? (
             <p className="text-xs text-emerald-400">
               Matched from SIMS catalog
               {catalogMatch.upc_barcode ? " · barcode linked" : ""}

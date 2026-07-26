@@ -1,5 +1,14 @@
 # Carpet Hub — Development Journal
 
+## 2026-07-26 — Sheet Vinyl as Mode A roll goods
+
+### Shipped
+- Added `Sheet Vinyl` to `FLOORING_CATEGORIES`; `isRollGoodsCategory` treats Carpet + Sheet Vinyl as Mode A.
+- 6ft / 12ft roll-width pickers on Audit, Quick-Add, Catalog, and Remnant forms.
+- Remnant Rack form now includes Category dropdown (catalog auto-fill).
+
+---
+
 ## 2026-07-26 — Universal Flooring & SIMS Audit Hub
 
 ### Shipped

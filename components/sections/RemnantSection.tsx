@@ -14,7 +14,19 @@ import { clearanceBadgeLabel } from "@/lib/markdown";
 import { toNumber } from "@/lib/number-input";
 import { deleteRemnant, saveRemnant } from "@/lib/remnants";
 import { isSupervisor } from "@/lib/specialists";
-import type { CatalogItem, Remnant, RemnantStatus, StoreSpecialist } from "@/lib/types";
+import type {
+  CatalogItem,
+  FlooringCategory,
+  Remnant,
+  RemnantStatus,
+  StoreSpecialist,
+} from "@/lib/types";
+import {
+  FLOORING_CATEGORIES,
+  ROLL_WIDTH_OPTIONS_FT,
+  isRollGoodsCategory,
+  normalizeCategory,
+} from "@/lib/types";
 import { NumberField, TextField } from "@/components/ui/NumberField";
 
 const STATUS_FILTERS: { id: "all" | RemnantStatus; label: string }[] = [
@@ -59,6 +71,7 @@ export function RemnantSection({
   const [editing, setEditing] = useState<Remnant | null>(null);
   const [sku, setSku] = useState("");
   const [carpetName, setCarpetName] = useState("");
+  const [category, setCategory] = useState<FlooringCategory>("Carpet");
   const [tag, setTag] = useState("");
   const [width, setWidth] = useState("12");
   const [length, setLength] = useState("");
@@ -74,6 +87,7 @@ export function RemnantSection({
   const lengthNum = toNumber(length, 0);
   const sqFt = calculateSquareFeet(widthNum, lengthNum);
   const sqYd = calculateSquareYards(sqFt);
+  const remnantIsRoll = isRollGoodsCategory(category);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -83,6 +97,7 @@ export function RemnantSection({
       return (
         r.sku.toLowerCase().includes(q) ||
         r.carpet_name.toLowerCase().includes(q) ||
+        r.category.toLowerCase().includes(q) ||
         r.tag_number.toLowerCase().includes(q) ||
         r.location.toLowerCase().includes(q)
       );
@@ -98,6 +113,7 @@ export function RemnantSection({
     setEditing(null);
     setSku("");
     setCarpetName("");
+    setCategory("Carpet");
     setTag("");
     setWidth("12");
     setLength("");
@@ -111,6 +127,7 @@ export function RemnantSection({
     setEditing(item);
     setSku(item.sku);
     setCarpetName(item.carpet_name);
+    setCategory(normalizeCategory(item.category));
     setTag(item.tag_number);
     setWidth(String(item.width_ft));
     setLength(String(item.length_ft));
@@ -126,7 +143,13 @@ export function RemnantSection({
     const cleaned = sanitizeBarcodeScan(next);
     setSku(cleaned);
     const hit = findCatalogBySkuOrBarcode(catalog, cleaned);
-    if (hit) setCarpetName(hit.carpet_name);
+    if (hit) {
+      setCarpetName(hit.carpet_name);
+      setCategory(normalizeCategory(hit.category));
+      if (isRollGoodsCategory(hit.category)) {
+        setWidth(String(hit.roll_width_ft || 12));
+      }
+    }
   }
 
   async function handleSave() {
@@ -142,7 +165,7 @@ export function RemnantSection({
           id: editing?.id,
           sku: sku.trim(),
           carpet_name: carpetName.trim(),
-          category: editing?.category ?? "Carpet",
+          category,
           tag_number: tag.trim(),
           width_ft: widthNum,
           length_ft: lengthNum,
@@ -282,11 +305,31 @@ export function RemnantSection({
             placeholder="Item #"
           />
           <TextField
-            label="Carpet Name"
+            label="Product Name"
             value={carpetName}
             onChange={setCarpetName}
             placeholder="Auto-fills from catalog"
           />
+          <label className="block space-y-1.5">
+            <span className="text-sm font-medium text-slate-200">Category</span>
+            <select
+              value={category}
+              onChange={(e) => {
+                const next = normalizeCategory(e.target.value);
+                setCategory(next);
+                if (isRollGoodsCategory(next)) {
+                  setWidth((w) => (w === "6" || w === "12" ? w : "12"));
+                }
+              }}
+              className="min-h-12 w-full rounded-xl border border-slate-800 bg-slate-950 px-3 text-base text-slate-100"
+            >
+              {FLOORING_CATEGORIES.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+          </label>
           <TextField
             label="Tag # / Remnant ID"
             value={tag}
@@ -294,13 +337,43 @@ export function RemnantSection({
             placeholder="REM-101"
           />
           <div className="grid grid-cols-2 gap-2">
-            <NumberField
-              label="Width (ft)"
-              mode="decimal"
-              value={width}
-              onChange={setWidth}
-              placeholder="12"
-            />
+            {remnantIsRoll ? (
+              <fieldset className="space-y-1.5">
+                <legend className="text-sm font-medium text-slate-200">
+                  Width (ft)
+                </legend>
+                <div
+                  role="group"
+                  className="grid grid-cols-2 gap-1 rounded-xl border border-slate-800 bg-slate-950 p-1"
+                >
+                  {ROLL_WIDTH_OPTIONS_FT.map((ft) => {
+                    const active = widthNum === ft;
+                    return (
+                      <button
+                        key={ft}
+                        type="button"
+                        onClick={() => setWidth(String(ft))}
+                        className={`flex min-h-12 items-center justify-center rounded-lg font-mono text-sm font-semibold transition ${
+                          active
+                            ? "bg-emerald-500 text-slate-950 shadow"
+                            : "text-slate-400 hover:text-slate-100"
+                        }`}
+                      >
+                        {ft}
+                      </button>
+                    );
+                  })}
+                </div>
+              </fieldset>
+            ) : (
+              <NumberField
+                label="Width (ft)"
+                mode="decimal"
+                value={width}
+                onChange={setWidth}
+                placeholder="12"
+              />
+            )}
             <NumberField
               label="Length (ft)"
               mode="decimal"

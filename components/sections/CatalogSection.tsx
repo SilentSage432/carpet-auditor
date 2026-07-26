@@ -19,6 +19,7 @@ import { playSuccessChime } from "@/lib/scan-feedback";
 import { fetchAudits } from "@/lib/storage";
 import {
   FLOORING_CATEGORIES,
+  ROLL_WIDTH_OPTIONS_FT,
   auditModeForCategory,
   normalizeCategory,
   type CarpetAudit,
@@ -257,9 +258,13 @@ export function CatalogSection({ catalog, onCatalogChange }: Props) {
             <span className="text-sm font-medium text-slate-200">Category</span>
             <select
               value={category}
-              onChange={(e) =>
-                setCategory(normalizeCategory(e.target.value))
-              }
+              onChange={(e) => {
+                const next = normalizeCategory(e.target.value);
+                setCategory(next);
+                if (auditModeForCategory(next) === "roll") {
+                  setWidth((w) => (w === "6" || w === "12" ? w : "12"));
+                }
+              }}
               className="min-h-12 w-full rounded-xl border border-slate-800 bg-slate-950 px-3 text-base text-slate-100"
             >
               {FLOORING_CATEGORIES.map((c) => (
@@ -282,13 +287,33 @@ export function CatalogSection({ catalog, onCatalogChange }: Props) {
             placeholder="Vendor"
           />
           {formMode === "roll" ? (
-            <NumberField
-              label="Roll Width (ft)"
-              mode="decimal"
-              value={width}
-              onChange={setWidth}
-              placeholder="12"
-            />
+            <fieldset>
+              <legend className="mb-1.5 text-sm font-medium text-slate-200">
+                Roll Width
+              </legend>
+              <div
+                role="group"
+                className="grid grid-cols-2 gap-1 rounded-xl border border-slate-800 bg-slate-950 p-1"
+              >
+                {ROLL_WIDTH_OPTIONS_FT.map((ft) => {
+                  const active = toNumber(width, 12) === ft;
+                  return (
+                    <button
+                      key={ft}
+                      type="button"
+                      onClick={() => setWidth(String(ft))}
+                      className={`flex min-h-12 items-center justify-center rounded-lg font-mono text-sm font-semibold transition ${
+                        active
+                          ? "bg-emerald-500 text-slate-950 shadow"
+                          : "text-slate-400 hover:text-slate-100"
+                      }`}
+                    >
+                      {ft} ft
+                    </button>
+                  );
+                })}
+              </div>
+            </fieldset>
           ) : (
             <NumberField
               label="Sq Ft Coverage per Box"

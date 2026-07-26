@@ -8,6 +8,7 @@ import { toNumber } from "@/lib/number-input";
 import { playSuccessChime } from "@/lib/scan-feedback";
 import {
   FLOORING_CATEGORIES,
+  ROLL_WIDTH_OPTIONS_FT,
   auditModeForCategory,
   type CatalogItem,
   type FlooringCategory,
@@ -144,17 +145,43 @@ export function QuickAddCatalogModal({
             onChange={setSimsLocation}
             placeholder="e.g. Aisle 14 - Bay 012"
           />
-          <NumberField
-            label={
-              mode === "roll"
-                ? "Roll Width (ft)"
-                : "Sq Ft Coverage per Box"
-            }
-            mode="decimal"
-            value={specValue}
-            onChange={setSpecValue}
-            placeholder={mode === "roll" ? "12" : "e.g. 23.64"}
-          />
+          {mode === "roll" ? (
+            <fieldset>
+              <legend className="mb-1.5 text-sm font-medium text-slate-200">
+                Roll Width
+              </legend>
+              <div
+                role="group"
+                className="grid grid-cols-2 gap-1 rounded-xl border border-slate-800 bg-slate-950 p-1"
+              >
+                {ROLL_WIDTH_OPTIONS_FT.map((ft) => {
+                  const active = toNumber(specValue, 12) === ft;
+                  return (
+                    <button
+                      key={ft}
+                      type="button"
+                      onClick={() => setSpecValue(String(ft))}
+                      className={`flex min-h-12 items-center justify-center rounded-lg font-mono text-sm font-semibold transition ${
+                        active
+                          ? "bg-emerald-500 text-slate-950 shadow"
+                          : "text-slate-400 hover:text-slate-100"
+                      }`}
+                    >
+                      {ft} ft
+                    </button>
+                  );
+                })}
+              </div>
+            </fieldset>
+          ) : (
+            <NumberField
+              label="Sq Ft Coverage per Box"
+              mode="decimal"
+              value={specValue}
+              onChange={setSpecValue}
+              placeholder="e.g. 23.64"
+            />
+          )}
         </div>
 
         {error && (

@@ -9,7 +9,7 @@ Universal Flooring & SIMS Location Audit Hub — multi-category flooring goods, 
 - Unlinked barcode → `QuickAddCatalogModal` (⚡ Quick-Add to SIMS Catalog) → Save & Continue Audit
 
 ## Dual audit engine
-- Mode A (Carpet): inches × rounds × 0.2625 = CLF
+- Mode A (Carpet / Sheet Vinyl): inches × rounds × 0.2625 = CLF
 - Mode B (Vinyl Plank, Tile & Stone, Hardwood, Grout & Mortar, Accessories): cartons × sqft/box
 
 ## SIMS Location Finder

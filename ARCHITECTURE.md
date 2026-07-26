@@ -50,7 +50,7 @@ supabase/schema.sql               → Tables + multi-category + SIMS + store_num
 
 ## Dual audit modes
 
-- **Mode A (Carpet)** — inches + fraction + rounds → CLF (`× 0.2625`)
+- **Mode A (Carpet / Sheet Vinyl)** — inches + fraction + rounds → CLF (`× 0.2625`)
 - **Mode B (LVP / Tile / Grout / Accessories / Hardwood)** — box count × sq ft per box
 
 ## Offline
