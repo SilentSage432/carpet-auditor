@@ -1,6 +1,7 @@
 import { sanitizeBarcodeScan } from "./barcode";
 import { uid } from "./uid";
 import type { CatalogItem, CatalogItemInsert } from "./types";
+import { normalizeCategory } from "./types";
 import { getStoreNumber } from "./store";
 import { getSupabase } from "./supabase";
 import {
@@ -40,13 +41,25 @@ function mapRow(row: Record<string, unknown>): CatalogItem {
       ? null
       : sanitizeBarcodeScan(String(upcRaw));
 
+  const sqftRaw = row.sqft_per_box;
+  const sqftPerBox =
+    sqftRaw == null || sqftRaw === ""
+      ? null
+      : Number(sqftRaw);
+
   return {
     id: String(row.id),
     store_number: String(row.store_number ?? getStoreNumber()),
     sku: String(row.sku ?? ""),
     carpet_name: String(row.carpet_name ?? ""),
     vendor: String(row.vendor ?? ""),
+    category: normalizeCategory(row.category),
+    default_sims_location: String(
+      row.default_sims_location ?? row.sims_location ?? ""
+    ),
     roll_width_ft: Number(row.roll_width_ft ?? 12),
+    sqft_per_box:
+      sqftPerBox != null && Number.isFinite(sqftPerBox) ? sqftPerBox : null,
     upc_barcode: upc && upc.length > 0 ? upc : null,
     created_at: String(row.created_at ?? new Date().toISOString()),
     updated_at: String(row.updated_at ?? row.created_at ?? new Date().toISOString()),
@@ -113,7 +126,10 @@ function catalogPayload(record: CatalogItem) {
     sku: record.sku,
     carpet_name: record.carpet_name,
     vendor: record.vendor,
+    category: record.category,
+    default_sims_location: record.default_sims_location,
     roll_width_ft: record.roll_width_ft,
+    sqft_per_box: record.sqft_per_box,
     upc_barcode: record.upc_barcode,
     updated_at: record.updated_at,
     created_at: record.created_at,
@@ -166,7 +182,13 @@ export async function saveCatalogItem(input: CatalogItemInsert): Promise<{
     sku: input.sku.trim(),
     carpet_name: input.carpet_name.trim(),
     vendor: (input.vendor ?? "").trim(),
+    category: normalizeCategory(input.category),
+    default_sims_location: (input.default_sims_location ?? "").trim(),
     roll_width_ft: input.roll_width_ft ?? 12,
+    sqft_per_box:
+      input.sqft_per_box != null && Number.isFinite(input.sqft_per_box)
+        ? input.sqft_per_box
+        : null,
     upc_barcode: upc && upc.length > 0 ? upc : null,
     created_at: now,
     updated_at: now,
@@ -221,7 +243,10 @@ export async function clearCatalogBarcode(item: CatalogItem): Promise<{
     sku: item.sku,
     carpet_name: item.carpet_name,
     vendor: item.vendor,
+    category: item.category,
+    default_sims_location: item.default_sims_location,
     roll_width_ft: item.roll_width_ft,
+    sqft_per_box: item.sqft_per_box,
     upc_barcode: null,
   });
 }

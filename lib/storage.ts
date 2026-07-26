@@ -1,5 +1,6 @@
 import { uid } from "./uid";
 import type { CarpetAudit, CarpetAuditInsert, LocationType } from "./types";
+import { normalizeCategory } from "./types";
 import { getStoreNumber } from "./store";
 import { getSupabase } from "./supabase";
 import {
@@ -8,6 +9,7 @@ import {
 } from "./sync-queue";
 
 const STORAGE_KEY = "carpet_audits_offline";
+const DRAFT_KEY = "carpet_hub_audit_draft";
 const TABLE = "carpet_audits";
 
 function readAllLocal(): CarpetAudit[] {
@@ -55,6 +57,46 @@ export function countLocalAudits(): number {
   return forStore().length;
 }
 
+/** Mid-scan draft — survives refresh / dead-zone reloads. */
+export type AuditFormDraft = {
+  store_number: string;
+  sku: string;
+  carpetName: string;
+  category: string;
+  simsLocation: string;
+  location: LocationType;
+  wholeInches: string;
+  fraction: number;
+  rounds: string;
+  boxCount: string;
+  sqftPerBox: string;
+  systemClf: string;
+  rollWidth: number | null;
+};
+
+export function loadAuditDraft(store = getStoreNumber()): AuditFormDraft | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(DRAFT_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as AuditFormDraft;
+    if (parsed.store_number !== store) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+export function saveAuditDraft(draft: AuditFormDraft): void {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+}
+
+export function clearAuditDraft(): void {
+  if (typeof window === "undefined") return;
+  localStorage.removeItem(DRAFT_KEY);
+}
+
 function mapRow(row: Record<string, unknown>): CarpetAudit {
   const locationType = (row.location_type ?? row.location ?? "sales_floor") as LocationType;
   const fraction = Number(row.measurement_fraction ?? row.fraction ?? 0);
@@ -72,17 +114,34 @@ function mapRow(row: Record<string, unknown>): CarpetAudit {
         ? null
         : clf - systemClf
       : Number(varianceRaw);
+  const boxRaw = row.box_count ?? row.unit_count;
+  const boxCount =
+    boxRaw == null || boxRaw === ""
+      ? null
+      : Number(boxRaw);
+  const sqftRaw = row.calculated_sqft;
+  const calculatedSqft =
+    sqftRaw == null || sqftRaw === ""
+      ? null
+      : Number(sqftRaw);
 
   return {
     id: String(row.id),
     store_number: String(row.store_number ?? getStoreNumber()),
     sku: String(row.sku ?? ""),
     carpet_name: String(row.carpet_name ?? row.notes ?? ""),
+    category: normalizeCategory(row.category),
+    sims_location: String(row.sims_location ?? ""),
     location_type: locationType === "top_stock" ? "top_stock" : "sales_floor",
     measurement_inches: whole,
     measurement_fraction: fraction,
     rounds: Number(row.rounds ?? 0),
     calculated_clf: clf,
+    box_count: boxCount != null && Number.isFinite(boxCount) ? boxCount : null,
+    calculated_sqft:
+      calculatedSqft != null && Number.isFinite(calculatedSqft)
+        ? calculatedSqft
+        : null,
     system_clf: systemClf != null && Number.isFinite(systemClf) ? systemClf : null,
     variance_clf:
       varianceClf != null && Number.isFinite(varianceClf) ? varianceClf : null,
@@ -98,11 +157,15 @@ function auditPayload(record: CarpetAudit) {
     store_number: record.store_number,
     sku: record.sku,
     carpet_name: record.carpet_name,
+    category: record.category,
+    sims_location: record.sims_location,
     location_type: record.location_type,
     measurement_inches: record.measurement_inches,
     measurement_fraction: record.measurement_fraction,
     rounds: record.rounds,
     calculated_clf: record.calculated_clf,
+    box_count: record.box_count,
+    calculated_sqft: record.calculated_sqft,
     system_clf: record.system_clf,
     variance_clf: record.variance_clf,
     audited_by: record.audited_by,
@@ -151,11 +214,15 @@ export async function saveAudit(input: CarpetAuditInsert): Promise<{
     store_number: store,
     sku: input.sku,
     carpet_name: input.carpet_name,
+    category: normalizeCategory(input.category),
+    sims_location: input.sims_location ?? "",
     location_type: input.location_type,
     measurement_inches: input.measurement_inches,
     measurement_fraction: input.measurement_fraction,
     rounds: input.rounds,
     calculated_clf: input.calculated_clf,
+    box_count: input.box_count ?? null,
+    calculated_sqft: input.calculated_sqft ?? null,
     system_clf: input.system_clf ?? null,
     variance_clf: input.variance_clf ?? null,
     audited_by: input.audited_by ?? "",
@@ -223,11 +290,15 @@ export function auditsToCsv(audits: CarpetAudit[]): string {
     "created_at",
     "sku",
     "carpet_name",
+    "category",
+    "sims_location",
     "location_type",
     "measurement_inches",
     "measurement_fraction",
     "rounds",
     "calculated_clf",
+    "box_count",
+    "calculated_sqft",
     "system_clf",
     "variance_clf",
     "audited_by",
@@ -245,11 +316,15 @@ export function auditsToCsv(audits: CarpetAudit[]): string {
       a.created_at,
       a.sku,
       a.carpet_name,
+      a.category,
+      a.sims_location,
       a.location_type,
       a.measurement_inches,
       a.measurement_fraction,
       a.rounds,
       a.calculated_clf,
+      a.box_count,
+      a.calculated_sqft,
       a.system_clf,
       a.variance_clf,
       a.audited_by,

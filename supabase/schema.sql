@@ -166,6 +166,45 @@ alter table public.carpet_remnants
 alter table public.carpet_remnants
   add column if not exists markdown_at timestamptz;
 
+-- Multi-category flooring + SIMS location tags
+-- Tables keep carpet_* names; app treats them as flooring_audits / SIMS catalog.
+alter table public.carpet_catalog
+  add column if not exists category text not null default 'Carpet';
+alter table public.carpet_catalog
+  add column if not exists default_sims_location text not null default '';
+alter table public.carpet_catalog
+  add column if not exists sqft_per_box numeric(12, 4);
+
+alter table public.carpet_audits
+  add column if not exists category text not null default 'Carpet';
+alter table public.carpet_audits
+  add column if not exists sims_location text not null default '';
+alter table public.carpet_audits
+  add column if not exists box_count numeric(12, 3);
+alter table public.carpet_audits
+  add column if not exists calculated_sqft numeric(12, 4);
+
+-- Allow rounds = 0 for carton / unit audits (roll goods still use rounds > 0 in app)
+alter table public.carpet_audits
+  drop constraint if exists carpet_audits_rounds_check;
+
+alter table public.carpet_audits
+  add constraint carpet_audits_rounds_check check (rounds >= 0);
+
+alter table public.carpet_remnants
+  add column if not exists category text not null default 'Carpet';
+
+create index if not exists carpet_catalog_category_idx
+  on public.carpet_catalog (category);
+create index if not exists carpet_catalog_sims_location_idx
+  on public.carpet_catalog (default_sims_location);
+create index if not exists carpet_audits_sims_location_idx
+  on public.carpet_audits (sims_location);
+create index if not exists carpet_audits_category_idx
+  on public.carpet_audits (category);
+create index if not exists carpet_audits_sku_idx
+  on public.carpet_audits (sku);
+
 -- Seed supervisor for default store if missing
 insert into public.store_specialists (name, role, pin_code, store_number)
 select 'Department Supervisor', 'Supervisor', '1234', '1234'

@@ -2,10 +2,10 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Carpet Hub — Flooring Dept",
-    short_name: "Carpet Hub",
+    name: "Flooring Hub — SIMS Audit",
+    short_name: "Flooring Hub",
     description:
-      "Flooring department cycle audits, catalog, and remnant rack inventory.",
+      "Universal flooring & SIMS location audits, catalog building, and remnant rack.",
     start_url: "/",
     display: "standalone",
     background_color: "#022c22",

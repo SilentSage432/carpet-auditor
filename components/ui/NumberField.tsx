@@ -5,6 +5,7 @@ import {
   useRef,
   type KeyboardEvent,
   type ReactNode,
+  type Ref,
 } from "react";
 import {
   SCANNER_INTER_KEY_MS,
@@ -37,6 +38,8 @@ type NumberFieldProps = {
   center?: boolean;
   leftIcon?: ReactNode;
   onBlur?: () => void;
+  inputRef?: Ref<HTMLInputElement>;
+  autoFocus?: boolean;
 } & ScanCapableProps;
 
 const baseInput =
@@ -87,6 +90,8 @@ export function NumberField({
   onScanCommit,
   flash,
   onBlur,
+  inputRef,
+  autoFocus,
 }: NumberFieldProps) {
   const { onKeyDown } = useScannerKeyTracking(onScanCommit);
 
@@ -103,10 +108,12 @@ export function NumberField({
         </span>
       ) : null}
       <input
+        ref={inputRef}
         type="text"
         inputMode={inputMode ?? (mode === "decimal" ? "decimal" : "numeric")}
         pattern={mode === "decimal" ? "[0-9]*[.]?[0-9]*" : "[0-9]*"}
         autoComplete="off"
+        autoFocus={autoFocus}
         placeholder={placeholder}
         aria-label={ariaLabel ?? label}
         value={value}

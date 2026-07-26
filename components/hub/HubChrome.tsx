@@ -31,11 +31,11 @@ export function HubHeader({
       <div className="mx-auto flex min-h-14 max-w-md items-center gap-2 px-3 py-1.5">
         <div className="min-w-0 flex-1">
           <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-emerald-400">
-            Carpet Hub
+            Flooring Hub
             {storeNumber ? ` · ${formatStoreLabel(storeNumber)}` : ""}
           </p>
           <h1 className="truncate text-base font-bold text-slate-50">
-            {meta?.title ?? "Carpet Hub"}
+            {meta?.title ?? "Flooring & SIMS Hub"}
           </h1>
           <p
             className={`mt-0.5 flex items-center gap-1.5 truncate text-[10px] font-semibold ${

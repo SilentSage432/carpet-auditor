@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { MarryBarcodeModal } from "@/components/barcode/MarryBarcodeModal";
+import { useEffect, useMemo, useState } from "react";
+import { QuickAddCatalogModal } from "@/components/barcode/QuickAddCatalogModal";
+import { SimsLocationFinder } from "@/components/catalog/SimsLocationFinder";
 import { NumberField, TextField } from "@/components/ui/NumberField";
 import {
   findCatalogBySkuOrBarcode,
@@ -15,7 +16,15 @@ import {
 } from "@/lib/catalog";
 import { toNumber } from "@/lib/number-input";
 import { playSuccessChime } from "@/lib/scan-feedback";
-import type { CatalogItem } from "@/lib/types";
+import { fetchAudits } from "@/lib/storage";
+import {
+  FLOORING_CATEGORIES,
+  auditModeForCategory,
+  normalizeCategory,
+  type CarpetAudit,
+  type CatalogItem,
+  type FlooringCategory,
+} from "@/lib/types";
 
 type Props = {
   catalog: CatalogItem[];
@@ -29,12 +38,19 @@ export function CatalogSection({ catalog, onCatalogChange }: Props) {
   const [sku, setSku] = useState("");
   const [name, setName] = useState("");
   const [vendor, setVendor] = useState("");
+  const [category, setCategory] = useState<FlooringCategory>("Carpet");
+  const [simsLocation, setSimsLocation] = useState("");
   const [width, setWidth] = useState("12");
+  const [sqftPerBox, setSqftPerBox] = useState("");
   const [upc, setUpc] = useState("");
   const [status, setStatus] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [scanFlash, setScanFlash] = useState(false);
-  const [marryBarcode, setMarryBarcode] = useState<string | null>(null);
+  const [quickAddBarcode, setQuickAddBarcode] = useState<string | null>(null);
+  const [finderOpen, setFinderOpen] = useState(false);
+  const [audits, setAudits] = useState<CarpetAudit[]>([]);
+
+  const formMode = auditModeForCategory(category);
 
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -44,7 +60,9 @@ export function CatalogSection({ catalog, onCatalogChange }: Props) {
       if (
         item.sku.toLowerCase().includes(q) ||
         item.carpet_name.toLowerCase().includes(q) ||
-        item.vendor.toLowerCase().includes(q)
+        item.vendor.toLowerCase().includes(q) ||
+        item.category.toLowerCase().includes(q) ||
+        item.default_sims_location.toLowerCase().includes(q)
       ) {
         return true;
       }
@@ -56,6 +74,16 @@ export function CatalogSection({ catalog, onCatalogChange }: Props) {
       );
     });
   }, [catalog, query]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void fetchAudits().then((rows) => {
+      if (!cancelled) setAudits(rows);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   function flash(msg: string) {
     setStatus(msg);
@@ -74,7 +102,10 @@ export function CatalogSection({ catalog, onCatalogChange }: Props) {
     setSku("");
     setName("");
     setVendor("");
+    setCategory("Carpet");
+    setSimsLocation("");
     setWidth("12");
+    setSqftPerBox("");
     setUpc("");
     setShowForm(true);
   }
@@ -84,7 +115,10 @@ export function CatalogSection({ catalog, onCatalogChange }: Props) {
     setSku(item.sku);
     setName(item.carpet_name);
     setVendor(item.vendor);
+    setCategory(normalizeCategory(item.category));
+    setSimsLocation(item.default_sims_location);
     setWidth(String(item.roll_width_ft));
+    setSqftPerBox(item.sqft_per_box != null ? String(item.sqft_per_box) : "");
     setUpc(item.upc_barcode ?? "");
     setShowForm(true);
   }
@@ -101,7 +135,7 @@ export function CatalogSection({ catalog, onCatalogChange }: Props) {
     }
     if (resolution.kind === "unlinked_barcode") {
       setQuery(resolution.scanned);
-      setMarryBarcode(resolution.scanned);
+      setQuickAddBarcode(resolution.scanned);
       return;
     }
     if (resolution.kind === "unknown_sku") {
@@ -113,12 +147,17 @@ export function CatalogSection({ catalog, onCatalogChange }: Props) {
     if (!sku.trim() || !name.trim()) return;
     setSaving(true);
     try {
+      const sqft = toNumber(sqftPerBox, 0);
       const { record, offline } = await saveCatalogItem({
         id: editing?.id,
         sku: sku.trim(),
         carpet_name: name.trim(),
         vendor: vendor.trim(),
+        category,
+        default_sims_location: simsLocation.trim(),
         roll_width_ft: toNumber(width, 12),
+        sqft_per_box:
+          formMode === "carton" && sqft > 0 ? sqft : null,
         upc_barcode: upc.trim() ? sanitizeBarcodeScan(upc) : null,
       });
       onCatalogChange(upsertLocalList(record));
@@ -141,22 +180,35 @@ export function CatalogSection({ catalog, onCatalogChange }: Props) {
     flash(offline ? "Barcode cleared offline" : "Barcode unlinked");
   }
 
-  function handleMarried(item: CatalogItem) {
+  function handleQuickAdded(item: CatalogItem) {
     onCatalogChange(upsertLocalList(item));
-    setMarryBarcode(null);
+    setQuickAddBarcode(null);
     setQuery(item.sku);
-    flash(`Barcode linked to ${item.sku}`);
+    flash(`Added ${item.sku} to SIMS catalog`);
   }
 
   return (
     <div className="space-y-4">
-      <MarryBarcodeModal
-        open={marryBarcode != null}
-        scannedBarcode={marryBarcode ?? ""}
-        catalog={catalog}
-        onClose={() => setMarryBarcode(null)}
-        onLinked={handleMarried}
+      <QuickAddCatalogModal
+        open={quickAddBarcode != null}
+        scannedBarcode={quickAddBarcode ?? ""}
+        onClose={() => setQuickAddBarcode(null)}
+        onSaved={handleQuickAdded}
       />
+      <SimsLocationFinder
+        open={finderOpen}
+        onClose={() => setFinderOpen(false)}
+        catalog={catalog}
+        audits={audits}
+      />
+
+      <button
+        type="button"
+        onClick={() => setFinderOpen(true)}
+        className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-emerald-500/40 bg-emerald-950/40 text-sm font-semibold text-emerald-300"
+      >
+        📍 SIMS Location Finder
+      </button>
 
       <div className="flex gap-2">
         <TextField
@@ -165,7 +217,7 @@ export function CatalogSection({ catalog, onCatalogChange }: Props) {
           onChange={setQuery}
           onScanCommit={handleSearchScan}
           flash={scanFlash}
-          placeholder="Search SKU, barcode, name…"
+          placeholder="Search SKU, barcode, SIMS tag…"
           aria-label="Search catalog"
         />
         <button
@@ -186,14 +238,42 @@ export function CatalogSection({ catalog, onCatalogChange }: Props) {
       {showForm && (
         <div className="space-y-3 rounded-2xl border border-slate-800 bg-slate-900/90 p-4">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-400">
-            {editing ? "Edit wall SKU" : "Add wall SKU"}
+            {editing ? "Edit SIMS SKU" : "Add SIMS SKU"}
           </h2>
-          <NumberField label="SKU" mode="digits" value={sku} onChange={setSku} placeholder="Item #" />
+          <NumberField
+            label="SKU"
+            mode="digits"
+            value={sku}
+            onChange={setSku}
+            placeholder="Item #"
+          />
           <TextField
-            label="Carpet Name"
+            label="Product Name"
             value={name}
             onChange={setName}
             placeholder="Style name"
+          />
+          <label className="block space-y-1.5">
+            <span className="text-sm font-medium text-slate-200">Category</span>
+            <select
+              value={category}
+              onChange={(e) =>
+                setCategory(normalizeCategory(e.target.value))
+              }
+              className="min-h-12 w-full rounded-xl border border-slate-800 bg-slate-950 px-3 text-base text-slate-100"
+            >
+              {FLOORING_CATEGORIES.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
+          </label>
+          <TextField
+            label="Default SIMS Location"
+            value={simsLocation}
+            onChange={setSimsLocation}
+            placeholder="e.g. Top Stock Bay 003"
           />
           <TextField
             label="Vendor (optional)"
@@ -201,13 +281,23 @@ export function CatalogSection({ catalog, onCatalogChange }: Props) {
             onChange={setVendor}
             placeholder="Vendor"
           />
-          <NumberField
-            label="Roll Width (ft)"
-            mode="decimal"
-            value={width}
-            onChange={setWidth}
-            placeholder="12"
-          />
+          {formMode === "roll" ? (
+            <NumberField
+              label="Roll Width (ft)"
+              mode="decimal"
+              value={width}
+              onChange={setWidth}
+              placeholder="12"
+            />
+          ) : (
+            <NumberField
+              label="Sq Ft Coverage per Box"
+              mode="decimal"
+              value={sqftPerBox}
+              onChange={setSqftPerBox}
+              placeholder="e.g. 23.64"
+            />
+          )}
           <NumberField
             label="UPC / Vendor Barcode (optional)"
             mode="digits"
@@ -238,7 +328,7 @@ export function CatalogSection({ catalog, onCatalogChange }: Props) {
       {filtered.length === 0 ? (
         <p className="rounded-2xl border border-dashed border-slate-700 bg-slate-900/60 px-4 py-8 text-center text-sm text-slate-400">
           {catalog.length === 0
-            ? "No wall SKUs yet. Tap + Add to build your catalog."
+            ? "No SIMS SKUs yet. Scan a barcode or tap + Add."
             : "No matches for that search."}
         </p>
       ) : (
@@ -253,17 +343,32 @@ export function CatalogSection({ catalog, onCatalogChange }: Props) {
                   <p className="font-mono text-base font-bold text-slate-50">
                     SKU {item.sku}
                   </p>
+                  <span className="rounded bg-slate-700/50 px-2 py-0.5 text-[10px] font-bold uppercase text-slate-300">
+                    {item.category}
+                  </span>
                   {item.upc_barcode ? (
                     <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-300">
                       🏷️ Barcode Linked
                     </span>
                   ) : null}
                 </div>
-                <p className="truncate text-sm text-slate-200">{item.carpet_name}</p>
+                <p className="truncate text-sm text-slate-200">
+                  {item.carpet_name}
+                </p>
                 <p className="mt-1 text-xs text-slate-500">
-                  {item.vendor || "No vendor"} · {item.roll_width_ft} ft
+                  {item.vendor || "No vendor"}
+                  {auditModeForCategory(item.category) === "roll"
+                    ? ` · ${item.roll_width_ft} ft`
+                    : item.sqft_per_box != null
+                      ? ` · ${item.sqft_per_box} sq ft/box`
+                      : ""}
                   {item.offline ? " · Offline" : ""}
                 </p>
+                {item.default_sims_location ? (
+                  <p className="mt-1 font-mono text-xs text-emerald-400/90">
+                    📍 {item.default_sims_location}
+                  </p>
+                ) : null}
                 {item.upc_barcode ? (
                   <p className="mt-1 font-mono text-xs text-emerald-400/90">
                     UPC {item.upc_barcode}
@@ -304,7 +409,10 @@ export function CatalogSection({ catalog, onCatalogChange }: Props) {
                       if (!code) return;
                       const cleaned = sanitizeBarcodeScan(code);
                       if (!cleaned) return;
-                      const existing = findCatalogBySkuOrBarcode(catalog, cleaned);
+                      const existing = findCatalogBySkuOrBarcode(
+                        catalog,
+                        cleaned
+                      );
                       if (existing && existing.id !== item.id) {
                         flash(`Barcode already on SKU ${existing.sku}`);
                         return;
@@ -314,7 +422,10 @@ export function CatalogSection({ catalog, onCatalogChange }: Props) {
                         sku: item.sku,
                         carpet_name: item.carpet_name,
                         vendor: item.vendor,
+                        category: item.category,
+                        default_sims_location: item.default_sims_location,
                         roll_width_ft: item.roll_width_ft,
+                        sqft_per_box: item.sqft_per_box,
                         upc_barcode: cleaned,
                       }).then(({ record }) => {
                         onCatalogChange(upsertLocalList(record));

@@ -54,3 +54,23 @@ export function calculateSquareYards(squareFeet: number): number {
 export function formatSqYd(sqYd: number): string {
   return sqYd.toFixed(2);
 }
+
+/** Carton / unit goods: Total SqFt = cartons × coverage per box. */
+export function calculateCartonSqFt(
+  boxCount: number,
+  sqFtPerBox: number
+): number {
+  return boxCount * sqFtPerBox;
+}
+
+export function formatSqFt(sqFt: number): string {
+  return sqFt.toFixed(2);
+}
+
+export function formatCartonBreakdown(
+  boxCount: number,
+  sqFtPerBox: number,
+  totalSqFt: number
+): string {
+  return `${boxCount} × ${formatSqFt(sqFtPerBox)} sq ft/box = ${formatSqFt(totalSqFt)} sq ft`;
+}

@@ -1,6 +1,7 @@
 import { calculateSquareFeet, calculateSquareYards } from "./calc";
 import { uid } from "./uid";
 import type { Remnant, RemnantInsert, RemnantStatus } from "./types";
+import { normalizeCategory } from "./types";
 import { getStoreNumber } from "./store";
 import { getSupabase } from "./supabase";
 import {
@@ -50,6 +51,7 @@ function mapRow(row: Record<string, unknown>): Remnant {
     store_number: String(row.store_number ?? getStoreNumber()),
     sku: String(row.sku ?? ""),
     carpet_name: String(row.carpet_name ?? ""),
+    category: normalizeCategory(row.category),
     tag_number: String(row.tag_number ?? ""),
     width_ft: width,
     length_ft: length,
@@ -101,6 +103,7 @@ function remnantPayload(record: Remnant) {
     store_number: record.store_number,
     sku: record.sku,
     carpet_name: record.carpet_name,
+    category: record.category,
     tag_number: record.tag_number,
     width_ft: record.width_ft,
     length_ft: record.length_ft,
@@ -165,6 +168,7 @@ function buildRemnant(input: RemnantInsert, existing?: Remnant): Remnant {
     store_number: store,
     sku: input.sku.trim(),
     carpet_name: input.carpet_name.trim(),
+    category: normalizeCategory(input.category ?? existing?.category),
     tag_number: input.tag_number.trim(),
     width_ft: width,
     length_ft: length,

@@ -16,13 +16,13 @@ const jetbrains = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Carpet Hub — Flooring Dept",
+  title: "Flooring Hub — SIMS Audit",
   description:
-    "Carpet Management Hub — cycle audit, catalog, and remnant rack.",
-  applicationName: "Carpet Hub",
+    "Universal Flooring & SIMS Location Audit Hub — cycle audit, catalog, and remnant rack.",
+  applicationName: "Flooring Hub",
   appleWebApp: {
     capable: true,
-    title: "Carpet Hub",
+    title: "Flooring Hub",
     statusBarStyle: "black-translucent",
   },
   formatDetection: {

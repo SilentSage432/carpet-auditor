@@ -142,6 +142,7 @@ export function RemnantSection({
           id: editing?.id,
           sku: sku.trim(),
           carpet_name: carpetName.trim(),
+          category: editing?.category ?? "Carpet",
           tag_number: tag.trim(),
           width_ft: widthNum,
           length_ft: lengthNum,

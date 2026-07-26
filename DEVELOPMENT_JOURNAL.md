@@ -1,5 +1,26 @@
 # Carpet Hub — Development Journal
 
+## 2026-07-26 — Universal Flooring & SIMS Audit Hub
+
+### Shipped
+- Multi-category schema/types: `category`, `sims_location` / `default_sims_location`, `box_count`, `calculated_sqft`, `sqft_per_box` on `carpet_*` tables (flooring_audits alias).
+- Scan-to-Catalog: match auto-fills + chime + focus measure/count; unlinked UPC opens ⚡ Quick-Add modal → writes `carpet_catalog` and continues audit.
+- Dual audit engine: Mode A Carpet CLF; Mode B carton/unit sq ft (`cartons × sqft_per_box`).
+- SIMS Location Finder drawer in Catalog (`lib/sims.ts` aggregates audits + catalog defaults).
+- Mid-scan draft (`carpet_hub_audit_draft`) + existing offline sync queue for dead zones.
+- Hub copy / PWA manifest → Flooring Hub — SIMS Audit.
+
+### Ownership
+| Concern | Owner |
+|---|---|
+| Categories / audit mode | `lib/types.ts` |
+| Carton math | `lib/calc.ts` |
+| Quick-Add | `QuickAddCatalogModal` |
+| SIMS locations | `lib/sims.ts`, `SimsLocationFinder` |
+| Audit draft | `lib/storage.ts` |
+
+---
+
 ## 2026-07-25 — Never query Supabase with fallback profile IDs
 
 ### Shipped

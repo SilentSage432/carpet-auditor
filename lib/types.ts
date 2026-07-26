@@ -4,6 +4,38 @@ export type HubSection = "audit" | "catalog" | "remnants" | "settings";
 
 export type SpecialistRole = "Associate" | "Supervisor";
 
+/** Flooring / SIMS catalog categories. */
+export const FLOORING_CATEGORIES = [
+  "Carpet",
+  "Vinyl Plank",
+  "Tile & Stone",
+  "Hardwood",
+  "Grout & Mortar",
+  "Accessories",
+] as const;
+
+export type FlooringCategory = (typeof FLOORING_CATEGORIES)[number];
+
+export type AuditMode = "roll" | "carton";
+
+/** Carpet & vinyl roll goods use CLF measurement; everything else uses unit/carton counts. */
+export function isRollGoodsCategory(category: FlooringCategory | string): boolean {
+  return category === "Carpet";
+}
+
+export function auditModeForCategory(
+  category: FlooringCategory | string | null | undefined
+): AuditMode {
+  return isRollGoodsCategory(category ?? "Carpet") ? "roll" : "carton";
+}
+
+export function normalizeCategory(raw: unknown): FlooringCategory {
+  const value = String(raw ?? "Carpet");
+  return (FLOORING_CATEGORIES as readonly string[]).includes(value)
+    ? (value as FlooringCategory)
+    : "Carpet";
+}
+
 export type StoreSpecialist = {
   id: string;
   store_number: string;
@@ -15,16 +47,24 @@ export type StoreSpecialist = {
   offline?: boolean;
 };
 
+/** Alias: flooring_audits — physical cycle counts (rolls + cartons). */
 export type CarpetAudit = {
   id: string;
   store_number: string;
   sku: string;
   carpet_name: string;
+  category: FlooringCategory;
+  /** SIMS bay / aisle tag, e.g. "Aisle 14 - Bay 012". */
+  sims_location: string;
   location_type: LocationType;
   measurement_inches: number;
   measurement_fraction: number;
   rounds: number;
   calculated_clf: number;
+  /** Carton / bag / unit count for non-roll goods. */
+  box_count: number | null;
+  /** Total coverage: cartons × sqft_per_box (or linear ft when applicable). */
+  calculated_sqft: number | null;
   /** Optional system/on-hand CLF from Lowe's inventory. */
   system_clf: number | null;
   /** Physical CLF − System CLF when system_clf is set. */
@@ -34,7 +74,13 @@ export type CarpetAudit = {
   offline?: boolean;
 };
 
-export type CarpetAuditInsert = Omit<CarpetAudit, "id" | "created_at" | "offline" | "store_number"> & {
+/** Contextual alias for multi-category flooring audits. */
+export type FlooringAudit = CarpetAudit;
+
+export type CarpetAuditInsert = Omit<
+  CarpetAudit,
+  "id" | "created_at" | "offline" | "store_number"
+> & {
   id?: string;
   created_at?: string;
   store_number?: string;
@@ -46,7 +92,12 @@ export type CatalogItem = {
   sku: string;
   carpet_name: string;
   vendor: string;
+  category: FlooringCategory;
+  /** Default SIMS location tag for this SKU. */
+  default_sims_location: string;
   roll_width_ft: number;
+  /** Sq ft (or linear ft) coverage per carton / bag. */
+  sqft_per_box: number | null;
   /** Vendor / handheld UPC linked to this Lowe's Item #. */
   upc_barcode: string | null;
   created_at: string;
@@ -69,6 +120,7 @@ export type Remnant = {
   store_number: string;
   sku: string;
   carpet_name: string;
+  category: FlooringCategory;
   tag_number: string;
   width_ft: number;
   length_ft: number;
@@ -117,16 +169,16 @@ export const HUB_SECTIONS: {
   {
     id: "audit",
     label: "Cycle Audit",
-    title: "Cycle Audit",
+    title: "Flooring Cycle Audit",
     icon: "📊",
-    description: "Carpet roll auditor with CLF formula",
+    description: "Roll CLF + carton / SIMS location audits",
   },
   {
     id: "catalog",
-    label: "Carpet Catalog",
-    title: "Carpet Catalog",
+    label: "SIMS Catalog",
+    title: "SIMS Catalog",
     icon: "🏷️",
-    description: "Master wall SKUs and name lookup",
+    description: "Master SKUs, barcodes & location tags",
   },
   {
     id: "remnants",

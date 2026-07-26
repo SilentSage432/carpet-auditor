@@ -63,7 +63,10 @@ export function MarryBarcodeModal({
         sku: item.sku,
         carpet_name: item.carpet_name,
         vendor: item.vendor,
+        category: item.category,
+        default_sims_location: item.default_sims_location,
         roll_width_ft: item.roll_width_ft,
+        sqft_per_box: item.sqft_per_box,
         upc_barcode: cleaned,
       });
       playSuccessChime();
@@ -88,7 +91,10 @@ export function MarryBarcodeModal({
         sku: sanitizeBarcodeScan(newSku) || newSku.trim(),
         carpet_name: newName.trim(),
         vendor: "",
+        category: "Carpet",
+        default_sims_location: "",
         roll_width_ft: 12,
+        sqft_per_box: null,
         upc_barcode: cleaned,
       });
       playSuccessChime();
