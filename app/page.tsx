@@ -101,6 +101,7 @@ export default function CarpetHubPage() {
             onCatalogChange={setCatalog}
             auditedBy={specialist?.name ?? ""}
             specialists={specialists}
+            activeSpecialist={specialist}
           />
         )}
         {section === "catalog" && (
@@ -118,6 +119,16 @@ export default function CarpetHubPage() {
           <SettingsSection
             catalogCount={catalog.length}
             remnantCount={remnants.length}
+            activeSpecialist={specialist}
+            onSpecialistUpdated={(member) => {
+              setSpecialist(member);
+              setActiveSpecialist(member);
+              setSpecialists((prev) =>
+                [member, ...prev.filter((p) => p.id !== member.id)].sort((a, b) =>
+                  a.name.localeCompare(b.name)
+                )
+              );
+            }}
           />
         )}
       </div>

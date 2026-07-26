@@ -1,5 +1,17 @@
 # Carpet Hub — Development Journal
 
+## 2026-07-25 — Supervisor PIN security & roster cleanup
+
+### Shipped
+- Removed Alex/Dave placeholder seeds; default roster is **Department Supervisor** (PIN `1234`) or a clean team the store registers.
+- Role badges: 🛡️ Department Supervisor / 👤 Associate.
+- PIN keypad for Supervisor (or any profile with `pin_code`); incorrect PIN shakes + stays on current user.
+- Discrepancies-only filter gated behind supervisor session or PIN unlock.
+- Settings: **Change Supervisor PIN** (verify current → set new).
+- Add Team Member: name, role, optional/required PIN.
+
+---
+
 ## 2026-07-25 — PWA, specialists, variance & remnant aging
 
 ### Shipped

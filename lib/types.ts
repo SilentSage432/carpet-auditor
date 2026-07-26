@@ -2,10 +2,14 @@ export type LocationType = "sales_floor" | "top_stock";
 
 export type HubSection = "audit" | "catalog" | "remnants" | "settings";
 
+export type SpecialistRole = "Associate" | "Supervisor";
+
 export type StoreSpecialist = {
   id: string;
   name: string;
-  role: string;
+  role: SpecialistRole;
+  /** Optional access PIN. Required for Supervisor profiles. */
+  pin_code: string | null;
   created_at: string;
   offline?: boolean;
 };

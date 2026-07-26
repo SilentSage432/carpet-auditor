@@ -3,10 +3,16 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { MarryBarcodeModal } from "@/components/barcode/MarryBarcodeModal";
 import { NumberField, TextField } from "@/components/ui/NumberField";
+import { PinKeypadModal } from "@/components/hub/PinKeypadModal";
 import {
   resolveScan,
   sanitizeBarcodeScan,
 } from "@/lib/barcode";
+import {
+  findSupervisor,
+  isSupervisor,
+  verifyPin,
+} from "@/lib/specialists";
 import {
   CLF_FACTOR,
   FRACTION_OPTIONS,
@@ -78,6 +84,7 @@ type Props = {
   onCatalogChange: (items: CatalogItem[]) => void;
   auditedBy: string;
   specialists: StoreSpecialist[];
+  activeSpecialist: StoreSpecialist | null;
 };
 
 export function CycleAuditSection({
@@ -85,6 +92,7 @@ export function CycleAuditSection({
   onCatalogChange,
   auditedBy,
   specialists,
+  activeSpecialist,
 }: Props) {
   const [sku, setSku] = useState("");
   const [carpetName, setCarpetName] = useState("");
@@ -106,6 +114,11 @@ export function CycleAuditSection({
   const [filterSpecialist, setFilterSpecialist] = useState("all");
   const [filterLocation, setFilterLocation] = useState<"all" | LocationType>("all");
   const [filterDiscrepancies, setFilterDiscrepancies] = useState(false);
+  const [discrepancyUnlocked, setDiscrepancyUnlocked] = useState(false);
+  const [pinForDiscrepancy, setPinForDiscrepancy] = useState(false);
+
+  const canViewDiscrepancies =
+    isSupervisor(activeSpecialist) || discrepancyUnlocked;
 
   const wholeNum = toNumber(wholeInches, 0);
   const roundsNum = toNumber(rounds, 0);
@@ -161,12 +174,12 @@ export function CycleAuditSection({
       if (filterLocation !== "all" && a.location_type !== filterLocation) {
         return false;
       }
-      if (filterDiscrepancies && !isDiscrepancy(a.variance_clf)) {
+      if (filterDiscrepancies && canViewDiscrepancies && !isDiscrepancy(a.variance_clf)) {
         return false;
       }
       return true;
     });
-  }, [audits, filterSpecialist, filterLocation, filterDiscrepancies]);
+  }, [audits, filterSpecialist, filterLocation, filterDiscrepancies, canViewDiscrepancies]);
 
   const visibleAudits = showAll ? filteredAudits : filteredAudits.slice(0, 5);
 
@@ -371,6 +384,21 @@ export function CycleAuditSection({
         catalog={catalog}
         onClose={() => setMarryBarcode(null)}
         onLinked={handleMarried}
+      />
+      <PinKeypadModal
+        open={pinForDiscrepancy}
+        title="Supervisor PIN required"
+        subtitle="Unlock Discrepancies Only filter"
+        verify={(pin) => {
+          const supervisor = findSupervisor(specialists);
+          return supervisor ? verifyPin(supervisor, pin) : false;
+        }}
+        onClose={() => setPinForDiscrepancy(false)}
+        onSuccess={() => {
+          setDiscrepancyUnlocked(true);
+          setFilterDiscrepancies(true);
+          setPinForDiscrepancy(false);
+        }}
       />
 
       <section aria-label="Shift summary" className={cardClass}>
@@ -705,11 +733,24 @@ export function CycleAuditSection({
           <label className="flex min-h-12 items-center gap-3 rounded-xl border border-slate-800 bg-slate-950 px-3">
             <input
               type="checkbox"
-              checked={filterDiscrepancies}
-              onChange={(e) => setFilterDiscrepancies(e.target.checked)}
+              checked={filterDiscrepancies && canViewDiscrepancies}
+              onChange={(e) => {
+                if (!canViewDiscrepancies) {
+                  setPinForDiscrepancy(true);
+                  return;
+                }
+                setFilterDiscrepancies(e.target.checked);
+              }}
               className="h-5 w-5 accent-emerald-500"
             />
-            <span className="text-sm text-slate-200">Discrepancies only</span>
+            <span className="min-w-0 text-sm text-slate-200">
+              Discrepancies only
+              {!canViewDiscrepancies ? (
+                <span className="mt-0.5 block text-xs text-amber-400">
+                  🛡️ Supervisor PIN required
+                </span>
+              ) : null}
+            </span>
           </label>
         </div>
 

@@ -38,7 +38,9 @@ export function HubHeader({
         >
           <span aria-hidden>👤</span>
           <span className="min-w-0 truncate text-xs font-semibold text-emerald-200">
-            {specialist ? `${specialist.name}` : "Select"}
+            {specialist
+              ? `${specialist.role === "Supervisor" ? "🛡️ " : "👤 "}${specialist.name}`
+              : "Select"}
           </span>
         </button>
         <button

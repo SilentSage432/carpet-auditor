@@ -78,8 +78,29 @@ create index if not exists carpet_remnants_tag_idx on public.carpet_remnants (ta
 create table if not exists public.store_specialists (
   id uuid primary key default gen_random_uuid(),
   name text not null unique,
-  role text not null default 'Specialist',
+  role text not null default 'Associate'
+    check (role in ('Associate', 'Supervisor', 'Specialist')),
+  pin_code text,
   created_at timestamptz not null default now()
+);
+
+alter table public.store_specialists
+  add column if not exists pin_code text;
+
+-- Prefer Associate/Supervisor roles going forward
+update public.store_specialists
+set role = 'Associate'
+where lower(role) in ('specialist', 'associate');
+
+-- Remove old demo placeholder names if present
+delete from public.store_specialists
+where lower(name) in ('alex', 'dave', 'sales specialist 1', 'sales specialist 2');
+
+-- Seed a single Department Supervisor (default PIN 1234) if none exists
+insert into public.store_specialists (name, role, pin_code)
+select 'Department Supervisor', 'Supervisor', '1234'
+where not exists (
+  select 1 from public.store_specialists where role = 'Supervisor'
 );
 
 -- RLS
@@ -110,8 +131,3 @@ create policy "Allow anon all carpet_remnants"
 
 create policy "Allow anon all store_specialists"
   on public.store_specialists for all to anon using (true) with check (true);
-
--- Optional seed specialists
-insert into public.store_specialists (name, role)
-values ('Alex', 'Specialist'), ('Dave', 'Specialist')
-on conflict (name) do nothing;
