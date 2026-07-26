@@ -4,8 +4,8 @@
 Universal Flooring & SIMS Location Audit Hub — multi-category flooring goods, rapid barcode scan-to-catalog, dual roll/carton audit engine, SIMS location finder, PWA offline shell + sync queue, multi-store isolation, specialist PIN, CLF/sqft variance, remnant aging, and manager markdown.
 
 ## Navigation & handheld chrome
-- Primary: fixed bottom tabs (Audit / Catalog / Remnants / Settings) — 1-tap section switch
-- Fallback: header hamburger → NavDrawer (section list + descriptions)
+- Primary: fixed bottom tabs (Audit / Catalog / Remnants / Settings) — exclusive section navigation
+- Header: Flooring Hub · store · network on the left; specialist badge + PIN gear on the right (no hamburger/drawer)
 - Cycle Audit first viewport is scan-first: collapsed shift summary bar; sticky Log & Reset docked above bottom nav
 - Audit form includes 📍 SIMS Stock → opens SimsLocationFinder without leaving Audit
 

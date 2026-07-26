@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { ChangePinModal } from "@/components/hub/ChangePinModal";
 import { DefaultPinNotice } from "@/components/hub/DefaultPinNotice";
-import { BottomNavBar, HubHeader, NavDrawer } from "@/components/hub/HubChrome";
+import { BottomNavBar, HubHeader } from "@/components/hub/HubChrome";
 import { SpecialistModal } from "@/components/hub/SpecialistModal";
 import { CatalogSection } from "@/components/sections/CatalogSection";
 import { CycleAuditSection } from "@/components/sections/CycleAuditSection";
@@ -32,7 +32,6 @@ import type {
 
 export default function CarpetHubPage() {
   const [section, setSection] = useState<HubSection>("audit");
-  const [menuOpen, setMenuOpen] = useState(false);
   const [catalog, setCatalog] = useState<CatalogItem[]>([]);
   const [remnants, setRemnants] = useState<Remnant[]>([]);
   const [specialist, setSpecialist] = useState<StoreSpecialist | null>(null);
@@ -139,11 +138,11 @@ export default function CarpetHubPage() {
 
   useEffect(() => {
     document.body.style.overflow =
-      menuOpen || specialistOpen || changePinOpen ? "hidden" : "";
+      specialistOpen || changePinOpen ? "hidden" : "";
     return () => {
       document.body.style.overflow = "";
     };
-  }, [menuOpen, specialistOpen, changePinOpen]);
+  }, [specialistOpen, changePinOpen]);
 
   function upsertSpecialist(member: StoreSpecialist) {
     setSpecialists((prev) => dedupeRoster([member, ...prev]));
@@ -177,18 +176,10 @@ export default function CarpetHubPage() {
     <div className="flex min-h-dvh flex-col">
       <HubHeader
         section={section}
-        menuOpen={menuOpen}
-        onToggleMenu={() => setMenuOpen((o) => !o)}
         specialist={specialist}
         onOpenSpecialist={() => setSpecialistOpen(true)}
         onChangePin={specialist ? () => setChangePinOpen(true) : undefined}
         storeNumber={storeNumber}
-      />
-      <NavDrawer
-        open={menuOpen}
-        active={section}
-        onClose={() => setMenuOpen(false)}
-        onSelect={setSection}
       />
       <SpecialistModal
         open={specialistOpen}

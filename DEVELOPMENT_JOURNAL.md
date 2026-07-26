@@ -1,5 +1,13 @@
 # Carpet Hub — Development Journal
 
+## 2026-07-26 — Remove redundant header hamburger / NavDrawer
+
+### Shipped
+- Section switching is bottom-nav only; removed hamburger button, `NavDrawer`, and `menuOpen` state from header / page shell.
+- Header now: Flooring Hub · store · network (left) + specialist badge · PIN gear (right).
+
+---
+
 ## 2026-07-26 — Handheld layout pass (bottom nav + scan-first audit)
 
 ### Shipped

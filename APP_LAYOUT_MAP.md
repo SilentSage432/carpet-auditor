@@ -50,9 +50,9 @@
 ```
 
 - **Default section on load:** `audit` (Cycle Audit).
-- **Primary nav:** fixed bottom tab bar (1-tap section switch). Hamburger drawer retained as fallback.
+- **Primary nav:** fixed bottom tab bar — exclusive section switcher (no header hamburger).
 - **`pb-32` / audit `pb-44`** reserves space for bottom nav (+ sticky Log bar on Audit).
-- Body scroll locks when the nav drawer, specialist modal, or change-PIN modal is open.
+- Body scroll locks when the specialist modal or change-PIN modal is open.
 
 ### A.2 Sticky header bar (`HubChrome` → `HubHeader`)
 
@@ -62,32 +62,26 @@
 | Slot (L → R) | Content | Action |
 |--------------|---------|--------|
 | Brand eyebrow | `Flooring Hub · Lowe's #{store}` | Display only (store set in Settings) |
-| Section title | Active `HUB_SECTIONS[].title` | Updates when drawer selects a section |
+| Section title | Active `HUB_SECTIONS[].title` | Updates when bottom tab selects a section |
 | Network badge | 🟢 Online / 🟠 Offline Mode · `N queued` | Live via `useNetworkBadge` |
 | Specialist chip | 🛡️/👤 + name or “Select” | Opens **SpecialistModal** |
 | ⚙️ (conditional) | Shown when a specialist is active | Opens **ChangePinModal** |
-| ☰ / ✕ | Hamburger | Toggles **NavDrawer** |
 
-### A.3 Main navigation (`BottomNavBar` + `NavDrawer`)
+### A.3 Main navigation (`BottomNavBar`)
 
 **Primary — BottomNavBar** (`HubChrome.tsx`)
 
 - Fixed `bottom-0 left-0 right-0 z-30`, `max-w-md mx-auto`, `bg-slate-900/95 backdrop-blur-md`, top border.
 - Four tabs: 📊 Audit · 🏷️ Catalog · 📦 Remnants · ⚙️ Settings.
 - Active tab: emerald glow + top indicator line.
+- Header hamburger / `NavDrawer` removed — bottom tabs are the exclusive section switcher.
 
-**Fallback — NavDrawer**
-
-- **Open:** hamburger · **Close:** backdrop, ✕, or selecting a section.
-- Fixed **right** slide-over (`w-[min(20rem,88vw)]`, z-50) with dimmed backdrop (z-40).
-- One nav card per `HUB_SECTIONS` entry (icon + label + description). Active = emerald highlight.
-
-| id | Bottom label | Drawer label | Header title | Icon |
-|----|--------------|--------------|--------------|------|
-| `audit` | Audit | Cycle Audit | Flooring Cycle Audit | 📊 |
-| `catalog` | Catalog | SIMS Catalog | SIMS Catalog | 🏷️ |
-| `remnants` | Remnants | Remnant Rack | Remnant Rack | 📦 |
-| `settings` | Settings | Settings & Sync | Settings & Sync | ⚙️ |
+| id | Bottom label | Header title | Icon |
+|----|--------------|--------------|------|
+| `audit` | Audit | Flooring Cycle Audit | 📊 |
+| `catalog` | Catalog | SIMS Catalog | 🏷️ |
+| `remnants` | Remnants | Remnant Rack | 📦 |
+| `settings` | Settings | Settings & Sync | ⚙️ |
 
 ### A.4 Page-level toasts & notices (non-modal)
 
@@ -301,8 +295,7 @@ Stacked cards (~1.5–2 handheld screens):
 
 | Component | File | Trigger | UI pattern |
 |-----------|------|---------|------------|
-| **NavDrawer** | `HubChrome.tsx` | Hamburger | Right slide-over (fallback) |
-| **BottomNavBar** | `HubChrome.tsx` | Always | Fixed bottom tabs |
+| **BottomNavBar** | `HubChrome.tsx` | Always | Fixed bottom tabs (exclusive section nav) |
 | **TextPromptModal** | `TextPromptModal.tsx` | Reserve remnant; Link barcode | Bottom sheet input |
 | **ConfirmModal** | `ConfirmModal.tsx` | Delete remnant | Confirm / cancel sheet |
 | **SpecialistModal** | `SpecialistModal.tsx` | Header chip; auto if no specialist | Bottom sheet / dialog; roster + Add Team Member |
@@ -319,8 +312,7 @@ Stacked cards (~1.5–2 handheld screens):
 
 ```
 30  BottomNavBar
-40  Header, drawer backdrop
-50  NavDrawer
+40  Header
 55  DefaultPinNotice (above bottom nav)
 56  Toasts
 60  Most modals (Specialist, Quick-Add, SIMS Finder, TextPrompt, Confirm, …)
@@ -362,7 +354,7 @@ flowchart TD
 | View | Was | Now |
 |------|-----|-----|
 | **Cycle Audit** | Summary + Log CTA below fold | Collapsed summary; sticky Log & Reset above bottom nav |
-| **Section change** | Drawer-only (2 taps) | Bottom tabs (1 tap); drawer fallback |
+| **Section change** | Drawer-only (2 taps) | Bottom tabs only (1 tap) |
 | **SIMS lookup** | Catalog-only | Audit 📍 SIMS Stock opens finder |
 | **Link barcode / Reserve** | `window.prompt` | `TextPromptModal` |
 | **Delete remnant** | `window.confirm` | `ConfirmModal` |
@@ -389,7 +381,7 @@ app/layout.tsx
 app/page.tsx
 app/manifest.ts
 app/globals.css
-components/hub/HubChrome.tsx          HubHeader + BottomNavBar + NavDrawer
+components/hub/HubChrome.tsx          HubHeader + BottomNavBar
 components/hub/SpecialistModal.tsx
 components/hub/PinKeypadModal.tsx
 components/hub/ChangePinModal.tsx

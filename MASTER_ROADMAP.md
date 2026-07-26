@@ -23,6 +23,7 @@
 - [x] Dual scan trigger (Enter + rapid burst) with SKU auto-focus
 - [x] `APP_LAYOUT_MAP.md` — current shell / views / modals / UX friction blueprint
 - [x] Handheld layout pass: bottom nav, scan-first audit, SIMS from Audit, prompt/confirm overlays
+- [x] Remove redundant header hamburger / NavDrawer (bottom tabs only)
 
 ## Next
 - [ ] JWT / claim-based RLS enforcing `store_number` server-side
