@@ -1,5 +1,13 @@
 # Carpet Hub — Development Journal
 
+## 2026-07-25 — Never query Supabase with fallback profile IDs
+
+### Shipped
+- PIN save resolves Supervisor by name/role when `id` is not a UUID; inserts without `id` when missing; only `.eq('id', …)` with real UUIDs (avoids 22P02).
+- Load sync prefers DB Supervisor UUID + `pin_code` over seed/fallback session ids.
+
+---
+
 ## 2026-07-25 — Supervisor PIN upsert + friendly errors
 
 ### Shipped

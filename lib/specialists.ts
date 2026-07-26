@@ -264,15 +264,38 @@ export function setActiveSpecialist(specialist: StoreSpecialist | null): void {
   localStorage.setItem(ACTIVE_KEY, JSON.stringify(specialist));
 }
 
-function specialistPayload(record: StoreSpecialist) {
-  return {
-    id: record.id,
+function specialistPayload(record: StoreSpecialist): Record<string, unknown> {
+  const payload: Record<string, unknown> = {
     store_number: record.store_number,
     name: record.name,
     role: record.role,
     pin_code: record.pin_code,
     created_at: record.created_at,
   };
+  // Never send seed/fallback strings into a uuid column
+  if (!isFallbackProfileId(record.id)) {
+    payload.id = record.id;
+  }
+  return payload;
+}
+
+export function isDatabaseUuid(id: string): boolean {
+  return /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(
+    id
+  );
+}
+
+/** Seed / local fallback IDs that are not real Supabase row UUIDs. */
+export function isFallbackProfileId(id: string): boolean {
+  if (!id || !isDatabaseUuid(id)) return true;
+  const lower = id.toLowerCase();
+  return (
+    lower.startsWith("seed-") ||
+    lower.startsWith("sup-") ||
+    lower.startsWith("supervisor-") ||
+    lower.startsWith("default-") ||
+    lower.startsWith("local-")
+  );
 }
 
 export async function fetchSpecialists(): Promise<StoreSpecialist[]> {
@@ -328,8 +351,11 @@ export async function saveSpecialist(input: {
     pin = DEFAULT_SUPERVISOR_PIN;
   }
 
+  const id =
+    input.id && !isFallbackProfileId(input.id) ? input.id : uid();
+
   const record: StoreSpecialist = {
-    id: input.id ?? uid(),
+    id,
     store_number: store,
     name: input.name.trim(),
     role,
@@ -366,24 +392,10 @@ export async function saveSpecialist(input: {
   }
 }
 
-function isDatabaseUuid(id: string): boolean {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
-    id
-  );
-}
-
-/** Seed / local fallback IDs that are not real Supabase row UUIDs. */
-export function isFallbackProfileId(id: string): boolean {
-  if (!id || !isDatabaseUuid(id)) return true;
-  const lower = id.toLowerCase();
-  return (
-    lower.startsWith("seed-") ||
-    lower.startsWith("sup-") ||
-    lower.startsWith("default-") ||
-    lower.startsWith("local-")
-  );
-}
-
+/**
+ * Persist a new PIN without ever querying `.eq('id', fallbackString)`.
+ * Resolves/creates a real UUID row, then updates state + localStorage.
+ */
 export async function updateSpecialistPin(
   member: StoreSpecialist,
   newPin: string
@@ -397,11 +409,14 @@ export async function updateSpecialistPin(
   const supabase = getSupabase();
   const profileLabel =
     member.role === "Supervisor" ? "Supervisor" : "Profile";
+  const displayName =
+    member.name?.trim() ||
+    (member.role === "Supervisor" ? "Department Supervisor" : "Team Member");
 
-  // Offline / unconfigured: persist locally + queue; still update active session.
   if (!supabase || shouldSaveOffline()) {
     const offlineRecord: StoreSpecialist = {
       ...member,
+      name: displayName,
       store_number: store,
       pin_code: pin,
       offline: true,
@@ -416,26 +431,87 @@ export async function updateSpecialistPin(
     return { record: offlineRecord, offline: true };
   }
 
-  async function upsertProfile(): Promise<StoreSpecialist> {
-    const payload: Record<string, unknown> = {
-      name: member.name,
-      role: member.role === "Supervisor" ? "Supervisor" : member.role,
-      pin_code: pin,
-      store_number: store,
-      created_at: member.created_at || new Date().toISOString(),
-    };
-    // Only send a real UUID — never insert seed-/fallback ids into uuid PK
-    if (!isFallbackProfileId(member.id)) {
-      payload.id = member.id;
+  async function findExistingDbId(): Promise<string | null> {
+    // 1) Only query by id when it is a real UUID
+    if (isDatabaseUuid(member.id) && !isFallbackProfileId(member.id)) {
+      const { data, error } = await supabase!
+        .from(TABLE)
+        .select("id")
+        .eq("id", member.id)
+        .maybeSingle();
+      if (!error && data?.id && isDatabaseUuid(String(data.id))) {
+        return String(data.id);
+      }
     }
 
+    // 2) Match by name within store
+    {
+      const { data, error } = await supabase!
+        .from(TABLE)
+        .select("id")
+        .eq("store_number", store)
+        .eq("name", displayName)
+        .maybeSingle();
+      if (!error && data?.id && isDatabaseUuid(String(data.id))) {
+        return String(data.id);
+      }
+    }
+
+    // 3) Match Supervisor role within store
+    if (member.role === "Supervisor") {
+      const { data, error } = await supabase!
+        .from(TABLE)
+        .select("id")
+        .eq("store_number", store)
+        .eq("role", "Supervisor")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (!error && data?.id && isDatabaseUuid(String(data.id))) {
+        return String(data.id);
+      }
+    }
+
+    return null;
+  }
+
+  async function insertProfile(): Promise<StoreSpecialist> {
+    // Omit id — Postgres generates a valid UUID
     const { data, error } = await supabase!
       .from(TABLE)
-      .upsert(payload, { onConflict: "store_number,name" })
+      .insert({
+        name: displayName,
+        role: member.role === "Supervisor" ? "Supervisor" : member.role,
+        pin_code: pin,
+        store_number: store,
+      })
       .select("*")
       .single();
 
     if (error || !data) {
+      // Unique conflict: try update via name lookup instead
+      const { data: existing } = await supabase!
+        .from(TABLE)
+        .select("id")
+        .eq("store_number", store)
+        .eq("name", displayName)
+        .maybeSingle();
+
+      if (existing?.id && isDatabaseUuid(String(existing.id))) {
+        const { data: updated, error: updErr } = await supabase!
+          .from(TABLE)
+          .update({ pin_code: pin })
+          .eq("id", String(existing.id))
+          .select("*")
+          .single();
+        if (!updErr && updated) {
+          return mapRow({
+            ...(updated as Record<string, unknown>),
+            offline: false,
+          });
+        }
+      }
+
       throw new Error(
         `Could not update ${profileLabel} profile in database. Please try again.`
       );
@@ -448,38 +524,11 @@ export async function updateSpecialistPin(
   }
 
   try {
-    let targetId: string | null = null;
-
-    if (!isFallbackProfileId(member.id)) {
-      const { data: byId } = await supabase
-        .from(TABLE)
-        .select("id")
-        .eq("id", member.id)
-        .maybeSingle();
-      if (byId?.id) targetId = String(byId.id);
-    }
-
-    if (!targetId) {
-      const { data: byName, error: findError } = await supabase
-        .from(TABLE)
-        .select("id")
-        .eq("store_number", store)
-        .eq("name", member.name)
-        .maybeSingle();
-
-      if (findError) {
-        throw new Error(
-          `Could not update ${profileLabel} profile in database. Please try again.`
-        );
-      }
-      if (byName?.id) targetId = String(byName.id);
-    }
-
+    const targetId = await findExistingDbId();
     let saved: StoreSpecialist;
 
     if (!targetId) {
-      // No DB row yet — insert/upsert a real Supervisor/Profile record
-      saved = await upsertProfile();
+      saved = await insertProfile();
     } else {
       const { data, error } = await supabase
         .from(TABLE)
@@ -494,8 +543,7 @@ export async function updateSpecialistPin(
       }
 
       if (!data || data.length === 0) {
-        // Update matched zero rows — fall back to upsert
-        saved = await upsertProfile();
+        saved = await insertProfile();
       } else {
         saved = mapRow({
           ...(data[0] as Record<string, unknown>),
@@ -518,21 +566,50 @@ export async function updateSpecialistPin(
 }
 
 /**
- * Resolve the active specialist against the loaded roster and sync
- * localStorage so DB pin_code wins after reloads.
+ * Resolve the active profile against the loaded roster.
+ * Prefer a real DB Supervisor UUID + pin_code over seed/fallback sessions.
  */
 export function syncActiveSpecialistFromRoster(
   roster: StoreSpecialist[]
 ): StoreSpecialist | null {
+  const store = getStoreNumber();
+  const dbSupervisor =
+    roster.find(
+      (m) =>
+        m.role === "Supervisor" &&
+        m.store_number === store &&
+        !isFallbackProfileId(m.id)
+    ) ??
+    roster.find(
+      (m) => m.role === "Supervisor" && !isFallbackProfileId(m.id)
+    );
+
   const saved = getActiveSpecialist();
+
+  if (dbSupervisor) {
+    const useDbSupervisor =
+      !saved ||
+      saved.role === "Supervisor" ||
+      isFallbackProfileId(saved.id) ||
+      isDepartmentSupervisorName(saved.name) ||
+      saved.name.toLowerCase() === dbSupervisor.name.toLowerCase();
+
+    if (useDbSupervisor) {
+      setActiveSpecialist(dbSupervisor);
+      return dbSupervisor;
+    }
+  }
+
   if (!saved) return null;
 
   const matched =
-    roster.find((m) => m.id === saved.id) ??
+    (!isFallbackProfileId(saved.id)
+      ? roster.find((m) => m.id === saved.id)
+      : undefined) ??
     roster.find(
       (m) =>
         m.name.toLowerCase() === saved.name.toLowerCase() &&
-        m.store_number === (saved.store_number || getStoreNumber())
+        m.store_number === (saved.store_number || store)
     ) ??
     roster.find((m) => m.name.toLowerCase() === saved.name.toLowerCase()) ??
     null;
@@ -546,5 +623,8 @@ export function syncActiveSpecialistFromRoster(
 export function findSupervisor(
   roster: StoreSpecialist[]
 ): StoreSpecialist | undefined {
-  return roster.find((m) => m.role === "Supervisor");
+  return (
+    roster.find((m) => m.role === "Supervisor" && !isFallbackProfileId(m.id)) ??
+    roster.find((m) => m.role === "Supervisor")
+  );
 }

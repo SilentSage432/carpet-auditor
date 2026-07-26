@@ -153,11 +153,29 @@ async function replayAction(action: SyncAction): Promise<void> {
       return;
     }
     case "upsert_specialist": {
-      const { error } = await supabase
+      const specialistPayload = { ...payload };
+      const rawId = specialistPayload.id;
+      const uuidOk =
+        typeof rawId === "string" &&
+        /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(
+          rawId
+        );
+      if (!uuidOk) {
+        delete specialistPayload.id;
+      }
+      const { data, error } = await supabase
         .from("store_specialists")
-        .upsert(payload, { onConflict: "store_number,name" });
+        .upsert(specialistPayload, { onConflict: "store_number,name" })
+        .select("id")
+        .maybeSingle();
       if (error) throw error;
-      if (entityId) markLocalOnline(LOCAL_KEYS.store_specialists, entityId);
+      const syncedId =
+        data && typeof (data as { id?: string }).id === "string"
+          ? String((data as { id: string }).id)
+          : uuidOk
+            ? String(rawId)
+            : "";
+      if (syncedId) markLocalOnline(LOCAL_KEYS.store_specialists, syncedId);
       return;
     }
     case "delete_audit": {
