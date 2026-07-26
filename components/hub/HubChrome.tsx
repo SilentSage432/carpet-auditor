@@ -101,6 +101,59 @@ export function HubHeader({
   );
 }
 
+const BOTTOM_NAV_TABS: { id: HubSection; label: string; icon: string }[] = [
+  { id: "audit", label: "Audit", icon: "📊" },
+  { id: "catalog", label: "Catalog", icon: "🏷️" },
+  { id: "remnants", label: "Remnants", icon: "📦" },
+  { id: "settings", label: "Settings", icon: "⚙️" },
+];
+
+type BottomNavBarProps = {
+  active: HubSection;
+  onSelect: (section: HubSection) => void;
+};
+
+export function BottomNavBar({ active, onSelect }: BottomNavBarProps) {
+  return (
+    <nav
+      aria-label="Primary"
+      className="fixed bottom-0 left-0 right-0 z-30 mx-auto max-w-md border-t border-slate-800 bg-slate-900/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-md"
+    >
+      <div className="grid grid-cols-4">
+        {BOTTOM_NAV_TABS.map((tab) => {
+          const isActive = tab.id === active;
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => onSelect(tab.id)}
+              aria-current={isActive ? "page" : undefined}
+              className={`relative flex min-h-16 flex-col items-center justify-center gap-0.5 px-1 pb-1.5 pt-2 transition ${
+                isActive
+                  ? "text-emerald-300 [text-shadow:0_0_12px_rgba(16,185,129,0.55)]"
+                  : "text-slate-400 active:text-slate-200"
+              }`}
+            >
+              {isActive ? (
+                <span
+                  className="absolute inset-x-5 top-0 h-0.5 rounded-full bg-emerald-400 shadow-[0_0_10px_rgba(16,185,129,0.85)]"
+                  aria-hidden
+                />
+              ) : null}
+              <span className="text-lg leading-none" aria-hidden>
+                {tab.icon}
+              </span>
+              <span className="text-[10px] font-bold uppercase tracking-wide">
+                {tab.label}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </nav>
+  );
+}
+
 type NavDrawerProps = {
   open: boolean;
   active: HubSection;
@@ -125,7 +178,12 @@ export function NavDrawer({ open, active, onClose, onSelect }: NavDrawerProps) {
         aria-hidden={!open}
       >
         <div className="flex h-14 items-center justify-between border-b border-slate-800 px-4">
-          <p className="font-semibold text-slate-100">Navigate</p>
+          <div>
+            <p className="font-semibold text-slate-100">Quick navigate</p>
+            <p className="text-[10px] text-slate-500">
+              Sections · use bottom tabs for 1-tap switch
+            </p>
+          </div>
           <button
             type="button"
             aria-label="Close menu"

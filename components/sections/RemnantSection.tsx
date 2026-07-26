@@ -2,6 +2,8 @@
 
 import { useMemo, useState } from "react";
 import { ApplyMarkdownModal } from "@/components/hub/ApplyMarkdownModal";
+import { ConfirmModal } from "@/components/hub/ConfirmModal";
+import { TextPromptModal } from "@/components/hub/TextPromptModal";
 import { findCatalogBySkuOrBarcode } from "@/lib/catalog";
 import { agingBadge, daysOld } from "@/lib/aging";
 import {
@@ -81,6 +83,8 @@ export function RemnantSection({
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [markdownTarget, setMarkdownTarget] = useState<Remnant | null>(null);
+  const [reserveTarget, setReserveTarget] = useState<Remnant | null>(null);
+  const [deleteTargetId, setDeleteTargetId] = useState<string | null>(null);
 
   const supervisorSession = isSupervisor(activeSpecialist);
   const widthNum = toNumber(width, 12);
@@ -197,17 +201,12 @@ export function RemnantSection({
     }
   }
 
-  async function markReserved(item: Remnant) {
-    const name = window.prompt(
-      "Customer / order name for reservation?",
-      item.reserved_for || ""
-    );
-    if (name === null) return;
+  async function markReserved(item: Remnant, customerName: string) {
     const { record } = await saveRemnant(
       {
         ...item,
         status: "reserved",
-        reserved_for: name.trim(),
+        reserved_for: customerName.trim(),
       },
       item
     );
@@ -228,14 +227,13 @@ export function RemnantSection({
   }
 
   async function handleDelete(id: string) {
-    if (!window.confirm("Delete this remnant?")) return;
     await deleteRemnant(id);
     onRemnantsChange(remnants.filter((r) => r.id !== id));
     flash("Remnant deleted");
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 overflow-x-hidden">
       <ApplyMarkdownModal
         key={markdownTarget?.id ?? "markdown-closed"}
         open={markdownTarget != null}
@@ -249,6 +247,38 @@ export function RemnantSection({
             ...remnants.filter((r) => r.id !== record.id),
           ]);
           flash("Manager markdown applied");
+        }}
+      />
+      <TextPromptModal
+        open={reserveTarget != null}
+        title="Reserve remnant"
+        subtitle={
+          reserveTarget
+            ? `${reserveTarget.sku} · ${reserveTarget.carpet_name || "Untitled"}`
+            : undefined
+        }
+        label="Customer / order name"
+        placeholder="Customer name…"
+        confirmLabel="Mark Reserved"
+        initialValue={reserveTarget?.reserved_for ?? ""}
+        onClose={() => setReserveTarget(null)}
+        onConfirm={(name) => {
+          const target = reserveTarget;
+          setReserveTarget(null);
+          if (target) void markReserved(target, name);
+        }}
+      />
+      <ConfirmModal
+        open={deleteTargetId != null}
+        title="Delete remnant?"
+        message="This removes the remnant from the rack. This cannot be undone."
+        confirmLabel="Delete"
+        danger
+        onClose={() => setDeleteTargetId(null)}
+        onConfirm={() => {
+          const id = deleteTargetId;
+          setDeleteTargetId(null);
+          if (id) void handleDelete(id);
         }}
       />
 
@@ -530,8 +560,8 @@ export function RemnantSection({
                   {item.status !== "reserved" && item.status !== "sold" && (
                     <button
                       type="button"
-                      onClick={() => void markReserved(item)}
-                      className="flex min-h-12 items-center justify-center rounded-xl border border-amber-500/40 text-sm font-semibold text-amber-300"
+                      onClick={() => setReserveTarget(item)}
+                      className="flex h-12 items-center justify-center rounded-xl border border-amber-500/40 text-sm font-semibold text-amber-300"
                     >
                       Mark Reserved
                     </button>
@@ -540,7 +570,7 @@ export function RemnantSection({
                     <button
                       type="button"
                       onClick={() => void markSold(item)}
-                      className="flex min-h-12 items-center justify-center rounded-xl border border-slate-600 text-sm font-semibold text-slate-200"
+                      className="flex h-12 items-center justify-center rounded-xl border border-slate-600 text-sm font-semibold text-slate-200"
                     >
                       Mark Sold
                     </button>
@@ -548,14 +578,14 @@ export function RemnantSection({
                   <button
                     type="button"
                     onClick={() => openEdit(item)}
-                    className="flex min-h-12 items-center justify-center rounded-xl border border-slate-700 text-sm font-semibold text-slate-100"
+                    className="flex h-12 items-center justify-center rounded-xl border border-slate-700 text-sm font-semibold text-slate-100"
                   >
                     Edit
                   </button>
                   <button
                     type="button"
-                    onClick={() => void handleDelete(item.id)}
-                    className="flex min-h-12 items-center justify-center rounded-xl border border-red-500/40 text-sm font-semibold text-red-400"
+                    onClick={() => setDeleteTargetId(item.id)}
+                    className="flex h-12 items-center justify-center rounded-xl border border-red-500/40 text-sm font-semibold text-red-400"
                   >
                     Delete
                   </button>

@@ -1,5 +1,22 @@
 # Carpet Hub — Development Journal
 
+## 2026-07-26 — Handheld layout pass (bottom nav + scan-first audit)
+
+### Shipped
+- Fixed PWA bottom nav (Audit / Catalog / Remnants / Settings) with emerald active glow; hamburger drawer retained as fallback.
+- Cycle Audit: collapsible 1-line shift summary (default collapsed); sticky Log & Reset bar above bottom nav; in-form 📍 SIMS Stock opens SimsLocationFinder without leaving Audit.
+- Replaced `window.prompt` / `window.confirm` with `TextPromptModal` (barcode link, remnant reserve) and `ConfirmModal` (remnant delete).
+- Main column `pb-32` / audit `pb-44`; body `overflow-x: hidden`; touch targets stay at `h-12`.
+
+---
+
+## 2026-07-26 — APP_LAYOUT_MAP blueprint
+
+### Shipped
+- Added root `APP_LAYOUT_MAP.md`: shell/header, four workspace views, modal inventory, scan-path UX friction analysis for layout evaluation.
+
+---
+
 ## 2026-07-26 — Dual scan trigger + auto-focus SKU
 
 ### Shipped

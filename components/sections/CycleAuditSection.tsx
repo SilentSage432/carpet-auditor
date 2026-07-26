@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { QuickAddCatalogModal } from "@/components/barcode/QuickAddCatalogModal";
+import { SimsLocationFinder } from "@/components/catalog/SimsLocationFinder";
 import { NumberField, TextField } from "@/components/ui/NumberField";
 import { PinKeypadModal } from "@/components/hub/PinKeypadModal";
 import {
@@ -141,6 +142,8 @@ export function CycleAuditSection({
   const [discrepancyUnlocked, setDiscrepancyUnlocked] = useState(false);
   const [pinForDiscrepancy, setPinForDiscrepancy] = useState(false);
   const [draftRestored, setDraftRestored] = useState(false);
+  const [summaryExpanded, setSummaryExpanded] = useState(false);
+  const [simsFinderOpen, setSimsFinderOpen] = useState(false);
 
   const auditMode = auditModeForCategory(category);
   const canViewDiscrepancies =
@@ -195,6 +198,10 @@ export function CycleAuditSection({
   const shiftSqFt = useMemo(
     () =>
       shiftAudits.reduce((sum, a) => sum + (a.calculated_sqft ?? 0), 0),
+    [shiftAudits]
+  );
+  const shiftCartons = useMemo(
+    () => shiftAudits.reduce((sum, a) => sum + (a.box_count ?? 0), 0),
     [shiftAudits]
   );
 
@@ -542,7 +549,7 @@ export function CycleAuditSection({
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 overflow-x-hidden">
       <QuickAddCatalogModal
         open={quickAddBarcode != null}
         scannedBarcode={quickAddBarcode ?? ""}
@@ -551,6 +558,12 @@ export function CycleAuditSection({
           focusSkuInput();
         }}
         onSaved={handleQuickAdded}
+      />
+      <SimsLocationFinder
+        open={simsFinderOpen}
+        onClose={() => setSimsFinderOpen(false)}
+        catalog={catalog}
+        audits={audits}
       />
       <PinKeypadModal
         key={pinForDiscrepancy ? "discrepancy-pin" : "discrepancy-closed"}
@@ -569,59 +582,83 @@ export function CycleAuditSection({
         }}
       />
 
-      <section aria-label="Shift summary" className={cardClass}>
-        <div className="grid grid-cols-3 gap-2">
-          <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-3">
-            <p className="text-[10px] font-medium uppercase tracking-wide text-slate-400">
-              Entries
-            </p>
-            <p className="mt-1 font-mono text-2xl font-semibold tabular-nums text-slate-50">
-              {loaded ? totalRolls : "—"}
-            </p>
-          </div>
-          <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-3">
-            <p className="text-[10px] font-medium uppercase tracking-wide text-emerald-400/80">
-              Floor
-            </p>
-            <p className="mt-1 font-mono text-2xl font-semibold tabular-nums text-emerald-400">
-              {loaded ? floorCount : "—"}
-            </p>
-          </div>
-          <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-3">
-            <p className="text-[10px] font-medium uppercase tracking-wide text-amber-400/80">
-              Top stock
-            </p>
-            <p className="mt-1 font-mono text-2xl font-semibold tabular-nums text-amber-300">
-              {loaded ? topStockCount : "—"}
-            </p>
-          </div>
-        </div>
-        <p className="mt-3 text-sm text-slate-400">
-          Cumulative CLF:{" "}
-          <span className="font-mono text-lg font-semibold text-emerald-400">
-            {loaded ? formatClf(cumulativeClf) : "—"}
+      <section
+        aria-label="Shift summary"
+        className="overflow-x-auto rounded-2xl border border-slate-800 bg-slate-900/90 shadow-lg shadow-black/20"
+      >
+        <button
+          type="button"
+          onClick={() => setSummaryExpanded((v) => !v)}
+          aria-expanded={summaryExpanded}
+          className="flex min-h-12 w-full items-center gap-2 px-3 py-2 text-left"
+        >
+          <span className="min-w-0 flex-1 truncate font-mono text-xs font-semibold tabular-nums text-slate-200 sm:text-sm">
+            📊 {loaded ? totalRolls : "—"} Audited
+            <span className="text-slate-500"> | </span>
+            {loaded ? formatClf(shiftClf) : "—"} CLF
+            <span className="text-slate-500"> | </span>
+            {loaded ? shiftCartons : "—"} Cartons
           </span>
-          <span className="ml-2 font-mono text-xs text-slate-500">
-            (shift {loaded ? formatClf(shiftClf) : "—"}
-            {shiftSqFt > 0 ? ` · ${formatSqFt(shiftSqFt)} sq ft` : ""})
+          <span className="shrink-0 text-xs font-semibold text-emerald-400">
+            {summaryExpanded ? "Collapse ▴" : "Expand ▾"}
           </span>
-        </p>
-        <div className="mt-3 grid grid-cols-2 gap-2">
-          <button
-            type="button"
-            onClick={() => void handleCopySummary()}
-            className="flex min-h-12 items-center justify-center rounded-xl border border-slate-700 bg-slate-800 px-3 text-sm font-semibold text-slate-100"
-          >
-            {copied ? "Copied ✓" : "Copy Shift Summary"}
-          </button>
-          <button
-            type="button"
-            onClick={handleExportCsv}
-            className="flex min-h-12 items-center justify-center rounded-xl border border-slate-700 bg-slate-800 px-3 text-sm font-semibold text-slate-100"
-          >
-            Export CSV
-          </button>
-        </div>
+        </button>
+        {summaryExpanded ? (
+          <div className="space-y-3 border-t border-slate-800 p-4">
+            <div className="grid grid-cols-3 gap-2">
+              <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-3">
+                <p className="text-[10px] font-medium uppercase tracking-wide text-slate-400">
+                  Entries
+                </p>
+                <p className="mt-1 font-mono text-2xl font-semibold tabular-nums text-slate-50">
+                  {loaded ? totalRolls : "—"}
+                </p>
+              </div>
+              <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-3">
+                <p className="text-[10px] font-medium uppercase tracking-wide text-emerald-400/80">
+                  Floor
+                </p>
+                <p className="mt-1 font-mono text-2xl font-semibold tabular-nums text-emerald-400">
+                  {loaded ? floorCount : "—"}
+                </p>
+              </div>
+              <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-3">
+                <p className="text-[10px] font-medium uppercase tracking-wide text-amber-400/80">
+                  Top stock
+                </p>
+                <p className="mt-1 font-mono text-2xl font-semibold tabular-nums text-amber-300">
+                  {loaded ? topStockCount : "—"}
+                </p>
+              </div>
+            </div>
+            <p className="text-sm text-slate-400">
+              Cumulative CLF:{" "}
+              <span className="font-mono text-lg font-semibold text-emerald-400">
+                {loaded ? formatClf(cumulativeClf) : "—"}
+              </span>
+              <span className="ml-2 font-mono text-xs text-slate-500">
+                (shift {loaded ? formatClf(shiftClf) : "—"}
+                {shiftSqFt > 0 ? ` · ${formatSqFt(shiftSqFt)} sq ft` : ""})
+              </span>
+            </p>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => void handleCopySummary()}
+                className="flex h-12 items-center justify-center rounded-xl border border-slate-700 bg-slate-800 px-3 text-sm font-semibold text-slate-100"
+              >
+                {copied ? "Copied ✓" : "Copy Shift Summary"}
+              </button>
+              <button
+                type="button"
+                onClick={handleExportCsv}
+                className="flex h-12 items-center justify-center rounded-xl border border-slate-700 bg-slate-800 px-3 text-sm font-semibold text-slate-100"
+              >
+                Export CSV
+              </button>
+            </div>
+          </div>
+        ) : null}
       </section>
 
       {statusMsg && (
@@ -634,7 +671,8 @@ export function CycleAuditSection({
       )}
 
       <form
-        className={`${cardClass} space-y-4 overflow-hidden`}
+        id="cycle-audit-form"
+        className={`${cardClass} space-y-4 overflow-x-auto`}
         onSubmit={(e) => {
           e.preventDefault();
           void handleLog();
@@ -689,12 +727,22 @@ export function CycleAuditSection({
               ))}
             </select>
           </label>
-          <TextField
-            label="SIMS Location Tag"
-            value={simsLocation}
-            onChange={setSimsLocation}
-            placeholder="e.g. Aisle 14 - Bay 012"
-          />
+          <div className="flex items-end gap-2">
+            <TextField
+              className="min-w-0 flex-1"
+              label="SIMS Location Tag"
+              value={simsLocation}
+              onChange={setSimsLocation}
+              placeholder="e.g. Aisle 14 - Bay 012"
+            />
+            <button
+              type="button"
+              onClick={() => setSimsFinderOpen(true)}
+              className="flex h-12 shrink-0 items-center justify-center rounded-xl border border-emerald-500/40 bg-emerald-950/40 px-3 text-xs font-semibold text-emerald-300 active:scale-95"
+            >
+              📍 SIMS Stock
+            </button>
+          </div>
           {auditMode === "roll" ? (
             <fieldset>
               <legend className="mb-1.5 text-sm font-medium text-slate-200">
@@ -987,9 +1035,12 @@ export function CycleAuditSection({
             Select an active specialist in the header before logging.
           </p>
         )}
+      </form>
 
+      <div className="fixed bottom-16 left-0 right-0 z-20 mx-auto w-full max-w-md border-t border-slate-800/80 bg-slate-950/90 p-3 backdrop-blur-md">
         <button
           type="submit"
+          form="cycle-audit-form"
           disabled={!canLog}
           className="flex h-12 w-full items-center justify-center rounded-xl bg-emerald-500 text-base font-bold text-slate-950 transition enabled:active:scale-[0.98] enabled:hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-40"
         >
@@ -999,9 +1050,9 @@ export function CycleAuditSection({
               ? "Log Roll & Reset"
               : "Log Units & Reset"}
         </button>
-      </form>
+      </div>
 
-      <section className="space-y-3" aria-label="Shift audit log">
+      <section className="space-y-3 overflow-x-hidden" aria-label="Shift audit log">
         <div className="flex items-baseline justify-between gap-2 px-1">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-400">
             Shift log

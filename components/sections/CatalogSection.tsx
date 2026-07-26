@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { QuickAddCatalogModal } from "@/components/barcode/QuickAddCatalogModal";
 import { SimsLocationFinder } from "@/components/catalog/SimsLocationFinder";
+import { TextPromptModal } from "@/components/hub/TextPromptModal";
 import { NumberField, TextField } from "@/components/ui/NumberField";
 import {
   findCatalogBySkuOrBarcode,
@@ -50,6 +51,7 @@ export function CatalogSection({ catalog, onCatalogChange }: Props) {
   const [quickAddBarcode, setQuickAddBarcode] = useState<string | null>(null);
   const [finderOpen, setFinderOpen] = useState(false);
   const [audits, setAudits] = useState<CarpetAudit[]>([]);
+  const [linkTarget, setLinkTarget] = useState<CatalogItem | null>(null);
 
   const formMode = auditModeForCategory(category);
 
@@ -186,8 +188,37 @@ export function CatalogSection({ catalog, onCatalogChange }: Props) {
     flash(`Added ${item.sku} to SIMS catalog`);
   }
 
+  function handleLinkBarcode(code: string) {
+    if (!linkTarget) return;
+    const cleaned = sanitizeBarcodeScan(code);
+    if (!cleaned) return;
+    const existing = findCatalogBySkuOrBarcode(catalog, cleaned);
+    if (existing && existing.id !== linkTarget.id) {
+      flash(`Barcode already on SKU ${existing.sku}`);
+      setLinkTarget(null);
+      return;
+    }
+    const target = linkTarget;
+    setLinkTarget(null);
+    void saveCatalogItem({
+      id: target.id,
+      sku: target.sku,
+      carpet_name: target.carpet_name,
+      vendor: target.vendor,
+      category: target.category,
+      default_sims_location: target.default_sims_location,
+      roll_width_ft: target.roll_width_ft,
+      sqft_per_box: target.sqft_per_box,
+      upc_barcode: cleaned,
+    }).then(({ record }) => {
+      onCatalogChange(upsertLocalList(record));
+      playSuccessChime();
+      flash("Barcode linked");
+    });
+  }
+
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 overflow-x-hidden">
       <QuickAddCatalogModal
         open={quickAddBarcode != null}
         scannedBarcode={quickAddBarcode ?? ""}
@@ -199,6 +230,21 @@ export function CatalogSection({ catalog, onCatalogChange }: Props) {
         onClose={() => setFinderOpen(false)}
         catalog={catalog}
         audits={audits}
+      />
+      <TextPromptModal
+        open={linkTarget != null}
+        title="Link vendor barcode"
+        subtitle={
+          linkTarget
+            ? `Scan or paste barcode for SKU ${linkTarget.sku}`
+            : undefined
+        }
+        label="Barcode / UPC"
+        placeholder="Scan barcode…"
+        confirmLabel="Link Barcode"
+        scanDigits
+        onClose={() => setLinkTarget(null)}
+        onConfirm={handleLinkBarcode}
       />
 
       <button
@@ -424,39 +470,8 @@ export function CatalogSection({ catalog, onCatalogChange }: Props) {
                 ) : (
                   <button
                     type="button"
-                    onClick={() => {
-                      const code = window.prompt(
-                        "Scan or paste vendor barcode to link:",
-                        ""
-                      );
-                      if (!code) return;
-                      const cleaned = sanitizeBarcodeScan(code);
-                      if (!cleaned) return;
-                      const existing = findCatalogBySkuOrBarcode(
-                        catalog,
-                        cleaned
-                      );
-                      if (existing && existing.id !== item.id) {
-                        flash(`Barcode already on SKU ${existing.sku}`);
-                        return;
-                      }
-                      void saveCatalogItem({
-                        id: item.id,
-                        sku: item.sku,
-                        carpet_name: item.carpet_name,
-                        vendor: item.vendor,
-                        category: item.category,
-                        default_sims_location: item.default_sims_location,
-                        roll_width_ft: item.roll_width_ft,
-                        sqft_per_box: item.sqft_per_box,
-                        upc_barcode: cleaned,
-                      }).then(({ record }) => {
-                        onCatalogChange(upsertLocalList(record));
-                        playSuccessChime();
-                        flash("Barcode linked");
-                      });
-                    }}
-                    className="col-span-2 flex min-h-12 items-center justify-center rounded-xl border border-emerald-500/40 text-sm font-semibold text-emerald-300"
+                    onClick={() => setLinkTarget(item)}
+                    className="col-span-2 flex h-12 items-center justify-center rounded-xl border border-emerald-500/40 text-sm font-semibold text-emerald-300"
                   >
                     Link Barcode
                   </button>

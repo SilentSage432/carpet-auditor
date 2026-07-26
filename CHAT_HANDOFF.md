@@ -3,6 +3,12 @@
 ## Product
 Universal Flooring & SIMS Location Audit Hub — multi-category flooring goods, rapid barcode scan-to-catalog, dual roll/carton audit engine, SIMS location finder, PWA offline shell + sync queue, multi-store isolation, specialist PIN, CLF/sqft variance, remnant aging, and manager markdown.
 
+## Navigation & handheld chrome
+- Primary: fixed bottom tabs (Audit / Catalog / Remnants / Settings) — 1-tap section switch
+- Fallback: header hamburger → NavDrawer (section list + descriptions)
+- Cycle Audit first viewport is scan-first: collapsed shift summary bar; sticky Log & Reset docked above bottom nav
+- Audit form includes 📍 SIMS Stock → opens SimsLocationFinder without leaving Audit
+
 ## Scan-to-Catalog
 - SKU / UPC search resolves via `lib/barcode.ts` → `carpet_catalog`
 - Dual trigger: Enter key **or** rapid ≥8-digit burst (≤150ms gaps → 250ms debounce)
@@ -15,8 +21,13 @@ Universal Flooring & SIMS Location Audit Hub — multi-category flooring goods, 
 - Mode B (Vinyl Plank, Tile & Stone, Hardwood, Grout & Mortar, Accessories): cartons × sqft/box
 
 ## SIMS Location Finder
-- Catalog section drawer; search SKU / barcode / SIMS tag
-- Aggregates audit stock by location (Sales Floor vs Top Stock) via `lib/sims.ts`
+- Reachable from Catalog CTA **and** Audit 📍 SIMS Stock
+- Search SKU / barcode / SIMS tag; aggregates via `lib/sims.ts`
+
+## Overlays (no native prompt/confirm)
+- `TextPromptModal` — remnant reservation customer name; catalog barcode link
+- `ConfirmModal` — remnant delete confirmation
+- Existing: Specialist, PIN keypad, Change PIN, Quick-Add, SIMS Finder, Markdown
 
 ## Offline & PWA
 - Service worker: `public/sw.js` (registered in `app/layout.tsx` via `ServiceWorkerRegister`)
@@ -32,7 +43,7 @@ Universal Flooring & SIMS Location Audit Hub — multi-category flooring goods, 
 
 ## Specialists & PIN
 - Default roster: **Department Supervisor** (PIN `1234`) per store
-- `dedupeRoster()`; default-PIN notice; Change PIN modal
+- `dedupeRoster()`; default-PIN notice (sits above bottom nav); Change PIN modal
 
 ## Remnants / markdown
 - Aging badges; 60+ or Supervisor → **Apply Manager Markdown**

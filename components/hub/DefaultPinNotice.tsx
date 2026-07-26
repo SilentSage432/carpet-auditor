@@ -12,7 +12,7 @@ export function DefaultPinNotice({ open, onSetNewPin, onRemindLater }: Props) {
   return (
     <div
       role="status"
-      className="fixed inset-x-0 bottom-0 z-[55] mx-auto w-full max-w-md px-4 pb-4"
+      className="fixed inset-x-0 bottom-16 z-[55] mx-auto w-full max-w-md px-4 pb-4"
     >
       <div className="rounded-2xl border border-amber-500/40 bg-amber-950/95 p-4 shadow-2xl backdrop-blur">
         <p className="text-sm font-semibold text-amber-100">Security Notice</p>

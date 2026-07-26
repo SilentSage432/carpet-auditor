@@ -20,12 +20,15 @@
 - [x] SIMS Location Finder drawer (SKU / barcode / tag → staged locations)
 - [x] Mid-scan audit draft in localStorage for dead-zone resilience
 - [x] Sheet Vinyl as roll-goods category (Mode A) with 6ft / 12ft width pickers
+- [x] Dual scan trigger (Enter + rapid burst) with SKU auto-focus
+- [x] `APP_LAYOUT_MAP.md` — current shell / views / modals / UX friction blueprint
+- [x] Handheld layout pass: bottom nav, scan-first audit, SIMS from Audit, prompt/confirm overlays
 
 ## Next
 - [ ] JWT / claim-based RLS enforcing `store_number` server-side
 - [ ] Background Sync API / periodic queue flush while tab backgrounded
 - [ ] Conflict resolution UI when offline edits collide
-
+- [ ] Retire or wire orphan `MarryBarcodeModal`
 ## Non-goals
 - Pricing / margin engines
 - Replenishment recommendations

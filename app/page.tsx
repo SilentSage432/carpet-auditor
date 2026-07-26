@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { ChangePinModal } from "@/components/hub/ChangePinModal";
 import { DefaultPinNotice } from "@/components/hub/DefaultPinNotice";
-import { HubHeader, NavDrawer } from "@/components/hub/HubChrome";
+import { BottomNavBar, HubHeader, NavDrawer } from "@/components/hub/HubChrome";
 import { SpecialistModal } from "@/components/hub/SpecialistModal";
 import { CatalogSection } from "@/components/sections/CatalogSection";
 import { CycleAuditSection } from "@/components/sections/CycleAuditSection";
@@ -233,7 +233,11 @@ export default function CarpetHubPage() {
         </p>
       )}
 
-      <div className="mx-auto w-full max-w-md flex-1 px-4 py-4 pb-28">
+      <div
+        className={`mx-auto w-full max-w-md flex-1 overflow-x-hidden px-4 py-4 ${
+          section === "audit" ? "pb-44" : "pb-32"
+        }`}
+      >
         {section === "audit" && (
           <CycleAuditSection
             catalog={catalog}
@@ -268,6 +272,8 @@ export default function CarpetHubPage() {
           />
         )}
       </div>
+
+      <BottomNavBar active={section} onSelect={setSection} />
     </div>
   );
 }
