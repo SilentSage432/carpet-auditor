@@ -372,13 +372,95 @@ export async function updateSpecialistPin(
   member: StoreSpecialist,
   newPin: string
 ): Promise<{ record: StoreSpecialist; offline: boolean }> {
-  return saveSpecialist({
-    id: member.id,
-    store_number: member.store_number,
-    name: member.name,
-    role: member.role,
-    pin_code: newPin.trim(),
+  const pin = newPin.trim();
+  if (!/^\d{4}$/.test(pin)) {
+    throw new Error("PIN must be exactly 4 digits");
+  }
+
+  const store = member.store_number || getStoreNumber();
+  const supabase = getSupabase();
+
+  // Offline / unconfigured: persist locally + queue; still update active session.
+  if (!supabase || shouldSaveOffline()) {
+    const offlineRecord: StoreSpecialist = {
+      ...member,
+      store_number: store,
+      pin_code: pin,
+      offline: true,
+    };
+    upsertLocal(offlineRecord);
+    enqueueSyncAction(
+      "upsert_specialist",
+      specialistPayload(offlineRecord),
+      store
+    );
+    setActiveSpecialist(offlineRecord);
+    return { record: offlineRecord, offline: true };
+  }
+
+  const uuidRe =
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  let targetId = member.id;
+
+  if (!uuidRe.test(targetId)) {
+    const { data: found, error: findError } = await supabase
+      .from(TABLE)
+      .select("*")
+      .eq("store_number", store)
+      .eq("name", member.name)
+      .maybeSingle();
+
+    if (findError) throw findError;
+    if (!found) {
+      throw new Error("Could not find this specialist in the store database");
+    }
+    targetId = String((found as Record<string, unknown>).id);
+  }
+
+  const { data, error } = await supabase
+    .from(TABLE)
+    .update({ pin_code: pin })
+    .eq("id", targetId)
+    .select("*")
+    .single();
+
+  if (error) throw error;
+  if (!data) throw new Error("PIN update returned no row");
+
+  const saved = mapRow({
+    ...(data as Record<string, unknown>),
+    offline: false,
   });
+  upsertLocal(saved);
+  // Immediately persist session so reloads / verifyPin use the new code.
+  setActiveSpecialist(saved);
+  return { record: saved, offline: false };
+}
+
+/**
+ * Resolve the active specialist against the loaded roster and sync
+ * localStorage so DB pin_code wins after reloads.
+ */
+export function syncActiveSpecialistFromRoster(
+  roster: StoreSpecialist[]
+): StoreSpecialist | null {
+  const saved = getActiveSpecialist();
+  if (!saved) return null;
+
+  const matched =
+    roster.find((m) => m.id === saved.id) ??
+    roster.find(
+      (m) =>
+        m.name.toLowerCase() === saved.name.toLowerCase() &&
+        m.store_number === (saved.store_number || getStoreNumber())
+    ) ??
+    roster.find((m) => m.name.toLowerCase() === saved.name.toLowerCase()) ??
+    null;
+
+  if (!matched) return saved;
+
+  setActiveSpecialist(matched);
+  return matched;
 }
 
 export function findSupervisor(

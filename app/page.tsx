@@ -18,6 +18,7 @@ import {
   isDefaultPin,
   setActiveSpecialist,
   setPinRemindLater,
+  syncActiveSpecialistFromRoster,
   wasPinRemindLater,
 } from "@/lib/specialists";
 import { getStoreNumber, STORE_CHANGED_EVENT } from "@/lib/store";
@@ -45,6 +46,33 @@ export default function CarpetHubPage() {
     typeof window === "undefined" ? "1234" : getStoreNumber()
   );
 
+  function applyActiveFromRoster(roster: StoreSpecialist[]) {
+    const matched = syncActiveSpecialistFromRoster(roster);
+    if (matched) {
+      setSpecialist(matched);
+      // Dismiss default-PIN banner once the live pin is no longer 1234
+      if (isDefaultPin(matched) && !wasPinRemindLater(matched.id)) {
+        setDefaultPinNotice(true);
+      } else {
+        setDefaultPinNotice(false);
+      }
+      return;
+    }
+    const saved = getActiveSpecialist();
+    if (saved) {
+      setSpecialist(saved);
+      if (isDefaultPin(saved) && !wasPinRemindLater(saved.id)) {
+        setDefaultPinNotice(true);
+      } else {
+        setDefaultPinNotice(false);
+      }
+      return;
+    }
+    setSpecialist(null);
+    setSpecialistOpen(true);
+    setDefaultPinNotice(false);
+  }
+
   const loadStoreData = useCallback(async () => {
     const [cat, rem, team] = await Promise.all([
       fetchCatalog(),
@@ -55,20 +83,7 @@ export default function CarpetHubPage() {
     setCatalog(cat);
     setRemnants(rem);
     setSpecialists(roster);
-    const saved = getActiveSpecialist();
-    if (saved) {
-      const matched =
-        roster.find((m) => m.id === saved.id) ??
-        roster.find((m) => m.name === saved.name) ??
-        saved;
-      setSpecialist(matched);
-      if (isDefaultPin(matched) && !wasPinRemindLater(matched.id)) {
-        setDefaultPinNotice(true);
-      }
-    } else {
-      setSpecialist(null);
-      setSpecialistOpen(true);
-    }
+    applyActiveFromRoster(roster);
   }, []);
 
   useEffect(() => {
@@ -84,20 +99,7 @@ export default function CarpetHubPage() {
       setCatalog(cat);
       setRemnants(rem);
       setSpecialists(roster);
-      const saved = getActiveSpecialist();
-      if (saved) {
-        const matched =
-          roster.find((m) => m.id === saved.id) ??
-          roster.find((m) => m.name === saved.name) ??
-          saved;
-        setSpecialist(matched);
-        if (isDefaultPin(matched) && !wasPinRemindLater(matched.id)) {
-          setDefaultPinNotice(true);
-        }
-      } else {
-        setSpecialist(null);
-        setSpecialistOpen(true);
-      }
+      applyActiveFromRoster(roster);
     })();
     return () => {
       cancelled = true;
@@ -164,7 +166,8 @@ export default function CarpetHubPage() {
     setSpecialist(member);
     setActiveSpecialist(member);
     upsertSpecialist(member);
-    setDefaultPinNotice(false);
+    // Dismiss default-PIN banner whenever pin is no longer the default
+    setDefaultPinNotice(isDefaultPin(member) && !wasPinRemindLater(member.id));
     setPinToast(true);
     window.setTimeout(() => setPinToast(false), 2500);
   }

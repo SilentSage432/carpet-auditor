@@ -1,19 +1,19 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { countLocalCatalog } from "@/lib/catalog";
 import { countLocalRemnants } from "@/lib/remnants";
+import { selectOnFocus } from "@/lib/number-input";
 import { isSupervisor } from "@/lib/specialists";
 import { countLocalAudits } from "@/lib/storage";
 import {
   formatStoreLabel,
+  normalizeStoreNumber,
   setStoreNumber,
-  STORE_PRESETS,
 } from "@/lib/store";
 import { countPendingSync, flushSyncQueue } from "@/lib/sync-queue";
 import { isSupabaseConfigured, getSupabase } from "@/lib/supabase";
 import type { StoreSpecialist } from "@/lib/types";
-import { NumberField } from "@/components/ui/NumberField";
 
 type Props = {
   catalogCount: number;
@@ -39,6 +39,7 @@ export function SettingsSection({
   );
   const [syncMsg, setSyncMsg] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
+  const storeSaveTimer = useRef<number | null>(null);
 
   const configured = isSupabaseConfigured();
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
@@ -50,6 +51,31 @@ export function SettingsSection({
   const localAudits = countLocalAudits();
   const localCatalog = countLocalCatalog();
   const localRemnants = countLocalRemnants();
+
+  function commitStore(raw: string) {
+    if (storeSaveTimer.current != null) {
+      window.clearTimeout(storeSaveTimer.current);
+      storeSaveTimer.current = null;
+    }
+    const next = setStoreNumber(raw);
+    onStoreNumberChange(next);
+    setStoreDraftOverride(null);
+  }
+
+  function handleStoreDraftChange(raw: string) {
+    setStoreDraftOverride(raw);
+    if (storeSaveTimer.current != null) {
+      window.clearTimeout(storeSaveTimer.current);
+    }
+    storeSaveTimer.current = window.setTimeout(() => {
+      const normalized = normalizeStoreNumber(raw);
+      if (normalized !== storeNumber) {
+        commitStore(raw);
+      } else {
+        setStoreDraftOverride(null);
+      }
+    }, 500);
+  }
 
   async function testConnection() {
     setPing("checking");
@@ -68,14 +94,6 @@ export function SettingsSection({
     } catch {
       setPing("fail");
     }
-  }
-
-  function applyStore() {
-    const next = setStoreNumber(storeDraft);
-    onStoreNumberChange(next);
-    setStoreDraftOverride(null);
-    setSyncMsg(`Switched to ${formatStoreLabel(next)}`);
-    window.setTimeout(() => setSyncMsg(null), 2500);
   }
 
   async function syncNow() {
@@ -105,40 +123,35 @@ export function SettingsSection({
             {formatStoreLabel(storeNumber)}
           </span>
         </p>
-        <NumberField
-          label="Store #"
-          mode="digits"
-          value={storeDraft}
-          onChange={setStoreDraftOverride}
-          placeholder="1234"
-        />
-        <div className="flex flex-wrap gap-2">
-          {STORE_PRESETS.map((preset) => (
-            <button
-              key={preset}
-              type="button"
-              onClick={() => setStoreDraftOverride(preset)}
-              className={`rounded-lg border px-2.5 py-1.5 text-xs font-semibold ${
-                storeDraft === preset
-                  ? "border-emerald-500/50 bg-emerald-950/40 text-emerald-300"
-                  : "border-slate-700 text-slate-300"
-              }`}
-            >
-              {formatStoreLabel(preset)}
-            </button>
-          ))}
-        </div>
-        <button
-          type="button"
-          onClick={applyStore}
-          disabled={storeDraft.replace(/\D/g, "") === storeNumber}
-          className="flex min-h-12 w-full items-center justify-center rounded-xl bg-emerald-500 text-sm font-bold text-slate-950 disabled:opacity-40"
-        >
-          Switch store context
-        </button>
+        <label className="block space-y-1.5">
+          <span className="text-sm font-medium text-slate-200">
+            Store Number / Location
+          </span>
+          <input
+            type="text"
+            inputMode="numeric"
+            autoComplete="off"
+            placeholder="e.g. Store #1234"
+            aria-label="Store Number / Location"
+            value={storeDraft}
+            onFocus={selectOnFocus}
+            onChange={(e) =>
+              handleStoreDraftChange(e.target.value.replace(/\D/g, ""))
+            }
+            onBlur={() => commitStore(storeDraft)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                commitStore(storeDraft);
+                e.currentTarget.blur();
+              }
+            }}
+            className="min-h-12 h-12 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 font-mono text-base font-semibold tabular-nums text-slate-100 outline-none transition focus:border-emerald-500"
+          />
+        </label>
         <p className="text-xs leading-relaxed text-slate-500">
-          Audits, catalog, remnants, and specialists are scoped by store number
-          for district isolation (RLS-ready).
+          Saves automatically. Audits, catalog, remnants, and specialists are
+          scoped by this store number for district isolation.
         </p>
       </section>
 

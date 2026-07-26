@@ -1,5 +1,14 @@
 # Carpet Hub — Development Journal
 
+## 2026-07-25 — Fix PIN persistence across reloads
+
+### Shipped
+- `updateSpecialistPin` now updates Supabase by specialist `id` (resolves seed IDs via name), throws on failure (modal stays open).
+- On success: immediately writes `carpet_active_specialist` + React state with new `pin_code`.
+- On load: `syncActiveSpecialistFromRoster` merges DB roster into active session; dismisses default-PIN banner when `pin_code !== 1234`.
+
+---
+
 ## 2026-07-25 — Offline sync, SW shell, multi-store, manager markdown
 
 ### Shipped

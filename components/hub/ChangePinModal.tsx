@@ -54,14 +54,21 @@ export function ChangePinModal({ open, member, onClose, onUpdated }: Props) {
     try {
       const { record } = await updateSpecialistPin(member, newPin);
       clearPinRemindLater(record.id);
+      // Parent updates React state + localStorage; lib also wrote localStorage.
       onUpdated(record);
       setToast(true);
       window.setTimeout(() => {
         setToast(false);
         onClose();
       }, 900);
-    } catch {
-      setError("Could not update PIN");
+    } catch (err) {
+      const message =
+        err instanceof Error && err.message
+          ? err.message
+          : "Could not update PIN — changes were not saved";
+      setError(message);
+      setToast(false);
+      // Keep modal open on failure
     } finally {
       setSaving(false);
     }

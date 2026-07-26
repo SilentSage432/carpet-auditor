@@ -36,6 +36,7 @@ type NumberFieldProps = {
   inputMode?: "numeric" | "decimal";
   center?: boolean;
   leftIcon?: ReactNode;
+  onBlur?: () => void;
 } & ScanCapableProps;
 
 const baseInput =
@@ -85,6 +86,7 @@ export function NumberField({
   leftIcon,
   onScanCommit,
   flash,
+  onBlur,
 }: NumberFieldProps) {
   const { onKeyDown } = useScannerKeyTracking(onScanCommit);
 
@@ -109,8 +111,17 @@ export function NumberField({
         aria-label={ariaLabel ?? label}
         value={value}
         onFocus={selectOnFocus}
+        onBlur={() => onBlur?.()}
         onChange={(e) => handleChange(e.target.value)}
-        onKeyDown={onScanCommit ? onKeyDown : undefined}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            onBlur?.();
+            e.currentTarget.blur();
+            return;
+          }
+          if (onScanCommit) onKeyDown(e);
+        }}
         className={`${baseInput} ${leftIcon ? "pl-11" : ""} ${center ? "text-center font-mono tabular-nums" : "font-mono tabular-nums"} ${
           flash
             ? "border-emerald-400 ring-2 ring-emerald-400/50 shadow-[0_0_20px_-4px_rgba(16,185,129,0.7)]"
