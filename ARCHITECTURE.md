@@ -1,36 +1,37 @@
-# Architecture — Carpet Cycle Count Auditor
+# Carpet Hub — Architecture
 
 ```
-app/page.tsx          → presentation (entry, summary, shift log)
-lib/calc.ts           → owns CLF math + formula breakdown strings
-lib/storage.ts        → composes remote + local persistence + CSV
-lib/supabase.ts       → Supabase client factory
-lib/types.ts          → CarpetAudit domain model
-supabase/schema.sql   → authoritative table shape
+app/page.tsx                      → Hub shell (section state + data load)
+components/hub/HubChrome.tsx      → Sticky header + slide-over drawer
+components/sections/*             → Presentation per workspace section
+components/ui/NumberField.tsx     → Focus-select + leading-zero sanitize inputs
+lib/calc.ts                       → CLF + remnant sq ft / sq yd
+lib/number-input.ts               → Numeric string sanitizers
+lib/catalog.ts                    → carpet_catalog persistence
+lib/remnants.ts                   → carpet_remnants persistence
+lib/storage.ts                    → carpet_audits persistence
+lib/supabase.ts                   → Client factory
+supabase/schema.sql               → Audits + catalog + remnants tables
 ```
 
-## Domain columns
+## Ownership
 
-| Field | Meaning |
+| Concern | Owner |
 |---|---|
-| `sku` | Item number |
-| `carpet_name` | Style / product name (notes) |
-| `location_type` | `sales_floor` \| `top_stock` |
-| `measurement_inches` | Whole-inch portion |
-| `measurement_fraction` | Fraction pad (0–0.875) |
-| `rounds` | Wrap count |
-| `calculated_clf` | `(inches + fraction) × rounds × 0.2625` |
+| Navigation / section routing | `app/page.tsx` + `HubChrome` |
+| CLF math | `lib/calc.ts` |
+| Number typing UX | `lib/number-input.ts` + `NumberField` |
+| Catalog knowledge | `lib/catalog.ts` |
+| Remnant inventory | `lib/remnants.ts` |
+| Audit log | `lib/storage.ts` |
 
-## Data flow
+## Sections
 
-1. Operator enters SKU, carpet name, location, inches + fraction, rounds.
-2. `lib/calc.ts` computes total inches and CLF on every change; UI shows formula card.
-3. **Log Roll & Reset** → `saveAudit()` inserts to Supabase (or localStorage), appends feed, resets form to 0.
-4. Summary cards count today’s Floor vs Top Stock; cumulative CLF spans all loaded rows.
-5. Copy / CSV export operate on the shift (today) set.
+1. **Cycle Audit** — roll CLF logging, catalog auto-fill, compact shift log
+2. **Carpet Catalog** — wall SKU master list
+3. **Remnant Rack** — back-room remnant status hub
+4. **Settings & Sync** — Supabase + localStorage status
 
-## Offline policy
+## Offline
 
-- Read: merge remote rows with local `offline: true` rows not yet present remotely.
-- Write: always keep a local copy; mark `offline` when remote write fails.
-- No automatic retry queue yet (see roadmap).
+Each domain falls back to its own `localStorage` key when Supabase is missing or unreachable.

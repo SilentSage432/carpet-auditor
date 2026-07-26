@@ -42,3 +42,15 @@ export function formatFormulaBreakdown(
 ): string {
   return `${totalInches.toFixed(2)}" × ${rounds} rounds × ${CLF_FACTOR} = ${formatClf(clf)} CLF`;
 }
+
+export function calculateSquareFeet(widthFt: number, lengthFt: number): number {
+  return widthFt * lengthFt;
+}
+
+export function calculateSquareYards(squareFeet: number): number {
+  return squareFeet / 9;
+}
+
+export function formatSqYd(sqYd: number): string {
+  return sqYd.toFixed(2);
+}

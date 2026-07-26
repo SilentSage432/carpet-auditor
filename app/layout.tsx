@@ -15,9 +15,9 @@ const jetbrains = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Carpet Cycle Count Auditor",
+  title: "Carpet Hub",
   description:
-    "Mobile-first carpet cycle count auditor with calculated linear feet (CLF).",
+    "Carpet Management Hub — cycle audit, catalog, and remnant rack.",
 };
 
 export const viewport: Viewport = {

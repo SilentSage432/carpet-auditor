@@ -1,3 +1,27 @@
+# Carpet Hub — Development Journal
+
+## 2026-07-25 — Carpet Management Hub overhaul
+
+### Shipped
+- Multi-section **Carpet Hub** with sticky header + translucent slide-over drawer (Audit / Catalog / Remnants / Settings).
+- Fixed sticky leading-zero typing via string-based `NumberField` + sanitizers + focus-select.
+- Cycle Audit: catalog SKU auto-fill, **+ Save to Catalog**, shift log capped at 5 with Show All.
+- Catalog Manager: search, add/edit/remove wall SKUs (vendor + roll width).
+- Remnant Rack: status filters, W×L → sq ft / sq yd, reserve/sold/edit/delete.
+- Settings: Supabase config/ping + localStorage cache counts.
+- Schema expanded: `carpet_catalog`, `carpet_remnants`.
+
+### Ownership
+| Concern | Owner |
+|---|---|
+| Hub navigation | `app/page.tsx`, `components/hub/HubChrome.tsx` |
+| Number UX | `lib/number-input.ts`, `components/ui/NumberField.tsx` |
+| Catalog | `lib/catalog.ts` |
+| Remnants | `lib/remnants.ts` |
+| Audits | `lib/storage.ts` |
+
+---
+
 ## 2026-07-25 — Visual / mobile layout polish
 
 ### Changes

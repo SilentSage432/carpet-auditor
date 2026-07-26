@@ -1,39 +1,35 @@
-# Carpet Cycle Count Auditor — Chat Handoff
+# Carpet Hub — Chat Handoff
 
 ## Product
-Mobile-first carpet cycle count tool. Operators enter SKU + carpet name/style, measure core-to-outer edge (inches + fraction pad), enter wrap rounds (with +5/+10/+20 chips), and log calculated linear feet (CLF). Form auto-resets to 0 after each successful log.
+**Carpet Management Hub** — mobile-first store tool with four workspaces behind a hamburger drawer:
 
-## Stack
-- Next.js App Router, Client Components
-- Tailwind CSS v4
-- `@supabase/supabase-js` → `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-- Offline: `localStorage` key `carpet_audits_offline`
+1. Cycle Audit (CLF roll auditor + catalog lookup)
+2. Carpet Catalog (wall SKU master)
+3. Remnant Rack (back-room inventory)
+4. Settings & Sync
+
+## Number input fix
+Fields use string state + `NumberField` / sanitizers so typing `22` into a `0` field does not become `022`. Focus selects all; empty string allowed while typing.
 
 ## Formula
-```
-CLF = Total Inches × Rounds × 0.2625
-Total Inches = whole_inches + measurement_fraction
-```
+`CLF = (whole + fraction) × rounds × 0.2625`
 
-## Supabase columns (`carpet_audits`)
-`sku`, `carpet_name`, `location_type`, `measurement_inches` (whole), `measurement_fraction`, `rounds`, `calculated_clf`, `created_at`
+## Supabase tables
+- `carpet_audits`
+- `carpet_catalog` (unique `sku`)
+- `carpet_remnants`
+
+Apply `supabase/schema.sql`.
 
 ## Key paths
-- `app/page.tsx` — auditor UI
-- `lib/calc.ts` — CLF + formula display
-- `lib/storage.ts` — fetch / save / delete / CSV + offline
-- `supabase/schema.sql` — table + RLS
-
-## UI shell
-Mobile column: `max-w-md mx-auto px-4 py-6`. Dark slate + emerald accents. Rounds stepper uses `shrink-0` ± and `min-w-0 flex-1` input to prevent card overflow.
+- `app/page.tsx` — hub shell
+- `components/sections/CycleAuditSection.tsx`
+- `components/sections/CatalogSection.tsx`
+- `components/sections/RemnantSection.tsx`
+- `components/sections/SettingsSection.tsx`
 
 ## Verify
 ```bash
 npm run typecheck
 npm run build
 ```
-
-## Setup
-1. `.env.local` from `.env.example`
-2. Run `supabase/schema.sql` (or migration comments if upgrading older schema)
-3. `npm run dev`

@@ -1,15 +1,9 @@
+import { uid } from "./uid";
 import type { CarpetAudit, CarpetAuditInsert, LocationType } from "./types";
 import { getSupabase } from "./supabase";
 
 const STORAGE_KEY = "carpet_audits_offline";
 const TABLE = "carpet_audits";
-
-function uid(): string {
-  if (typeof crypto !== "undefined" && crypto.randomUUID) {
-    return crypto.randomUUID();
-  }
-  return `local-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
-}
 
 function readLocal(): CarpetAudit[] {
   if (typeof window === "undefined") return [];
@@ -48,14 +42,14 @@ export function getLocalAudits(): CarpetAudit[] {
   return readLocal();
 }
 
-/** Normalize new schema + legacy local/remote rows. */
+export function countLocalAudits(): number {
+  return readLocal().length;
+}
+
 function mapRow(row: Record<string, unknown>): CarpetAudit {
   const locationType = (row.location_type ?? row.location ?? "sales_floor") as LocationType;
-
   const fraction = Number(row.measurement_fraction ?? row.fraction ?? 0);
-  // New schema: measurement_inches = whole inches. Legacy: whole_inches.
   const whole = Number(row.whole_inches ?? row.measurement_inches ?? 0);
-
   const clf = Number(row.calculated_clf ?? row.clf ?? 0);
 
   return {
@@ -157,14 +151,12 @@ export async function saveAudit(input: CarpetAuditInsert): Promise<{
 
 export async function deleteAudit(id: string): Promise<void> {
   removeLocal(id);
-
   const supabase = getSupabase();
   if (!supabase) return;
-
   try {
     await supabase.from(TABLE).delete().eq("id", id);
   } catch {
-    // Local already removed; remote delete can retry later if needed.
+    /* local already removed */
   }
 }
 

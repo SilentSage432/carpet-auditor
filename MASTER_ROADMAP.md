@@ -1,24 +1,22 @@
-# Carpet Roll Auditor — Master Roadmap
+# Carpet Hub — Master Roadmap
 
 ## Done
-- [x] Scaffold Next.js App Router + Tailwind v4
-- [x] CLF calculation engine (`× 0.2625`)
-- [x] Mobile roll entry: SKU, carpet name, location, fraction pad, rounds stepper + quick chips
-- [x] Zero defaults + auto-reset on Log Roll & Reset
-- [x] Live formula breakdown card
-- [x] Summary: Floor vs Top Stock counts + cumulative CLF; Copy + CSV export
-- [x] Audit history feed with delete + SVG measurement guide
-- [x] Supabase column alignment + localStorage offline fallback
-- [x] `npm run typecheck` + build verification
+- [x] Carpet Hub shell with sticky header + slide-over nav
+- [x] Number input sanitize (no sticky leading zeros; focus-select; blank allowed)
+- [x] Cycle Audit with catalog auto-fill + Save to Catalog + compact shift log (5 + show all)
+- [x] Carpet Catalog manager (search, add/edit/remove, roll width)
+- [x] Remnant Rack (status filters, sq ft/yd, reserve/sold, edit/delete)
+- [x] Settings & Sync (Supabase ping + local cache counts)
+- [x] Schema for audits, catalog, remnants
+- [x] Offline localStorage fallback per domain
 
 ## Next
-- [ ] Optional sync queue that retries offline rows when connectivity returns
-- [ ] Shift / associate ID for multi-person stores
-- [ ] Tighten Supabase RLS (store-scoped keys or authenticated role)
-- [ ] PWA install + large-display / landscape layout for back-office review
-- [ ] Hardware barcode scanner focus/auto-advance on SKU field
+- [ ] Offline sync queue / retry when connectivity returns
+- [ ] Associate / shift ID
+- [ ] Hardware barcode scanner auto-advance
+- [ ] Tighten RLS for multi-store
+- [ ] PWA install
 
-## Non-goals (for now)
-- Inventory replenishment recommendations
-- Pricing or margin math
-- Multi-warehouse routing
+## Non-goals
+- Pricing / margin engines
+- Replenishment recommendations

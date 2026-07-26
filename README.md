@@ -1,17 +1,17 @@
-# Carpet Cycle Count Auditor
+# Carpet Hub
 
-Mobile-first carpet cycle count tool. Measure inches (fraction pad), enter wrap rounds, log **Calculated Linear Feet (CLF)**, then auto-reset for the next roll.
+Mobile-first **Carpet Management Hub** for cycle counts, wall SKU catalog, and remnant rack inventory.
 
 ```
 CLF = Total Inches × Rounds × 0.2625
+Remnant sq yd = (Width × Length) / 9
 ```
 
 ## Stack
 
 - Next.js App Router (Client Components)
 - Tailwind CSS v4
-- Supabase (`@supabase/supabase-js`)
-- Offline fallback via `localStorage`
+- Supabase + localStorage offline fallback
 
 ## Setup
 
@@ -23,9 +23,7 @@ npm install
 npm run dev
 ```
 
-Apply `supabase/schema.sql` in the Supabase SQL editor.
-
-Without Supabase env vars, entries still save offline in the browser.
+Apply `supabase/schema.sql` (creates `carpet_audits`, `carpet_catalog`, `carpet_remnants`).
 
 ## Scripts
 
@@ -37,7 +35,7 @@ npm run lint
 
 ## Docs
 
-- [DEVELOPMENT_JOURNAL.md](./DEVELOPMENT_JOURNAL.md)
-- [CHAT_HANDOFF.md](./CHAT_HANDOFF.md)
-- [MASTER_ROADMAP.md](./MASTER_ROADMAP.md)
 - [ARCHITECTURE.md](./ARCHITECTURE.md)
+- [CHAT_HANDOFF.md](./CHAT_HANDOFF.md)
+- [DEVELOPMENT_JOURNAL.md](./DEVELOPMENT_JOURNAL.md)
+- [MASTER_ROADMAP.md](./MASTER_ROADMAP.md)
