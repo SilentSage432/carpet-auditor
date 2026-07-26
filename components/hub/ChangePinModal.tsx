@@ -26,12 +26,16 @@ export function ChangePinModal({ open, member, onClose, onUpdated }: Props) {
 
   if (!open || !member) return null;
 
+  const profileLabel =
+    member.role === "Supervisor" ? "Supervisor" : "Profile";
+
   async function handleSave() {
     if (!member) return;
     if (!/^\d+$/.test(currentPin)) {
       setError("Current PIN must be digits only");
       return;
     }
+    // Match active profile pin_code (defaults to 1234 when unset)
     if (!verifyPin(member, currentPin)) {
       setError("Current PIN is incorrect");
       return;
@@ -54,7 +58,6 @@ export function ChangePinModal({ open, member, onClose, onUpdated }: Props) {
     try {
       const { record } = await updateSpecialistPin(member, newPin);
       clearPinRemindLater(record.id);
-      // Parent updates React state + localStorage; lib also wrote localStorage.
       onUpdated(record);
       setToast(true);
       window.setTimeout(() => {
@@ -64,15 +67,19 @@ export function ChangePinModal({ open, member, onClose, onUpdated }: Props) {
     } catch (err) {
       const message =
         err instanceof Error && err.message
-          ? err.message
-          : "Could not update PIN — changes were not saved";
+          ? err.message.replace(/specialist/gi, "Profile")
+          : `Could not update ${profileLabel} profile in database. Please try again.`;
       setError(message);
       setToast(false);
-      // Keep modal open on failure
     } finally {
       setSaving(false);
     }
   }
+
+  const successToast =
+    member.role === "Supervisor"
+      ? "✅ Supervisor PIN updated successfully!"
+      : "✅ Profile PIN updated successfully!";
 
   return (
     <div className="fixed inset-0 z-[75] flex items-end justify-center sm:items-center">
@@ -126,7 +133,7 @@ export function ChangePinModal({ open, member, onClose, onUpdated }: Props) {
         )}
         {toast && (
           <p className="mt-3 text-center text-sm font-semibold text-emerald-400">
-            PIN updated successfully!
+            {successToast}
           </p>
         )}
 

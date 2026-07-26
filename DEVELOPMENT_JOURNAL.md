@@ -1,5 +1,13 @@
 # Carpet Hub — Development Journal
 
+## 2026-07-25 — Supervisor PIN upsert + friendly errors
+
+### Shipped
+- PIN save upserts Supervisor into `store_specialists` when ID is a seed/fallback or update hits zero rows; persists real UUID + pin to session.
+- Error copy uses Profile/Supervisor (not "specialist"); success toast "✅ Supervisor PIN updated successfully!"; dismisses change modal + default-PIN banner.
+
+---
+
 ## 2026-07-25 — Fix PIN persistence across reloads
 
 ### Shipped

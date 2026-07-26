@@ -224,13 +224,11 @@ export function requiresPin(member: StoreSpecialist): boolean {
 }
 
 export function verifyPin(member: StoreSpecialist, pin: string): boolean {
+  // Match stored pin_code; Supervisors (and any blank pin) default to 1234
   const expected =
-    member.pin_code && member.pin_code.length > 0
-      ? member.pin_code
-      : member.role === "Supervisor"
-        ? DEFAULT_SUPERVISOR_PIN
-        : null;
-  if (!expected) return false;
+    member.pin_code && member.pin_code.trim().length > 0
+      ? member.pin_code.trim()
+      : DEFAULT_SUPERVISOR_PIN;
   return pin === expected;
 }
 
@@ -368,6 +366,24 @@ export async function saveSpecialist(input: {
   }
 }
 
+function isDatabaseUuid(id: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+    id
+  );
+}
+
+/** Seed / local fallback IDs that are not real Supabase row UUIDs. */
+export function isFallbackProfileId(id: string): boolean {
+  if (!id || !isDatabaseUuid(id)) return true;
+  const lower = id.toLowerCase();
+  return (
+    lower.startsWith("seed-") ||
+    lower.startsWith("sup-") ||
+    lower.startsWith("default-") ||
+    lower.startsWith("local-")
+  );
+}
+
 export async function updateSpecialistPin(
   member: StoreSpecialist,
   newPin: string
@@ -379,6 +395,8 @@ export async function updateSpecialistPin(
 
   const store = member.store_number || getStoreNumber();
   const supabase = getSupabase();
+  const profileLabel =
+    member.role === "Supervisor" ? "Supervisor" : "Profile";
 
   // Offline / unconfigured: persist locally + queue; still update active session.
   if (!supabase || shouldSaveOffline()) {
@@ -398,43 +416,105 @@ export async function updateSpecialistPin(
     return { record: offlineRecord, offline: true };
   }
 
-  const uuidRe =
-    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-  let targetId = member.id;
-
-  if (!uuidRe.test(targetId)) {
-    const { data: found, error: findError } = await supabase
-      .from(TABLE)
-      .select("*")
-      .eq("store_number", store)
-      .eq("name", member.name)
-      .maybeSingle();
-
-    if (findError) throw findError;
-    if (!found) {
-      throw new Error("Could not find this specialist in the store database");
+  async function upsertProfile(): Promise<StoreSpecialist> {
+    const payload: Record<string, unknown> = {
+      name: member.name,
+      role: member.role === "Supervisor" ? "Supervisor" : member.role,
+      pin_code: pin,
+      store_number: store,
+      created_at: member.created_at || new Date().toISOString(),
+    };
+    // Only send a real UUID — never insert seed-/fallback ids into uuid PK
+    if (!isFallbackProfileId(member.id)) {
+      payload.id = member.id;
     }
-    targetId = String((found as Record<string, unknown>).id);
+
+    const { data, error } = await supabase!
+      .from(TABLE)
+      .upsert(payload, { onConflict: "store_number,name" })
+      .select("*")
+      .single();
+
+    if (error || !data) {
+      throw new Error(
+        `Could not update ${profileLabel} profile in database. Please try again.`
+      );
+    }
+
+    return mapRow({
+      ...(data as Record<string, unknown>),
+      offline: false,
+    });
   }
 
-  const { data, error } = await supabase
-    .from(TABLE)
-    .update({ pin_code: pin })
-    .eq("id", targetId)
-    .select("*")
-    .single();
+  try {
+    let targetId: string | null = null;
 
-  if (error) throw error;
-  if (!data) throw new Error("PIN update returned no row");
+    if (!isFallbackProfileId(member.id)) {
+      const { data: byId } = await supabase
+        .from(TABLE)
+        .select("id")
+        .eq("id", member.id)
+        .maybeSingle();
+      if (byId?.id) targetId = String(byId.id);
+    }
 
-  const saved = mapRow({
-    ...(data as Record<string, unknown>),
-    offline: false,
-  });
-  upsertLocal(saved);
-  // Immediately persist session so reloads / verifyPin use the new code.
-  setActiveSpecialist(saved);
-  return { record: saved, offline: false };
+    if (!targetId) {
+      const { data: byName, error: findError } = await supabase
+        .from(TABLE)
+        .select("id")
+        .eq("store_number", store)
+        .eq("name", member.name)
+        .maybeSingle();
+
+      if (findError) {
+        throw new Error(
+          `Could not update ${profileLabel} profile in database. Please try again.`
+        );
+      }
+      if (byName?.id) targetId = String(byName.id);
+    }
+
+    let saved: StoreSpecialist;
+
+    if (!targetId) {
+      // No DB row yet — insert/upsert a real Supervisor/Profile record
+      saved = await upsertProfile();
+    } else {
+      const { data, error } = await supabase
+        .from(TABLE)
+        .update({ pin_code: pin })
+        .eq("id", targetId)
+        .select("*");
+
+      if (error) {
+        throw new Error(
+          `Could not update ${profileLabel} profile in database. Please try again.`
+        );
+      }
+
+      if (!data || data.length === 0) {
+        // Update matched zero rows — fall back to upsert
+        saved = await upsertProfile();
+      } else {
+        saved = mapRow({
+          ...(data[0] as Record<string, unknown>),
+          offline: false,
+        });
+      }
+    }
+
+    upsertLocal(saved);
+    setActiveSpecialist(saved);
+    return { record: saved, offline: false };
+  } catch (err) {
+    if (err instanceof Error && err.message.includes("profile in database")) {
+      throw err;
+    }
+    throw new Error(
+      `Could not update ${profileLabel} profile in database. Please try again.`
+    );
+  }
 }
 
 /**

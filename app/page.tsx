@@ -166,8 +166,9 @@ export default function CarpetHubPage() {
     setSpecialist(member);
     setActiveSpecialist(member);
     upsertSpecialist(member);
-    // Dismiss default-PIN banner whenever pin is no longer the default
-    setDefaultPinNotice(isDefaultPin(member) && !wasPinRemindLater(member.id));
+    // Always dismiss default-PIN banner after a successful PIN save
+    setDefaultPinNotice(false);
+    setChangePinOpen(false);
     setPinToast(true);
     window.setTimeout(() => setPinToast(false), 2500);
   }
@@ -217,9 +218,9 @@ export default function CarpetHubPage() {
       {pinToast && (
         <p
           role="status"
-          className="fixed inset-x-0 top-20 z-[56] mx-auto w-fit rounded-xl border border-emerald-500/40 bg-emerald-950/95 px-4 py-2 text-sm font-semibold text-emerald-200 shadow-lg"
+          className="fixed inset-x-0 top-20 z-[56] mx-auto w-fit max-w-sm rounded-xl border border-emerald-500/40 bg-emerald-950/95 px-4 py-2 text-center text-sm font-semibold text-emerald-200 shadow-lg"
         >
-          PIN updated successfully!
+          ✅ Supervisor PIN updated successfully!
         </p>
       )}
 
