@@ -1,5 +1,17 @@
 # Carpet Hub — Development Journal
 
+## 2026-07-25 — Offline sync, SW shell, multi-store, manager markdown
+
+### Shipped
+- `public/sw.js` + `ServiceWorkerRegister`: cache-first static shell, network-first HTML, network-only APIs.
+- `lib/sync-queue.ts` (`carpet_hub_sync_queue`): enqueue offline writes; auto-replay on `online` with green sync toast.
+- Header network badge: 🟢 Online / 🟠 Offline Mode (+ pending queue count).
+- Store context (`lib/store.ts`): Lowe's # selector in Settings; `store_number` on all entities + Supabase `.eq` filters.
+- Manager markdown: 60+ / Supervisor-gated modal (%, fixed $); clearance badge on remnant cards.
+- Schema: `store_number`, markdown columns, per-store unique indexes.
+
+---
+
 ## 2026-07-25 — Deduplicate supervisors + default PIN customization
 
 ### Shipped

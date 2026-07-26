@@ -1,12 +1,17 @@
 import { sanitizeBarcodeScan } from "./barcode";
 import { uid } from "./uid";
 import type { CatalogItem, CatalogItemInsert } from "./types";
+import { getStoreNumber } from "./store";
 import { getSupabase } from "./supabase";
+import {
+  enqueueSyncAction,
+  shouldSaveOffline,
+} from "./sync-queue";
 
 const STORAGE_KEY = "carpet_catalog_offline";
 const TABLE = "carpet_catalog";
 
-function readLocal(): CatalogItem[] {
+function readAllLocal(): CatalogItem[] {
   if (typeof window === "undefined") return [];
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -19,9 +24,13 @@ function readLocal(): CatalogItem[] {
   }
 }
 
-function writeLocal(records: CatalogItem[]): void {
+function writeAllLocal(records: CatalogItem[]): void {
   if (typeof window === "undefined") return;
   localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
+}
+
+function forStore(store = getStoreNumber()): CatalogItem[] {
+  return readAllLocal().filter((r) => r.store_number === store);
 }
 
 function mapRow(row: Record<string, unknown>): CatalogItem {
@@ -33,6 +42,7 @@ function mapRow(row: Record<string, unknown>): CatalogItem {
 
   return {
     id: String(row.id),
+    store_number: String(row.store_number ?? getStoreNumber()),
     sku: String(row.sku ?? ""),
     carpet_name: String(row.carpet_name ?? ""),
     vendor: String(row.vendor ?? ""),
@@ -49,11 +59,21 @@ function upsertLocal(record: CatalogItem): CatalogItem[] {
     ? sanitizeBarcodeScan(record.upc_barcode)
     : null;
 
-  const existing = readLocal()
-    .filter((r) => r.id !== record.id && r.sku !== record.sku)
+  const existing = readAllLocal()
+    .filter(
+      (r) =>
+        !(
+          r.store_number === record.store_number &&
+          (r.id === record.id || r.sku === record.sku)
+        )
+    )
     .map((r) => {
-      // Keep UPC unique locally when linking
-      if (upc && r.upc_barcode && sanitizeBarcodeScan(r.upc_barcode) === upc) {
+      if (
+        upc &&
+        r.store_number === record.store_number &&
+        r.upc_barcode &&
+        sanitizeBarcodeScan(r.upc_barcode) === upc
+      ) {
         return { ...r, upc_barcode: null };
       }
       return r;
@@ -63,16 +83,16 @@ function upsertLocal(record: CatalogItem): CatalogItem[] {
     { ...record, upc_barcode: upc && upc.length > 0 ? upc : null },
     ...existing,
   ].sort((a, b) => a.sku.localeCompare(b.sku));
-  writeLocal(next);
-  return next;
+  writeAllLocal(next);
+  return forStore(record.store_number);
 }
 
 export function getLocalCatalog(): CatalogItem[] {
-  return readLocal();
+  return forStore();
 }
 
 export function countLocalCatalog(): number {
-  return readLocal().length;
+  return forStore().length;
 }
 
 export function findCatalogBySku(
@@ -86,16 +106,32 @@ export function findCatalogBySku(
 
 export { findCatalogBySkuOrBarcode } from "./barcode";
 
-export async function fetchCatalog(): Promise<CatalogItem[]> {
-  const supabase = getSupabase();
-  const local = getLocalCatalog();
+function catalogPayload(record: CatalogItem) {
+  return {
+    id: record.id,
+    store_number: record.store_number,
+    sku: record.sku,
+    carpet_name: record.carpet_name,
+    vendor: record.vendor,
+    roll_width_ft: record.roll_width_ft,
+    upc_barcode: record.upc_barcode,
+    updated_at: record.updated_at,
+    created_at: record.created_at,
+  };
+}
 
-  if (!supabase) return local;
+export async function fetchCatalog(): Promise<CatalogItem[]> {
+  const store = getStoreNumber();
+  const local = forStore(store);
+  const supabase = getSupabase();
+
+  if (!supabase || shouldSaveOffline()) return local;
 
   try {
     const { data, error } = await supabase
       .from(TABLE)
       .select("*")
+      .eq("store_number", store)
       .order("sku", { ascending: true });
 
     if (error) throw error;
@@ -117,6 +153,7 @@ export async function saveCatalogItem(input: CatalogItemInsert): Promise<{
   offline: boolean;
 }> {
   const now = new Date().toISOString();
+  const store = input.store_number ?? getStoreNumber();
   const upcRaw = input.upc_barcode;
   const upc =
     upcRaw == null || upcRaw === ""
@@ -125,6 +162,7 @@ export async function saveCatalogItem(input: CatalogItemInsert): Promise<{
 
   const record: CatalogItem = {
     id: input.id ?? uid(),
+    store_number: store,
     sku: input.sku.trim(),
     carpet_name: input.carpet_name.trim(),
     vendor: (input.vendor ?? "").trim(),
@@ -137,36 +175,26 @@ export async function saveCatalogItem(input: CatalogItemInsert): Promise<{
 
   const supabase = getSupabase();
 
-  if (!supabase) {
+  if (!supabase || shouldSaveOffline()) {
     const offlineRecord = { ...record, offline: true };
     upsertLocal(offlineRecord);
+    enqueueSyncAction("upsert_catalog", catalogPayload(offlineRecord), store);
     return { record: offlineRecord, offline: true };
   }
 
   try {
-    // Clear this UPC from other rows remotely when linking
     if (record.upc_barcode) {
       await supabase
         .from(TABLE)
         .update({ upc_barcode: null, updated_at: now })
+        .eq("store_number", store)
         .eq("upc_barcode", record.upc_barcode)
         .neq("sku", record.sku);
     }
 
     const { data, error } = await supabase
       .from(TABLE)
-      .upsert(
-        {
-          id: record.id,
-          sku: record.sku,
-          carpet_name: record.carpet_name,
-          vendor: record.vendor,
-          roll_width_ft: record.roll_width_ft,
-          upc_barcode: record.upc_barcode,
-          updated_at: record.updated_at,
-        },
-        { onConflict: "sku" }
-      )
+      .upsert(catalogPayload(record), { onConflict: "store_number,sku" })
       .select("*")
       .single();
 
@@ -178,6 +206,7 @@ export async function saveCatalogItem(input: CatalogItemInsert): Promise<{
   } catch {
     const offlineRecord = { ...record, offline: true };
     upsertLocal(offlineRecord);
+    enqueueSyncAction("upsert_catalog", catalogPayload(offlineRecord), store);
     return { record: offlineRecord, offline: true };
   }
 }
@@ -188,6 +217,7 @@ export async function clearCatalogBarcode(item: CatalogItem): Promise<{
 }> {
   return saveCatalogItem({
     id: item.id,
+    store_number: item.store_number,
     sku: item.sku,
     carpet_name: item.carpet_name,
     vendor: item.vendor,
@@ -197,14 +227,17 @@ export async function clearCatalogBarcode(item: CatalogItem): Promise<{
 }
 
 export async function deleteCatalogItem(id: string): Promise<void> {
-  const local = readLocal();
-  writeLocal(local.filter((r) => r.id !== id));
+  const store = getStoreNumber();
+  writeAllLocal(readAllLocal().filter((r) => r.id !== id));
 
   const supabase = getSupabase();
-  if (!supabase) return;
+  if (!supabase || shouldSaveOffline()) {
+    enqueueSyncAction("delete_catalog", { id }, store);
+    return;
+  }
   try {
-    await supabase.from(TABLE).delete().eq("id", id);
+    await supabase.from(TABLE).delete().eq("id", id).eq("store_number", store);
   } catch {
-    /* local already removed */
+    enqueueSyncAction("delete_catalog", { id }, store);
   }
 }

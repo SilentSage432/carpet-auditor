@@ -6,6 +6,7 @@ export type SpecialistRole = "Associate" | "Supervisor";
 
 export type StoreSpecialist = {
   id: string;
+  store_number: string;
   name: string;
   role: SpecialistRole;
   /** Optional access PIN. Required for Supervisor profiles. */
@@ -16,6 +17,7 @@ export type StoreSpecialist = {
 
 export type CarpetAudit = {
   id: string;
+  store_number: string;
   sku: string;
   carpet_name: string;
   location_type: LocationType;
@@ -32,13 +34,15 @@ export type CarpetAudit = {
   offline?: boolean;
 };
 
-export type CarpetAuditInsert = Omit<CarpetAudit, "id" | "created_at" | "offline"> & {
+export type CarpetAuditInsert = Omit<CarpetAudit, "id" | "created_at" | "offline" | "store_number"> & {
   id?: string;
   created_at?: string;
+  store_number?: string;
 };
 
 export type CatalogItem = {
   id: string;
+  store_number: string;
   sku: string;
   carpet_name: string;
   vendor: string;
@@ -52,15 +56,17 @@ export type CatalogItem = {
 
 export type CatalogItemInsert = Omit<
   CatalogItem,
-  "id" | "created_at" | "updated_at" | "offline"
+  "id" | "created_at" | "updated_at" | "offline" | "store_number"
 > & {
   id?: string;
+  store_number?: string;
 };
 
 export type RemnantStatus = "available" | "reserved" | "sold";
 
 export type Remnant = {
   id: string;
+  store_number: string;
   sku: string;
   carpet_name: string;
   tag_number: string;
@@ -73,6 +79,13 @@ export type Remnant = {
   status: RemnantStatus;
   reserved_for: string;
   logged_by: string;
+  /** Original estimated retail / list value before markdown. */
+  estimated_value: number | null;
+  markdown_percent: number | null;
+  markdown_price: number | null;
+  markdown_notes: string;
+  markdown_by: string;
+  markdown_at: string | null;
   created_at: string;
   updated_at: string;
   offline?: boolean;
@@ -80,9 +93,10 @@ export type Remnant = {
 
 export type RemnantInsert = Omit<
   Remnant,
-  "id" | "created_at" | "updated_at" | "offline" | "square_feet" | "square_yards"
+  "id" | "created_at" | "updated_at" | "offline" | "square_feet" | "square_yards" | "store_number"
 > & {
   id?: string;
+  store_number?: string;
   square_feet?: number;
   square_yards?: number;
 };
@@ -126,6 +140,6 @@ export const HUB_SECTIONS: {
     label: "Settings & Sync",
     title: "Settings & Sync",
     icon: "⚙️",
-    description: "Supabase connection & local storage",
+    description: "Store context, Supabase & offline queue",
   },
 ];

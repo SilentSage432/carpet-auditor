@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { ApplyMarkdownModal } from "@/components/hub/ApplyMarkdownModal";
 import { findCatalogBySkuOrBarcode } from "@/lib/catalog";
 import { agingBadge, daysOld } from "@/lib/aging";
 import {
@@ -9,9 +10,11 @@ import {
   formatSqYd,
 } from "@/lib/calc";
 import { sanitizeBarcodeScan } from "@/lib/barcode";
+import { clearanceBadgeLabel } from "@/lib/markdown";
 import { toNumber } from "@/lib/number-input";
 import { deleteRemnant, saveRemnant } from "@/lib/remnants";
-import type { CatalogItem, Remnant, RemnantStatus } from "@/lib/types";
+import { isSupervisor } from "@/lib/specialists";
+import type { CatalogItem, Remnant, RemnantStatus, StoreSpecialist } from "@/lib/types";
 import { NumberField, TextField } from "@/components/ui/NumberField";
 
 const STATUS_FILTERS: { id: "all" | RemnantStatus; label: string }[] = [
@@ -38,6 +41,8 @@ type Props = {
   remnants: Remnant[];
   onRemnantsChange: (items: Remnant[]) => void;
   loggedBy: string;
+  specialists: StoreSpecialist[];
+  activeSpecialist: StoreSpecialist | null;
 };
 
 export function RemnantSection({
@@ -45,6 +50,8 @@ export function RemnantSection({
   remnants,
   onRemnantsChange,
   loggedBy,
+  specialists,
+  activeSpecialist,
 }: Props) {
   const [statusFilter, setStatusFilter] = useState<"all" | RemnantStatus>("all");
   const [query, setQuery] = useState("");
@@ -57,9 +64,12 @@ export function RemnantSection({
   const [length, setLength] = useState("");
   const [location, setLocation] = useState("");
   const [notes, setNotes] = useState("");
+  const [estimatedValue, setEstimatedValue] = useState("");
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [markdownTarget, setMarkdownTarget] = useState<Remnant | null>(null);
 
+  const supervisorSession = isSupervisor(activeSpecialist);
   const widthNum = toNumber(width, 12);
   const lengthNum = toNumber(length, 0);
   const sqFt = calculateSquareFeet(widthNum, lengthNum);
@@ -93,6 +103,7 @@ export function RemnantSection({
     setLength("");
     setLocation("");
     setNotes("");
+    setEstimatedValue("");
     setShowForm(true);
   }
 
@@ -105,6 +116,9 @@ export function RemnantSection({
     setLength(String(item.length_ft));
     setLocation(item.location);
     setNotes(item.notes);
+    setEstimatedValue(
+      item.estimated_value != null ? String(item.estimated_value) : ""
+    );
     setShowForm(true);
   }
 
@@ -119,6 +133,10 @@ export function RemnantSection({
     if (!tag.trim() || lengthNum <= 0) return;
     setSaving(true);
     try {
+      const est =
+        estimatedValue.trim() === ""
+          ? null
+          : toNumber(estimatedValue, Number.NaN);
       const { record, offline } = await saveRemnant(
         {
           id: editing?.id,
@@ -132,6 +150,15 @@ export function RemnantSection({
           status: editing?.status ?? "available",
           reserved_for: editing?.reserved_for ?? "",
           logged_by: editing?.logged_by || loggedBy,
+          estimated_value:
+            est != null && Number.isFinite(est)
+              ? est
+              : (editing?.estimated_value ?? null),
+          markdown_percent: editing?.markdown_percent ?? null,
+          markdown_price: editing?.markdown_price ?? null,
+          markdown_notes: editing?.markdown_notes ?? "",
+          markdown_by: editing?.markdown_by ?? "",
+          markdown_at: editing?.markdown_at ?? null,
         },
         editing ?? undefined
       );
@@ -147,7 +174,10 @@ export function RemnantSection({
   }
 
   async function markReserved(item: Remnant) {
-    const name = window.prompt("Customer / order name for reservation?", item.reserved_for || "");
+    const name = window.prompt(
+      "Customer / order name for reservation?",
+      item.reserved_for || ""
+    );
     if (name === null) return;
     const { record } = await saveRemnant(
       {
@@ -182,6 +212,22 @@ export function RemnantSection({
 
   return (
     <div className="space-y-4">
+      <ApplyMarkdownModal
+        key={markdownTarget?.id ?? "markdown-closed"}
+        open={markdownTarget != null}
+        remnant={markdownTarget}
+        specialists={specialists}
+        activeSpecialist={activeSpecialist}
+        onClose={() => setMarkdownTarget(null)}
+        onApplied={(record) => {
+          onRemnantsChange([
+            record,
+            ...remnants.filter((r) => r.id !== record.id),
+          ]);
+          flash("Manager markdown applied");
+        }}
+      />
+
       <div className="flex gap-2 overflow-x-auto pb-1">
         {STATUS_FILTERS.map((f) => (
           <button
@@ -265,6 +311,13 @@ export function RemnantSection({
           <p className="rounded-xl border border-slate-800 bg-slate-950/70 px-3 py-2 font-mono text-sm text-emerald-400">
             {sqFt.toFixed(2)} sq ft · {formatSqYd(sqYd)} sq yd
           </p>
+          <NumberField
+            label="Estimated value ($)"
+            mode="decimal"
+            value={estimatedValue}
+            onChange={setEstimatedValue}
+            placeholder="Optional list / retail"
+          />
           <TextField
             label="Location"
             value={location}
@@ -318,92 +371,122 @@ export function RemnantSection({
           {filtered.map((item) => {
             const age = daysOld(item.created_at);
             const ageBadge = agingBadge(age);
+            const canMarkdown =
+              ageBadge.tier === "clearance" || supervisorSession;
+            const clearance = clearanceBadgeLabel({
+              markdown_price: item.markdown_price,
+              markdown_percent: item.markdown_percent,
+              markdown_by: item.markdown_by,
+              estimated_value: item.estimated_value,
+            });
             return (
-            <li
-              key={item.id}
-              className="space-y-3 rounded-2xl border border-slate-800 bg-slate-900/90 p-3"
-            >
-              <div className="flex flex-wrap items-start justify-between gap-2">
-                <div className="min-w-0">
-                  <p className="font-mono text-base font-bold text-slate-50">
-                    {item.tag_number}
-                  </p>
-                  <p className="truncate text-sm text-slate-200">
-                    {item.carpet_name || `SKU ${item.sku}`}
-                  </p>
-                  <p className="mt-1 text-sm text-slate-400">
-                    {item.width_ft}′ × {item.length_ft}′ · {formatSqYd(item.square_yards)} sq yd
-                  </p>
-                </div>
-                <span
-                  className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide ${statusPill(item.status)}`}
-                >
-                  {item.status}
-                </span>
-              </div>
-              <p
-                className={`rounded-lg border px-2.5 py-2 text-xs font-semibold leading-snug ${ageBadge.className}`}
+              <li
+                key={item.id}
+                className="space-y-3 rounded-2xl border border-slate-800 bg-slate-900/90 p-3"
               >
-                {ageBadge.label}
-              </p>
-              <div className="flex flex-wrap gap-2">
-                {item.location ? (
-                  <span className="rounded-lg bg-slate-800 px-2 py-1 text-xs text-slate-300">
-                    {item.location}
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="font-mono text-base font-bold text-slate-50">
+                      {item.tag_number}
+                    </p>
+                    <p className="truncate text-sm text-slate-200">
+                      {item.carpet_name || `SKU ${item.sku}`}
+                    </p>
+                    <p className="mt-1 text-sm text-slate-400">
+                      {item.width_ft}′ × {item.length_ft}′ ·{" "}
+                      {formatSqYd(item.square_yards)} sq yd
+                    </p>
+                  </div>
+                  <span
+                    className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide ${statusPill(item.status)}`}
+                  >
+                    {item.status}
                   </span>
+                </div>
+                <p
+                  className={`rounded-lg border px-2.5 py-2 text-xs font-semibold leading-snug ${ageBadge.className}`}
+                >
+                  {ageBadge.label}
+                </p>
+                {clearance ? (
+                  <p className="rounded-lg border border-red-500/50 bg-red-950/50 px-2.5 py-2 text-xs font-bold leading-snug text-red-200">
+                    {clearance}
+                  </p>
                 ) : null}
-                {item.reserved_for ? (
-                  <span className="rounded-lg bg-amber-500/15 px-2 py-1 text-xs text-amber-300">
-                    For: {item.reserved_for}
-                  </span>
+                <div className="flex flex-wrap gap-2">
+                  {item.location ? (
+                    <span className="rounded-lg bg-slate-800 px-2 py-1 text-xs text-slate-300">
+                      {item.location}
+                    </span>
+                  ) : null}
+                  {item.reserved_for ? (
+                    <span className="rounded-lg bg-amber-500/15 px-2 py-1 text-xs text-amber-300">
+                      For: {item.reserved_for}
+                    </span>
+                  ) : null}
+                  {item.offline ? (
+                    <span className="rounded-lg bg-orange-500/15 px-2 py-1 text-xs text-orange-300">
+                      Offline
+                    </span>
+                  ) : null}
+                </div>
+                {item.logged_by ? (
+                  <p className="text-xs text-slate-500">
+                    Logged by {item.logged_by}
+                  </p>
                 ) : null}
-                {item.offline ? (
-                  <span className="rounded-lg bg-orange-500/15 px-2 py-1 text-xs text-orange-300">
-                    Offline
-                  </span>
+                {item.notes ? (
+                  <p className="text-xs text-slate-500">{item.notes}</p>
                 ) : null}
-              </div>
-              {item.logged_by ? (
-                <p className="text-xs text-slate-500">Logged by {item.logged_by}</p>
-              ) : null}
-              {item.notes ? (
-                <p className="text-xs text-slate-500">{item.notes}</p>
-              ) : null}
-              <div className="grid grid-cols-2 gap-2">
-                {item.status !== "reserved" && item.status !== "sold" && (
+                {item.markdown_notes ? (
+                  <p className="text-xs text-red-300/80">
+                    Markdown: {item.markdown_notes}
+                  </p>
+                ) : null}
+                {canMarkdown ? (
                   <button
                     type="button"
-                    onClick={() => void markReserved(item)}
-                    className="flex min-h-12 items-center justify-center rounded-xl border border-amber-500/40 text-sm font-semibold text-amber-300"
+                    onClick={() => setMarkdownTarget(item)}
+                    className="flex min-h-12 w-full items-center justify-center rounded-xl border border-red-500/50 bg-red-950/40 text-sm font-bold text-red-200"
                   >
-                    Mark Reserved
+                    🏷️ Apply Manager Markdown
                   </button>
-                )}
-                {item.status !== "sold" && (
+                ) : null}
+                <div className="grid grid-cols-2 gap-2">
+                  {item.status !== "reserved" && item.status !== "sold" && (
+                    <button
+                      type="button"
+                      onClick={() => void markReserved(item)}
+                      className="flex min-h-12 items-center justify-center rounded-xl border border-amber-500/40 text-sm font-semibold text-amber-300"
+                    >
+                      Mark Reserved
+                    </button>
+                  )}
+                  {item.status !== "sold" && (
+                    <button
+                      type="button"
+                      onClick={() => void markSold(item)}
+                      className="flex min-h-12 items-center justify-center rounded-xl border border-slate-600 text-sm font-semibold text-slate-200"
+                    >
+                      Mark Sold
+                    </button>
+                  )}
                   <button
                     type="button"
-                    onClick={() => void markSold(item)}
-                    className="flex min-h-12 items-center justify-center rounded-xl border border-slate-600 text-sm font-semibold text-slate-200"
+                    onClick={() => openEdit(item)}
+                    className="flex min-h-12 items-center justify-center rounded-xl border border-slate-700 text-sm font-semibold text-slate-100"
                   >
-                    Mark Sold
+                    Edit
                   </button>
-                )}
-                <button
-                  type="button"
-                  onClick={() => openEdit(item)}
-                  className="flex min-h-12 items-center justify-center rounded-xl border border-slate-700 text-sm font-semibold text-slate-100"
-                >
-                  Edit
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void handleDelete(item.id)}
-                  className="flex min-h-12 items-center justify-center rounded-xl border border-red-500/40 text-sm font-semibold text-red-400"
-                >
-                  Delete
-                </button>
-              </div>
-            </li>
+                  <button
+                    type="button"
+                    onClick={() => void handleDelete(item.id)}
+                    className="flex min-h-12 items-center justify-center rounded-xl border border-red-500/40 text-sm font-semibold text-red-400"
+                  >
+                    Delete
+                  </button>
+                </div>
+              </li>
             );
           })}
         </ul>

@@ -1,6 +1,11 @@
 import { uid } from "./uid";
 import type { SpecialistRole, StoreSpecialist } from "./types";
+import { getStoreNumber } from "./store";
 import { getSupabase } from "./supabase";
+import {
+  enqueueSyncAction,
+  shouldSaveOffline,
+} from "./sync-queue";
 
 const STORAGE_KEY = "carpet_specialists_offline";
 const ACTIVE_KEY = "carpet_active_specialist";
@@ -17,14 +22,17 @@ const PLACEHOLDER_NAMES = new Set([
   "specialist 2",
 ]);
 
-const SUPERVISOR_SEED: StoreSpecialist = {
-  id: "seed-supervisor",
-  name: "Department Supervisor",
-  role: "Supervisor",
-  pin_code: DEFAULT_SUPERVISOR_PIN,
-  created_at: new Date(0).toISOString(),
-  offline: true,
-};
+function supervisorSeed(store = getStoreNumber()): StoreSpecialist {
+  return {
+    id: `seed-supervisor-${store}`,
+    store_number: store,
+    name: "Department Supervisor",
+    role: "Supervisor",
+    pin_code: DEFAULT_SUPERVISOR_PIN,
+    created_at: new Date(0).toISOString(),
+    offline: true,
+  };
+}
 
 function normalizeRole(raw: unknown): SpecialistRole {
   const value = String(raw ?? "").toLowerCase();
@@ -47,6 +55,7 @@ function mapRow(row: Record<string, unknown>): StoreSpecialist {
 
   return {
     id: String(row.id),
+    store_number: String(row.store_number ?? getStoreNumber()),
     name: String(row.name ?? ""),
     role: normalizeRole(row.role),
     pin_code: pin,
@@ -63,20 +72,16 @@ function isPlaceholder(member: StoreSpecialist): boolean {
 }
 
 function preferSpecialist(a: StoreSpecialist, b: StoreSpecialist): StoreSpecialist {
-  // Prefer remote (non-offline) over offline/seed
   if (a.offline && !b.offline) return b;
   if (!a.offline && b.offline) return a;
-  // Prefer non-seed IDs
   const aSeed = a.id.startsWith("seed-");
   const bSeed = b.id.startsWith("seed-");
   if (aSeed && !bSeed) return b;
   if (!aSeed && bSeed) return a;
-  // Prefer custom PIN over default/null
   const aCustom = a.pin_code && a.pin_code !== DEFAULT_SUPERVISOR_PIN;
   const bCustom = b.pin_code && b.pin_code !== DEFAULT_SUPERVISOR_PIN;
   if (!aCustom && bCustom) return b;
   if (aCustom && !bCustom) return a;
-  // Prefer newer created_at
   return new Date(a.created_at).getTime() >= new Date(b.created_at).getTime() ? a : b;
 }
 
@@ -92,11 +97,10 @@ export function dedupeRoster(roster: StoreSpecialist[]): StoreSpecialist[] {
   for (const member of roster) {
     if (!member.name.trim() || isPlaceholder(member)) continue;
 
-    // All Department Supervisor / role Supervisor share one slot
     const key =
       member.role === "Supervisor" || isDepartmentSupervisorName(member.name)
-        ? "__supervisor__"
-        : `name:${member.name.toLowerCase().trim()}`;
+        ? `__supervisor__:${member.store_number}`
+        : `name:${member.store_number}:${member.name.toLowerCase().trim()}`;
 
     const existing = byKey.get(key);
     if (!existing) {
@@ -134,12 +138,17 @@ export function dedupeRoster(roster: StoreSpecialist[]): StoreSpecialist[] {
   });
 }
 
-function ensureSupervisor(roster: StoreSpecialist[]): StoreSpecialist[] {
-  const cleaned = dedupeRoster(roster);
+function ensureSupervisor(
+  roster: StoreSpecialist[],
+  store = getStoreNumber()
+): StoreSpecialist[] {
+  const scoped = roster.filter((m) => m.store_number === store);
+  const cleaned = dedupeRoster(scoped);
+  const seed = supervisorSeed(store);
   const hasSupervisor = cleaned.some((m) => m.role === "Supervisor");
-  if (cleaned.length === 0) return [SUPERVISOR_SEED];
+  if (cleaned.length === 0) return [seed];
   if (!hasSupervisor) {
-    return dedupeRoster([SUPERVISOR_SEED, ...cleaned]);
+    return dedupeRoster([seed, ...cleaned]);
   }
   return cleaned;
 }
@@ -167,7 +176,7 @@ export function clearPinRemindLater(memberId: string): void {
   sessionStorage.removeItem(`${PIN_REMIND_PREFIX}${memberId}`);
 }
 
-function readLocal(): StoreSpecialist[] {
+function readAllLocal(): StoreSpecialist[] {
   if (typeof window === "undefined") return [];
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -180,17 +189,28 @@ function readLocal(): StoreSpecialist[] {
   }
 }
 
-function writeLocal(records: StoreSpecialist[]): void {
+function writeAllLocal(records: StoreSpecialist[]): void {
   if (typeof window === "undefined") return;
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(ensureSupervisor(records)));
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
+}
+
+function readLocal(store = getStoreNumber()): StoreSpecialist[] {
+  return ensureSupervisor(readAllLocal().filter((r) => r.store_number === store), store);
+}
+
+function writeLocal(records: StoreSpecialist[], store = getStoreNumber()): void {
+  const others = readAllLocal().filter((r) => r.store_number !== store);
+  const scoped = ensureSupervisor(records, store);
+  writeAllLocal([...others, ...scoped]);
 }
 
 function upsertLocal(record: StoreSpecialist): StoreSpecialist[] {
-  const existing = readLocal().filter(
+  const store = record.store_number;
+  const existing = readLocal(store).filter(
     (r) => r.id !== record.id && r.name.toLowerCase() !== record.name.toLowerCase()
   );
-  const next = ensureSupervisor([record, ...existing]);
-  writeLocal(next);
+  const next = ensureSupervisor([record, ...existing], store);
+  writeLocal(next, store);
   return next;
 }
 
@@ -230,6 +250,7 @@ export function getActiveSpecialist(): StoreSpecialist | null {
       localStorage.removeItem(ACTIVE_KEY);
       return null;
     }
+    if (member.store_number !== getStoreNumber()) return null;
     return member;
   } catch {
     return null;
@@ -245,17 +266,30 @@ export function setActiveSpecialist(specialist: StoreSpecialist | null): void {
   localStorage.setItem(ACTIVE_KEY, JSON.stringify(specialist));
 }
 
+function specialistPayload(record: StoreSpecialist) {
+  return {
+    id: record.id,
+    store_number: record.store_number,
+    name: record.name,
+    role: record.role,
+    pin_code: record.pin_code,
+    created_at: record.created_at,
+  };
+}
+
 export async function fetchSpecialists(): Promise<StoreSpecialist[]> {
-  const local = ensureSupervisor(readLocal());
-  writeLocal(local);
+  const store = getStoreNumber();
+  const local = readLocal(store);
+  writeLocal(local, store);
 
   const supabase = getSupabase();
-  if (!supabase) return local;
+  if (!supabase || shouldSaveOffline()) return local;
 
   try {
     const { data, error } = await supabase
       .from(TABLE)
       .select("*")
+      .eq("store_number", store)
       .order("name", { ascending: true });
 
     if (error) throw error;
@@ -269,8 +303,8 @@ export async function fetchSpecialists(): Promise<StoreSpecialist[]> {
       (r) => r.offline && !remoteNames.has(r.name.toLowerCase()) && !isPlaceholder(r)
     );
 
-    const merged = ensureSupervisor([...offlineOnly, ...remote]);
-    writeLocal(merged);
+    const merged = ensureSupervisor([...offlineOnly, ...remote], store);
+    writeLocal(merged, store);
     return merged;
   } catch {
     return local;
@@ -279,11 +313,13 @@ export async function fetchSpecialists(): Promise<StoreSpecialist[]> {
 
 export async function saveSpecialist(input: {
   id?: string;
+  store_number?: string;
   name: string;
   role?: SpecialistRole | string;
   pin_code?: string | null;
 }): Promise<{ record: StoreSpecialist; offline: boolean }> {
   const now = new Date().toISOString();
+  const store = input.store_number ?? getStoreNumber();
   const role = normalizeRole(input.role ?? "Associate");
   let pin =
     input.pin_code == null || String(input.pin_code).trim() === ""
@@ -296,6 +332,7 @@ export async function saveSpecialist(input: {
 
   const record: StoreSpecialist = {
     id: input.id ?? uid(),
+    store_number: store,
     name: input.name.trim(),
     role,
     pin_code: pin,
@@ -304,25 +341,17 @@ export async function saveSpecialist(input: {
   };
 
   const supabase = getSupabase();
-  if (!supabase) {
+  if (!supabase || shouldSaveOffline()) {
     const offlineRecord = { ...record, offline: true };
     upsertLocal(offlineRecord);
+    enqueueSyncAction("upsert_specialist", specialistPayload(offlineRecord), store);
     return { record: offlineRecord, offline: true };
   }
 
   try {
     const { data, error } = await supabase
       .from(TABLE)
-      .upsert(
-        {
-          id: record.id,
-          name: record.name,
-          role: record.role,
-          pin_code: record.pin_code,
-          created_at: record.created_at,
-        },
-        { onConflict: "name" }
-      )
+      .upsert(specialistPayload(record), { onConflict: "store_number,name" })
       .select("*")
       .single();
 
@@ -334,6 +363,7 @@ export async function saveSpecialist(input: {
   } catch {
     const offlineRecord = { ...record, offline: true };
     upsertLocal(offlineRecord);
+    enqueueSyncAction("upsert_specialist", specialistPayload(offlineRecord), store);
     return { record: offlineRecord, offline: true };
   }
 }
@@ -344,6 +374,7 @@ export async function updateSpecialistPin(
 ): Promise<{ record: StoreSpecialist; offline: boolean }> {
   return saveSpecialist({
     id: member.id,
+    store_number: member.store_number,
     name: member.name,
     role: member.role,
     pin_code: newPin.trim(),

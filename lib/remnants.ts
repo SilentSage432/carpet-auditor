@@ -1,12 +1,17 @@
 import { calculateSquareFeet, calculateSquareYards } from "./calc";
 import { uid } from "./uid";
 import type { Remnant, RemnantInsert, RemnantStatus } from "./types";
+import { getStoreNumber } from "./store";
 import { getSupabase } from "./supabase";
+import {
+  enqueueSyncAction,
+  shouldSaveOffline,
+} from "./sync-queue";
 
 const STORAGE_KEY = "carpet_remnants_offline";
 const TABLE = "carpet_remnants";
 
-function readLocal(): Remnant[] {
+function readAllLocal(): Remnant[] {
   if (typeof window === "undefined") return [];
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
@@ -19,9 +24,19 @@ function readLocal(): Remnant[] {
   }
 }
 
-function writeLocal(records: Remnant[]): void {
+function writeAllLocal(records: Remnant[]): void {
   if (typeof window === "undefined") return;
   localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
+}
+
+function forStore(store = getStoreNumber()): Remnant[] {
+  return readAllLocal().filter((r) => r.store_number === store);
+}
+
+function nullableNumber(value: unknown): number | null {
+  if (value == null || value === "") return null;
+  const n = Number(value);
+  return Number.isFinite(n) ? n : null;
 }
 
 function mapRow(row: Record<string, unknown>): Remnant {
@@ -32,6 +47,7 @@ function mapRow(row: Record<string, unknown>): Remnant {
 
   return {
     id: String(row.id),
+    store_number: String(row.store_number ?? getStoreNumber()),
     sku: String(row.sku ?? ""),
     carpet_name: String(row.carpet_name ?? ""),
     tag_number: String(row.tag_number ?? ""),
@@ -47,6 +63,15 @@ function mapRow(row: Record<string, unknown>): Remnant {
         : "available",
     reserved_for: String(row.reserved_for ?? ""),
     logged_by: String(row.logged_by ?? ""),
+    estimated_value: nullableNumber(row.estimated_value),
+    markdown_percent: nullableNumber(row.markdown_percent),
+    markdown_price: nullableNumber(row.markdown_price),
+    markdown_notes: String(row.markdown_notes ?? ""),
+    markdown_by: String(row.markdown_by ?? ""),
+    markdown_at:
+      row.markdown_at == null || row.markdown_at === ""
+        ? null
+        : String(row.markdown_at),
     created_at: String(row.created_at ?? new Date().toISOString()),
     updated_at: String(row.updated_at ?? row.created_at ?? new Date().toISOString()),
     offline: Boolean(row.offline),
@@ -54,32 +79,61 @@ function mapRow(row: Record<string, unknown>): Remnant {
 }
 
 function upsertLocal(record: Remnant): Remnant[] {
-  const existing = readLocal().filter((r) => r.id !== record.id);
+  const existing = readAllLocal().filter((r) => r.id !== record.id);
   const next = [record, ...existing].sort(
     (a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
   );
-  writeLocal(next);
-  return next;
+  writeAllLocal(next);
+  return forStore(record.store_number);
 }
 
 export function getLocalRemnants(): Remnant[] {
-  return readLocal();
+  return forStore();
 }
 
 export function countLocalRemnants(): number {
-  return readLocal().length;
+  return forStore().length;
+}
+
+function remnantPayload(record: Remnant) {
+  return {
+    id: record.id,
+    store_number: record.store_number,
+    sku: record.sku,
+    carpet_name: record.carpet_name,
+    tag_number: record.tag_number,
+    width_ft: record.width_ft,
+    length_ft: record.length_ft,
+    square_feet: record.square_feet,
+    square_yards: record.square_yards,
+    location: record.location,
+    notes: record.notes,
+    status: record.status,
+    reserved_for: record.reserved_for,
+    logged_by: record.logged_by,
+    estimated_value: record.estimated_value,
+    markdown_percent: record.markdown_percent,
+    markdown_price: record.markdown_price,
+    markdown_notes: record.markdown_notes,
+    markdown_by: record.markdown_by,
+    markdown_at: record.markdown_at,
+    updated_at: record.updated_at,
+    created_at: record.created_at,
+  };
 }
 
 export async function fetchRemnants(): Promise<Remnant[]> {
+  const store = getStoreNumber();
+  const local = forStore(store);
   const supabase = getSupabase();
-  const local = getLocalRemnants();
 
-  if (!supabase) return local;
+  if (!supabase || shouldSaveOffline()) return local;
 
   try {
     const { data, error } = await supabase
       .from(TABLE)
       .select("*")
+      .eq("store_number", store)
       .order("updated_at", { ascending: false });
 
     if (error) throw error;
@@ -104,9 +158,11 @@ function buildRemnant(input: RemnantInsert, existing?: Remnant): Remnant {
   const length = input.length_ft;
   const sqFt = input.square_feet ?? calculateSquareFeet(width, length);
   const sqYd = input.square_yards ?? calculateSquareYards(sqFt);
+  const store = input.store_number ?? existing?.store_number ?? getStoreNumber();
 
   return {
     id: input.id ?? existing?.id ?? uid(),
+    store_number: store,
     sku: input.sku.trim(),
     carpet_name: input.carpet_name.trim(),
     tag_number: input.tag_number.trim(),
@@ -119,6 +175,30 @@ function buildRemnant(input: RemnantInsert, existing?: Remnant): Remnant {
     status: input.status,
     reserved_for: (input.reserved_for ?? "").trim(),
     logged_by: (input.logged_by ?? existing?.logged_by ?? "").trim(),
+    estimated_value:
+      input.estimated_value !== undefined
+        ? input.estimated_value
+        : (existing?.estimated_value ?? null),
+    markdown_percent:
+      input.markdown_percent !== undefined
+        ? input.markdown_percent
+        : (existing?.markdown_percent ?? null),
+    markdown_price:
+      input.markdown_price !== undefined
+        ? input.markdown_price
+        : (existing?.markdown_price ?? null),
+    markdown_notes:
+      input.markdown_notes !== undefined
+        ? input.markdown_notes
+        : (existing?.markdown_notes ?? ""),
+    markdown_by:
+      input.markdown_by !== undefined
+        ? input.markdown_by
+        : (existing?.markdown_by ?? ""),
+    markdown_at:
+      input.markdown_at !== undefined
+        ? input.markdown_at
+        : (existing?.markdown_at ?? null),
     created_at: existing?.created_at ?? now,
     updated_at: now,
     offline: false,
@@ -131,35 +211,19 @@ export async function saveRemnant(
 ): Promise<{ record: Remnant; offline: boolean }> {
   const record = buildRemnant(input, existing);
   const supabase = getSupabase();
+  const store = record.store_number;
 
-  if (!supabase) {
+  if (!supabase || shouldSaveOffline()) {
     const offlineRecord = { ...record, offline: true };
     upsertLocal(offlineRecord);
+    enqueueSyncAction("upsert_remnant", remnantPayload(offlineRecord), store);
     return { record: offlineRecord, offline: true };
   }
 
   try {
-    const payload = {
-      id: record.id,
-      sku: record.sku,
-      carpet_name: record.carpet_name,
-      tag_number: record.tag_number,
-      width_ft: record.width_ft,
-      length_ft: record.length_ft,
-      square_feet: record.square_feet,
-      square_yards: record.square_yards,
-      location: record.location,
-      notes: record.notes,
-      status: record.status,
-      reserved_for: record.reserved_for,
-      logged_by: record.logged_by,
-      updated_at: record.updated_at,
-      created_at: record.created_at,
-    };
-
     const { data, error } = await supabase
       .from(TABLE)
-      .upsert(payload)
+      .upsert(remnantPayload(record))
       .select("*")
       .single();
 
@@ -171,17 +235,22 @@ export async function saveRemnant(
   } catch {
     const offlineRecord = { ...record, offline: true };
     upsertLocal(offlineRecord);
+    enqueueSyncAction("upsert_remnant", remnantPayload(offlineRecord), store);
     return { record: offlineRecord, offline: true };
   }
 }
 
 export async function deleteRemnant(id: string): Promise<void> {
-  writeLocal(readLocal().filter((r) => r.id !== id));
+  const store = getStoreNumber();
+  writeAllLocal(readAllLocal().filter((r) => r.id !== id));
   const supabase = getSupabase();
-  if (!supabase) return;
+  if (!supabase || shouldSaveOffline()) {
+    enqueueSyncAction("delete_remnant", { id }, store);
+    return;
+  }
   try {
-    await supabase.from(TABLE).delete().eq("id", id);
+    await supabase.from(TABLE).delete().eq("id", id).eq("store_number", store);
   } catch {
-    /* local already removed */
+    enqueueSyncAction("delete_remnant", { id }, store);
   }
 }

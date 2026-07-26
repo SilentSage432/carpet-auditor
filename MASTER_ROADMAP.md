@@ -10,12 +10,15 @@
 - [x] Remnant aging / discount badges
 - [x] Supervisor audit filters (specialist / location / discrepancies)
 - [x] Deduplicated supervisor roster + default-PIN customization prompt / Change PIN modal
+- [x] Offline sync queue / retry when connectivity returns
+- [x] Service worker for full offline shell caching
+- [x] Multi-store `store_number` context (client filter + schema; RLS-ready)
+- [x] Manager markdown workflow from 60+ remnant badge
 
 ## Next
-- [ ] Offline sync queue / retry when connectivity returns
-- [ ] Service worker for full offline shell caching
-- [ ] Tighten RLS for multi-store
-- [ ] Manager markdown workflow from 60+ remnant badge
+- [ ] JWT / claim-based RLS enforcing `store_number` server-side
+- [ ] Background Sync API / periodic queue flush while tab backgrounded
+- [ ] Conflict resolution UI when offline edits collide
 
 ## Non-goals
 - Pricing / margin engines

@@ -1,5 +1,7 @@
 "use client";
 
+import { useNetworkBadge } from "@/lib/network";
+import { formatStoreLabel } from "@/lib/store";
 import { HUB_SECTIONS, type HubSection, type StoreSpecialist } from "@/lib/types";
 
 type HubHeaderProps = {
@@ -9,6 +11,7 @@ type HubHeaderProps = {
   specialist: StoreSpecialist | null;
   onOpenSpecialist: () => void;
   onChangePin?: () => void;
+  storeNumber?: string;
 };
 
 export function HubHeader({
@@ -18,19 +21,39 @@ export function HubHeader({
   specialist,
   onOpenSpecialist,
   onChangePin,
+  storeNumber,
 }: HubHeaderProps) {
   const meta = HUB_SECTIONS.find((s) => s.id === section);
+  const network = useNetworkBadge();
 
   return (
     <header className="sticky top-0 z-40 border-b border-slate-800 bg-slate-950/95 backdrop-blur">
-      <div className="mx-auto flex h-14 max-w-md items-center gap-2 px-3">
+      <div className="mx-auto flex min-h-14 max-w-md items-center gap-2 px-3 py-1.5">
         <div className="min-w-0 flex-1">
           <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-emerald-400">
             Carpet Hub
+            {storeNumber ? ` · ${formatStoreLabel(storeNumber)}` : ""}
           </p>
           <h1 className="truncate text-base font-bold text-slate-50">
             {meta?.title ?? "Carpet Hub"}
           </h1>
+          <p
+            className={`mt-0.5 flex items-center gap-1.5 truncate text-[10px] font-semibold ${
+              network.tone === "online" ? "text-emerald-400/90" : "text-amber-300/90"
+            }`}
+            title={network.label}
+          >
+            <span
+              className={`inline-block h-1.5 w-1.5 shrink-0 rounded-full ${
+                network.tone === "online" ? "bg-emerald-400" : "bg-amber-400"
+              }`}
+              aria-hidden
+            />
+            <span className="truncate">
+              {network.tone === "online" ? "🟢 Online" : "🟠 Offline Mode"}
+              {network.pending > 0 ? ` · ${network.pending} queued` : ""}
+            </span>
+          </p>
         </div>
         <button
           type="button"

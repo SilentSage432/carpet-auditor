@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { ChangePinModal } from "@/components/hub/ChangePinModal";
 import { DefaultPinNotice } from "@/components/hub/DefaultPinNotice";
 import { HubHeader, NavDrawer } from "@/components/hub/HubChrome";
@@ -20,6 +20,8 @@ import {
   setPinRemindLater,
   wasPinRemindLater,
 } from "@/lib/specialists";
+import { getStoreNumber, STORE_CHANGED_EVENT } from "@/lib/store";
+import { flushSyncQueue } from "@/lib/sync-queue";
 import type {
   CatalogItem,
   HubSection,
@@ -38,39 +40,100 @@ export default function CarpetHubPage() {
   const [defaultPinNotice, setDefaultPinNotice] = useState(false);
   const [changePinOpen, setChangePinOpen] = useState(false);
   const [pinToast, setPinToast] = useState(false);
+  const [syncToast, setSyncToast] = useState<string | null>(null);
+  const [storeNumber, setStoreNumberState] = useState(() =>
+    typeof window === "undefined" ? "1234" : getStoreNumber()
+  );
+
+  const loadStoreData = useCallback(async () => {
+    const [cat, rem, team] = await Promise.all([
+      fetchCatalog(),
+      fetchRemnants(),
+      fetchSpecialists(),
+    ]);
+    const roster = dedupeRoster(team);
+    setCatalog(cat);
+    setRemnants(rem);
+    setSpecialists(roster);
+    const saved = getActiveSpecialist();
+    if (saved) {
+      const matched =
+        roster.find((m) => m.id === saved.id) ??
+        roster.find((m) => m.name === saved.name) ??
+        saved;
+      setSpecialist(matched);
+      if (isDefaultPin(matched) && !wasPinRemindLater(matched.id)) {
+        setDefaultPinNotice(true);
+      }
+    } else {
+      setSpecialist(null);
+      setSpecialistOpen(true);
+    }
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
-    (async () => {
+    void (async () => {
       const [cat, rem, team] = await Promise.all([
         fetchCatalog(),
         fetchRemnants(),
         fetchSpecialists(),
       ]);
-      if (!cancelled) {
-        const roster = dedupeRoster(team);
-        setCatalog(cat);
-        setRemnants(rem);
-        setSpecialists(roster);
-        const saved = getActiveSpecialist();
-        if (saved) {
-          const matched =
-            roster.find((m) => m.id === saved.id) ??
-            roster.find((m) => m.name === saved.name) ??
-            saved;
-          setSpecialist(matched);
-          if (isDefaultPin(matched) && !wasPinRemindLater(matched.id)) {
-            setDefaultPinNotice(true);
-          }
-        } else {
-          setSpecialistOpen(true);
+      if (cancelled) return;
+      const roster = dedupeRoster(team);
+      setCatalog(cat);
+      setRemnants(rem);
+      setSpecialists(roster);
+      const saved = getActiveSpecialist();
+      if (saved) {
+        const matched =
+          roster.find((m) => m.id === saved.id) ??
+          roster.find((m) => m.name === saved.name) ??
+          saved;
+        setSpecialist(matched);
+        if (isDefaultPin(matched) && !wasPinRemindLater(matched.id)) {
+          setDefaultPinNotice(true);
         }
+      } else {
+        setSpecialist(null);
+        setSpecialistOpen(true);
       }
     })();
     return () => {
       cancelled = true;
     };
   }, []);
+
+  useEffect(() => {
+    function onStoreChanged(event: Event) {
+      const detail = (event as CustomEvent<string>).detail;
+      setStoreNumberState(detail || getStoreNumber());
+      setActiveSpecialist(null);
+      setSpecialist(null);
+      setDefaultPinNotice(false);
+      void loadStoreData();
+    }
+    window.addEventListener(STORE_CHANGED_EVENT, onStoreChanged);
+    return () => window.removeEventListener(STORE_CHANGED_EVENT, onStoreChanged);
+  }, [loadStoreData]);
+
+  useEffect(() => {
+    async function onOnline() {
+      const synced = await flushSyncQueue();
+      if (synced > 0) {
+        setSyncToast(
+          `🟢 Connected! Synced ${synced} offline action${synced === 1 ? "" : "s"} to store database.`
+        );
+        window.setTimeout(() => setSyncToast(null), 4000);
+        await loadStoreData();
+      }
+    }
+    window.addEventListener("online", onOnline);
+    if (navigator.onLine) {
+      void onOnline();
+    }
+    return () => window.removeEventListener("online", onOnline);
+  }, [loadStoreData]);
 
   useEffect(() => {
     document.body.style.overflow =
@@ -115,6 +178,7 @@ export default function CarpetHubPage() {
         specialist={specialist}
         onOpenSpecialist={() => setSpecialistOpen(true)}
         onChangePin={specialist ? () => setChangePinOpen(true) : undefined}
+        storeNumber={storeNumber}
       />
       <NavDrawer
         open={menuOpen}
@@ -150,9 +214,18 @@ export default function CarpetHubPage() {
       {pinToast && (
         <p
           role="status"
-          className="fixed inset-x-0 top-16 z-[56] mx-auto w-fit rounded-xl border border-emerald-500/40 bg-emerald-950/95 px-4 py-2 text-sm font-semibold text-emerald-200 shadow-lg"
+          className="fixed inset-x-0 top-20 z-[56] mx-auto w-fit rounded-xl border border-emerald-500/40 bg-emerald-950/95 px-4 py-2 text-sm font-semibold text-emerald-200 shadow-lg"
         >
           PIN updated successfully!
+        </p>
+      )}
+
+      {syncToast && (
+        <p
+          role="status"
+          className="fixed inset-x-0 top-20 z-[56] mx-auto max-w-sm rounded-xl border border-emerald-500/40 bg-emerald-950/95 px-4 py-2 text-center text-sm font-semibold text-emerald-200 shadow-lg"
+        >
+          {syncToast}
         </p>
       )}
 
@@ -175,6 +248,8 @@ export default function CarpetHubPage() {
             remnants={remnants}
             onRemnantsChange={setRemnants}
             loggedBy={specialist?.name ?? ""}
+            specialists={specialists}
+            activeSpecialist={specialist}
           />
         )}
         {section === "settings" && (
@@ -184,6 +259,8 @@ export default function CarpetHubPage() {
             activeSpecialist={specialist}
             onSpecialistUpdated={handleSpecialistUpdated}
             onOpenChangePin={() => setChangePinOpen(true)}
+            storeNumber={storeNumber}
+            onStoreNumberChange={setStoreNumberState}
           />
         )}
       </div>

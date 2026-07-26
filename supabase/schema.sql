@@ -123,6 +123,57 @@ set name = 'Department Supervisor', role = 'Supervisor'
 where role = 'Supervisor'
    or lower(name) in ('department supervisor', 'dept supervisor');
 
+-- Multi-store context
+alter table public.carpet_audits
+  add column if not exists store_number text not null default '1234';
+alter table public.carpet_catalog
+  add column if not exists store_number text not null default '1234';
+alter table public.carpet_remnants
+  add column if not exists store_number text not null default '1234';
+alter table public.store_specialists
+  add column if not exists store_number text not null default '1234';
+
+create index if not exists carpet_audits_store_number_idx
+  on public.carpet_audits (store_number);
+create index if not exists carpet_catalog_store_number_idx
+  on public.carpet_catalog (store_number);
+create index if not exists carpet_remnants_store_number_idx
+  on public.carpet_remnants (store_number);
+create index if not exists store_specialists_store_number_idx
+  on public.store_specialists (store_number);
+
+-- Catalog uniqueness per store (drop global sku unique if present)
+alter table public.carpet_catalog drop constraint if exists carpet_catalog_sku_key;
+create unique index if not exists carpet_catalog_store_sku_uidx
+  on public.carpet_catalog (store_number, sku);
+
+-- Specialist uniqueness per store
+alter table public.store_specialists drop constraint if exists store_specialists_name_key;
+create unique index if not exists store_specialists_store_name_uidx
+  on public.store_specialists (store_number, name);
+
+-- Manager markdown fields on remnants
+alter table public.carpet_remnants
+  add column if not exists estimated_value numeric(12, 2);
+alter table public.carpet_remnants
+  add column if not exists markdown_percent numeric(6, 2);
+alter table public.carpet_remnants
+  add column if not exists markdown_price numeric(12, 2);
+alter table public.carpet_remnants
+  add column if not exists markdown_notes text not null default '';
+alter table public.carpet_remnants
+  add column if not exists markdown_by text not null default '';
+alter table public.carpet_remnants
+  add column if not exists markdown_at timestamptz;
+
+-- Seed supervisor for default store if missing
+insert into public.store_specialists (name, role, pin_code, store_number)
+select 'Department Supervisor', 'Supervisor', '1234', '1234'
+where not exists (
+  select 1 from public.store_specialists
+  where role = 'Supervisor' and store_number = '1234'
+);
+
 -- RLS
 alter table public.carpet_audits enable row level security;
 alter table public.carpet_catalog enable row level security;
@@ -132,16 +183,15 @@ alter table public.store_specialists enable row level security;
 drop policy if exists "Allow anon read carpet_audits" on public.carpet_audits;
 drop policy if exists "Allow anon insert carpet_audits" on public.carpet_audits;
 drop policy if exists "Allow anon delete carpet_audits" on public.carpet_audits;
+drop policy if exists "Allow anon all carpet_audits" on public.carpet_audits;
 drop policy if exists "Allow anon all carpet_catalog" on public.carpet_catalog;
 drop policy if exists "Allow anon all carpet_remnants" on public.carpet_remnants;
 drop policy if exists "Allow anon all store_specialists" on public.store_specialists;
 
-create policy "Allow anon read carpet_audits"
-  on public.carpet_audits for select to anon using (true);
-create policy "Allow anon insert carpet_audits"
-  on public.carpet_audits for insert to anon with check (true);
-create policy "Allow anon delete carpet_audits"
-  on public.carpet_audits for delete to anon using (true);
+-- Hub currently filters by store_number in the client (.eq).
+-- Policies remain open for anon until per-store JWT claims are introduced.
+create policy "Allow anon all carpet_audits"
+  on public.carpet_audits for all to anon using (true) with check (true);
 
 create policy "Allow anon all carpet_catalog"
   on public.carpet_catalog for all to anon using (true) with check (true);
@@ -151,3 +201,4 @@ create policy "Allow anon all carpet_remnants"
 
 create policy "Allow anon all store_specialists"
   on public.store_specialists for all to anon using (true) with check (true);
+

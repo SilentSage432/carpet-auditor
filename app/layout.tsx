@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Barlow, JetBrains_Mono } from "next/font/google";
+import { ServiceWorkerRegister } from "@/components/hub/ServiceWorkerRegister";
 import "./globals.css";
 
 const barlow = Barlow({
@@ -54,7 +55,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={`${barlow.variable} ${jetbrains.variable} h-full antialiased`}>
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        <ServiceWorkerRegister />
+        {children}
+      </body>
     </html>
   );
 }

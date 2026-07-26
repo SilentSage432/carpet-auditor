@@ -1,17 +1,20 @@
 # Carpet Hub — Architecture
 
 ```
-app/page.tsx                      → Hub shell (section state + data load)
-components/hub/HubChrome.tsx      → Sticky header + slide-over drawer
+app/page.tsx                      → Hub shell (section state + data load + online flush)
+app/layout.tsx                    → Fonts, PWA meta, ServiceWorkerRegister
+public/sw.js                      → Offline shell cache strategies
+components/hub/HubChrome.tsx      → Sticky header (network badge) + slide-over drawer
+components/hub/*Modal.tsx         → Specialist / PIN / Markdown modals
 components/sections/*             → Presentation per workspace section
-components/ui/NumberField.tsx     → Focus-select + leading-zero sanitize inputs
+lib/store.ts                      → Active store_number session
+lib/sync-queue.ts                 → Offline action queue + replay
+lib/network.ts                    → Online/offline badge state
+lib/markdown.ts                   → Clearance price math + badge label
 lib/calc.ts                       → CLF + remnant sq ft / sq yd
-lib/number-input.ts               → Numeric string sanitizers
-lib/catalog.ts                    → carpet_catalog persistence
-lib/remnants.ts                   → carpet_remnants persistence
-lib/storage.ts                    → carpet_audits persistence
+lib/catalog.ts / remnants.ts / storage.ts / specialists.ts → Domain persistence
 lib/supabase.ts                   → Client factory
-supabase/schema.sql               → Audits + catalog + remnants tables
+supabase/schema.sql               → Tables + store_number + markdown + RLS
 ```
 
 ## Ownership
@@ -19,12 +22,16 @@ supabase/schema.sql               → Audits + catalog + remnants tables
 | Concern | Owner |
 |---|---|
 | Navigation / section routing | `app/page.tsx` + `HubChrome` |
+| Store context | `lib/store.ts` |
+| Offline sync queue | `lib/sync-queue.ts` |
+| Shell caching | `public/sw.js` + `ServiceWorkerRegister` |
 | CLF math | `lib/calc.ts` |
 | Number typing UX | `lib/number-input.ts` + `NumberField` |
 | Catalog knowledge | `lib/catalog.ts` |
 | Barcode resolve / marry | `lib/barcode.ts`, `MarryBarcodeModal` |
 | Specialists session | `lib/specialists.ts`, `SpecialistModal` |
-| PIN change / default notice | `ChangePinModal`, `DefaultPinNotice`, `dedupeRoster` |
+| PIN change / default notice | `ChangePinModal`, `DefaultPinNotice` |
+| Manager markdown | `lib/markdown.ts`, `ApplyMarkdownModal` |
 | Variance | `lib/variance.ts` |
 | Remnant aging | `lib/aging.ts` |
 | Remnant inventory | `lib/remnants.ts` |
@@ -33,10 +40,12 @@ supabase/schema.sql               → Audits + catalog + remnants tables
 ## Sections
 
 1. **Cycle Audit** — roll CLF logging, catalog auto-fill, compact shift log
-2. **Carpet Catalog** — wall SKU master list
-3. **Remnant Rack** — back-room remnant status hub
-4. **Settings & Sync** — Supabase + localStorage status
+2. **Carpet Catalog** — wall SKU master list (per store)
+3. **Remnant Rack** — back-room remnant status + manager markdown
+4. **Settings & Sync** — store selector, queue, Supabase + localStorage status
 
 ## Offline
 
-Each domain falls back to its own `localStorage` key when Supabase is missing or unreachable.
+Writes fall back to localStorage and enqueue into `carpet_hub_sync_queue`.
+On `online`, `flushSyncQueue()` replays pending actions for the active store.
+The service worker caches the app shell for instant cold starts without connectivity.
