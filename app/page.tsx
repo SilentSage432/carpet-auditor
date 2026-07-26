@@ -1,6 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { ChangePinModal } from "@/components/hub/ChangePinModal";
+import { DefaultPinNotice } from "@/components/hub/DefaultPinNotice";
 import { HubHeader, NavDrawer } from "@/components/hub/HubChrome";
 import { SpecialistModal } from "@/components/hub/SpecialistModal";
 import { CatalogSection } from "@/components/sections/CatalogSection";
@@ -10,9 +12,13 @@ import { SettingsSection } from "@/components/sections/SettingsSection";
 import { fetchCatalog } from "@/lib/catalog";
 import { fetchRemnants } from "@/lib/remnants";
 import {
+  dedupeRoster,
   fetchSpecialists,
   getActiveSpecialist,
+  isDefaultPin,
   setActiveSpecialist,
+  setPinRemindLater,
+  wasPinRemindLater,
 } from "@/lib/specialists";
 import type {
   CatalogItem,
@@ -29,6 +35,9 @@ export default function CarpetHubPage() {
   const [specialist, setSpecialist] = useState<StoreSpecialist | null>(null);
   const [specialistOpen, setSpecialistOpen] = useState(false);
   const [specialists, setSpecialists] = useState<StoreSpecialist[]>([]);
+  const [defaultPinNotice, setDefaultPinNotice] = useState(false);
+  const [changePinOpen, setChangePinOpen] = useState(false);
+  const [pinToast, setPinToast] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -39,12 +48,20 @@ export default function CarpetHubPage() {
         fetchSpecialists(),
       ]);
       if (!cancelled) {
+        const roster = dedupeRoster(team);
         setCatalog(cat);
         setRemnants(rem);
-        setSpecialists(team);
+        setSpecialists(roster);
         const saved = getActiveSpecialist();
         if (saved) {
-          setSpecialist(saved);
+          const matched =
+            roster.find((m) => m.id === saved.id) ??
+            roster.find((m) => m.name === saved.name) ??
+            saved;
+          setSpecialist(matched);
+          if (isDefaultPin(matched) && !wasPinRemindLater(matched.id)) {
+            setDefaultPinNotice(true);
+          }
         } else {
           setSpecialistOpen(true);
         }
@@ -56,20 +73,37 @@ export default function CarpetHubPage() {
   }, []);
 
   useEffect(() => {
-    document.body.style.overflow = menuOpen || specialistOpen ? "hidden" : "";
+    document.body.style.overflow =
+      menuOpen || specialistOpen || changePinOpen ? "hidden" : "";
     return () => {
       document.body.style.overflow = "";
     };
-  }, [menuOpen, specialistOpen]);
+  }, [menuOpen, specialistOpen, changePinOpen]);
 
-  function handleSelectSpecialist(member: StoreSpecialist) {
+  function upsertSpecialist(member: StoreSpecialist) {
+    setSpecialists((prev) => dedupeRoster([member, ...prev]));
+  }
+
+  function handleSelectSpecialist(
+    member: StoreSpecialist,
+    meta?: { usedDefaultPin: boolean }
+  ) {
     setSpecialist(member);
     setActiveSpecialist(member);
-    setSpecialists((prev) =>
-      prev.some((p) => p.id === member.id)
-        ? prev
-        : [...prev, member].sort((a, b) => a.name.localeCompare(b.name))
-    );
+    upsertSpecialist(member);
+    const showNotice =
+      (meta?.usedDefaultPin || isDefaultPin(member)) &&
+      !wasPinRemindLater(member.id);
+    setDefaultPinNotice(Boolean(showNotice));
+  }
+
+  function handleSpecialistUpdated(member: StoreSpecialist) {
+    setSpecialist(member);
+    setActiveSpecialist(member);
+    upsertSpecialist(member);
+    setDefaultPinNotice(false);
+    setPinToast(true);
+    window.setTimeout(() => setPinToast(false), 2500);
   }
 
   return (
@@ -80,6 +114,7 @@ export default function CarpetHubPage() {
         onToggleMenu={() => setMenuOpen((o) => !o)}
         specialist={specialist}
         onOpenSpecialist={() => setSpecialistOpen(true)}
+        onChangePin={specialist ? () => setChangePinOpen(true) : undefined}
       />
       <NavDrawer
         open={menuOpen}
@@ -93,8 +128,35 @@ export default function CarpetHubPage() {
         onClose={() => setSpecialistOpen(false)}
         onSelect={handleSelectSpecialist}
       />
+      <ChangePinModal
+        key={changePinOpen ? `change-pin-${specialist?.id}` : "change-pin-closed"}
+        open={changePinOpen}
+        member={specialist}
+        onClose={() => setChangePinOpen(false)}
+        onUpdated={handleSpecialistUpdated}
+      />
+      <DefaultPinNotice
+        open={defaultPinNotice && !changePinOpen && !specialistOpen}
+        onSetNewPin={() => {
+          setDefaultPinNotice(false);
+          setChangePinOpen(true);
+        }}
+        onRemindLater={() => {
+          if (specialist) setPinRemindLater(specialist.id);
+          setDefaultPinNotice(false);
+        }}
+      />
 
-      <div className="mx-auto w-full max-w-md flex-1 px-4 py-4 pb-10">
+      {pinToast && (
+        <p
+          role="status"
+          className="fixed inset-x-0 top-16 z-[56] mx-auto w-fit rounded-xl border border-emerald-500/40 bg-emerald-950/95 px-4 py-2 text-sm font-semibold text-emerald-200 shadow-lg"
+        >
+          PIN updated successfully!
+        </p>
+      )}
+
+      <div className="mx-auto w-full max-w-md flex-1 px-4 py-4 pb-28">
         {section === "audit" && (
           <CycleAuditSection
             catalog={catalog}
@@ -120,15 +182,8 @@ export default function CarpetHubPage() {
             catalogCount={catalog.length}
             remnantCount={remnants.length}
             activeSpecialist={specialist}
-            onSpecialistUpdated={(member) => {
-              setSpecialist(member);
-              setActiveSpecialist(member);
-              setSpecialists((prev) =>
-                [member, ...prev.filter((p) => p.id !== member.id)].sort((a, b) =>
-                  a.name.localeCompare(b.name)
-                )
-              );
-            }}
+            onSpecialistUpdated={handleSpecialistUpdated}
+            onOpenChangePin={() => setChangePinOpen(true)}
           />
         )}
       </div>

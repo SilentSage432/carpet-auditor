@@ -62,16 +62,109 @@ function isPlaceholder(member: StoreSpecialist): boolean {
   return false;
 }
 
+function preferSpecialist(a: StoreSpecialist, b: StoreSpecialist): StoreSpecialist {
+  // Prefer remote (non-offline) over offline/seed
+  if (a.offline && !b.offline) return b;
+  if (!a.offline && b.offline) return a;
+  // Prefer non-seed IDs
+  const aSeed = a.id.startsWith("seed-");
+  const bSeed = b.id.startsWith("seed-");
+  if (aSeed && !bSeed) return b;
+  if (!aSeed && bSeed) return a;
+  // Prefer custom PIN over default/null
+  const aCustom = a.pin_code && a.pin_code !== DEFAULT_SUPERVISOR_PIN;
+  const bCustom = b.pin_code && b.pin_code !== DEFAULT_SUPERVISOR_PIN;
+  if (!aCustom && bCustom) return b;
+  if (aCustom && !bCustom) return a;
+  // Prefer newer created_at
+  return new Date(a.created_at).getTime() >= new Date(b.created_at).getTime() ? a : b;
+}
+
+function isDepartmentSupervisorName(name: string): boolean {
+  const n = name.toLowerCase().trim();
+  return n === "department supervisor" || n === "dept supervisor";
+}
+
+/** Collapse duplicate supervisors / same-name cards to a single roster entry. */
+export function dedupeRoster(roster: StoreSpecialist[]): StoreSpecialist[] {
+  const byKey = new Map<string, StoreSpecialist>();
+
+  for (const member of roster) {
+    if (!member.name.trim() || isPlaceholder(member)) continue;
+
+    // All Department Supervisor / role Supervisor share one slot
+    const key =
+      member.role === "Supervisor" || isDepartmentSupervisorName(member.name)
+        ? "__supervisor__"
+        : `name:${member.name.toLowerCase().trim()}`;
+
+    const existing = byKey.get(key);
+    if (!existing) {
+      byKey.set(key, {
+        ...member,
+        name:
+          member.role === "Supervisor" || isDepartmentSupervisorName(member.name)
+            ? "Department Supervisor"
+            : member.name,
+        role:
+          member.role === "Supervisor" || isDepartmentSupervisorName(member.name)
+            ? "Supervisor"
+            : member.role,
+      });
+    } else {
+      const winner = preferSpecialist(existing, member);
+      byKey.set(key, {
+        ...winner,
+        name:
+          winner.role === "Supervisor" || isDepartmentSupervisorName(winner.name)
+            ? "Department Supervisor"
+            : winner.name,
+        role:
+          winner.role === "Supervisor" || isDepartmentSupervisorName(winner.name)
+            ? "Supervisor"
+            : winner.role,
+      });
+    }
+  }
+
+  return Array.from(byKey.values()).sort((a, b) => {
+    if (a.role === "Supervisor" && b.role !== "Supervisor") return -1;
+    if (b.role === "Supervisor" && a.role !== "Supervisor") return 1;
+    return a.name.localeCompare(b.name);
+  });
+}
+
 function ensureSupervisor(roster: StoreSpecialist[]): StoreSpecialist[] {
-  const cleaned = roster.filter((m) => m.name.trim() && !isPlaceholder(m));
+  const cleaned = dedupeRoster(roster);
   const hasSupervisor = cleaned.some((m) => m.role === "Supervisor");
   if (cleaned.length === 0) return [SUPERVISOR_SEED];
   if (!hasSupervisor) {
-    return [SUPERVISOR_SEED, ...cleaned].sort((a, b) =>
-      a.name.localeCompare(b.name)
-    );
+    return dedupeRoster([SUPERVISOR_SEED, ...cleaned]);
   }
-  return cleaned.sort((a, b) => a.name.localeCompare(b.name));
+  return cleaned;
+}
+
+export function isDefaultPin(member: StoreSpecialist): boolean {
+  const pin = member.pin_code?.trim();
+  if (!pin) return member.role === "Supervisor";
+  return pin === DEFAULT_SUPERVISOR_PIN;
+}
+
+const PIN_REMIND_PREFIX = "carpet_pin_remind_later_";
+
+export function wasPinRemindLater(memberId: string): boolean {
+  if (typeof window === "undefined") return false;
+  return sessionStorage.getItem(`${PIN_REMIND_PREFIX}${memberId}`) === "1";
+}
+
+export function setPinRemindLater(memberId: string): void {
+  if (typeof window === "undefined") return;
+  sessionStorage.setItem(`${PIN_REMIND_PREFIX}${memberId}`, "1");
+}
+
+export function clearPinRemindLater(memberId: string): void {
+  if (typeof window === "undefined") return;
+  sessionStorage.removeItem(`${PIN_REMIND_PREFIX}${memberId}`);
 }
 
 function readLocal(): StoreSpecialist[] {

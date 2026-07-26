@@ -97,7 +97,6 @@ export function CycleAuditSection({
   const [sku, setSku] = useState("");
   const [carpetName, setCarpetName] = useState("");
   const [rollWidth, setRollWidth] = useState<number | null>(null);
-  const [nameFromCatalog, setNameFromCatalog] = useState(false);
   const [location, setLocation] = useState<LocationType>("sales_floor");
   const [wholeInches, setWholeInches] = useState("");
   const [fraction, setFraction] = useState(0);
@@ -209,28 +208,10 @@ export function CycleAuditSection({
     setSku(item.sku);
     setCarpetName(item.carpet_name);
     setRollWidth(item.roll_width_ft);
-    setNameFromCatalog(true);
     setScanFlash(true);
     playSuccessChime();
     window.setTimeout(() => setScanFlash(false), 900);
   }, []);
-
-  useEffect(() => {
-    const hit = findCatalogBySkuOrBarcode(catalog, sku);
-    if (hit) {
-      setCarpetName(hit.carpet_name);
-      setRollWidth(hit.roll_width_ft);
-      setNameFromCatalog(true);
-      return;
-    }
-    setNameFromCatalog((wasFromCatalog) => {
-      if (wasFromCatalog) {
-        setCarpetName("");
-        setRollWidth(null);
-      }
-      return false;
-    });
-  }, [sku, catalog]);
 
   const flashStatus = useCallback((msg: string) => {
     setStatusMsg(msg);
@@ -238,7 +219,16 @@ export function CycleAuditSection({
   }, []);
 
   function handleSkuChange(raw: string) {
-    setSku(sanitizeBarcodeScan(raw));
+    const next = sanitizeBarcodeScan(raw);
+    setSku(next);
+    const hit = findCatalogBySkuOrBarcode(catalog, next);
+    if (hit) {
+      setCarpetName(hit.carpet_name);
+      setRollWidth(hit.roll_width_ft);
+    } else {
+      setCarpetName("");
+      setRollWidth(null);
+    }
   }
 
   function handleScanCommit(sanitized: string) {
@@ -275,7 +265,6 @@ export function CycleAuditSection({
     setSku("");
     setCarpetName("");
     setRollWidth(null);
-    setNameFromCatalog(false);
     setLocation("sales_floor");
     setWholeInches("");
     setFraction(0);
@@ -327,7 +316,6 @@ export function CycleAuditSection({
     onCatalogChange(
       next.length ? next : [record, ...catalog.filter((c) => c.sku !== record.sku)]
     );
-    setNameFromCatalog(true);
     setRollWidth(record.roll_width_ft);
     flashStatus(offline ? "Catalog saved offline" : "Saved to catalog");
   }
@@ -386,6 +374,7 @@ export function CycleAuditSection({
         onLinked={handleMarried}
       />
       <PinKeypadModal
+        key={pinForDiscrepancy ? "discrepancy-pin" : "discrepancy-closed"}
         open={pinForDiscrepancy}
         title="Supervisor PIN required"
         subtitle="Unlock Discrepancies Only filter"
@@ -490,10 +479,7 @@ export function CycleAuditSection({
           <TextField
             label="Carpet Name / Style"
             value={carpetName}
-            onChange={(v) => {
-              setCarpetName(v);
-              setNameFromCatalog(false);
-            }}
+            onChange={setCarpetName}
             placeholder="e.g. Stainmaster Hearthstone 12ft"
           />
           {rollWidth != null && (

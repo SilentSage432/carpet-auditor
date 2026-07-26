@@ -1,5 +1,15 @@
 # Carpet Hub — Development Journal
 
+## 2026-07-25 — Deduplicate supervisors + default PIN customization
+
+### Shipped
+- `dedupeRoster()` merges duplicate Supervisor / "Department Supervisor" cards (local + remote + UI).
+- After login with default PIN `1234`, show security banner: Set New PIN / Remind Me Later.
+- `ChangePinModal`: Current PIN + New 4-digit + Confirm; saves to Supabase/`pin_code`.
+- Header ⚙️ Change PIN + Settings shortcut; green toast on success.
+
+---
+
 ## 2026-07-25 — Supervisor PIN security & roster cleanup
 
 ### Shipped

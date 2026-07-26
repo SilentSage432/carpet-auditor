@@ -4,7 +4,9 @@ import { useEffect, useState } from "react";
 import { PinKeypadModal } from "@/components/hub/PinKeypadModal";
 import { NumberField, TextField } from "@/components/ui/NumberField";
 import {
+  dedupeRoster,
   fetchSpecialists,
+  isDefaultPin,
   requiresPin,
   roleBadge,
   saveSpecialist,
@@ -16,12 +18,11 @@ type Props = {
   open: boolean;
   active: StoreSpecialist | null;
   onClose: () => void;
-  onSelect: (specialist: StoreSpecialist) => void;
+  onSelect: (specialist: StoreSpecialist, meta?: { usedDefaultPin: boolean }) => void;
 };
 
 export function SpecialistModal({ open, active, onClose, onSelect }: Props) {
-  const [team, setTeam] = useState<StoreSpecialist[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [team, setTeam] = useState<StoreSpecialist[] | null>(null);
   const [adding, setAdding] = useState(false);
   const [newName, setNewName] = useState("");
   const [newRole, setNewRole] = useState<SpecialistRole>("Associate");
@@ -35,11 +36,9 @@ export function SpecialistModal({ open, active, onClose, onSelect }: Props) {
   useEffect(() => {
     if (!open) return;
     let cancelled = false;
-    setLoading(true);
     void fetchSpecialists().then((rows) => {
       if (!cancelled) {
-        setTeam(rows);
-        setLoading(false);
+        setTeam(dedupeRoster(rows));
       }
     });
     return () => {
@@ -49,12 +48,15 @@ export function SpecialistModal({ open, active, onClose, onSelect }: Props) {
 
   if (!open && !pendingPinMember) return null;
 
+  const loading = team === null;
+  const roster = team ?? [];
+
   function requestSelect(member: StoreSpecialist) {
     if (requiresPin(member)) {
       setPendingPinMember(member);
       return;
     }
-    onSelect(member);
+    onSelect(member, { usedDefaultPin: isDefaultPin(member) });
     onClose();
   }
 
@@ -75,11 +77,7 @@ export function SpecialistModal({ open, active, onClose, onSelect }: Props) {
         role: newRole,
         pin_code: newPin.trim() || null,
       });
-      setTeam((prev) =>
-        [record, ...prev.filter((p) => p.id !== record.id)].sort((a, b) =>
-          a.name.localeCompare(b.name)
-        )
-      );
+      setTeam((prev) => dedupeRoster([record, ...(prev ?? [])]));
       setNewName("");
       setNewRole("Associate");
       setNewPin("");
@@ -119,7 +117,7 @@ export function SpecialistModal({ open, active, onClose, onSelect }: Props) {
               <p className="mt-6 text-center text-sm text-slate-500">Loading team…</p>
             ) : (
               <ul className="mt-4 max-h-64 space-y-1 overflow-y-auto">
-                {team.map((member) => {
+                {roster.map((member) => {
                   const selected =
                     active?.id === member.id || active?.name === member.name;
                   return (
@@ -243,6 +241,7 @@ export function SpecialistModal({ open, active, onClose, onSelect }: Props) {
       )}
 
       <PinKeypadModal
+        key={pendingPinMember?.id ?? "pin-closed"}
         open={pendingPinMember != null}
         title="Enter Supervisor PIN / Password"
         subtitle={
@@ -258,7 +257,7 @@ export function SpecialistModal({ open, active, onClose, onSelect }: Props) {
           if (!pendingPinMember) return;
           const member = pendingPinMember;
           setPendingPinMember(null);
-          onSelect(member);
+          onSelect(member, { usedDefaultPin: isDefaultPin(member) });
           onClose();
         }}
       />

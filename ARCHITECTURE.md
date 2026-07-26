@@ -24,6 +24,7 @@ supabase/schema.sql               → Audits + catalog + remnants tables
 | Catalog knowledge | `lib/catalog.ts` |
 | Barcode resolve / marry | `lib/barcode.ts`, `MarryBarcodeModal` |
 | Specialists session | `lib/specialists.ts`, `SpecialistModal` |
+| PIN change / default notice | `ChangePinModal`, `DefaultPinNotice`, `dedupeRoster` |
 | Variance | `lib/variance.ts` |
 | Remnant aging | `lib/aging.ts` |
 | Remnant inventory | `lib/remnants.ts` |

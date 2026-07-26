@@ -9,6 +9,7 @@
 - [x] System vs physical CLF variance tracker
 - [x] Remnant aging / discount badges
 - [x] Supervisor audit filters (specialist / location / discrepancies)
+- [x] Deduplicated supervisor roster + default-PIN customization prompt / Change PIN modal
 
 ## Next
 - [ ] Offline sync queue / retry when connectivity returns

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 type Props = {
   open: boolean;
@@ -22,14 +22,6 @@ export function PinKeypadModal({
   const [pin, setPin] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [shake, setShake] = useState(false);
-
-  useEffect(() => {
-    if (open) {
-      setPin("");
-      setError(null);
-      setShake(false);
-    }
-  }, [open]);
 
   if (!open) return null;
 

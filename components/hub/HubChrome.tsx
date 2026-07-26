@@ -8,6 +8,7 @@ type HubHeaderProps = {
   onToggleMenu: () => void;
   specialist: StoreSpecialist | null;
   onOpenSpecialist: () => void;
+  onChangePin?: () => void;
 };
 
 export function HubHeader({
@@ -16,6 +17,7 @@ export function HubHeader({
   onToggleMenu,
   specialist,
   onOpenSpecialist,
+  onChangePin,
 }: HubHeaderProps) {
   const meta = HUB_SECTIONS.find((s) => s.id === section);
 
@@ -33,16 +35,27 @@ export function HubHeader({
         <button
           type="button"
           onClick={onOpenSpecialist}
-          className="flex h-12 max-w-[9.5rem] shrink-0 items-center gap-1.5 rounded-xl border border-emerald-500/30 bg-emerald-950/40 px-2.5 text-left transition active:scale-95"
+          className="flex h-12 max-w-[8.5rem] shrink-0 items-center gap-1.5 rounded-xl border border-emerald-500/30 bg-emerald-950/40 px-2.5 text-left transition active:scale-95"
           aria-label="Select active specialist"
         >
-          <span aria-hidden>👤</span>
+          <span aria-hidden>
+            {specialist?.role === "Supervisor" ? "🛡️" : "👤"}
+          </span>
           <span className="min-w-0 truncate text-xs font-semibold text-emerald-200">
-            {specialist
-              ? `${specialist.role === "Supervisor" ? "🛡️ " : "👤 "}${specialist.name}`
-              : "Select"}
+            {specialist ? specialist.name : "Select"}
           </span>
         </button>
+        {specialist && onChangePin ? (
+          <button
+            type="button"
+            onClick={onChangePin}
+            aria-label="Change PIN"
+            title="Change PIN"
+            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-slate-700 bg-slate-900 text-slate-100 transition active:scale-95"
+          >
+            ⚙️
+          </button>
+        ) : null}
         <button
           type="button"
           aria-label={menuOpen ? "Close menu" : "Open menu"}

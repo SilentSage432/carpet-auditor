@@ -103,6 +103,26 @@ where not exists (
   select 1 from public.store_specialists where role = 'Supervisor'
 );
 
+-- Deduplicate Department Supervisor / Supervisor rows (keep newest)
+delete from public.store_specialists s
+using public.store_specialists keep
+where (
+    lower(s.name) in ('department supervisor', 'dept supervisor')
+    or s.role = 'Supervisor'
+  )
+  and (
+    lower(keep.name) in ('department supervisor', 'dept supervisor')
+    or keep.role = 'Supervisor'
+  )
+  and s.id <> keep.id
+  and s.created_at < keep.created_at;
+
+-- Normalize surviving supervisor display name
+update public.store_specialists
+set name = 'Department Supervisor', role = 'Supervisor'
+where role = 'Supervisor'
+   or lower(name) in ('department supervisor', 'dept supervisor');
+
 -- RLS
 alter table public.carpet_audits enable row level security;
 alter table public.carpet_catalog enable row level security;
