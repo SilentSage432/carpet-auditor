@@ -2,6 +2,14 @@ export type LocationType = "sales_floor" | "top_stock";
 
 export type HubSection = "audit" | "catalog" | "remnants" | "settings";
 
+export type StoreSpecialist = {
+  id: string;
+  name: string;
+  role: string;
+  created_at: string;
+  offline?: boolean;
+};
+
 export type CarpetAudit = {
   id: string;
   sku: string;
@@ -11,6 +19,11 @@ export type CarpetAudit = {
   measurement_fraction: number;
   rounds: number;
   calculated_clf: number;
+  /** Optional system/on-hand CLF from Lowe's inventory. */
+  system_clf: number | null;
+  /** Physical CLF − System CLF when system_clf is set. */
+  variance_clf: number | null;
+  audited_by: string;
   created_at: string;
   offline?: boolean;
 };
@@ -55,6 +68,7 @@ export type Remnant = {
   notes: string;
   status: RemnantStatus;
   reserved_for: string;
+  logged_by: string;
   created_at: string;
   updated_at: string;
   offline?: boolean;

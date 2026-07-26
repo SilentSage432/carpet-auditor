@@ -51,6 +51,18 @@ function mapRow(row: Record<string, unknown>): CarpetAudit {
   const fraction = Number(row.measurement_fraction ?? row.fraction ?? 0);
   const whole = Number(row.whole_inches ?? row.measurement_inches ?? 0);
   const clf = Number(row.calculated_clf ?? row.clf ?? 0);
+  const systemRaw = row.system_clf;
+  const systemClf =
+    systemRaw == null || systemRaw === ""
+      ? null
+      : Number(systemRaw);
+  const varianceRaw = row.variance_clf;
+  const varianceClf =
+    varianceRaw == null || varianceRaw === ""
+      ? systemClf == null
+        ? null
+        : clf - systemClf
+      : Number(varianceRaw);
 
   return {
     id: String(row.id),
@@ -61,6 +73,10 @@ function mapRow(row: Record<string, unknown>): CarpetAudit {
     measurement_fraction: fraction,
     rounds: Number(row.rounds ?? 0),
     calculated_clf: clf,
+    system_clf: systemClf != null && Number.isFinite(systemClf) ? systemClf : null,
+    variance_clf:
+      varianceClf != null && Number.isFinite(varianceClf) ? varianceClf : null,
+    audited_by: String(row.audited_by ?? ""),
     created_at: String(row.created_at ?? new Date().toISOString()),
     offline: Boolean(row.offline),
   };
@@ -108,6 +124,9 @@ export async function saveAudit(input: CarpetAuditInsert): Promise<{
     measurement_fraction: input.measurement_fraction,
     rounds: input.rounds,
     calculated_clf: input.calculated_clf,
+    system_clf: input.system_clf ?? null,
+    variance_clf: input.variance_clf ?? null,
+    audited_by: input.audited_by ?? "",
     created_at: input.created_at ?? now,
     offline: false,
   };
@@ -132,6 +151,9 @@ export async function saveAudit(input: CarpetAuditInsert): Promise<{
         measurement_fraction: record.measurement_fraction,
         rounds: record.rounds,
         calculated_clf: record.calculated_clf,
+        system_clf: record.system_clf,
+        variance_clf: record.variance_clf,
+        audited_by: record.audited_by,
         created_at: record.created_at,
       })
       .select("*")
@@ -180,10 +202,13 @@ export function auditsToCsv(audits: CarpetAudit[]): string {
     "measurement_fraction",
     "rounds",
     "calculated_clf",
+    "system_clf",
+    "variance_clf",
+    "audited_by",
   ];
 
-  const escape = (value: string | number) => {
-    const s = String(value);
+  const escape = (value: string | number | null) => {
+    const s = String(value ?? "");
     if (/[",\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
     return s;
   };
@@ -198,6 +223,9 @@ export function auditsToCsv(audits: CarpetAudit[]): string {
       a.measurement_fraction,
       a.rounds,
       a.calculated_clf,
+      a.system_clf,
+      a.variance_clf,
+      a.audited_by,
     ]
       .map(escape)
       .join(",")

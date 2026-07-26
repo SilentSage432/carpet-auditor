@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { findCatalogBySkuOrBarcode } from "@/lib/catalog";
+import { agingBadge, daysOld } from "@/lib/aging";
 import {
   calculateSquareFeet,
   calculateSquareYards,
@@ -36,9 +37,15 @@ type Props = {
   catalog: CatalogItem[];
   remnants: Remnant[];
   onRemnantsChange: (items: Remnant[]) => void;
+  loggedBy: string;
 };
 
-export function RemnantSection({ catalog, remnants, onRemnantsChange }: Props) {
+export function RemnantSection({
+  catalog,
+  remnants,
+  onRemnantsChange,
+  loggedBy,
+}: Props) {
   const [statusFilter, setStatusFilter] = useState<"all" | RemnantStatus>("all");
   const [query, setQuery] = useState("");
   const [showForm, setShowForm] = useState(false);
@@ -124,6 +131,7 @@ export function RemnantSection({ catalog, remnants, onRemnantsChange }: Props) {
           notes: notes.trim(),
           status: editing?.status ?? "available",
           reserved_for: editing?.reserved_for ?? "",
+          logged_by: editing?.logged_by || loggedBy,
         },
         editing ?? undefined
       );
@@ -307,7 +315,10 @@ export function RemnantSection({ catalog, remnants, onRemnantsChange }: Props) {
         </p>
       ) : (
         <ul className="space-y-2">
-          {filtered.map((item) => (
+          {filtered.map((item) => {
+            const age = daysOld(item.created_at);
+            const ageBadge = agingBadge(age);
+            return (
             <li
               key={item.id}
               className="space-y-3 rounded-2xl border border-slate-800 bg-slate-900/90 p-3"
@@ -330,6 +341,11 @@ export function RemnantSection({ catalog, remnants, onRemnantsChange }: Props) {
                   {item.status}
                 </span>
               </div>
+              <p
+                className={`rounded-lg border px-2.5 py-2 text-xs font-semibold leading-snug ${ageBadge.className}`}
+              >
+                {ageBadge.label}
+              </p>
               <div className="flex flex-wrap gap-2">
                 {item.location ? (
                   <span className="rounded-lg bg-slate-800 px-2 py-1 text-xs text-slate-300">
@@ -347,6 +363,9 @@ export function RemnantSection({ catalog, remnants, onRemnantsChange }: Props) {
                   </span>
                 ) : null}
               </div>
+              {item.logged_by ? (
+                <p className="text-xs text-slate-500">Logged by {item.logged_by}</p>
+              ) : null}
               {item.notes ? (
                 <p className="text-xs text-slate-500">{item.notes}</p>
               ) : null}
@@ -385,7 +404,8 @@ export function RemnantSection({ catalog, remnants, onRemnantsChange }: Props) {
                 </button>
               </div>
             </li>
-          ))}
+            );
+          })}
         </ul>
       )}
     </div>

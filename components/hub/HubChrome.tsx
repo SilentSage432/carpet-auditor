@@ -1,20 +1,28 @@
 "use client";
 
-import { HUB_SECTIONS, type HubSection } from "@/lib/types";
+import { HUB_SECTIONS, type HubSection, type StoreSpecialist } from "@/lib/types";
 
 type HubHeaderProps = {
   section: HubSection;
   menuOpen: boolean;
   onToggleMenu: () => void;
+  specialist: StoreSpecialist | null;
+  onOpenSpecialist: () => void;
 };
 
-export function HubHeader({ section, menuOpen, onToggleMenu }: HubHeaderProps) {
+export function HubHeader({
+  section,
+  menuOpen,
+  onToggleMenu,
+  specialist,
+  onOpenSpecialist,
+}: HubHeaderProps) {
   const meta = HUB_SECTIONS.find((s) => s.id === section);
 
   return (
     <header className="sticky top-0 z-40 border-b border-slate-800 bg-slate-950/95 backdrop-blur">
-      <div className="mx-auto flex h-14 max-w-md items-center justify-between gap-3 px-4">
-        <div className="min-w-0">
+      <div className="mx-auto flex h-14 max-w-md items-center gap-2 px-3">
+        <div className="min-w-0 flex-1">
           <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-emerald-400">
             Carpet Hub
           </p>
@@ -22,6 +30,17 @@ export function HubHeader({ section, menuOpen, onToggleMenu }: HubHeaderProps) {
             {meta?.title ?? "Carpet Hub"}
           </h1>
         </div>
+        <button
+          type="button"
+          onClick={onOpenSpecialist}
+          className="flex h-12 max-w-[9.5rem] shrink-0 items-center gap-1.5 rounded-xl border border-emerald-500/30 bg-emerald-950/40 px-2.5 text-left transition active:scale-95"
+          aria-label="Select active specialist"
+        >
+          <span aria-hidden>👤</span>
+          <span className="min-w-0 truncate text-xs font-semibold text-emerald-200">
+            {specialist ? `${specialist.name}` : "Select"}
+          </span>
+        </button>
         <button
           type="button"
           aria-label={menuOpen ? "Close menu" : "Open menu"}

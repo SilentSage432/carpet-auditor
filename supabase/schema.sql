@@ -13,11 +13,20 @@ create table if not exists public.carpet_audits (
   measurement_fraction numeric(4, 3) not null check (measurement_fraction >= 0 and measurement_fraction < 1),
   rounds integer not null check (rounds > 0),
   calculated_clf numeric(12, 4) not null,
+  system_clf numeric(12, 4),
+  variance_clf numeric(12, 4),
+  audited_by text not null default '',
   created_at timestamptz not null default now()
 );
 
+alter table public.carpet_audits add column if not exists system_clf numeric(12, 4);
+alter table public.carpet_audits add column if not exists variance_clf numeric(12, 4);
+alter table public.carpet_audits add column if not exists audited_by text not null default '';
+
 create index if not exists carpet_audits_created_at_idx
   on public.carpet_audits (created_at desc);
+create index if not exists carpet_audits_audited_by_idx
+  on public.carpet_audits (audited_by);
 
 -- Master wall catalog
 create table if not exists public.carpet_catalog (
@@ -31,7 +40,6 @@ create table if not exists public.carpet_catalog (
   updated_at timestamptz not null default now()
 );
 
--- Migration for existing projects
 alter table public.carpet_catalog
   add column if not exists upc_barcode text;
 
@@ -55,23 +63,37 @@ create table if not exists public.carpet_remnants (
   status text not null default 'available'
     check (status in ('available', 'reserved', 'sold')),
   reserved_for text not null default '',
+  logged_by text not null default '',
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
 
+alter table public.carpet_remnants
+  add column if not exists logged_by text not null default '';
+
 create index if not exists carpet_remnants_status_idx on public.carpet_remnants (status);
 create index if not exists carpet_remnants_tag_idx on public.carpet_remnants (tag_number);
+
+-- Floor specialists
+create table if not exists public.store_specialists (
+  id uuid primary key default gen_random_uuid(),
+  name text not null unique,
+  role text not null default 'Specialist',
+  created_at timestamptz not null default now()
+);
 
 -- RLS
 alter table public.carpet_audits enable row level security;
 alter table public.carpet_catalog enable row level security;
 alter table public.carpet_remnants enable row level security;
+alter table public.store_specialists enable row level security;
 
 drop policy if exists "Allow anon read carpet_audits" on public.carpet_audits;
 drop policy if exists "Allow anon insert carpet_audits" on public.carpet_audits;
 drop policy if exists "Allow anon delete carpet_audits" on public.carpet_audits;
 drop policy if exists "Allow anon all carpet_catalog" on public.carpet_catalog;
 drop policy if exists "Allow anon all carpet_remnants" on public.carpet_remnants;
+drop policy if exists "Allow anon all store_specialists" on public.store_specialists;
 
 create policy "Allow anon read carpet_audits"
   on public.carpet_audits for select to anon using (true);
@@ -85,3 +107,11 @@ create policy "Allow anon all carpet_catalog"
 
 create policy "Allow anon all carpet_remnants"
   on public.carpet_remnants for all to anon using (true) with check (true);
+
+create policy "Allow anon all store_specialists"
+  on public.store_specialists for all to anon using (true) with check (true);
+
+-- Optional seed specialists
+insert into public.store_specialists (name, role)
+values ('Alex', 'Specialist'), ('Dave', 'Specialist')
+on conflict (name) do nothing;

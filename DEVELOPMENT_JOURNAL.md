@@ -1,5 +1,24 @@
 # Carpet Hub — Development Journal
 
+## 2026-07-25 — PWA, specialists, variance & remnant aging
+
+### Shipped
+- PWA manifest (`Carpet Hub — Flooring Dept`, standalone, theme `#022c22`) + iOS web-app meta/icons.
+- Active specialist badge + Select Specialist modal (`store_specialists`); stamps `audited_by` / `logged_by`.
+- System On-Hand CLF → variance (Physical − System) with match / shortage / overage badges (±2 CLF tolerance).
+- Remnant aging badges (0–29 / 30+ / 60+) + Logged by display.
+- Supervisor audit filters: specialist, location, discrepancies only.
+
+### Ownership
+| Concern | Owner |
+|---|---|
+| PWA manifest | `app/manifest.ts`, `app/layout.tsx` |
+| Specialists | `lib/specialists.ts`, `SpecialistModal` |
+| Variance math | `lib/variance.ts` |
+| Remnant aging | `lib/aging.ts` |
+
+---
+
 ## 2026-07-25 — Handheld barcode + Marry Barcode workflow
 
 ### Shipped

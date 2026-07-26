@@ -15,16 +15,36 @@ const jetbrains = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Carpet Hub",
+  title: "Carpet Hub — Flooring Dept",
   description:
     "Carpet Management Hub — cycle audit, catalog, and remnant rack.",
+  applicationName: "Carpet Hub",
+  appleWebApp: {
+    capable: true,
+    title: "Carpet Hub",
+    statusBarStyle: "black-translucent",
+  },
+  formatDetection: {
+    telephone: false,
+  },
+  icons: {
+    icon: [
+      { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icons/icon-512.png", sizes: "512x512", type: "image/png" },
+    ],
+    apple: [{ url: "/icons/apple-touch-icon.png", sizes: "180x180" }],
+  },
+  other: {
+    "mobile-web-app-capable": "yes",
+  },
 };
 
 export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
-  themeColor: "#020617",
+  themeColor: "#022c22",
+  viewportFit: "cover",
 };
 
 export default function RootLayout({

@@ -1,30 +1,29 @@
 # Carpet Hub — Chat Handoff
 
 ## Product
-**Carpet Management Hub** — mobile drawer workspaces: Cycle Audit, Catalog, Remnant Rack, Settings.
+Mobile Carpet Management Hub with PWA install, specialist stamping, CLF variance, and remnant aging.
 
-## Barcode / scanner workflow
-- Catalog rows support nullable indexed `upc_barcode`.
-- Lookup matches **SKU or UPC** (`findCatalogBySkuOrBarcode` / `resolveScan`).
-- Scans strip leading zeros; Enter (scanner suffix) commits resolution.
-- Match → success chime + emerald flash + fill Item #, name, roll width.
-- Unlinked 10–14 digit UPC → **Marry Barcode** modal (link existing or create new).
+## PWA
+- `app/manifest.ts` — name "Carpet Hub — Flooring Dept", short "Carpet Hub", standalone, theme `#022c22`
+- Icons in `public/icons/`
+- iOS: `appleWebApp` + apple-touch-icon in `app/layout.tsx`
 
-## Formula
-`CLF = (whole + fraction) × rounds × 0.2625`
+## Specialists
+- Table `store_specialists`
+- Header badge opens picker; active name saved in localStorage
+- Audits: `audited_by`; Remnants: `logged_by`
 
-## Supabase tables
-- `carpet_audits`
-- `carpet_catalog` (+ `upc_barcode`)
-- `carpet_remnants`
+## Variance
+`variance_clf = calculated_clf - system_clf`
+- Match: |v| ≤ 2
+- Shortage: v < −2 (red)
+- Overage: v > 2 (amber)
 
-Apply `supabase/schema.sql` (includes `add column if not exists upc_barcode`).
+## Remnant aging
+Days from `created_at`: New &lt;30 · Promote 30+ · Clearance 60+
 
-## Key paths
-- `lib/barcode.ts` — sanitize + resolve
-- `components/barcode/MarryBarcodeModal.tsx`
-- `components/sections/CycleAuditSection.tsx`
-- `components/sections/CatalogSection.tsx`
+## Schema
+Re-apply `supabase/schema.sql` for new columns + `store_specialists`.
 
 ## Verify
 ```bash

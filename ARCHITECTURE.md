@@ -23,6 +23,9 @@ supabase/schema.sql               → Audits + catalog + remnants tables
 | Number typing UX | `lib/number-input.ts` + `NumberField` |
 | Catalog knowledge | `lib/catalog.ts` |
 | Barcode resolve / marry | `lib/barcode.ts`, `MarryBarcodeModal` |
+| Specialists session | `lib/specialists.ts`, `SpecialistModal` |
+| Variance | `lib/variance.ts` |
+| Remnant aging | `lib/aging.ts` |
 | Remnant inventory | `lib/remnants.ts` |
 | Audit log | `lib/storage.ts` |
 

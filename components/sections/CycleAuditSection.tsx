@@ -31,7 +31,15 @@ import {
   isToday,
   saveAudit,
 } from "@/lib/storage";
-import type { CarpetAudit, CatalogItem, LocationType } from "@/lib/types";
+import type { CarpetAudit, CatalogItem, LocationType, StoreSpecialist } from "@/lib/types";
+import {
+  calculateVariance,
+  classifyVariance,
+  formatVariance,
+  isDiscrepancy,
+  varianceBadgeClass,
+  varianceLabel,
+} from "@/lib/variance";
 
 function locationLabel(location: LocationType): string {
   return location === "sales_floor" ? "Sales Floor" : "Top Stock";
@@ -68,9 +76,16 @@ const cardClass =
 type Props = {
   catalog: CatalogItem[];
   onCatalogChange: (items: CatalogItem[]) => void;
+  auditedBy: string;
+  specialists: StoreSpecialist[];
 };
 
-export function CycleAuditSection({ catalog, onCatalogChange }: Props) {
+export function CycleAuditSection({
+  catalog,
+  onCatalogChange,
+  auditedBy,
+  specialists,
+}: Props) {
   const [sku, setSku] = useState("");
   const [carpetName, setCarpetName] = useState("");
   const [rollWidth, setRollWidth] = useState<number | null>(null);
@@ -79,6 +94,7 @@ export function CycleAuditSection({ catalog, onCatalogChange }: Props) {
   const [wholeInches, setWholeInches] = useState("");
   const [fraction, setFraction] = useState(0);
   const [rounds, setRounds] = useState("");
+  const [systemClf, setSystemClf] = useState("");
   const [audits, setAudits] = useState<CarpetAudit[]>([]);
   const [saving, setSaving] = useState(false);
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
@@ -87,9 +103,14 @@ export function CycleAuditSection({ catalog, onCatalogChange }: Props) {
   const [loaded, setLoaded] = useState(false);
   const [scanFlash, setScanFlash] = useState(false);
   const [marryBarcode, setMarryBarcode] = useState<string | null>(null);
+  const [filterSpecialist, setFilterSpecialist] = useState("all");
+  const [filterLocation, setFilterLocation] = useState<"all" | LocationType>("all");
+  const [filterDiscrepancies, setFilterDiscrepancies] = useState(false);
 
   const wholeNum = toNumber(wholeInches, 0);
   const roundsNum = toNumber(rounds, 0);
+  const systemClfNum =
+    systemClf.trim() === "" ? null : toNumber(systemClf, Number.NaN);
   const totalInchesValue = useMemo(
     () => toTotalInches(wholeNum, fraction),
     [wholeNum, fraction]
@@ -98,6 +119,15 @@ export function CycleAuditSection({ catalog, onCatalogChange }: Props) {
     () => calculateClf(totalInchesValue, roundsNum),
     [totalInchesValue, roundsNum]
   );
+  const liveVariance = useMemo(
+    () =>
+      calculateVariance(
+        clf,
+        systemClfNum != null && Number.isFinite(systemClfNum) ? systemClfNum : null
+      ),
+    [clf, systemClfNum]
+  );
+  const liveVarianceKind = classifyVariance(liveVariance);
 
   const shiftAudits = useMemo(() => audits.filter((a) => isToday(a.created_at)), [audits]);
   const floorCount = useMemo(
@@ -123,7 +153,30 @@ export function CycleAuditSection({ catalog, onCatalogChange }: Props) {
     [catalog, sku]
   );
 
-  const visibleAudits = showAll ? audits : audits.slice(0, 5);
+  const filteredAudits = useMemo(() => {
+    return audits.filter((a) => {
+      if (filterSpecialist !== "all" && a.audited_by !== filterSpecialist) {
+        return false;
+      }
+      if (filterLocation !== "all" && a.location_type !== filterLocation) {
+        return false;
+      }
+      if (filterDiscrepancies && !isDiscrepancy(a.variance_clf)) {
+        return false;
+      }
+      return true;
+    });
+  }, [audits, filterSpecialist, filterLocation, filterDiscrepancies]);
+
+  const visibleAudits = showAll ? filteredAudits : filteredAudits.slice(0, 5);
+
+  const specialistOptions = useMemo(() => {
+    const names = new Set<string>([
+      ...specialists.map((s) => s.name),
+      ...audits.map((a) => a.audited_by).filter(Boolean),
+    ]);
+    return Array.from(names).sort((a, b) => a.localeCompare(b));
+  }, [specialists, audits]);
 
   useEffect(() => {
     let cancelled = false;
@@ -214,6 +267,7 @@ export function CycleAuditSection({ catalog, onCatalogChange }: Props) {
     setWholeInches("");
     setFraction(0);
     setRounds("");
+    setSystemClf("");
   }
 
   const canLog = sku.trim().length > 0 && roundsNum > 0 && !saving;
@@ -222,6 +276,9 @@ export function CycleAuditSection({ catalog, onCatalogChange }: Props) {
     if (!canLog) return;
     setSaving(true);
     try {
+      const systemValue =
+        systemClfNum != null && Number.isFinite(systemClfNum) ? systemClfNum : null;
+      const variance = calculateVariance(clf, systemValue);
       const { record, offline } = await saveAudit({
         sku: sku.trim(),
         carpet_name: carpetName.trim(),
@@ -230,6 +287,9 @@ export function CycleAuditSection({ catalog, onCatalogChange }: Props) {
         measurement_fraction: fraction,
         rounds: roundsNum,
         calculated_clf: clf,
+        system_clf: systemValue,
+        variance_clf: variance,
+        audited_by: auditedBy,
       });
       setAudits((prev) => [record, ...prev.filter((a) => a.id !== record.id)]);
       resetForm();
@@ -559,6 +619,37 @@ export function CycleAuditSection({ catalog, onCatalogChange }: Props) {
           </p>
         </div>
 
+        <NumberField
+          label="System On-Hand (CLF) — optional"
+          mode="decimal"
+          value={systemClf}
+          onChange={setSystemClf}
+          placeholder="e.g. 48.00"
+        />
+        {liveVariance != null && (
+          <div
+            className={`rounded-xl border px-3 py-3 text-center text-sm font-semibold ${varianceBadgeClass(liveVarianceKind)}`}
+          >
+            {liveVarianceKind === "match" && "🟢 "}
+            {liveVarianceKind === "shortage" && "🔴 "}
+            {liveVarianceKind === "overage" && "🟡 "}
+            {varianceLabel(liveVarianceKind)}: {formatVariance(liveVariance)}
+            <span className="mt-1 block text-xs font-normal opacity-80">
+              Physical {formatClf(clf)} − System {formatClf(systemClfNum ?? 0)}
+            </span>
+          </div>
+        )}
+
+        {auditedBy ? (
+          <p className="text-center text-xs text-slate-500">
+            Logging as <span className="font-semibold text-emerald-400">{auditedBy}</span>
+          </p>
+        ) : (
+          <p className="text-center text-xs text-amber-400">
+            Select an active specialist in the header before logging.
+          </p>
+        )}
+
         <button
           type="submit"
           disabled={!canLog}
@@ -573,7 +664,53 @@ export function CycleAuditSection({ catalog, onCatalogChange }: Props) {
           <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-400">
             Shift log
           </h2>
-          <span className="font-mono text-xs text-slate-500">{audits.length} total</span>
+          <span className="font-mono text-xs text-slate-500">
+            {filteredAudits.length}/{audits.length}
+          </span>
+        </div>
+
+        <div className="space-y-2 rounded-2xl border border-slate-800 bg-slate-900/90 p-3">
+          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Supervisor filters
+          </p>
+          <label className="block space-y-1">
+            <span className="text-xs text-slate-400">Specialist</span>
+            <select
+              value={filterSpecialist}
+              onChange={(e) => setFilterSpecialist(e.target.value)}
+              className="min-h-12 w-full rounded-xl border border-slate-800 bg-slate-950 px-3 text-base text-slate-100"
+            >
+              <option value="all">All</option>
+              {specialistOptions.map((name) => (
+                <option key={name} value={name}>
+                  {name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="block space-y-1">
+            <span className="text-xs text-slate-400">Location</span>
+            <select
+              value={filterLocation}
+              onChange={(e) =>
+                setFilterLocation(e.target.value as "all" | LocationType)
+              }
+              className="min-h-12 w-full rounded-xl border border-slate-800 bg-slate-950 px-3 text-base text-slate-100"
+            >
+              <option value="all">All</option>
+              <option value="sales_floor">Sales Floor</option>
+              <option value="top_stock">Top Stock</option>
+            </select>
+          </label>
+          <label className="flex min-h-12 items-center gap-3 rounded-xl border border-slate-800 bg-slate-950 px-3">
+            <input
+              type="checkbox"
+              checked={filterDiscrepancies}
+              onChange={(e) => setFilterDiscrepancies(e.target.checked)}
+              className="h-5 w-5 accent-emerald-500"
+            />
+            <span className="text-sm text-slate-200">Discrepancies only</span>
+          </label>
         </div>
 
         {!loaded && (
@@ -582,14 +719,18 @@ export function CycleAuditSection({ catalog, onCatalogChange }: Props) {
           </p>
         )}
 
-        {loaded && audits.length === 0 && (
+        {loaded && filteredAudits.length === 0 && (
           <p className="rounded-2xl border border-dashed border-slate-700 bg-slate-900/60 px-4 py-8 text-center text-sm text-slate-400">
-            No rolls logged yet.
+            {audits.length === 0
+              ? "No rolls logged yet."
+              : "No rolls match the current filters."}
           </p>
         )}
 
         <ul className="space-y-2">
-          {visibleAudits.map((audit) => (
+          {visibleAudits.map((audit) => {
+            const kind = classifyVariance(audit.variance_clf);
+            return (
             <li
               key={audit.id}
               className="flex gap-2 rounded-2xl border border-slate-800 bg-slate-900/90 p-3"
@@ -632,6 +773,19 @@ export function CycleAuditSection({ catalog, onCatalogChange }: Props) {
                     {formatTime(audit.created_at)}
                   </time>
                 </div>
+                {audit.audited_by ? (
+                  <p className="text-xs text-slate-500">Logged by {audit.audited_by}</p>
+                ) : null}
+                {audit.variance_clf != null && (
+                  <span
+                    className={`inline-flex rounded-lg border px-2 py-1 text-xs font-semibold ${varianceBadgeClass(kind)}`}
+                  >
+                    {kind === "match" && "🟢 "}
+                    {kind === "shortage" && "🔴 "}
+                    {kind === "overage" && "🟡 "}
+                    {formatVariance(audit.variance_clf)}
+                  </span>
+                )}
               </div>
               <button
                 type="button"
@@ -642,16 +796,19 @@ export function CycleAuditSection({ catalog, onCatalogChange }: Props) {
                 Del
               </button>
             </li>
-          ))}
+            );
+          })}
         </ul>
 
-        {audits.length > 5 && (
+        {filteredAudits.length > 5 && (
           <button
             type="button"
             onClick={() => setShowAll((v) => !v)}
             className="flex min-h-12 w-full items-center justify-center rounded-xl border border-slate-700 bg-slate-900 text-sm font-semibold text-slate-200"
           >
-            {showAll ? "Show Fewer Rolls" : `Show All Logged Rolls (${audits.length})`}
+            {showAll
+              ? "Show Fewer Rolls"
+              : `Show All Logged Rolls (${filteredAudits.length})`}
           </button>
         )}
       </section>

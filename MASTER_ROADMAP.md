@@ -2,20 +2,19 @@
 
 ## Done
 - [x] Carpet Hub shell with sticky header + slide-over nav
-- [x] Number input sanitize (no sticky leading zeros; focus-select; blank allowed)
-- [x] Cycle Audit with catalog auto-fill + Save to Catalog + compact shift log (5 + show all)
-- [x] Carpet Catalog manager (search, add/edit/remove, roll width)
-- [x] Remnant Rack (status filters, sq ft/yd, reserve/sold, edit/delete)
-- [x] Settings & Sync (Supabase ping + local cache counts)
-- [x] Handheld barcode scan resolve + Marry Barcode linking (`upc_barcode`)
-- [x] Schema for audits, catalog, remnants
-- [x] Offline localStorage fallback per domain
+- [x] Number input sanitize + barcode Marry workflow
+- [x] Cycle Audit, Catalog, Remnant Rack, Settings
+- [x] PWA manifest + home-screen icons / iOS meta
+- [x] Active specialist session + audited_by / logged_by
+- [x] System vs physical CLF variance tracker
+- [x] Remnant aging / discount badges
+- [x] Supervisor audit filters (specialist / location / discrepancies)
 
 ## Next
 - [ ] Offline sync queue / retry when connectivity returns
-- [ ] Associate / shift ID
+- [ ] Service worker for full offline shell caching
 - [ ] Tighten RLS for multi-store
-- [ ] PWA install
+- [ ] Manager markdown workflow from 60+ remnant badge
 
 ## Non-goals
 - Pricing / margin engines

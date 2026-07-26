@@ -46,6 +46,7 @@ function mapRow(row: Record<string, unknown>): Remnant {
         ? status
         : "available",
     reserved_for: String(row.reserved_for ?? ""),
+    logged_by: String(row.logged_by ?? ""),
     created_at: String(row.created_at ?? new Date().toISOString()),
     updated_at: String(row.updated_at ?? row.created_at ?? new Date().toISOString()),
     offline: Boolean(row.offline),
@@ -117,6 +118,7 @@ function buildRemnant(input: RemnantInsert, existing?: Remnant): Remnant {
     notes: input.notes.trim(),
     status: input.status,
     reserved_for: (input.reserved_for ?? "").trim(),
+    logged_by: (input.logged_by ?? existing?.logged_by ?? "").trim(),
     created_at: existing?.created_at ?? now,
     updated_at: now,
     offline: false,
@@ -150,6 +152,7 @@ export async function saveRemnant(
       notes: record.notes,
       status: record.status,
       reserved_for: record.reserved_for,
+      logged_by: record.logged_by,
       updated_at: record.updated_at,
       created_at: record.created_at,
     };
