@@ -5,8 +5,10 @@ Universal Flooring & SIMS Location Audit Hub — multi-category flooring goods, 
 
 ## Scan-to-Catalog
 - SKU / UPC search resolves via `lib/barcode.ts` → `carpet_catalog`
+- Dual trigger: Enter key **or** rapid ≥8-digit burst (≤150ms gaps → 250ms debounce)
+- SKU field auto-focuses on audit load / after reset
 - Match → auto-fill name, category, SIMS tag, specs + success chime + focus measure/count
-- Unlinked barcode → `QuickAddCatalogModal` (⚡ Quick-Add to SIMS Catalog) → Save & Continue Audit
+- Unlinked / not found → `QuickAddCatalogModal` (⚡ Quick-Add to SIMS Catalog) → Save & Continue Audit
 
 ## Dual audit engine
 - Mode A (Carpet / Sheet Vinyl): inches × rounds × 0.2625 = CLF

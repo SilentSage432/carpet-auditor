@@ -2,12 +2,15 @@
 
 import {
   useCallback,
+  useEffect,
   useRef,
   type KeyboardEvent,
   type ReactNode,
   type Ref,
 } from "react";
 import {
+  SCANNER_BURST_MIN_DIGITS,
+  SCANNER_DEBOUNCE_MS,
   SCANNER_INTER_KEY_MS,
   sanitizeBarcodeScan,
 } from "@/lib/barcode";
@@ -18,7 +21,7 @@ import {
 } from "@/lib/number-input";
 
 type ScanCapableProps = {
-  /** Called when Enter ends a scan (or manual commit). */
+  /** Called when Enter ends a scan, or a rapid digit burst settles. */
   onScanCommit?: (sanitizedValue: string) => void;
   /** Visual flash after a successful match. */
   flash?: boolean;
@@ -45,34 +48,101 @@ type NumberFieldProps = {
 const baseInput =
   "min-h-12 h-12 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 text-base font-semibold text-slate-100 outline-none transition focus:border-emerald-500";
 
-function useScannerKeyTracking(onScanCommit?: (v: string) => void) {
-  const lastKeyAt = useRef(0);
-  const rapidBurst = useRef(false);
+function assignRef<T>(ref: Ref<T> | undefined, node: T | null) {
+  if (!ref) return;
+  if (typeof ref === "function") ref(node);
+  else ref.current = node;
+}
+
+/**
+ * Dual scan trigger: Enter key + rapid digit burst (8+ chars, ≤150ms gaps)
+ * with 250ms quiet debounce so wedges without Enter still resolve.
+ */
+function useScannerKeyTracking(
+  onScanCommit?: (v: string) => void,
+  getCurrentValue?: () => string
+) {
+  const lastChangeAt = useRef(0);
+  const prevDigitLen = useRef(0);
+  const debounceTimer = useRef<number | null>(null);
+  const onScanCommitRef = useRef(onScanCommit);
+  const getValueRef = useRef(getCurrentValue);
+
+  useEffect(() => {
+    onScanCommitRef.current = onScanCommit;
+  }, [onScanCommit]);
+
+  useEffect(() => {
+    getValueRef.current = getCurrentValue;
+  }, [getCurrentValue]);
+
+  useEffect(() => {
+    return () => {
+      if (debounceTimer.current != null) {
+        window.clearTimeout(debounceTimer.current);
+      }
+    };
+  }, []);
+
+  const clearDebounce = useCallback(() => {
+    if (debounceTimer.current != null) {
+      window.clearTimeout(debounceTimer.current);
+      debounceTimer.current = null;
+    }
+  }, []);
+
+  const commit = useCallback(
+    (raw: string) => {
+      clearDebounce();
+      const sanitized = sanitizeBarcodeScan(raw);
+      if (!sanitized || !onScanCommitRef.current) return;
+      onScanCommitRef.current(sanitized);
+    },
+    [clearDebounce]
+  );
 
   const onKeyDown = useCallback(
     (e: KeyboardEvent<HTMLInputElement>) => {
-      const now = Date.now();
-      const gap = now - lastKeyAt.current;
-      if (lastKeyAt.current > 0 && gap > 0 && gap < SCANNER_INTER_KEY_MS) {
-        rapidBurst.current = true;
-      }
-      lastKeyAt.current = now;
-
-      if (e.key === "Enter") {
-        e.preventDefault();
-        const raw = e.currentTarget.value;
-        const sanitized = sanitizeBarcodeScan(raw);
-        // Prefer scan commit on Enter (scanner suffix) or rapid burst
-        if (onScanCommit && (rapidBurst.current || sanitized.length > 0)) {
-          onScanCommit(sanitized || sanitizeBarcodeScan(raw));
-        }
-        rapidBurst.current = false;
-      }
+      if (!onScanCommitRef.current) return;
+      if (e.key !== "Enter") return;
+      e.preventDefault();
+      e.stopPropagation();
+      commit(e.currentTarget.value);
     },
-    [onScanCommit]
+    [commit]
   );
 
-  return { onKeyDown };
+  /** Call from onChange after the controlled value updates. */
+  const noteValueChange = useCallback(
+    (nextValue: string) => {
+      if (!onScanCommitRef.current) return;
+
+      const digits = sanitizeBarcodeScan(nextValue);
+      const now = Date.now();
+      const gap = lastChangeAt.current > 0 ? now - lastChangeAt.current : 0;
+      const digitDelta = digits.length - prevDigitLen.current;
+      lastChangeAt.current = now;
+      prevDigitLen.current = digits.length;
+
+      clearDebounce();
+
+      if (digits.length < SCANNER_BURST_MIN_DIGITS) return;
+
+      const rapidBurst = gap > 0 && gap <= SCANNER_INTER_KEY_MS;
+      const pasteOrDump = digitDelta >= SCANNER_BURST_MIN_DIGITS || gap === 0;
+
+      if (!rapidBurst && !pasteOrDump) return;
+
+      debounceTimer.current = window.setTimeout(() => {
+        debounceTimer.current = null;
+        const latest = getValueRef.current?.() ?? nextValue;
+        commit(latest);
+      }, SCANNER_DEBOUNCE_MS);
+    },
+    [clearDebounce, commit]
+  );
+
+  return { onKeyDown, noteValueChange };
 }
 
 export function NumberField({
@@ -93,11 +163,21 @@ export function NumberField({
   inputRef,
   autoFocus,
 }: NumberFieldProps) {
-  const { onKeyDown } = useScannerKeyTracking(onScanCommit);
+  const localRef = useRef<HTMLInputElement | null>(null);
+  const getCurrentValue = useCallback(
+    () => localRef.current?.value ?? value,
+    [value]
+  );
+  const { onKeyDown, noteValueChange } = useScannerKeyTracking(
+    onScanCommit,
+    getCurrentValue
+  );
 
   function handleChange(raw: string) {
-    if (mode === "decimal") onChange(sanitizeDecimalInput(raw));
-    else onChange(sanitizeIntegerInput(raw));
+    const next =
+      mode === "decimal" ? sanitizeDecimalInput(raw) : sanitizeIntegerInput(raw);
+    onChange(next);
+    if (onScanCommit) noteValueChange(next);
   }
 
   const input = (
@@ -108,7 +188,10 @@ export function NumberField({
         </span>
       ) : null}
       <input
-        ref={inputRef}
+        ref={(node) => {
+          localRef.current = node;
+          assignRef(inputRef, node);
+        }}
         type="text"
         inputMode={inputMode ?? (mode === "decimal" ? "decimal" : "numeric")}
         pattern={mode === "decimal" ? "[0-9]*[.]?[0-9]*" : "[0-9]*"}
@@ -121,13 +204,15 @@ export function NumberField({
         onBlur={() => onBlur?.()}
         onChange={(e) => handleChange(e.target.value)}
         onKeyDown={(e) => {
+          if (onScanCommit) {
+            onKeyDown(e);
+            return;
+          }
           if (e.key === "Enter") {
             e.preventDefault();
             onBlur?.();
             e.currentTarget.blur();
-            return;
           }
-          if (onScanCommit) onKeyDown(e);
         }}
         className={`${baseInput} ${leftIcon ? "pl-11" : ""} ${center ? "text-center font-mono tabular-nums" : "font-mono tabular-nums"} ${
           flash
@@ -161,6 +246,8 @@ type TextFieldProps = {
   "aria-label"?: string;
   /** When true, sanitize digit queries and support scan Enter. */
   scanDigits?: boolean;
+  inputRef?: Ref<HTMLInputElement>;
+  autoFocus?: boolean;
 } & ScanCapableProps;
 
 export function TextField({
@@ -175,8 +262,18 @@ export function TextField({
   onScanCommit,
   flash,
   scanDigits,
+  inputRef,
+  autoFocus,
 }: TextFieldProps) {
-  const { onKeyDown } = useScannerKeyTracking(onScanCommit);
+  const localRef = useRef<HTMLInputElement | null>(null);
+  const getCurrentValue = useCallback(
+    () => localRef.current?.value ?? value,
+    [value]
+  );
+  const { onKeyDown, noteValueChange } = useScannerKeyTracking(
+    onScanCommit,
+    getCurrentValue
+  );
 
   const input = (
     <div className="relative">
@@ -186,15 +283,23 @@ export function TextField({
         </span>
       ) : null}
       <input
+        ref={(node) => {
+          localRef.current = node;
+          assignRef(inputRef, node);
+        }}
         type="text"
         autoComplete="off"
+        autoFocus={autoFocus}
         placeholder={placeholder}
         aria-label={ariaLabel ?? label}
         value={value}
         onFocus={selectOnFocus}
         onChange={(e) => {
-          const next = e.target.value;
-          onChange(scanDigits ? sanitizeIntegerInput(next) : next);
+          const next = scanDigits
+            ? sanitizeIntegerInput(e.target.value)
+            : e.target.value;
+          onChange(next);
+          if (onScanCommit) noteValueChange(next);
         }}
         onKeyDown={onScanCommit ? onKeyDown : undefined}
         className={`${baseInput} ${leftIcon ? "pl-11" : ""} ${

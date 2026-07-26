@@ -113,6 +113,7 @@ export function CycleAuditSection({
 }: Props) {
   const measureInputRef = useRef<HTMLInputElement>(null);
   const boxCountInputRef = useRef<HTMLInputElement>(null);
+  const skuInputRef = useRef<HTMLInputElement>(null);
 
   const [sku, setSku] = useState("");
   const [carpetName, setCarpetName] = useState("");
@@ -307,6 +308,14 @@ export function CycleAuditSection({
     rollWidth,
   ]);
 
+  const focusSkuInput = useCallback(() => {
+    window.setTimeout(() => {
+      const el = skuInputRef.current;
+      el?.focus();
+      el?.select();
+    }, 50);
+  }, []);
+
   const focusMeasureInput = useCallback((mode: "roll" | "carton") => {
     window.setTimeout(() => {
       const el =
@@ -315,6 +324,11 @@ export function CycleAuditSection({
       el?.select();
     }, 50);
   }, []);
+
+  // Ready for handheld scan as soon as the audit workspace mounts
+  useEffect(() => {
+    focusSkuInput();
+  }, [focusSkuInput]);
 
   const applyCatalogItem = useCallback(
     (item: CatalogItem) => {
@@ -357,8 +371,14 @@ export function CycleAuditSection({
     }
   }
 
-  function handleScanCommit(sanitized: string) {
-    const resolution = resolveScan(catalog, sanitized);
+  /** Enter / rapid-burst scan resolution — catalog match or Quick-Add. */
+  function handleSkuLookup(raw: string) {
+    const cleaned = sanitizeBarcodeScan(raw);
+    if (!cleaned) return;
+
+    setSku(cleaned);
+    const resolution = resolveScan(catalog, cleaned);
+
     if (resolution.kind === "empty") return;
 
     if (resolution.kind === "matched") {
@@ -367,13 +387,11 @@ export function CycleAuditSection({
       return;
     }
 
+    // Unlinked barcode / unknown scan → Quick-Add / marry modal
+    setQuickAddBarcode(resolution.scanned);
     if (resolution.kind === "unlinked_barcode") {
-      setSku(resolution.scanned);
-      setQuickAddBarcode(resolution.scanned);
-      return;
+      flashStatus("Unlinked barcode — Quick-Add to SIMS catalog");
     }
-
-    setSku(resolution.scanned);
   }
 
   function handleQuickAdded(item: CatalogItem) {
@@ -401,6 +419,7 @@ export function CycleAuditSection({
     setBoxCount("");
     setSystemClf("");
     clearAuditDraft();
+    focusSkuInput();
   }
 
   const canLog =
@@ -527,7 +546,10 @@ export function CycleAuditSection({
       <QuickAddCatalogModal
         open={quickAddBarcode != null}
         scannedBarcode={quickAddBarcode ?? ""}
-        onClose={() => setQuickAddBarcode(null)}
+        onClose={() => {
+          setQuickAddBarcode(null);
+          focusSkuInput();
+        }}
         onSaved={handleQuickAdded}
       />
       <PinKeypadModal
@@ -632,10 +654,12 @@ export function CycleAuditSection({
           mode="digits"
           value={sku}
           onChange={handleSkuChange}
-          onScanCommit={handleScanCommit}
+          onScanCommit={handleSkuLookup}
           flash={scanFlash}
           placeholder="Scan barcode or type item #"
           leftIcon={<BarcodeIcon className="h-5 w-5" />}
+          inputRef={skuInputRef}
+          autoFocus
         />
 
         <div className="space-y-1.5">

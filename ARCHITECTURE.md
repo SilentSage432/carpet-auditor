@@ -31,7 +31,7 @@ supabase/schema.sql               → Tables + multi-category + SIMS + store_num
 | CLF / carton math | `lib/calc.ts` |
 | Number typing UX | `lib/number-input.ts` + `NumberField` |
 | Catalog knowledge | `lib/catalog.ts` |
-| Barcode resolve / Quick-Add | `lib/barcode.ts`, `QuickAddCatalogModal` |
+| Barcode resolve / Quick-Add | `lib/barcode.ts`, `NumberField` scan hooks, `QuickAddCatalogModal` |
 | SIMS location stock | `lib/sims.ts`, `SimsLocationFinder` |
 | Specialists session | `lib/specialists.ts`, `SpecialistModal` |
 | PIN change / default notice | `ChangePinModal`, `DefaultPinNotice` |

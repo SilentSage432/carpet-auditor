@@ -125,7 +125,9 @@ export function CatalogSection({ catalog, onCatalogChange }: Props) {
   }
 
   function handleSearchScan(sanitized: string) {
-    const resolution = resolveScan(catalog, sanitized);
+    const cleaned = sanitizeBarcodeScan(sanitized);
+    if (!cleaned) return;
+    const resolution = resolveScan(catalog, cleaned);
     if (resolution.kind === "matched") {
       setQuery(resolution.item.sku);
       setScanFlash(true);
@@ -134,14 +136,10 @@ export function CatalogSection({ catalog, onCatalogChange }: Props) {
       flash(`Found ${resolution.item.sku}`);
       return;
     }
-    if (resolution.kind === "unlinked_barcode") {
-      setQuery(resolution.scanned);
-      setQuickAddBarcode(resolution.scanned);
-      return;
-    }
-    if (resolution.kind === "unknown_sku") {
-      setQuery(resolution.scanned);
-    }
+    if (resolution.kind === "empty") return;
+    setQuery(resolution.scanned);
+    setQuickAddBarcode(resolution.scanned);
+    flash("Unlinked barcode — Quick-Add to SIMS catalog");
   }
 
   async function handleSave() {

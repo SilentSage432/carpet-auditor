@@ -1,6 +1,6 @@
 /**
  * Handheld scanner + UPC helpers.
- * Scanners emulate a keyboard and usually end a scan with Enter.
+ * Scanners emulate a keyboard; some append Enter, others dump digits only.
  */
 
 import { stripLeadingZeros } from "./number-input";
@@ -8,7 +8,7 @@ import type { CatalogItem } from "./types";
 
 /** Digits only, strip leading zeros (0000084312345678 → 84312345678). */
 export function sanitizeBarcodeScan(raw: string): string {
-  const digits = raw.replace(/\D/g, "");
+  const digits = String(raw ?? "").replace(/\D/g, "");
   return stripLeadingZeros(digits);
 }
 
@@ -50,12 +50,23 @@ export function resolveScan(
   const item = findCatalogBySkuOrBarcode(items, scanned);
   if (item) return { kind: "matched", item, scanned };
 
-  if (isVendorBarcode(scanned)) {
+  // Any unmatched handheld scan should offer Quick-Add / marry flow.
+  // Prefer classifying longer codes as unlinked barcodes.
+  if (isVendorBarcode(scanned) || scanned.length >= 8) {
     return { kind: "unlinked_barcode", scanned };
   }
 
   return { kind: "unknown_sku", scanned };
 }
 
-/** Heuristic: keystrokes arriving faster than this are scanner-like. */
-export const SCANNER_INTER_KEY_MS = 45;
+/**
+ * Inter-key gap under this = scanner-like burst (user asked ~150ms).
+ * Kept slightly below typical human typing for handheld wedges.
+ */
+export const SCANNER_INTER_KEY_MS = 150;
+
+/** Fire lookup after this quiet period following a rapid digit burst. */
+export const SCANNER_DEBOUNCE_MS = 250;
+
+/** Minimum digit length in a rapid burst before auto-lookup (no Enter). */
+export const SCANNER_BURST_MIN_DIGITS = 8;

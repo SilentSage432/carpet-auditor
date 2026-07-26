@@ -1,5 +1,15 @@
 # Carpet Hub — Development Journal
 
+## 2026-07-26 — Dual scan trigger + auto-focus SKU
+
+### Shipped
+- SKU / barcode field auto-focuses on audit mount and after form reset.
+- Enter on SKU always `preventDefault` + `handleSkuLookup` (fixed prior blur-without-lookup bug).
+- Rapid digit burst (≥8 digits, ≤150ms gaps) auto-looks up after 250ms quiet — works when scanner omits Enter.
+- Unmatched scans open ⚡ Quick-Add with barcode pre-filled.
+
+---
+
 ## 2026-07-26 — Sheet Vinyl as Mode A roll goods
 
 ### Shipped
