@@ -5,11 +5,13 @@ import { NumberField, TextField } from "@/components/ui/NumberField";
 import { sanitizeBarcodeScan } from "@/lib/barcode";
 import { saveCatalogItem } from "@/lib/catalog";
 import { toNumber } from "@/lib/number-input";
-import { playSuccessChime } from "@/lib/scan-feedback";
+import { playQuickAddPrompt } from "@/lib/scan-feedback";
 import {
+  DEFAULT_ROLL_WIDTH_FT,
   FLOORING_CATEGORIES,
   ROLL_WIDTH_OPTIONS_FT,
   auditModeForCategory,
+  normalizeRollWidthFt,
   type CatalogItem,
   type FlooringCategory,
 } from "@/lib/types";
@@ -45,9 +47,10 @@ export function QuickAddCatalogModal({
     setName("");
     setCategory("Carpet");
     setSimsLocation("");
-    setSpecValue("12");
+    setSpecValue(String(DEFAULT_ROLL_WIDTH_FT));
     setError(null);
     setSaving(false);
+    playQuickAddPrompt();
   }, [open, cleaned]);
 
   if (!open) return null;
@@ -60,20 +63,21 @@ export function QuickAddCatalogModal({
     setSaving(true);
     setError(null);
     try {
-      const spec = toNumber(specValue, mode === "roll" ? 12 : 0);
+      const spec = toNumber(
+        specValue,
+        mode === "roll" ? DEFAULT_ROLL_WIDTH_FT : 0
+      );
       const { record } = await saveCatalogItem({
         sku: sanitizeBarcodeScan(sku) || sku.trim(),
         carpet_name: name.trim(),
         vendor: "",
         category,
         default_sims_location: simsLocation.trim(),
-        roll_width_ft: mode === "roll" ? spec || 12 : 12,
+          roll_width_ft: mode === "roll" ? normalizeRollWidthFt(spec || DEFAULT_ROLL_WIDTH_FT) : DEFAULT_ROLL_WIDTH_FT,
         sqft_per_box: mode === "carton" ? (spec > 0 ? spec : null) : null,
         upc_barcode: cleaned || null,
       });
-      playSuccessChime();
       onSaved(record);
-      onClose();
     } catch {
       setError("Could not save to SIMS catalog");
     } finally {
@@ -128,7 +132,11 @@ export function QuickAddCatalogModal({
               onChange={(e) => {
                 const next = e.target.value as FlooringCategory;
                 setCategory(next);
-                setSpecValue(auditModeForCategory(next) === "roll" ? "12" : "");
+                setSpecValue(
+                  auditModeForCategory(next) === "roll"
+                    ? String(DEFAULT_ROLL_WIDTH_FT)
+                    : ""
+                );
               }}
               className="min-h-12 w-full rounded-xl border border-slate-800 bg-slate-950 px-3 text-base text-slate-100"
             >
@@ -155,7 +163,10 @@ export function QuickAddCatalogModal({
                 className="grid grid-cols-2 gap-1 rounded-xl border border-slate-800 bg-slate-950 p-1"
               >
                 {ROLL_WIDTH_OPTIONS_FT.map((ft) => {
-                  const active = toNumber(specValue, 12) === ft;
+                  const active =
+                    normalizeRollWidthFt(
+                      toNumber(specValue, DEFAULT_ROLL_WIDTH_FT)
+                    ) === ft;
                   return (
                     <button
                       key={ft}

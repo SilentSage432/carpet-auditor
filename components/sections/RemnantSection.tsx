@@ -24,10 +24,12 @@ import type {
   StoreSpecialist,
 } from "@/lib/types";
 import {
+  DEFAULT_ROLL_WIDTH_FT,
   FLOORING_CATEGORIES,
   ROLL_WIDTH_OPTIONS_FT,
   isRollGoodsCategory,
   normalizeCategory,
+  normalizeRollWidthFt,
 } from "@/lib/types";
 import { NumberField, TextField } from "@/components/ui/NumberField";
 
@@ -119,7 +121,7 @@ export function RemnantSection({
     setCarpetName("");
     setCategory("Carpet");
     setTag("");
-    setWidth("12");
+    setWidth(String(DEFAULT_ROLL_WIDTH_FT));
     setLength("");
     setLocation("");
     setNotes("");
@@ -133,7 +135,7 @@ export function RemnantSection({
     setCarpetName(item.carpet_name);
     setCategory(normalizeCategory(item.category));
     setTag(item.tag_number);
-    setWidth(String(item.width_ft));
+    setWidth(String(normalizeRollWidthFt(item.width_ft)));
     setLength(String(item.length_ft));
     setLocation(item.location);
     setNotes(item.notes);
@@ -151,7 +153,7 @@ export function RemnantSection({
       setCarpetName(hit.carpet_name);
       setCategory(normalizeCategory(hit.category));
       if (isRollGoodsCategory(hit.category)) {
-        setWidth(String(hit.roll_width_ft || 12));
+        setWidth(String(normalizeRollWidthFt(hit.roll_width_ft)));
       }
     }
   }
@@ -348,7 +350,9 @@ export function RemnantSection({
                 const next = normalizeCategory(e.target.value);
                 setCategory(next);
                 if (isRollGoodsCategory(next)) {
-                  setWidth((w) => (w === "6" || w === "12" ? w : "12"));
+                  setWidth((w) =>
+                    w === "12" || w === "15" ? w : String(DEFAULT_ROLL_WIDTH_FT)
+                  );
                 }
               }}
               className="min-h-12 w-full rounded-xl border border-slate-800 bg-slate-950 px-3 text-base text-slate-100"

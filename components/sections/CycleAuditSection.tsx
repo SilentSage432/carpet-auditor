@@ -19,12 +19,15 @@ import {
   FRACTION_OPTIONS,
   calculateCartonSqFt,
   calculateClf,
+  calculateRollSqFt,
+  calculateSquareYards,
   formatCartonBreakdown,
   formatClf,
   formatDecimalInches,
   formatFormulaBreakdown,
   formatMeasurementDisplay,
   formatSqFt,
+  formatSqYd,
   toTotalInches,
 } from "@/lib/calc";
 import {
@@ -32,6 +35,7 @@ import {
   fetchCatalog,
   saveCatalogItem,
 } from "@/lib/catalog";
+import { focusAndSelect } from "@/lib/focus-input";
 import { toNumber } from "@/lib/number-input";
 import { playSuccessChime } from "@/lib/scan-feedback";
 import { getStoreNumber } from "@/lib/store";
@@ -46,10 +50,12 @@ import {
   saveAuditDraft,
 } from "@/lib/storage";
 import {
+  DEFAULT_ROLL_WIDTH_FT,
   FLOORING_CATEGORIES,
   ROLL_WIDTH_OPTIONS_FT,
   auditModeForCategory,
   normalizeCategory,
+  normalizeRollWidthFt,
   type CarpetAudit,
   type CatalogItem,
   type FlooringCategory,
@@ -144,8 +150,14 @@ export function CycleAuditSection({
   const [draftRestored, setDraftRestored] = useState(false);
   const [summaryExpanded, setSummaryExpanded] = useState(false);
   const [simsFinderOpen, setSimsFinderOpen] = useState(false);
+  const [undoToast, setUndoToast] = useState<{
+    id: string;
+    label: string;
+  } | null>(null);
+  const undoTimerRef = useRef<number | null>(null);
 
   const auditMode = auditModeForCategory(category);
+  const effectiveRollWidth = normalizeRollWidthFt(rollWidth);
   const canViewDiscrepancies =
     isSupervisor(activeSpecialist) || discrepancyUnlocked;
 
@@ -162,6 +174,14 @@ export function CycleAuditSection({
   const clf = useMemo(
     () => calculateClf(totalInchesValue, roundsNum),
     [totalInchesValue, roundsNum]
+  );
+  const rollSqFt = useMemo(
+    () => calculateRollSqFt(clf, effectiveRollWidth),
+    [clf, effectiveRollWidth]
+  );
+  const rollSqYd = useMemo(
+    () => calculateSquareYards(rollSqFt),
+    [rollSqFt]
   );
   const cartonSqFt = useMemo(
     () => calculateCartonSqFt(boxCountNum, sqftPerBoxNum),
@@ -267,7 +287,9 @@ export function CycleAuditSection({
     setBoxCount(draft.boxCount);
     setSqftPerBox(draft.sqftPerBox);
     setSystemClf(draft.systemClf);
-    setRollWidth(draft.rollWidth);
+    setRollWidth(
+      draft.rollWidth != null ? normalizeRollWidthFt(draft.rollWidth) : null
+    );
     setDraftRestored(true);
   }, [draftRestored]);
 
@@ -316,26 +338,28 @@ export function CycleAuditSection({
   ]);
 
   const focusSkuInput = useCallback(() => {
-    window.setTimeout(() => {
-      const el = skuInputRef.current;
-      el?.focus();
-      el?.select();
-    }, 50);
+    focusAndSelect(skuInputRef, 100);
   }, []);
 
   const focusMeasureInput = useCallback((mode: "roll" | "carton") => {
-    window.setTimeout(() => {
-      const el =
-        mode === "roll" ? measureInputRef.current : boxCountInputRef.current;
-      el?.focus();
-      el?.select();
-    }, 50);
+    focusAndSelect(
+      mode === "roll" ? measureInputRef : boxCountInputRef,
+      100
+    );
   }, []);
 
   // Ready for handheld scan as soon as the audit workspace mounts
   useEffect(() => {
     focusSkuInput();
   }, [focusSkuInput]);
+
+  useEffect(() => {
+    return () => {
+      if (undoTimerRef.current != null) {
+        window.clearTimeout(undoTimerRef.current);
+      }
+    };
+  }, []);
 
   const applyCatalogItem = useCallback(
     (item: CatalogItem) => {
@@ -345,7 +369,7 @@ export function CycleAuditSection({
       setCarpetName(item.carpet_name);
       setCategory(nextCategory);
       setSimsLocation(item.default_sims_location || "");
-      setRollWidth(item.roll_width_ft);
+      setRollWidth(normalizeRollWidthFt(item.roll_width_ft));
       setSqftPerBox(
         item.sqft_per_box != null ? String(item.sqft_per_box) : ""
       );
@@ -370,7 +394,7 @@ export function CycleAuditSection({
       setCarpetName(hit.carpet_name);
       setCategory(normalizeCategory(hit.category));
       setSimsLocation(hit.default_sims_location || "");
-      setRollWidth(hit.roll_width_ft);
+      setRollWidth(normalizeRollWidthFt(hit.roll_width_ft));
       setSqftPerBox(hit.sqft_per_box != null ? String(hit.sqft_per_box) : "");
     } else {
       setCarpetName("");
@@ -407,9 +431,23 @@ export function CycleAuditSection({
       ...catalog.filter((c) => c.id !== item.id && c.sku !== item.sku),
     ].sort((a, b) => a.sku.localeCompare(b.sku));
     onCatalogChange(next);
-    applyCatalogItem(item);
     setQuickAddBarcode(null);
+    // Clear scan field + measure state; apply catalog for continue-audit
+    setWholeInches("");
+    setFraction(0);
+    setRounds("");
+    setBoxCount("");
+    setSystemClf("");
+    applyCatalogItem(item);
     flashStatus(`Added ${item.sku} to SIMS catalog`);
+  }
+
+  function closeQuickAdd() {
+    setQuickAddBarcode(null);
+    setSku("");
+    setCarpetName("");
+    setRollWidth(null);
+    focusSkuInput();
   }
 
   function resetForm() {
@@ -426,6 +464,36 @@ export function CycleAuditSection({
     setBoxCount("");
     setSystemClf("");
     clearAuditDraft();
+    focusSkuInput();
+  }
+
+  function showUndoToast(record: CarpetAudit) {
+    if (undoTimerRef.current != null) {
+      window.clearTimeout(undoTimerRef.current);
+    }
+    const qty =
+      record.box_count != null && record.box_count > 0
+        ? `${formatSqFt(record.calculated_sqft ?? 0)} sq ft`
+        : `${formatClf(record.calculated_clf)} CLF`;
+    const name = record.carpet_name.trim() || `SKU ${record.sku}`;
+    setUndoToast({ id: record.id, label: `Logged ${qty} — ${name}` });
+    undoTimerRef.current = window.setTimeout(() => {
+      setUndoToast(null);
+      undoTimerRef.current = null;
+    }, 6000);
+  }
+
+  async function handleUndoLast() {
+    if (!undoToast) return;
+    const id = undoToast.id;
+    if (undoTimerRef.current != null) {
+      window.clearTimeout(undoTimerRef.current);
+      undoTimerRef.current = null;
+    }
+    setUndoToast(null);
+    await deleteAudit(id);
+    setAudits((prev) => prev.filter((a) => a.id !== id));
+    flashStatus("Last audit undone");
     focusSkuInput();
   }
 
@@ -459,7 +527,9 @@ export function CycleAuditSection({
         audited_by: auditedBy,
       });
       setAudits((prev) => [record, ...prev.filter((a) => a.id !== record.id)]);
+      playSuccessChime();
       resetForm();
+      showUndoToast(record);
       flashStatus(
         offline
           ? "Saved offline — form reset"
@@ -482,7 +552,7 @@ export function CycleAuditSection({
       vendor: "",
       category,
       default_sims_location: simsLocation.trim(),
-      roll_width_ft: rollWidth ?? 12,
+      roll_width_ft: rollWidth ?? DEFAULT_ROLL_WIDTH_FT,
       sqft_per_box:
         auditMode === "carton" && sqftPerBoxNum > 0 ? sqftPerBoxNum : null,
       upc_barcode: null,
@@ -553,15 +623,15 @@ export function CycleAuditSection({
       <QuickAddCatalogModal
         open={quickAddBarcode != null}
         scannedBarcode={quickAddBarcode ?? ""}
-        onClose={() => {
-          setQuickAddBarcode(null);
-          focusSkuInput();
-        }}
+        onClose={closeQuickAdd}
         onSaved={handleQuickAdded}
       />
       <SimsLocationFinder
         open={simsFinderOpen}
-        onClose={() => setSimsFinderOpen(false)}
+        onClose={() => {
+          setSimsFinderOpen(false);
+          focusSkuInput();
+        }}
         catalog={catalog}
         audits={audits}
       />
@@ -574,13 +644,35 @@ export function CycleAuditSection({
           const supervisor = findSupervisor(specialists);
           return supervisor ? verifyPin(supervisor, pin) : false;
         }}
-        onClose={() => setPinForDiscrepancy(false)}
+        onClose={() => {
+          setPinForDiscrepancy(false);
+          focusSkuInput();
+        }}
         onSuccess={() => {
           setDiscrepancyUnlocked(true);
           setFilterDiscrepancies(true);
           setPinForDiscrepancy(false);
+          focusSkuInput();
         }}
       />
+
+      {undoToast ? (
+        <div
+          role="status"
+          className="fixed bottom-32 left-3 right-3 z-40 mx-auto flex max-w-md items-center gap-2 rounded-2xl border border-emerald-500/40 bg-slate-900/95 px-3 py-3 shadow-2xl shadow-black/40 backdrop-blur-md"
+        >
+          <p className="min-w-0 flex-1 truncate text-sm font-medium text-slate-100">
+            {undoToast.label}
+          </p>
+          <button
+            type="button"
+            onClick={() => void handleUndoLast()}
+            className="flex h-11 shrink-0 items-center justify-center rounded-xl border border-amber-400/50 bg-amber-950/50 px-3 text-sm font-bold text-amber-200 active:scale-95"
+          >
+            ↩️ Undo
+          </button>
+        </div>
+      ) : null}
 
       <section
         aria-label="Shift summary"
@@ -715,7 +807,9 @@ export function CycleAuditSection({
                 const next = normalizeCategory(e.target.value);
                 setCategory(next);
                 if (auditModeForCategory(next) === "roll") {
-                  setRollWidth((w) => w ?? 12);
+                  setRollWidth((w) =>
+                    w != null ? normalizeRollWidthFt(w) : DEFAULT_ROLL_WIDTH_FT
+                  );
                 }
               }}
               className="min-h-12 w-full rounded-xl border border-slate-800 bg-slate-950 px-3 text-base text-slate-100"
@@ -753,7 +847,7 @@ export function CycleAuditSection({
                 className="grid grid-cols-2 gap-1 rounded-xl border border-slate-800 bg-slate-950 p-1"
               >
                 {ROLL_WIDTH_OPTIONS_FT.map((ft) => {
-                  const active = (rollWidth ?? 12) === ft;
+                  const active = effectiveRollWidth === ft;
                   return (
                     <button
                       key={ft}
@@ -771,7 +865,8 @@ export function CycleAuditSection({
                 })}
               </div>
             </fieldset>
-          ) : null}          {catalogMatch ? (
+          ) : null}
+          {catalogMatch ? (
             <p className="text-xs text-emerald-400">
               Matched from SIMS catalog
               {catalogMatch.upc_barcode ? " · barcode linked" : ""}
@@ -917,8 +1012,17 @@ export function CycleAuditSection({
                 {formatClf(clf)}{" "}
                 <span className="text-base font-semibold text-emerald-300/90">CLF</span>
               </p>
+              <p className="mt-2 break-words rounded-lg border border-emerald-500/25 bg-slate-950/70 px-2.5 py-2 font-mono text-[11px] font-semibold leading-relaxed tabular-nums text-emerald-100 sm:text-xs">
+                {formatClf(clf)} CLF{" "}
+                <span className="text-slate-500">|</span> {formatSqFt(rollSqFt)}{" "}
+                SQFT <span className="text-slate-500">|</span>{" "}
+                {formatSqYd(rollSqYd)} SQYD{" "}
+                <span className="text-emerald-300/80">
+                  ({effectiveRollWidth} ft Roll)
+                </span>
+              </p>
               <p className="mt-1 font-mono text-[10px] text-slate-500">
-                × {CLF_FACTOR} factor
+                CLF × {effectiveRollWidth} ft · × {CLF_FACTOR} factor
               </p>
             </div>
           </>

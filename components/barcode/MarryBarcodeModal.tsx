@@ -5,6 +5,7 @@ import { sanitizeBarcodeScan } from "@/lib/barcode";
 import { saveCatalogItem } from "@/lib/catalog";
 import { playSuccessChime } from "@/lib/scan-feedback";
 import type { CatalogItem } from "@/lib/types";
+import { DEFAULT_ROLL_WIDTH_FT } from "@/lib/types";
 import { NumberField, TextField } from "@/components/ui/NumberField";
 
 type Props = {
@@ -93,7 +94,7 @@ export function MarryBarcodeModal({
         vendor: "",
         category: "Carpet",
         default_sims_location: "",
-        roll_width_ft: 12,
+        roll_width_ft: DEFAULT_ROLL_WIDTH_FT,
         sqft_per_box: null,
         upc_barcode: cleaned,
       });

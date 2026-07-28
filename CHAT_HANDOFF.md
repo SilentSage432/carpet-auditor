@@ -12,13 +12,19 @@ Universal Flooring & SIMS Location Audit Hub — multi-category flooring goods, 
 ## Scan-to-Catalog
 - SKU / UPC search resolves via `lib/barcode.ts` → `carpet_catalog`
 - Dual trigger: Enter key **or** rapid ≥8-digit burst (≤150ms gaps → 250ms debounce)
-- SKU field auto-focuses on audit load / after reset
-- Match → auto-fill name, category, SIMS tag, specs + success chime + focus measure/count
-- Unlinked / not found → `QuickAddCatalogModal` (⚡ Quick-Add to SIMS Catalog) → Save & Continue Audit
+- SKU field auto-focuses on audit load / after reset / after modal & drawer close (`lib/focus-input.ts`)
+- Match → auto-fill name, category, SIMS tag, specs + success double-beep + focus measure/count
+- Unlinked / not found → soft-pop + `QuickAddCatalogModal` (⚡ Quick-Add) → Save & Continue Audit
+- Cancel Quick-Add clears stale scan string and re-focuses SKU
 
 ## Dual audit engine
-- Mode A (Carpet / Sheet Vinyl): inches × rounds × 0.2625 = CLF
+- Mode A (Carpet / Sheet Vinyl): inches × rounds × 0.2625 = CLF; live badge also shows SQFT (CLF × 12|15) and SQYD (SQFT / 9)
 - Mode B (Vinyl Plank, Tile & Stone, Hardwood, Grout & Mortar, Accessories): cartons × sqft/box
+- Roll width chips: **12 ft / 15 ft** (default 12)
+
+## Post-log UX
+- Log Roll & Reset clears all form fields and re-focuses SKU for the next scan
+- Floating 6s undo toast removes the just-logged audit from Supabase/local state in one tap
 
 ## SIMS Location Finder
 - Reachable from Catalog CTA **and** Audit 📍 SIMS Stock

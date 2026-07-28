@@ -47,8 +47,23 @@ export function calculateSquareFeet(widthFt: number, lengthFt: number): number {
   return widthFt * lengthFt;
 }
 
+/** Roll goods: SQFT = CLF × roll width (ft). */
+export function calculateRollSqFt(clf: number, rollWidthFt: number): number {
+  return clf * rollWidthFt;
+}
+
 export function calculateSquareYards(squareFeet: number): number {
   return squareFeet / 9;
+}
+
+/** Compact live badge: `51.32 CLF | 615.84 SQFT | 68.43 SQYD (12 ft Roll)`. */
+export function formatRollAreaBadge(
+  clf: number,
+  rollWidthFt: number
+): string {
+  const sqft = calculateRollSqFt(clf, rollWidthFt);
+  const sqyd = calculateSquareYards(sqft);
+  return `${formatClf(clf)} CLF | ${formatSqFt(sqft)} SQFT | ${formatSqYd(sqyd)} SQYD (${rollWidthFt} ft Roll)`;
 }
 
 export function formatSqYd(sqYd: number): string {

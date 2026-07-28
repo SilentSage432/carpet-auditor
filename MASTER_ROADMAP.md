@@ -19,11 +19,13 @@
 - [x] Dual audit engine: roll CLF vs carton / unit sq ft
 - [x] SIMS Location Finder drawer (SKU / barcode / tag → staged locations)
 - [x] Mid-scan audit draft in localStorage for dead-zone resilience
-- [x] Sheet Vinyl as roll-goods category (Mode A) with 6ft / 12ft width pickers
+- [x] Sheet Vinyl as roll-goods category (Mode A) with 12ft / 15ft width pickers
 - [x] Dual scan trigger (Enter + rapid burst) with SKU auto-focus
 - [x] `APP_LAYOUT_MAP.md` — current shell / views / modals / UX friction blueprint
 - [x] Handheld layout pass: bottom nav, scan-first audit, SIMS from Audit, prompt/confirm overlays
 - [x] Remove redundant header hamburger / NavDrawer (bottom tabs only)
+- [x] Focus persistence helper + form clear after log / Quick-Add cancel
+- [x] Live CLF | SQFT | SQYD badge; undo-last-audit toast; Web Audio success / Quick-Add chimes
 
 ## Next
 - [ ] JWT / claim-based RLS enforcing `store_number` server-side

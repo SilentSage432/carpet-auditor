@@ -19,10 +19,12 @@ import { toNumber } from "@/lib/number-input";
 import { playSuccessChime } from "@/lib/scan-feedback";
 import { fetchAudits } from "@/lib/storage";
 import {
+  DEFAULT_ROLL_WIDTH_FT,
   FLOORING_CATEGORIES,
   ROLL_WIDTH_OPTIONS_FT,
   auditModeForCategory,
   normalizeCategory,
+  normalizeRollWidthFt,
   type CarpetAudit,
   type CatalogItem,
   type FlooringCategory,
@@ -107,7 +109,7 @@ export function CatalogSection({ catalog, onCatalogChange }: Props) {
     setVendor("");
     setCategory("Carpet");
     setSimsLocation("");
-    setWidth("12");
+    setWidth(String(DEFAULT_ROLL_WIDTH_FT));
     setSqftPerBox("");
     setUpc("");
     setShowForm(true);
@@ -120,7 +122,7 @@ export function CatalogSection({ catalog, onCatalogChange }: Props) {
     setVendor(item.vendor);
     setCategory(normalizeCategory(item.category));
     setSimsLocation(item.default_sims_location);
-    setWidth(String(item.roll_width_ft));
+    setWidth(String(normalizeRollWidthFt(item.roll_width_ft)));
     setSqftPerBox(item.sqft_per_box != null ? String(item.sqft_per_box) : "");
     setUpc(item.upc_barcode ?? "");
     setShowForm(true);
@@ -156,7 +158,7 @@ export function CatalogSection({ catalog, onCatalogChange }: Props) {
         vendor: vendor.trim(),
         category,
         default_sims_location: simsLocation.trim(),
-        roll_width_ft: toNumber(width, 12),
+        roll_width_ft: normalizeRollWidthFt(toNumber(width, DEFAULT_ROLL_WIDTH_FT)),
         sqft_per_box:
           formMode === "carton" && sqft > 0 ? sqft : null,
         upc_barcode: upc.trim() ? sanitizeBarcodeScan(upc) : null,
@@ -185,6 +187,7 @@ export function CatalogSection({ catalog, onCatalogChange }: Props) {
     onCatalogChange(upsertLocalList(item));
     setQuickAddBarcode(null);
     setQuery(item.sku);
+    playSuccessChime();
     flash(`Added ${item.sku} to SIMS catalog`);
   }
 
@@ -306,7 +309,9 @@ export function CatalogSection({ catalog, onCatalogChange }: Props) {
                 const next = normalizeCategory(e.target.value);
                 setCategory(next);
                 if (auditModeForCategory(next) === "roll") {
-                  setWidth((w) => (w === "6" || w === "12" ? w : "12"));
+                  setWidth((w) =>
+                    w === "12" || w === "15" ? w : String(DEFAULT_ROLL_WIDTH_FT)
+                  );
                 }
               }}
               className="min-h-12 w-full rounded-xl border border-slate-800 bg-slate-950 px-3 text-base text-slate-100"
@@ -340,7 +345,9 @@ export function CatalogSection({ catalog, onCatalogChange }: Props) {
                 className="grid grid-cols-2 gap-1 rounded-xl border border-slate-800 bg-slate-950 p-1"
               >
                 {ROLL_WIDTH_OPTIONS_FT.map((ft) => {
-                  const active = toNumber(width, 12) === ft;
+                  const active =
+                    normalizeRollWidthFt(toNumber(width, DEFAULT_ROLL_WIDTH_FT)) ===
+                    ft;
                   return (
                     <button
                       key={ft}

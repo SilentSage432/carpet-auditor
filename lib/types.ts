@@ -20,7 +20,18 @@ export type FlooringCategory = (typeof FLOORING_CATEGORIES)[number];
 export type AuditMode = "roll" | "carton";
 
 /** Standard roll widths for Carpet & Sheet Vinyl. */
-export const ROLL_WIDTH_OPTIONS_FT = [6, 12] as const;
+export const ROLL_WIDTH_OPTIONS_FT = [12, 15] as const;
+
+/** Default roll width when none is selected / legacy values are remapped. */
+export const DEFAULT_ROLL_WIDTH_FT = 12;
+
+/** Normalize legacy (e.g. 6 ft) or null widths onto the 12 / 15 ft preset set. */
+export function normalizeRollWidthFt(
+  ft: number | null | undefined
+): (typeof ROLL_WIDTH_OPTIONS_FT)[number] {
+  if (ft === 15) return 15;
+  return DEFAULT_ROLL_WIDTH_FT;
+}
 
 /** Carpet & Sheet Vinyl (resilient roll) use CLF measurement; everything else uses unit/carton counts. */
 export function isRollGoodsCategory(category: FlooringCategory | string): boolean {

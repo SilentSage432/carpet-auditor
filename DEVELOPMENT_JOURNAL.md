@@ -1,5 +1,15 @@
 # Carpet Hub — Development Journal
 
+## 2026-07-27 — Handheld focus, 12/15 ft rolls, undo + live area
+
+### Shipped
+- `lib/focus-input.ts` — `focusAndSelect` (rAF + 100ms) restores SKU soft keyboard after modal close, reset, log, and drawer dismiss.
+- Roll width presets: **12 ft / 15 ft** (default 12); legacy 6 ft remapped via `normalizeRollWidthFt`. Catalog edit saves `roll_width_ft` to Supabase.
+- Log Roll & Reset / Quick-Add cancel fully clear SKU + measure fields (no sticky zeros); undo toast (6s) deletes last audit in one tap.
+- Live roll badge: CLF | SQFT | SQYD from CLF × width; success double-beep + Quick-Add soft-pop via Web Audio.
+
+---
+
 ## 2026-07-26 — Remove redundant header hamburger / NavDrawer
 
 ### Shipped

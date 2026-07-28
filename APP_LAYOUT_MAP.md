@@ -130,7 +130,7 @@ Not a separate tab — **category drives mode** via `auditModeForCategory`:
 
 | Mode | Categories | Primary inputs | Computed |
 |------|------------|----------------|----------|
-| **A · Rolls** | Carpet, Sheet Vinyl | Inches + fraction + rounds; roll width 6/12 | CLF = in × rounds × 0.2625 |
+| **A · Rolls** | Carpet, Sheet Vinyl | Inches + fraction + rounds; roll width 12/15 | CLF = in × rounds × 0.2625; live SQFT/SQYD |
 | **B · Cartons** | Vinyl Plank, Tile & Stone, Hardwood, Grout & Mortar, Accessories | Box/unit count × sq ft per box | Total sq ft |
 
 Badge on form header: `Mode A · Rolls` / `Mode B · Cartons`.
@@ -200,7 +200,7 @@ UPC …
 #### Inline add/edit form fields
 
 SKU · Product Name · Category · Default SIMS Location · Vendor ·  
-Roll Width **6/12** (roll goods) **or** Sq Ft/box · UPC · Cancel / Save
+Roll Width **12/15** (roll goods) **or** Sq Ft/box · UPC · Cancel / Save
 
 #### SIMS Location Finder drawer
 
@@ -222,7 +222,7 @@ Shared with Audit.
 | Product Description | Required |
 | Category | Dropdown (`FLOORING_CATEGORIES`) |
 | Default SIMS Location | Free text |
-| Roll Width 6/12 **or** Sq Ft/box | Depends on category mode |
+| Roll Width 12/15 **or** Sq Ft/box | Depends on category mode |
 | **Save & Continue Audit** | Writes `carpet_catalog`, applies to current form |
 | Cancel | Closes; Audit refocuses SKU |
 
@@ -263,7 +263,7 @@ Mark Reserved · Mark Sold · Edit · Delete ·
 #### Add/edit form fields
 
 SKU (catalog auto-fill) · Product Name · Category · Tag # ·  
-Width (6/12 for roll goods) · Length · live sq ft / sq yd ·  
+Width (12/15 for roll goods) · Length · live sq ft / sq yd ·  
 Estimated value · Location (+ suggestion chips) · Notes · Cancel / Save
 
 #### Nested overlay
