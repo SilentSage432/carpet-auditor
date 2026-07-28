@@ -26,6 +26,8 @@
 - [x] Remove redundant header hamburger / NavDrawer (bottom tabs only)
 - [x] Focus persistence helper + form clear after log / Quick-Add cancel
 - [x] Live CLF | SQFT | SQYD badge; undo-last-audit toast; Web Audio success / Quick-Add chimes
+- [x] Appliances Inventory & SIMS Audit tab (unit counts + appliance categories)
+- [x] Catalog category folder browse (folders / drill-down / flat toggle / search override)
 
 ## Next
 - [ ] JWT / claim-based RLS enforcing `store_number` server-side

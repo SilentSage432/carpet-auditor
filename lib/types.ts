@@ -1,6 +1,11 @@
 export type LocationType = "sales_floor" | "top_stock";
 
-export type HubSection = "audit" | "catalog" | "remnants" | "settings";
+export type HubSection =
+  | "audit"
+  | "catalog"
+  | "remnants"
+  | "appliances"
+  | "settings";
 
 export type SpecialistRole = "Associate" | "Supervisor";
 
@@ -16,6 +21,37 @@ export const FLOORING_CATEGORIES = [
 ] as const;
 
 export type FlooringCategory = (typeof FLOORING_CATEGORIES)[number];
+
+/** Home appliance inventory categories. */
+export const APPLIANCE_CATEGORIES = [
+  "Refrigerator",
+  "Washer",
+  "Dryer",
+  "Range / Stove",
+  "Dishwasher",
+  "Microwave",
+  "Range Hood",
+  "Freezer",
+  "Appliance Accessories",
+] as const;
+
+export type ApplianceCategory = (typeof APPLIANCE_CATEGORIES)[number];
+
+/** Unified catalog / audit category (flooring + appliances). */
+export type CatalogCategory = FlooringCategory | ApplianceCategory;
+
+export const CATALOG_CATEGORIES = [
+  ...FLOORING_CATEGORIES,
+  ...APPLIANCE_CATEGORIES,
+] as const;
+
+/** Quick SIMS staging chips for appliance floor audits. */
+export const APPLIANCE_SIMS_SUGGESTIONS = [
+  "Appliance Wall Bay 01",
+  "Top Stock Bay 012",
+  "Receiving Holding",
+  "Clearance Floor",
+] as const;
 
 export type AuditMode = "roll" | "carton";
 
@@ -33,18 +69,27 @@ export function normalizeRollWidthFt(
   return DEFAULT_ROLL_WIDTH_FT;
 }
 
+export function isApplianceCategory(
+  category: string | null | undefined
+): boolean {
+  return (
+    !!category &&
+    (APPLIANCE_CATEGORIES as readonly string[]).includes(category)
+  );
+}
+
 /** Carpet & Sheet Vinyl (resilient roll) use CLF measurement; everything else uses unit/carton counts. */
-export function isRollGoodsCategory(category: FlooringCategory | string): boolean {
+export function isRollGoodsCategory(category: CatalogCategory | string): boolean {
   return category === "Carpet" || category === "Sheet Vinyl";
 }
 
 export function auditModeForCategory(
-  category: FlooringCategory | string | null | undefined
+  category: CatalogCategory | string | null | undefined
 ): AuditMode {
   return isRollGoodsCategory(category ?? "Carpet") ? "roll" : "carton";
 }
 
-export function normalizeCategory(raw: unknown): FlooringCategory {
+export function normalizeCategory(raw: unknown): CatalogCategory {
   const value = String(raw ?? "Carpet").trim();
   // Accept longer display aliases from older notes / imports
   if (
@@ -53,9 +98,27 @@ export function normalizeCategory(raw: unknown): FlooringCategory {
   ) {
     return "Sheet Vinyl";
   }
-  return (FLOORING_CATEGORIES as readonly string[]).includes(value)
-    ? (value as FlooringCategory)
-    : "Carpet";
+  if (/^range\s*\/?\s*stove$/i.test(value) || /^range$/i.test(value)) {
+    return "Range / Stove";
+  }
+  if ((APPLIANCE_CATEGORIES as readonly string[]).includes(value)) {
+    return value as ApplianceCategory;
+  }
+  if ((FLOORING_CATEGORIES as readonly string[]).includes(value)) {
+    return value as FlooringCategory;
+  }
+  return "Carpet";
+}
+
+/** Prefer an appliance category when normalizing for the Appliances workspace. */
+export function normalizeApplianceCategory(
+  raw: unknown
+): ApplianceCategory {
+  const normalized = normalizeCategory(raw);
+  if (isApplianceCategory(normalized)) {
+    return normalized as ApplianceCategory;
+  }
+  return "Refrigerator";
 }
 
 export type StoreSpecialist = {
@@ -69,13 +132,13 @@ export type StoreSpecialist = {
   offline?: boolean;
 };
 
-/** Alias: flooring_audits — physical cycle counts (rolls + cartons). */
+/** Alias: flooring_audits — physical cycle counts (rolls + cartons + appliance units). */
 export type CarpetAudit = {
   id: string;
   store_number: string;
   sku: string;
   carpet_name: string;
-  category: FlooringCategory;
+  category: CatalogCategory;
   /** SIMS bay / aisle tag, e.g. "Aisle 14 - Bay 012". */
   sims_location: string;
   location_type: LocationType;
@@ -114,7 +177,7 @@ export type CatalogItem = {
   sku: string;
   carpet_name: string;
   vendor: string;
-  category: FlooringCategory;
+  category: CatalogCategory;
   /** Default SIMS location tag for this SKU. */
   default_sims_location: string;
   roll_width_ft: number;
@@ -142,7 +205,7 @@ export type Remnant = {
   store_number: string;
   sku: string;
   carpet_name: string;
-  category: FlooringCategory;
+  category: CatalogCategory;
   tag_number: string;
   width_ft: number;
   length_ft: number;
@@ -208,6 +271,13 @@ export const HUB_SECTIONS: {
     title: "Remnant Rack",
     icon: "📦",
     description: "Back-room remnant inventory & status",
+  },
+  {
+    id: "appliances",
+    label: "Appliances",
+    title: "Appliances Inventory & SIMS",
+    icon: "🔌",
+    description: "Unit counts + appliance SIMS staging audits",
   },
   {
     id: "settings",

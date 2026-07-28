@@ -1,5 +1,23 @@
 # Carpet Hub — Development Journal
 
+## 2026-07-27 — Catalog category folder browse
+
+### Shipped
+- Catalog default view is category folder cards (icon, SKU count, SIMS bay preview); appliances roll up under 🔌 Appliances.
+- Drill-down with ← Categories back badge + “+ Add [Category] Item”; search/scan bypasses folders and lists matches across all categories.
+- 📂 / 📋 toggle next to search switches Folders vs flat master list; item cards extracted to `CatalogItemCard`.
+
+---
+
+## 2026-07-27 — Appliances Inventory & SIMS Audit workspace
+
+### Shipped
+- New hub tab **🔌 Appliances** (`HubSection: appliances`) in bottom nav + `HUB_SECTIONS`.
+- `ApplianceAuditSection`: scan-to-catalog, appliance categories, SIMS staging chips, unit stepper, sticky Log Appliance & Reset (reuses `carpet_audits` / `carpet_catalog`).
+- `APPLIANCE_CATEGORIES` + `CatalogCategory` union; Quick-Add `domain="appliances"`; Catalog / SIMS Finder search by appliance category & staging tags.
+
+---
+
 ## 2026-07-27 — Handheld focus, 12/15 ft rolls, undo + live area
 
 ### Shipped

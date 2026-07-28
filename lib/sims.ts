@@ -23,7 +23,13 @@ export type SimsLocationStock = {
 };
 
 function matchesQuery(
-  item: { sku: string; carpet_name?: string; upc_barcode?: string | null; sims?: string },
+  item: {
+    sku: string;
+    carpet_name?: string;
+    upc_barcode?: string | null;
+    sims?: string;
+    category?: string;
+  },
   raw: string
 ): boolean {
   const q = raw.trim().toLowerCase();
@@ -33,6 +39,7 @@ function matchesQuery(
   if (item.sku.toLowerCase().includes(q)) return true;
   if (item.carpet_name && item.carpet_name.toLowerCase().includes(q)) return true;
   if (item.sims && item.sims.toLowerCase().includes(q)) return true;
+  if (item.category && item.category.toLowerCase().includes(q)) return true;
   if (qDigits) {
     if (sanitizeBarcodeScan(item.sku).includes(qDigits)) return true;
     if (
@@ -68,6 +75,7 @@ export function findSimsLocations(opts: {
           carpet_name: item.carpet_name,
           upc_barcode: item.upc_barcode,
           sims: item.default_sims_location,
+          category: item.category,
         },
         q
       )
@@ -83,6 +91,7 @@ export function findSimsLocations(opts: {
           sku: audit.sku,
           carpet_name: audit.carpet_name,
           sims: audit.sims_location,
+          category: audit.category,
         },
         q
       )

@@ -7,6 +7,7 @@ import { BottomNavBar, HubHeader } from "@/components/hub/HubChrome";
 import { SpecialistModal } from "@/components/hub/SpecialistModal";
 import { CatalogSection } from "@/components/sections/CatalogSection";
 import { CycleAuditSection } from "@/components/sections/CycleAuditSection";
+import { ApplianceAuditSection } from "@/components/sections/ApplianceAuditSection";
 import { RemnantSection } from "@/components/sections/RemnantSection";
 import { SettingsSection } from "@/components/sections/SettingsSection";
 import { fetchCatalog } from "@/lib/catalog";
@@ -226,7 +227,7 @@ export default function CarpetHubPage() {
 
       <div
         className={`mx-auto w-full max-w-md flex-1 overflow-x-hidden px-4 py-4 ${
-          section === "audit" ? "pb-44" : "pb-32"
+          section === "audit" || section === "appliances" ? "pb-44" : "pb-32"
         }`}
       >
         {section === "audit" && (
@@ -249,6 +250,13 @@ export default function CarpetHubPage() {
             loggedBy={specialist?.name ?? ""}
             specialists={specialists}
             activeSpecialist={specialist}
+          />
+        )}
+        {section === "appliances" && (
+          <ApplianceAuditSection
+            catalog={catalog}
+            onCatalogChange={setCatalog}
+            auditedBy={specialist?.name ?? ""}
           />
         )}
         {section === "settings" && (

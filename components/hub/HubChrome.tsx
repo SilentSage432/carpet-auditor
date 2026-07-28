@@ -86,6 +86,7 @@ const BOTTOM_NAV_TABS: { id: HubSection; label: string; icon: string }[] = [
   { id: "audit", label: "Audit", icon: "📊" },
   { id: "catalog", label: "Catalog", icon: "🏷️" },
   { id: "remnants", label: "Remnants", icon: "📦" },
+  { id: "appliances", label: "Appliances", icon: "🔌" },
   { id: "settings", label: "Settings", icon: "⚙️" },
 ];
 
@@ -100,7 +101,7 @@ export function BottomNavBar({ active, onSelect }: BottomNavBarProps) {
       aria-label="Primary"
       className="fixed bottom-0 left-0 right-0 z-30 mx-auto max-w-md border-t border-slate-800 bg-slate-900/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-md"
     >
-      <div className="grid grid-cols-4">
+      <div className="grid grid-cols-5">
         {BOTTOM_NAV_TABS.map((tab) => {
           const isActive = tab.id === active;
           return (
@@ -109,7 +110,7 @@ export function BottomNavBar({ active, onSelect }: BottomNavBarProps) {
               type="button"
               onClick={() => onSelect(tab.id)}
               aria-current={isActive ? "page" : undefined}
-              className={`relative flex min-h-16 flex-col items-center justify-center gap-0.5 px-1 pb-1.5 pt-2 transition ${
+              className={`relative flex min-h-16 flex-col items-center justify-center gap-0.5 px-0.5 pb-1.5 pt-2 transition ${
                 isActive
                   ? "text-emerald-300 [text-shadow:0_0_12px_rgba(16,185,129,0.55)]"
                   : "text-slate-400 active:text-slate-200"
@@ -117,14 +118,14 @@ export function BottomNavBar({ active, onSelect }: BottomNavBarProps) {
             >
               {isActive ? (
                 <span
-                  className="absolute inset-x-5 top-0 h-0.5 rounded-full bg-emerald-400 shadow-[0_0_10px_rgba(16,185,129,0.85)]"
+                  className="absolute inset-x-3 top-0 h-0.5 rounded-full bg-emerald-400 shadow-[0_0_10px_rgba(16,185,129,0.85)]"
                   aria-hidden
                 />
               ) : null}
-              <span className="text-lg leading-none" aria-hidden>
+              <span className="text-base leading-none sm:text-lg" aria-hidden>
                 {tab.icon}
               </span>
-              <span className="text-[10px] font-bold uppercase tracking-wide">
+              <span className="max-w-full truncate text-[9px] font-bold uppercase tracking-wide sm:text-[10px]">
                 {tab.label}
               </span>
             </button>

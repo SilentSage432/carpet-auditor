@@ -51,7 +51,7 @@ export function SimsLocationFinder({ open, onClose, catalog, audits }: Props) {
                 📍 SIMS Location Finder
               </h2>
               <p className="mt-1 text-sm text-slate-400">
-                Search SKU, barcode, or SIMS tag (Aisle 14, Bay 012…)
+                Search SKU, barcode, category, or SIMS tag (Bay 012, Refrigerator…)
               </p>
             </div>
             <button
@@ -67,7 +67,7 @@ export function SimsLocationFinder({ open, onClose, catalog, audits }: Props) {
             <TextField
               value={query}
               onChange={setQuery}
-              placeholder="SKU, UPC, or SIMS tag…"
+              placeholder="SKU, UPC, category, or SIMS tag…"
               aria-label="SIMS location search"
               scanDigits={false}
             />

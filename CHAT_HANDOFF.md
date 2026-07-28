@@ -4,9 +4,10 @@
 Universal Flooring & SIMS Location Audit Hub — multi-category flooring goods, rapid barcode scan-to-catalog, dual roll/carton audit engine, SIMS location finder, PWA offline shell + sync queue, multi-store isolation, specialist PIN, CLF/sqft variance, remnant aging, and manager markdown.
 
 ## Navigation & handheld chrome
-- Primary: fixed bottom tabs (Audit / Catalog / Remnants / Settings) — exclusive section navigation
+- Primary: fixed bottom tabs (Audit / Catalog / Remnants / Appliances / Settings) — exclusive section navigation
 - Header: Flooring Hub · store · network on the left; specialist badge + PIN gear on the right (no hamburger/drawer)
 - Cycle Audit first viewport is scan-first: collapsed shift summary bar; sticky Log & Reset docked above bottom nav
+- Appliances workspace: unit-count audit with SIMS staging chips; sticky Log Appliance & Reset
 - Audit form includes 📍 SIMS Stock → opens SimsLocationFinder without leaving Audit
 
 ## Scan-to-Catalog
@@ -16,10 +17,12 @@ Universal Flooring & SIMS Location Audit Hub — multi-category flooring goods, 
 - Match → auto-fill name, category, SIMS tag, specs + success double-beep + focus measure/count
 - Unlinked / not found → soft-pop + `QuickAddCatalogModal` (⚡ Quick-Add) → Save & Continue Audit
 - Cancel Quick-Add clears stale scan string and re-focuses SKU
+- **Catalog browse:** folder cards by category (`lib/catalog-folders.ts`); search/scan overrides folders; 📂/📋 view toggle
 
 ## Dual audit engine
 - Mode A (Carpet / Sheet Vinyl): inches × rounds × 0.2625 = CLF; live badge also shows SQFT (CLF × 12|15) and SQYD (SQFT / 9)
 - Mode B (Vinyl Plank, Tile & Stone, Hardwood, Grout & Mortar, Accessories): cartons × sqft/box
+- Mode · Units (Appliances tab): unit count + appliance category + SIMS staging; Model # stored on catalog `vendor`
 - Roll width chips: **12 ft / 15 ft** (default 12)
 
 ## Post-log UX

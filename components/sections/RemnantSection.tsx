@@ -17,8 +17,8 @@ import { toNumber } from "@/lib/number-input";
 import { deleteRemnant, saveRemnant } from "@/lib/remnants";
 import { isSupervisor } from "@/lib/specialists";
 import type {
+  CatalogCategory,
   CatalogItem,
-  FlooringCategory,
   Remnant,
   RemnantStatus,
   StoreSpecialist,
@@ -75,7 +75,7 @@ export function RemnantSection({
   const [editing, setEditing] = useState<Remnant | null>(null);
   const [sku, setSku] = useState("");
   const [carpetName, setCarpetName] = useState("");
-  const [category, setCategory] = useState<FlooringCategory>("Carpet");
+  const [category, setCategory] = useState<CatalogCategory>("Carpet");
   const [tag, setTag] = useState("");
   const [width, setWidth] = useState("12");
   const [length, setLength] = useState("");

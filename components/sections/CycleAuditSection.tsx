@@ -56,9 +56,9 @@ import {
   auditModeForCategory,
   normalizeCategory,
   normalizeRollWidthFt,
+  type CatalogCategory,
   type CarpetAudit,
   type CatalogItem,
-  type FlooringCategory,
   type LocationType,
   type StoreSpecialist,
 } from "@/lib/types";
@@ -124,7 +124,7 @@ export function CycleAuditSection({
 
   const [sku, setSku] = useState("");
   const [carpetName, setCarpetName] = useState("");
-  const [category, setCategory] = useState<FlooringCategory>("Carpet");
+  const [category, setCategory] = useState<CatalogCategory>("Carpet");
   const [simsLocation, setSimsLocation] = useState("");
   const [rollWidth, setRollWidth] = useState<number | null>(null);
   const [sqftPerBox, setSqftPerBox] = useState("");

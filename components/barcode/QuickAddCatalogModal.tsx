@@ -7,14 +7,20 @@ import { saveCatalogItem } from "@/lib/catalog";
 import { toNumber } from "@/lib/number-input";
 import { playQuickAddPrompt } from "@/lib/scan-feedback";
 import {
+  APPLIANCE_CATEGORIES,
+  APPLIANCE_SIMS_SUGGESTIONS,
   DEFAULT_ROLL_WIDTH_FT,
   FLOORING_CATEGORIES,
   ROLL_WIDTH_OPTIONS_FT,
   auditModeForCategory,
+  normalizeApplianceCategory,
+  normalizeCategory,
   normalizeRollWidthFt,
+  type CatalogCategory,
   type CatalogItem,
-  type FlooringCategory,
 } from "@/lib/types";
+
+export type QuickAddDomain = "flooring" | "appliances";
 
 type Props = {
   open: boolean;
@@ -22,6 +28,8 @@ type Props = {
   onClose: () => void;
   /** Saves to catalog and immediately populates the current audit entry. */
   onSaved: (item: CatalogItem) => void;
+  /** Pre-configures category list + defaults (appliances hides roll/sqft specs). */
+  domain?: QuickAddDomain;
 };
 
 export function QuickAddCatalogModal({
@@ -29,11 +37,21 @@ export function QuickAddCatalogModal({
   scannedBarcode,
   onClose,
   onSaved,
+  domain = "flooring",
 }: Props) {
   const cleaned = sanitizeBarcodeScan(scannedBarcode);
+  const isApplianceDomain = domain === "appliances";
+  const categoryOptions = isApplianceDomain
+    ? APPLIANCE_CATEGORIES
+    : FLOORING_CATEGORIES;
+  const defaultCategory: CatalogCategory = isApplianceDomain
+    ? "Refrigerator"
+    : "Carpet";
+
   const [sku, setSku] = useState("");
   const [name, setName] = useState("");
-  const [category, setCategory] = useState<FlooringCategory>("Carpet");
+  const [model, setModel] = useState("");
+  const [category, setCategory] = useState<CatalogCategory>(defaultCategory);
   const [simsLocation, setSimsLocation] = useState("");
   const [specValue, setSpecValue] = useState("12");
   const [saving, setSaving] = useState(false);
@@ -45,13 +63,14 @@ export function QuickAddCatalogModal({
     if (!open) return;
     setSku("");
     setName("");
-    setCategory("Carpet");
+    setModel("");
+    setCategory(isApplianceDomain ? "Refrigerator" : "Carpet");
     setSimsLocation("");
     setSpecValue(String(DEFAULT_ROLL_WIDTH_FT));
     setError(null);
     setSaving(false);
     playQuickAddPrompt();
-  }, [open, cleaned]);
+  }, [open, cleaned, isApplianceDomain]);
 
   if (!open) return null;
 
@@ -70,11 +89,18 @@ export function QuickAddCatalogModal({
       const { record } = await saveCatalogItem({
         sku: sanitizeBarcodeScan(sku) || sku.trim(),
         carpet_name: name.trim(),
-        vendor: "",
+        vendor: isApplianceDomain ? model.trim() : "",
         category,
         default_sims_location: simsLocation.trim(),
-          roll_width_ft: mode === "roll" ? normalizeRollWidthFt(spec || DEFAULT_ROLL_WIDTH_FT) : DEFAULT_ROLL_WIDTH_FT,
-        sqft_per_box: mode === "carton" ? (spec > 0 ? spec : null) : null,
+        roll_width_ft: mode === "roll"
+          ? normalizeRollWidthFt(spec || DEFAULT_ROLL_WIDTH_FT)
+          : DEFAULT_ROLL_WIDTH_FT,
+        sqft_per_box:
+          !isApplianceDomain && mode === "carton"
+            ? spec > 0
+              ? spec
+              : null
+            : null,
         upc_barcode: cleaned || null,
       });
       onSaved(record);
@@ -103,8 +129,9 @@ export function QuickAddCatalogModal({
           ⚡ Quick-Add to SIMS Catalog
         </h2>
         <p className="mt-1 text-sm text-slate-400">
-          Unlinked barcode — add it to the store master list and continue the
-          audit.
+          {isApplianceDomain
+            ? "Unlinked barcode — add this appliance to the store master list and continue the audit."
+            : "Unlinked barcode — add it to the store master list and continue the audit."}
         </p>
         <p className="mt-3 rounded-xl border border-amber-500/30 bg-amber-950/30 px-3 py-2 font-mono text-sm font-semibold text-amber-200">
           UPC {cleaned || "—"}
@@ -120,40 +147,88 @@ export function QuickAddCatalogModal({
             autoFocus
           />
           <TextField
-            label="Product Description / Style Name"
+            label={
+              isApplianceDomain
+                ? "Appliance Name"
+                : "Product Description / Style Name"
+            }
             value={name}
             onChange={setName}
-            placeholder="e.g. Stainmaster Hearthstone"
+            placeholder={
+              isApplianceDomain
+                ? "e.g. Whirlpool French Door"
+                : "e.g. Stainmaster Hearthstone"
+            }
           />
+          {isApplianceDomain ? (
+            <TextField
+              label="Model #"
+              value={model}
+              onChange={setModel}
+              placeholder="e.g. WRF535SWHZ"
+            />
+          ) : null}
           <label className="block space-y-1.5">
             <span className="text-sm font-medium text-slate-200">Category</span>
             <select
               value={category}
               onChange={(e) => {
-                const next = e.target.value as FlooringCategory;
+                const next = isApplianceDomain
+                  ? normalizeApplianceCategory(e.target.value)
+                  : normalizeCategory(e.target.value);
                 setCategory(next);
-                setSpecValue(
-                  auditModeForCategory(next) === "roll"
-                    ? String(DEFAULT_ROLL_WIDTH_FT)
-                    : ""
-                );
+                if (!isApplianceDomain) {
+                  setSpecValue(
+                    auditModeForCategory(next) === "roll"
+                      ? String(DEFAULT_ROLL_WIDTH_FT)
+                      : ""
+                  );
+                }
               }}
               className="min-h-12 w-full rounded-xl border border-slate-800 bg-slate-950 px-3 text-base text-slate-100"
             >
-              {FLOORING_CATEGORIES.map((c) => (
+              {categoryOptions.map((c) => (
                 <option key={c} value={c}>
                   {c}
                 </option>
               ))}
             </select>
           </label>
-          <TextField
-            label="Default SIMS Location Tag"
-            value={simsLocation}
-            onChange={setSimsLocation}
-            placeholder="e.g. Aisle 14 - Bay 012"
-          />
-          {mode === "roll" ? (
+          <div className="space-y-1.5">
+            <TextField
+              label={
+                isApplianceDomain
+                  ? "Default SIMS Staging Location"
+                  : "Default SIMS Location Tag"
+              }
+              value={simsLocation}
+              onChange={setSimsLocation}
+              placeholder={
+                isApplianceDomain
+                  ? "e.g. Appliance Wall Bay 01"
+                  : "e.g. Aisle 14 - Bay 012"
+              }
+            />
+            {isApplianceDomain ? (
+              <div className="flex flex-wrap gap-1.5">
+                {APPLIANCE_SIMS_SUGGESTIONS.map((tag) => (
+                  <button
+                    key={tag}
+                    type="button"
+                    onClick={() => setSimsLocation(tag)}
+                    className={`rounded-lg border px-2.5 py-1.5 text-[11px] font-semibold transition ${
+                      simsLocation === tag
+                        ? "border-emerald-500/50 bg-emerald-950/50 text-emerald-300"
+                        : "border-slate-700 bg-slate-950 text-slate-400"
+                    }`}
+                  >
+                    {tag}
+                  </button>
+                ))}
+              </div>
+            ) : null}
+          </div>
+          {!isApplianceDomain && mode === "roll" ? (
             <fieldset>
               <legend className="mb-1.5 text-sm font-medium text-slate-200">
                 Roll Width
@@ -184,7 +259,8 @@ export function QuickAddCatalogModal({
                 })}
               </div>
             </fieldset>
-          ) : (
+          ) : null}
+          {!isApplianceDomain && mode === "carton" ? (
             <NumberField
               label="Sq Ft Coverage per Box"
               mode="decimal"
@@ -192,7 +268,7 @@ export function QuickAddCatalogModal({
               onChange={setSpecValue}
               placeholder="e.g. 23.64"
             />
-          )}
+          ) : null}
         </div>
 
         {error && (

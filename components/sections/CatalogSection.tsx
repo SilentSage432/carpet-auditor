@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { QuickAddCatalogModal } from "@/components/barcode/QuickAddCatalogModal";
+import { CatalogItemCard } from "@/components/catalog/CatalogItemCard";
 import { SimsLocationFinder } from "@/components/catalog/SimsLocationFinder";
 import { TextPromptModal } from "@/components/hub/TextPromptModal";
 import { NumberField, TextField } from "@/components/ui/NumberField";
@@ -15,19 +16,28 @@ import {
   deleteCatalogItem,
   saveCatalogItem,
 } from "@/lib/catalog";
+import {
+  buildCatalogFolders,
+  defaultCategoryForFolder,
+  folderMeta,
+  itemInFolder,
+  type CatalogFolderId,
+} from "@/lib/catalog-folders";
 import { toNumber } from "@/lib/number-input";
 import { playSuccessChime } from "@/lib/scan-feedback";
 import { fetchAudits } from "@/lib/storage";
 import {
+  APPLIANCE_CATEGORIES,
   DEFAULT_ROLL_WIDTH_FT,
   FLOORING_CATEGORIES,
   ROLL_WIDTH_OPTIONS_FT,
   auditModeForCategory,
+  isApplianceCategory,
   normalizeCategory,
   normalizeRollWidthFt,
   type CarpetAudit,
+  type CatalogCategory,
   type CatalogItem,
-  type FlooringCategory,
 } from "@/lib/types";
 
 type Props = {
@@ -35,14 +45,20 @@ type Props = {
   onCatalogChange: (items: CatalogItem[]) => void;
 };
 
+type CatalogViewMode = "folders" | "flat";
+
 export function CatalogSection({ catalog, onCatalogChange }: Props) {
   const [query, setQuery] = useState("");
+  const [viewMode, setViewMode] = useState<CatalogViewMode>("folders");
+  const [activeFolder, setActiveFolder] = useState<CatalogFolderId | null>(
+    null
+  );
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState<CatalogItem | null>(null);
   const [sku, setSku] = useState("");
   const [name, setName] = useState("");
   const [vendor, setVendor] = useState("");
-  const [category, setCategory] = useState<FlooringCategory>("Carpet");
+  const [category, setCategory] = useState<CatalogCategory>("Carpet");
   const [simsLocation, setSimsLocation] = useState("");
   const [width, setWidth] = useState("12");
   const [sqftPerBox, setSqftPerBox] = useState("");
@@ -56,10 +72,13 @@ export function CatalogSection({ catalog, onCatalogChange }: Props) {
   const [linkTarget, setLinkTarget] = useState<CatalogItem | null>(null);
 
   const formMode = auditModeForCategory(category);
+  const searchActive = query.trim().length > 0;
 
-  const filtered = useMemo(() => {
+  const folders = useMemo(() => buildCatalogFolders(catalog), [catalog]);
+
+  const searchMatches = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return catalog;
+    if (!q) return [];
     const qDigits = sanitizeBarcodeScan(query);
     return catalog.filter((item) => {
       if (
@@ -80,6 +99,18 @@ export function CatalogSection({ catalog, onCatalogChange }: Props) {
     });
   }, [catalog, query]);
 
+  const folderItems = useMemo(() => {
+    if (!activeFolder) return [];
+    return catalog
+      .filter((item) => itemInFolder(item, activeFolder))
+      .sort((a, b) => a.sku.localeCompare(b.sku));
+  }, [catalog, activeFolder]);
+
+  const flatItems = useMemo(
+    () => [...catalog].sort((a, b) => a.sku.localeCompare(b.sku)),
+    [catalog]
+  );
+
   useEffect(() => {
     let cancelled = false;
     void fetchAudits().then((rows) => {
@@ -89,6 +120,13 @@ export function CatalogSection({ catalog, onCatalogChange }: Props) {
       cancelled = true;
     };
   }, []);
+
+  // Search overrides folder drill-down
+  useEffect(() => {
+    if (searchActive && activeFolder != null) {
+      setActiveFolder(null);
+    }
+  }, [searchActive, activeFolder]);
 
   function flash(msg: string) {
     setStatus(msg);
@@ -102,12 +140,17 @@ export function CatalogSection({ catalog, onCatalogChange }: Props) {
     ].sort((a, b) => a.sku.localeCompare(b.sku));
   }
 
-  function openAdd() {
+  function openAdd(prefillCategory?: CatalogCategory) {
+    const nextCategory = prefillCategory
+      ? normalizeCategory(prefillCategory)
+      : activeFolder
+        ? defaultCategoryForFolder(activeFolder)
+        : "Carpet";
     setEditing(null);
     setSku("");
     setName("");
     setVendor("");
-    setCategory("Carpet");
+    setCategory(nextCategory);
     setSimsLocation("");
     setWidth(String(DEFAULT_ROLL_WIDTH_FT));
     setSqftPerBox("");
@@ -134,6 +177,7 @@ export function CatalogSection({ catalog, onCatalogChange }: Props) {
     const resolution = resolveScan(catalog, cleaned);
     if (resolution.kind === "matched") {
       setQuery(resolution.item.sku);
+      setActiveFolder(null);
       setScanFlash(true);
       playSuccessChime();
       window.setTimeout(() => setScanFlash(false), 900);
@@ -142,6 +186,7 @@ export function CatalogSection({ catalog, onCatalogChange }: Props) {
     }
     if (resolution.kind === "empty") return;
     setQuery(resolution.scanned);
+    setActiveFolder(null);
     setQuickAddBarcode(resolution.scanned);
     flash("Unlinked barcode — Quick-Add to SIMS catalog");
   }
@@ -158,9 +203,15 @@ export function CatalogSection({ catalog, onCatalogChange }: Props) {
         vendor: vendor.trim(),
         category,
         default_sims_location: simsLocation.trim(),
-        roll_width_ft: normalizeRollWidthFt(toNumber(width, DEFAULT_ROLL_WIDTH_FT)),
+        roll_width_ft: normalizeRollWidthFt(
+          toNumber(width, DEFAULT_ROLL_WIDTH_FT)
+        ),
         sqft_per_box:
-          formMode === "carton" && sqft > 0 ? sqft : null,
+          formMode === "carton" &&
+          !isApplianceCategory(category) &&
+          sqft > 0
+            ? sqft
+            : null,
         upc_barcode: upc.trim() ? sanitizeBarcodeScan(upc) : null,
       });
       onCatalogChange(upsertLocalList(record));
@@ -187,6 +238,7 @@ export function CatalogSection({ catalog, onCatalogChange }: Props) {
     onCatalogChange(upsertLocalList(item));
     setQuickAddBarcode(null);
     setQuery(item.sku);
+    setActiveFolder(null);
     playSuccessChime();
     flash(`Added ${item.sku} to SIMS catalog`);
   }
@@ -219,6 +271,37 @@ export function CatalogSection({ catalog, onCatalogChange }: Props) {
       flash("Barcode linked");
     });
   }
+
+  function renderItemList(items: CatalogItem[], emptyMessage: string) {
+    if (items.length === 0) {
+      return (
+        <p className="rounded-2xl border border-dashed border-slate-700 bg-slate-900/60 px-4 py-8 text-center text-sm text-slate-400">
+          {emptyMessage}
+        </p>
+      );
+    }
+    return (
+      <ul className="space-y-2">
+        {items.map((item) => (
+          <CatalogItemCard
+            key={item.id}
+            item={item}
+            onEdit={openEdit}
+            onDelete={(id) => void handleDelete(id)}
+            onLinkBarcode={setLinkTarget}
+            onClearBarcode={(it) => void handleClearBarcode(it)}
+          />
+        ))}
+      </ul>
+    );
+  }
+
+  const activeFolderMeta = activeFolder ? folderMeta(activeFolder) : null;
+  const showFolderGrid =
+    !searchActive && viewMode === "folders" && activeFolder == null;
+  const showFolderDrill =
+    !searchActive && viewMode === "folders" && activeFolder != null;
+  const showFlatList = !searchActive && viewMode === "flat";
 
   return (
     <div className="space-y-4 overflow-x-hidden">
@@ -265,13 +348,51 @@ export function CatalogSection({ catalog, onCatalogChange }: Props) {
           onChange={setQuery}
           onScanCommit={handleSearchScan}
           flash={scanFlash}
-          placeholder="Search SKU, barcode, SIMS tag…"
+          placeholder="Search SKU, barcode, category, SIMS tag…"
           aria-label="Search catalog"
         />
+        <div
+          role="group"
+          aria-label="Catalog view mode"
+          className="flex h-12 shrink-0 overflow-hidden rounded-xl border border-slate-700 bg-slate-950"
+        >
+          <button
+            type="button"
+            aria-pressed={viewMode === "folders"}
+            title="Folders view"
+            onClick={() => {
+              setViewMode("folders");
+              if (searchActive) setQuery("");
+            }}
+            className={`flex h-12 w-11 items-center justify-center text-base transition ${
+              viewMode === "folders"
+                ? "bg-emerald-500 text-slate-950"
+                : "text-slate-400 active:bg-slate-800"
+            }`}
+          >
+            📂
+          </button>
+          <button
+            type="button"
+            aria-pressed={viewMode === "flat"}
+            title="Flat list view"
+            onClick={() => {
+              setViewMode("flat");
+              setActiveFolder(null);
+            }}
+            className={`flex h-12 w-11 items-center justify-center text-base transition ${
+              viewMode === "flat"
+                ? "bg-emerald-500 text-slate-950"
+                : "text-slate-400 active:bg-slate-800"
+            }`}
+          >
+            📋
+          </button>
+        </div>
         <button
           type="button"
-          onClick={openAdd}
-          className="flex h-12 shrink-0 items-center justify-center rounded-xl bg-emerald-500 px-4 text-sm font-bold text-slate-950"
+          onClick={() => openAdd()}
+          className="flex h-12 shrink-0 items-center justify-center rounded-xl bg-emerald-500 px-3 text-sm font-bold text-slate-950 sm:px-4"
         >
           + Add
         </button>
@@ -316,11 +437,20 @@ export function CatalogSection({ catalog, onCatalogChange }: Props) {
               }}
               className="min-h-12 w-full rounded-xl border border-slate-800 bg-slate-950 px-3 text-base text-slate-100"
             >
-              {FLOORING_CATEGORIES.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
+              <optgroup label="Flooring">
+                {FLOORING_CATEGORIES.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </optgroup>
+              <optgroup label="Appliances">
+                {APPLIANCE_CATEGORIES.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </optgroup>
             </select>
           </label>
           <TextField
@@ -330,10 +460,16 @@ export function CatalogSection({ catalog, onCatalogChange }: Props) {
             placeholder="e.g. Top Stock Bay 003"
           />
           <TextField
-            label="Vendor (optional)"
+            label={
+              isApplianceCategory(category)
+                ? "Model # / Vendor"
+                : "Vendor (optional)"
+            }
             value={vendor}
             onChange={setVendor}
-            placeholder="Vendor"
+            placeholder={
+              isApplianceCategory(category) ? "e.g. WRF535SWHZ" : "Vendor"
+            }
           />
           {formMode === "roll" ? (
             <fieldset>
@@ -346,8 +482,9 @@ export function CatalogSection({ catalog, onCatalogChange }: Props) {
               >
                 {ROLL_WIDTH_OPTIONS_FT.map((ft) => {
                   const active =
-                    normalizeRollWidthFt(toNumber(width, DEFAULT_ROLL_WIDTH_FT)) ===
-                    ft;
+                    normalizeRollWidthFt(
+                      toNumber(width, DEFAULT_ROLL_WIDTH_FT)
+                    ) === ft;
                   return (
                     <button
                       key={ft}
@@ -365,7 +502,7 @@ export function CatalogSection({ catalog, onCatalogChange }: Props) {
                 })}
               </div>
             </fieldset>
-          ) : (
+          ) : isApplianceCategory(category) ? null : (
             <NumberField
               label="Sq Ft Coverage per Box"
               mode="decimal"
@@ -401,93 +538,114 @@ export function CatalogSection({ catalog, onCatalogChange }: Props) {
         </div>
       )}
 
-      {filtered.length === 0 ? (
-        <p className="rounded-2xl border border-dashed border-slate-700 bg-slate-900/60 px-4 py-8 text-center text-sm text-slate-400">
-          {catalog.length === 0
-            ? "No SIMS SKUs yet. Scan a barcode or tap + Add."
-            : "No matches for that search."}
-        </p>
-      ) : (
-        <ul className="space-y-2">
-          {filtered.map((item) => (
-            <li
-              key={item.id}
-              className="rounded-2xl border border-slate-800 bg-slate-900/90 p-3"
+      {searchActive ? (
+        <section className="space-y-3" aria-label="Search results">
+          <div className="flex items-center justify-between gap-2 px-1">
+            <p className="text-xs font-semibold uppercase tracking-wide text-emerald-400">
+              Search results · {searchMatches.length}
+            </p>
+            <button
+              type="button"
+              onClick={() => setQuery("")}
+              className="text-xs font-semibold text-slate-400 underline-offset-2 hover:text-slate-200 hover:underline"
             >
-              <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-2">
-                  <p className="font-mono text-base font-bold text-slate-50">
-                    SKU {item.sku}
-                  </p>
-                  <span className="rounded bg-slate-700/50 px-2 py-0.5 text-[10px] font-bold uppercase text-slate-300">
-                    {item.category}
-                  </span>
-                  {item.upc_barcode ? (
-                    <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-300">
-                      🏷️ Barcode Linked
+              Clear search
+            </button>
+          </div>
+          {renderItemList(
+            searchMatches,
+            catalog.length === 0
+              ? "No SIMS SKUs yet. Scan a barcode or tap + Add."
+              : "No matches for that search."
+          )}
+        </section>
+      ) : null}
+
+      {showFolderGrid ? (
+        <section className="space-y-3" aria-label="Category folders">
+          <p className="px-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Category folders
+          </p>
+          {folders.length === 0 ? (
+            <p className="rounded-2xl border border-dashed border-slate-700 bg-slate-900/60 px-4 py-8 text-center text-sm text-slate-400">
+              No SIMS SKUs yet. Scan a barcode or tap + Add.
+            </p>
+          ) : (
+            <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              {folders.map((folder) => (
+                <li key={folder.id}>
+                  <button
+                    type="button"
+                    onClick={() => setActiveFolder(folder.id)}
+                    className="flex min-h-[5.5rem] w-full flex-col items-start gap-1 rounded-2xl border border-slate-800 bg-slate-900/90 p-4 text-left shadow-lg shadow-black/10 transition active:scale-[0.99] active:border-emerald-500/40"
+                  >
+                    <span className="flex items-center gap-2">
+                      <span className="text-2xl leading-none" aria-hidden>
+                        {folder.icon}
+                      </span>
+                      <span className="text-base font-bold text-slate-50">
+                        {folder.title}
+                      </span>
                     </span>
-                  ) : null}
-                </div>
-                <p className="truncate text-sm text-slate-200">
-                  {item.carpet_name}
-                </p>
-                <p className="mt-1 text-xs text-slate-500">
-                  {item.vendor || "No vendor"}
-                  {auditModeForCategory(item.category) === "roll"
-                    ? ` · ${item.roll_width_ft} ft`
-                    : item.sqft_per_box != null
-                      ? ` · ${item.sqft_per_box} sq ft/box`
-                      : ""}
-                  {item.offline ? " · Offline" : ""}
-                </p>
-                {item.default_sims_location ? (
-                  <p className="mt-1 font-mono text-xs text-emerald-400/90">
-                    📍 {item.default_sims_location}
-                  </p>
-                ) : null}
-                {item.upc_barcode ? (
-                  <p className="mt-1 font-mono text-xs text-emerald-400/90">
-                    UPC {item.upc_barcode}
-                  </p>
-                ) : null}
-              </div>
-              <div className="mt-3 grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => openEdit(item)}
-                  className="flex min-h-12 items-center justify-center rounded-xl border border-slate-700 text-sm font-semibold text-slate-100"
-                >
-                  Edit
-                </button>
-                <button
-                  type="button"
-                  onClick={() => void handleDelete(item.id)}
-                  className="flex min-h-12 items-center justify-center rounded-xl border border-red-500/40 text-sm font-semibold text-red-400"
-                >
-                  Remove
-                </button>
-                {item.upc_barcode ? (
-                  <button
-                    type="button"
-                    onClick={() => void handleClearBarcode(item)}
-                    className="col-span-2 flex min-h-12 items-center justify-center rounded-xl border border-amber-500/40 text-sm font-semibold text-amber-300"
-                  >
-                    Unlink Barcode
+                    <span className="font-mono text-sm font-semibold tabular-nums text-emerald-400">
+                      {folder.itemCount}{" "}
+                      {folder.itemCount === 1 ? "Item" : "Items"}
+                    </span>
+                    <span className="text-xs text-slate-500">
+                      {folder.bayCount > 0
+                        ? `Staged in ${folder.bayCount} Bay${folder.bayCount === 1 ? "" : "s"}`
+                        : "No SIMS bays tagged yet"}
+                    </span>
                   </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => setLinkTarget(item)}
-                    className="col-span-2 flex h-12 items-center justify-center rounded-xl border border-emerald-500/40 text-sm font-semibold text-emerald-300"
-                  >
-                    Link Barcode
-                  </button>
-                )}
-              </div>
-            </li>
-          ))}
-        </ul>
-      )}
+                </li>
+              ))}
+            </ul>
+          )}
+        </section>
+      ) : null}
+
+      {showFolderDrill && activeFolderMeta ? (
+        <section className="space-y-3" aria-label={`${activeFolderMeta.title} items`}>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setActiveFolder(null)}
+              className="flex min-h-11 items-center gap-1.5 rounded-xl border border-slate-700 bg-slate-950 px-3 text-sm font-semibold text-slate-200 active:scale-95"
+            >
+              ← Categories
+            </button>
+            <span className="inline-flex min-h-11 items-center gap-1.5 rounded-xl border border-emerald-500/30 bg-emerald-950/40 px-3 text-sm font-semibold text-emerald-200">
+              <span aria-hidden>{activeFolderMeta.icon}</span>
+              {activeFolderMeta.title}
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() =>
+              openAdd(defaultCategoryForFolder(activeFolderMeta.id))
+            }
+            className="flex min-h-12 w-full items-center justify-center rounded-xl border border-emerald-500/40 bg-emerald-950/40 text-sm font-semibold text-emerald-300"
+          >
+            + Add {activeFolderMeta.shortTitle} Item
+          </button>
+          {renderItemList(
+            folderItems,
+            `No ${activeFolderMeta.title} SKUs yet. Tap + Add to create one.`
+          )}
+        </section>
+      ) : null}
+
+      {showFlatList ? (
+        <section className="space-y-3" aria-label="All catalog SKUs">
+          <p className="px-1 text-xs font-semibold uppercase tracking-wide text-slate-500">
+            All SKUs · {flatItems.length}
+          </p>
+          {renderItemList(
+            flatItems,
+            "No SIMS SKUs yet. Scan a barcode or tap + Add."
+          )}
+        </section>
+      ) : null}
     </div>
   );
 }
