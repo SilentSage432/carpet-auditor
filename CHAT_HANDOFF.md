@@ -21,7 +21,9 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 ### Master Admin roster console
 - Settings → **👥 Team & Department Roster Manager** (Master Admin only)
 - Add supervisor/associate with department, username suggest, temp password, first-login reset flag
-- Reset credentials / Edit scope / Delete; shareable issued-login card after create/reset
+- Reset credentials / Edit scope / **Deactivate** (soft-delete `is_active: false` + optional hard delete)
+- Deactivated profiles stay out of active roster fetches; seed helpers respect tombstones so Amber is not revived
+- Shareable issued-login card after create/reset
 
 ### Departments
 `flooring` · `appliances` · `plumbing` · `electrical` · `lawn_garden` · `paint` · `millwork` · `building_materials` · `hardware` · `all`

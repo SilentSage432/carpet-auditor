@@ -1,5 +1,16 @@
 # DeptSync Hub — Development Journal
 
+## 2026-07-30 — Soft-delete specialist roster (fix revive-after-delete)
+
+### Shipped
+- Root cause: `ensureRosterSeeds` re-inserted Amber / Flooring / Master after hard `removeLocal`.
+- Added `store_specialists.is_active` (default true); delete now soft-deactivates locally + in Supabase, then best-effort hard DELETE.
+- Inactive tombstones stay in localStorage so seeds are not revived; `fetchSpecialists` returns active-only.
+- Admin roster: optimistic card removal, green toast `User [Name] has been removed from the roster.`, error toast on DB failure.
+- Sync queue `delete_specialist` soft-deletes first; RLS policy note for update/delete.
+
+---
+
 ## 2026-07-30 — Zero-Access Authentication Wall
 
 ### Shipped

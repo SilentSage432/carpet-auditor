@@ -207,10 +207,31 @@ async function replayAction(action: SyncAction): Promise<void> {
       return;
     }
     case "delete_specialist": {
+      const specialistId = String(
+        entityId || (payload as { id?: string }).id || ""
+      );
+      if (!specialistId) throw new Error("Missing specialist id for delete");
+
+      // Soft-delete first so FK history cannot block removal.
+      const soft = await supabase
+        .from("store_specialists")
+        .update({ is_active: false })
+        .eq("id", specialistId)
+        .eq("store_number", action.store_number);
+      if (!soft.error) {
+        // Best-effort hard delete when no FK blocks it.
+        await supabase
+          .from("store_specialists")
+          .delete()
+          .eq("id", specialistId)
+          .eq("store_number", action.store_number);
+        return;
+      }
+
       const { error } = await supabase
         .from("store_specialists")
         .delete()
-        .eq("id", entityId)
+        .eq("id", specialistId)
         .eq("store_number", action.store_number);
       if (error) throw error;
       return;

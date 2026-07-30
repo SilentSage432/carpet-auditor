@@ -36,7 +36,7 @@ supabase/schema.sql               → Tables + multi-category + SIMS + store_num
 |---|---|
 | Navigation / section routing | `app/page.tsx` + `HubChrome` |
 | Department RBAC / tab visibility | `lib/rbac.ts` |
-| Team roster (Master Admin) | `AdminRosterManager`, `lib/specialists.ts` |
+| Team roster (Master Admin) | `AdminRosterManager`, `lib/specialists.ts` (`is_active` soft-delete) |
 | Store context | `lib/store.ts` |
 | Offline sync queue | `lib/sync-queue.ts` |
 | Shell caching | `public/sw.js` + `ServiceWorkerRegister` |

@@ -72,13 +72,16 @@ export function AdminRosterManager({
   const [deleteTarget, setDeleteTarget] = useState<StoreSpecialist | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [toastTone, setToastTone] = useState<"ok" | "err">("ok");
   const [issued, setIssued] = useState<IssuedCredentials | null>(null);
 
   const canManage = canManageTeamRoster(activeSpecialist);
 
   const sorted = useMemo(
     () =>
-      [...roster].sort((a, b) => {
+      [...roster]
+        .filter((m) => m.is_active !== false)
+        .sort((a, b) => {
         const rank = (m: StoreSpecialist) =>
           m.role === "MasterAdmin" ? 0 : m.role === "Supervisor" ? 1 : 2;
         const d = rank(a) - rank(b);
@@ -90,9 +93,10 @@ export function AdminRosterManager({
 
   if (!canManage) return null;
 
-  function flash(msg: string) {
+  function flash(msg: string, tone: "ok" | "err" = "ok") {
+    setToastTone(tone);
     setToast(msg);
-    window.setTimeout(() => setToast(null), 2800);
+    window.setTimeout(() => setToast(null), 3200);
   }
 
   async function refreshRoster(nextMember?: StoreSpecialist) {
@@ -127,11 +131,27 @@ export function AdminRosterManager({
     setDeleteTarget(null);
     setBusyId(target.id);
     try {
+      // Optimistic UI — remove immediately (strict string id match).
+      onRosterChange(
+        roster.filter((s) => String(s.id) !== String(target.id))
+      );
       await deleteSpecialist(target);
+      const team = await fetchSpecialists();
+      onRosterChange(
+        dedupeRoster(team).filter(
+          (s) =>
+            String(s.id) !== String(target.id) && s.is_active !== false
+        )
+      );
+      flash(`User ${target.name} has been removed from the roster.`, "ok");
+    } catch (err) {
       await refreshRoster();
-      flash(`🗑️ Removed ${target.name}`);
-    } catch {
-      flash("Could not remove profile");
+      flash(
+        err instanceof Error
+          ? err.message
+          : `Could not remove ${target.name} from the roster`,
+        "err"
+      );
     } finally {
       setBusyId(null);
     }
@@ -228,7 +248,15 @@ export function AdminRosterManager({
       </button>
 
       {toast ? (
-        <p className="text-center text-sm font-semibold text-emerald-300" role="status">
+        <p
+          className={`rounded-xl border px-3 py-2 text-center text-sm font-semibold ${
+            toastTone === "err"
+              ? "border-red-500/40 bg-red-950/50 text-red-200"
+              : "border-emerald-500/40 bg-emerald-950/50 text-emerald-200"
+          }`}
+          role="status"
+        >
+          {toastTone === "ok" ? "✅ " : "⚠️ "}
           {toast}
         </p>
       ) : null}
@@ -263,7 +291,7 @@ export function AdminRosterManager({
             ? `Deactivate ${deleteTarget.name}? They will no longer appear in the store roster.`
             : ""
         }
-        confirmLabel="Delete"
+        confirmLabel="Deactivate"
         danger
         onClose={() => setDeleteTarget(null)}
         onConfirm={() => void handleDelete()}

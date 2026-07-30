@@ -40,6 +40,7 @@ function flooringSupervisorSeed(store = getStoreNumber()): StoreSpecialist {
     username: "flooring_supervisor",
     assigned_department: "flooring",
     must_change_credentials: false,
+    is_active: true,
     created_at: new Date(0).toISOString(),
     offline: true,
   };
@@ -55,6 +56,7 @@ function applianceSupervisorSeed(store = getStoreNumber()): StoreSpecialist {
     username: DEFAULT_APPLIANCE_USERNAME,
     assigned_department: "appliances",
     must_change_credentials: true,
+    is_active: true,
     created_at: new Date(0).toISOString(),
     offline: true,
   };
@@ -70,6 +72,7 @@ function masterAdminSeed(store = getStoreNumber()): StoreSpecialist {
     username: "master_admin",
     assigned_department: "all",
     must_change_credentials: false,
+    is_active: true,
     created_at: new Date(0).toISOString(),
     offline: true,
   };
@@ -161,6 +164,14 @@ export function mapRow(row: Record<string, unknown>): StoreSpecialist {
     row.must_change_credentials === "true" ||
     row.must_change_credentials === 1;
 
+  const isActiveRaw = row.is_active;
+  const isActive =
+    isActiveRaw === false ||
+    isActiveRaw === "false" ||
+    isActiveRaw === 0
+      ? false
+      : true;
+
   return {
     id: String(row.id),
     store_number: String(row.store_number ?? getStoreNumber()),
@@ -170,6 +181,7 @@ export function mapRow(row: Record<string, unknown>): StoreSpecialist {
     username,
     assigned_department: assigned,
     must_change_credentials: Boolean(mustChange),
+    is_active: isActive,
     created_at: String(row.created_at ?? new Date().toISOString()),
     offline: Boolean(row.offline),
   };
@@ -239,13 +251,17 @@ export function dedupeRoster(roster: StoreSpecialist[]): StoreSpecialist[] {
       byKey.set(key, normalized);
     } else {
       const winner = preferSpecialist(existing, member);
+      const inactive =
+        existing.is_active === false || member.is_active === false;
       byKey.set(key, {
         ...winner,
-        role: existing.role === "MasterAdmin" || winner.role === "MasterAdmin"
-          ? "MasterAdmin"
-          : winner.role,
+        role:
+          existing.role === "MasterAdmin" || winner.role === "MasterAdmin"
+            ? "MasterAdmin"
+            : winner.role,
         assigned_department:
           winner.assigned_department ?? existing.assigned_department,
+        is_active: inactive ? false : winner.is_active !== false,
       });
     }
   }
@@ -266,6 +282,7 @@ function ensureRosterSeeds(
   const scoped = roster.filter((m) => m.store_number === store);
   const cleaned = dedupeRoster(scoped);
 
+  // Count inactive tombstones too — otherwise deleting Amber re-seeds her.
   const hasMaster = cleaned.some((m) => m.role === "MasterAdmin");
   const hasFlooringSup = cleaned.some(
     (m) =>
@@ -294,6 +311,31 @@ function ensureRosterSeeds(
   }
 
   return dedupeRoster([...seeds, ...cleaned]);
+}
+
+/** Active roster only — deactivated profiles stay in storage as tombstones. */
+export function activeSpecialistsOnly(
+  roster: StoreSpecialist[]
+): StoreSpecialist[] {
+  return roster.filter((m) => m.is_active !== false);
+}
+
+function sameSpecialistIdentity(
+  a: StoreSpecialist,
+  b: StoreSpecialist
+): boolean {
+  if (String(a.id) === String(b.id)) return true;
+  if (rosterKey(a) === rosterKey(b)) return true;
+  const aUser = a.username?.trim().toLowerCase() ?? "";
+  const bUser = b.username?.trim().toLowerCase() ?? "";
+  if (aUser && bUser && aUser === bUser && a.store_number === b.store_number) {
+    return true;
+  }
+  return (
+    a.store_number === b.store_number &&
+    a.name.trim().toLowerCase() === b.name.trim().toLowerCase() &&
+    a.role === b.role
+  );
 }
 
 export function isDefaultPin(member: StoreSpecialist): boolean {
@@ -440,6 +482,7 @@ export function findSpecialistByLogin(
   }
 
   const candidates = roster.filter((m) => {
+    if (m.is_active === false) return false;
     const uname = m.username?.trim().toLowerCase() ?? "";
     const name = m.name.trim().toLowerCase();
     if (uname && aliases.has(uname)) return true;
@@ -501,6 +544,7 @@ function specialistPayload(record: StoreSpecialist): Record<string, unknown> {
     username: record.username,
     assigned_department: record.assigned_department,
     must_change_credentials: record.must_change_credentials,
+    is_active: record.is_active !== false,
     created_at: record.created_at,
   };
   if (!isFallbackProfileId(record.id)) {
@@ -534,7 +578,9 @@ export async function fetchSpecialists(): Promise<StoreSpecialist[]> {
   writeLocal(local, store);
 
   const supabase = getSupabase();
-  if (!supabase || shouldSaveOffline()) return local;
+  if (!supabase || shouldSaveOffline()) {
+    return activeSpecialistsOnly(local);
+  }
 
   try {
     const { data, error } = await supabase
@@ -549,16 +595,22 @@ export async function fetchSpecialists(): Promise<StoreSpecialist[]> {
       .map((row) => mapRow({ ...(row as Record<string, unknown>), offline: false }))
       .filter((m) => !isPlaceholder(m));
 
+    const remoteIds = new Set(remote.map((r) => String(r.id)));
     const remoteNames = new Set(remote.map((r) => r.name.toLowerCase()));
     const offlineOnly = local.filter(
-      (r) => r.offline && !remoteNames.has(r.name.toLowerCase()) && !isPlaceholder(r)
+      (r) =>
+        r.offline &&
+        !remoteIds.has(String(r.id)) &&
+        !remoteNames.has(r.name.toLowerCase()) &&
+        !isPlaceholder(r)
     );
 
-    const merged = ensureRosterSeeds([...offlineOnly, ...remote], store);
+    // Keep inactive remote + local tombstones so ensureRosterSeeds does not revive them.
+    const merged = ensureRosterSeeds([...offlineOnly, ...remote, ...local], store);
     writeLocal(merged, store);
-    return merged;
+    return activeSpecialistsOnly(merged);
   } catch {
-    return local;
+    return activeSpecialistsOnly(local);
   }
 }
 
@@ -608,6 +660,7 @@ export async function saveSpecialist(input: {
         : String(input.username).trim(),
     assigned_department: assigned,
     must_change_credentials: Boolean(input.must_change_credentials),
+    is_active: true,
     created_at: now,
     offline: false,
   };
@@ -798,6 +851,7 @@ async function persistSpecialistFields(
         username: nextLocal.username,
         assigned_department: nextLocal.assigned_department,
         must_change_credentials: nextLocal.must_change_credentials,
+        is_active: nextLocal.is_active !== false,
         store_number: store,
       })
       .select("*")
@@ -819,6 +873,7 @@ async function persistSpecialistFields(
             username: nextLocal.username,
             assigned_department: nextLocal.assigned_department,
             must_change_credentials: nextLocal.must_change_credentials,
+            is_active: nextLocal.is_active !== false,
           })
           .eq("id", String(existing.id))
           .select("*")
@@ -856,6 +911,7 @@ async function persistSpecialistFields(
           username: nextLocal.username,
           assigned_department: nextLocal.assigned_department,
           must_change_credentials: nextLocal.must_change_credentials,
+          is_active: nextLocal.is_active !== false,
         })
         .eq("id", targetId)
         .select("*");
@@ -998,46 +1054,119 @@ export async function updateSpecialistScope(
   });
 }
 
-function removeLocal(id: string, store = getStoreNumber()): StoreSpecialist[] {
-  const next = readLocal(store).filter((r) => r.id !== id);
-  writeLocal(next, store);
-  return next;
+function deactivateLocal(
+  member: StoreSpecialist,
+  store = getStoreNumber()
+): StoreSpecialist[] {
+  const scoped = readAllLocal().filter((r) => r.store_number === store);
+  let found = false;
+  const next = scoped.map((r) => {
+    if (sameSpecialistIdentity(r, member)) {
+      found = true;
+      return { ...r, is_active: false, offline: Boolean(r.offline) };
+    }
+    return r;
+  });
+  if (!found) {
+    next.push({
+      ...member,
+      store_number: store,
+      is_active: false,
+      offline: true,
+    });
+  }
+  const seeded = ensureRosterSeeds(next, store);
+  const others = readAllLocal().filter((r) => r.store_number !== store);
+  writeAllLocal([...others, ...seeded]);
+  return seeded;
 }
 
-/** Deactivate / delete a specialist profile for the active store. */
+/**
+ * Deactivate (soft-delete) a specialist. Prefer is_active=false so audit history
+ * FKs / name references cannot block removal. Attempt hard DELETE afterward;
+ * if Postgres rejects it, soft-delete still stands.
+ */
 export async function deleteSpecialist(
   member: StoreSpecialist
-): Promise<{ offline: boolean }> {
+): Promise<{ offline: boolean; mode: "soft" | "hard" }> {
   const store = member.store_number || getStoreNumber();
   const supabase = getSupabase();
+  const targetId = String(member.id);
 
-  removeLocal(member.id, store);
+  deactivateLocal(member, store);
+
   const active = getActiveSpecialist();
-  if (active?.id === member.id) {
+  if (active && sameSpecialistIdentity(active, member)) {
     setActiveSpecialist(null);
   }
+
+  const deactivated: StoreSpecialist = {
+    ...member,
+    store_number: store,
+    is_active: false,
+  };
 
   if (!supabase || shouldSaveOffline() || isFallbackProfileId(member.id)) {
     if (!isFallbackProfileId(member.id)) {
       enqueueSyncAction(
         "delete_specialist",
-        { id: member.id },
+        { ...specialistPayload(deactivated), id: targetId },
         store
       );
     }
-    return { offline: true };
+    return { offline: true, mode: "soft" };
   }
 
   try {
-    const { error } = await supabase
+    // Soft-delete first (survives FK constraints from audit name history).
+    const { error: softError } = await supabase
+      .from(TABLE)
+      .update({ is_active: false })
+      .eq("id", targetId)
+      .eq("store_number", store);
+
+    if (softError) {
+      // Column may be missing on older DBs — attempt hard delete.
+      const { error: hardError } = await supabase
+        .from(TABLE)
+        .delete()
+        .eq("id", targetId)
+        .eq("store_number", store);
+      if (hardError) {
+        enqueueSyncAction(
+          "delete_specialist",
+          { ...specialistPayload(deactivated), id: targetId },
+          store
+        );
+        throw new Error(
+          softError.message ||
+            hardError.message ||
+            "Could not remove specialist from the store database"
+        );
+      }
+      return { offline: false, mode: "hard" };
+    }
+
+    // Soft-delete applied — try hard delete when no FK blocks it.
+    const { error: hardError } = await supabase
       .from(TABLE)
       .delete()
-      .eq("id", member.id)
+      .eq("id", targetId)
       .eq("store_number", store);
-    if (error) throw error;
-    return { offline: false };
-  } catch {
-    enqueueSyncAction("delete_specialist", { id: member.id }, store);
-    return { offline: true };
+
+    if (!hardError) {
+      return { offline: false, mode: "hard" };
+    }
+
+    // FK / policy blocked hard delete — soft-delete is the durable removal.
+    return { offline: false, mode: "soft" };
+  } catch (err) {
+    enqueueSyncAction(
+      "delete_specialist",
+      { ...specialistPayload(deactivated), id: targetId },
+      store
+    );
+    if (err instanceof Error) throw err;
+    throw new Error("Could not remove specialist from the store database");
   }
 }

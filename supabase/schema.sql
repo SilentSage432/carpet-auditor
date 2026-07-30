@@ -216,6 +216,16 @@ alter table public.store_specialists
 alter table public.store_specialists
   add column if not exists must_change_credentials boolean not null default false;
 
+alter table public.store_specialists
+  add column if not exists is_active boolean not null default true;
+
+update public.store_specialists
+set is_active = true
+where is_active is null;
+
+create index if not exists store_specialists_is_active_idx
+  on public.store_specialists (store_number, is_active);
+
 -- Normalize legacy Department Supervisor → Flooring Supervisor
 update public.store_specialists
 set
@@ -282,6 +292,7 @@ drop policy if exists "Allow anon all carpet_audits" on public.carpet_audits;
 drop policy if exists "Allow anon all carpet_catalog" on public.carpet_catalog;
 drop policy if exists "Allow anon all carpet_remnants" on public.carpet_remnants;
 drop policy if exists "Allow anon all store_specialists" on public.store_specialists;
+drop policy if exists "Allow delete and update for store_specialists" on public.store_specialists;
 
 -- Hub currently filters by store_number in the client (.eq).
 -- Policies remain open for anon until per-store JWT claims are introduced.
@@ -295,5 +306,9 @@ create policy "Allow anon all carpet_remnants"
   on public.carpet_remnants for all to anon using (true) with check (true);
 
 create policy "Allow anon all store_specialists"
+  on public.store_specialists for all to anon using (true) with check (true);
+
+-- Explicit update/delete coverage for soft-delete + hard-delete fallbacks
+create policy "Allow delete and update for store_specialists"
   on public.store_specialists for all to anon using (true) with check (true);
 
