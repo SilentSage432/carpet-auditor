@@ -33,9 +33,11 @@ export function HubHeader({
         <DeptSyncBadge size="sm" />
         <div className="min-w-0 flex-1">
           <p className="truncate font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-400">
+            DeptSync Hub
+          </p>
+          <p className="truncate text-[10px] font-semibold text-slate-400">
             DeptSync
             {storeNumber ? ` · ${formatStoreLabel(storeNumber)}` : ""}
-            {" · Inventory & SIMS Audit"}
           </p>
           <h1 className="truncate text-base font-bold text-slate-50">
             {title}

@@ -13,7 +13,8 @@ import { NumberField, TextField } from "@/components/ui/NumberField";
 import { AuditReportModal } from "@/components/hub/AuditReportModal";
 import { resolveScan, sanitizeBarcodeScan } from "@/lib/barcode";
 import { findCatalogBySkuOrBarcode } from "@/lib/catalog";
-import { focusAndSelect } from "@/lib/focus-input";
+import { blurActiveInput } from "@/lib/focus-input";
+import { useGlobalBarcodeScanner } from "@/lib/hardware-scanner";
 import { toNumber } from "@/lib/number-input";
 import { playSuccessChime } from "@/lib/scan-feedback";
 import { deleteAudit, fetchAudits, isToday, saveAudit } from "@/lib/storage";
@@ -85,8 +86,8 @@ export function DepartmentAuditSection({
     [meta.label]
   );
 
-  const focusSkuInput = useCallback(() => {
-    focusAndSelect(skuInputRef);
+  const dismissKeyboard = useCallback(() => {
+    blurActiveInput(skuInputRef);
   }, []);
 
   useEffect(() => {
@@ -100,10 +101,6 @@ export function DepartmentAuditSection({
       cancelled = true;
     };
   }, []);
-
-  useEffect(() => {
-    focusSkuInput();
-  }, [department, focusSkuInput]);
 
   const shiftAudits = useMemo(
     () => audits.filter((a) => isToday(a.created_at)),
@@ -140,12 +137,13 @@ export function DepartmentAuditSection({
     setSimsLocation(item.default_sims_location || simsLocation);
     setScanFlash(true);
     window.setTimeout(() => setScanFlash(false), 600);
-    focusAndSelect(qtyInputRef);
+    blurActiveInput(skuInputRef);
   }
 
   async function handleSkuLookup(raw: string) {
     const cleaned = sanitizeBarcodeScan(raw);
     if (!cleaned) return;
+    setSku(cleaned);
     const local = findCatalogBySkuOrBarcode(catalog, cleaned);
     if (local) {
       applyCatalogItem(local);
@@ -161,6 +159,8 @@ export function DepartmentAuditSection({
     if (resolution.kind === "empty") return;
     setQuickAddBarcode(resolution.scanned);
   }
+
+  useGlobalBarcodeScanner(handleSkuLookup);
 
   function handleSkuChange(value: string) {
     setSku(value);
@@ -179,7 +179,7 @@ export function DepartmentAuditSection({
     setQuickAddBarcode(null);
     setSku("");
     setName("");
-    focusSkuInput();
+    dismissKeyboard();
   }
 
   function resetForm() {
@@ -188,7 +188,7 @@ export function DepartmentAuditSection({
     setSimsLocation("");
     setLocation("sales_floor");
     setUnitCount("1");
-    focusSkuInput();
+    dismissKeyboard();
   }
 
   function bumpUnits(delta: number) {
@@ -253,7 +253,7 @@ export function DepartmentAuditSection({
         open={simsFinderOpen}
         onClose={() => {
           setSimsFinderOpen(false);
-          focusSkuInput();
+          dismissKeyboard();
         }}
         catalog={catalog}
         audits={audits}
@@ -262,7 +262,7 @@ export function DepartmentAuditSection({
         open={reportOpen}
         onClose={() => {
           setReportOpen(false);
-          focusSkuInput();
+          dismissKeyboard();
         }}
         kind="department"
         departmentLabel={meta.label}
@@ -323,9 +323,8 @@ export function DepartmentAuditSection({
           onChange={handleSkuChange}
           onScanCommit={handleSkuLookup}
           flash={scanFlash}
-          placeholder="Scan barcode or type item #"
+          placeholder="Scan barcode or tap to type item #"
           inputRef={skuInputRef}
-          autoFocus
         />
 
         <TextField

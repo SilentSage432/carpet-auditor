@@ -5,7 +5,7 @@ export default function manifest(): MetadataRoute.Manifest {
     name: "DeptSync — Department & SIMS Audit Hub",
     short_name: "DeptSync",
     description:
-      "Department-scoped inventory & SIMS audits — flooring, appliances, catalog, and remnant rack.",
+      "Department & SIMS Inventory Audit Suite for Lowe's Stores",
     start_url: "/",
     display: "standalone",
     background_color: "#022c22",

@@ -55,7 +55,7 @@ function assignRef<T>(ref: Ref<T> | undefined, node: T | null) {
 }
 
 /**
- * Dual scan trigger: Enter key + rapid digit burst (8+ chars, ≤150ms gaps)
+ * Dual scan trigger: Enter key + rapid digit burst (6+ chars, ≤150ms gaps)
  * with 250ms quiet debounce so wedges without Enter still resolve.
  */
 function useScannerKeyTracking(
@@ -197,6 +197,7 @@ export function NumberField({
         pattern={mode === "decimal" ? "[0-9]*[.]?[0-9]*" : "[0-9]*"}
         autoComplete="off"
         autoFocus={autoFocus}
+        data-barcode-scan={onScanCommit ? "true" : undefined}
         placeholder={placeholder}
         aria-label={ariaLabel ?? label}
         value={value}
@@ -294,6 +295,7 @@ export function TextField({
         type={type}
         autoComplete={autoComplete}
         autoFocus={autoFocus}
+        data-barcode-scan={onScanCommit ? "true" : undefined}
         placeholder={placeholder}
         aria-label={ariaLabel ?? label}
         value={value}

@@ -16,6 +16,7 @@ components/hub/AdminRosterManager.tsx → Master Admin team/department roster co
 components/hub/AuditReportModal.tsx → Printable / emailable / clipboard audit report
 components/sections/DepartmentAuditSection.tsx → Generic unit-count audit for non-flooring/appliance depts
 lib/audit-report.ts               → Audit report metrics + email/clipboard composition
+lib/hardware-scanner.ts           → Window-level Bluetooth/wedge barcode burst listener
 lib/rbac.ts                       → Department-scoped section / catalog visibility (compose only)
 lib/store.ts                      → Active store_number session
 lib/sync-queue.ts                 → Offline action queue + replay
@@ -42,6 +43,8 @@ supabase/schema.sql               → Tables + multi-category + SIMS + store_num
 | Number typing UX | `lib/number-input.ts` + `NumberField` |
 | Catalog knowledge | `lib/catalog.ts` |
 | Barcode resolve / Quick-Add | `lib/barcode.ts`, `NumberField` scan hooks, `QuickAddCatalogModal` |
+| Hardware wedge (no soft keyboard) | `lib/hardware-scanner.ts` |
+| Focus / keyboard dismiss | `lib/focus-input.ts` (`blurActiveInput` — never auto-focus on tab switch) |
 | SIMS location stock | `lib/sims.ts`, `SimsLocationFinder` |
 | Specialists session / credentials | `lib/specialists.ts`, `SpecialistModal`, `FirstLoginCredentialsModal` |
 | PIN change / default notice | `ChangePinModal`, `DefaultPinNotice` |

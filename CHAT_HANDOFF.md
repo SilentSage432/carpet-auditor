@@ -5,7 +5,9 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 
 ## Branding
 - App: **DeptSync Hub** · PWA short_name **DeptSync**
-- Eyebrow: `DeptSync · Lowe's #{store} · Inventory & SIMS Audit`
+- Manifest name: `DeptSync — Department & SIMS Audit Hub`
+- Layout title: `DeptSync Hub · Department & SIMS Audit` · appleWebApp title `DeptSync`
+- Header: brand `DeptSync Hub` · subtitle `DeptSync · Lowe's #{store}` · section title · network
 - Header badge: `DeptSyncBadge` (stacked boxes + barcode, emerald/amber on dark)
 - Icons: `public/icons/icon-192.png`, `icon-512.png`, `apple-touch-icon.png`
 
@@ -30,12 +32,14 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 
 ## Navigation & handheld chrome
 - Primary: fixed bottom tabs — **filtered by role/department**
-- Header: DeptSync badge + eyebrow · section title · network; specialist chip + PIN gear
-- Cycle Audit / Appliances: scan-first; sticky Log docked above bottom nav
+- Header: DeptSync Hub brand + `DeptSync · Lowe's #…` subtitle · section title · network; specialist chip + PIN gear
+- Cycle Audit / Appliances: hardware-scan ready without soft keyboard; sticky Log docked above bottom nav
 
 ## Scan-to-Catalog
 - SKU / UPC resolve via `lib/barcode.ts` → `carpet_catalog`
-- Dual trigger: Enter **or** rapid ≥8-digit burst
+- Soft keyboard: **tap-to-type only** (no auto-focus on tab switch)
+- Hardware wedges: `useGlobalBarcodeScanner` (window keydown, 6+ chars ≤150ms) → active section lookup
+- Focused SKU fields still support Enter **or** rapid burst via NumberField
 - Quick-Add modal for unlinked barcodes
 - Catalog folders (`lib/catalog-folders.ts`); domain-filtered for department supervisors
 

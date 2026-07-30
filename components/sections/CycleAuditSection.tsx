@@ -36,7 +36,8 @@ import {
   fetchCatalog,
   saveCatalogItem,
 } from "@/lib/catalog";
-import { focusAndSelect } from "@/lib/focus-input";
+import { blurActiveInput } from "@/lib/focus-input";
+import { useGlobalBarcodeScanner } from "@/lib/hardware-scanner";
 import { toNumber } from "@/lib/number-input";
 import { playSuccessChime } from "@/lib/scan-feedback";
 import { getStoreNumber } from "@/lib/store";
@@ -339,21 +340,9 @@ export function CycleAuditSection({
     rollWidth,
   ]);
 
-  const focusSkuInput = useCallback(() => {
-    focusAndSelect(skuInputRef, 100);
+  const dismissKeyboard = useCallback(() => {
+    blurActiveInput(skuInputRef);
   }, []);
-
-  const focusMeasureInput = useCallback((mode: "roll" | "carton") => {
-    focusAndSelect(
-      mode === "roll" ? measureInputRef : boxCountInputRef,
-      100
-    );
-  }, []);
-
-  // Ready for handheld scan as soon as the audit workspace mounts
-  useEffect(() => {
-    focusSkuInput();
-  }, [focusSkuInput]);
 
   useEffect(() => {
     return () => {
@@ -363,25 +352,21 @@ export function CycleAuditSection({
     };
   }, []);
 
-  const applyCatalogItem = useCallback(
-    (item: CatalogItem) => {
-      const nextCategory = normalizeCategory(item.category);
-      const mode = auditModeForCategory(nextCategory);
-      setSku(item.sku);
-      setCarpetName(item.carpet_name);
-      setCategory(nextCategory);
-      setSimsLocation(item.default_sims_location || "");
-      setRollWidth(normalizeRollWidthFt(item.roll_width_ft));
-      setSqftPerBox(
-        item.sqft_per_box != null ? String(item.sqft_per_box) : ""
-      );
-      setScanFlash(true);
-      playSuccessChime();
-      window.setTimeout(() => setScanFlash(false), 900);
-      focusMeasureInput(mode);
-    },
-    [focusMeasureInput]
-  );
+  const applyCatalogItem = useCallback((item: CatalogItem) => {
+    const nextCategory = normalizeCategory(item.category);
+    setSku(item.sku);
+    setCarpetName(item.carpet_name);
+    setCategory(nextCategory);
+    setSimsLocation(item.default_sims_location || "");
+    setRollWidth(normalizeRollWidthFt(item.roll_width_ft));
+    setSqftPerBox(
+      item.sqft_per_box != null ? String(item.sqft_per_box) : ""
+    );
+    setScanFlash(true);
+    playSuccessChime();
+    window.setTimeout(() => setScanFlash(false), 900);
+    blurActiveInput(skuInputRef);
+  }, []);
 
   const flashStatus = useCallback((msg: string) => {
     setStatusMsg(msg);
@@ -427,6 +412,8 @@ export function CycleAuditSection({
     }
   }
 
+  useGlobalBarcodeScanner(handleSkuLookup);
+
   function handleQuickAdded(item: CatalogItem) {
     const next = [
       item,
@@ -449,7 +436,7 @@ export function CycleAuditSection({
     setSku("");
     setCarpetName("");
     setRollWidth(null);
-    focusSkuInput();
+    dismissKeyboard();
   }
 
   function resetForm() {
@@ -466,7 +453,7 @@ export function CycleAuditSection({
     setBoxCount("");
     setSystemClf("");
     clearAuditDraft();
-    focusSkuInput();
+    dismissKeyboard();
   }
 
   function showUndoToast(record: CarpetAudit) {
@@ -496,7 +483,7 @@ export function CycleAuditSection({
     await deleteAudit(id);
     setAudits((prev) => prev.filter((a) => a.id !== id));
     flashStatus("Last audit undone");
-    focusSkuInput();
+    dismissKeyboard();
   }
 
   const canLog =
@@ -632,7 +619,7 @@ export function CycleAuditSection({
         open={simsFinderOpen}
         onClose={() => {
           setSimsFinderOpen(false);
-          focusSkuInput();
+          dismissKeyboard();
         }}
         catalog={catalog}
         audits={audits}
@@ -648,20 +635,20 @@ export function CycleAuditSection({
         }}
         onClose={() => {
           setPinForDiscrepancy(false);
-          focusSkuInput();
+          dismissKeyboard();
         }}
         onSuccess={() => {
           setDiscrepancyUnlocked(true);
           setFilterDiscrepancies(true);
           setPinForDiscrepancy(false);
-          focusSkuInput();
+          dismissKeyboard();
         }}
       />
       <AuditReportModal
         open={reportOpen}
         onClose={() => {
           setReportOpen(false);
-          focusSkuInput();
+          dismissKeyboard();
         }}
         kind="flooring"
         departmentLabel="Flooring"
@@ -807,10 +794,9 @@ export function CycleAuditSection({
           onChange={handleSkuChange}
           onScanCommit={handleSkuLookup}
           flash={scanFlash}
-          placeholder="Scan barcode or type item #"
+          placeholder="Scan barcode or tap to type item #"
           leftIcon={<BarcodeIcon className="h-5 w-5" />}
           inputRef={skuInputRef}
-          autoFocus
         />
 
         <div className="space-y-1.5">

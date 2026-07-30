@@ -16,9 +16,9 @@ const jetbrains = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "DeptSync Hub — Department & SIMS Audit",
+  title: "DeptSync Hub · Department & SIMS Audit",
   description:
-    "DeptSync Hub — department-scoped inventory & SIMS audits for flooring, appliances, catalog, and remnant rack.",
+    "Department & SIMS Inventory Audit Suite for Lowe's Stores",
   applicationName: "DeptSync Hub",
   appleWebApp: {
     capable: true,

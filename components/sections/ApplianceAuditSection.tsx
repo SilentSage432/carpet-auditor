@@ -12,7 +12,8 @@ import {
 import {
   findCatalogBySkuOrBarcode,
 } from "@/lib/catalog";
-import { focusAndSelect } from "@/lib/focus-input";
+import { blurActiveInput } from "@/lib/focus-input";
+import { useGlobalBarcodeScanner } from "@/lib/hardware-scanner";
 import { toNumber } from "@/lib/number-input";
 import { playSuccessChime } from "@/lib/scan-feedback";
 import {
@@ -119,17 +120,9 @@ export function ApplianceAuditSection({
     [catalog, sku]
   );
 
-  const focusSkuInput = useCallback(() => {
-    focusAndSelect(skuInputRef, 100);
+  const dismissKeyboard = useCallback(() => {
+    blurActiveInput(skuInputRef);
   }, []);
-
-  const focusQtyInput = useCallback(() => {
-    focusAndSelect(qtyInputRef, 100);
-  }, []);
-
-  useEffect(() => {
-    focusSkuInput();
-  }, [focusSkuInput]);
 
   useEffect(() => {
     let cancelled = false;
@@ -149,20 +142,17 @@ export function ApplianceAuditSection({
     window.setTimeout(() => setStatusMsg(null), 2800);
   }, []);
 
-  const applyCatalogItem = useCallback(
-    (item: CatalogItem) => {
-      setSku(item.sku);
-      setName(item.carpet_name);
-      setModel(item.vendor || "");
-      setCategory(normalizeApplianceCategory(item.category));
-      setSimsLocation(item.default_sims_location || "");
-      setScanFlash(true);
-      playSuccessChime();
-      window.setTimeout(() => setScanFlash(false), 900);
-      focusQtyInput();
-    },
-    [focusQtyInput]
-  );
+  const applyCatalogItem = useCallback((item: CatalogItem) => {
+    setSku(item.sku);
+    setName(item.carpet_name);
+    setModel(item.vendor || "");
+    setCategory(normalizeApplianceCategory(item.category));
+    setSimsLocation(item.default_sims_location || "");
+    setScanFlash(true);
+    playSuccessChime();
+    window.setTimeout(() => setScanFlash(false), 900);
+    blurActiveInput(skuInputRef);
+  }, []);
 
   function handleSkuChange(raw: string) {
     const next = sanitizeBarcodeScan(raw);
@@ -197,6 +187,8 @@ export function ApplianceAuditSection({
     flashStatus("Unlinked barcode — Quick-Add appliance to SIMS catalog");
   }
 
+  useGlobalBarcodeScanner(handleSkuLookup);
+
   function handleQuickAdded(item: CatalogItem) {
     const next = [
       item,
@@ -214,7 +206,7 @@ export function ApplianceAuditSection({
     setSku("");
     setName("");
     setModel("");
-    focusSkuInput();
+    dismissKeyboard();
   }
 
   function resetForm() {
@@ -225,7 +217,7 @@ export function ApplianceAuditSection({
     setSimsLocation("");
     setLocation("sales_floor");
     setUnitCount("1");
-    focusSkuInput();
+    dismissKeyboard();
   }
 
   function bumpUnits(delta: number) {
@@ -288,7 +280,7 @@ export function ApplianceAuditSection({
         open={simsFinderOpen}
         onClose={() => {
           setSimsFinderOpen(false);
-          focusSkuInput();
+          dismissKeyboard();
         }}
         catalog={catalog}
         audits={audits}
@@ -297,7 +289,7 @@ export function ApplianceAuditSection({
         open={reportOpen}
         onClose={() => {
           setReportOpen(false);
-          focusSkuInput();
+          dismissKeyboard();
         }}
         kind="appliances"
         departmentLabel="Appliance"
@@ -357,10 +349,9 @@ export function ApplianceAuditSection({
           onChange={handleSkuChange}
           onScanCommit={handleSkuLookup}
           flash={scanFlash}
-          placeholder="Scan barcode or type item #"
+          placeholder="Scan barcode or tap to type item #"
           leftIcon={<BarcodeIcon className="h-5 w-5" />}
           inputRef={skuInputRef}
-          autoFocus
         />
 
         <TextField

@@ -25,6 +25,7 @@ import {
 } from "@/lib/catalog-folders";
 import { toNumber } from "@/lib/number-input";
 import { playSuccessChime } from "@/lib/scan-feedback";
+import { useGlobalBarcodeScanner } from "@/lib/hardware-scanner";
 import { fetchAudits } from "@/lib/storage";
 import {
   APPLIANCE_CATEGORIES,
@@ -215,6 +216,8 @@ export function CatalogSection({
     setQuickAddBarcode(resolution.scanned);
     flash("Unlinked barcode — Quick-Add to SIMS catalog");
   }
+
+  useGlobalBarcodeScanner(handleSearchScan, !showForm && linkTarget == null);
 
   async function handleSave() {
     if (!sku.trim() || !name.trim()) return;

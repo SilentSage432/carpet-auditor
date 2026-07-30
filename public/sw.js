@@ -1,4 +1,4 @@
-/* Carpet Hub — offline shell cache */
+/* DeptSync Hub — offline shell cache */
 const CACHE_VERSION = "carpet-hub-shell-v1";
 const SHELL_ASSETS = [
   "/",

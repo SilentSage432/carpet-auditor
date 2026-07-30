@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 
-/** Registers the Carpet Hub service worker for shell caching. */
+/** Registers the DeptSync Hub service worker for shell caching. */
 export function ServiceWorkerRegister() {
   useEffect(() => {
     if (typeof window === "undefined") return;

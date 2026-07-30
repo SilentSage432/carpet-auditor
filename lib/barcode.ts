@@ -68,5 +68,5 @@ export const SCANNER_INTER_KEY_MS = 150;
 /** Fire lookup after this quiet period following a rapid digit burst. */
 export const SCANNER_DEBOUNCE_MS = 250;
 
-/** Minimum digit length in a rapid burst before auto-lookup (no Enter). */
-export const SCANNER_BURST_MIN_DIGITS = 8;
+/** Minimum characters in a rapid burst before auto-lookup (no Enter). */
+export const SCANNER_BURST_MIN_DIGITS = 6;

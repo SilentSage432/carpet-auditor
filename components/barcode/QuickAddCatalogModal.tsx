@@ -143,8 +143,7 @@ export function QuickAddCatalogModal({
             mode="digits"
             value={sku}
             onChange={setSku}
-            placeholder="Item #"
-            autoFocus
+            placeholder="Tap to type Item #"
           />
           <TextField
             label={

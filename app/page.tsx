@@ -11,6 +11,7 @@ import { CycleAuditSection } from "@/components/sections/CycleAuditSection";
 import { ApplianceAuditSection } from "@/components/sections/ApplianceAuditSection";
 import { RemnantSection } from "@/components/sections/RemnantSection";
 import { SettingsSection } from "@/components/sections/SettingsSection";
+import { blurActiveInput } from "@/lib/focus-input";
 import { fetchCatalog } from "@/lib/catalog";
 import { fetchRemnants } from "@/lib/remnants";
 import {
@@ -212,6 +213,8 @@ export default function DeptSyncHubPage() {
 
   function handleSectionSelect(next: HubSection) {
     if (!canAccessSection(specialist, next)) return;
+    // Dismiss soft keyboard on tab switch — never auto-focus the next section.
+    blurActiveInput();
     setSection(next);
   }
 

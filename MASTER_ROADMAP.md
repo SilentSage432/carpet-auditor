@@ -34,6 +34,7 @@
 - [x] Master Admin Team & Department Roster Manager (add / reset / edit / delete)
 - [x] Full Lowe's department list + generic department audit workspace
 - [x] Audit Report Exporter & Printable Email Engine (print / mailto+share / clipboard)
+- [x] Soft keyboard tap-to-type + global hardware barcode scanner (no focus on tab switch)
 
 ## Next
 - [ ] JWT / claim-based RLS enforcing `store_number` (+ department) server-side

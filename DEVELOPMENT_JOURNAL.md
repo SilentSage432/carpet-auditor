@@ -1,5 +1,25 @@
 # DeptSync Hub — Development Journal
 
+## 2026-07-30 — Soft keyboard + global hardware scanner
+
+### Shipped
+- Removed programmatic `.focus()` on tab/section mount (Flooring, Appliances, Department) so iOS/Android soft keyboards no longer open on every bottom-nav tap.
+- `lib/hardware-scanner.ts` — window-level wedge listener (6+ chars, ≤150ms gaps) routes scans into the active section’s SKU lookup without focusing an input.
+- Tap-to-type only: `selectOnFocus` highlights existing text; post-log / Quick-Add cancel uses `blurActiveInput()` to dismiss the keyboard.
+- `app/page.tsx` blurs on section switch; Quick-Add no longer autoFocuses Item #.
+
+---
+
+## 2026-07-30 — DeptSync branding metadata alignment
+
+### Shipped
+- Locked PWA/layout/header copy to **DeptSync Hub** (no remaining Carpet/Flooring Hub titles).
+- Manifest: name `DeptSync — Department & SIMS Audit Hub`, short_name `DeptSync`.
+- Layout: title `DeptSync Hub · Department & SIMS Audit`, description inventory suite for Lowe's, appleWebApp title `DeptSync`.
+- Header chrome: brand `DeptSync Hub`, subtitle `DeptSync · Lowe's #[store]`.
+
+---
+
 ## 2026-07-30 — Audit Report Exporter & Printable Email Engine
 
 ### Shipped
