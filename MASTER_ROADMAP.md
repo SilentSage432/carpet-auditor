@@ -33,6 +33,7 @@
 - [x] Supervisor first-login username/password customization modal
 - [x] Master Admin Team & Department Roster Manager (add / reset / edit / delete)
 - [x] Full Lowe's department list + generic department audit workspace
+- [x] Audit Report Exporter & Printable Email Engine (print / mailto+share / clipboard)
 
 ## Next
 - [ ] JWT / claim-based RLS enforcing `store_number` (+ department) server-side

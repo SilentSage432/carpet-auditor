@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { QuickAddCatalogModal } from "@/components/barcode/QuickAddCatalogModal";
 import { SimsLocationFinder } from "@/components/catalog/SimsLocationFinder";
 import { NumberField, TextField } from "@/components/ui/NumberField";
+import { AuditReportModal } from "@/components/hub/AuditReportModal";
 import {
   resolveScan,
   sanitizeBarcodeScan,
@@ -29,6 +30,7 @@ import {
   type CarpetAudit,
   type CatalogItem,
   type LocationType,
+  type StoreSpecialist,
 } from "@/lib/types";
 
 function locationLabel(location: LocationType): string {
@@ -67,12 +69,14 @@ type Props = {
   catalog: CatalogItem[];
   onCatalogChange: (items: CatalogItem[]) => void;
   auditedBy: string;
+  activeSpecialist: StoreSpecialist | null;
 };
 
 export function ApplianceAuditSection({
   catalog,
   onCatalogChange,
   auditedBy,
+  activeSpecialist,
 }: Props) {
   const skuInputRef = useRef<HTMLInputElement>(null);
   const qtyInputRef = useRef<HTMLInputElement>(null);
@@ -92,6 +96,7 @@ export function ApplianceAuditSection({
   const [quickAddBarcode, setQuickAddBarcode] = useState<string | null>(null);
   const [simsFinderOpen, setSimsFinderOpen] = useState(false);
   const [showAll, setShowAll] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
 
   const unitNum = toNumber(unitCount, 0);
 
@@ -288,16 +293,35 @@ export function ApplianceAuditSection({
         catalog={catalog}
         audits={audits}
       />
+      <AuditReportModal
+        open={reportOpen}
+        onClose={() => {
+          setReportOpen(false);
+          focusSkuInput();
+        }}
+        kind="appliances"
+        departmentLabel="Appliance"
+        audits={shiftAudits.length > 0 ? shiftAudits : applianceAudits}
+        specialist={activeSpecialist}
+        auditedBy={auditedBy}
+      />
 
       <section
         aria-label="Appliance shift summary"
-        className="rounded-2xl border border-slate-800 bg-slate-900/90 px-3 py-2 shadow-lg shadow-black/20"
+        className="space-y-2 rounded-2xl border border-slate-800 bg-slate-900/90 px-3 py-2 shadow-lg shadow-black/20"
       >
         <p className="truncate font-mono text-xs font-semibold tabular-nums text-slate-200 sm:text-sm">
           🔌 {loaded ? shiftAudits.length : "—"} Logged
           <span className="text-slate-500"> | </span>
           {loaded ? shiftUnits : "—"} Units today
         </p>
+        <button
+          type="button"
+          onClick={() => setReportOpen(true)}
+          className="flex h-11 w-full items-center justify-center rounded-xl border border-sky-500/40 bg-sky-950/40 px-3 text-sm font-bold text-sky-200 active:scale-[0.98]"
+        >
+          📊 Export / Print Report
+        </button>
       </section>
 
       {statusMsg && (

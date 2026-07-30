@@ -10,6 +10,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { QuickAddCatalogModal } from "@/components/barcode/QuickAddCatalogModal";
 import { SimsLocationFinder } from "@/components/catalog/SimsLocationFinder";
 import { NumberField, TextField } from "@/components/ui/NumberField";
+import { AuditReportModal } from "@/components/hub/AuditReportModal";
 import { resolveScan, sanitizeBarcodeScan } from "@/lib/barcode";
 import { findCatalogBySkuOrBarcode } from "@/lib/catalog";
 import { focusAndSelect } from "@/lib/focus-input";
@@ -22,6 +23,7 @@ import {
   type CatalogItem,
   type LocationType,
   type OperationalDepartment,
+  type StoreSpecialist,
 } from "@/lib/types";
 
 type Props = {
@@ -29,6 +31,7 @@ type Props = {
   catalog: CatalogItem[];
   onCatalogChange: (items: CatalogItem[]) => void;
   auditedBy: string;
+  activeSpecialist: StoreSpecialist | null;
 };
 
 const cardClass =
@@ -52,6 +55,7 @@ export function DepartmentAuditSection({
   catalog,
   onCatalogChange,
   auditedBy,
+  activeSpecialist,
 }: Props) {
   const meta = departmentMeta(department);
   const skuInputRef = useRef<HTMLInputElement>(null);
@@ -69,6 +73,7 @@ export function DepartmentAuditSection({
   const [scanFlash, setScanFlash] = useState(false);
   const [quickAddBarcode, setQuickAddBarcode] = useState<string | null>(null);
   const [simsFinderOpen, setSimsFinderOpen] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
 
   const simsSuggestions = useMemo(
     () => [
@@ -253,10 +258,22 @@ export function DepartmentAuditSection({
         catalog={catalog}
         audits={audits}
       />
+      <AuditReportModal
+        open={reportOpen}
+        onClose={() => {
+          setReportOpen(false);
+          focusSkuInput();
+        }}
+        kind="department"
+        departmentLabel={meta.label}
+        audits={displayShift.length > 0 ? displayShift : shiftAudits}
+        specialist={activeSpecialist}
+        auditedBy={auditedBy}
+      />
 
       <section
         aria-label={`${meta.label} shift summary`}
-        className="rounded-2xl border border-slate-800 bg-slate-900/90 px-3 py-2 shadow-lg shadow-black/20"
+        className="space-y-2 rounded-2xl border border-slate-800 bg-slate-900/90 px-3 py-2 shadow-lg shadow-black/20"
       >
         <p className="truncate font-mono text-xs font-semibold tabular-nums text-slate-200 sm:text-sm">
           {meta.icon} {loaded ? displayShift.length : "—"} Logged
@@ -265,6 +282,13 @@ export function DepartmentAuditSection({
           <span className="text-slate-500"> · </span>
           {meta.description}
         </p>
+        <button
+          type="button"
+          onClick={() => setReportOpen(true)}
+          className="flex h-11 w-full items-center justify-center rounded-xl border border-emerald-500/40 bg-emerald-950/40 px-3 text-sm font-bold text-emerald-200 active:scale-[0.98]"
+        >
+          📊 Export / Print Report
+        </button>
       </section>
 
       {statusMsg ? (

@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { QuickAddCatalogModal } from "@/components/barcode/QuickAddCatalogModal";
 import { SimsLocationFinder } from "@/components/catalog/SimsLocationFinder";
 import { NumberField, TextField } from "@/components/ui/NumberField";
+import { AuditReportModal } from "@/components/hub/AuditReportModal";
 import { PinKeypadModal } from "@/components/hub/PinKeypadModal";
 import {
   resolveScan,
@@ -149,6 +150,7 @@ export function CycleAuditSection({
   const [pinForDiscrepancy, setPinForDiscrepancy] = useState(false);
   const [draftRestored, setDraftRestored] = useState(false);
   const [summaryExpanded, setSummaryExpanded] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
   const [simsFinderOpen, setSimsFinderOpen] = useState(false);
   const [undoToast, setUndoToast] = useState<{
     id: string;
@@ -655,6 +657,18 @@ export function CycleAuditSection({
           focusSkuInput();
         }}
       />
+      <AuditReportModal
+        open={reportOpen}
+        onClose={() => {
+          setReportOpen(false);
+          focusSkuInput();
+        }}
+        kind="flooring"
+        departmentLabel="Flooring"
+        audits={shiftAudits.length > 0 ? shiftAudits : audits}
+        specialist={activeSpecialist}
+        auditedBy={auditedBy}
+      />
 
       {undoToast ? (
         <div
@@ -749,6 +763,13 @@ export function CycleAuditSection({
                 Export CSV
               </button>
             </div>
+            <button
+              type="button"
+              onClick={() => setReportOpen(true)}
+              className="flex h-12 w-full items-center justify-center rounded-xl border border-emerald-500/40 bg-emerald-950/40 px-3 text-sm font-bold text-emerald-200 active:scale-[0.98]"
+            >
+              📊 Export / Print Report
+            </button>
           </div>
         ) : null}
       </section>

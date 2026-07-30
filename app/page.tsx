@@ -326,6 +326,7 @@ export default function DeptSyncHubPage() {
               catalog={catalog}
               onCatalogChange={setCatalog}
               auditedBy={specialist?.name ?? ""}
+              activeSpecialist={specialist}
             />
           )}
         {section === "department" &&
@@ -336,6 +337,7 @@ export default function DeptSyncHubPage() {
               catalog={catalog}
               onCatalogChange={setCatalog}
               auditedBy={specialist?.name ?? ""}
+              activeSpecialist={specialist}
             />
           )}
         {section === "settings" && canAccessSection(specialist, "settings") && (

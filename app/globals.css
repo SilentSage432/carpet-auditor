@@ -73,3 +73,69 @@ input[type="number"] {
   animation: pin-shake 0.4s ease-in-out;
 }
 
+/* Printable audit report — crisp B&W on letter paper */
+@media print {
+  @page {
+    size: letter;
+    margin: 0.5in;
+  }
+
+  html,
+  body {
+    background: #fff !important;
+    background-image: none !important;
+    color: #000 !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+  }
+
+  body * {
+    visibility: hidden;
+  }
+
+  #audit-report-print-area,
+  #audit-report-print-area * {
+    visibility: visible;
+  }
+
+  #audit-report-print-area {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    background: #fff !important;
+    color: #000 !important;
+    padding: 0 !important;
+  }
+
+  .no-print {
+    display: none !important;
+    visibility: hidden !important;
+  }
+
+  .audit-report-print,
+  .audit-report-print * {
+    color: #000 !important;
+    background: #fff !important;
+    box-shadow: none !important;
+    text-shadow: none !important;
+  }
+
+  .audit-report-table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+  }
+
+  .audit-report-table th,
+  .audit-report-table td {
+    border: 1px solid #000 !important;
+    padding: 4px 6px !important;
+    font-size: 9pt !important;
+  }
+
+  .audit-report-table thead th {
+    font-weight: 700 !important;
+    background: #fff !important;
+  }
+}
+

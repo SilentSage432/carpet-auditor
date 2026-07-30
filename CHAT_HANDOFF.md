@@ -52,3 +52,8 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 
 ## Remnants / markdown
 - Aging badges; 60+ or elevated role → Apply Manager Markdown
+
+## Audit Report Export
+- Shift summary → **📊 Export / Print Report** (Flooring, Appliances, Department)
+- `AuditReportModal` + `lib/audit-report.ts`: formal SIMS/cycle summary, print-to-PDF, mailto / `navigator.share`, Markdown clipboard paste
+- Print stylesheet strips hub chrome for letter B&W output

@@ -1,5 +1,15 @@
 # DeptSync Hub — Development Journal
 
+## 2026-07-30 — Audit Report Exporter & Printable Email Engine
+
+### Shipped
+- `lib/audit-report.ts` — report composition (metrics, sort by SIMS bay, email body, Markdown clipboard, mailto / Web Share).
+- `components/hub/AuditReportModal.tsx` — formal printable inventory report with Print / Save PDF, Send via Email, Copy Formatted Summary.
+- Export / Print Report action on Flooring (Cycle) shift summary, Appliances shift card, and generic Department shift cards.
+- Print CSS in `globals.css` (`@media print`) strips chrome/nav/actions and renders high-contrast letter-size B&W tables.
+
+---
+
 ## 2026-07-30 — Master Admin Team & Department Roster Manager
 
 ### Shipped

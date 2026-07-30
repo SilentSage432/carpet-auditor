@@ -13,7 +13,9 @@ components/barcode/QuickAddCatalogModal.tsx → Scan-to-catalog Quick-Add
 components/catalog/SimsLocationFinder.tsx   → SIMS location stock drawer
 components/sections/*             → Presentation per workspace section
 components/hub/AdminRosterManager.tsx → Master Admin team/department roster console
+components/hub/AuditReportModal.tsx → Printable / emailable / clipboard audit report
 components/sections/DepartmentAuditSection.tsx → Generic unit-count audit for non-flooring/appliance depts
+lib/audit-report.ts               → Audit report metrics + email/clipboard composition
 lib/rbac.ts                       → Department-scoped section / catalog visibility (compose only)
 lib/store.ts                      → Active store_number session
 lib/sync-queue.ts                 → Offline action queue + replay
@@ -48,6 +50,7 @@ supabase/schema.sql               → Tables + multi-category + SIMS + store_num
 | Remnant aging | `lib/aging.ts` |
 | Remnant inventory | `lib/remnants.ts` |
 | Audit log + draft | `lib/storage.ts` |
+| Audit report export / print / email | `lib/audit-report.ts`, `AuditReportModal` |
 
 ## Sections (role-filtered)
 
