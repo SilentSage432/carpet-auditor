@@ -1,5 +1,22 @@
 # DeptSync Hub — Development Journal
 
+## 2026-07-30 — Biometric login + password manager autocomplete
+
+### Shipped
+- Login/setup/unlock forms: `method="post"`, `name` + `autocomplete` (`username` / `current-password`) for native OS keychain save prompts.
+- `lib/biometric-auth.ts` — WebAuthn platform authenticator register/get; credential id stored in `deptsync_biometric_credential`.
+- AuthWall: post-login “Enable Fingerprint / Touch ID” banner; returning “👆 Login with Fingerprint / Touch ID” when a passkey exists.
+
+---
+
+## 2026-07-30 — Login field cleanup + password eye toggle
+
+### Shipped
+- AuthWall login/setup/unlock: removed all username/password placeholder hints (empty fields on load).
+- `TextField` `passwordToggle` — inline eye / eye-off SVG (no icon package) reveals or obscures password with aria-label + 44px touch target.
+
+---
+
 ## 2026-07-30 — Soft-delete specialist roster (fix revive-after-delete)
 
 ### Shipped

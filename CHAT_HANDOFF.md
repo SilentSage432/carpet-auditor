@@ -34,9 +34,11 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 ## Authentication (Zero-Access Wall)
 - Unauthenticated visitors never see workspace tabs/data — `AuthWall` only
 - Login: username + password/PIN → roster match (`findSpecialistByLogin`)
+- Native keychain: form `autocomplete` username / current-password
+- Biometric: WebAuthn platform authenticator (`lib/biometric-auth.ts`); optional enroll after login; fingerprint unlock button when registered
 - `must_change_credentials` → non-dismissible permanent credential setup
 - Session: `deptsync_auth_session` (`specialist`, `sessionToken`, `lastActiveTimestamp`); 8h idle lock
-- Returning unlock: quick 4-digit PIN or password; header 🔒 logs out
+- Returning unlock: quick 4-digit PIN, password, or fingerprint; header 🔒 logs out
 - Seeds: `master_admin` / `1234`, `flooring_supervisor` / `1234`, `amber_appliance` / `ChangeMe123` (must change)
 - Primary: fixed bottom tabs — **filtered by role/department**
 - Header: DeptSync Hub brand + `DeptSync · Lowe's #…` subtitle · section title · network; specialist chip + PIN gear

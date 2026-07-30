@@ -4,6 +4,7 @@ import {
   useCallback,
   useEffect,
   useRef,
+  useState,
   type KeyboardEvent,
   type ReactNode,
   type Ref,
@@ -251,7 +252,49 @@ type TextFieldProps = {
   autoFocus?: boolean;
   type?: "text" | "password";
   autoComplete?: string;
+  /** Native password-manager / keychain field name. */
+  name?: string;
+  id?: string;
+  /** Show an eye toggle to reveal/hide password text. */
+  passwordToggle?: boolean;
 } & ScanCapableProps;
+
+function EyeIcon({ open }: { open: boolean }) {
+  if (open) {
+    return (
+      <svg
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        className="h-5 w-5"
+        aria-hidden
+      >
+        <path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94" />
+        <path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19" />
+        <path d="M14.12 14.12a3 3 0 1 1-4.24-4.24" />
+        <line x1="1" y1="1" x2="23" y2="23" />
+      </svg>
+    );
+  }
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="h-5 w-5"
+      aria-hidden
+    >
+      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  );
+}
 
 export function TextField({
   value,
@@ -269,8 +312,12 @@ export function TextField({
   autoFocus,
   type = "text",
   autoComplete = "off",
+  name,
+  id,
+  passwordToggle = false,
 }: TextFieldProps) {
   const localRef = useRef<HTMLInputElement | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
   const getCurrentValue = useCallback(
     () => localRef.current?.value ?? value,
     [value]
@@ -279,6 +326,9 @@ export function TextField({
     onScanCommit,
     getCurrentValue
   );
+
+  const canToggle = passwordToggle && type === "password";
+  const inputType = canToggle && showPassword ? "text" : type;
 
   const input = (
     <div className="relative">
@@ -292,7 +342,9 @@ export function TextField({
           localRef.current = node;
           assignRef(inputRef, node);
         }}
-        type={type}
+        type={inputType}
+        name={name}
+        id={id}
         autoComplete={autoComplete}
         autoFocus={autoFocus}
         data-barcode-scan={onScanCommit ? "true" : undefined}
@@ -309,11 +361,25 @@ export function TextField({
         }}
         onKeyDown={onScanCommit ? onKeyDown : undefined}
         className={`${baseInput} ${leftIcon ? "pl-11" : ""} ${
+          canToggle ? "pr-12" : ""
+        } ${
           flash
             ? "border-emerald-400 ring-2 ring-emerald-400/50 shadow-[0_0_20px_-4px_rgba(16,185,129,0.7)]"
             : ""
         } ${inputClassName ?? ""}`}
       />
+      {canToggle ? (
+        <button
+          type="button"
+          tabIndex={0}
+          aria-label={showPassword ? "Hide password" : "Show password"}
+          aria-pressed={showPassword}
+          onClick={() => setShowPassword((v) => !v)}
+          className="absolute inset-y-0 right-1 flex w-11 items-center justify-center rounded-lg text-slate-400 transition active:scale-95 active:bg-slate-800 hover:text-slate-200"
+        >
+          <EyeIcon open={showPassword} />
+        </button>
+      ) : null}
     </div>
   );
 

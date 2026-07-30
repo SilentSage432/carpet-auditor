@@ -37,6 +37,7 @@
 - [x] Soft keyboard tap-to-type + global hardware barcode scanner (no focus on tab switch)
 - [x] Zero-Access Authentication Wall (login / setup / PIN unlock / 8h idle lock)
 - [x] Soft-delete roster deactivation (`is_active`) — no revive after Master Admin delete
+- [x] Biometric WebAuthn login + OS password-manager autocomplete on AuthWall
 
 ## Next
 - [ ] JWT / claim-based RLS enforcing `store_number` (+ department) server-side

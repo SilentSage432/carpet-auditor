@@ -16,6 +16,7 @@ components/catalog/SimsLocationFinder.tsx   → SIMS location stock drawer
 components/sections/*             → Presentation per workspace section
 components/sections/DepartmentAuditSection.tsx → Generic unit-count audit for non-flooring/appliance depts
 lib/auth-session.ts               → Auth session token + inactivity lock
+lib/biometric-auth.ts             → WebAuthn fingerprint / Face ID register + assert
 lib/audit-report.ts               → Audit report metrics + email/clipboard composition
 lib/hardware-scanner.ts           → Window-level Bluetooth/wedge barcode burst listener
 lib/rbac.ts                       → Department-scoped section / catalog visibility (compose only)
@@ -49,6 +50,7 @@ supabase/schema.sql               → Tables + multi-category + SIMS + store_num
 | SIMS location stock | `lib/sims.ts`, `SimsLocationFinder` |
 | Specialists session / credentials | `lib/specialists.ts`, `SpecialistModal` |
 | Zero-access auth wall / idle lock | `lib/auth-session.ts`, `components/auth/AuthWall.tsx` |
+| Biometric / WebAuthn unlock | `lib/biometric-auth.ts`, `AuthWall` |
 | PIN change / default notice | `ChangePinModal` |
 | Manager markdown | `lib/markdown.ts`, `ApplyMarkdownModal` |
 | Variance | `lib/variance.ts` |
