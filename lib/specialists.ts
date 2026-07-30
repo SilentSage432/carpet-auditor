@@ -37,7 +37,7 @@ function flooringSupervisorSeed(store = getStoreNumber()): StoreSpecialist {
     name: "Flooring Supervisor",
     role: "Supervisor",
     pin_code: DEFAULT_SUPERVISOR_PIN,
-    username: null,
+    username: "flooring_supervisor",
     assigned_department: "flooring",
     must_change_credentials: false,
     created_at: new Date(0).toISOString(),
@@ -132,7 +132,7 @@ function normalizeDepartment(raw: unknown, role: SpecialistRole): DepartmentScop
   return null;
 }
 
-function mapRow(row: Record<string, unknown>): StoreSpecialist {
+export function mapRow(row: Record<string, unknown>): StoreSpecialist {
   const pinRaw = row.pin_code;
   const pin =
     pinRaw == null || String(pinRaw).trim() === ""
@@ -410,6 +410,48 @@ export function verifyPin(member: StoreSpecialist, pin: string): boolean {
       ? member.pin_code.trim()
       : DEFAULT_SUPERVISOR_PIN;
   return pin === expected;
+}
+
+/** True when the member can unlock via a 4-digit PIN keypad. */
+export function hasQuickPin(member: StoreSpecialist): boolean {
+  const secret =
+    member.pin_code && member.pin_code.trim().length > 0
+      ? member.pin_code.trim()
+      : DEFAULT_SUPERVISOR_PIN;
+  return /^\d{4}$/.test(secret);
+}
+
+/**
+ * Username + password/PIN login against the store roster (local + Supabase-backed).
+ * Matches username (case-insensitive), Master Admin aliases, or display name.
+ */
+export function findSpecialistByLogin(
+  roster: StoreSpecialist[],
+  usernameRaw: string,
+  passwordRaw: string
+): StoreSpecialist | null {
+  const username = usernameRaw.trim().toLowerCase();
+  const password = passwordRaw.trim();
+  if (!username || !password) return null;
+
+  const aliases = new Set([username]);
+  if (username === "admin" || username === "master" || username === "masteradmin") {
+    aliases.add("master_admin");
+  }
+
+  const candidates = roster.filter((m) => {
+    const uname = m.username?.trim().toLowerCase() ?? "";
+    const name = m.name.trim().toLowerCase();
+    if (uname && aliases.has(uname)) return true;
+    if (aliases.has(name)) return true;
+    if (aliases.has(name.replace(/\s+/g, "_"))) return true;
+    return false;
+  });
+
+  for (const member of candidates) {
+    if (verifyPin(member, password)) return member;
+  }
+  return null;
 }
 
 export function roleBadge(member: StoreSpecialist): string {

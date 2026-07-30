@@ -1,5 +1,16 @@
 # DeptSync Hub — Development Journal
 
+## 2026-07-30 — Zero-Access Authentication Wall
+
+### Shipped
+- Non-dismissible `AuthWall` (`components/auth/AuthWall.tsx`) — full-screen blur gate; no Remind Later, ✕, or backdrop bypass.
+- Workspace chrome/tabs/data hidden until login, credential setup, or quick unlock succeeds.
+- Login: username + password/PIN against store roster (Amber temp → forced permanent credential setup).
+- `lib/auth-session.ts` — sessionToken + lastActiveTimestamp in localStorage; 8-hour inactivity lock; header 🔒 logout.
+- Returning session prompts quick 4-digit PIN (or password) unlock; Master Admin unlocks full-store tabs.
+
+---
+
 ## 2026-07-30 — Soft keyboard + global hardware scanner
 
 ### Shipped

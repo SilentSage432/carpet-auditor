@@ -1,9 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { AuthWall, type AuthWallMode } from "@/components/auth/AuthWall";
 import { ChangePinModal } from "@/components/hub/ChangePinModal";
-import { DefaultPinNotice } from "@/components/hub/DefaultPinNotice";
-import { FirstLoginCredentialsModal } from "@/components/hub/FirstLoginCredentialsModal";
 import { BottomNavBar, HubHeader } from "@/components/hub/HubChrome";
 import { SpecialistModal } from "@/components/hub/SpecialistModal";
 import { CatalogSection } from "@/components/sections/CatalogSection";
@@ -11,6 +10,15 @@ import { CycleAuditSection } from "@/components/sections/CycleAuditSection";
 import { ApplianceAuditSection } from "@/components/sections/ApplianceAuditSection";
 import { RemnantSection } from "@/components/sections/RemnantSection";
 import { SettingsSection } from "@/components/sections/SettingsSection";
+import { DepartmentAuditSection } from "@/components/sections/DepartmentAuditSection";
+import {
+  clearAuthSession,
+  isAuthSessionExpired,
+  readAuthSession,
+  startAuthSession,
+  touchAuthSession,
+  updateAuthSessionSpecialist,
+} from "@/lib/auth-session";
 import { blurActiveInput } from "@/lib/focus-input";
 import { fetchCatalog } from "@/lib/catalog";
 import { fetchRemnants } from "@/lib/remnants";
@@ -24,13 +32,8 @@ import {
 import {
   dedupeRoster,
   fetchSpecialists,
-  getActiveSpecialist,
-  isDefaultPin,
   needsCredentialSetup,
-  setActiveSpecialist,
-  setPinRemindLater,
   syncActiveSpecialistFromRoster,
-  wasPinRemindLater,
 } from "@/lib/specialists";
 import { getStoreNumber, STORE_CHANGED_EVENT } from "@/lib/store";
 import { flushSyncQueue } from "@/lib/sync-queue";
@@ -40,66 +43,71 @@ import type {
   Remnant,
   StoreSpecialist,
 } from "@/lib/types";
-import { DepartmentAuditSection } from "@/components/sections/DepartmentAuditSection";
+
+type Gate = "booting" | AuthWallMode | "ready";
 
 export default function DeptSyncHubPage() {
   const [section, setSection] = useState<HubSection>("audit");
   const [catalog, setCatalog] = useState<CatalogItem[]>([]);
   const [remnants, setRemnants] = useState<Remnant[]>([]);
   const [specialist, setSpecialist] = useState<StoreSpecialist | null>(null);
-  const [specialistOpen, setSpecialistOpen] = useState(false);
   const [specialists, setSpecialists] = useState<StoreSpecialist[]>([]);
-  const [defaultPinNotice, setDefaultPinNotice] = useState(false);
+  const [specialistOpen, setSpecialistOpen] = useState(false);
   const [changePinOpen, setChangePinOpen] = useState(false);
-  const [credentialSetupOpen, setCredentialSetupOpen] = useState(false);
   const [pinToast, setPinToast] = useState(false);
   const [syncToast, setSyncToast] = useState<string | null>(null);
   const [storeNumber, setStoreNumberState] = useState(() =>
     typeof window === "undefined" ? "1234" : getStoreNumber()
   );
+  const [gate, setGate] = useState<Gate>("booting");
+  const [rosterReady, setRosterReady] = useState(false);
 
-  function applyActiveFromRoster(roster: StoreSpecialist[]) {
-    const matched = syncActiveSpecialistFromRoster(roster);
-    if (matched) {
-      setSpecialist(matched);
-      setSection((prev) =>
-        canAccessSection(matched, prev) ? prev : defaultSectionForMember(matched)
-      );
-      if (needsCredentialSetup(matched)) {
-        setCredentialSetupOpen(true);
-        setDefaultPinNotice(false);
-      } else if (isDefaultPin(matched) && !wasPinRemindLater(matched.id)) {
-        setDefaultPinNotice(true);
-        setCredentialSetupOpen(false);
-      } else {
-        setDefaultPinNotice(false);
-        setCredentialSetupOpen(false);
-      }
+  const unlockWorkspace = useCallback((member: StoreSpecialist) => {
+    setSpecialist(member);
+    setSection(defaultSectionForMember(member));
+    if (needsCredentialSetup(member)) {
+      setGate("setup");
       return;
     }
-    const saved = getActiveSpecialist();
-    if (saved) {
-      setSpecialist(saved);
-      setSection((prev) =>
-        canAccessSection(saved, prev) ? prev : defaultSectionForMember(saved)
-      );
-      if (needsCredentialSetup(saved)) {
-        setCredentialSetupOpen(true);
-        setDefaultPinNotice(false);
-      } else if (isDefaultPin(saved) && !wasPinRemindLater(saved.id)) {
-        setDefaultPinNotice(true);
-        setCredentialSetupOpen(false);
-      } else {
-        setDefaultPinNotice(false);
-        setCredentialSetupOpen(false);
-      }
-      return;
-    }
+    setGate("ready");
+  }, []);
+
+  const lockToUnlock = useCallback((member: StoreSpecialist) => {
+    setSpecialist(member);
+    setGate("unlock");
+  }, []);
+
+  const requireLogin = useCallback(() => {
+    clearAuthSession();
     setSpecialist(null);
-    setSpecialistOpen(true);
-    setDefaultPinNotice(false);
-    setCredentialSetupOpen(false);
-  }
+    setGate("login");
+  }, []);
+
+  const resolveGateFromSession = useCallback(
+    (roster: StoreSpecialist[]) => {
+      const session = readAuthSession();
+      if (!session || isAuthSessionExpired(session)) {
+        clearAuthSession();
+        setSpecialist(null);
+        setGate("login");
+        return;
+      }
+
+      const matched =
+        syncActiveSpecialistFromRoster(roster) ?? session.specialist;
+      updateAuthSessionSpecialist(matched);
+
+      if (needsCredentialSetup(matched)) {
+        setSpecialist(matched);
+        setGate("setup");
+        return;
+      }
+
+      // Valid remembered session → quick PIN / password unlock (zero trust on load).
+      lockToUnlock(matched);
+    },
+    [lockToUnlock]
+  );
 
   const loadStoreData = useCallback(async () => {
     const [cat, rem, team] = await Promise.all([
@@ -111,42 +119,32 @@ export default function DeptSyncHubPage() {
     setCatalog(cat);
     setRemnants(rem);
     setSpecialists(roster);
-    applyActiveFromRoster(roster);
+    setRosterReady(true);
+    return roster;
   }, []);
 
   useEffect(() => {
     let cancelled = false;
     void (async () => {
-      const [cat, rem, team] = await Promise.all([
-        fetchCatalog(),
-        fetchRemnants(),
-        fetchSpecialists(),
-      ]);
+      const roster = await loadStoreData();
       if (cancelled) return;
-      const roster = dedupeRoster(team);
-      setCatalog(cat);
-      setRemnants(rem);
-      setSpecialists(roster);
-      applyActiveFromRoster(roster);
+      resolveGateFromSession(roster);
     })();
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [loadStoreData, resolveGateFromSession]);
 
   useEffect(() => {
     function onStoreChanged(event: Event) {
       const detail = (event as CustomEvent<string>).detail;
       setStoreNumberState(detail || getStoreNumber());
-      setActiveSpecialist(null);
-      setSpecialist(null);
-      setDefaultPinNotice(false);
-      setCredentialSetupOpen(false);
+      requireLogin();
       void loadStoreData();
     }
     window.addEventListener(STORE_CHANGED_EVENT, onStoreChanged);
     return () => window.removeEventListener(STORE_CHANGED_EVENT, onStoreChanged);
-  }, [loadStoreData]);
+  }, [loadStoreData, requireLogin]);
 
   useEffect(() => {
     async function onOnline() {
@@ -166,60 +164,127 @@ export default function DeptSyncHubPage() {
     return () => window.removeEventListener("online", onOnline);
   }, [loadStoreData]);
 
+  // Inactivity watchdog — lock after 8h idle while unlocked.
+  useEffect(() => {
+    if (gate !== "ready") return;
+
+    function onActivity() {
+      const next = touchAuthSession();
+      if (!next) {
+        const session = readAuthSession();
+        if (session?.specialist) lockToUnlock(session.specialist);
+        else requireLogin();
+      }
+    }
+
+    const events = ["pointerdown", "keydown", "touchstart", "visibilitychange"] as const;
+    for (const evt of events) {
+      window.addEventListener(evt, onActivity, { passive: true });
+    }
+
+    const timer = window.setInterval(() => {
+      const session = readAuthSession();
+      if (!session || isAuthSessionExpired(session)) {
+        if (session?.specialist) {
+          lockToUnlock(session.specialist);
+        } else {
+          requireLogin();
+        }
+      }
+    }, 60_000);
+
+    return () => {
+      for (const evt of events) {
+        window.removeEventListener(evt, onActivity);
+      }
+      window.clearInterval(timer);
+    };
+  }, [gate, lockToUnlock, requireLogin]);
+
   useEffect(() => {
     document.body.style.overflow =
-      specialistOpen || changePinOpen || credentialSetupOpen ? "hidden" : "";
+      gate !== "ready" || specialistOpen || changePinOpen ? "hidden" : "";
     return () => {
       document.body.style.overflow = "";
     };
-  }, [specialistOpen, changePinOpen, credentialSetupOpen]);
+  }, [gate, specialistOpen, changePinOpen]);
 
   function upsertSpecialist(member: StoreSpecialist) {
     setSpecialists((prev) => dedupeRoster([member, ...prev]));
   }
 
-  function handleSelectSpecialist(
-    member: StoreSpecialist,
-    meta?: { usedDefaultPin: boolean }
-  ) {
-    setSpecialist(member);
-    setActiveSpecialist(member);
+  function handleAuthenticated(member: StoreSpecialist) {
     upsertSpecialist(member);
-    setSection(defaultSectionForMember(member));
+    startAuthSession(member);
+    unlockWorkspace(member);
+  }
 
-    if (needsCredentialSetup(member)) {
-      setCredentialSetupOpen(true);
-      setDefaultPinNotice(false);
-      return;
-    }
-
-    const showNotice =
-      (meta?.usedDefaultPin || isDefaultPin(member)) &&
-      !wasPinRemindLater(member.id);
-    setDefaultPinNotice(Boolean(showNotice));
-    setCredentialSetupOpen(false);
+  function handleSelectSpecialist(member: StoreSpecialist) {
+    upsertSpecialist(member);
+    startAuthSession(member);
+    unlockWorkspace(member);
+    setSpecialistOpen(false);
   }
 
   function handleSpecialistUpdated(member: StoreSpecialist) {
-    setSpecialist(member);
-    setActiveSpecialist(member);
     upsertSpecialist(member);
-    setDefaultPinNotice(false);
-    setCredentialSetupOpen(false);
+    updateAuthSessionSpecialist(member);
+    setSpecialist(member);
     setChangePinOpen(false);
+    if (needsCredentialSetup(member)) {
+      setGate("setup");
+      return;
+    }
+    setGate("ready");
     setPinToast(true);
     window.setTimeout(() => setPinToast(false), 2500);
   }
 
+  function handleLogout() {
+    requireLogin();
+    setSpecialistOpen(false);
+    setChangePinOpen(false);
+  }
+
   function handleSectionSelect(next: HubSection) {
     if (!canAccessSection(specialist, next)) return;
-    // Dismiss soft keyboard on tab switch — never auto-focus the next section.
     blurActiveInput();
+    touchAuthSession();
     setSection(next);
   }
 
   const catalogDomain = catalogDomainForMember(specialist);
   const dept = effectiveDepartment(specialist);
+  const authenticated = gate === "ready" && specialist != null;
+
+  // Zero-access wall — hide all workspace chrome until auth succeeds.
+  if (gate === "booting" || !rosterReady) {
+    return (
+      <div className="flex min-h-dvh items-center justify-center bg-slate-950 px-4">
+        <p className="text-sm font-semibold text-slate-400">
+          Loading DeptSync secure session…
+        </p>
+      </div>
+    );
+  }
+
+  if (gate === "login" || gate === "setup" || gate === "unlock") {
+    return (
+      <AuthWall
+        mode={gate}
+        roster={specialists}
+        member={specialist}
+        onAuthenticated={handleAuthenticated}
+        onRequestFullLogin={
+          gate === "unlock"
+            ? () => {
+                requireLogin();
+              }
+            : undefined
+        }
+      />
+    );
+  }
 
   return (
     <div className="flex min-h-dvh flex-col">
@@ -228,46 +293,21 @@ export default function DeptSyncHubPage() {
         specialist={specialist}
         onOpenSpecialist={() => setSpecialistOpen(true)}
         onChangePin={specialist ? () => setChangePinOpen(true) : undefined}
+        onLogout={handleLogout}
         storeNumber={storeNumber}
       />
       <SpecialistModal
-        open={specialistOpen && !credentialSetupOpen}
+        open={specialistOpen}
         active={specialist}
         onClose={() => setSpecialistOpen(false)}
         onSelect={handleSelectSpecialist}
       />
       <ChangePinModal
         key={changePinOpen ? `change-pin-${specialist?.id}` : "change-pin-closed"}
-        open={changePinOpen && !credentialSetupOpen}
+        open={changePinOpen}
         member={specialist}
         onClose={() => setChangePinOpen(false)}
         onUpdated={handleSpecialistUpdated}
-      />
-      <FirstLoginCredentialsModal
-        key={
-          credentialSetupOpen
-            ? `first-login-${specialist?.id}`
-            : "first-login-closed"
-        }
-        open={credentialSetupOpen}
-        member={specialist}
-        onUpdated={handleSpecialistUpdated}
-      />
-      <DefaultPinNotice
-        open={
-          defaultPinNotice &&
-          !changePinOpen &&
-          !specialistOpen &&
-          !credentialSetupOpen
-        }
-        onSetNewPin={() => {
-          setDefaultPinNotice(false);
-          setChangePinOpen(true);
-        }}
-        onRemindLater={() => {
-          if (specialist) setPinRemindLater(specialist.id);
-          setDefaultPinNotice(false);
-        }}
       />
 
       {pinToast && (
@@ -288,81 +328,87 @@ export default function DeptSyncHubPage() {
         </p>
       )}
 
-      <div
-        className={`mx-auto w-full max-w-md flex-1 overflow-x-hidden px-4 py-4 ${
-          section === "audit" ||
-          section === "appliances" ||
-          section === "department"
-            ? "pb-44"
-            : "pb-32"
-        }`}
-      >
-        {section === "audit" && canAccessSection(specialist, "audit") && (
-          <CycleAuditSection
-            catalog={catalog}
-            onCatalogChange={setCatalog}
-            auditedBy={specialist?.name ?? ""}
-            specialists={specialists}
-            activeSpecialist={specialist}
-          />
-        )}
-        {section === "catalog" && canAccessSection(specialist, "catalog") && (
-          <CatalogSection
-            catalog={catalog}
-            onCatalogChange={setCatalog}
-            domainFilter={catalogDomain}
-          />
-        )}
-        {section === "remnants" && canAccessSection(specialist, "remnants") && (
-          <RemnantSection
-            catalog={catalog}
-            remnants={remnants}
-            onRemnantsChange={setRemnants}
-            loggedBy={specialist?.name ?? ""}
-            specialists={specialists}
-            activeSpecialist={specialist}
-          />
-        )}
-        {section === "appliances" &&
-          canAccessSection(specialist, "appliances") && (
-            <ApplianceAuditSection
-              catalog={catalog}
-              onCatalogChange={setCatalog}
-              auditedBy={specialist?.name ?? ""}
-              activeSpecialist={specialist}
-            />
-          )}
-        {section === "department" &&
-          canAccessSection(specialist, "department") &&
-          isGenericDepartment(dept) && (
-            <DepartmentAuditSection
-              department={dept}
-              catalog={catalog}
-              onCatalogChange={setCatalog}
-              auditedBy={specialist?.name ?? ""}
-              activeSpecialist={specialist}
-            />
-          )}
-        {section === "settings" && canAccessSection(specialist, "settings") && (
-          <SettingsSection
-            catalogCount={catalog.length}
-            remnantCount={remnants.length}
-            activeSpecialist={specialist}
-            specialists={specialists}
-            onSpecialistUpdated={handleSpecialistUpdated}
-            onRosterChange={(roster) => setSpecialists(dedupeRoster(roster))}
-            onOpenChangePin={() => setChangePinOpen(true)}
-            storeNumber={storeNumber}
-            onStoreNumberChange={setStoreNumberState}
-          />
-        )}
-      </div>
+      {authenticated ? (
+        <>
+          <div
+            className={`mx-auto w-full max-w-md flex-1 overflow-x-hidden px-4 py-4 ${
+              section === "audit" ||
+              section === "appliances" ||
+              section === "department"
+                ? "pb-44"
+                : "pb-32"
+            }`}
+          >
+            {section === "audit" && canAccessSection(specialist, "audit") && (
+              <CycleAuditSection
+                catalog={catalog}
+                onCatalogChange={setCatalog}
+                auditedBy={specialist?.name ?? ""}
+                specialists={specialists}
+                activeSpecialist={specialist}
+              />
+            )}
+            {section === "catalog" && canAccessSection(specialist, "catalog") && (
+              <CatalogSection
+                catalog={catalog}
+                onCatalogChange={setCatalog}
+                domainFilter={catalogDomain}
+              />
+            )}
+            {section === "remnants" &&
+              canAccessSection(specialist, "remnants") && (
+                <RemnantSection
+                  catalog={catalog}
+                  remnants={remnants}
+                  onRemnantsChange={setRemnants}
+                  loggedBy={specialist?.name ?? ""}
+                  specialists={specialists}
+                  activeSpecialist={specialist}
+                />
+              )}
+            {section === "appliances" &&
+              canAccessSection(specialist, "appliances") && (
+                <ApplianceAuditSection
+                  catalog={catalog}
+                  onCatalogChange={setCatalog}
+                  auditedBy={specialist?.name ?? ""}
+                  activeSpecialist={specialist}
+                />
+              )}
+            {section === "department" &&
+              canAccessSection(specialist, "department") &&
+              isGenericDepartment(dept) && (
+                <DepartmentAuditSection
+                  department={dept}
+                  catalog={catalog}
+                  onCatalogChange={setCatalog}
+                  auditedBy={specialist?.name ?? ""}
+                  activeSpecialist={specialist}
+                />
+              )}
+            {section === "settings" &&
+              canAccessSection(specialist, "settings") && (
+                <SettingsSection
+                  catalogCount={catalog.length}
+                  remnantCount={remnants.length}
+                  activeSpecialist={specialist}
+                  specialists={specialists}
+                  onSpecialistUpdated={handleSpecialistUpdated}
+                  onRosterChange={(roster) => setSpecialists(dedupeRoster(roster))}
+                  onOpenChangePin={() => setChangePinOpen(true)}
+                  storeNumber={storeNumber}
+                  onStoreNumberChange={setStoreNumberState}
+                />
+              )}
+          </div>
 
-      <BottomNavBar
-        active={section}
-        onSelect={handleSectionSelect}
-        specialist={specialist}
-      />
+          <BottomNavBar
+            active={section}
+            onSelect={handleSectionSelect}
+            specialist={specialist}
+          />
+        </>
+      ) : null}
     </div>
   );
 }

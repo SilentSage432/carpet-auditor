@@ -14,6 +14,7 @@ type HubHeaderProps = {
   specialist: StoreSpecialist | null;
   onOpenSpecialist: () => void;
   onChangePin?: () => void;
+  onLogout?: () => void;
   storeNumber?: string;
 };
 
@@ -22,6 +23,7 @@ export function HubHeader({
   specialist,
   onOpenSpecialist,
   onChangePin,
+  onLogout,
   storeNumber,
 }: HubHeaderProps) {
   const network = useNetworkBadge();
@@ -60,12 +62,12 @@ export function HubHeader({
             </span>
           </p>
         </div>
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="flex shrink-0 items-center gap-1.5">
           <button
             type="button"
             onClick={onOpenSpecialist}
-            className="flex h-12 max-w-[9.5rem] items-center gap-1.5 rounded-xl border border-emerald-500/30 bg-emerald-950/40 px-2.5 text-left transition active:scale-95"
-            aria-label="Select active specialist"
+            className="flex h-12 max-w-[8.5rem] items-center gap-1.5 rounded-xl border border-emerald-500/30 bg-emerald-950/40 px-2.5 text-left transition active:scale-95"
+            aria-label="Switch active specialist"
           >
             <span aria-hidden>
               {specialist?.role === "MasterAdmin"
@@ -75,7 +77,7 @@ export function HubHeader({
                   : "👤"}
             </span>
             <span className="min-w-0 truncate text-xs font-semibold text-emerald-200">
-              {specialist ? specialist.name : "Select"}
+              {specialist ? specialist.name : "Locked"}
             </span>
           </button>
           {specialist && onChangePin ? (
@@ -84,9 +86,20 @@ export function HubHeader({
               onClick={onChangePin}
               aria-label="Change PIN"
               title="Change PIN"
-              className="flex h-12 w-12 items-center justify-center rounded-xl border border-slate-700 bg-slate-900 text-slate-100 transition active:scale-95"
+              className="flex h-12 w-11 items-center justify-center rounded-xl border border-slate-700 bg-slate-900 text-slate-100 transition active:scale-95"
             >
               ⚙️
+            </button>
+          ) : null}
+          {onLogout ? (
+            <button
+              type="button"
+              onClick={onLogout}
+              aria-label="Log out and lock DeptSync"
+              title="Log out"
+              className="flex h-12 w-11 items-center justify-center rounded-xl border border-red-500/40 bg-red-950/40 text-sm font-bold text-red-300 transition active:scale-95"
+            >
+              🔒
             </button>
           ) : null}
         </div>

@@ -26,11 +26,16 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 ### Departments
 `flooring` · `appliances` · `plumbing` · `electrical` · `lawn_garden` · `paint` · `millwork` · `building_materials` · `hardware` · `all`
 
-- Seeds: Master Admin (`master_admin` / `1234`), Flooring Supervisor (`1234`), Amber appliances (`amber_appliance` / `ChangeMe123`, `must_change_credentials: true`)
-- First-login: non-dismissible `FirstLoginCredentialsModal` when `must_change_credentials`
-- Password unlock when secret is non-numeric or username is set (`PinKeypadModal` mode)
+- Seeds: Master Admin (`master_admin` / `1234`), Flooring Supervisor (`flooring_supervisor` / `1234`), Amber appliances (`amber_appliance` / `ChangeMe123`, `must_change_credentials: true`)
+- First-login: non-dismissible AuthWall setup when `must_change_credentials` (no Remind Later)
 
-## Navigation & handheld chrome
+## Authentication (Zero-Access Wall)
+- Unauthenticated visitors never see workspace tabs/data — `AuthWall` only
+- Login: username + password/PIN → roster match (`findSpecialistByLogin`)
+- `must_change_credentials` → non-dismissible permanent credential setup
+- Session: `deptsync_auth_session` (`specialist`, `sessionToken`, `lastActiveTimestamp`); 8h idle lock
+- Returning unlock: quick 4-digit PIN or password; header 🔒 logs out
+- Seeds: `master_admin` / `1234`, `flooring_supervisor` / `1234`, `amber_appliance` / `ChangeMe123` (must change)
 - Primary: fixed bottom tabs — **filtered by role/department**
 - Header: DeptSync Hub brand + `DeptSync · Lowe's #…` subtitle · section title · network; specialist chip + PIN gear
 - Cycle Audit / Appliances: hardware-scan ready without soft keyboard; sticky Log docked above bottom nav

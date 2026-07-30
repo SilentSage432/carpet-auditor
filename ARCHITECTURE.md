@@ -7,14 +7,15 @@ app/manifest.ts                   → short_name DeptSync · Department & SIMS A
 public/sw.js                      → Offline shell cache strategies
 components/hub/HubChrome.tsx      → Sticky header (DeptSync badge + network) + role-filtered bottom nav
 components/hub/DeptSyncBadge.tsx  → Multi-department scanner/shield mark
-components/hub/FirstLoginCredentialsModal.tsx → Non-dismissible supervisor credential setup
+components/auth/AuthWall.tsx      → Non-dismissible login / setup / unlock gate
+components/hub/AdminRosterManager.tsx → Master Admin team/department roster console
+components/hub/AuditReportModal.tsx → Printable / emailable / clipboard audit report
 components/hub/*Modal.tsx         → Specialist / PIN / Markdown modals
 components/barcode/QuickAddCatalogModal.tsx → Scan-to-catalog Quick-Add
 components/catalog/SimsLocationFinder.tsx   → SIMS location stock drawer
 components/sections/*             → Presentation per workspace section
-components/hub/AdminRosterManager.tsx → Master Admin team/department roster console
-components/hub/AuditReportModal.tsx → Printable / emailable / clipboard audit report
 components/sections/DepartmentAuditSection.tsx → Generic unit-count audit for non-flooring/appliance depts
+lib/auth-session.ts               → Auth session token + inactivity lock
 lib/audit-report.ts               → Audit report metrics + email/clipboard composition
 lib/hardware-scanner.ts           → Window-level Bluetooth/wedge barcode burst listener
 lib/rbac.ts                       → Department-scoped section / catalog visibility (compose only)
@@ -46,8 +47,9 @@ supabase/schema.sql               → Tables + multi-category + SIMS + store_num
 | Hardware wedge (no soft keyboard) | `lib/hardware-scanner.ts` |
 | Focus / keyboard dismiss | `lib/focus-input.ts` (`blurActiveInput` — never auto-focus on tab switch) |
 | SIMS location stock | `lib/sims.ts`, `SimsLocationFinder` |
-| Specialists session / credentials | `lib/specialists.ts`, `SpecialistModal`, `FirstLoginCredentialsModal` |
-| PIN change / default notice | `ChangePinModal`, `DefaultPinNotice` |
+| Specialists session / credentials | `lib/specialists.ts`, `SpecialistModal` |
+| Zero-access auth wall / idle lock | `lib/auth-session.ts`, `components/auth/AuthWall.tsx` |
+| PIN change / default notice | `ChangePinModal` |
 | Manager markdown | `lib/markdown.ts`, `ApplyMarkdownModal` |
 | Variance | `lib/variance.ts` |
 | Remnant aging | `lib/aging.ts` |
