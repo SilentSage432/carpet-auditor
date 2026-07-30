@@ -16,7 +16,8 @@ export type SyncActionType =
   | "upsert_specialist"
   | "delete_audit"
   | "delete_catalog"
-  | "delete_remnant";
+  | "delete_remnant"
+  | "delete_specialist";
 
 export type SyncAction = {
   id: string;
@@ -199,6 +200,15 @@ async function replayAction(action: SyncAction): Promise<void> {
     case "delete_remnant": {
       const { error } = await supabase
         .from("carpet_remnants")
+        .delete()
+        .eq("id", entityId)
+        .eq("store_number", action.store_number);
+      if (error) throw error;
+      return;
+    }
+    case "delete_specialist": {
+      const { error } = await supabase
+        .from("store_specialists")
         .delete()
         .eq("id", entityId)
         .eq("store_number", action.store_number);

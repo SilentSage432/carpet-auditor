@@ -5,6 +5,7 @@ export type HubSection =
   | "catalog"
   | "remnants"
   | "appliances"
+  | "department"
   | "settings";
 
 /**
@@ -15,8 +16,129 @@ export type HubSection =
  */
 export type SpecialistRole = "Associate" | "Supervisor" | "MasterAdmin";
 
-/** Department workspace scope for RBAC. */
-export type DepartmentScope = "flooring" | "appliances" | "all";
+/** Standard Lowe's store departments + master full-store scope. */
+export const STORE_DEPARTMENTS = [
+  "flooring",
+  "appliances",
+  "plumbing",
+  "electrical",
+  "lawn_garden",
+  "paint",
+  "millwork",
+  "building_materials",
+  "hardware",
+  "all",
+] as const;
+
+export type DepartmentScope = (typeof STORE_DEPARTMENTS)[number];
+
+/** Operational departments (excludes master `all`). */
+export type OperationalDepartment = Exclude<DepartmentScope, "all">;
+
+export const OPERATIONAL_DEPARTMENTS: OperationalDepartment[] = [
+  "flooring",
+  "appliances",
+  "plumbing",
+  "electrical",
+  "lawn_garden",
+  "paint",
+  "millwork",
+  "building_materials",
+  "hardware",
+];
+
+export type DepartmentMeta = {
+  id: DepartmentScope;
+  icon: string;
+  label: string;
+  shortLabel: string;
+  description: string;
+};
+
+export const DEPARTMENT_META: Record<DepartmentScope, DepartmentMeta> = {
+  flooring: {
+    id: "flooring",
+    icon: "🧶",
+    label: "Flooring",
+    shortLabel: "Flooring",
+    description: "Flooring & SIMS Audit",
+  },
+  appliances: {
+    id: "appliances",
+    icon: "🔌",
+    label: "Appliances",
+    shortLabel: "Appliances",
+    description: "Appliances Inventory",
+  },
+  plumbing: {
+    id: "plumbing",
+    icon: "🚿",
+    label: "Plumbing",
+    shortLabel: "Plumbing",
+    description: "Plumbing & Fixtures",
+  },
+  electrical: {
+    id: "electrical",
+    icon: "💡",
+    label: "Electrical",
+    shortLabel: "Electrical",
+    description: "Electrical & Lighting",
+  },
+  lawn_garden: {
+    id: "lawn_garden",
+    icon: "🌿",
+    label: "Lawn & Garden",
+    shortLabel: "Lawn/Garden",
+    description: "Lawn & Garden / Outdoor",
+  },
+  paint: {
+    id: "paint",
+    icon: "🎨",
+    label: "Paint",
+    shortLabel: "Paint",
+    description: "Paint & Decor",
+  },
+  millwork: {
+    id: "millwork",
+    icon: "🚪",
+    label: "Millwork",
+    shortLabel: "Millwork",
+    description: "Doors & Windows",
+  },
+  building_materials: {
+    id: "building_materials",
+    icon: "🪵",
+    label: "Building Materials",
+    shortLabel: "Bldg Mat",
+    description: "Lumber & Building Materials",
+  },
+  hardware: {
+    id: "hardware",
+    icon: "🔧",
+    label: "Hardware",
+    shortLabel: "Hardware",
+    description: "Hardware & Tools",
+  },
+  all: {
+    id: "all",
+    icon: "👑",
+    label: "Full Store",
+    shortLabel: "All Depts",
+    description: "Master Admin — Full Store Access",
+  },
+};
+
+export function isDepartmentScope(raw: unknown): raw is DepartmentScope {
+  return (
+    typeof raw === "string" &&
+    (STORE_DEPARTMENTS as readonly string[]).includes(raw)
+  );
+}
+
+export function departmentMeta(id: DepartmentScope | null | undefined): DepartmentMeta {
+  if (id && isDepartmentScope(id)) return DEPARTMENT_META[id];
+  return DEPARTMENT_META.flooring;
+}
 
 /** Flooring / SIMS catalog categories. */
 export const FLOORING_CATEGORIES = [
@@ -293,6 +415,13 @@ export const HUB_SECTIONS: {
     title: "Appliances Audit",
     icon: "🔌",
     description: "Unit counts + appliance SIMS staging audits",
+  },
+  {
+    id: "department",
+    label: "Department Audit",
+    title: "Department Audit",
+    icon: "🏬",
+    description: "Unit-count SIMS audits for non-flooring departments",
   },
   {
     id: "settings",

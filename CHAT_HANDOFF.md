@@ -13,8 +13,16 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 | Role | Scope | Tabs |
 |------|-------|------|
 | 👑 Master Admin | `assigned_department: all` | Flooring Audit · Appliances · Universal Catalog · Remnants · Master Settings |
-| 🛡️ Department Supervisor | e.g. Amber → `appliances` | Appliances Audit · Appliance Catalog · Profile |
+| 🛡️ Department Supervisor | e.g. Amber → `appliances`, Dave → `plumbing` | Dept audit/catalog/profile (flooring also gets Remnants) |
 | 👤 Floor Associate | inherits / assigned dept | Same as department supervisor for that dept |
+
+### Master Admin roster console
+- Settings → **👥 Team & Department Roster Manager** (Master Admin only)
+- Add supervisor/associate with department, username suggest, temp password, first-login reset flag
+- Reset credentials / Edit scope / Delete; shareable issued-login card after create/reset
+
+### Departments
+`flooring` · `appliances` · `plumbing` · `electrical` · `lawn_garden` · `paint` · `millwork` · `building_materials` · `hardware` · `all`
 
 - Seeds: Master Admin (`master_admin` / `1234`), Flooring Supervisor (`1234`), Amber appliances (`amber_appliance` / `ChangeMe123`, `must_change_credentials: true`)
 - First-login: non-dismissible `FirstLoginCredentialsModal` when `must_change_credentials`

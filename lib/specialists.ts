@@ -4,6 +4,7 @@ import type {
   SpecialistRole,
   StoreSpecialist,
 } from "./types";
+import { departmentMeta } from "./types";
 import { getStoreNumber } from "./store";
 import { getSupabase } from "./supabase";
 import {
@@ -18,6 +19,7 @@ const TABLE = "store_specialists";
 export const DEFAULT_SUPERVISOR_PIN = "1234";
 export const DEFAULT_APPLIANCE_USERNAME = "amber_appliance";
 export const DEFAULT_APPLIANCE_PASSWORD = "ChangeMe123";
+export const DEFAULT_TEMP_PASSWORD = "ChangeMe123";
 
 const PLACEHOLDER_NAMES = new Set([
   "alex",
@@ -94,10 +96,38 @@ function normalizeRole(raw: unknown): SpecialistRole {
 }
 
 function normalizeDepartment(raw: unknown, role: SpecialistRole): DepartmentScope | null {
-  const value = String(raw ?? "").toLowerCase().trim();
-  if (value === "appliances" || value === "appliance") return "appliances";
-  if (value === "flooring" || value === "carpet") return "flooring";
-  if (value === "all" || value === "*") return "all";
+  const value = String(raw ?? "")
+    .toLowerCase()
+    .trim()
+    .replace(/[\s-]+/g, "_");
+  if (
+    value === "lawn_and_garden" ||
+    value === "lawn" ||
+    value === "garden" ||
+    value === "outdoor"
+  ) {
+    return "lawn_garden";
+  }
+  if (value === "bldg_materials" || value === "lumber" || value === "building") {
+    return "building_materials";
+  }
+  if (value === "appliance") return "appliances";
+  if (value === "carpet") return "flooring";
+  if (value === "*") return "all";
+  if (
+    value === "flooring" ||
+    value === "appliances" ||
+    value === "plumbing" ||
+    value === "electrical" ||
+    value === "lawn_garden" ||
+    value === "paint" ||
+    value === "millwork" ||
+    value === "building_materials" ||
+    value === "hardware" ||
+    value === "all"
+  ) {
+    return value;
+  }
   if (role === "MasterAdmin") return "all";
   return null;
 }
@@ -385,13 +415,11 @@ export function verifyPin(member: StoreSpecialist, pin: string): boolean {
 export function roleBadge(member: StoreSpecialist): string {
   if (member.role === "MasterAdmin") return "👑 Master Admin";
   if (member.role === "Supervisor") {
-    const dept =
-      member.assigned_department === "appliances"
-        ? "Appliances"
-        : member.assigned_department === "flooring"
-          ? "Flooring"
-          : "Department";
-    return `🛡️ ${dept} Supervisor`;
+    const dept = member.assigned_department;
+    if (dept && dept !== "all") {
+      return `🛡️ ${departmentMeta(dept).label} Supervisor`;
+    }
+    return "🛡️ Department Supervisor";
   }
   return "👤 Floor Associate";
 }
@@ -879,4 +907,95 @@ export function findSupervisor(
     roster.find((m) => m.role === "Supervisor" && !isFallbackProfileId(m.id)) ??
     roster.find((m) => m.role === "Supervisor")
   );
+}
+
+/** Reset to temporary password and force first-login credential change. */
+export async function resetSpecialistCredentials(
+  member: StoreSpecialist,
+  temporaryPassword = DEFAULT_TEMP_PASSWORD
+): Promise<{ record: StoreSpecialist; offline: boolean }> {
+  return persistSpecialistFields(member, {
+    pin_code: temporaryPassword,
+    must_change_credentials: true,
+  });
+}
+
+/** Update role / department scope (Master Admin roster edit). */
+export async function updateSpecialistScope(
+  member: StoreSpecialist,
+  input: {
+    name?: string;
+    role?: SpecialistRole;
+    assigned_department?: DepartmentScope | null;
+    username?: string | null;
+  }
+): Promise<{ record: StoreSpecialist; offline: boolean }> {
+  const role = input.role ?? member.role;
+  const assigned =
+    role === "MasterAdmin"
+      ? "all"
+      : (input.assigned_department ??
+        member.assigned_department ??
+        "flooring");
+  const username =
+    input.username === undefined
+      ? member.username
+      : input.username == null || String(input.username).trim() === ""
+        ? null
+        : String(input.username).trim();
+
+  return saveSpecialist({
+    id: member.id,
+    store_number: member.store_number,
+    name: input.name?.trim() || member.name,
+    role,
+    pin_code: member.pin_code,
+    username,
+    assigned_department: assigned,
+    must_change_credentials: member.must_change_credentials,
+  });
+}
+
+function removeLocal(id: string, store = getStoreNumber()): StoreSpecialist[] {
+  const next = readLocal(store).filter((r) => r.id !== id);
+  writeLocal(next, store);
+  return next;
+}
+
+/** Deactivate / delete a specialist profile for the active store. */
+export async function deleteSpecialist(
+  member: StoreSpecialist
+): Promise<{ offline: boolean }> {
+  const store = member.store_number || getStoreNumber();
+  const supabase = getSupabase();
+
+  removeLocal(member.id, store);
+  const active = getActiveSpecialist();
+  if (active?.id === member.id) {
+    setActiveSpecialist(null);
+  }
+
+  if (!supabase || shouldSaveOffline() || isFallbackProfileId(member.id)) {
+    if (!isFallbackProfileId(member.id)) {
+      enqueueSyncAction(
+        "delete_specialist",
+        { id: member.id },
+        store
+      );
+    }
+    return { offline: true };
+  }
+
+  try {
+    const { error } = await supabase
+      .from(TABLE)
+      .delete()
+      .eq("id", member.id)
+      .eq("store_number", store);
+    if (error) throw error;
+    return { offline: false };
+  } catch {
+    enqueueSyncAction("delete_specialist", { id: member.id }, store);
+    return { offline: true };
+  }
 }

@@ -12,6 +12,8 @@ components/hub/*Modal.tsx         → Specialist / PIN / Markdown modals
 components/barcode/QuickAddCatalogModal.tsx → Scan-to-catalog Quick-Add
 components/catalog/SimsLocationFinder.tsx   → SIMS location stock drawer
 components/sections/*             → Presentation per workspace section
+components/hub/AdminRosterManager.tsx → Master Admin team/department roster console
+components/sections/DepartmentAuditSection.tsx → Generic unit-count audit for non-flooring/appliance depts
 lib/rbac.ts                       → Department-scoped section / catalog visibility (compose only)
 lib/store.ts                      → Active store_number session
 lib/sync-queue.ts                 → Offline action queue + replay
@@ -30,6 +32,7 @@ supabase/schema.sql               → Tables + multi-category + SIMS + store_num
 |---|---|
 | Navigation / section routing | `app/page.tsx` + `HubChrome` |
 | Department RBAC / tab visibility | `lib/rbac.ts` |
+| Team roster (Master Admin) | `AdminRosterManager`, `lib/specialists.ts` |
 | Store context | `lib/store.ts` |
 | Offline sync queue | `lib/sync-queue.ts` |
 | Shell caching | `public/sw.js` + `ServiceWorkerRegister` |

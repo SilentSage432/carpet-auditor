@@ -17,6 +17,8 @@ import {
   canAccessSection,
   catalogDomainForMember,
   defaultSectionForMember,
+  effectiveDepartment,
+  isGenericDepartment,
 } from "@/lib/rbac";
 import {
   dedupeRoster,
@@ -37,6 +39,7 @@ import type {
   Remnant,
   StoreSpecialist,
 } from "@/lib/types";
+import { DepartmentAuditSection } from "@/components/sections/DepartmentAuditSection";
 
 export default function DeptSyncHubPage() {
   const [section, setSection] = useState<HubSection>("audit");
@@ -213,6 +216,7 @@ export default function DeptSyncHubPage() {
   }
 
   const catalogDomain = catalogDomainForMember(specialist);
+  const dept = effectiveDepartment(specialist);
 
   return (
     <div className="flex min-h-dvh flex-col">
@@ -283,7 +287,11 @@ export default function DeptSyncHubPage() {
 
       <div
         className={`mx-auto w-full max-w-md flex-1 overflow-x-hidden px-4 py-4 ${
-          section === "audit" || section === "appliances" ? "pb-44" : "pb-32"
+          section === "audit" ||
+          section === "appliances" ||
+          section === "department"
+            ? "pb-44"
+            : "pb-32"
         }`}
       >
         {section === "audit" && canAccessSection(specialist, "audit") && (
@@ -320,12 +328,24 @@ export default function DeptSyncHubPage() {
               auditedBy={specialist?.name ?? ""}
             />
           )}
+        {section === "department" &&
+          canAccessSection(specialist, "department") &&
+          isGenericDepartment(dept) && (
+            <DepartmentAuditSection
+              department={dept}
+              catalog={catalog}
+              onCatalogChange={setCatalog}
+              auditedBy={specialist?.name ?? ""}
+            />
+          )}
         {section === "settings" && canAccessSection(specialist, "settings") && (
           <SettingsSection
             catalogCount={catalog.length}
             remnantCount={remnants.length}
             activeSpecialist={specialist}
+            specialists={specialists}
             onSpecialistUpdated={handleSpecialistUpdated}
+            onRosterChange={(roster) => setSpecialists(dedupeRoster(roster))}
             onOpenChangePin={() => setChangePinOpen(true)}
             storeNumber={storeNumber}
             onStoreNumberChange={setStoreNumberState}

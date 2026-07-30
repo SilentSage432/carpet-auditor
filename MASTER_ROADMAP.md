@@ -31,12 +31,15 @@
 - [x] DeptSync rebrand + multi-department badge / PWA icons
 - [x] Department-scoped RBAC (Master Admin / Supervisor / Associate) + nav filter
 - [x] Supervisor first-login username/password customization modal
+- [x] Master Admin Team & Department Roster Manager (add / reset / edit / delete)
+- [x] Full Lowe's department list + generic department audit workspace
 
 ## Next
 - [ ] JWT / claim-based RLS enforcing `store_number` (+ department) server-side
 - [ ] Background Sync API / periodic queue flush while tab backgrounded
 - [ ] Conflict resolution UI when offline edits collide
 - [ ] Retire or wire orphan `MarryBarcodeModal`
+- [ ] Department-specific catalog category taxonomies beyond flooring/appliances
 ## Non-goals
 - Pricing / margin engines
 - Replenishment recommendations

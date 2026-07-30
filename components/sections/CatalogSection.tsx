@@ -44,7 +44,7 @@ type Props = {
   catalog: CatalogItem[];
   onCatalogChange: (items: CatalogItem[]) => void;
   /** RBAC catalog domain — appliances supervisors see appliance SKUs only. */
-  domainFilter?: "all" | "flooring" | "appliances";
+  domainFilter?: "all" | "flooring" | "appliances" | string;
 };
 
 type CatalogViewMode = "folders" | "flat";

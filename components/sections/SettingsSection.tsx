@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import { AdminRosterManager } from "@/components/hub/AdminRosterManager";
 import { countLocalCatalog } from "@/lib/catalog";
 import { countLocalRemnants } from "@/lib/remnants";
 import { selectOnFocus } from "@/lib/number-input";
@@ -20,7 +21,9 @@ type Props = {
   catalogCount: number;
   remnantCount: number;
   activeSpecialist: StoreSpecialist | null;
+  specialists: StoreSpecialist[];
   onSpecialistUpdated: (member: StoreSpecialist) => void;
+  onRosterChange: (roster: StoreSpecialist[]) => void;
   onOpenChangePin: () => void;
   storeNumber: string;
   onStoreNumberChange: (storeNumber: string) => void;
@@ -30,6 +33,8 @@ export function SettingsSection({
   catalogCount,
   remnantCount,
   activeSpecialist,
+  specialists,
+  onRosterChange,
   onOpenChangePin,
   storeNumber,
   onStoreNumberChange,
@@ -116,6 +121,13 @@ export function SettingsSection({
 
   return (
     <div className="space-y-4">
+      <AdminRosterManager
+        activeSpecialist={activeSpecialist}
+        storeNumber={storeNumber}
+        roster={specialists}
+        onRosterChange={onRosterChange}
+      />
+
       <section className="space-y-3 rounded-2xl border border-slate-800 bg-slate-900/90 p-4">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-400">
           Store number / location

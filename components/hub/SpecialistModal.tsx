@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { PinKeypadModal } from "@/components/hub/PinKeypadModal";
-import { NumberField, TextField } from "@/components/ui/NumberField";
+import { TextField } from "@/components/ui/NumberField";
 import {
   dedupeRoster,
   fetchSpecialists,
@@ -15,6 +15,10 @@ import {
   verifyPin,
 } from "@/lib/specialists";
 import type { DepartmentScope, SpecialistRole, StoreSpecialist } from "@/lib/types";
+import {
+  DEPARTMENT_META,
+  OPERATIONAL_DEPARTMENTS,
+} from "@/lib/types";
 
 type Props = {
   open: boolean;
@@ -205,45 +209,39 @@ export function SpecialistModal({ open, active, onClose, onSelect }: Props) {
                   </div>
                 </fieldset>
                 {(newRole === "Supervisor" || newRole === "Associate") && (
-                  <fieldset>
-                    <legend className="mb-1.5 text-sm font-medium text-slate-200">
+                  <label className="block space-y-1.5">
+                    <span className="text-sm font-medium text-slate-200">
                       Department
-                    </legend>
-                    <div className="grid grid-cols-2 gap-1 rounded-xl border border-slate-800 bg-slate-950 p-1">
-                      {(
-                        [
-                          ["flooring", "📊 Flooring"],
-                          ["appliances", "🔌 Appliances"],
-                        ] as const
-                      ).map(([value, label]) => (
-                        <button
-                          key={value}
-                          type="button"
-                          onClick={() => setNewDepartment(value)}
-                          className={`flex min-h-12 items-center justify-center rounded-lg text-sm font-semibold ${
-                            newDepartment === value
-                              ? "bg-emerald-500 text-slate-950"
-                              : "text-slate-400"
-                          }`}
-                        >
-                          {label}
-                        </button>
-                      ))}
-                    </div>
-                  </fieldset>
+                    </span>
+                    <select
+                      value={newDepartment}
+                      onChange={(e) =>
+                        setNewDepartment(e.target.value as DepartmentScope)
+                      }
+                      className="min-h-12 w-full rounded-xl border border-slate-800 bg-slate-950 px-3 text-base text-slate-100"
+                    >
+                      {OPERATIONAL_DEPARTMENTS.map((id) => {
+                        const meta = DEPARTMENT_META[id];
+                        return (
+                          <option key={id} value={id}>
+                            {meta.icon} {meta.label}
+                          </option>
+                        );
+                      })}
+                    </select>
+                  </label>
                 )}
-                <NumberField
+                <TextField
                   label={
                     newRole === "Supervisor" || newRole === "MasterAdmin"
                       ? "PIN / Password (required)"
                       : "PIN Code (optional)"
                   }
-                  mode="digits"
                   value={newPin}
                   onChange={setNewPin}
                   placeholder={
                     newRole === "Supervisor" || newRole === "MasterAdmin"
-                      ? "e.g. 1234"
+                      ? "e.g. 1234 or ChangeMe123"
                       : "Optional"
                   }
                 />
