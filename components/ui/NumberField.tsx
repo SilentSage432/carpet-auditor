@@ -248,6 +248,8 @@ type TextFieldProps = {
   scanDigits?: boolean;
   inputRef?: Ref<HTMLInputElement>;
   autoFocus?: boolean;
+  type?: "text" | "password";
+  autoComplete?: string;
 } & ScanCapableProps;
 
 export function TextField({
@@ -264,6 +266,8 @@ export function TextField({
   scanDigits,
   inputRef,
   autoFocus,
+  type = "text",
+  autoComplete = "off",
 }: TextFieldProps) {
   const localRef = useRef<HTMLInputElement | null>(null);
   const getCurrentValue = useCallback(
@@ -287,8 +291,8 @@ export function TextField({
           localRef.current = node;
           assignRef(inputRef, node);
         }}
-        type="text"
-        autoComplete="off"
+        type={type}
+        autoComplete={autoComplete}
         autoFocus={autoFocus}
         placeholder={placeholder}
         aria-label={ariaLabel ?? label}

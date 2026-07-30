@@ -79,7 +79,7 @@ create table if not exists public.store_specialists (
   id uuid primary key default gen_random_uuid(),
   name text not null unique,
   role text not null default 'Associate'
-    check (role in ('Associate', 'Supervisor', 'Specialist')),
+    check (role in ('Associate', 'Supervisor', 'MasterAdmin', 'Specialist')),
   pin_code text,
   created_at timestamptz not null default now()
 );
@@ -96,32 +96,26 @@ where lower(role) in ('specialist', 'associate');
 delete from public.store_specialists
 where lower(name) in ('alex', 'dave', 'sales specialist 1', 'sales specialist 2');
 
--- Seed a single Department Supervisor (default PIN 1234) if none exists
+-- Seed a single Flooring Supervisor (default PIN 1234) if none exists
 insert into public.store_specialists (name, role, pin_code)
-select 'Department Supervisor', 'Supervisor', '1234'
+select 'Flooring Supervisor', 'Supervisor', '1234'
 where not exists (
   select 1 from public.store_specialists where role = 'Supervisor'
 );
 
--- Deduplicate Department Supervisor / Supervisor rows (keep newest)
+-- Deduplicate generic Department Supervisor rows only (keep newest).
+-- Do NOT collapse all Supervisor roles — department supervisors coexist.
 delete from public.store_specialists s
 using public.store_specialists keep
-where (
-    lower(s.name) in ('department supervisor', 'dept supervisor')
-    or s.role = 'Supervisor'
-  )
-  and (
-    lower(keep.name) in ('department supervisor', 'dept supervisor')
-    or keep.role = 'Supervisor'
-  )
+where lower(s.name) in ('department supervisor', 'dept supervisor')
+  and lower(keep.name) in ('department supervisor', 'dept supervisor')
   and s.id <> keep.id
   and s.created_at < keep.created_at;
 
--- Normalize surviving supervisor display name
+-- Normalize surviving generic supervisor display name
 update public.store_specialists
-set name = 'Department Supervisor', role = 'Supervisor'
-where role = 'Supervisor'
-   or lower(name) in ('department supervisor', 'dept supervisor');
+set name = 'Flooring Supervisor', role = 'Supervisor'
+where lower(name) in ('department supervisor', 'dept supervisor');
 
 -- Multi-store context
 alter table public.carpet_audits
@@ -205,13 +199,75 @@ create index if not exists carpet_audits_category_idx
 create index if not exists carpet_audits_sku_idx
   on public.carpet_audits (sku);
 
--- Seed supervisor for default store if missing
-insert into public.store_specialists (name, role, pin_code, store_number)
-select 'Department Supervisor', 'Supervisor', '1234', '1234'
+-- Department-scoped RBAC columns (before dept-aware seeds)
+alter table public.store_specialists
+  drop constraint if exists store_specialists_role_check;
+
+alter table public.store_specialists
+  add constraint store_specialists_role_check
+  check (role in ('Associate', 'Supervisor', 'MasterAdmin', 'Specialist'));
+
+alter table public.store_specialists
+  add column if not exists username text;
+
+alter table public.store_specialists
+  add column if not exists assigned_department text;
+
+alter table public.store_specialists
+  add column if not exists must_change_credentials boolean not null default false;
+
+-- Normalize legacy Department Supervisor → Flooring Supervisor
+update public.store_specialists
+set
+  name = 'Flooring Supervisor',
+  assigned_department = coalesce(assigned_department, 'flooring')
+where role = 'Supervisor'
+  and lower(name) in ('department supervisor', 'dept supervisor', 'flooring supervisor');
+
+-- Seed Flooring Supervisor for default store if missing
+insert into public.store_specialists (
+  name, role, pin_code, store_number, assigned_department, must_change_credentials
+)
+select 'Flooring Supervisor', 'Supervisor', '1234', '1234', 'flooring', false
 where not exists (
   select 1 from public.store_specialists
   where role = 'Supervisor' and store_number = '1234'
+    and coalesce(assigned_department, 'flooring') = 'flooring'
 );
+
+-- Seed Master Admin
+insert into public.store_specialists (
+  name, role, pin_code, store_number, username, assigned_department, must_change_credentials
+)
+select 'Master Admin', 'MasterAdmin', '1234', '1234', 'master_admin', 'all', false
+where not exists (
+  select 1 from public.store_specialists
+  where role = 'MasterAdmin' and store_number = '1234'
+);
+
+-- Seed Amber (Appliances Supervisor) with first-login credential force
+insert into public.store_specialists (
+  name, role, pin_code, store_number, username, assigned_department, must_change_credentials
+)
+select
+  'Amber',
+  'Supervisor',
+  'ChangeMe123',
+  '1234',
+  'amber_appliance',
+  'appliances',
+  true
+where not exists (
+  select 1 from public.store_specialists
+  where store_number = '1234'
+    and (
+      lower(username) = 'amber_appliance'
+      or (role = 'Supervisor' and coalesce(assigned_department, '') = 'appliances')
+    )
+);
+
+create index if not exists store_specialists_username_idx
+  on public.store_specialists (store_number, username);
 
 -- RLS
 alter table public.carpet_audits enable row level security;

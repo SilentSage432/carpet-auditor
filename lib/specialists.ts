@@ -1,5 +1,9 @@
 import { uid } from "./uid";
-import type { SpecialistRole, StoreSpecialist } from "./types";
+import type {
+  DepartmentScope,
+  SpecialistRole,
+  StoreSpecialist,
+} from "./types";
 import { getStoreNumber } from "./store";
 import { getSupabase } from "./supabase";
 import {
@@ -12,6 +16,8 @@ const ACTIVE_KEY = "carpet_active_specialist";
 const TABLE = "store_specialists";
 
 export const DEFAULT_SUPERVISOR_PIN = "1234";
+export const DEFAULT_APPLIANCE_USERNAME = "amber_appliance";
+export const DEFAULT_APPLIANCE_PASSWORD = "ChangeMe123";
 
 const PLACEHOLDER_NAMES = new Set([
   "alex",
@@ -22,20 +28,61 @@ const PLACEHOLDER_NAMES = new Set([
   "specialist 2",
 ]);
 
-function supervisorSeed(store = getStoreNumber()): StoreSpecialist {
+function flooringSupervisorSeed(store = getStoreNumber()): StoreSpecialist {
   return {
-    id: `seed-supervisor-${store}`,
+    id: `seed-supervisor-flooring-${store}`,
     store_number: store,
-    name: "Department Supervisor",
+    name: "Flooring Supervisor",
     role: "Supervisor",
     pin_code: DEFAULT_SUPERVISOR_PIN,
+    username: null,
+    assigned_department: "flooring",
+    must_change_credentials: false,
+    created_at: new Date(0).toISOString(),
+    offline: true,
+  };
+}
+
+function applianceSupervisorSeed(store = getStoreNumber()): StoreSpecialist {
+  return {
+    id: `seed-supervisor-appliances-${store}`,
+    store_number: store,
+    name: "Amber",
+    role: "Supervisor",
+    pin_code: DEFAULT_APPLIANCE_PASSWORD,
+    username: DEFAULT_APPLIANCE_USERNAME,
+    assigned_department: "appliances",
+    must_change_credentials: true,
+    created_at: new Date(0).toISOString(),
+    offline: true,
+  };
+}
+
+function masterAdminSeed(store = getStoreNumber()): StoreSpecialist {
+  return {
+    id: `seed-master-admin-${store}`,
+    store_number: store,
+    name: "Master Admin",
+    role: "MasterAdmin",
+    pin_code: DEFAULT_SUPERVISOR_PIN,
+    username: "master_admin",
+    assigned_department: "all",
+    must_change_credentials: false,
     created_at: new Date(0).toISOString(),
     offline: true,
   };
 }
 
 function normalizeRole(raw: unknown): SpecialistRole {
-  const value = String(raw ?? "").toLowerCase();
+  const value = String(raw ?? "").toLowerCase().trim();
+  if (
+    value === "masteradmin" ||
+    value === "master_admin" ||
+    value === "master admin" ||
+    value.includes("master")
+  ) {
+    return "MasterAdmin";
+  }
   if (
     value.includes("supervisor") ||
     value.includes("manager") ||
@@ -46,19 +93,53 @@ function normalizeRole(raw: unknown): SpecialistRole {
   return "Associate";
 }
 
+function normalizeDepartment(raw: unknown, role: SpecialistRole): DepartmentScope | null {
+  const value = String(raw ?? "").toLowerCase().trim();
+  if (value === "appliances" || value === "appliance") return "appliances";
+  if (value === "flooring" || value === "carpet") return "flooring";
+  if (value === "all" || value === "*") return "all";
+  if (role === "MasterAdmin") return "all";
+  return null;
+}
+
 function mapRow(row: Record<string, unknown>): StoreSpecialist {
   const pinRaw = row.pin_code;
   const pin =
     pinRaw == null || String(pinRaw).trim() === ""
       ? null
       : String(pinRaw).trim();
+  const role = normalizeRole(row.role);
+  const usernameRaw = row.username;
+  const username =
+    usernameRaw == null || String(usernameRaw).trim() === ""
+      ? null
+      : String(usernameRaw).trim();
+
+  let assigned = normalizeDepartment(row.assigned_department, role);
+  if (!assigned && role === "Supervisor") {
+    const hint = `${row.name ?? ""} ${username ?? ""}`;
+    if (/appliance/i.test(hint) || /amber/i.test(hint)) {
+      assigned = "appliances";
+    } else {
+      assigned = "flooring";
+    }
+  }
+  if (!assigned && role === "MasterAdmin") assigned = "all";
+
+  const mustChange =
+    row.must_change_credentials === true ||
+    row.must_change_credentials === "true" ||
+    row.must_change_credentials === 1;
 
   return {
     id: String(row.id),
     store_number: String(row.store_number ?? getStoreNumber()),
     name: String(row.name ?? ""),
-    role: normalizeRole(row.role),
+    role,
     pin_code: pin,
+    username,
+    assigned_department: assigned,
+    must_change_credentials: Boolean(mustChange),
     created_at: String(row.created_at ?? new Date().toISOString()),
     offline: Boolean(row.offline),
   };
@@ -85,78 +166,130 @@ function preferSpecialist(a: StoreSpecialist, b: StoreSpecialist): StoreSpeciali
   return new Date(a.created_at).getTime() >= new Date(b.created_at).getTime() ? a : b;
 }
 
-function isDepartmentSupervisorName(name: string): boolean {
+function isGenericFlooringSupervisorName(name: string): boolean {
   const n = name.toLowerCase().trim();
-  return n === "department supervisor" || n === "dept supervisor";
+  return (
+    n === "department supervisor" ||
+    n === "dept supervisor" ||
+    n === "flooring supervisor"
+  );
 }
 
-/** Collapse duplicate supervisors / same-name cards to a single roster entry. */
+function rosterKey(member: StoreSpecialist): string {
+  if (member.role === "MasterAdmin") {
+    return `__master__:${member.store_number}`;
+  }
+  if (member.role === "Supervisor") {
+    const dept = member.assigned_department ?? "flooring";
+    return `__supervisor__:${member.store_number}:${dept}`;
+  }
+  return `name:${member.store_number}:${member.name.toLowerCase().trim()}`;
+}
+
+/** Collapse duplicate master/supervisor-per-dept / same-name cards. */
 export function dedupeRoster(roster: StoreSpecialist[]): StoreSpecialist[] {
   const byKey = new Map<string, StoreSpecialist>();
 
   for (const member of roster) {
     if (!member.name.trim() || isPlaceholder(member)) continue;
 
-    const key =
-      member.role === "Supervisor" || isDepartmentSupervisorName(member.name)
-        ? `__supervisor__:${member.store_number}`
-        : `name:${member.store_number}:${member.name.toLowerCase().trim()}`;
-
+    const key = rosterKey(member);
     const existing = byKey.get(key);
     if (!existing) {
-      byKey.set(key, {
-        ...member,
-        name:
-          member.role === "Supervisor" || isDepartmentSupervisorName(member.name)
-            ? "Department Supervisor"
-            : member.name,
-        role:
-          member.role === "Supervisor" || isDepartmentSupervisorName(member.name)
-            ? "Supervisor"
-            : member.role,
-      });
+      const normalized: StoreSpecialist = { ...member };
+      if (
+        member.role === "Supervisor" &&
+        isGenericFlooringSupervisorName(member.name) &&
+        (member.assigned_department === "flooring" || !member.assigned_department)
+      ) {
+        normalized.name = "Flooring Supervisor";
+        normalized.assigned_department = "flooring";
+        normalized.role = "Supervisor";
+      }
+      byKey.set(key, normalized);
     } else {
       const winner = preferSpecialist(existing, member);
       byKey.set(key, {
         ...winner,
-        name:
-          winner.role === "Supervisor" || isDepartmentSupervisorName(winner.name)
-            ? "Department Supervisor"
-            : winner.name,
-        role:
-          winner.role === "Supervisor" || isDepartmentSupervisorName(winner.name)
-            ? "Supervisor"
-            : winner.role,
+        role: existing.role === "MasterAdmin" || winner.role === "MasterAdmin"
+          ? "MasterAdmin"
+          : winner.role,
+        assigned_department:
+          winner.assigned_department ?? existing.assigned_department,
       });
     }
   }
 
   return Array.from(byKey.values()).sort((a, b) => {
-    if (a.role === "Supervisor" && b.role !== "Supervisor") return -1;
-    if (b.role === "Supervisor" && a.role !== "Supervisor") return 1;
+    const rank = (m: StoreSpecialist) =>
+      m.role === "MasterAdmin" ? 0 : m.role === "Supervisor" ? 1 : 2;
+    const d = rank(a) - rank(b);
+    if (d !== 0) return d;
     return a.name.localeCompare(b.name);
   });
 }
 
-function ensureSupervisor(
+function ensureRosterSeeds(
   roster: StoreSpecialist[],
   store = getStoreNumber()
 ): StoreSpecialist[] {
   const scoped = roster.filter((m) => m.store_number === store);
   const cleaned = dedupeRoster(scoped);
-  const seed = supervisorSeed(store);
-  const hasSupervisor = cleaned.some((m) => m.role === "Supervisor");
-  if (cleaned.length === 0) return [seed];
-  if (!hasSupervisor) {
-    return dedupeRoster([seed, ...cleaned]);
+
+  const hasMaster = cleaned.some((m) => m.role === "MasterAdmin");
+  const hasFlooringSup = cleaned.some(
+    (m) =>
+      m.role === "Supervisor" &&
+      (m.assigned_department === "flooring" ||
+        (!m.assigned_department && !/appliance|amber/i.test(m.name)))
+  );
+  const hasApplianceSup = cleaned.some(
+    (m) =>
+      m.role === "Supervisor" &&
+      (m.assigned_department === "appliances" ||
+        /appliance|amber/i.test(m.name + " " + (m.username ?? "")))
+  );
+
+  const seeds: StoreSpecialist[] = [];
+  if (!hasMaster) seeds.push(masterAdminSeed(store));
+  if (!hasFlooringSup) seeds.push(flooringSupervisorSeed(store));
+  if (!hasApplianceSup) seeds.push(applianceSupervisorSeed(store));
+
+  if (cleaned.length === 0 && seeds.length === 0) {
+    return [
+      masterAdminSeed(store),
+      flooringSupervisorSeed(store),
+      applianceSupervisorSeed(store),
+    ];
   }
-  return cleaned;
+
+  return dedupeRoster([...seeds, ...cleaned]);
 }
 
 export function isDefaultPin(member: StoreSpecialist): boolean {
   const pin = member.pin_code?.trim();
-  if (!pin) return member.role === "Supervisor";
-  return pin === DEFAULT_SUPERVISOR_PIN;
+  if (!pin) return member.role === "Supervisor" || member.role === "MasterAdmin";
+  if (pin === DEFAULT_SUPERVISOR_PIN) return true;
+  if (
+    member.username === DEFAULT_APPLIANCE_USERNAME &&
+    pin === DEFAULT_APPLIANCE_PASSWORD
+  ) {
+    return true;
+  }
+  return false;
+}
+
+/** True when first-login credential customization is required. */
+export function needsCredentialSetup(member: StoreSpecialist): boolean {
+  if (member.must_change_credentials) return true;
+  if (
+    member.role === "Supervisor" &&
+    member.username === DEFAULT_APPLIANCE_USERNAME &&
+    member.pin_code === DEFAULT_APPLIANCE_PASSWORD
+  ) {
+    return true;
+  }
+  return false;
 }
 
 const PIN_REMIND_PREFIX = "carpet_pin_remind_later_";
@@ -195,36 +328,53 @@ function writeAllLocal(records: StoreSpecialist[]): void {
 }
 
 function readLocal(store = getStoreNumber()): StoreSpecialist[] {
-  return ensureSupervisor(readAllLocal().filter((r) => r.store_number === store), store);
+  return ensureRosterSeeds(
+    readAllLocal().filter((r) => r.store_number === store),
+    store
+  );
 }
 
 function writeLocal(records: StoreSpecialist[], store = getStoreNumber()): void {
   const others = readAllLocal().filter((r) => r.store_number !== store);
-  const scoped = ensureSupervisor(records, store);
+  const scoped = ensureRosterSeeds(records, store);
   writeAllLocal([...others, ...scoped]);
 }
 
 function upsertLocal(record: StoreSpecialist): StoreSpecialist[] {
   const store = record.store_number;
-  const existing = readLocal(store).filter(
-    (r) => r.id !== record.id && r.name.toLowerCase() !== record.name.toLowerCase()
-  );
-  const next = ensureSupervisor([record, ...existing], store);
+  const existing = readLocal(store).filter((r) => {
+    if (r.id === record.id) return false;
+    if (
+      r.name.toLowerCase() === record.name.toLowerCase() &&
+      r.role === record.role &&
+      (r.assigned_department ?? null) === (record.assigned_department ?? null)
+    ) {
+      return false;
+    }
+    return true;
+  });
+  const next = ensureRosterSeeds([record, ...existing], store);
   writeLocal(next, store);
   return next;
 }
 
 export function isSupervisor(member: StoreSpecialist | null | undefined): boolean {
-  return member?.role === "Supervisor";
+  return member?.role === "Supervisor" || member?.role === "MasterAdmin";
 }
 
 export function requiresPin(member: StoreSpecialist): boolean {
-  if (member.role === "Supervisor") return true;
+  if (member.role === "Supervisor" || member.role === "MasterAdmin") return true;
   return Boolean(member.pin_code && member.pin_code.length > 0);
 }
 
+/** True when unlock should use a text password field (non-digit secrets). */
+export function usesPasswordUnlock(member: StoreSpecialist): boolean {
+  const secret = member.pin_code?.trim() ?? "";
+  if (!secret) return false;
+  return !/^\d+$/.test(secret) || Boolean(member.username);
+}
+
 export function verifyPin(member: StoreSpecialist, pin: string): boolean {
-  // Match stored pin_code; Supervisors (and any blank pin) default to 1234
   const expected =
     member.pin_code && member.pin_code.trim().length > 0
       ? member.pin_code.trim()
@@ -233,9 +383,17 @@ export function verifyPin(member: StoreSpecialist, pin: string): boolean {
 }
 
 export function roleBadge(member: StoreSpecialist): string {
-  return member.role === "Supervisor"
-    ? "🛡️ Department Supervisor"
-    : "👤 Associate";
+  if (member.role === "MasterAdmin") return "👑 Master Admin";
+  if (member.role === "Supervisor") {
+    const dept =
+      member.assigned_department === "appliances"
+        ? "Appliances"
+        : member.assigned_department === "flooring"
+          ? "Flooring"
+          : "Department";
+    return `🛡️ ${dept} Supervisor`;
+  }
+  return "👤 Floor Associate";
 }
 
 export function getActiveSpecialist(): StoreSpecialist | null {
@@ -270,9 +428,11 @@ function specialistPayload(record: StoreSpecialist): Record<string, unknown> {
     name: record.name,
     role: record.role,
     pin_code: record.pin_code,
+    username: record.username,
+    assigned_department: record.assigned_department,
+    must_change_credentials: record.must_change_credentials,
     created_at: record.created_at,
   };
-  // Never send seed/fallback strings into a uuid column
   if (!isFallbackProfileId(record.id)) {
     payload.id = record.id;
   }
@@ -324,7 +484,7 @@ export async function fetchSpecialists(): Promise<StoreSpecialist[]> {
       (r) => r.offline && !remoteNames.has(r.name.toLowerCase()) && !isPlaceholder(r)
     );
 
-    const merged = ensureSupervisor([...offlineOnly, ...remote], store);
+    const merged = ensureRosterSeeds([...offlineOnly, ...remote], store);
     writeLocal(merged, store);
     return merged;
   } catch {
@@ -338,6 +498,9 @@ export async function saveSpecialist(input: {
   name: string;
   role?: SpecialistRole | string;
   pin_code?: string | null;
+  username?: string | null;
+  assigned_department?: DepartmentScope | null;
+  must_change_credentials?: boolean;
 }): Promise<{ record: StoreSpecialist; offline: boolean }> {
   const now = new Date().toISOString();
   const store = input.store_number ?? getStoreNumber();
@@ -347,9 +510,18 @@ export async function saveSpecialist(input: {
       ? null
       : String(input.pin_code).trim();
 
-  if (role === "Supervisor" && !pin) {
+  if ((role === "Supervisor" || role === "MasterAdmin") && !pin) {
     pin = DEFAULT_SUPERVISOR_PIN;
   }
+
+  const assigned =
+    input.assigned_department ??
+    normalizeDepartment(input.assigned_department, role) ??
+    (role === "MasterAdmin"
+      ? "all"
+      : role === "Supervisor"
+        ? "flooring"
+        : null);
 
   const id =
     input.id && !isFallbackProfileId(input.id) ? input.id : uid();
@@ -360,6 +532,12 @@ export async function saveSpecialist(input: {
     name: input.name.trim(),
     role,
     pin_code: pin,
+    username:
+      input.username == null || String(input.username).trim() === ""
+        ? null
+        : String(input.username).trim(),
+    assigned_department: assigned,
+    must_change_credentials: Boolean(input.must_change_credentials),
     created_at: now,
     offline: false,
   };
@@ -405,22 +583,78 @@ export async function updateSpecialistPin(
     throw new Error("PIN must be exactly 4 digits");
   }
 
+  return persistSpecialistFields(member, {
+    pin_code: pin,
+    must_change_credentials: false,
+  });
+}
+
+/** First-login / supervisor credential customization (username + password). */
+export async function updateSpecialistCredentials(
+  member: StoreSpecialist,
+  input: { username: string; password: string }
+): Promise<{ record: StoreSpecialist; offline: boolean }> {
+  const username = input.username.trim();
+  const password = input.password.trim();
+
+  if (username.length < 3) {
+    throw new Error("Username must be at least 3 characters");
+  }
+  if (password.length < 6) {
+    throw new Error("Password must be at least 6 characters");
+  }
+  if (
+    username.toLowerCase() === DEFAULT_APPLIANCE_USERNAME &&
+    password === DEFAULT_APPLIANCE_PASSWORD
+  ) {
+    throw new Error("Choose a custom username and password (not the defaults)");
+  }
+  if (username.toLowerCase() === "master_admin" && password === DEFAULT_SUPERVISOR_PIN) {
+    throw new Error("Choose a custom username and password (not the defaults)");
+  }
+
+  return persistSpecialistFields(member, {
+    username,
+    pin_code: password,
+    must_change_credentials: false,
+  });
+}
+
+async function persistSpecialistFields(
+  member: StoreSpecialist,
+  patch: Partial<
+    Pick<
+      StoreSpecialist,
+      "pin_code" | "username" | "must_change_credentials" | "name" | "assigned_department"
+    >
+  >
+): Promise<{ record: StoreSpecialist; offline: boolean }> {
   const store = member.store_number || getStoreNumber();
   const supabase = getSupabase();
   const profileLabel =
-    member.role === "Supervisor" ? "Supervisor" : "Profile";
+    member.role === "MasterAdmin"
+      ? "Master Admin"
+      : member.role === "Supervisor"
+        ? "Supervisor"
+        : "Profile";
   const displayName =
+    patch.name?.trim() ||
     member.name?.trim() ||
-    (member.role === "Supervisor" ? "Department Supervisor" : "Team Member");
+    (member.role === "MasterAdmin"
+      ? "Master Admin"
+      : member.role === "Supervisor"
+        ? "Department Supervisor"
+        : "Team Member");
+
+  const nextLocal: StoreSpecialist = {
+    ...member,
+    ...patch,
+    name: displayName,
+    store_number: store,
+  };
 
   if (!supabase || shouldSaveOffline()) {
-    const offlineRecord: StoreSpecialist = {
-      ...member,
-      name: displayName,
-      store_number: store,
-      pin_code: pin,
-      offline: true,
-    };
+    const offlineRecord: StoreSpecialist = { ...nextLocal, offline: true };
     upsertLocal(offlineRecord);
     enqueueSyncAction(
       "upsert_specialist",
@@ -432,7 +666,6 @@ export async function updateSpecialistPin(
   }
 
   async function findExistingDbId(): Promise<string | null> {
-    // 1) Only query by id when it is a real UUID
     if (isDatabaseUuid(member.id) && !isFallbackProfileId(member.id)) {
       const { data, error } = await supabase!
         .from(TABLE)
@@ -444,7 +677,6 @@ export async function updateSpecialistPin(
       }
     }
 
-    // 2) Match by name within store
     {
       const { data, error } = await supabase!
         .from(TABLE)
@@ -457,13 +689,24 @@ export async function updateSpecialistPin(
       }
     }
 
-    // 3) Match Supervisor role within store
-    if (member.role === "Supervisor") {
+    if (member.username) {
       const { data, error } = await supabase!
         .from(TABLE)
         .select("id")
         .eq("store_number", store)
-        .eq("role", "Supervisor")
+        .eq("username", member.username)
+        .maybeSingle();
+      if (!error && data?.id && isDatabaseUuid(String(data.id))) {
+        return String(data.id);
+      }
+    }
+
+    if (member.role === "Supervisor" || member.role === "MasterAdmin") {
+      const { data, error } = await supabase!
+        .from(TABLE)
+        .select("id")
+        .eq("store_number", store)
+        .eq("role", member.role)
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
@@ -476,20 +719,21 @@ export async function updateSpecialistPin(
   }
 
   async function insertProfile(): Promise<StoreSpecialist> {
-    // Omit id — Postgres generates a valid UUID
     const { data, error } = await supabase!
       .from(TABLE)
       .insert({
         name: displayName,
-        role: member.role === "Supervisor" ? "Supervisor" : member.role,
-        pin_code: pin,
+        role: member.role,
+        pin_code: nextLocal.pin_code,
+        username: nextLocal.username,
+        assigned_department: nextLocal.assigned_department,
+        must_change_credentials: nextLocal.must_change_credentials,
         store_number: store,
       })
       .select("*")
       .single();
 
     if (error || !data) {
-      // Unique conflict: try update via name lookup instead
       const { data: existing } = await supabase!
         .from(TABLE)
         .select("id")
@@ -500,7 +744,12 @@ export async function updateSpecialistPin(
       if (existing?.id && isDatabaseUuid(String(existing.id))) {
         const { data: updated, error: updErr } = await supabase!
           .from(TABLE)
-          .update({ pin_code: pin })
+          .update({
+            pin_code: nextLocal.pin_code,
+            username: nextLocal.username,
+            assigned_department: nextLocal.assigned_department,
+            must_change_credentials: nextLocal.must_change_credentials,
+          })
           .eq("id", String(existing.id))
           .select("*")
           .single();
@@ -532,7 +781,12 @@ export async function updateSpecialistPin(
     } else {
       const { data, error } = await supabase
         .from(TABLE)
-        .update({ pin_code: pin })
+        .update({
+          pin_code: nextLocal.pin_code,
+          username: nextLocal.username,
+          assigned_department: nextLocal.assigned_department,
+          must_change_credentials: nextLocal.must_change_credentials,
+        })
         .eq("id", targetId)
         .select("*");
 
@@ -567,63 +821,61 @@ export async function updateSpecialistPin(
 
 /**
  * Resolve the active profile against the loaded roster.
- * Prefer a real DB Supervisor UUID + pin_code over seed/fallback sessions.
+ * Prefer a real DB Master Admin / Supervisor UUID over seed sessions.
  */
 export function syncActiveSpecialistFromRoster(
   roster: StoreSpecialist[]
 ): StoreSpecialist | null {
   const store = getStoreNumber();
-  const dbSupervisor =
-    roster.find(
-      (m) =>
-        m.role === "Supervisor" &&
-        m.store_number === store &&
-        !isFallbackProfileId(m.id)
-    ) ??
-    roster.find(
-      (m) => m.role === "Supervisor" && !isFallbackProfileId(m.id)
-    );
-
   const saved = getActiveSpecialist();
 
-  if (dbSupervisor) {
-    const useDbSupervisor =
-      !saved ||
-      saved.role === "Supervisor" ||
-      isFallbackProfileId(saved.id) ||
-      isDepartmentSupervisorName(saved.name) ||
-      saved.name.toLowerCase() === dbSupervisor.name.toLowerCase();
+  if (saved) {
+    const matched =
+      (!isFallbackProfileId(saved.id)
+        ? roster.find((m) => m.id === saved.id)
+        : undefined) ??
+      roster.find(
+        (m) =>
+          m.name.toLowerCase() === saved.name.toLowerCase() &&
+          m.store_number === (saved.store_number || store) &&
+          m.role === saved.role
+      ) ??
+      roster.find(
+        (m) =>
+          saved.username &&
+          m.username?.toLowerCase() === saved.username.toLowerCase()
+      ) ??
+      null;
 
-    if (useDbSupervisor) {
-      setActiveSpecialist(dbSupervisor);
-      return dbSupervisor;
+    if (matched) {
+      setActiveSpecialist(matched);
+      return matched;
     }
+    return saved;
   }
 
-  if (!saved) return null;
-
-  const matched =
-    (!isFallbackProfileId(saved.id)
-      ? roster.find((m) => m.id === saved.id)
-      : undefined) ??
+  const dbMaster =
     roster.find(
       (m) =>
-        m.name.toLowerCase() === saved.name.toLowerCase() &&
-        m.store_number === (saved.store_number || store)
-    ) ??
-    roster.find((m) => m.name.toLowerCase() === saved.name.toLowerCase()) ??
-    null;
+        m.role === "MasterAdmin" &&
+        m.store_number === store &&
+        !isFallbackProfileId(m.id)
+    ) ?? roster.find((m) => m.role === "MasterAdmin" && !isFallbackProfileId(m.id));
 
-  if (!matched) return saved;
+  if (dbMaster) {
+    setActiveSpecialist(dbMaster);
+    return dbMaster;
+  }
 
-  setActiveSpecialist(matched);
-  return matched;
+  return null;
 }
 
 export function findSupervisor(
   roster: StoreSpecialist[]
 ): StoreSpecialist | undefined {
   return (
+    roster.find((m) => m.role === "MasterAdmin" && !isFallbackProfileId(m.id)) ??
+    roster.find((m) => m.role === "MasterAdmin") ??
     roster.find((m) => m.role === "Supervisor" && !isFallbackProfileId(m.id)) ??
     roster.find((m) => m.role === "Supervisor")
   );

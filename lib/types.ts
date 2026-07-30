@@ -7,7 +7,16 @@ export type HubSection =
   | "appliances"
   | "settings";
 
-export type SpecialistRole = "Associate" | "Supervisor";
+/**
+ * Platform roles:
+ * - MasterAdmin — unrestricted cross-department access
+ * - Supervisor — department-scoped (assigned_department)
+ * - Associate — shift PIN access within a department
+ */
+export type SpecialistRole = "Associate" | "Supervisor" | "MasterAdmin";
+
+/** Department workspace scope for RBAC. */
+export type DepartmentScope = "flooring" | "appliances" | "all";
 
 /** Flooring / SIMS catalog categories. */
 export const FLOORING_CATEGORIES = [
@@ -126,8 +135,14 @@ export type StoreSpecialist = {
   store_number: string;
   name: string;
   role: SpecialistRole;
-  /** Optional access PIN. Required for Supervisor profiles. */
+  /** Optional access PIN / password. Required for Supervisor & Master Admin. */
   pin_code: string | null;
+  /** Login username (supervisors / master admin). */
+  username: string | null;
+  /** Department workspace this profile may access. */
+  assigned_department: DepartmentScope | null;
+  /** First-login must set custom username + password. */
+  must_change_credentials: boolean;
   created_at: string;
   offline?: boolean;
 };
@@ -253,36 +268,36 @@ export const HUB_SECTIONS: {
 }[] = [
   {
     id: "audit",
-    label: "Cycle Audit",
-    title: "Flooring Cycle Audit",
+    label: "Flooring Audit",
+    title: "Flooring Audit",
     icon: "📊",
     description: "Roll CLF + carton / SIMS location audits",
   },
   {
     id: "catalog",
-    label: "SIMS Catalog",
-    title: "SIMS Catalog",
+    label: "Universal Catalog",
+    title: "Universal Catalog",
     icon: "🏷️",
     description: "Master SKUs, barcodes & location tags",
   },
   {
     id: "remnants",
-    label: "Remnant Rack",
+    label: "Remnants",
     title: "Remnant Rack",
     icon: "📦",
     description: "Back-room remnant inventory & status",
   },
   {
     id: "appliances",
-    label: "Appliances",
-    title: "Appliances Inventory & SIMS",
+    label: "Appliances Audit",
+    title: "Appliances Audit",
     icon: "🔌",
     description: "Unit counts + appliance SIMS staging audits",
   },
   {
     id: "settings",
-    label: "Settings & Sync",
-    title: "Settings & Sync",
+    label: "Master Settings",
+    title: "Master Settings",
     icon: "⚙️",
     description: "Store context, Supabase & offline queue",
   },

@@ -1,4 +1,16 @@
-# Carpet Hub — Development Journal
+# DeptSync Hub — Development Journal
+
+## 2026-07-30 — DeptSync rebrand + department-scoped RBAC
+
+### Shipped
+- Rebranded to **DeptSync Hub** (manifest short_name `DeptSync`, layout meta, header eyebrow `DeptSync · Lowe's #… · Inventory & SIMS Audit`).
+- New multi-department scanner/shield badge (`DeptSyncBadge`) + refreshed PWA icons (emerald boxes + amber barcode).
+- Role schema: `MasterAdmin` | `Supervisor` | `Associate` with `assigned_department`, `username`, `must_change_credentials` on `store_specialists` (local + Supabase schema).
+- `lib/rbac.ts` owns section visibility; Hub bottom nav filters tabs (Master Admin = all 5; Appliances Supervisor = Appliances / Catalog / Profile).
+- First-login non-dismissible credential modal for supervisors on default credentials (`amber_appliance` / `ChangeMe123`).
+- Catalog domain filter for department supervisors; store number change restricted to Master Admin.
+
+---
 
 ## 2026-07-27 — Catalog category folder browse
 

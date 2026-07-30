@@ -43,11 +43,17 @@ import {
 type Props = {
   catalog: CatalogItem[];
   onCatalogChange: (items: CatalogItem[]) => void;
+  /** RBAC catalog domain — appliances supervisors see appliance SKUs only. */
+  domainFilter?: "all" | "flooring" | "appliances";
 };
 
 type CatalogViewMode = "folders" | "flat";
 
-export function CatalogSection({ catalog, onCatalogChange }: Props) {
+export function CatalogSection({
+  catalog,
+  onCatalogChange,
+  domainFilter = "all",
+}: Props) {
   const [query, setQuery] = useState("");
   const [viewMode, setViewMode] = useState<CatalogViewMode>("folders");
   const [activeFolder, setActiveFolder] = useState<CatalogFolderId | null>(
@@ -74,13 +80,26 @@ export function CatalogSection({ catalog, onCatalogChange }: Props) {
   const formMode = auditModeForCategory(category);
   const searchActive = query.trim().length > 0;
 
-  const folders = useMemo(() => buildCatalogFolders(catalog), [catalog]);
+  const scopedCatalog = useMemo(() => {
+    if (domainFilter === "appliances") {
+      return catalog.filter((item) => isApplianceCategory(item.category));
+    }
+    if (domainFilter === "flooring") {
+      return catalog.filter((item) => !isApplianceCategory(item.category));
+    }
+    return catalog;
+  }, [catalog, domainFilter]);
+
+  const folders = useMemo(
+    () => buildCatalogFolders(scopedCatalog),
+    [scopedCatalog]
+  );
 
   const searchMatches = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return [];
     const qDigits = sanitizeBarcodeScan(query);
-    return catalog.filter((item) => {
+    return scopedCatalog.filter((item) => {
       if (
         item.sku.toLowerCase().includes(q) ||
         item.carpet_name.toLowerCase().includes(q) ||
@@ -97,19 +116,25 @@ export function CatalogSection({ catalog, onCatalogChange }: Props) {
           sanitizeBarcodeScan(item.upc_barcode).includes(qDigits))
       );
     });
-  }, [catalog, query]);
+  }, [scopedCatalog, query]);
 
   const folderItems = useMemo(() => {
     if (!activeFolder) return [];
-    return catalog
+    return scopedCatalog
       .filter((item) => itemInFolder(item, activeFolder))
       .sort((a, b) => a.sku.localeCompare(b.sku));
-  }, [catalog, activeFolder]);
+  }, [scopedCatalog, activeFolder]);
 
   const flatItems = useMemo(
-    () => [...catalog].sort((a, b) => a.sku.localeCompare(b.sku)),
-    [catalog]
+    () => [...scopedCatalog].sort((a, b) => a.sku.localeCompare(b.sku)),
+    [scopedCatalog]
   );
+
+  useEffect(() => {
+    if (domainFilter === "appliances" && !isApplianceCategory(category)) {
+      setCategory("Refrigerator");
+    }
+  }, [domainFilter, category]);
 
   useEffect(() => {
     let cancelled = false;
@@ -437,20 +462,24 @@ export function CatalogSection({ catalog, onCatalogChange }: Props) {
               }}
               className="min-h-12 w-full rounded-xl border border-slate-800 bg-slate-950 px-3 text-base text-slate-100"
             >
-              <optgroup label="Flooring">
-                {FLOORING_CATEGORIES.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-              </optgroup>
-              <optgroup label="Appliances">
-                {APPLIANCE_CATEGORIES.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
-                  </option>
-                ))}
-              </optgroup>
+              {domainFilter !== "appliances" ? (
+                <optgroup label="Flooring">
+                  {FLOORING_CATEGORIES.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </optgroup>
+              ) : null}
+              {domainFilter !== "flooring" ? (
+                <optgroup label="Appliances">
+                  {APPLIANCE_CATEGORIES.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </optgroup>
+              ) : null}
             </select>
           </label>
           <TextField

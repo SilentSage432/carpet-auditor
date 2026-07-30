@@ -5,6 +5,7 @@ import { countLocalCatalog } from "@/lib/catalog";
 import { countLocalRemnants } from "@/lib/remnants";
 import { selectOnFocus } from "@/lib/number-input";
 import { isSupervisor } from "@/lib/specialists";
+import { canManageStoreNumber, isMasterAdmin } from "@/lib/rbac";
 import { countLocalAudits } from "@/lib/storage";
 import {
   formatStoreLabel,
@@ -44,6 +45,8 @@ export function SettingsSection({
   const configured = isSupabaseConfigured();
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
   const supervisorSession = isSupervisor(activeSpecialist);
+  const masterSession = isMasterAdmin(activeSpecialist);
+  const canEditStore = canManageStoreNumber(activeSpecialist);
   const canChangePin = Boolean(activeSpecialist);
   const pending = countPendingSync(storeNumber);
   const storeDraft = storeDraftOverride ?? storeNumber;
@@ -123,36 +126,45 @@ export function SettingsSection({
             {formatStoreLabel(storeNumber)}
           </span>
         </p>
-        <label className="block space-y-1.5">
-          <span className="text-sm font-medium text-slate-200">
-            Store Number / Location
-          </span>
-          <input
-            type="text"
-            inputMode="numeric"
-            autoComplete="off"
-            placeholder="e.g. Store #1234"
-            aria-label="Store Number / Location"
-            value={storeDraft}
-            onFocus={selectOnFocus}
-            onChange={(e) =>
-              handleStoreDraftChange(e.target.value.replace(/\D/g, ""))
-            }
-            onBlur={() => commitStore(storeDraft)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter") {
-                e.preventDefault();
-                commitStore(storeDraft);
-                e.currentTarget.blur();
-              }
-            }}
-            className="min-h-12 h-12 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 font-mono text-base font-semibold tabular-nums text-slate-100 outline-none transition focus:border-emerald-500"
-          />
-        </label>
-        <p className="text-xs leading-relaxed text-slate-500">
-          Saves automatically. Audits, catalog, remnants, and specialists are
-          scoped by this store number for district isolation.
-        </p>
+        {canEditStore ? (
+          <>
+            <label className="block space-y-1.5">
+              <span className="text-sm font-medium text-slate-200">
+                Store Number / Location
+              </span>
+              <input
+                type="text"
+                inputMode="numeric"
+                autoComplete="off"
+                placeholder="e.g. Store #1234"
+                aria-label="Store Number / Location"
+                value={storeDraft}
+                onFocus={selectOnFocus}
+                onChange={(e) =>
+                  handleStoreDraftChange(e.target.value.replace(/\D/g, ""))
+                }
+                onBlur={() => commitStore(storeDraft)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    commitStore(storeDraft);
+                    e.currentTarget.blur();
+                  }
+                }}
+                className="min-h-12 h-12 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 font-mono text-base font-semibold tabular-nums text-slate-100 outline-none transition focus:border-emerald-500"
+              />
+            </label>
+            <p className="text-xs leading-relaxed text-slate-500">
+              Master Admin only. Audits, catalog, remnants, and specialists are
+              scoped by this store number for district isolation.
+            </p>
+          </>
+        ) : (
+          <p className="text-xs leading-relaxed text-slate-500">
+            Store switching is restricted to Master Admin. Contact your admin to
+            change location.
+          </p>
+        )}
       </section>
 
       <section className="space-y-3 rounded-2xl border border-slate-800 bg-slate-900/90 p-4">
@@ -166,7 +178,12 @@ export function SettingsSection({
               <span className="font-semibold text-emerald-400">
                 {activeSpecialist?.name}
               </span>
-              {supervisorSession ? " (Department Supervisor)" : ""}.
+              {masterSession
+                ? " (Master Admin)"
+                : supervisorSession
+                  ? " (Department Supervisor)"
+                  : " (Floor Associate)"}
+              .
             </p>
             <button
               type="button"

@@ -1,11 +1,14 @@
 "use client";
 
 import { useState } from "react";
+import { TextField } from "@/components/ui/NumberField";
 
 type Props = {
   open: boolean;
   title?: string;
   subtitle?: string;
+  /** Digit keypad (default) or alphanumeric password field. */
+  mode?: "pin" | "password";
   onClose: () => void;
   onSuccess: () => void;
   verify: (pin: string) => boolean;
@@ -15,6 +18,7 @@ export function PinKeypadModal({
   open,
   title = "Enter Supervisor PIN",
   subtitle,
+  mode = "pin",
   onClose,
   onSuccess,
   verify,
@@ -25,6 +29,13 @@ export function PinKeypadModal({
 
   if (!open) return null;
 
+  function fail(message: string) {
+    setShake(true);
+    setError(message);
+    setPin("");
+    window.setTimeout(() => setShake(false), 450);
+  }
+
   function backspace() {
     setError(null);
     setPin((prev) => prev.slice(0, -1));
@@ -33,7 +44,7 @@ export function PinKeypadModal({
   function submit(nextPin?: string) {
     const attempt = nextPin ?? pin;
     if (!attempt) {
-      setError("Enter PIN");
+      setError(mode === "password" ? "Enter password" : "Enter PIN");
       return;
     }
     if (verify(attempt)) {
@@ -42,17 +53,13 @@ export function PinKeypadModal({
       onSuccess();
       return;
     }
-    setShake(true);
-    setError("Incorrect PIN");
-    setPin("");
-    window.setTimeout(() => setShake(false), 450);
+    fail(mode === "password" ? "Incorrect password" : "Incorrect PIN");
   }
 
   function handleDigit(digit: string) {
     const next = pin.length >= 8 ? pin : pin + digit;
     setError(null);
     setPin(next);
-    // Auto-submit common 4-digit PINs
     if (next.length === 4) {
       window.setTimeout(() => submit(next), 80);
     }
@@ -83,18 +90,35 @@ export function PinKeypadModal({
           <p className="mt-1 text-center text-sm text-slate-400">{subtitle}</p>
         ) : null}
 
-        <div className="mt-4 flex justify-center gap-2">
-          {Array.from({ length: Math.max(4, pin.length || 4) }).map((_, i) => (
-            <span
-              key={i}
-              className={`h-3 w-3 rounded-full border ${
-                i < pin.length
-                  ? "border-emerald-400 bg-emerald-400"
-                  : "border-slate-600 bg-transparent"
-              }`}
+        {mode === "password" ? (
+          <div className="mt-4">
+            <TextField
+              label="Password"
+              type="password"
+              autoComplete="current-password"
+              value={pin}
+              onChange={(v) => {
+                setError(null);
+                setPin(v);
+              }}
+              placeholder="Enter password"
+              autoFocus
             />
-          ))}
-        </div>
+          </div>
+        ) : (
+          <div className="mt-4 flex justify-center gap-2">
+            {Array.from({ length: Math.max(4, pin.length || 4) }).map((_, i) => (
+              <span
+                key={i}
+                className={`h-3 w-3 rounded-full border ${
+                  i < pin.length
+                    ? "border-emerald-400 bg-emerald-400"
+                    : "border-slate-600 bg-transparent"
+                }`}
+              />
+            ))}
+          </div>
+        )}
 
         {error && (
           <p className="mt-3 text-center text-sm font-semibold text-red-400" role="alert">
@@ -102,35 +126,37 @@ export function PinKeypadModal({
           </p>
         )}
 
-        <div className="mt-4 grid grid-cols-3 gap-2">
-          {keys.map((key, idx) => {
-            if (key === "") {
-              return <div key={`empty-${idx}`} />;
-            }
-            if (key === "⌫") {
+        {mode === "pin" ? (
+          <div className="mt-4 grid grid-cols-3 gap-2">
+            {keys.map((key, idx) => {
+              if (key === "") {
+                return <div key={`empty-${idx}`} />;
+              }
+              if (key === "⌫") {
+                return (
+                  <button
+                    key={key}
+                    type="button"
+                    onClick={backspace}
+                    className="flex h-14 items-center justify-center rounded-xl border border-slate-700 bg-slate-950 text-lg font-semibold text-slate-200 active:scale-95"
+                  >
+                    ⌫
+                  </button>
+                );
+              }
               return (
                 <button
                   key={key}
                   type="button"
-                  onClick={backspace}
-                  className="flex h-14 items-center justify-center rounded-xl border border-slate-700 bg-slate-950 text-lg font-semibold text-slate-200 active:scale-95"
+                  onClick={() => handleDigit(key)}
+                  className="flex h-14 items-center justify-center rounded-xl border border-slate-700 bg-slate-950 font-mono text-xl font-bold text-slate-50 active:scale-95"
                 >
-                  ⌫
+                  {key}
                 </button>
               );
-            }
-            return (
-              <button
-                key={key}
-                type="button"
-                onClick={() => handleDigit(key)}
-                className="flex h-14 items-center justify-center rounded-xl border border-slate-700 bg-slate-950 font-mono text-xl font-bold text-slate-50 active:scale-95"
-              >
-                {key}
-              </button>
-            );
-          })}
-        </div>
+            })}
+          </div>
+        ) : null}
 
         <button
           type="button"

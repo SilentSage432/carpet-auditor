@@ -27,7 +27,11 @@ export function ChangePinModal({ open, member, onClose, onUpdated }: Props) {
   if (!open || !member) return null;
 
   const profileLabel =
-    member.role === "Supervisor" ? "Supervisor" : "Profile";
+    member.role === "MasterAdmin"
+      ? "Master Admin"
+      : member.role === "Supervisor"
+        ? "Supervisor"
+        : "Profile";
 
   async function handleSave() {
     if (!member) return;
@@ -77,9 +81,11 @@ export function ChangePinModal({ open, member, onClose, onUpdated }: Props) {
   }
 
   const successToast =
-    member.role === "Supervisor"
-      ? "✅ Supervisor PIN updated successfully!"
-      : "✅ Profile PIN updated successfully!";
+    member.role === "MasterAdmin"
+      ? "✅ Master Admin PIN updated successfully!"
+      : member.role === "Supervisor"
+        ? "✅ Supervisor PIN updated successfully!"
+        : "✅ Profile PIN updated successfully!";
 
   return (
     <div className="fixed inset-0 z-[75] flex items-end justify-center sm:items-center">

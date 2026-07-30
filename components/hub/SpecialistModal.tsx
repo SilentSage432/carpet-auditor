@@ -6,13 +6,15 @@ import { NumberField, TextField } from "@/components/ui/NumberField";
 import {
   dedupeRoster,
   fetchSpecialists,
+  getActiveSpecialist,
   isDefaultPin,
   requiresPin,
   roleBadge,
   saveSpecialist,
+  usesPasswordUnlock,
   verifyPin,
 } from "@/lib/specialists";
-import type { SpecialistRole, StoreSpecialist } from "@/lib/types";
+import type { DepartmentScope, SpecialistRole, StoreSpecialist } from "@/lib/types";
 
 type Props = {
   open: boolean;
@@ -27,6 +29,7 @@ export function SpecialistModal({ open, active, onClose, onSelect }: Props) {
   const [newName, setNewName] = useState("");
   const [newRole, setNewRole] = useState<SpecialistRole>("Associate");
   const [newPin, setNewPin] = useState("");
+  const [newDepartment, setNewDepartment] = useState<DepartmentScope>("flooring");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [pendingPinMember, setPendingPinMember] = useState<StoreSpecialist | null>(
@@ -72,15 +75,29 @@ export function SpecialistModal({ open, active, onClose, onSelect }: Props) {
     setSaving(true);
     setError(null);
     try {
+      const active = getActiveSpecialist();
+      const inheritedDept =
+        newRole === "Associate"
+          ? (active?.assigned_department === "appliances" ||
+            active?.assigned_department === "flooring"
+              ? active.assigned_department
+              : newDepartment)
+          : newRole === "MasterAdmin"
+            ? "all"
+            : newDepartment;
+
       const { record } = await saveSpecialist({
         name: newName.trim(),
         role: newRole,
         pin_code: newPin.trim() || null,
+        assigned_department: inheritedDept,
+        must_change_credentials: newRole === "Supervisor",
       });
       setTeam((prev) => dedupeRoster([record, ...(prev ?? [])]));
       setNewName("");
       setNewRole("Associate");
       setNewPin("");
+      setNewDepartment("flooring");
       setAdding(false);
       requestSelect(record);
     } catch {
@@ -164,18 +181,19 @@ export function SpecialistModal({ open, active, onClose, onSelect }: Props) {
                   <legend className="mb-1.5 text-sm font-medium text-slate-200">
                     Role
                   </legend>
-                  <div className="grid grid-cols-2 gap-1 rounded-xl border border-slate-800 bg-slate-950 p-1">
+                  <div className="grid grid-cols-3 gap-1 rounded-xl border border-slate-800 bg-slate-950 p-1">
                     {(
                       [
-                        ["Associate", "👤 Associate"],
-                        ["Supervisor", "🛡️ Supervisor"],
+                        ["Associate", "👤"],
+                        ["Supervisor", "🛡️"],
+                        ["MasterAdmin", "👑"],
                       ] as const
                     ).map(([value, label]) => (
                       <button
                         key={value}
                         type="button"
                         onClick={() => setNewRole(value)}
-                        className={`flex min-h-12 items-center justify-center rounded-lg text-sm font-semibold ${
+                        className={`flex min-h-12 items-center justify-center rounded-lg text-xs font-semibold ${
                           newRole === value
                             ? "bg-emerald-500 text-slate-950"
                             : "text-slate-400"
@@ -186,16 +204,48 @@ export function SpecialistModal({ open, active, onClose, onSelect }: Props) {
                     ))}
                   </div>
                 </fieldset>
+                {(newRole === "Supervisor" || newRole === "Associate") && (
+                  <fieldset>
+                    <legend className="mb-1.5 text-sm font-medium text-slate-200">
+                      Department
+                    </legend>
+                    <div className="grid grid-cols-2 gap-1 rounded-xl border border-slate-800 bg-slate-950 p-1">
+                      {(
+                        [
+                          ["flooring", "📊 Flooring"],
+                          ["appliances", "🔌 Appliances"],
+                        ] as const
+                      ).map(([value, label]) => (
+                        <button
+                          key={value}
+                          type="button"
+                          onClick={() => setNewDepartment(value)}
+                          className={`flex min-h-12 items-center justify-center rounded-lg text-sm font-semibold ${
+                            newDepartment === value
+                              ? "bg-emerald-500 text-slate-950"
+                              : "text-slate-400"
+                          }`}
+                        >
+                          {label}
+                        </button>
+                      ))}
+                    </div>
+                  </fieldset>
+                )}
                 <NumberField
                   label={
-                    newRole === "Supervisor"
-                      ? "PIN Code (required)"
+                    newRole === "Supervisor" || newRole === "MasterAdmin"
+                      ? "PIN / Password (required)"
                       : "PIN Code (optional)"
                   }
                   mode="digits"
                   value={newPin}
                   onChange={setNewPin}
-                  placeholder={newRole === "Supervisor" ? "e.g. 1234" : "Optional"}
+                  placeholder={
+                    newRole === "Supervisor" || newRole === "MasterAdmin"
+                      ? "e.g. 1234"
+                      : "Optional"
+                  }
                 />
                 <div className="grid grid-cols-2 gap-2">
                   <button
@@ -243,11 +293,24 @@ export function SpecialistModal({ open, active, onClose, onSelect }: Props) {
       <PinKeypadModal
         key={pendingPinMember?.id ?? "pin-closed"}
         open={pendingPinMember != null}
-        title="Enter Supervisor PIN / Password"
+        title={
+          pendingPinMember && usesPasswordUnlock(pendingPinMember)
+            ? "Enter Password"
+            : "Enter Supervisor PIN / Password"
+        }
         subtitle={
           pendingPinMember
-            ? `Unlock ${pendingPinMember.name}`
+            ? `Unlock ${pendingPinMember.name}${
+                pendingPinMember.username
+                  ? ` · ${pendingPinMember.username}`
+                  : ""
+              }`
             : undefined
+        }
+        mode={
+          pendingPinMember && usesPasswordUnlock(pendingPinMember)
+            ? "password"
+            : "pin"
         }
         verify={(pin) =>
           pendingPinMember ? verifyPin(pendingPinMember, pin) : false

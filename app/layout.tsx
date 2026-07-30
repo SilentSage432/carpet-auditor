@@ -16,13 +16,13 @@ const jetbrains = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Flooring Hub — SIMS Audit",
+  title: "DeptSync Hub — Department & SIMS Audit",
   description:
-    "Universal Flooring & SIMS Location Audit Hub — cycle audit, catalog, and remnant rack.",
-  applicationName: "Flooring Hub",
+    "DeptSync Hub — department-scoped inventory & SIMS audits for flooring, appliances, catalog, and remnant rack.",
+  applicationName: "DeptSync Hub",
   appleWebApp: {
     capable: true,
-    title: "Flooring Hub",
+    title: "DeptSync",
     statusBarStyle: "black-translucent",
   },
   formatDetection: {

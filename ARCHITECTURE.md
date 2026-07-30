@@ -1,14 +1,18 @@
-# Flooring Hub — Architecture
+# DeptSync Hub — Architecture
 
 ```
-app/page.tsx                      → Hub shell (section state + data load + online flush)
-app/layout.tsx                    → Fonts, PWA meta, ServiceWorkerRegister
+app/page.tsx                      → Hub shell (section state + RBAC gate + data load + online flush)
+app/layout.tsx                    → Fonts, PWA meta (DeptSync), ServiceWorkerRegister
+app/manifest.ts                   → short_name DeptSync · Department & SIMS Audit Hub
 public/sw.js                      → Offline shell cache strategies
-components/hub/HubChrome.tsx      → Sticky header (network badge) + slide-over drawer
+components/hub/HubChrome.tsx      → Sticky header (DeptSync badge + network) + role-filtered bottom nav
+components/hub/DeptSyncBadge.tsx  → Multi-department scanner/shield mark
+components/hub/FirstLoginCredentialsModal.tsx → Non-dismissible supervisor credential setup
 components/hub/*Modal.tsx         → Specialist / PIN / Markdown modals
 components/barcode/QuickAddCatalogModal.tsx → Scan-to-catalog Quick-Add
 components/catalog/SimsLocationFinder.tsx   → SIMS location stock drawer
 components/sections/*             → Presentation per workspace section
+lib/rbac.ts                       → Department-scoped section / catalog visibility (compose only)
 lib/store.ts                      → Active store_number session
 lib/sync-queue.ts                 → Offline action queue + replay
 lib/network.ts                    → Online/offline badge state
@@ -17,7 +21,7 @@ lib/markdown.ts                   → Clearance price math + badge label
 lib/calc.ts                       → CLF + carton sq ft + remnant sq ft / sq yd
 lib/catalog.ts / remnants.ts / storage.ts / specialists.ts → Domain persistence
 lib/supabase.ts                   → Client factory
-supabase/schema.sql               → Tables + multi-category + SIMS + store_number + RLS
+supabase/schema.sql               → Tables + multi-category + SIMS + store_number + RBAC columns + RLS
 ```
 
 ## Ownership
@@ -25,6 +29,7 @@ supabase/schema.sql               → Tables + multi-category + SIMS + store_num
 | Concern | Owner |
 |---|---|
 | Navigation / section routing | `app/page.tsx` + `HubChrome` |
+| Department RBAC / tab visibility | `lib/rbac.ts` |
 | Store context | `lib/store.ts` |
 | Offline sync queue | `lib/sync-queue.ts` |
 | Shell caching | `public/sw.js` + `ServiceWorkerRegister` |
@@ -33,7 +38,7 @@ supabase/schema.sql               → Tables + multi-category + SIMS + store_num
 | Catalog knowledge | `lib/catalog.ts` |
 | Barcode resolve / Quick-Add | `lib/barcode.ts`, `NumberField` scan hooks, `QuickAddCatalogModal` |
 | SIMS location stock | `lib/sims.ts`, `SimsLocationFinder` |
-| Specialists session | `lib/specialists.ts`, `SpecialistModal` |
+| Specialists session / credentials | `lib/specialists.ts`, `SpecialistModal`, `FirstLoginCredentialsModal` |
 | PIN change / default notice | `ChangePinModal`, `DefaultPinNotice` |
 | Manager markdown | `lib/markdown.ts`, `ApplyMarkdownModal` |
 | Variance | `lib/variance.ts` |
@@ -41,12 +46,13 @@ supabase/schema.sql               → Tables + multi-category + SIMS + store_num
 | Remnant inventory | `lib/remnants.ts` |
 | Audit log + draft | `lib/storage.ts` |
 
-## Sections
+## Sections (role-filtered)
 
-1. **Cycle Audit** — dual engine (roll CLF vs carton sq ft), scan-to-catalog, SIMS tags
-2. **SIMS Catalog** — master SKU list + Location Finder drawer
-3. **Remnant Rack** — back-room remnant status + manager markdown
-4. **Settings & Sync** — store selector, queue, Supabase + localStorage status
+1. **Flooring Audit** — dual engine (roll CLF vs carton sq ft), scan-to-catalog, SIMS tags
+2. **Appliances Audit** — unit counts + appliance SIMS staging
+3. **Universal / Appliance Catalog** — master SKU list (domain-scoped) + Location Finder
+4. **Remnant Rack** — back-room remnant status + manager markdown
+5. **Master / Profile Settings** — store selector (Master Admin), queue, Supabase + localStorage
 
 ## Dual audit modes
 
@@ -63,5 +69,5 @@ The service worker caches the app shell for instant cold starts without connecti
 ## Schema note
 
 Tables retain `carpet_*` names (alias: flooring_audits / SIMS catalog) for migration
-compatibility. New columns: `category`, `sims_location` / `default_sims_location`,
-`box_count`, `calculated_sqft`, `sqft_per_box`.
+compatibility. RBAC columns on `store_specialists`: `username`, `assigned_department`,
+`must_change_credentials`; roles include `MasterAdmin`.

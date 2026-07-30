@@ -1,8 +1,13 @@
 "use client";
 
 import { useNetworkBadge } from "@/lib/network";
+import {
+  sectionTitle,
+  visibleNavTabs,
+} from "@/lib/rbac";
 import { formatStoreLabel } from "@/lib/store";
-import { HUB_SECTIONS, type HubSection, type StoreSpecialist } from "@/lib/types";
+import type { HubSection, StoreSpecialist } from "@/lib/types";
+import { DeptSyncBadge } from "@/components/hub/DeptSyncBadge";
 
 type HubHeaderProps = {
   section: HubSection;
@@ -19,19 +24,21 @@ export function HubHeader({
   onChangePin,
   storeNumber,
 }: HubHeaderProps) {
-  const meta = HUB_SECTIONS.find((s) => s.id === section);
   const network = useNetworkBadge();
+  const title = sectionTitle(section, specialist);
 
   return (
     <header className="sticky top-0 z-40 border-b border-slate-800 bg-slate-950/95 backdrop-blur">
       <div className="mx-auto flex min-h-14 max-w-md items-center gap-2 px-3 py-1.5">
+        <DeptSyncBadge size="sm" />
         <div className="min-w-0 flex-1">
-          <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-emerald-400">
-            Flooring Hub
+          <p className="truncate font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-400">
+            DeptSync
             {storeNumber ? ` · ${formatStoreLabel(storeNumber)}` : ""}
+            {" · Inventory & SIMS Audit"}
           </p>
           <h1 className="truncate text-base font-bold text-slate-50">
-            {meta?.title ?? "Flooring & SIMS Hub"}
+            {title}
           </h1>
           <p
             className={`mt-0.5 flex items-center gap-1.5 truncate text-[10px] font-semibold ${
@@ -59,7 +66,11 @@ export function HubHeader({
             aria-label="Select active specialist"
           >
             <span aria-hidden>
-              {specialist?.role === "Supervisor" ? "🛡️" : "👤"}
+              {specialist?.role === "MasterAdmin"
+                ? "👑"
+                : specialist?.role === "Supervisor"
+                  ? "🛡️"
+                  : "👤"}
             </span>
             <span className="min-w-0 truncate text-xs font-semibold text-emerald-200">
               {specialist ? specialist.name : "Select"}
@@ -82,27 +93,32 @@ export function HubHeader({
   );
 }
 
-const BOTTOM_NAV_TABS: { id: HubSection; label: string; icon: string }[] = [
-  { id: "audit", label: "Audit", icon: "📊" },
-  { id: "catalog", label: "Catalog", icon: "🏷️" },
-  { id: "remnants", label: "Remnants", icon: "📦" },
-  { id: "appliances", label: "Appliances", icon: "🔌" },
-  { id: "settings", label: "Settings", icon: "⚙️" },
-];
-
 type BottomNavBarProps = {
   active: HubSection;
   onSelect: (section: HubSection) => void;
+  specialist: StoreSpecialist | null;
 };
 
-export function BottomNavBar({ active, onSelect }: BottomNavBarProps) {
+export function BottomNavBar({
+  active,
+  onSelect,
+  specialist,
+}: BottomNavBarProps) {
+  const tabs = visibleNavTabs(specialist);
+  const cols =
+    tabs.length <= 3
+      ? "grid-cols-3"
+      : tabs.length === 4
+        ? "grid-cols-4"
+        : "grid-cols-5";
+
   return (
     <nav
       aria-label="Primary"
       className="fixed bottom-0 left-0 right-0 z-30 mx-auto max-w-md border-t border-slate-800 bg-slate-900/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-md"
     >
-      <div className="grid grid-cols-5">
-        {BOTTOM_NAV_TABS.map((tab) => {
+      <div className={`grid ${cols}`}>
+        {tabs.map((tab) => {
           const isActive = tab.id === active;
           return (
             <button

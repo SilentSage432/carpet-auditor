@@ -1,6 +1,6 @@
-# Carpet Hub
+# DeptSync Hub
 
-Mobile-first **Carpet Management Hub** for cycle counts, wall SKU catalog, and remnant rack inventory.
+Mobile-first **DeptSync Hub** — department-scoped inventory & SIMS audits (flooring, appliances, catalog, remnants) with role-based workspace access.
 
 ```
 CLF = Total Inches × Rounds × 0.2625

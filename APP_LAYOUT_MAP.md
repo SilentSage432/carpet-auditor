@@ -28,9 +28,9 @@
 | Layer | File | Role |
 |-------|------|------|
 | HTML shell | `app/layout.tsx` | Barlow + JetBrains Mono fonts; PWA meta; `themeColor #022c22`; `viewportFit: cover`; `maximumScale: 1` |
-| PWA | `app/manifest.ts` | Standalone, portrait-primary, short_name **Flooring Hub** |
+| PWA | `app/manifest.ts` | Standalone, portrait-primary, short_name **DeptSync** |
 | Visual base | `app/globals.css` | Dark slate body; emerald radial wash on `#020617`; pin-shake animation |
-| Hub page | `app/page.tsx` | Section state, data load, overlay orchestration |
+| Hub page | `app/page.tsx` | Section state, RBAC gate, data load, overlay orchestration |
 | SW | `components/hub/ServiceWorkerRegister.tsx` | Registers `public/sw.js` (no visible UI) |
 
 **Viewport composition**
@@ -61,10 +61,11 @@
 
 | Slot (L → R) | Content | Action |
 |--------------|---------|--------|
-| Brand eyebrow | `Flooring Hub · Lowe's #{store}` | Display only (store set in Settings) |
-| Section title | Active `HUB_SECTIONS[].title` | Updates when bottom tab selects a section |
+| Brand badge | `DeptSyncBadge` (boxes + barcode) | Display only |
+| Brand eyebrow | `DeptSync · Lowe's #{store} · Inventory & SIMS Audit` | Display only (store set in Settings) |
+| Section title | Role-aware title via `sectionTitle()` | Updates when bottom tab selects a section |
 | Network badge | 🟢 Online / 🟠 Offline Mode · `N queued` | Live via `useNetworkBadge` |
-| Specialist chip | 🛡️/👤 + name or “Select” | Opens **SpecialistModal** |
+| Specialist chip | 👑/🛡️/👤 + name or “Select” | Opens **SpecialistModal** |
 | ⚙️ (conditional) | Shown when a specialist is active | Opens **ChangePinModal** |
 
 ### A.3 Main navigation (`BottomNavBar`)

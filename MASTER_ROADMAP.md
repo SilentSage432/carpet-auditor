@@ -1,4 +1,4 @@
-# Flooring Hub — Master Roadmap
+# DeptSync Hub — Master Roadmap
 
 ## Done
 - [x] Carpet Hub shell with sticky header + slide-over nav
@@ -28,9 +28,12 @@
 - [x] Live CLF | SQFT | SQYD badge; undo-last-audit toast; Web Audio success / Quick-Add chimes
 - [x] Appliances Inventory & SIMS Audit tab (unit counts + appliance categories)
 - [x] Catalog category folder browse (folders / drill-down / flat toggle / search override)
+- [x] DeptSync rebrand + multi-department badge / PWA icons
+- [x] Department-scoped RBAC (Master Admin / Supervisor / Associate) + nav filter
+- [x] Supervisor first-login username/password customization modal
 
 ## Next
-- [ ] JWT / claim-based RLS enforcing `store_number` server-side
+- [ ] JWT / claim-based RLS enforcing `store_number` (+ department) server-side
 - [ ] Background Sync API / periodic queue flush while tab backgrounded
 - [ ] Conflict resolution UI when offline edits collide
 - [ ] Retire or wire orphan `MarryBarcodeModal`
