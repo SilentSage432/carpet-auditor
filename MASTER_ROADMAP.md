@@ -38,9 +38,14 @@
 - [x] Zero-Access Authentication Wall (login / setup / PIN unlock / 8h idle lock)
 - [x] Soft-delete roster deactivation (`is_active`) — no revive after Master Admin delete
 - [x] Biometric WebAuthn login + OS password-manager autocomplete on AuthWall
+- [x] Store Operations schema (departments / profiles / store_locations / weekly_rotations + RLS)
+- [x] Super Admin Store Map bulk generator (`/admin/store-map`)
+- [x] Weekly rotation engine API (`/api/rotations/generate` + cycle reset)
+- [x] Zebra supervisor rotation dashboard (`/dashboard`)
 
 ## Next
 - [ ] JWT / claim-based RLS enforcing `store_number` (+ department) server-side
+- [ ] Wire Supabase Auth sessions into `profiles` (replace header-based store-ops actor bridge)
 - [ ] Background Sync API / periodic queue flush while tab backgrounded
 - [ ] Conflict resolution UI when offline edits collide
 - [ ] Retire or wire orphan `MarryBarcodeModal`

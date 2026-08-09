@@ -312,3 +312,8 @@ create policy "Allow anon all store_specialists"
 create policy "Allow delete and update for store_specialists"
   on public.store_specialists for all to anon using (true) with check (true);
 
+-- ---------------------------------------------------------------------------
+-- Store Operations (multi-dept map + weekly rotations + auth.users RBAC)
+-- Apply: supabase/migrations/20260809_store_operations_rbac.sql
+-- ---------------------------------------------------------------------------
+

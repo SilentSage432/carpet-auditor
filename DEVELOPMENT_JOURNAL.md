@@ -1,5 +1,16 @@
 # DeptSync Hub — Development Journal
 
+## 2026-08-09 — Store Operations: multi-dept map, RBAC, weekly rotations
+
+### Shipped
+- Migration `supabase/migrations/20260809_store_operations_rbac.sql`: enums (`user_role`, `location_type`, `rotation_status`), tables (`departments`, `profiles`, `store_locations`, `weekly_rotations`), RLS (super_admin full CRUD; department_supervisor read/update on assigned dept).
+- Domain: `lib/store-ops/*` — rotation engine (PENDING pick → ASSIGNED; cycle bump when all COMPLETED; cool-down until reset), bulk bay generator, hub MasterAdmin/Supervisor → store-ops actor bridge.
+- APIs: `POST /api/rotations/generate`, `POST /api/rotations/complete`, `GET /api/weekly-rotations`, departments + store-locations (+ bulk) routes (service role).
+- UI: `/admin/store-map` Super Admin bulk generator + location grid + weekly generate; `/dashboard` Zebra supervisor checklist with optimistic complete.
+- Settings → Store Operations links; `.env.example` adds `SUPABASE_SERVICE_ROLE_KEY`.
+
+---
+
 ## 2026-07-30 — Biometric login + password manager autocomplete
 
 ### Shipped

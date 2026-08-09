@@ -1,7 +1,7 @@
 # DeptSync Hub — Chat Handoff
 
 ## Product
-DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's store teams. Multi-category flooring + appliances, barcode scan-to-catalog, dual roll/carton audit engine, SIMS location finder, PWA offline shell + sync queue, multi-store isolation, department-scoped RBAC, specialist PIN / password, CLF/sqft variance, remnant aging, and manager markdown.
+DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's store teams. Multi-category flooring + appliances, barcode scan-to-catalog, dual roll/carton audit engine, SIMS location finder, PWA offline shell + sync queue, multi-store isolation, department-scoped RBAC, specialist PIN / password, CLF/sqft variance, remnant aging, manager markdown, and **Store Operations** (aisle/bay map + automated weekly maintenance rotations).
 
 ## Branding
 - App: **DeptSync Hub** · PWA short_name **DeptSync**
@@ -70,3 +70,13 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 - Shift summary → **📊 Export / Print Report** (Flooring, Appliances, Department)
 - `AuditReportModal` + `lib/audit-report.ts`: formal SIMS/cycle summary, print-to-PDF, mailto / `navigator.share`, Markdown clipboard paste
 - Print stylesheet strips hub chrome for letter B&W output
+
+## Store Operations (multi-dept maintenance)
+- Schema migration: `supabase/migrations/20260809_store_operations_rbac.sql`
+  - `departments`, `profiles` (auth.users + `super_admin` / `department_supervisor`), `store_locations` (SELLING/TOPSTOCK + cycle status), `weekly_rotations`
+  - RLS: super_admin all; supervisors read/update own `assigned_department_id`
+- Hub bridge: Master Admin → super_admin; Supervisor → department_supervisor (via `departments.code` = hub `assigned_department`)
+- `/admin/store-map` — bulk aisle/bay generator + grid deactivate toggles + Generate Week
+- `/dashboard` — Zebra checklist for this ISO week; checkbox → complete rotation + location COMPLETED (cool-down)
+- APIs under `/api/rotations/*`, `/api/store-locations*`, `/api/departments`, `/api/weekly-rotations`
+- Requires `SUPABASE_SERVICE_ROLE_KEY` for server routes (apply migration in Supabase SQL editor)

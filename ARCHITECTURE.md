@@ -28,7 +28,13 @@ lib/markdown.ts                   → Clearance price math + badge label
 lib/calc.ts                       → CLF + carton sq ft + remnant sq ft / sq yd
 lib/catalog.ts / remnants.ts / storage.ts / specialists.ts → Domain persistence
 lib/supabase.ts                   → Client factory
+lib/store-ops/*                   → Store Operations domain (rotations, bulk map, auth bridge)
+app/admin/store-map/page.tsx      → Super Admin aisle/bay bulk mapper + weekly generate
+app/dashboard/page.tsx            → Zebra supervisor weekly rotation checklist
+app/api/rotations/*               → Generate + complete rotation route handlers
+app/api/store-locations*          → List / patch / bulk location APIs
 supabase/schema.sql               → Tables + multi-category + SIMS + store_number + RBAC columns + RLS
+supabase/migrations/20260809_store_operations_rbac.sql → departments, profiles, locations, weekly rotations + RLS
 ```
 
 ## Ownership
@@ -37,6 +43,7 @@ supabase/schema.sql               → Tables + multi-category + SIMS + store_num
 |---|---|
 | Navigation / section routing | `app/page.tsx` + `HubChrome` |
 | Department RBAC / tab visibility | `lib/rbac.ts` |
+| Store Operations map + rotations | `lib/store-ops/*` + `/admin/store-map` + `/dashboard` |
 | Team roster (Master Admin) | `AdminRosterManager`, `lib/specialists.ts` (`is_active` soft-delete) |
 | Store context | `lib/store.ts` |
 | Offline sync queue | `lib/sync-queue.ts` |

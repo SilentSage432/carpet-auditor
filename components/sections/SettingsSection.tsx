@@ -1,6 +1,7 @@
 "use client";
 
 import { useRef, useState } from "react";
+import Link from "next/link";
 import { AdminRosterManager } from "@/components/hub/AdminRosterManager";
 import { countLocalCatalog } from "@/lib/catalog";
 import { countLocalRemnants } from "@/lib/remnants";
@@ -178,6 +179,33 @@ export function SettingsSection({
           </p>
         )}
       </section>
+
+      {(masterSession || supervisorSession) && (
+        <section className="space-y-3 rounded-2xl border border-emerald-500/25 bg-slate-900/90 p-4">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-400">
+            Store Operations
+          </h2>
+          <p className="text-sm text-slate-300">
+            Weekly bay maintenance rotations for Zebra handhelds.
+          </p>
+          <div className="grid gap-2">
+            {masterSession ? (
+              <Link
+                href="/admin/store-map"
+                className="flex min-h-12 items-center justify-center rounded-xl border border-emerald-500/40 text-sm font-semibold text-emerald-300"
+              >
+                🗺️ Store Map (Bulk Bay Generator)
+              </Link>
+            ) : null}
+            <Link
+              href="/dashboard"
+              className="flex min-h-12 items-center justify-center rounded-xl border border-slate-700 bg-slate-950 text-sm font-semibold text-slate-100"
+            >
+              📱 This Week&apos;s Rotation Dashboard
+            </Link>
+          </div>
+        </section>
+      )}
 
       <section className="space-y-3 rounded-2xl border border-slate-800 bg-slate-900/90 p-4">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-400">
