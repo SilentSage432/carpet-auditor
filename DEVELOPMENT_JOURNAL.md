@@ -1,5 +1,13 @@
 # DeptSync Hub — Development Journal
 
+## 2026-08-09 — Cron route bypass in Next.js Proxy
+
+### Shipped
+- Added root `proxy.ts` (Next 16 successor to middleware): immediate `NextResponse.next()` for `/api/cron/*` so Vercel Cron reaches JSON handlers with `CRON_SECRET` (no session cookie).
+- Note: this repo had no prior middleware; HTML login responses on cron are often **Vercel Deployment Protection** — also set Protection Bypass / ensure Cron is allowed in project settings.
+
+---
+
 ## 2026-08-09 — Automated weekly rotation cron + bay targets
 
 ### Shipped
