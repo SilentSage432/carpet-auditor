@@ -133,8 +133,10 @@ function StoreMapBody({
           <p className="mb-4 rounded-xl border border-red-500/40 bg-red-950/40 px-4 py-3 text-sm text-red-200">
             {error}
             <span className="mt-1 block text-red-200/70">
-              Apply the store-ops migration and set{" "}
-              <code className="font-mono text-xs">SUPABASE_SERVICE_ROLE_KEY</code>.
+              Check <code className="font-mono text-xs">.env.local</code> has
+              real Supabase URL + service role key (not placeholders), restart{" "}
+              <code className="font-mono text-xs">npm run dev</code>, and confirm
+              the store-ops migration ran on that same project.
             </span>
           </p>
         ) : null}

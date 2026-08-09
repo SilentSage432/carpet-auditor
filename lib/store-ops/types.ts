@@ -13,6 +13,8 @@ export type Department = {
   id: string;
   name: string;
   code: string;
+  weekly_bay_target: number;
+  is_active: boolean;
   created_at?: string;
 };
 

@@ -23,10 +23,13 @@ export const STORE_DEPARTMENTS = [
   "plumbing",
   "electrical",
   "lawn_garden",
+  "inside_garden",
+  "outside_garden",
   "paint",
   "millwork",
   "building_materials",
   "hardware",
+  "tools",
   "all",
 ] as const;
 
@@ -40,11 +43,12 @@ export const OPERATIONAL_DEPARTMENTS: OperationalDepartment[] = [
   "appliances",
   "plumbing",
   "electrical",
-  "lawn_garden",
   "paint",
+  "inside_garden",
+  "outside_garden",
   "millwork",
+  "tools",
   "building_materials",
-  "hardware",
 ];
 
 export type DepartmentMeta = {
@@ -59,9 +63,9 @@ export const DEPARTMENT_META: Record<DepartmentScope, DepartmentMeta> = {
   flooring: {
     id: "flooring",
     icon: "🧶",
-    label: "Flooring",
+    label: "Flooring / Home Decor",
     shortLabel: "Flooring",
-    description: "Flooring & SIMS Audit",
+    description: "Flooring & Home Decor (merged)",
   },
   appliances: {
     id: "appliances",
@@ -89,21 +93,35 @@ export const DEPARTMENT_META: Record<DepartmentScope, DepartmentMeta> = {
     icon: "🌿",
     label: "Lawn & Garden",
     shortLabel: "Lawn/Garden",
-    description: "Lawn & Garden / Outdoor",
+    description: "Legacy — prefer Inside / Outside Garden",
+  },
+  inside_garden: {
+    id: "inside_garden",
+    icon: "🪴",
+    label: "Inside Garden",
+    shortLabel: "Inside Garden",
+    description: "Inside Garden (D28I)",
+  },
+  outside_garden: {
+    id: "outside_garden",
+    icon: "🌿",
+    label: "Outside Garden",
+    shortLabel: "Outside Garden",
+    description: "Outside Garden (D28O)",
   },
   paint: {
     id: "paint",
     icon: "🎨",
     label: "Paint",
     shortLabel: "Paint",
-    description: "Paint & Decor",
+    description: "Paint (D24P)",
   },
   millwork: {
     id: "millwork",
     icon: "🚪",
     label: "Millwork",
     shortLabel: "Millwork",
-    description: "Doors & Windows",
+    description: "Millwork (D30)",
   },
   building_materials: {
     id: "building_materials",
@@ -117,7 +135,14 @@ export const DEPARTMENT_META: Record<DepartmentScope, DepartmentMeta> = {
     icon: "🔧",
     label: "Hardware",
     shortLabel: "Hardware",
-    description: "Hardware & Tools",
+    description: "Legacy — prefer Tools (D25)",
+  },
+  tools: {
+    id: "tools",
+    icon: "🛠️",
+    label: "Tools",
+    shortLabel: "Tools",
+    description: "Tools (D25)",
   },
   all: {
     id: "all",

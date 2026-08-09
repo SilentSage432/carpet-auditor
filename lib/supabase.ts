@@ -1,22 +1,28 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { getSupabaseAnonKey, getSupabaseUrl } from "@/lib/supabase/env";
 
 let client: SupabaseClient | null = null;
+let clientFingerprint: string | null = null;
 
 export function getSupabase(): SupabaseClient | null {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
+  const url = getSupabaseUrl();
+  const key = getSupabaseAnonKey();
 
-  if (!url || !key) return null;
+  if (!url || !key) {
+    client = null;
+    clientFingerprint = null;
+    return null;
+  }
 
-  if (!client) {
+  const fingerprint = `${url}::${key.slice(0, 8)}::${key.length}`;
+  if (!client || clientFingerprint !== fingerprint) {
     client = createClient(url, key);
+    clientFingerprint = fingerprint;
   }
 
   return client;
 }
 
 export function isSupabaseConfigured(): boolean {
-  return Boolean(
-    process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  );
+  return Boolean(getSupabaseUrl() && getSupabaseAnonKey());
 }

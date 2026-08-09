@@ -44,6 +44,7 @@
 - [x] Zebra supervisor rotation dashboard (`/dashboard`)
 - [x] Navigation Hub — role-aware hamburger, ops bottom tabs, Super Admin quick actions
 - [x] Web Push subscriptions + dispatch on weekly rotation generate
+- [x] Automated weekly rotation cron (`/api/cron/weekly-rotation` + `weekly_bay_target`)
 
 ## Next
 - [ ] JWT / claim-based RLS enforcing `store_number` (+ department) server-side

@@ -4,7 +4,7 @@
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { StoreLocation, WeeklyRotation } from "./types";
+import type { Department, StoreLocation, WeeklyRotation } from "./types";
 import { isoWeekLabel, pickRandom } from "./week";
 
 export type GenerateRotationsResult = {
@@ -24,6 +24,7 @@ async function loadPendingLocations(
     .select("cycle_number")
     .eq("department_id", departmentId)
     .eq("is_active", true)
+    .order("cycle_number", { ascending: false })
     .limit(1)
     .maybeSingle();
 
@@ -44,6 +45,53 @@ async function loadPendingLocations(
     locations: (data ?? []) as StoreLocation[],
     cycleNumber,
   };
+}
+
+/**
+ * Return stale ASSIGNED bays (not on this week's open rotation) to PENDING
+ * so the weekly engine can keep moving.
+ */
+export async function reclaimStaleAssignments(
+  supabase: SupabaseClient,
+  departmentId: string,
+  weekLabel: string
+): Promise<number> {
+  const { data: openThisWeek, error: openError } = await supabase
+    .from("weekly_rotations")
+    .select("location_id")
+    .eq("department_id", departmentId)
+    .eq("assigned_week", weekLabel)
+    .eq("is_completed", false);
+
+  if (openError) throw new Error(openError.message);
+
+  const keep = new Set((openThisWeek ?? []).map((r) => r.location_id as string));
+
+  const { data: assigned, error: assignedError } = await supabase
+    .from("store_locations")
+    .select("id")
+    .eq("department_id", departmentId)
+    .eq("is_active", true)
+    .eq("status", "ASSIGNED");
+
+  if (assignedError) throw new Error(assignedError.message);
+
+  const staleIds = (assigned ?? [])
+    .map((r) => r.id as string)
+    .filter((id) => !keep.has(id));
+
+  if (staleIds.length === 0) return 0;
+
+  const { error: resetError } = await supabase
+    .from("store_locations")
+    .update({
+      status: "PENDING",
+      updated_at: new Date().toISOString(),
+    })
+    .in("id", staleIds);
+
+  if (resetError) throw new Error(resetError.message);
+  return staleIds.length;
 }
 
 /**
@@ -76,7 +124,6 @@ export async function resetDepartmentCycleIfNeeded(
 
   const allCompleted = active.every((row) => row.status === "COMPLETED");
   if (!allCompleted) {
-    // ASSIGNED leftovers still block a soft reset — return empty pending
     return { reset: false, cycleNumber, pending: [] };
   }
 
@@ -110,6 +157,8 @@ export async function generateWeeklyRotations(
   if (!Number.isFinite(count) || count < 1) {
     throw new Error("count must be a positive integer");
   }
+
+  await reclaimStaleAssignments(supabase, departmentId, weekLabel);
 
   const { reset, cycleNumber, pending } = await resetDepartmentCycleIfNeeded(
     supabase,
@@ -161,6 +210,92 @@ export async function generateWeeklyRotations(
     rotations: (rotations ?? []) as WeeklyRotation[],
     locations: (locations ?? []) as StoreLocation[],
   };
+}
+
+export type DepartmentCronResult = {
+  department_id: string;
+  department_code: string;
+  department_name: string;
+  weekly_bay_target: number;
+  ok: boolean;
+  skipped?: boolean;
+  reason?: string;
+  created?: number;
+  cycle_number?: number;
+  cycle_reset?: boolean;
+  assigned_week?: string;
+};
+
+/**
+ * Sunday cron: for every active department, queue up to weekly_bay_target bays.
+ */
+export async function runWeeklyRotationForAllDepartments(
+  supabase: SupabaseClient,
+  weekLabel: string = isoWeekLabel()
+): Promise<DepartmentCronResult[]> {
+  const { data: departments, error } = await supabase
+    .from("departments")
+    .select("*")
+    .eq("is_active", true)
+    .order("name");
+
+  if (error) throw new Error(error.message);
+
+  const results: DepartmentCronResult[] = [];
+
+  for (const dept of (departments ?? []) as Department[]) {
+    const target = Math.max(1, Number(dept.weekly_bay_target) || 10);
+    const base: DepartmentCronResult = {
+      department_id: dept.id,
+      department_code: dept.code,
+      department_name: dept.name,
+      weekly_bay_target: target,
+      ok: false,
+    };
+
+    try {
+      const { count, error: locCountError } = await supabase
+        .from("store_locations")
+        .select("id", { count: "exact", head: true })
+        .eq("department_id", dept.id)
+        .eq("is_active", true);
+
+      if (locCountError) throw new Error(locCountError.message);
+      if (!count) {
+        results.push({
+          ...base,
+          ok: true,
+          skipped: true,
+          reason: "No mapped store locations",
+        });
+        continue;
+      }
+
+      const generated = await generateWeeklyRotations(
+        supabase,
+        dept.id,
+        target,
+        weekLabel
+      );
+
+      results.push({
+        ...base,
+        ok: true,
+        created: generated.rotations.length,
+        cycle_number: generated.cycle_number,
+        cycle_reset: generated.cycle_reset,
+        assigned_week: generated.assigned_week,
+      });
+    } catch (err) {
+      results.push({
+        ...base,
+        ok: false,
+        reason: err instanceof Error ? err.message : "Unknown error",
+      });
+    }
+  }
+
+  return results;
 }
 
 export async function completeWeeklyRotation(

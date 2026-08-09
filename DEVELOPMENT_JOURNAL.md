@@ -1,5 +1,24 @@
 # DeptSync Hub — Development Journal
 
+## 2026-08-09 — Automated weekly rotation cron + bay targets
+
+### Shipped
+- Migration `20260809_weekly_rotation_cron.sql`: `departments.weekly_bay_target` (default 10), `is_active`; Paint D24P, Inside/Outside Garden D28I/D28O, Millwork D30, Tools D25; Flooring / Home Decor merged.
+- `GET /api/cron/weekly-rotation` — `CRON_SECRET` Bearer auth; queues each active dept up to its target (cycle reset when all COMPLETED).
+- `vercel.json` cron: `59 23 * * 0` (Sunday 23:59 UTC).
+- Settings → Weekly bay target card (`PATCH /api/departments`).
+
+---
+
+## 2026-08-09 — Fix Supabase service-role client + placeholder env detection
+
+### Shipped
+- `lib/supabase/admin.ts` — `createAdminClient()` requires real `SUPABASE_SERVICE_ROLE_KEY` (no anon fallback).
+- `lib/supabase/env.ts` — rejects placeholder URL/keys so fake `.env.local` values fail loudly.
+- API 503s return actionable missing-env messages; Store Map hint updated.
+
+---
+
 ## 2026-08-09 — Web Push for weekly rotation alerts
 
 ### Shipped

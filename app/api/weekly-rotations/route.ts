@@ -7,6 +7,7 @@ import {
 import { resolveDepartmentIdByCode } from "@/lib/store-ops/rotations";
 import { getSupabaseAdmin } from "@/lib/store-ops/supabase-admin";
 import { isoWeekLabel } from "@/lib/store-ops/week";
+import { supabaseAdminMissingMessage } from "@/lib/supabase/env";
 
 /**
  * GET /api/weekly-rotations — this week's assignments for the actor's department.
@@ -17,7 +18,7 @@ export async function GET(request: Request) {
     const supabase = getSupabaseAdmin();
     if (!supabase) {
       return NextResponse.json(
-        { error: "Supabase is not configured" },
+        { error: supabaseAdminMissingMessage() },
         { status: 503 }
       );
     }

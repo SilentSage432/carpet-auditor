@@ -125,3 +125,22 @@ export async function generateRotations(
     body: JSON.stringify({ department_id: departmentId, count }),
   });
 }
+
+export async function updateDepartmentWeeklyTarget(
+  specialist: StoreSpecialist,
+  weeklyBayTarget: number,
+  departmentId?: string
+): Promise<Department> {
+  const data = await storeOpsFetch<{ department: Department }>(
+    "/api/departments",
+    specialist,
+    {
+      method: "PATCH",
+      body: JSON.stringify({
+        weekly_bay_target: weeklyBayTarget,
+        ...(departmentId ? { department_id: departmentId } : {}),
+      }),
+    }
+  );
+  return data.department;
+}

@@ -11,6 +11,7 @@ import {
 import { getSupabaseAdmin } from "@/lib/store-ops/supabase-admin";
 import { notifyDepartmentRotationBatch } from "@/lib/push/dispatch";
 import { isWebPushConfigured } from "@/lib/push/vapid";
+import { supabaseAdminMissingMessage } from "@/lib/supabase/env";
 
 /**
  * POST /api/rotations/generate
@@ -24,7 +25,7 @@ export async function POST(request: Request) {
     const supabase = getSupabaseAdmin();
     if (!supabase) {
       return NextResponse.json(
-        { error: "Supabase is not configured" },
+        { error: supabaseAdminMissingMessage() },
         { status: 503 }
       );
     }

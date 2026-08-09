@@ -6,12 +6,13 @@
 
 import type { DepartmentScope, StoreSpecialist } from "@/lib/types";
 import { isMasterAdmin } from "@/lib/rbac";
+import { toStoreOpsDepartmentCode } from "./department-codes";
 import type { StoreOpsUserRole } from "./types";
 
 export type StoreOpsActor = {
   specialistId: string;
   role: StoreOpsUserRole;
-  /** Hub department scope code (maps to departments.code). */
+  /** Store-ops departments.code (Lowe's / mapped hub scope). */
   departmentCode: string | null;
 };
 
@@ -27,12 +28,14 @@ export function actorFromSpecialist(
     };
   }
   if (member.role === "Supervisor") {
-    const code = member.assigned_department;
-    if (!code || code === "all") return null;
+    const code = toStoreOpsDepartmentCode(
+      member.assigned_department as DepartmentScope | string | null
+    );
+    if (!code) return null;
     return {
       specialistId: member.id,
       role: "department_supervisor",
-      departmentCode: code as DepartmentScope,
+      departmentCode: code,
     };
   }
   return null;

@@ -92,3 +92,9 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 - Generate keys: `npx web-push generate-vapid-keys`
 - `POST /api/rotations/generate` dispatches push to matching `department_code` / profile subscribers
 - SW shows notification and opens `/dashboard` on click
+
+## Weekly rotation cron
+- Migration: `supabase/migrations/20260809_weekly_rotation_cron.sql` (`weekly_bay_target`, Lowe's codes)
+- `vercel.json`: Sunday `59 23 * * 0` → `/api/cron/weekly-rotation`
+- Env on Vercel: `CRON_SECRET` (Bearer token Vercel sends automatically)
+- Settings → Weekly bay target for supervisors

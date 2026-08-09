@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/weekly-rotation",
+      "schedule": "59 23 * * 0"
+    }
+  ]
+}

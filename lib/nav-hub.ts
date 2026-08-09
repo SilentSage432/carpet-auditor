@@ -43,10 +43,13 @@ const DEPT_BADGE_CODE: Record<string, string> = {
   plumbing: "PLB",
   electrical: "ELC",
   lawn_garden: "L&G",
+  inside_garden: "IGN",
+  outside_garden: "OGN",
   paint: "PNT",
   millwork: "MLW",
   building_materials: "BLD",
   hardware: "HDW",
+  tools: "TLS",
   all: "ALL",
 };
 

@@ -7,6 +7,7 @@ import {
 import { bulkInsertLocations } from "@/lib/store-ops/locations";
 import { getSupabaseAdmin } from "@/lib/store-ops/supabase-admin";
 import type { StoreLocationType } from "@/lib/store-ops/types";
+import { supabaseAdminMissingMessage } from "@/lib/supabase/env";
 
 export async function POST(request: Request) {
   try {
@@ -14,7 +15,7 @@ export async function POST(request: Request) {
     const supabase = getSupabaseAdmin();
     if (!supabase) {
       return NextResponse.json(
-        { error: "Supabase is not configured" },
+        { error: supabaseAdminMissingMessage() },
         { status: 503 }
       );
     }

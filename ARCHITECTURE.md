@@ -17,7 +17,10 @@ app/dashboard/page.tsx            → Zebra supervisor weekly rotation checklist
 app/department/page.tsx           → Department Overview (supervisor audit workspace)
 app/settings/page.tsx             → Standalone Settings & Config
 app/api/push/*                    → VAPID public key, subscribe, manual dispatch
+app/api/cron/weekly-rotation      → Sunday automated rotation engine (CRON_SECRET)
+vercel.json                       → Cron schedule 59 23 * * 0
 supabase/migrations/20260809_push_notifications.sql → push_subscriptions + RLS
+supabase/migrations/20260809_weekly_rotation_cron.sql → weekly_bay_target + Lowe's dept codes
 components/auth/AuthWall.tsx      → Non-dismissible login / setup / unlock gate
 components/hub/AdminRosterManager.tsx → Master Admin team/department roster console
 components/hub/AuditReportModal.tsx → Printable / emailable / clipboard audit report

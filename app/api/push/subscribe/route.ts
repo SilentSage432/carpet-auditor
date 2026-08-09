@@ -10,6 +10,7 @@ import {
   upsertPushSubscription,
 } from "@/lib/push/dispatch";
 import type { PushSubscriptionJSON } from "@/lib/push/types";
+import { supabaseAdminMissingMessage } from "@/lib/supabase/env";
 
 function isValidSubscription(raw: unknown): raw is PushSubscriptionJSON {
   if (!raw || typeof raw !== "object") return false;
@@ -34,7 +35,7 @@ export async function POST(request: Request) {
     const supabase = getSupabaseAdmin();
     if (!supabase) {
       return NextResponse.json(
-        { error: "Supabase is not configured" },
+        { error: supabaseAdminMissingMessage() },
         { status: 503 }
       );
     }
@@ -76,7 +77,7 @@ export async function DELETE(request: Request) {
     const supabase = getSupabaseAdmin();
     if (!supabase) {
       return NextResponse.json(
-        { error: "Supabase is not configured" },
+        { error: supabaseAdminMissingMessage() },
         { status: 503 }
       );
     }

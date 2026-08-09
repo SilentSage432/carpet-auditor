@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import Link from "next/link";
 import { AdminRosterManager } from "@/components/hub/AdminRosterManager";
 import { PushNotificationsCard } from "@/components/hub/PushNotificationsCard";
+import { WeeklyBayTargetCard } from "@/components/hub/WeeklyBayTargetCard";
 import { countLocalCatalog } from "@/lib/catalog";
 import { countLocalRemnants } from "@/lib/remnants";
 import { selectOnFocus } from "@/lib/number-input";
@@ -226,6 +227,8 @@ export function SettingsSection({
       )}
 
       <PushNotificationsCard specialist={activeSpecialist} />
+
+      <WeeklyBayTargetCard specialist={activeSpecialist} />
 
       <section className="space-y-3 rounded-2xl border border-slate-800 bg-slate-900/90 p-4">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-400">

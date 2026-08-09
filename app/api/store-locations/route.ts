@@ -7,6 +7,7 @@ import {
 } from "@/lib/store-ops/auth";
 import { getSupabaseAdmin } from "@/lib/store-ops/supabase-admin";
 import { resolveDepartmentIdByCode } from "@/lib/store-ops/rotations";
+import { supabaseAdminMissingMessage } from "@/lib/supabase/env";
 
 export async function GET(request: Request) {
   try {
@@ -14,7 +15,7 @@ export async function GET(request: Request) {
     const supabase = getSupabaseAdmin();
     if (!supabase) {
       return NextResponse.json(
-        { error: "Supabase is not configured" },
+        { error: supabaseAdminMissingMessage() },
         { status: 503 }
       );
     }
@@ -70,7 +71,7 @@ export async function PATCH(request: Request) {
     const supabase = getSupabaseAdmin();
     if (!supabase) {
       return NextResponse.json(
-        { error: "Supabase is not configured" },
+        { error: supabaseAdminMissingMessage() },
         { status: 503 }
       );
     }
