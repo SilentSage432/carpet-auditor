@@ -7,7 +7,11 @@ export type StoreOpsUserRole = "super_admin" | "department_supervisor";
 
 export type StoreLocationType = "SELLING" | "TOPSTOCK";
 
-export type RotationStatus = "PENDING" | "ASSIGNED" | "COMPLETED";
+export type RotationStatus =
+  | "PENDING"
+  | "ASSIGNED"
+  | "COMPLETED"
+  | "CARRIED_OVER";
 
 export type Department = {
   id: string;
@@ -15,6 +19,8 @@ export type Department = {
   code: string;
   weekly_bay_target: number;
   is_active: boolean;
+  last_verified_week?: string | null;
+  last_verified_at?: string | null;
   created_at?: string;
 };
 
@@ -44,6 +50,23 @@ export type WeeklyRotation = {
 
 export type WeeklyRotationWithLocation = WeeklyRotation & {
   store_locations: StoreLocation | null;
+};
+
+export type ExceptionReason =
+  | "Freight/Pallets In Aisle"
+  | "Short Staffed"
+  | "High Customer Volume"
+  | "Other";
+
+export type RotationException = {
+  id: string;
+  department_id: string;
+  bay_id: string;
+  reason: string;
+  cycle_number: number;
+  assigned_week: string | null;
+  reported_by: string | null;
+  created_at: string;
 };
 
 export type BulkGenerateInput = {

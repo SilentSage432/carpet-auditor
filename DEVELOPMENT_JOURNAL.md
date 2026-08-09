@@ -1,5 +1,16 @@
 # DeptSync Hub — Development Journal
 
+## 2026-08-09 — Supervisor verification & exception logging
+
+### Shipped
+- Migration `20260809_rotation_verification.sql`: `rotation_exceptions`, `CARRIED_OVER` status, `last_verified_week` on departments.
+- `/verify-rotation` — Confirm All Completed or Report Incomplete Bays (reasons → exceptions + CARRIED_OVER).
+- Next-week picks prioritize `CARRIED_OVER` before `PENDING`.
+- `/admin/exceptions` — Super Admin weekly verification status + bottleneck log.
+- Nav Hub links for Verify (supervisors) and Exceptions (admin).
+
+---
+
 ## 2026-08-09 — Cron route bypass in Next.js Proxy
 
 ### Shipped

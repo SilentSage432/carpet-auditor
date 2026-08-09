@@ -165,13 +165,39 @@ export async function generateWeeklyRotations(
     departmentId
   );
 
-  if (pending.length === 0) {
-    throw new Error(
-      "No PENDING locations available for this department. Map bays in Store Map first, or finish ASSIGNED work."
+  // Prioritize CARRIED_OVER (missed last week) ahead of fresh PENDING
+  const { data: carriedRows, error: carriedError } = await supabase
+    .from("store_locations")
+    .select("*")
+    .eq("department_id", departmentId)
+    .eq("is_active", true)
+    .eq("status", "CARRIED_OVER");
+
+  if (carriedError) throw new Error(carriedError.message);
+
+  const carried = (carriedRows ?? []) as StoreLocation[];
+  const pool: StoreLocation[] = [];
+
+  const carriedPick = pickRandom(carried, Math.min(count, carried.length));
+  pool.push(...carriedPick);
+
+  const remaining = count - pool.length;
+  if (remaining > 0) {
+    const pendingAvailable = pending.filter(
+      (p) => !pool.some((s) => s.id === p.id)
+    );
+    pool.push(
+      ...pickRandom(pendingAvailable, Math.min(remaining, pendingAvailable.length))
     );
   }
 
-  const selected = pickRandom(pending, Math.min(count, pending.length));
+  if (pool.length === 0) {
+    throw new Error(
+      "No PENDING or CARRIED_OVER locations available for this department. Map bays in Store Map first, or finish ASSIGNED work."
+    );
+  }
+
+  const selected = pool;
   const ids = selected.map((loc) => loc.id);
   const now = new Date().toISOString();
 

@@ -98,3 +98,9 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 - `vercel.json`: Sunday `59 23 * * 0` → `/api/cron/weekly-rotation`
 - Env on Vercel: `CRON_SECRET` (Bearer token Vercel sends automatically)
 - Settings → Weekly bay target for supervisors
+
+## End-of-week verification
+- Migration: `supabase/migrations/20260809_rotation_verification.sql`
+- `/verify-rotation` — supervisors confirm or report incomplete bays (CARRIED_OVER + exception reasons)
+- `/admin/exceptions` — Master Admin verification status + bottleneck log
+- APIs: `POST /api/rotations/verify`, `GET /api/rotations/exceptions`

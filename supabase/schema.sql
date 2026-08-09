@@ -317,5 +317,6 @@ create policy "Allow delete and update for store_specialists"
 -- Apply: supabase/migrations/20260809_store_operations_rbac.sql
 -- Web Push: supabase/migrations/20260809_push_notifications.sql
 -- Weekly cron targets: supabase/migrations/20260809_weekly_rotation_cron.sql
+-- Verification exceptions: supabase/migrations/20260809_rotation_verification.sql
 -- ---------------------------------------------------------------------------
 

@@ -12,7 +12,9 @@ import { departmentMeta, type StoreSpecialist } from "@/lib/types";
 export type NavHubHref =
   | "/admin/store-map"
   | "/admin/supervisors"
+  | "/admin/exceptions"
   | "/dashboard"
+  | "/verify-rotation"
   | "/department"
   | "/settings"
   | "/";
@@ -83,6 +85,13 @@ export function navRoleLinks(
         description: "Issue and manage department logins",
       },
       {
+        href: "/admin/exceptions",
+        label: "Exception Log",
+        shortLabel: "Exceptions",
+        icon: "⚠️",
+        description: "Weekly verification & bottlenecks",
+      },
+      {
         href: "/dashboard",
         label: "Zebra Floor View",
         shortLabel: "Zebra",
@@ -108,6 +117,13 @@ export function navRoleLinks(
         shortLabel: "Checklist",
         icon: "📱",
         description: "This week’s assigned rotation bays",
+      },
+      {
+        href: "/verify-rotation",
+        label: "Verify & Report Exceptions",
+        shortLabel: "Verify",
+        icon: "✅",
+        description: "End-of-week confirmation / incomplete bays",
       },
       {
         href: "/department",
