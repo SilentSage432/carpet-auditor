@@ -5,8 +5,19 @@ app/page.tsx                      → Hub shell (section state + RBAC gate + dat
 app/layout.tsx                    → Fonts, PWA meta (DeptSync), ServiceWorkerRegister
 app/manifest.ts                   → short_name DeptSync · Department & SIMS Audit Hub
 public/sw.js                      → Offline shell cache strategies
-components/hub/HubChrome.tsx      → Sticky header (DeptSync badge + network) + role-filtered bottom nav
-components/hub/DeptSyncBadge.tsx  → Multi-department scanner/shield mark
+components/hub/HubChrome.tsx      → Sticky header (legacy) + role-filtered inventory bottom nav
+components/hub/NavigationHub.tsx  → Cross-app Navigation Hub (hamburger, role badge, ops bottom nav)
+components/hub/SuperAdminQuickActions.tsx → Bulk / Trigger Rotation / Manage Supervisors banner
+components/hub/SessionGate.tsx    → Auth gate for Store Ops route pages
+lib/nav-hub.ts                    → Role-aware Store Ops route menus + compact role badges
+lib/push/*                        → Web Push subscribe + VAPID dispatch for rotation alerts
+app/admin/store-map/page.tsx      → Super Admin aisle/bay bulk mapper + weekly generate
+app/admin/supervisors/page.tsx    → Supervisor & role management console
+app/dashboard/page.tsx            → Zebra supervisor weekly rotation checklist
+app/department/page.tsx           → Department Overview (supervisor audit workspace)
+app/settings/page.tsx             → Standalone Settings & Config
+app/api/push/*                    → VAPID public key, subscribe, manual dispatch
+supabase/migrations/20260809_push_notifications.sql → push_subscriptions + RLS
 components/auth/AuthWall.tsx      → Non-dismissible login / setup / unlock gate
 components/hub/AdminRosterManager.tsx → Master Admin team/department roster console
 components/hub/AuditReportModal.tsx → Printable / emailable / clipboard audit report
@@ -43,6 +54,7 @@ supabase/migrations/20260809_store_operations_rbac.sql → departments, profiles
 |---|---|
 | Navigation / section routing | `app/page.tsx` + `HubChrome` |
 | Department RBAC / tab visibility | `lib/rbac.ts` |
+| Cross-app Navigation Hub | `lib/nav-hub.ts` + `NavigationHub` |
 | Store Operations map + rotations | `lib/store-ops/*` + `/admin/store-map` + `/dashboard` |
 | Team roster (Master Admin) | `AdminRosterManager`, `lib/specialists.ts` (`is_active` soft-delete) |
 | Store context | `lib/store.ts` |

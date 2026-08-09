@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useState } from "react";
 import { AuthWall, type AuthWallMode } from "@/components/auth/AuthWall";
 import { ChangePinModal } from "@/components/hub/ChangePinModal";
-import { BottomNavBar, HubHeader } from "@/components/hub/HubChrome";
+import { BottomNavBar } from "@/components/hub/HubChrome";
+import { NavigationHub } from "@/components/hub/NavigationHub";
 import { SpecialistModal } from "@/components/hub/SpecialistModal";
 import { CatalogSection } from "@/components/sections/CatalogSection";
 import { CycleAuditSection } from "@/components/sections/CycleAuditSection";
@@ -28,6 +29,7 @@ import {
   defaultSectionForMember,
   effectiveDepartment,
   isGenericDepartment,
+  sectionTitle,
 } from "@/lib/rbac";
 import {
   dedupeRoster,
@@ -288,13 +290,14 @@ export default function DeptSyncHubPage() {
 
   return (
     <div className="flex min-h-dvh flex-col">
-      <HubHeader
-        section={section}
+      <NavigationHub
+        title={sectionTitle(section, specialist)}
         specialist={specialist}
         onOpenSpecialist={() => setSpecialistOpen(true)}
         onChangePin={specialist ? () => setChangePinOpen(true) : undefined}
         onLogout={handleLogout}
         storeNumber={storeNumber}
+        showBottomNav={false}
       />
       <SpecialistModal
         open={specialistOpen}

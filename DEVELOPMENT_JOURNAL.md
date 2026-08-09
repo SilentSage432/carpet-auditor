@@ -1,5 +1,27 @@
 # DeptSync Hub — Development Journal
 
+## 2026-08-09 — Web Push for weekly rotation alerts
+
+### Shipped
+- Migration `supabase/migrations/20260809_push_notifications.sql` — `push_subscriptions` + RLS (`auth.uid() = user_id`); hub bridge columns `specialist_id` / `department_code`.
+- `lib/push/*` — VAPID config, browser subscribe helpers, `usePushNotifications` hook, server dispatch via `web-push`.
+- APIs: `GET /api/push/vapid-public-key`, `POST|DELETE /api/push/subscribe`, `POST /api/push/dispatch`; rotation generate fans out pushes on success.
+- Service worker `push` + `notificationclick` → opens `/dashboard`.
+- Settings → **Phone rotation alerts** enable/disable card.
+
+---
+
+## 2026-08-09 — Navigation Hub (role-aware Zebra chrome)
+
+### Shipped
+- `lib/nav-hub.ts` — Super Admin vs Supervisor route menus + compact role badges (`[SUPER ADMIN]`, `[FLR DEPT]`).
+- `components/hub/NavigationHub.tsx` — high-contrast hamburger drawer, user menu (role badge + login username), ops bottom nav.
+- Routes: `/admin/supervisors`, `/settings`, `/department`; Store Map + Dashboard wrapped in Nav Hub + SessionGate.
+- `SuperAdminQuickActions` on Store Map & Dashboard (Bulk Generate · Trigger Rotation · Manage Supervisors).
+- Inventory `/` uses NavigationHub header; BottomNavBar still owns audit/catalog section tabs.
+
+---
+
 ## 2026-08-09 — Store Operations: multi-dept map, RBAC, weekly rotations
 
 ### Shipped

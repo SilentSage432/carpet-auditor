@@ -42,10 +42,13 @@
 - [x] Super Admin Store Map bulk generator (`/admin/store-map`)
 - [x] Weekly rotation engine API (`/api/rotations/generate` + cycle reset)
 - [x] Zebra supervisor rotation dashboard (`/dashboard`)
+- [x] Navigation Hub — role-aware hamburger, ops bottom tabs, Super Admin quick actions
+- [x] Web Push subscriptions + dispatch on weekly rotation generate
 
 ## Next
 - [ ] JWT / claim-based RLS enforcing `store_number` (+ department) server-side
 - [ ] Wire Supabase Auth sessions into `profiles` (replace header-based store-ops actor bridge)
+- [ ] Link push `user_id` to Supabase Auth profiles (retire specialist_id bridge when ready)
 - [ ] Background Sync API / periodic queue flush while tab backgrounded
 - [ ] Conflict resolution UI when offline edits collide
 - [ ] Retire or wire orphan `MarryBarcodeModal`

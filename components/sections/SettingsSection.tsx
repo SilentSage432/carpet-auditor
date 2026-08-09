@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import Link from "next/link";
 import { AdminRosterManager } from "@/components/hub/AdminRosterManager";
+import { PushNotificationsCard } from "@/components/hub/PushNotificationsCard";
 import { countLocalCatalog } from "@/lib/catalog";
 import { countLocalRemnants } from "@/lib/remnants";
 import { selectOnFocus } from "@/lib/number-input";
@@ -183,29 +184,48 @@ export function SettingsSection({
       {(masterSession || supervisorSession) && (
         <section className="space-y-3 rounded-2xl border border-emerald-500/25 bg-slate-900/90 p-4">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-400">
-            Store Operations
+            Navigation Hub
           </h2>
           <p className="text-sm text-slate-300">
-            Weekly bay maintenance rotations for Zebra handhelds.
+            Use the header hamburger (☰) for role-aware Store Operations links —
+            Store Map, Zebra checklist, supervisors, and settings.
           </p>
           <div className="grid gap-2">
             {masterSession ? (
-              <Link
-                href="/admin/store-map"
-                className="flex min-h-12 items-center justify-center rounded-xl border border-emerald-500/40 text-sm font-semibold text-emerald-300"
-              >
-                🗺️ Store Map (Bulk Bay Generator)
-              </Link>
+              <>
+                <Link
+                  href="/admin/store-map"
+                  className="flex min-h-12 items-center justify-center rounded-xl border border-emerald-500/40 text-sm font-semibold text-emerald-300"
+                >
+                  Store Map & Bulk Generator
+                </Link>
+                <Link
+                  href="/admin/supervisors"
+                  className="flex min-h-12 items-center justify-center rounded-xl border border-slate-700 bg-slate-950 text-sm font-semibold text-slate-100"
+                >
+                  Supervisor & Role Management
+                </Link>
+              </>
             ) : null}
             <Link
               href="/dashboard"
               className="flex min-h-12 items-center justify-center rounded-xl border border-slate-700 bg-slate-950 text-sm font-semibold text-slate-100"
             >
-              📱 This Week&apos;s Rotation Dashboard
+              Zebra Floor Checklist
             </Link>
+            {supervisorSession && !masterSession ? (
+              <Link
+                href="/department"
+                className="flex min-h-12 items-center justify-center rounded-xl border border-slate-700 bg-slate-950 text-sm font-semibold text-slate-100"
+              >
+                Department Overview
+              </Link>
+            ) : null}
           </div>
         </section>
       )}
+
+      <PushNotificationsCard specialist={activeSpecialist} />
 
       <section className="space-y-3 rounded-2xl border border-slate-800 bg-slate-900/90 p-4">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-400">

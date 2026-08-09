@@ -1,5 +1,5 @@
 /* DeptSync Hub — offline shell cache */
-const CACHE_VERSION = "carpet-hub-shell-v1";
+const CACHE_VERSION = "deptsync-shell-v2-push";
 const SHELL_ASSETS = [
   "/",
   "/manifest.webmanifest",
@@ -132,4 +132,66 @@ self.addEventListener("fetch", (event) => {
   }
 
   event.respondWith(cacheFirst(request));
+});
+
+/* --- Web Push: weekly rotation alerts on personal phones --- */
+self.addEventListener("push", (event) => {
+  let data = {
+    title: "DeptSync",
+    body: "New weekly rotation batch assigned.",
+    url: "/dashboard",
+    tag: "deptsync-rotation",
+  };
+
+  try {
+    if (event.data) {
+      const parsed = event.data.json();
+      data = {
+        title: parsed.title || data.title,
+        body: parsed.body || data.body,
+        url: parsed.url || data.url,
+        tag: parsed.tag || data.tag,
+      };
+    }
+  } catch {
+    try {
+      const text = event.data && event.data.text();
+      if (text) data.body = text;
+    } catch {
+      /* keep defaults */
+    }
+  }
+
+  event.waitUntil(
+    self.registration.showNotification(data.title, {
+      body: data.body,
+      tag: data.tag,
+      renotify: true,
+      icon: "/icons/icon-192.png",
+      badge: "/icons/icon-192.png",
+      data: { url: data.url },
+      vibrate: [120, 60, 120],
+    })
+  );
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const target =
+    (event.notification.data && event.notification.data.url) || "/dashboard";
+  const absolute = new URL(target, self.location.origin).href;
+
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clientList) => {
+      for (const client of clientList) {
+        if ("focus" in client && client.url.startsWith(self.location.origin)) {
+          client.navigate(absolute);
+          return client.focus();
+        }
+      }
+      if (self.clients.openWindow) {
+        return self.clients.openWindow(absolute);
+      }
+    })
+  );
 });

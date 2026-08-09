@@ -1,3 +1,9 @@
+/**
+ * Inventory Hub chrome — bottom section tabs for audits/catalog/remnants.
+ * Cross-app Navigation Hub header lives in `NavigationHub.tsx`.
+ * `HubHeader` kept as a thin alias for any legacy imports.
+ */
+
 "use client";
 
 import { useNetworkBadge } from "@/lib/network";
@@ -18,6 +24,7 @@ type HubHeaderProps = {
   storeNumber?: string;
 };
 
+/** @deprecated Prefer NavigationHub for new surfaces. */
 export function HubHeader({
   section,
   specialist,

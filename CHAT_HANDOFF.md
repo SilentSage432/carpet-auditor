@@ -76,7 +76,19 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
   - `departments`, `profiles` (auth.users + `super_admin` / `department_supervisor`), `store_locations` (SELLING/TOPSTOCK + cycle status), `weekly_rotations`
   - RLS: super_admin all; supervisors read/update own `assigned_department_id`
 - Hub bridge: Master Admin → super_admin; Supervisor → department_supervisor (via `departments.code` = hub `assigned_department`)
+- **Navigation Hub** (`lib/nav-hub.ts` + `NavigationHub.tsx`): role-aware hamburger + ops bottom tabs
+  - Super Admin: `/admin/store-map` · `/admin/supervisors` · `/dashboard` · `/settings`
+  - Supervisor: `/dashboard` · `/department` · `/settings`
+- Quick Actions banner (Super Admin): Bulk Generate · Trigger Weekly Rotation · Manage Supervisors
 - `/admin/store-map` — bulk aisle/bay generator + grid deactivate toggles + Generate Week
 - `/dashboard` — Zebra checklist for this ISO week; checkbox → complete rotation + location COMPLETED (cool-down)
 - APIs under `/api/rotations/*`, `/api/store-locations*`, `/api/departments`, `/api/weekly-rotations`
 - Requires `SUPABASE_SERVICE_ROLE_KEY` for server routes (apply migration in Supabase SQL editor)
+
+## Web Push (rotation phone alerts)
+- Migration: `supabase/migrations/20260809_push_notifications.sql`
+- Supervisors enable via Settings → Phone rotation alerts (`usePushNotifications`)
+- Env: `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, optional `VAPID_SUBJECT`
+- Generate keys: `npx web-push generate-vapid-keys`
+- `POST /api/rotations/generate` dispatches push to matching `department_code` / profile subscribers
+- SW shows notification and opens `/dashboard` on click

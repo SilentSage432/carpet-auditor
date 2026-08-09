@@ -9,11 +9,14 @@ import {
   resolveDepartmentIdByCode,
 } from "@/lib/store-ops/rotations";
 import { getSupabaseAdmin } from "@/lib/store-ops/supabase-admin";
+import { notifyDepartmentRotationBatch } from "@/lib/push/dispatch";
+import { isWebPushConfigured } from "@/lib/push/vapid";
 
 /**
  * POST /api/rotations/generate
  * Body: { department_id: uuid, count: number }
  * Super admin only — picks PENDING bays (auto cycle-reset when exhausted).
+ * On success, dispatches Web Push alerts to that department's supervisors.
  */
 export async function POST(request: Request) {
   try {
@@ -59,9 +62,31 @@ export async function POST(request: Request) {
       Math.floor(count)
     );
 
+    let push = {
+      attempted: 0,
+      delivered: 0,
+      failed: 0,
+      removed: 0,
+      skipped: !isWebPushConfigured() || result.rotations.length === 0,
+    };
+
+    if (isWebPushConfigured() && result.rotations.length > 0) {
+      try {
+        const dispatch = await notifyDepartmentRotationBatch(supabase, {
+          departmentId,
+          assignedWeek: result.assigned_week,
+          bayCount: result.rotations.length,
+        });
+        push = { ...dispatch, skipped: false };
+      } catch {
+        push = { ...push, skipped: false, failed: 1 };
+      }
+    }
+
     return NextResponse.json({
       ...result,
       created: result.rotations.length,
+      push,
     });
   } catch (err) {
     if (err instanceof StoreOpsAuthError) {
