@@ -65,7 +65,7 @@ export async function GET(request: Request) {
  * PATCH /api/departments
  * Body: { weekly_bay_target: number, department_id?: uuid }
  * Supervisors update their assigned department target; super admin may pass department_id.
- * Persists via upsert on departments.id.
+ * Persists via update filtered by departments.id (and active store).
  */
 export async function PATCH(request: Request) {
   try {
@@ -126,50 +126,33 @@ export async function PATCH(request: Request) {
       }
     }
 
-    // Ensure the row belongs to the active store before upserting by id
-    const { data: existing, error: existingError } = await supabase
-      .from("departments")
-      .select("id")
-      .eq("id", departmentId)
-      .eq("store_id", store.id)
-      .maybeSingle();
-
-    if (existingError) {
-      return NextResponse.json(
-        { error: readableError(existingError, "Could not load department") },
-        { status: 500 }
-      );
-    }
-    if (!existing) {
-      return NextResponse.json(
-        { error: "Department not found for this store" },
-        { status: 404 }
-      );
-    }
-
     const targetNumber = Math.floor(target);
-    const payload: {
-      id: string;
-      weekly_bay_target: number;
-      is_active?: boolean;
-    } = {
-      id: departmentId,
+    const patch: { weekly_bay_target: number; is_active?: boolean } = {
       weekly_bay_target: targetNumber,
     };
     if (actor.role === "super_admin" && typeof body.is_active === "boolean") {
-      payload.is_active = body.is_active;
+      patch.is_active = body.is_active;
     }
 
     const { data, error } = await supabase
       .from("departments")
-      .upsert(payload, { onConflict: "id" })
+      .update(patch)
+      .eq("id", departmentId)
+      .eq("store_id", store.id)
       .select("*")
-      .single();
+      .maybeSingle();
 
     if (error) {
+      console.error("Failed to update weekly bay target:", error);
       return NextResponse.json(
         { error: readableError(error, "Could not save weekly bay target") },
         { status: 500 }
+      );
+    }
+    if (!data) {
+      return NextResponse.json(
+        { error: "Department not found for this store" },
+        { status: 404 }
       );
     }
 
