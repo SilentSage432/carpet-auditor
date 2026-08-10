@@ -134,7 +134,9 @@ async function replayAction(action: SyncAction): Promise<void> {
 
   switch (action.type) {
     case "upsert_audit": {
-      const { error } = await supabase.from("carpet_audits").upsert(payload);
+      const { error } = await supabase
+        .from("carpet_audits")
+        .upsert(payload, { onConflict: "id" });
       if (error) throw error;
       if (entityId) markLocalOnline(LOCAL_KEYS.carpet_audits, entityId);
       return;
@@ -148,7 +150,9 @@ async function replayAction(action: SyncAction): Promise<void> {
       return;
     }
     case "upsert_remnant": {
-      const { error } = await supabase.from("carpet_remnants").upsert(payload);
+      const { error } = await supabase
+        .from("carpet_remnants")
+        .upsert(payload, { onConflict: "id" });
       if (error) throw error;
       if (entityId) markLocalOnline(LOCAL_KEYS.carpet_remnants, entityId);
       return;

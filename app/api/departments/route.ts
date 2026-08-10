@@ -6,6 +6,7 @@ import {
   StoreOpsAuthError,
 } from "@/lib/store-ops/auth";
 import { requireSupabaseAdmin } from "@/lib/supabase/admin-response";
+import { readableError } from "@/lib/store-ops/errors";
 import { resolveDepartmentIdByCode } from "@/lib/store-ops/rotations";
 import {
   ensureDepartmentsForStore,
@@ -35,9 +36,9 @@ export async function GET(request: Request) {
     if (error) {
       return NextResponse.json(
         {
-          error: error.message,
+          error: readableError(error, "Could not load departments"),
           hint:
-            "If this mentions schema cache, confirm departments exists in THIS Supabase project (API URL must match .env.local) and reload the schema cache.",
+            "If this mentions schema cache, confirm departments exists in THIS Supabase project (API URL must match .env.local) and apply 20260809_multi_store.sql.",
         },
         { status: 500 }
       );
@@ -52,8 +53,9 @@ export async function GET(request: Request) {
     if (err instanceof StoreOpsAuthError) {
       return NextResponse.json({ error: err.message }, { status: err.status });
     }
+    console.error("[departments GET]", err);
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Unknown error" },
+      { error: readableError(err, "Could not load departments") },
       { status: 500 }
     );
   }
@@ -139,7 +141,10 @@ export async function PATCH(request: Request) {
       .single();
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return NextResponse.json(
+        { error: readableError(error, "Could not update department") },
+        { status: 500 }
+      );
     }
 
     return NextResponse.json({ department: data });
@@ -147,8 +152,9 @@ export async function PATCH(request: Request) {
     if (err instanceof StoreOpsAuthError) {
       return NextResponse.json({ error: err.message }, { status: err.status });
     }
+    console.error("[departments PATCH]", err);
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Update failed" },
+      { error: readableError(err, "Update failed") },
       { status: 400 }
     );
   }

@@ -5,6 +5,7 @@ import {
   fetchDepartments,
   updateDepartmentWeeklyTarget,
 } from "@/lib/store-ops/client";
+import { readableError } from "@/lib/store-ops/errors";
 import type { Department } from "@/lib/store-ops/types";
 import { isMasterAdmin } from "@/lib/rbac";
 import type { StoreSpecialist } from "@/lib/types";
@@ -34,7 +35,7 @@ export function WeeklyBayTargetCard({ specialist }: Props) {
       setDept(first);
       if (first) setValue(String(first.weekly_bay_target ?? 10));
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load department");
+      setError(readableError(err, "Failed to load department"));
     }
   }, [specialist, canEdit]);
 
@@ -61,7 +62,7 @@ export function WeeklyBayTargetCard({ specialist }: Props) {
         `Saved — ${updated.name} will queue ${updated.weekly_bay_target} bays each Sunday.`
       );
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Save failed");
+      setError(readableError(err, "Save failed — could not update weekly bay target"));
     } finally {
       setBusy(false);
     }

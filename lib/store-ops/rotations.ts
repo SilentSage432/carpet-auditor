@@ -233,7 +233,11 @@ export async function generateWeeklyRotations(
     .upsert(rows, { onConflict: "location_id,assigned_week" })
     .select("*");
 
-  if (insertError) throw new Error(insertError.message);
+  if (insertError) {
+    throw new Error(
+      `Weekly rotation upsert failed: ${insertError.message}`
+    );
+  }
 
   const { data: locations, error: locError } = await supabase
     .from("store_locations")

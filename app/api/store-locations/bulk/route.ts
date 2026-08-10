@@ -4,6 +4,7 @@ import {
   requireSuperAdmin,
   StoreOpsAuthError,
 } from "@/lib/store-ops/auth";
+import { readableError } from "@/lib/store-ops/errors";
 import { bulkInsertLocations } from "@/lib/store-ops/locations";
 import { getSupabaseAdmin } from "@/lib/store-ops/supabase-admin";
 import { resolveStoreByNumber } from "@/lib/store-ops/stores";
@@ -48,7 +49,10 @@ export async function POST(request: Request) {
       .maybeSingle();
 
     if (deptError) {
-      return NextResponse.json({ error: deptError.message }, { status: 500 });
+      return NextResponse.json(
+        { error: readableError(deptError, "Could not load department") },
+        { status: 500 }
+      );
     }
     if (!dept) {
       return NextResponse.json(
@@ -75,8 +79,14 @@ export async function POST(request: Request) {
     if (err instanceof StoreOpsAuthError) {
       return NextResponse.json({ error: err.message }, { status: err.status });
     }
+    console.error("[store-locations/bulk]", err);
     return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Unknown error" },
+      {
+        error: readableError(
+          err,
+          "Bulk location generate failed — check department, aisle/bay range, and unique constraints"
+        ),
+      },
       { status: 400 }
     );
   }

@@ -12,6 +12,7 @@ import {
   fetchStoreLocations,
   generateRotations,
 } from "@/lib/store-ops/client";
+import { readableError } from "@/lib/store-ops/errors";
 import type { Department, StoreLocation } from "@/lib/store-ops/types";
 import type { StoreSpecialist } from "@/lib/types";
 
@@ -51,6 +52,7 @@ function StoreMapBody({
   const [genCount, setGenCount] = useState("10");
   const [genBusy, setGenBusy] = useState(false);
   const [genMsg, setGenMsg] = useState<string | null>(null);
+  const [genError, setGenError] = useState<string | null>(null);
   const bulkRef = useRef<HTMLElement>(null);
   const weekRef = useRef<HTMLElement>(null);
 
@@ -66,7 +68,7 @@ function StoreMapBody({
       setLocations(locs);
       setGenDept((current) => current || depts[0]?.id || "");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load store map");
+      setError(readableError(err, "Failed to load store map"));
     } finally {
       setLoading(false);
     }
@@ -90,6 +92,7 @@ function StoreMapBody({
     if (!genDept) return;
     setGenBusy(true);
     setGenMsg(null);
+    setGenError(null);
     try {
       const result = await generateRotations(
         specialist,
@@ -103,7 +106,12 @@ function StoreMapBody({
       );
       await reload(specialist);
     } catch (err) {
-      setGenMsg(err instanceof Error ? err.message : "Generate failed");
+      setGenError(
+        readableError(
+          err,
+          "Weekly generate failed — map PENDING bays first, then retry"
+        )
+      );
     } finally {
       setGenBusy(false);
     }
@@ -193,6 +201,11 @@ function StoreMapBody({
             {genMsg ? (
               <p className="mt-2 text-sm text-amber-200" role="status">
                 {genMsg}
+              </p>
+            ) : null}
+            {genError ? (
+              <p className="mt-2 text-sm font-medium text-red-300" role="alert">
+                {genError}
               </p>
             ) : null}
           </section>

@@ -227,7 +227,7 @@ export async function saveRemnant(
   try {
     const { data, error } = await supabase
       .from(TABLE)
-      .upsert(remnantPayload(record))
+      .upsert(remnantPayload(record), { onConflict: "id" })
       .select("*")
       .single();
 

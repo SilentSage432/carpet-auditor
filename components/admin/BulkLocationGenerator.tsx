@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { Department, StoreLocationType } from "@/lib/store-ops/types";
 import type { StoreSpecialist } from "@/lib/types";
 import { bulkGenerateLocations } from "@/lib/store-ops/client";
+import { readableError } from "@/lib/store-ops/errors";
 
 type Props = {
   specialist: StoreSpecialist;
@@ -51,7 +52,12 @@ export function BulkLocationGenerator({
       );
       onGenerated();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Generate failed");
+      setError(
+        readableError(
+          err,
+          "Generate failed — check Supabase migration and unique key department_id,aisle,bay"
+        )
+      );
     } finally {
       setBusy(false);
     }

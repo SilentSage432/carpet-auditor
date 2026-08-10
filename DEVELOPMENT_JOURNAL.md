@@ -1,5 +1,15 @@
 # DeptSync Hub — Development Journal
 
+## 2026-08-09 — Upsert constraint audit + readable errors
+
+### Shipped
+- Audited all Supabase `.upsert()` calls against live unique keys.
+- Store-ops: `stores` → `store_number`; `departments` → `store_id,code` (multi-store); `store_locations` → `department_id,aisle,bay`; `weekly_rotations` → `location_id,assigned_week`.
+- Inventory: catalog `store_number,sku`; specialists `store_number,name`; remnants/audits `id`; push `endpoint`.
+- `lib/store-ops/errors.ts` humanizes PostgREST/constraint errors for Settings, Bulk Generator, Store Map, and API JSON responses.
+
+---
+
 ## 2026-08-09 — Multi-store store_id + bulk upsert fix
 
 ### Shipped

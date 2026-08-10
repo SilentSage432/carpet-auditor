@@ -52,22 +52,28 @@ export async function upsertPushSubscription(
     departmentCode?: string | null;
   }
 ): Promise<PushSubscriptionRow> {
-  const row = {
-    endpoint: input.subscription.endpoint,
-    subscription_json: input.subscription,
-    user_id: input.userId ?? null,
-    specialist_id: input.specialistId ?? null,
-    department_code: input.departmentCode ?? null,
-  };
+  try {
+    const row = {
+      endpoint: input.subscription.endpoint,
+      subscription_json: input.subscription,
+      user_id: input.userId ?? null,
+      specialist_id: input.specialistId ?? null,
+      department_code: input.departmentCode ?? null,
+    };
 
-  const { data, error } = await supabase
-    .from("push_subscriptions")
-    .upsert(row, { onConflict: "endpoint" })
-    .select("*")
-    .single();
+    const { data, error } = await supabase
+      .from("push_subscriptions")
+      .upsert(row, { onConflict: "endpoint" })
+      .select("*")
+      .single();
 
-  if (error) throw new Error(error.message);
-  return data as PushSubscriptionRow;
+    if (error) throw new Error(error.message);
+    return data as PushSubscriptionRow;
+  } catch (error) {
+    const message =
+      error instanceof Error ? error.message : "Push subscription save failed";
+    throw new Error(`Push subscription upsert failed: ${message}`);
+  }
 }
 
 export async function deletePushSubscription(

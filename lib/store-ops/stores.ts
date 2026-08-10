@@ -5,6 +5,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { DEFAULT_STORE_NUMBER, normalizeStoreNumber } from "@/lib/store";
+import { readableError } from "./errors";
 
 export type StoreRecord = {
   id: string;
@@ -27,78 +28,115 @@ const DEPARTMENT_TEMPLATES: Array<{ name: string; code: string }> = [
   { name: "Building Materials", code: "building_materials" },
 ];
 
+/** Unique key on public.stores */
+export const STORES_ON_CONFLICT = "store_number" as const;
+
+/**
+ * Unique key on public.departments after multi-store.
+ * Bare `code` is not unique across stores — conflict target must include store_id.
+ */
+export const DEPARTMENTS_ON_CONFLICT = "store_id,code" as const;
+
 export async function resolveStoreByNumber(
   supabase: SupabaseClient,
   storeNumber?: string | null
 ): Promise<StoreRecord> {
-  const normalized = normalizeStoreNumber(
-    storeNumber?.trim() || DEFAULT_STORE_NUMBER
-  );
+  try {
+    const normalized = normalizeStoreNumber(
+      storeNumber?.trim() || DEFAULT_STORE_NUMBER
+    );
 
-  const { data: existing, error: existingError } = await supabase
-    .from("stores")
-    .select("*")
-    .eq("store_number", normalized)
-    .maybeSingle();
+    const { data: existing, error: existingError } = await supabase
+      .from("stores")
+      .select("*")
+      .eq("store_number", normalized)
+      .maybeSingle();
 
-  if (existingError) throw new Error(existingError.message);
-  if (existing) return existing as StoreRecord;
+    if (existingError) {
+      throw new Error(
+        readableError(existingError, "Could not look up store record")
+      );
+    }
+    if (existing) return existing as StoreRecord;
 
-  const { data: created, error: createError } = await supabase
-    .from("stores")
-    .upsert(
-      {
-        store_number: normalized,
-        name: `Lowe's #${normalized}`,
-        is_active: true,
-      },
-      { onConflict: "store_number" }
-    )
-    .select("*")
-    .single();
+    const payload = {
+      store_number: normalized,
+      name: `Lowe's #${normalized}`,
+      is_active: true as const,
+    };
 
-  if (createError) throw new Error(createError.message);
+    const { data: created, error: createError } = await supabase
+      .from("stores")
+      .upsert(payload, { onConflict: STORES_ON_CONFLICT })
+      .select("*")
+      .single();
 
-  const store = created as StoreRecord;
-  await ensureDepartmentsForStore(supabase, store.id);
-  return store;
+    if (createError) {
+      throw new Error(
+        readableError(createError, "Could not create store record")
+      );
+    }
+
+    const store = created as StoreRecord;
+    await ensureDepartmentsForStore(supabase, store.id);
+    return store;
+  } catch (error) {
+    throw new Error(readableError(error, "Store resolve failed"));
+  }
 }
 
 export async function listActiveStores(
   supabase: SupabaseClient
 ): Promise<StoreRecord[]> {
-  const { data, error } = await supabase
-    .from("stores")
-    .select("*")
-    .eq("is_active", true)
-    .order("store_number");
+  try {
+    const { data, error } = await supabase
+      .from("stores")
+      .select("*")
+      .eq("is_active", true)
+      .order("store_number");
 
-  if (error) throw new Error(error.message);
+    if (error) {
+      throw new Error(readableError(error, "Could not list active stores"));
+    }
 
-  const stores = (data ?? []) as StoreRecord[];
-  if (stores.length > 0) return stores;
+    const stores = (data ?? []) as StoreRecord[];
+    if (stores.length > 0) return stores;
 
-  // Safety: always have the default store for cron
-  const fallback = await resolveStoreByNumber(supabase, DEFAULT_STORE_NUMBER);
-  return [fallback];
+    const fallback = await resolveStoreByNumber(supabase, DEFAULT_STORE_NUMBER);
+    return [fallback];
+  } catch (error) {
+    throw new Error(readableError(error, "Could not list active stores"));
+  }
 }
 
 export async function ensureDepartmentsForStore(
   supabase: SupabaseClient,
   storeId: string
 ): Promise<void> {
-  const rows = DEPARTMENT_TEMPLATES.map((d) => ({
-    store_id: storeId,
-    name: d.name,
-    code: d.code,
-    weekly_bay_target: 10,
-    is_active: true,
-  }));
+  try {
+    if (!storeId) throw new Error("store_id is required for department seed");
 
-  const { error } = await supabase.from("departments").upsert(rows, {
-    onConflict: "store_id,code",
-    ignoreDuplicates: true,
-  });
+    const rows = DEPARTMENT_TEMPLATES.map((d) => ({
+      store_id: storeId,
+      name: d.name,
+      code: d.code,
+      weekly_bay_target: 10,
+      is_active: true as const,
+    }));
 
-  if (error) throw new Error(error.message);
+    const { error } = await supabase.from("departments").upsert(rows, {
+      onConflict: DEPARTMENTS_ON_CONFLICT,
+      ignoreDuplicates: true,
+    });
+
+    if (error) {
+      throw new Error(
+        readableError(error, "Could not seed departments for store")
+      );
+    }
+  } catch (error) {
+    throw new Error(
+      readableError(error, "Could not seed departments for store")
+    );
+  }
 }

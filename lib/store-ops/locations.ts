@@ -3,11 +3,15 @@
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { readableError } from "./errors";
 import type {
   BulkGenerateInput,
   StoreLocation,
   StoreLocationType,
 } from "./types";
+
+/** Unique key on public.store_locations (multi-store migration). */
+export const STORE_LOCATIONS_ON_CONFLICT = "department_id,aisle,bay" as const;
 
 export function buildBulkLocationRows(
   input: BulkGenerateInput & { store_id: string }
@@ -19,7 +23,7 @@ export function buildBulkLocationRows(
   type: StoreLocationType;
   status: "PENDING";
   cycle_number: number;
-  is_active: boolean;
+  is_active: true;
 }> {
   const { store_id, department_id, aisle, start_bay, end_bay, types } = input;
   if (!store_id) throw new Error("store_id is required");
@@ -38,8 +42,6 @@ export function buildBulkLocationRows(
   }
 
   // Unique key is (department_id, aisle, bay) — one row per bay.
-  // When both types are selected, emit both as separate upserts would collide;
-  // prefer SELLING when both are checked, otherwise the single selected type.
   const type: StoreLocationType = types.includes("SELLING")
     ? "SELLING"
     : types[0];
@@ -52,7 +54,7 @@ export function buildBulkLocationRows(
     type: StoreLocationType;
     status: "PENDING";
     cycle_number: number;
-    is_active: boolean;
+    is_active: true;
   }> = [];
 
   for (let bay = start_bay; bay <= end_bay; bay += 1) {
@@ -74,12 +76,20 @@ export async function bulkInsertLocations(
   supabase: SupabaseClient,
   input: BulkGenerateInput & { store_id: string }
 ): Promise<StoreLocation[]> {
-  const payload = buildBulkLocationRows(input);
-  const { data, error } = await supabase
-    .from("store_locations")
-    .upsert(payload, { onConflict: "department_id,aisle,bay" })
-    .select("*");
+  try {
+    const payload = buildBulkLocationRows(input);
+    const { data, error } = await supabase
+      .from("store_locations")
+      .upsert(payload, { onConflict: STORE_LOCATIONS_ON_CONFLICT })
+      .select("*");
 
-  if (error) throw new Error(error.message);
-  return (data ?? []) as StoreLocation[];
+    if (error) {
+      throw new Error(
+        readableError(error, "Bulk location upsert failed")
+      );
+    }
+    return (data ?? []) as StoreLocation[];
+  } catch (error) {
+    throw new Error(readableError(error, "Bulk location upsert failed"));
+  }
 }

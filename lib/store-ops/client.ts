@@ -5,6 +5,7 @@
 import type { StoreSpecialist } from "@/lib/types";
 import { getStoreNumber } from "@/lib/store";
 import { actorFromSpecialist, storeOpsAuthHeaders } from "./auth";
+import { readableError } from "./errors";
 import type {
   BulkGenerateInput,
   Department,
@@ -17,29 +18,40 @@ async function storeOpsFetch<T>(
   specialist: StoreSpecialist,
   init?: RequestInit
 ): Promise<T> {
-  const actor = actorFromSpecialist(specialist, getStoreNumber());
-  if (!actor) {
-    throw new Error("Store Operations access denied for this profile");
+  try {
+    const actor = actorFromSpecialist(specialist, getStoreNumber());
+    if (!actor) {
+      throw new Error("Store Operations access denied for this profile");
+    }
+
+    const res = await fetch(path, {
+      ...init,
+      headers: {
+        ...storeOpsAuthHeaders(actor),
+        ...(init?.headers ?? {}),
+      },
+    });
+
+    const body = (await res.json().catch(() => ({}))) as {
+      error?: string;
+      hint?: string;
+      [key: string]: unknown;
+    };
+
+    if (!res.ok) {
+      const detail = [body.error, body.hint].filter(Boolean).join(" — ");
+      throw new Error(
+        readableError(
+          detail || `Request failed (${res.status})`,
+          `Store Operations request failed (${res.status})`
+        )
+      );
+    }
+
+    return body as T;
+  } catch (error) {
+    throw new Error(readableError(error, "Store Operations request failed"));
   }
-
-  const res = await fetch(path, {
-    ...init,
-    headers: {
-      ...storeOpsAuthHeaders(actor),
-      ...(init?.headers ?? {}),
-    },
-  });
-
-  const body = (await res.json().catch(() => ({}))) as {
-    error?: string;
-    [key: string]: unknown;
-  };
-
-  if (!res.ok) {
-    throw new Error(body.error || `Request failed (${res.status})`);
-  }
-
-  return body as T;
 }
 
 export async function fetchDepartments(

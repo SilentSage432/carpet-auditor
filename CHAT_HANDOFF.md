@@ -65,6 +65,12 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 - Store Operations: `stores` table UUID `store_id`; hub session `store_number` maps via `lib/store-ops/stores.ts`
 - Departments / locations / weekly rotations scoped by `store_id`; cron runs per active store
 
+## Store Operations upsert keys
+- `stores`: `onConflict: store_number` (payload: store_number, name, is_active)
+- `departments`: `onConflict: store_id,code` (multi-store; bare `code` is not unique across stores)
+- `store_locations`: `onConflict: department_id,aisle,bay` (payload includes status PENDING, is_active true)
+- `weekly_rotations`: `onConflict: location_id,assigned_week`
+
 ## Remnants / markdown
 - Aging badges; 60+ or elevated role → Apply Manager Markdown
 
