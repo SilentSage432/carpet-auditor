@@ -75,6 +75,8 @@ export function DepartmentAuditSection({
   const [quickAddBarcode, setQuickAddBarcode] = useState<string | null>(null);
   const [simsFinderOpen, setSimsFinderOpen] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
+  const [summaryExpanded, setSummaryExpanded] = useState(false);
+  const [showAll, setShowAll] = useState(false);
 
   const simsSuggestions = useMemo(
     () => [
@@ -124,6 +126,7 @@ export function DepartmentAuditSection({
     (sum, a) => sum + (a.box_count ?? 0),
     0
   );
+  const visibleShift = showAll ? displayShift : displayShift.slice(0, 5);
   const unitNum = toNumber(unitCount, 0);
 
   function flashStatus(msg: string) {
@@ -273,22 +276,53 @@ export function DepartmentAuditSection({
 
       <section
         aria-label={`${meta.label} shift summary`}
-        className="space-y-2 rounded-2xl border border-slate-800 bg-slate-900/90 px-3 py-2 shadow-lg shadow-black/20"
+        className="overflow-x-auto rounded-2xl border border-slate-800 bg-slate-900/90 shadow-lg shadow-black/20"
       >
-        <p className="truncate font-mono text-xs font-semibold tabular-nums text-slate-200 sm:text-sm">
-          {meta.icon} {loaded ? displayShift.length : "—"} Logged
-          <span className="text-slate-500"> | </span>
-          {loaded ? shiftUnits : "—"} Units today
-          <span className="text-slate-500"> · </span>
-          {meta.description}
-        </p>
         <button
           type="button"
-          onClick={() => setReportOpen(true)}
-          className="flex h-11 w-full items-center justify-center rounded-xl border border-emerald-500/40 bg-emerald-950/40 px-3 text-sm font-bold text-emerald-200 active:scale-[0.98]"
+          onClick={() => setSummaryExpanded((v) => !v)}
+          aria-expanded={summaryExpanded}
+          className="flex min-h-12 w-full items-center gap-2 px-3 py-2 text-left"
         >
-          📊 Export / Print Report
+          <span className="min-w-0 flex-1 truncate font-mono text-xs font-semibold tabular-nums text-slate-200 sm:text-sm">
+            {meta.icon} {loaded ? displayShift.length : "—"} Logged
+            <span className="text-slate-500"> | </span>
+            {loaded ? shiftUnits : "—"} Units today
+          </span>
+          <span className="shrink-0 text-xs font-semibold text-emerald-400">
+            {summaryExpanded ? "Collapse ▴" : "Expand ▾"}
+          </span>
         </button>
+        {summaryExpanded ? (
+          <div className="space-y-3 border-t border-slate-800 p-4">
+            <div className="grid grid-cols-2 gap-2">
+              <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-3">
+                <p className="text-[10px] font-medium uppercase tracking-wide text-slate-400">
+                  Entries
+                </p>
+                <p className="mt-1 font-mono text-2xl font-semibold tabular-nums text-slate-50">
+                  {loaded ? displayShift.length : "—"}
+                </p>
+              </div>
+              <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-3">
+                <p className="text-[10px] font-medium uppercase tracking-wide text-emerald-400/80">
+                  Units today
+                </p>
+                <p className="mt-1 font-mono text-2xl font-semibold tabular-nums text-emerald-400">
+                  {loaded ? shiftUnits : "—"}
+                </p>
+              </div>
+            </div>
+            <p className="text-sm text-slate-400">{meta.description}</p>
+            <button
+              type="button"
+              onClick={() => setReportOpen(true)}
+              className="flex h-12 w-full items-center justify-center rounded-xl border border-emerald-500/40 bg-emerald-950/40 px-3 text-sm font-bold text-emerald-200 active:scale-[0.98]"
+            >
+              📊 Export / Print Report
+            </button>
+          </div>
+        ) : null}
       </section>
 
       {statusMsg ? (
@@ -454,31 +488,44 @@ export function DepartmentAuditSection({
             No {meta.label.toLowerCase()} units logged yet this shift.
           </p>
         ) : (
-          <ul className="space-y-2">
-            {displayShift.map((a) => (
-              <li
-                key={a.id}
-                className="flex items-start justify-between gap-2 rounded-xl bg-slate-950/70 px-3 py-2"
-              >
-                <div className="min-w-0">
-                  <p className="truncate font-semibold text-slate-100">
-                    {a.sku} · {a.carpet_name || meta.label}
-                  </p>
-                  <p className="text-xs text-slate-400">
-                    {a.box_count ?? 0} units · {locationLabel(a.location_type)} ·{" "}
-                    {a.sims_location || "—"} · {formatTime(a.created_at)}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => void handleDelete(a.id)}
-                  className="shrink-0 text-xs font-semibold text-red-300"
+          <>
+            <ul className="space-y-2">
+              {visibleShift.map((a) => (
+                <li
+                  key={a.id}
+                  className="flex items-start justify-between gap-2 rounded-xl bg-slate-950/70 px-3 py-2"
                 >
-                  Undo
-                </button>
-              </li>
-            ))}
-          </ul>
+                  <div className="min-w-0">
+                    <p className="truncate font-semibold text-slate-100">
+                      {a.sku} · {a.carpet_name || meta.label}
+                    </p>
+                    <p className="text-xs text-slate-400">
+                      {a.box_count ?? 0} units · {locationLabel(a.location_type)} ·{" "}
+                      {a.sims_location || "—"} · {formatTime(a.created_at)}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => void handleDelete(a.id)}
+                    className="shrink-0 text-xs font-semibold text-red-300"
+                  >
+                    Undo
+                  </button>
+                </li>
+              ))}
+            </ul>
+            {displayShift.length > 5 ? (
+              <button
+                type="button"
+                onClick={() => setShowAll((v) => !v)}
+                className="flex min-h-12 w-full items-center justify-center rounded-xl border border-slate-700 bg-slate-900 text-sm font-semibold text-slate-200"
+              >
+                {showAll
+                  ? "Show Fewer Entries"
+                  : `Show All Logged Entries (${displayShift.length})`}
+              </button>
+            ) : null}
+          </>
         )}
       </section>
     </div>

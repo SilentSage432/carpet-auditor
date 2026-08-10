@@ -19,11 +19,16 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 | 👤 Floor Associate | inherits / assigned dept | Same as department supervisor for that dept |
 
 ### Master Admin roster console
-- Settings → **👥 Team & Department Roster Manager** (Master Admin only)
+- Roster CRUD lives on `/admin/supervisors` and **Admin Tools** (not permanent Settings chrome)
 - Add supervisor/associate with department, username suggest, temp password, first-login reset flag
 - Reset credentials / Edit scope / **Deactivate** (soft-delete `is_active: false` + optional hard delete)
 - Deactivated profiles stay out of active roster fetches; seed helpers respect tombstones so Amber is not revived
 - Shareable issued-login card after create/reset
+
+### Admin Tools (Super Admin only)
+- Slide-over drawer defaults **closed** — header **Admin** chip, hamburger entry, or `openAdminTools()`
+- Owns: Bulk Generate, Trigger Weekly Rotation, all-dept bay targets, store number, device diagnostics, links to Store Map / Supervisors / Exceptions
+- Department Supervisors never see Admin Tools chrome
 
 ### Departments
 `flooring` · `appliances` · `plumbing` · `electrical` · `lawn_garden` · `paint` · `millwork` · `building_materials` · `hardware` · `all`
@@ -89,7 +94,8 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
   - Supervisor: `/dashboard` · `/department` · `/settings`
 - Quick Actions banner (Super Admin): Bulk Generate · Trigger Weekly Rotation · Manage Supervisors
 - `/admin/store-map` — department overview + location grid; Bulk Add accordion; Trigger Weekly Rotation modal (**Force Draw New Rotation**)
-- `/dashboard` — Zebra checklist for this ISO week; checkbox → complete rotation + location COMPLETED (cool-down)
+- `/dashboard` — Store Health Scorecard (top) + Zebra checklist for this ISO week; checkbox → complete rotation + location COMPLETED (cool-down)
+- `GET /api/store-health` — weekly pace + bottleneck aggregation for DS / Super Admin
 - APIs under `/api/rotations/*`, `/api/store-locations*`, `/api/departments`, `/api/weekly-rotations`
 - Multi-store: apply `20260809_multi_store.sql`; requests send `x-store-ops-store-number`
 - Requires `SUPABASE_SERVICE_ROLE_KEY` for server routes (apply migration in Supabase SQL editor)
@@ -106,17 +112,23 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 - Migration: `supabase/migrations/20260809_weekly_rotation_cron.sql` (`weekly_bay_target`, Lowe's codes)
 - `vercel.json`: Sunday `59 23 * * 0` → `/api/cron/weekly-rotation`
 - Env on Vercel: `CRON_SECRET` (Bearer token Vercel sends automatically)
-- Settings → Weekly bay target for supervisors
+- Settings → Weekly bay target for supervisors (Master: all-dept targets in Admin Tools)
 
 ## End-of-week verification
 - Migration: `supabase/migrations/20260809_rotation_verification.sql`
 - `/verify-rotation` — supervisors confirm or report incomplete bays (CARRIED_OVER + exception reasons)
-- `/admin/exceptions` — Master Admin verification status + bottleneck log
+- `/admin/exceptions` — Master Admin tabs: Pending / Verified / Barriers / All
 - APIs: `POST /api/rotations/verify`, `GET /api/rotations/exceptions`
 
 ## Store number (dynamic)
 - Owner: `lib/store.ts` — localStorage `carpet_hub_store_number`; **no hardcoded `1234`/`1852`**
-- Blank allowed; Settings → free edit + **Save Store Number** (session stays active)
+- Blank allowed; Master edits via **Admin Tools → Store Number** (session stays active)
 - Session / active specialist / biometric only reject when both sides have different store numbers
 - Login adopts `store_profiles` / specialist `store_number` when device store is unset
 - Store-ops APIs require a real `x-store-ops-store-number` (no inventing defaults)
+
+## Mobile floor UX (Waves A–C)
+- Floor job first: Dashboard = pace + checklist; no permanent Super Admin quick-action strip
+- Admin Tools drawer (Master only, defaults closed)
+- Dense bay/rotation rows; completed lists collapsed by default
+- Catalog/Remnant forms = bottom sheets; `/department` does not embed auditors

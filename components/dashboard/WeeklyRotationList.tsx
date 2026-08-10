@@ -22,6 +22,7 @@ export function WeeklyRotationList({
   onRefresh,
 }: Props) {
   const [error, setError] = useState<string | null>(null);
+  const [doneOpen, setDoneOpen] = useState(false);
   const [, startTransition] = useTransition();
   const [optimistic, setOptimistic] = useOptimistic(
     rotations,
@@ -55,7 +56,7 @@ export function WeeklyRotationList({
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       <div className="rounded-2xl border border-emerald-500/30 bg-emerald-950/30 px-4 py-3">
         <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-emerald-400">
           This Week&apos;s Assigned Rotation
@@ -76,11 +77,12 @@ export function WeeklyRotationList({
 
       {open.length === 0 && done.length === 0 ? (
         <p className="rounded-2xl border border-dashed border-slate-700 px-4 py-8 text-center text-sm text-slate-400">
-          No bays assigned this week. Ask Master Admin to generate the weekly rotation.
+          No bays assigned this week. Ask Master Admin to generate the weekly
+          rotation.
         </p>
       ) : null}
 
-      <ul className="space-y-2">
+      <ul className="divide-y divide-slate-800 overflow-hidden rounded-xl border border-slate-700 bg-slate-900/90">
         {open.map((rotation) => {
           const loc = rotation.store_locations;
           const label = loc
@@ -88,21 +90,16 @@ export function WeeklyRotationList({
             : `Location ${rotation.location_id.slice(0, 8)}`;
           return (
             <li key={rotation.id}>
-              <label className="flex min-h-[4.25rem] cursor-pointer items-center gap-3 rounded-2xl border border-slate-700 bg-slate-900/90 px-4 py-3 shadow-sm transition active:scale-[0.99]">
+              <label className="flex min-h-12 cursor-pointer items-center gap-3 px-3 py-2 active:bg-slate-800/60">
                 <input
                   type="checkbox"
                   checked={false}
                   onChange={() => handleCheck(rotation.id)}
-                  className="h-7 w-7 shrink-0 accent-emerald-500"
+                  className="h-6 w-6 shrink-0 accent-emerald-500"
                   aria-label={`Mark complete: ${label}`}
                 />
-                <span className="min-w-0 flex-1">
-                  <span className="block font-mono text-base font-bold leading-tight text-slate-50">
-                    {label}
-                  </span>
-                  <span className="mt-0.5 block text-xs text-slate-400">
-                    Tap checkbox when bay is maintained
-                  </span>
+                <span className="min-w-0 flex-1 truncate font-mono text-sm font-bold text-slate-50">
+                  {label}
                 </span>
               </label>
             </li>
@@ -111,35 +108,43 @@ export function WeeklyRotationList({
       </ul>
 
       {done.length > 0 ? (
-        <div className="pt-2">
-          <p className="mb-2 font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500">
-            Completed (cool-down locked)
-          </p>
-          <ul className="space-y-1.5 opacity-60">
-            {done.map((rotation) => {
-              const loc = rotation.store_locations;
-              const label = loc
-                ? formatLocationLabel(loc)
-                : rotation.location_id.slice(0, 8);
-              return (
-                <li
-                  key={rotation.id}
-                  className="flex min-h-12 items-center gap-3 rounded-xl border border-slate-800 bg-slate-950/50 px-3 py-2"
-                >
-                  <input
-                    type="checkbox"
-                    checked
-                    disabled
-                    readOnly
-                    className="h-5 w-5 accent-emerald-600"
-                  />
-                  <span className="font-mono text-sm text-slate-400 line-through">
-                    {label}
-                  </span>
-                </li>
-              );
-            })}
-          </ul>
+        <div className="overflow-hidden rounded-xl border border-slate-800 bg-slate-950/50">
+          <button
+            type="button"
+            aria-expanded={doneOpen}
+            onClick={() => setDoneOpen((o) => !o)}
+            className="flex min-h-11 w-full items-center justify-between px-3 text-left font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500"
+          >
+            Completed ({done.length}) · cool-down locked
+            <span aria-hidden>{doneOpen ? "▲" : "▼"}</span>
+          </button>
+          {doneOpen ? (
+            <ul className="divide-y divide-slate-800 border-t border-slate-800 opacity-60">
+              {done.map((rotation) => {
+                const loc = rotation.store_locations;
+                const label = loc
+                  ? formatLocationLabel(loc)
+                  : rotation.location_id.slice(0, 8);
+                return (
+                  <li
+                    key={rotation.id}
+                    className="flex min-h-10 items-center gap-3 px-3 py-1.5"
+                  >
+                    <input
+                      type="checkbox"
+                      checked
+                      disabled
+                      readOnly
+                      className="h-4 w-4 accent-emerald-600"
+                    />
+                    <span className="truncate font-mono text-sm text-slate-400 line-through">
+                      {label}
+                    </span>
+                  </li>
+                );
+              })}
+            </ul>
+          ) : null}
         </div>
       ) : null}
     </div>

@@ -2,10 +2,10 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import { StoreHealthCard } from "@/components/StoreHealthCard";
 import { WeeklyRotationList } from "@/components/dashboard/WeeklyRotationList";
 import { NavigationHub } from "@/components/hub/NavigationHub";
 import { SessionGate } from "@/components/hub/SessionGate";
-import { SuperAdminQuickActions } from "@/components/hub/SuperAdminQuickActions";
 import { actorFromSpecialist } from "@/lib/store-ops/auth";
 import { fetchThisWeekRotations } from "@/lib/store-ops/client";
 import type { WeeklyRotationWithLocation } from "@/lib/store-ops/types";
@@ -42,6 +42,7 @@ function DashboardBody({
   const [rotations, setRotations] = useState<WeeklyRotationWithLocation[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [healthKey, setHealthKey] = useState(0);
   const dept = departmentMeta(effectiveDepartment(specialist));
 
   const reload = useCallback(async (member: StoreSpecialist) => {
@@ -51,8 +52,8 @@ function DashboardBody({
       const data = await fetchThisWeekRotations(member);
       setWeek(data.assigned_week || "");
       setRotations(data.rotations ?? []);
+      setHealthKey((k) => k + 1);
     } catch {
-      // Zero rotations / soft failure — render empty checklist, no schema toast
       setWeek("");
       setRotations([]);
       setError(null);
@@ -75,21 +76,21 @@ function DashboardBody({
       />
 
       <main className="mx-auto w-full max-w-lg flex-1 px-3 pb-28 pt-4">
-        <SuperAdminQuickActions specialist={specialist} />
+        <StoreHealthCard specialist={specialist} refreshKey={healthKey} />
 
         {!isMasterAdmin(specialist) ? (
           <Link
             href="/verify-rotation"
-            className="mb-4 flex min-h-14 items-center justify-center rounded-xl border-2 border-emerald-500/40 bg-emerald-950/40 px-4 text-sm font-bold text-emerald-200"
+            className="mb-3 block text-center text-sm font-semibold text-emerald-300 underline-offset-2 hover:underline"
           >
             End-of-week Verify &amp; Report Exceptions →
           </Link>
         ) : (
           <Link
             href="/admin/exceptions"
-            className="mb-4 flex min-h-14 items-center justify-center rounded-xl border-2 border-amber-400/50 bg-amber-950/30 px-4 text-sm font-bold text-amber-100"
+            className="mb-3 block text-center text-sm font-semibold text-amber-200 underline-offset-2 hover:underline"
           >
-            Open Exception Log / Verification Status →
+            Exception Log / Verification Status →
           </Link>
         )}
 

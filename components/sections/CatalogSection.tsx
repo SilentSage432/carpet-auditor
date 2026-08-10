@@ -433,7 +433,21 @@ export function CatalogSection({
       )}
 
       {showForm && (
-        <div className="space-y-3 rounded-2xl border border-slate-800 bg-slate-900/90 p-4">
+        <div className="fixed inset-0 z-50 flex flex-col justify-end bg-slate-950/70">
+          <button
+            type="button"
+            aria-label="Close form"
+            className="absolute inset-0"
+            onClick={() => setShowForm(false)}
+          />
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label={editing ? "Edit SIMS SKU" : "Add SIMS SKU"}
+            className="relative z-10 max-h-[85dvh] overflow-y-auto rounded-t-2xl border-t-2 border-emerald-500/40 bg-slate-950 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3"
+          >
+            <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-slate-600" />
+            <div className="space-y-3">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-400">
             {editing ? "Edit SIMS SKU" : "Add SIMS SKU"}
           </h2>
@@ -550,7 +564,7 @@ export function CatalogSection({
             onChange={(v) => setUpc(sanitizeBarcodeScan(v))}
             placeholder="Scan or paste barcode"
           />
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-2 gap-2 pb-2">
             <button
               type="button"
               onClick={() => setShowForm(false)}
@@ -566,6 +580,8 @@ export function CatalogSection({
             >
               {saving ? "Saving…" : "Save"}
             </button>
+          </div>
+            </div>
           </div>
         </div>
       )}

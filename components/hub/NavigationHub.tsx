@@ -3,11 +3,18 @@
 /**
  * Navigation Hub chrome — high-contrast Zebra header with hamburger drawer,
  * role badge, and user menu. Owns cross-app route navigation presentation.
+ * Master Admin: Admin Tools slide-over (defaults closed).
  */
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useId, useRef, useState } from "react";
+import {
+  ADMIN_TOOLS_EVENT,
+  AdminToolsDrawer,
+  type AdminToolsEventDetail,
+  type AdminToolsSection,
+} from "@/components/hub/AdminToolsDrawer";
 import { DeptSyncBadge } from "@/components/hub/DeptSyncBadge";
 import { useNetworkBadge } from "@/lib/network";
 import {
@@ -17,6 +24,7 @@ import {
   navRoleLinks,
   type NavHubLink,
 } from "@/lib/nav-hub";
+import { isMasterAdmin } from "@/lib/rbac";
 import { formatStoreLabel } from "@/lib/store";
 import type { StoreSpecialist } from "@/lib/types";
 
@@ -28,6 +36,7 @@ type NavigationHubProps = {
   onLogout?: () => void;
   onChangePin?: () => void;
   onOpenSpecialist?: () => void;
+  onStoreNumberChange?: (storeNumber: string) => void;
   /** Show ops bottom tab bar (default true). */
   showBottomNav?: boolean;
 };
@@ -40,6 +49,7 @@ export function NavigationHub({
   onLogout,
   onChangePin,
   onOpenSpecialist,
+  onStoreNumberChange,
   showBottomNav = true,
 }: NavigationHubProps) {
   const pathname = usePathname() || "/";
@@ -47,14 +57,48 @@ export function NavigationHub({
   const links = navRoleLinks(specialist);
   const [menuOpen, setMenuOpen] = useState(false);
   const [userOpen, setUserOpen] = useState(false);
+  const [adminOpen, setAdminOpen] = useState(false);
+  const [adminSection, setAdminSection] =
+    useState<AdminToolsSection>("menu");
+  const [adminForce, setAdminForce] = useState(false);
   const userMenuId = useId();
   const drawerId = useId();
   const userRef = useRef<HTMLDivElement>(null);
+  const master = isMasterAdmin(specialist);
 
   useEffect(() => {
     setMenuOpen(false);
     setUserOpen(false);
   }, [pathname]);
+
+  useEffect(() => {
+    function onAdminEvent(e: Event) {
+      const detail = (e as CustomEvent<AdminToolsEventDetail>).detail ?? {};
+      setAdminSection(detail.section ?? "menu");
+      setAdminForce(Boolean(detail.openForceRotation));
+      setAdminOpen(true);
+    }
+    window.addEventListener(ADMIN_TOOLS_EVENT, onAdminEvent);
+    return () => window.removeEventListener(ADMIN_TOOLS_EVENT, onAdminEvent);
+  }, []);
+
+  useEffect(() => {
+    if (!master || typeof window === "undefined") return;
+    const hash = window.location.hash.replace(/^#/, "");
+    if (hash === "bulk-generate" || hash === "map-management") {
+      setAdminSection("bulk");
+      setAdminForce(false);
+      setAdminOpen(true);
+    } else if (hash === "weekly-rotation") {
+      setAdminSection("menu");
+      setAdminForce(true);
+      setAdminOpen(true);
+    } else if (hash === "admin-tools") {
+      setAdminSection("menu");
+      setAdminForce(false);
+      setAdminOpen(true);
+    }
+  }, [master, pathname]);
 
   useEffect(() => {
     if (!userOpen) return;
@@ -95,6 +139,21 @@ export function NavigationHub({
           </button>
 
           <DeptSyncBadge size="sm" />
+
+          {master && specialist ? (
+            <button
+              type="button"
+              onClick={() => {
+                setAdminSection("menu");
+                setAdminForce(false);
+                setAdminOpen(true);
+              }}
+              className="flex h-11 shrink-0 items-center rounded-xl border-2 border-amber-400/60 bg-amber-950/50 px-2 font-mono text-[10px] font-bold uppercase tracking-wide text-amber-200"
+              aria-label="Open Admin Tools"
+            >
+              Admin
+            </button>
+          ) : null}
 
           <div className="min-w-0 flex-1">
             <p className="truncate font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-emerald-400">
@@ -163,6 +222,17 @@ export function NavigationHub({
                   </p>
                 </div>
                 <div className="p-2">
+                  {master ? (
+                    <MenuAction
+                      label="Admin Tools"
+                      onClick={() => {
+                        setUserOpen(false);
+                        setAdminSection("menu");
+                        setAdminForce(false);
+                        setAdminOpen(true);
+                      }}
+                    />
+                  ) : null}
                   {onOpenSpecialist ? (
                     <MenuAction
                       label="Switch profile"
@@ -238,6 +308,32 @@ export function NavigationHub({
               </button>
             </div>
             <ul className="flex-1 space-y-2 overflow-y-auto p-3">
+              {master ? (
+                <li>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setMenuOpen(false);
+                      setAdminSection("menu");
+                      setAdminForce(false);
+                      setAdminOpen(true);
+                    }}
+                    className="flex min-h-16 w-full items-center gap-3 rounded-2xl border-2 border-amber-400/50 bg-amber-950/30 px-4 text-left"
+                  >
+                    <span className="text-xl" aria-hidden>
+                      ⚡
+                    </span>
+                    <span>
+                      <span className="block text-sm font-bold text-amber-100">
+                        Admin Tools
+                      </span>
+                      <span className="block text-xs text-amber-200/70">
+                        Bulk generate, rotation, store config
+                      </span>
+                    </span>
+                  </button>
+                </li>
+              ) : null}
               {links.map((link) => (
                 <NavDrawerItem
                   key={link.href}
@@ -272,6 +368,28 @@ export function NavigationHub({
 
       {showBottomNav && links.length > 0 ? (
         <OpsBottomNav pathname={pathname} links={links} />
+      ) : null}
+
+      {master && specialist ? (
+        <AdminToolsDrawer
+          open={adminOpen}
+          onClose={() => {
+            setAdminOpen(false);
+            setAdminForce(false);
+            if (typeof window !== "undefined" && window.location.hash) {
+              history.replaceState(
+                null,
+                "",
+                `${window.location.pathname}${window.location.search}`
+              );
+            }
+          }}
+          specialist={specialist}
+          storeNumber={storeNumber ?? ""}
+          onStoreNumberChange={onStoreNumberChange}
+          initialSection={adminSection}
+          openForceRotationOnMount={adminForce}
+        />
       ) : null}
     </>
   );

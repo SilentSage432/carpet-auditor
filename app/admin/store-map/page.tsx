@@ -1,12 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { BulkLocationGenerator } from "@/components/admin/BulkLocationGenerator";
-import { ForceRotationModal } from "@/components/admin/ForceRotationModal";
 import { StoreLocationGrid } from "@/components/admin/StoreLocationGrid";
+import { openAdminTools } from "@/components/hub/AdminToolsDrawer";
 import { NavigationHub } from "@/components/hub/NavigationHub";
 import { SessionGate } from "@/components/hub/SessionGate";
-import { SuperAdminQuickActions } from "@/components/hub/SuperAdminQuickActions";
 import { isMasterAdmin } from "@/lib/rbac";
 import {
   fetchDepartments,
@@ -49,9 +47,7 @@ function StoreMapBody({
   const [locations, setLocations] = useState<StoreLocation[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [mapMgmtOpen, setMapMgmtOpen] = useState(false);
   const [isOverviewOpen, setIsOverviewOpen] = useState(false);
-  const [forceOpen, setForceOpen] = useState(false);
   const currentWeek = isoWeekLabel();
 
   const reload = useCallback(async (member: StoreSpecialist) => {
@@ -74,16 +70,6 @@ function StoreMapBody({
   useEffect(() => {
     void reload(specialist);
   }, [specialist, reload]);
-
-  useEffect(() => {
-    const hash = window.location.hash;
-    if (hash === "#bulk-generate" || hash === "#map-management") {
-      setMapMgmtOpen(true);
-    }
-    if (hash === "#weekly-rotation") {
-      setForceOpen(true);
-    }
-  }, [loading]);
 
   const departmentOverview = useMemo(() => {
     return departments.map((dept) => {
@@ -120,27 +106,16 @@ function StoreMapBody({
       />
 
       <main className="mx-auto w-full max-w-lg flex-1 px-3 pb-28 pt-4">
-        <SuperAdminQuickActions
-          specialist={specialist}
-          onBulkGenerate={() => {
-            setMapMgmtOpen(true);
-            window.requestAnimationFrame(() => {
-              document
-                .getElementById("map-management")
-                ?.scrollIntoView({ behavior: "smooth", block: "start" });
-            });
-          }}
-          onTriggerRotation={() => setForceOpen(true)}
-        />
-
-        <section className="mb-5 rounded-2xl border border-emerald-500/30 bg-emerald-950/20 px-4 py-3">
-          <p className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-emerald-400">
-            Automated engine
-          </p>
-          <p className="mt-1 text-sm font-medium text-slate-100">
-            Automated Cron: Active · Last Draw: Current ISO Week ({currentWeek})
-          </p>
-        </section>
+        <p className="mb-3 font-mono text-[11px] text-slate-400">
+          Cron active · ISO week {currentWeek} ·{" "}
+          <button
+            type="button"
+            onClick={() => openAdminTools({ section: "bulk" })}
+            className="font-semibold text-amber-200 underline-offset-2 hover:underline"
+          >
+            Bulk generate / Admin tools
+          </button>
+        </p>
 
         {error ? (
           <p className="mb-4 rounded-xl border border-red-500/40 bg-red-950/40 px-4 py-3 text-sm text-red-200">
@@ -195,8 +170,8 @@ function StoreMapBody({
                   <p className="text-sm text-slate-400">Loading departments…</p>
                 ) : departmentOverview.length === 0 ? (
                   <p className="rounded-2xl border border-dashed border-slate-700 px-4 py-6 text-center text-sm text-slate-400">
-                    No departments yet. Seed departments, then use Map
-                    Management.
+                    No departments yet. Seed departments, then use Admin Tools →
+                    Bulk Generate.
                   </p>
                 ) : (
                   <ul className="space-y-2">
@@ -230,43 +205,6 @@ function StoreMapBody({
             ) : null}
           </section>
 
-          <section
-            id="map-management"
-            className="overflow-hidden rounded-2xl border border-slate-700 bg-slate-900/60"
-          >
-            <button
-              type="button"
-              id="bulk-generate"
-              aria-expanded={mapMgmtOpen}
-              onClick={() => setMapMgmtOpen((open) => !open)}
-              className="flex min-h-14 w-full items-center justify-between gap-3 px-4 py-3 text-left"
-            >
-              <div>
-                <p className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-emerald-400">
-                  Map Management &amp; Bulk Add
-                </p>
-                <p className="mt-0.5 text-sm text-slate-400">
-                  Expand to generate aisle/bay Selling + Topstock tags
-                </p>
-              </div>
-              <span
-                aria-hidden
-                className="shrink-0 font-mono text-base text-slate-300"
-              >
-                {mapMgmtOpen ? "▲" : "▼"}
-              </span>
-            </button>
-            {mapMgmtOpen ? (
-              <div className="border-t border-slate-800 px-3 pb-4 pt-3">
-                <BulkLocationGenerator
-                  specialist={specialist}
-                  departments={departments}
-                  onGenerated={() => void reload(specialist)}
-                />
-              </div>
-            ) : null}
-          </section>
-
           {loading ? (
             <p className="text-sm text-slate-400">Loading locations…</p>
           ) : (
@@ -279,15 +217,6 @@ function StoreMapBody({
           )}
         </div>
       </main>
-
-      <ForceRotationModal
-        open={forceOpen}
-        onClose={() => setForceOpen(false)}
-        specialist={specialist}
-        departments={departments}
-        initialDepartmentId={departments[0]?.id}
-        onForced={() => void reload(specialist)}
-      />
     </div>
   );
 }

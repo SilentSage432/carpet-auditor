@@ -97,6 +97,7 @@ export function ApplianceAuditSection({
   const [quickAddBarcode, setQuickAddBarcode] = useState<string | null>(null);
   const [simsFinderOpen, setSimsFinderOpen] = useState(false);
   const [showAll, setShowAll] = useState(false);
+  const [summaryExpanded, setSummaryExpanded] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
 
   const unitNum = toNumber(unitCount, 0);
@@ -300,20 +301,52 @@ export function ApplianceAuditSection({
 
       <section
         aria-label="Appliance shift summary"
-        className="space-y-2 rounded-2xl border border-slate-800 bg-slate-900/90 px-3 py-2 shadow-lg shadow-black/20"
+        className="overflow-x-auto rounded-2xl border border-slate-800 bg-slate-900/90 shadow-lg shadow-black/20"
       >
-        <p className="truncate font-mono text-xs font-semibold tabular-nums text-slate-200 sm:text-sm">
-          🔌 {loaded ? shiftAudits.length : "—"} Logged
-          <span className="text-slate-500"> | </span>
-          {loaded ? shiftUnits : "—"} Units today
-        </p>
         <button
           type="button"
-          onClick={() => setReportOpen(true)}
-          className="flex h-11 w-full items-center justify-center rounded-xl border border-sky-500/40 bg-sky-950/40 px-3 text-sm font-bold text-sky-200 active:scale-[0.98]"
+          onClick={() => setSummaryExpanded((v) => !v)}
+          aria-expanded={summaryExpanded}
+          className="flex min-h-12 w-full items-center gap-2 px-3 py-2 text-left"
         >
-          📊 Export / Print Report
+          <span className="min-w-0 flex-1 truncate font-mono text-xs font-semibold tabular-nums text-slate-200 sm:text-sm">
+            🔌 {loaded ? shiftAudits.length : "—"} Logged
+            <span className="text-slate-500"> | </span>
+            {loaded ? shiftUnits : "—"} Units today
+          </span>
+          <span className="shrink-0 text-xs font-semibold text-emerald-400">
+            {summaryExpanded ? "Collapse ▴" : "Expand ▾"}
+          </span>
         </button>
+        {summaryExpanded ? (
+          <div className="space-y-3 border-t border-slate-800 p-4">
+            <div className="grid grid-cols-2 gap-2">
+              <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-3">
+                <p className="text-[10px] font-medium uppercase tracking-wide text-slate-400">
+                  Entries
+                </p>
+                <p className="mt-1 font-mono text-2xl font-semibold tabular-nums text-slate-50">
+                  {loaded ? shiftAudits.length : "—"}
+                </p>
+              </div>
+              <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-3">
+                <p className="text-[10px] font-medium uppercase tracking-wide text-sky-400/80">
+                  Units today
+                </p>
+                <p className="mt-1 font-mono text-2xl font-semibold tabular-nums text-sky-300">
+                  {loaded ? shiftUnits : "—"}
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => setReportOpen(true)}
+              className="flex h-12 w-full items-center justify-center rounded-xl border border-sky-500/40 bg-sky-950/40 px-3 text-sm font-bold text-sky-200 active:scale-[0.98]"
+            >
+              📊 Export / Print Report
+            </button>
+          </div>
+        ) : null}
       </section>
 
       {statusMsg && (

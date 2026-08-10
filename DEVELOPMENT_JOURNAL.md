@@ -1,5 +1,35 @@
 # DeptSync Hub — Development Journal
 
+## 2026-08-10 — Mobile floor UX Waves A–C
+
+### Wave A — Admin Tools drawer + DS lockdown
+- `AdminToolsDrawer`: slide-over (defaults closed) for Bulk Generate, Force Rotation, all-dept targets, store #, diagnostics, supervisor link.
+- Wired via NavigationHub **Admin** chip + hamburger + `openAdminTools()` / hash deep-links.
+- Removed permanent Quick Actions from `/dashboard`; Store Map bulk accordion moved into drawer.
+- Settings: Supervisors see PIN, own bay target, push, collapsed Device & sync. Master setup not permanent page chrome.
+
+### Wave B — Density
+- Compact single-line rotation rows; completed lists default collapsed.
+- Store Map bay rows: inline S/T toggles on one line.
+- Exceptions: Pending / Verified / Barriers / All tabs.
+- Verify: collapsed completed + sticky Confirm/Submit bar.
+
+### Wave C — Progressive disclosure
+- `/department` = overview links only (no embedded auditor).
+- Catalog/Remnant add-edit → bottom sheets; dense rows + overflow menus.
+- Auditors: collapsible summaries; flooring “More details” + collapsed filters; denser shift log; Show All (5) on department Today.
+
+---
+
+## 2026-08-10 — Store Health Scorecard
+
+### Shipped
+- `lib/store-ops/health.ts` + `GET /api/store-health`: week rotations by dept (assigned/completed) + exception bottlenecks.
+- `components/StoreHealthCard.tsx`: DS pace bar + barriers; Super Admin storewide grid + Bottleneck Summary (Freight/Staffing/Traffic).
+- Embedded at top of `/dashboard` (first card after login for rotation roles).
+
+---
+
 ## 2026-08-10 — Per-department weekly_bay_target settings
 
 ### Shipped

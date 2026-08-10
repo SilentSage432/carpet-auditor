@@ -286,3 +286,76 @@ export async function fetchExceptionSummary(
     };
   }
 }
+
+export type StoreHealthSnapshotClient = {
+  assigned_week: string;
+  store_id: string | null;
+  scope: "store" | "department";
+  department: {
+    department_id: string;
+    department_name: string;
+    department_code: string;
+    weekly_bay_target: number;
+    assigned: number;
+    completed: number;
+    open: number;
+    exception_count: number;
+    completion_pct: number;
+  } | null;
+  departments: Array<{
+    department_id: string;
+    department_name: string;
+    department_code: string;
+    weekly_bay_target: number;
+    assigned: number;
+    completed: number;
+    open: number;
+    exception_count: number;
+    completion_pct: number;
+  }>;
+  barriers: Array<{
+    id: string;
+    department_id: string;
+    department_name: string;
+    reason: string;
+    created_at: string;
+  }>;
+  bottleneck_summary: Array<{ label: string; count: number }>;
+  totals: {
+    assigned: number;
+    completed: number;
+    open: number;
+    exceptions: number;
+    completion_pct: number;
+  };
+};
+
+export async function fetchStoreHealth(
+  specialist: StoreSpecialist,
+  week?: string
+): Promise<StoreHealthSnapshotClient> {
+  const qs = week ? `?week=${encodeURIComponent(week)}` : "";
+  try {
+    return await storeOpsFetch<StoreHealthSnapshotClient>(
+      `/api/store-health${qs}`,
+      specialist
+    );
+  } catch {
+    return {
+      assigned_week: week ?? "",
+      store_id: null,
+      scope: "store",
+      department: null,
+      departments: [],
+      barriers: [],
+      bottleneck_summary: [],
+      totals: {
+        assigned: 0,
+        completed: 0,
+        open: 0,
+        exceptions: 0,
+        completion_pct: 0,
+      },
+    };
+  }
+}

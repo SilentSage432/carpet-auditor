@@ -54,6 +54,7 @@ function VerifyBody({
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [doneOpen, setDoneOpen] = useState(false);
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -164,7 +165,7 @@ function VerifyBody({
         onLogout={logout}
       />
 
-      <main className="mx-auto w-full max-w-lg flex-1 px-3 pb-28 pt-4">
+      <main className="mx-auto w-full max-w-lg flex-1 px-3 pb-36 pt-4">
         <section className="mb-4 rounded-2xl border border-emerald-500/30 bg-emerald-950/30 px-4 py-3">
           <p className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-emerald-400">
             End-of-week verification
@@ -201,7 +202,7 @@ function VerifyBody({
           </p>
         ) : (
           <>
-            <label className="mb-4 flex min-h-14 items-center justify-between gap-3 rounded-2xl border border-slate-700 bg-slate-900/80 px-4">
+            <label className="mb-3 flex min-h-12 items-center justify-between gap-3 rounded-xl border border-slate-700 bg-slate-900/80 px-3">
               <span className="text-sm font-semibold text-slate-100">
                 Report Incomplete Bays
               </span>
@@ -213,13 +214,13 @@ function VerifyBody({
                   setReportMode((v) => !v);
                   setIncompleteIds(new Set());
                 }}
-                className={`relative h-8 w-14 rounded-full transition ${
+                className={`relative h-7 w-12 rounded-full transition ${
                   reportMode ? "bg-amber-500" : "bg-slate-600"
                 }`}
               >
                 <span
-                  className={`absolute top-1 h-6 w-6 rounded-full bg-white transition ${
-                    reportMode ? "left-7" : "left-1"
+                  className={`absolute top-0.5 h-6 w-6 rounded-full bg-white transition ${
+                    reportMode ? "left-5" : "left-0.5"
                   }`}
                 />
               </button>
@@ -227,12 +228,12 @@ function VerifyBody({
 
             {reportMode ? (
               <p className="mb-3 text-sm text-amber-200/90">
-                Uncheck any bay that was not finished, then pick a reason. Those
-                bays are marked CARRIED_OVER and prioritized next week.
+                Uncheck unfinished bays and pick a reason. Those bays carry over
+                next week.
               </p>
             ) : null}
 
-            <ul className="mb-4 space-y-2">
+            <ul className="mb-3 divide-y divide-slate-800 overflow-hidden rounded-xl border border-slate-700 bg-slate-900/90">
               {openRotations.map((rotation) => {
                 const loc = rotation.store_locations;
                 const label = loc
@@ -240,20 +241,17 @@ function VerifyBody({
                   : rotation.location_id.slice(0, 8);
                 const markedIncomplete = incompleteIds.has(rotation.id);
                 return (
-                  <li
-                    key={rotation.id}
-                    className="rounded-2xl border border-slate-700 bg-slate-900/90 px-4 py-3"
-                  >
+                  <li key={rotation.id} className="px-3 py-2">
                     {reportMode ? (
                       <>
-                        <label className="flex min-h-12 items-center gap-3">
+                        <label className="flex min-h-10 items-center gap-3">
                           <input
                             type="checkbox"
                             checked={!markedIncomplete}
                             onChange={() => toggleIncomplete(rotation.id)}
-                            className="h-6 w-6 accent-emerald-500"
+                            className="h-5 w-5 accent-emerald-500"
                           />
-                          <span className="font-mono text-sm font-bold text-slate-50">
+                          <span className="truncate font-mono text-sm font-bold text-slate-50">
                             {label}
                           </span>
                         </label>
@@ -266,7 +264,7 @@ function VerifyBody({
                                 [rotation.id]: e.target.value,
                               }))
                             }
-                            className="mt-2 w-full rounded-xl border border-amber-500/40 bg-slate-950 px-3 py-3 text-sm text-slate-100"
+                            className="mt-2 w-full rounded-xl border border-amber-500/40 bg-slate-950 px-3 py-2.5 text-sm text-slate-100"
                           >
                             <option value="">Select reason…</option>
                             {EXCEPTION_REASONS.map((r) => (
@@ -278,7 +276,7 @@ function VerifyBody({
                         ) : null}
                       </>
                     ) : (
-                      <p className="font-mono text-sm font-bold text-slate-50">
+                      <p className="min-h-10 font-mono text-sm font-bold leading-10 text-slate-50">
                         {label}
                       </p>
                     )}
@@ -288,51 +286,64 @@ function VerifyBody({
             </ul>
 
             {doneRotations.length > 0 ? (
-              <div className="mb-4 opacity-60">
-                <p className="mb-2 font-mono text-[10px] font-bold uppercase tracking-wide text-slate-500">
-                  Already completed on floor
-                </p>
-                <ul className="space-y-1">
-                  {doneRotations.map((r) => (
-                    <li
-                      key={r.id}
-                      className="rounded-xl border border-slate-800 px-3 py-2 font-mono text-xs text-slate-400 line-through"
-                    >
-                      {r.store_locations
-                        ? formatLocationLabel(r.store_locations)
-                        : r.location_id.slice(0, 8)}
-                    </li>
-                  ))}
-                </ul>
+              <div className="mb-4 overflow-hidden rounded-xl border border-slate-800 bg-slate-950/50">
+                <button
+                  type="button"
+                  aria-expanded={doneOpen}
+                  onClick={() => setDoneOpen((o) => !o)}
+                  className="flex min-h-11 w-full items-center justify-between px-3 text-left font-mono text-[10px] font-bold uppercase tracking-wide text-slate-500"
+                >
+                  Already completed ({doneRotations.length})
+                  <span aria-hidden>{doneOpen ? "▲" : "▼"}</span>
+                </button>
+                {doneOpen ? (
+                  <ul className="divide-y divide-slate-800 border-t border-slate-800 opacity-60">
+                    {doneRotations.map((r) => (
+                      <li
+                        key={r.id}
+                        className="px-3 py-2 font-mono text-xs text-slate-400 line-through"
+                      >
+                        {r.store_locations
+                          ? formatLocationLabel(r.store_locations)
+                          : r.location_id.slice(0, 8)}
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
               </div>
             ) : null}
 
-            <div className="grid gap-2">
-              {!reportMode ? (
-                <button
-                  type="button"
-                  disabled={busy || (openRotations.length === 0 && doneRotations.length === 0)}
-                  onClick={() => void submit(true)}
-                  className="flex min-h-14 items-center justify-center rounded-xl bg-emerald-500 px-4 text-base font-bold text-slate-950 disabled:opacity-50"
-                >
-                  {busy
-                    ? "Saving…"
-                    : openRotations.length === 0
-                      ? "Confirm Week Verified"
-                      : "Confirm All Completed"}
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={() => void submit(false)}
-                  className="flex min-h-14 items-center justify-center rounded-xl bg-amber-500 px-4 text-base font-bold text-slate-950 disabled:opacity-50"
-                >
-                  {busy
-                    ? "Saving…"
-                    : `Submit Verification (${incompleteIds.size} incomplete)`}
-                </button>
-              )}
+            <div className="fixed bottom-0 left-0 right-0 z-20 border-t border-slate-800 bg-slate-950/95 px-3 pb-[calc(env(safe-area-inset-bottom)+4.75rem)] pt-2">
+              <div className="mx-auto max-w-lg">
+                {!reportMode ? (
+                  <button
+                    type="button"
+                    disabled={
+                      busy ||
+                      (openRotations.length === 0 && doneRotations.length === 0)
+                    }
+                    onClick={() => void submit(true)}
+                    className="flex min-h-14 w-full items-center justify-center rounded-xl bg-emerald-500 px-4 text-base font-bold text-slate-950 disabled:opacity-50"
+                  >
+                    {busy
+                      ? "Saving…"
+                      : openRotations.length === 0
+                        ? "Confirm Week Verified"
+                        : "Confirm All Completed"}
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => void submit(false)}
+                    className="flex min-h-14 w-full items-center justify-center rounded-xl bg-amber-500 px-4 text-base font-bold text-slate-950 disabled:opacity-50"
+                  >
+                    {busy
+                      ? "Saving…"
+                      : `Submit Verification (${incompleteIds.size} incomplete)`}
+                  </button>
+                )}
+              </div>
             </div>
           </>
         )}

@@ -325,7 +325,21 @@ export function RemnantSection({
       )}
 
       {showForm && (
-        <div className="space-y-3 rounded-2xl border border-slate-800 bg-slate-900/90 p-4">
+        <div className="fixed inset-0 z-50 flex flex-col justify-end bg-slate-950/70">
+          <button
+            type="button"
+            aria-label="Close form"
+            className="absolute inset-0"
+            onClick={() => setShowForm(false)}
+          />
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-label={editing ? "Edit remnant" : "Add remnant"}
+            className="relative z-10 max-h-[85dvh] overflow-y-auto rounded-t-2xl border-t-2 border-emerald-500/40 bg-slate-950 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3"
+          >
+            <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-slate-600" />
+            <div className="space-y-3">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-400">
             {editing ? "Edit remnant" : "Add remnant"}
           </h2>
@@ -450,7 +464,7 @@ export function RemnantSection({
             onChange={setNotes}
             placeholder="Minor edge stain, discounted 20%"
           />
-          <div className="grid grid-cols-2 gap-2">
+          <div className="grid grid-cols-2 gap-2 pb-2">
             <button
               type="button"
               onClick={() => setShowForm(false)}
@@ -466,6 +480,8 @@ export function RemnantSection({
             >
               {saving ? "Saving…" : "Save"}
             </button>
+          </div>
+            </div>
           </div>
         </div>
       )}
@@ -488,117 +504,158 @@ export function RemnantSection({
               estimated_value: item.estimated_value,
             });
             return (
-              <li
+              <RemnantRow
                 key={item.id}
-                className="space-y-3 rounded-2xl border border-slate-800 bg-slate-900/90 p-3"
-              >
-                <div className="flex flex-wrap items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="font-mono text-base font-bold text-slate-50">
-                      {item.tag_number}
-                    </p>
-                    <p className="truncate text-sm text-slate-200">
-                      {item.carpet_name || `SKU ${item.sku}`}
-                    </p>
-                    <p className="mt-1 text-sm text-slate-400">
-                      {item.width_ft}′ × {item.length_ft}′ ·{" "}
-                      {formatSqYd(item.square_yards)} sq yd
-                    </p>
-                  </div>
-                  <span
-                    className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide ${statusPill(item.status)}`}
-                  >
-                    {item.status}
-                  </span>
-                </div>
-                <p
-                  className={`rounded-lg border px-2.5 py-2 text-xs font-semibold leading-snug ${ageBadge.className}`}
-                >
-                  {ageBadge.label}
-                </p>
-                {clearance ? (
-                  <p className="rounded-lg border border-red-500/50 bg-red-950/50 px-2.5 py-2 text-xs font-bold leading-snug text-red-200">
-                    {clearance}
-                  </p>
-                ) : null}
-                <div className="flex flex-wrap gap-2">
-                  {item.location ? (
-                    <span className="rounded-lg bg-slate-800 px-2 py-1 text-xs text-slate-300">
-                      {item.location}
-                    </span>
-                  ) : null}
-                  {item.reserved_for ? (
-                    <span className="rounded-lg bg-amber-500/15 px-2 py-1 text-xs text-amber-300">
-                      For: {item.reserved_for}
-                    </span>
-                  ) : null}
-                  {item.offline ? (
-                    <span className="rounded-lg bg-orange-500/15 px-2 py-1 text-xs text-orange-300">
-                      Offline
-                    </span>
-                  ) : null}
-                </div>
-                {item.logged_by ? (
-                  <p className="text-xs text-slate-500">
-                    Logged by {item.logged_by}
-                  </p>
-                ) : null}
-                {item.notes ? (
-                  <p className="text-xs text-slate-500">{item.notes}</p>
-                ) : null}
-                {item.markdown_notes ? (
-                  <p className="text-xs text-red-300/80">
-                    Markdown: {item.markdown_notes}
-                  </p>
-                ) : null}
-                {canMarkdown ? (
-                  <button
-                    type="button"
-                    onClick={() => setMarkdownTarget(item)}
-                    className="flex min-h-12 w-full items-center justify-center rounded-xl border border-red-500/50 bg-red-950/40 text-sm font-bold text-red-200"
-                  >
-                    🏷️ Apply Manager Markdown
-                  </button>
-                ) : null}
-                <div className="grid grid-cols-2 gap-2">
-                  {item.status !== "reserved" && item.status !== "sold" && (
-                    <button
-                      type="button"
-                      onClick={() => setReserveTarget(item)}
-                      className="flex h-12 items-center justify-center rounded-xl border border-amber-500/40 text-sm font-semibold text-amber-300"
-                    >
-                      Mark Reserved
-                    </button>
-                  )}
-                  {item.status !== "sold" && (
-                    <button
-                      type="button"
-                      onClick={() => void markSold(item)}
-                      className="flex h-12 items-center justify-center rounded-xl border border-slate-600 text-sm font-semibold text-slate-200"
-                    >
-                      Mark Sold
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    onClick={() => openEdit(item)}
-                    className="flex h-12 items-center justify-center rounded-xl border border-slate-700 text-sm font-semibold text-slate-100"
-                  >
-                    Edit
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setDeleteTargetId(item.id)}
-                    className="flex h-12 items-center justify-center rounded-xl border border-red-500/40 text-sm font-semibold text-red-400"
-                  >
-                    Delete
-                  </button>
-                </div>
-              </li>
+                item={item}
+                ageBadge={ageBadge}
+                clearance={clearance}
+                canMarkdown={canMarkdown}
+                onMarkdown={() => setMarkdownTarget(item)}
+                onReserve={() => setReserveTarget(item)}
+                onSold={() => void markSold(item)}
+                onEdit={() => openEdit(item)}
+                onDelete={() => setDeleteTargetId(item.id)}
+              />
             );
           })}
         </ul>
       )}
     </div>
+  );
+}
+
+function RemnantRow({
+  item,
+  ageBadge,
+  clearance,
+  canMarkdown,
+  onMarkdown,
+  onReserve,
+  onSold,
+  onEdit,
+  onDelete,
+}: {
+  item: Remnant;
+  ageBadge: ReturnType<typeof agingBadge>;
+  clearance: string | null;
+  canMarkdown: boolean;
+  onMarkdown: () => void;
+  onReserve: () => void;
+  onSold: () => void;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  return (
+    <li className="rounded-xl border border-slate-800 bg-slate-900/90 px-3 py-2.5">
+      <div className="flex items-start gap-2">
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <p className="font-mono text-sm font-bold text-slate-50">
+              {item.tag_number}
+            </p>
+            <span
+              className={`rounded px-1.5 py-0.5 text-[9px] font-bold uppercase ${statusPill(item.status)}`}
+            >
+              {item.status}
+            </span>
+          </div>
+          <p className="truncate text-sm text-slate-200">
+            {item.carpet_name || `SKU ${item.sku}`}
+          </p>
+          <p className="mt-0.5 text-[11px] text-slate-500">
+            {item.width_ft}′ × {item.length_ft}′ · {formatSqYd(item.square_yards)}{" "}
+            sq yd
+            {item.location ? ` · ${item.location}` : ""}
+          </p>
+          <p
+            className={`mt-1 text-[10px] font-semibold ${ageBadge.className.includes("text-") ? "" : "text-slate-400"}`}
+          >
+            {ageBadge.label}
+            {clearance ? ` · ${clearance}` : ""}
+          </p>
+        </div>
+        <div className="relative shrink-0">
+          <button
+            type="button"
+            aria-label="Remnant actions"
+            aria-expanded={menuOpen}
+            onClick={() => setMenuOpen((o) => !o)}
+            className="flex h-10 w-10 items-center justify-center rounded-lg border border-slate-700 text-lg font-bold text-slate-300"
+          >
+            ⋯
+          </button>
+          {menuOpen ? (
+            <>
+              <button
+                type="button"
+                aria-label="Close menu"
+                className="fixed inset-0 z-10"
+                onClick={() => setMenuOpen(false)}
+              />
+              <div className="absolute right-0 z-20 mt-1 w-44 overflow-hidden rounded-xl border border-slate-600 bg-slate-950 py-1">
+                {canMarkdown ? (
+                  <button
+                    type="button"
+                    className="flex min-h-11 w-full items-center px-3 text-left text-sm font-semibold text-red-200"
+                    onClick={() => {
+                      setMenuOpen(false);
+                      onMarkdown();
+                    }}
+                  >
+                    Apply markdown
+                  </button>
+                ) : null}
+                {item.status !== "reserved" && item.status !== "sold" ? (
+                  <button
+                    type="button"
+                    className="flex min-h-11 w-full items-center px-3 text-left text-sm font-semibold text-amber-200"
+                    onClick={() => {
+                      setMenuOpen(false);
+                      onReserve();
+                    }}
+                  >
+                    Mark reserved
+                  </button>
+                ) : null}
+                {item.status !== "sold" ? (
+                  <button
+                    type="button"
+                    className="flex min-h-11 w-full items-center px-3 text-left text-sm font-semibold text-slate-100"
+                    onClick={() => {
+                      setMenuOpen(false);
+                      onSold();
+                    }}
+                  >
+                    Mark sold
+                  </button>
+                ) : null}
+                <button
+                  type="button"
+                  className="flex min-h-11 w-full items-center px-3 text-left text-sm font-semibold text-slate-100"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    onEdit();
+                  }}
+                >
+                  Edit
+                </button>
+                <button
+                  type="button"
+                  className="flex min-h-11 w-full items-center px-3 text-left text-sm font-semibold text-red-300"
+                  onClick={() => {
+                    setMenuOpen(false);
+                    onDelete();
+                  }}
+                >
+                  Delete
+                </button>
+              </div>
+            </>
+          ) : null}
+        </div>
+      </div>
+    </li>
   );
 }

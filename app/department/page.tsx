@@ -1,25 +1,18 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { NavigationHub } from "@/components/hub/NavigationHub";
 import { SessionGate } from "@/components/hub/SessionGate";
-import { ApplianceAuditSection } from "@/components/sections/ApplianceAuditSection";
-import { CycleAuditSection } from "@/components/sections/CycleAuditSection";
-import { DepartmentAuditSection } from "@/components/sections/DepartmentAuditSection";
-import { fetchCatalog } from "@/lib/catalog";
 import {
   effectiveDepartment,
-  isGenericDepartment,
   isMasterAdmin,
 } from "@/lib/rbac";
-import { dedupeRoster, fetchSpecialists } from "@/lib/specialists";
-import {
-  departmentMeta,
-  type CatalogItem,
-  type StoreSpecialist,
-} from "@/lib/types";
+import { departmentMeta, type StoreSpecialist } from "@/lib/types";
 
+/**
+ * Department Overview — pace / ops entry only.
+ * Auditing lives on Inventory Hub tabs (Wave C: no embedded auditor).
+ */
 export default function DepartmentOverviewPage() {
   return (
     <SessionGate
@@ -48,24 +41,6 @@ function DepartmentBody({
 }) {
   const dept = effectiveDepartment(specialist);
   const meta = departmentMeta(dept);
-  const [catalog, setCatalog] = useState<CatalogItem[]>([]);
-  const [roster, setRoster] = useState<StoreSpecialist[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  const reload = useCallback(async () => {
-    setLoading(true);
-    const [cat, team] = await Promise.all([
-      fetchCatalog(),
-      fetchSpecialists(),
-    ]);
-    setCatalog(cat);
-    setRoster(dedupeRoster(team));
-    setLoading(false);
-  }, []);
-
-  useEffect(() => {
-    void reload();
-  }, [reload, storeNumber]);
 
   return (
     <div className="flex min-h-dvh flex-col">
@@ -84,50 +59,39 @@ function DepartmentBody({
             {meta.icon} {meta.label}
           </p>
           <p className="mt-1 text-sm text-slate-400">{meta.description}</p>
+        </div>
+
+        <div className="grid gap-2">
           <Link
             href="/dashboard"
-            className="mt-3 inline-flex min-h-12 items-center text-sm font-semibold text-emerald-300 underline-offset-2 hover:underline"
+            className="flex min-h-14 items-center justify-center rounded-xl border-2 border-emerald-500/40 bg-emerald-950/40 px-4 text-sm font-bold text-emerald-200"
           >
             Open this week&apos;s Zebra checklist →
           </Link>
+          {!isMasterAdmin(specialist) ? (
+            <Link
+              href="/"
+              className="flex min-h-14 items-center justify-center rounded-xl border border-slate-700 bg-slate-900 px-4 text-sm font-semibold text-slate-100"
+            >
+              Open Inventory Hub (scan / audit) →
+            </Link>
+          ) : (
+            <Link
+              href="/"
+              className="flex min-h-14 items-center justify-center rounded-xl border border-slate-700 bg-slate-900 px-4 text-sm font-semibold text-slate-100"
+            >
+              Open Inventory Hub →
+            </Link>
+          )}
+          {!isMasterAdmin(specialist) ? (
+            <Link
+              href="/verify-rotation"
+              className="flex min-h-12 items-center justify-center rounded-xl border border-slate-700 bg-slate-950 px-4 text-sm font-semibold text-slate-300"
+            >
+              End-of-week Verify &amp; Exceptions →
+            </Link>
+          ) : null}
         </div>
-
-        {loading ? (
-          <p className="text-sm text-slate-400">Loading department workspace…</p>
-        ) : isMasterAdmin(specialist) ? (
-          <p className="rounded-2xl border border-dashed border-slate-700 px-4 py-6 text-sm text-slate-400">
-            Master Admin: open{" "}
-            <Link href="/" className="text-emerald-300 underline">
-              Inventory Hub
-            </Link>{" "}
-            for full-store audits, or use Zebra Floor View for rotations.
-          </p>
-        ) : dept === "appliances" ? (
-          <ApplianceAuditSection
-            catalog={catalog}
-            onCatalogChange={setCatalog}
-            auditedBy={specialist.name}
-            activeSpecialist={specialist}
-          />
-        ) : dept === "flooring" ? (
-          <CycleAuditSection
-            catalog={catalog}
-            onCatalogChange={setCatalog}
-            auditedBy={specialist.name}
-            specialists={roster}
-            activeSpecialist={specialist}
-          />
-        ) : isGenericDepartment(dept) ? (
-          <DepartmentAuditSection
-            department={dept}
-            catalog={catalog}
-            onCatalogChange={setCatalog}
-            auditedBy={specialist.name}
-            activeSpecialist={specialist}
-          />
-        ) : (
-          <p className="text-sm text-slate-400">No department workspace mapped.</p>
-        )}
       </main>
     </div>
   );

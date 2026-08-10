@@ -42,13 +42,15 @@
 - [x] Super Admin Store Map bulk generator (`/admin/store-map`)
 - [x] Weekly rotation engine API (`/api/rotations/generate` + cycle reset)
 - [x] Zebra supervisor rotation dashboard (`/dashboard`)
-- [x] Navigation Hub — role-aware hamburger, ops bottom tabs, Super Admin quick actions
+- [x] Navigation Hub — role-aware hamburger, ops bottom tabs, Admin Tools slide-over
 - [x] Web Push subscriptions + dispatch on weekly rotation generate
 - [x] Automated weekly rotation cron (`/api/cron/weekly-rotation` + `weekly_bay_target`)
 - [x] Supervisor end-of-week verification + exception log (`/verify-rotation`, `/admin/exceptions`)
 - [x] Multi-store `store_id` on departments / locations / weekly rotations + per-store cron
 - [x] Bulk generator upsert on `(department_id, aisle, bay)`
 - [x] Bulk generator BOTH Selling+Topstock (`department_id,aisle,bay,type`)
+- [x] Store Health Scorecard on Zebra dashboard (DS pace + Super Admin bottlenecks)
+- [x] Mobile floor UX Waves A–C: Admin Tools drawer, DS lockdown, dense lists, progressive disclosure
 
 ## Next
 - [ ] JWT / claim-based RLS enforcing `store_number` (+ department) server-side

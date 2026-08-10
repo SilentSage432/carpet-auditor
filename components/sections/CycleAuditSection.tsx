@@ -147,6 +147,8 @@ export function CycleAuditSection({
   const [summaryExpanded, setSummaryExpanded] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
   const [simsFinderOpen, setSimsFinderOpen] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [detailsOpen, setDetailsOpen] = useState(false);
   const [undoToast, setUndoToast] = useState<{
     id: string;
     label: string;
@@ -780,6 +782,17 @@ export function CycleAuditSection({
             onChange={setCarpetName}
             placeholder="e.g. Stainmaster Hearthstone 12ft"
           />
+          <button
+            type="button"
+            aria-expanded={detailsOpen}
+            onClick={() => setDetailsOpen((o) => !o)}
+            className="flex min-h-10 w-full items-center justify-between rounded-xl border border-slate-800 bg-slate-950/60 px-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-400"
+          >
+            More details (category, SIMS, width)
+            <span aria-hidden>{detailsOpen ? "▲" : "▼"}</span>
+          </button>
+          {detailsOpen ? (
+            <>
           <label className="block space-y-1.5">
             <span className="text-sm font-medium text-slate-200">Category</span>
             <select
@@ -863,6 +876,8 @@ export function CycleAuditSection({
             >
               + Save to SIMS Catalog
             </button>
+          ) : null}
+            </>
           ) : null}
         </div>
 
@@ -1147,10 +1162,18 @@ export function CycleAuditSection({
           </span>
         </div>
 
-        <div className="space-y-2 rounded-2xl border border-slate-800 bg-slate-900/90 p-3">
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-            Supervisor filters
-          </p>
+        <div className="overflow-hidden rounded-xl border border-slate-800 bg-slate-900/90">
+          <button
+            type="button"
+            aria-expanded={filtersOpen}
+            onClick={() => setFiltersOpen((o) => !o)}
+            className="flex min-h-11 w-full items-center justify-between px-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500"
+          >
+            Filters
+            <span aria-hidden>{filtersOpen ? "▲" : "▼"}</span>
+          </button>
+          {filtersOpen ? (
+            <div className="space-y-2 border-t border-slate-800 p-3">
           <label className="block space-y-1">
             <span className="text-xs text-slate-400">Specialist</span>
             <select
@@ -1200,6 +1223,8 @@ export function CycleAuditSection({
               ) : null}
             </span>
           </label>
+            </div>
+          ) : null}
         </div>
 
         {!loaded && (
@@ -1216,7 +1241,7 @@ export function CycleAuditSection({
           </p>
         )}
 
-        <ul className="space-y-2">
+        <ul className="divide-y divide-slate-800 overflow-hidden rounded-xl border border-slate-800 bg-slate-900/90">
           {visibleAudits.map((audit) => {
             const kind = classifyVariance(audit.variance_clf);
             const isCarton =
@@ -1224,85 +1249,32 @@ export function CycleAuditSection({
             return (
               <li
                 key={audit.id}
-                className="flex gap-2 rounded-2xl border border-slate-800 bg-slate-900/90 p-3"
+                className="flex min-h-11 items-center gap-2 px-3 py-2"
               >
-                <div className="min-w-0 flex-1 space-y-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="font-mono text-base font-semibold text-slate-50">
-                      SKU {audit.sku}
-                    </span>
-                    <span className="rounded bg-slate-700/50 px-2 py-0.5 text-[10px] font-bold uppercase text-slate-300">
-                      {audit.category}
-                    </span>
-                    <span
-                      className={`rounded px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${
-                        audit.location_type === "sales_floor"
-                          ? "bg-emerald-500/20 text-emerald-300"
-                          : "bg-amber-500/20 text-amber-300"
-                      }`}
-                    >
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-mono text-sm font-semibold text-slate-50">
+                    {audit.sku}
+                    <span className="ml-2 font-sans text-[10px] font-bold uppercase text-slate-500">
                       {locationLabel(audit.location_type)}
                     </span>
-                    {audit.offline && (
-                      <span className="rounded bg-orange-500/20 px-2 py-0.5 text-[10px] font-bold uppercase text-orange-300">
-                        Offline
-                      </span>
-                    )}
-                  </div>
-                  {audit.carpet_name ? (
-                    <p className="truncate text-sm text-slate-300">
-                      {audit.carpet_name}
-                    </p>
-                  ) : null}
-                  {audit.sims_location ? (
-                    <p className="font-mono text-xs text-emerald-400/90">
-                      📍 {audit.sims_location}
-                    </p>
-                  ) : null}
-                  <p className="text-sm text-slate-400">
-                    {isCarton
-                      ? `${audit.box_count} units`
-                      : `${formatMeasurementDisplay(
-                          audit.measurement_inches,
-                          audit.measurement_fraction
-                        )} × ${audit.rounds} rounds`}
                   </p>
-                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                    <span className="font-mono text-lg font-bold tabular-nums text-emerald-400">
-                      {isCarton
-                        ? `${formatSqFt(audit.calculated_sqft ?? 0)} sq ft`
-                        : `${formatClf(audit.calculated_clf)} CLF`}
-                    </span>
-                    <time
-                      dateTime={audit.created_at}
-                      className="font-mono text-xs text-slate-500"
-                    >
-                      {formatTime(audit.created_at)}
-                    </time>
-                  </div>
-                  {audit.audited_by ? (
-                    <p className="text-xs text-slate-500">
-                      Logged by {audit.audited_by}
-                    </p>
-                  ) : null}
-                  {audit.variance_clf != null && (
-                    <span
-                      className={`inline-flex rounded-lg border px-2 py-1 text-xs font-semibold ${varianceBadgeClass(kind)}`}
-                    >
-                      {kind === "match" && "🟢 "}
-                      {kind === "shortage" && "🔴 "}
-                      {kind === "overage" && "🟡 "}
-                      {formatVariance(audit.variance_clf)}
-                    </span>
-                  )}
+                  <p className="truncate text-[11px] text-slate-500">
+                    {isCarton
+                      ? `${audit.box_count} units · ${formatSqFt(audit.calculated_sqft ?? 0)} sq ft`
+                      : `${formatClf(audit.calculated_clf)} CLF`}
+                    {audit.variance_clf != null
+                      ? ` · ${formatVariance(audit.variance_clf)}`
+                      : ""}
+                    {kind !== "match" && kind ? ` · ${kind}` : ""}
+                  </p>
                 </div>
                 <button
                   type="button"
                   aria-label={`Delete SKU ${audit.sku}`}
                   onClick={() => void handleDelete(audit.id)}
-                  className="flex h-12 w-12 shrink-0 items-center justify-center self-center rounded-xl border border-red-500/40 text-sm font-semibold text-red-400"
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-red-500/30 text-xs font-bold text-red-300"
                 >
-                  Del
+                  ✕
                 </button>
               </li>
             );

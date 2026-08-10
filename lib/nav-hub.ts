@@ -130,7 +130,7 @@ export function navRoleLinks(
         label: "Department Overview",
         shortLabel: dept.shortLabel,
         icon: dept.icon,
-        description: `${dept.label} audit workspace`,
+        description: `${dept.label} ops overview + Hub link`,
       },
       {
         href: "/settings",

@@ -214,20 +214,22 @@ export function StoreLocationGrid({
                           {aisle.bays.map((pair) => (
                             <li
                               key={`${aisleKey}-bay-${pair.bay}`}
-                              className="px-3 py-2.5"
+                              className="flex min-h-11 items-center gap-2 px-3 py-1.5"
                             >
-                              <p className="mb-2 font-mono text-xs font-bold uppercase tracking-wide text-slate-400">
+                              <p className="w-14 shrink-0 font-mono text-xs font-bold text-slate-400">
                                 Bay {pair.bay}
                               </p>
-                              <div className="grid grid-cols-2 gap-2">
+                              <div className="grid min-w-0 flex-1 grid-cols-2 gap-1.5">
                                 <TypeToggle
-                                  label="Selling"
+                                  label="S"
+                                  fullLabel="Selling"
                                   loc={pair.selling}
                                   pendingId={pendingId}
                                   onToggle={toggleActive}
                                 />
                                 <TypeToggle
-                                  label="Topstock"
+                                  label="T"
+                                  fullLabel="Topstock"
                                   loc={pair.topstock}
                                   pendingId={pendingId}
                                   onToggle={toggleActive}
@@ -251,60 +253,59 @@ export function StoreLocationGrid({
 
 function TypeToggle({
   label,
+  fullLabel,
   loc,
   pendingId,
   onToggle,
 }: {
   label: string;
+  fullLabel: string;
   loc: StoreLocation | null;
   pendingId: string | null;
   onToggle: (loc: StoreLocation) => void;
 }) {
   if (!loc) {
     return (
-      <div className="rounded-lg border border-dashed border-slate-800 px-2 py-2 opacity-40">
-        <p className="font-mono text-[10px] font-bold uppercase text-slate-500">
+      <div className="flex min-h-9 items-center gap-1.5 rounded-md border border-dashed border-slate-800 px-1.5 opacity-40">
+        <span className="font-mono text-[10px] font-bold text-slate-500">
           {label}
-        </p>
-        <p className="mt-1 text-[11px] text-slate-600">Not mapped</p>
+        </span>
+        <span className="text-[10px] text-slate-600">—</span>
       </div>
     );
   }
 
   return (
     <div
-      className={`rounded-lg border border-slate-800 bg-slate-900/80 px-2 py-2 ${
+      className={`flex min-h-9 items-center justify-between gap-1 rounded-md border border-slate-800 bg-slate-900/80 px-1.5 ${
         loc.is_active ? "" : "opacity-50"
       }`}
     >
-      <div className="flex items-start justify-between gap-1">
-        <div className="min-w-0">
-          <p className="font-mono text-[10px] font-bold uppercase text-emerald-400/90">
-            {label}
-          </p>
-          <p className="mt-0.5 text-[10px] leading-tight text-slate-500">
-            {loc.status}
-            {loc.cycle_number > 1 ? ` · C${loc.cycle_number}` : ""}
-          </p>
-        </div>
-        <button
-          type="button"
-          role="switch"
-          aria-checked={loc.is_active}
-          aria-label={`${label} bay ${loc.bay} ${loc.is_active ? "active" : "off"}`}
-          disabled={pendingId === loc.id}
-          onClick={() => onToggle(loc)}
-          className={`relative h-6 w-10 shrink-0 rounded-full transition ${
-            loc.is_active ? "bg-emerald-500" : "bg-slate-600"
-          } disabled:opacity-60`}
-        >
-          <span
-            className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition ${
-              loc.is_active ? "left-[1.1rem]" : "left-0.5"
-            }`}
-          />
-        </button>
+      <div className="min-w-0">
+        <p className="font-mono text-[10px] font-bold text-emerald-400/90">
+          {label}
+          <span className="ml-1 font-sans font-medium text-slate-500">
+            {loc.status === "PENDING" ? "P" : loc.status === "ASSIGNED" ? "A" : loc.status.slice(0, 1)}
+          </span>
+        </p>
       </div>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={loc.is_active}
+        aria-label={`${fullLabel} bay ${loc.bay} ${loc.is_active ? "active" : "off"}`}
+        disabled={pendingId === loc.id}
+        onClick={() => onToggle(loc)}
+        className={`relative h-5 w-9 shrink-0 rounded-full transition ${
+          loc.is_active ? "bg-emerald-500" : "bg-slate-600"
+        } disabled:opacity-60`}
+      >
+        <span
+          className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition ${
+            loc.is_active ? "left-[1rem]" : "left-0.5"
+          }`}
+        />
+      </button>
     </div>
   );
 }
