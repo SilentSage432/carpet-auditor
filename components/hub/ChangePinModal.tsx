@@ -69,6 +69,7 @@ export function ChangePinModal({ open, member, onClose, onUpdated }: Props) {
         onClose();
       }, 900);
     } catch (err) {
+      console.error("Failed to update PIN:", err);
       const message =
         err instanceof Error && err.message
           ? err.message.replace(/specialist/gi, "Profile")

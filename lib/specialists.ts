@@ -789,17 +789,72 @@ async function persistSpecialistFields(
   }
 
   async function findExistingDbId(): Promise<string | null> {
+    // 1) Prefer real UUID id — never require username match
     if (isDatabaseUuid(member.id) && !isFallbackProfileId(member.id)) {
       const { data, error } = await supabase!
         .from(TABLE)
         .select("id")
         .eq("id", member.id)
+        .eq("store_number", store)
         .maybeSingle();
-      if (!error && data?.id && isDatabaseUuid(String(data.id))) {
+      if (error) {
+        console.error("Failed to resolve specialist by id:", error);
+      } else if (data?.id && isDatabaseUuid(String(data.id))) {
         return String(data.id);
       }
     }
 
+    // 2) Master Admin / Supervisor: resolve by role + store (username optional)
+    if (member.role === "MasterAdmin" || member.role === "Supervisor") {
+      let roleQuery = supabase!
+        .from(TABLE)
+        .select("id")
+        .eq("store_number", store)
+        .eq("role", member.role)
+        .eq("is_active", true)
+        .order("created_at", { ascending: false })
+        .limit(1);
+
+      // Narrow supervisors by department when known
+      if (
+        member.role === "Supervisor" &&
+        member.assigned_department &&
+        member.assigned_department !== "all"
+      ) {
+        roleQuery = roleQuery.eq(
+          "assigned_department",
+          member.assigned_department
+        );
+      }
+
+      const { data, error } = await roleQuery.maybeSingle();
+      if (error) {
+        console.error(
+          `Failed to resolve ${member.role} by role:`,
+          error
+        );
+      } else if (data?.id && isDatabaseUuid(String(data.id))) {
+        return String(data.id);
+      }
+    }
+
+    // 3) Optional username lookup only when username is actually set
+    const username = member.username?.trim();
+    if (username) {
+      const { data, error } = await supabase!
+        .from(TABLE)
+        .select("id")
+        .eq("store_number", store)
+        .eq("username", username)
+        .maybeSingle();
+      if (error) {
+        console.error("Failed to resolve specialist by username:", error);
+      } else if (data?.id && isDatabaseUuid(String(data.id))) {
+        return String(data.id);
+      }
+    }
+
+    // 4) Display name as last resort
     {
       const { data, error } = await supabase!
         .from(TABLE)
@@ -807,33 +862,9 @@ async function persistSpecialistFields(
         .eq("store_number", store)
         .eq("name", displayName)
         .maybeSingle();
-      if (!error && data?.id && isDatabaseUuid(String(data.id))) {
-        return String(data.id);
-      }
-    }
-
-    if (member.username) {
-      const { data, error } = await supabase!
-        .from(TABLE)
-        .select("id")
-        .eq("store_number", store)
-        .eq("username", member.username)
-        .maybeSingle();
-      if (!error && data?.id && isDatabaseUuid(String(data.id))) {
-        return String(data.id);
-      }
-    }
-
-    if (member.role === "Supervisor" || member.role === "MasterAdmin") {
-      const { data, error } = await supabase!
-        .from(TABLE)
-        .select("id")
-        .eq("store_number", store)
-        .eq("role", member.role)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      if (!error && data?.id && isDatabaseUuid(String(data.id))) {
+      if (error) {
+        console.error("Failed to resolve specialist by name:", error);
+      } else if (data?.id && isDatabaseUuid(String(data.id))) {
         return String(data.id);
       }
     }
@@ -858,12 +889,22 @@ async function persistSpecialistFields(
       .single();
 
     if (error || !data) {
-      const { data: existing } = await supabase!
+      if (error) {
+        console.error("Failed to insert specialist profile:", error);
+      }
+
+      const { data: existing, error: findErr } = await supabase!
         .from(TABLE)
         .select("id")
         .eq("store_number", store)
-        .eq("name", displayName)
+        .eq("role", member.role)
+        .order("created_at", { ascending: false })
+        .limit(1)
         .maybeSingle();
+
+      if (findErr) {
+        console.error("Failed to find specialist after insert error:", findErr);
+      }
 
       if (existing?.id && isDatabaseUuid(String(existing.id))) {
         const { data: updated, error: updErr } = await supabase!
@@ -878,7 +919,14 @@ async function persistSpecialistFields(
           .eq("id", String(existing.id))
           .select("*")
           .single();
-        if (!updErr && updated) {
+        if (updErr) {
+          console.error("Failed to update specialist after insert conflict:", updErr);
+          throw new Error(
+            updErr.message ||
+              `Could not update ${profileLabel} profile in database. Please try again.`
+          );
+        }
+        if (updated) {
           return mapRow({
             ...(updated as Record<string, unknown>),
             offline: false,
@@ -887,7 +935,8 @@ async function persistSpecialistFields(
       }
 
       throw new Error(
-        `Could not update ${profileLabel} profile in database. Please try again.`
+        error?.message ||
+          `Could not update ${profileLabel} profile in database. Please try again.`
       );
     }
 
@@ -904,6 +953,7 @@ async function persistSpecialistFields(
     if (!targetId) {
       saved = await insertProfile();
     } else {
+      // Update by id only — do not require username match
       const { data, error } = await supabase
         .from(TABLE)
         .update({
@@ -917,12 +967,18 @@ async function persistSpecialistFields(
         .select("*");
 
       if (error) {
+        console.error("Failed to update specialist PIN/profile:", error);
         throw new Error(
-          `Could not update ${profileLabel} profile in database. Please try again.`
+          error.message ||
+            `Could not update ${profileLabel} profile in database. Please try again.`
         );
       }
 
       if (!data || data.length === 0) {
+        console.error(
+          "Failed to update specialist: no row matched id",
+          targetId
+        );
         saved = await insertProfile();
       } else {
         saved = mapRow({
@@ -936,7 +992,8 @@ async function persistSpecialistFields(
     setActiveSpecialist(saved);
     return { record: saved, offline: false };
   } catch (err) {
-    if (err instanceof Error && err.message.includes("profile in database")) {
+    console.error("Failed to persist specialist fields:", err);
+    if (err instanceof Error && err.message.trim()) {
       throw err;
     }
     throw new Error(
