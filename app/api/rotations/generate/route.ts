@@ -58,7 +58,7 @@ export async function POST(request: Request) {
 
     const { data: dept, error: deptError } = await supabase
       .from("departments")
-      .select("id, store_id")
+      .select("id, store_id, weekly_bay_target")
       .eq("id", departmentId)
       .eq("store_id", store.id)
       .maybeSingle();
@@ -73,18 +73,17 @@ export async function POST(request: Request) {
       );
     }
 
-    const count = Number(body.count);
-    if (!Number.isFinite(count) || count < 1) {
-      return NextResponse.json(
-        { error: "count must be a positive integer" },
-        { status: 400 }
-      );
-    }
+    // Optional override count for Force Draw; otherwise engine reads weekly_bay_target
+    const rawCount = body.count;
+    const countOverride =
+      rawCount != null && Number.isFinite(Number(rawCount)) && Number(rawCount) >= 1
+        ? Math.floor(Number(rawCount))
+        : null;
 
     const result = await generateWeeklyRotations(
       supabase,
       departmentId,
-      Math.floor(count)
+      countOverride
     );
 
     let push = {

@@ -50,6 +50,7 @@ function StoreMapBody({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [mapMgmtOpen, setMapMgmtOpen] = useState(false);
+  const [isOverviewOpen, setIsOverviewOpen] = useState(false);
   const [forceOpen, setForceOpen] = useState(false);
   const currentWeek = isoWeekLabel();
 
@@ -154,47 +155,79 @@ function StoreMapBody({
         ) : null}
 
         <div className="space-y-6">
-          <section>
-            <h2 className="font-mono text-xs font-semibold uppercase tracking-[0.16em] text-emerald-400">
-              Department overview
-            </h2>
-            <p className="mt-1 text-sm text-slate-400">
-              High-level map status by department. Open Map Management to bulk
-              add aisles.
-            </p>
-
-            {loading ? (
-              <p className="mt-3 text-sm text-slate-400">Loading departments…</p>
-            ) : departmentOverview.length === 0 ? (
-              <p className="mt-3 rounded-2xl border border-dashed border-slate-700 px-4 py-6 text-center text-sm text-slate-400">
-                No departments yet. Seed departments, then use Map Management.
-              </p>
-            ) : (
-              <ul className="mt-3 space-y-2">
-                {departmentOverview.map((row) => (
-                  <li
-                    key={row.id}
-                    className="rounded-2xl border border-slate-700 bg-slate-900/80 px-4 py-3"
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <p className="font-semibold text-slate-50">{row.name}</p>
-                        <p className="font-mono text-[11px] text-slate-400">
-                          {row.code} · target {row.weeklyTarget}/week
+          <section className="overflow-hidden rounded-2xl border border-slate-700 bg-slate-900/60">
+            <button
+              type="button"
+              aria-expanded={isOverviewOpen}
+              onClick={() => setIsOverviewOpen((open) => !open)}
+              className="flex min-h-14 w-full items-center justify-between gap-3 px-4 py-3 text-left"
+            >
+              <div className="min-w-0 flex-1">
+                <p className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-emerald-400">
+                  Department Overview
+                </p>
+                {!isOverviewOpen ? (
+                  <p className="mt-1">
+                    <span className="inline-flex rounded-lg bg-slate-800 px-2 py-1 font-mono text-[11px] font-semibold text-slate-200">
+                      {loading
+                        ? "Loading…"
+                        : `${departmentOverview.length} Department${
+                            departmentOverview.length === 1 ? "" : "s"
+                          } Registered`}
+                    </span>
+                  </p>
+                ) : (
+                  <p className="mt-0.5 text-sm text-slate-400">
+                    High-level map status by department
+                  </p>
+                )}
+              </div>
+              <span
+                aria-hidden
+                className="shrink-0 font-mono text-base text-slate-300"
+              >
+                {isOverviewOpen ? "▲" : "▼"}
+              </span>
+            </button>
+            {isOverviewOpen ? (
+              <div className="border-t border-slate-800 px-3 pb-4 pt-3">
+                {loading ? (
+                  <p className="text-sm text-slate-400">Loading departments…</p>
+                ) : departmentOverview.length === 0 ? (
+                  <p className="rounded-2xl border border-dashed border-slate-700 px-4 py-6 text-center text-sm text-slate-400">
+                    No departments yet. Seed departments, then use Map
+                    Management.
+                  </p>
+                ) : (
+                  <ul className="space-y-2">
+                    {departmentOverview.map((row) => (
+                      <li
+                        key={row.id}
+                        className="rounded-2xl border border-slate-700 bg-slate-900/80 px-4 py-3"
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div>
+                            <p className="font-semibold text-slate-50">
+                              {row.name}
+                            </p>
+                            <p className="font-mono text-[11px] text-slate-400">
+                              {row.code} · target {row.weeklyTarget}/week
+                            </p>
+                          </div>
+                          <span className="shrink-0 rounded-lg bg-slate-800 px-2 py-1 font-mono text-[10px] font-bold text-slate-300">
+                            {row.aisles} aisle{row.aisles === 1 ? "" : "s"}
+                          </span>
+                        </div>
+                        <p className="mt-2 text-sm text-slate-300">
+                          {row.total} tags · {row.active} active · {row.pending}{" "}
+                          pending · {row.assigned} assigned
                         </p>
-                      </div>
-                      <span className="shrink-0 rounded-lg bg-slate-800 px-2 py-1 font-mono text-[10px] font-bold text-slate-300">
-                        {row.aisles} aisle{row.aisles === 1 ? "" : "s"}
-                      </span>
-                    </div>
-                    <p className="mt-2 text-sm text-slate-300">
-                      {row.total} tags · {row.active} active · {row.pending}{" "}
-                      pending · {row.assigned} assigned
-                    </p>
-                  </li>
-                ))}
-              </ul>
-            )}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+            ) : null}
           </section>
 
           <section
@@ -218,11 +251,9 @@ function StoreMapBody({
               </div>
               <span
                 aria-hidden
-                className={`font-mono text-lg text-slate-300 transition ${
-                  mapMgmtOpen ? "rotate-180" : ""
-                }`}
+                className="shrink-0 font-mono text-base text-slate-300"
               >
-                ▾
+                {mapMgmtOpen ? "▲" : "▼"}
               </span>
             </button>
             {mapMgmtOpen ? (

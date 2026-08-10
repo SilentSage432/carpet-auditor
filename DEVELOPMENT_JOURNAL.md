@@ -1,5 +1,21 @@
 # DeptSync Hub — Development Journal
 
+## 2026-08-10 — Per-department weekly_bay_target settings
+
+### Shipped
+- Settings card lists every department with editable `weekly_bay_target` (Master Admin) or own dept (Supervisor); null/0 → 10.
+- Draw engine already selects `departments.weekly_bay_target` in `generateWeeklyRotations` when choosing PENDING → ASSIGNED count.
+
+---
+
+## 2026-08-10 — Nested location grid + weekly_bay_target draw
+
+### Shipped
+- Store Location Grid: dept accordion → aisle accordion → bay row with Selling|Topstock toggles (depts collapsed by default).
+- `generateWeeklyRotations` reads `departments.weekly_bay_target` per dept (null/0 → 10); cron uses the same path.
+
+---
+
 ## 2026-08-10 — Store Map overview + force-draw modal
 
 ### Shipped

@@ -2,6 +2,13 @@
  * ISO week helpers for weekly_rotations.assigned_week (e.g. "2026-W32").
  */
 
+/** Safe draw size from departments.weekly_bay_target (null/0/invalid → 10). */
+export function resolveWeeklyBayTarget(raw: unknown): number {
+  const n = Number(raw);
+  if (!Number.isFinite(n) || n <= 0) return 10;
+  return Math.floor(n);
+}
+
 /** Return ISO week label for a Date (UTC-based ISO week-date). */
 export function isoWeekLabel(date: Date = new Date()): string {
   const target = new Date(

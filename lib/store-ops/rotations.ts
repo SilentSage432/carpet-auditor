@@ -6,7 +6,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Department, StoreLocation, WeeklyRotation } from "./types";
 import { listActiveStores } from "./stores";
-import { isoWeekLabel, pickRandom } from "./week";
+import { isoWeekLabel, pickRandom, resolveWeeklyBayTarget } from "./week";
 
 export type GenerateRotationsResult = {
   assigned_week: string;
@@ -14,7 +14,10 @@ export type GenerateRotationsResult = {
   cycle_reset: boolean;
   rotations: WeeklyRotation[];
   locations: StoreLocation[];
+  weekly_bay_target: number;
 };
+
+export { resolveWeeklyBayTarget };
 
 async function loadPendingLocations(
   supabase: SupabaseClient,
@@ -152,18 +155,14 @@ export async function resetDepartmentCycleIfNeeded(
 export async function generateWeeklyRotations(
   supabase: SupabaseClient,
   departmentId: string,
-  count: number,
+  count?: number | null,
   weekLabel: string = isoWeekLabel()
 ): Promise<GenerateRotationsResult> {
-  if (!Number.isFinite(count) || count < 1) {
-    throw new Error("count must be a positive integer");
-  }
-
   await reclaimStaleAssignments(supabase, departmentId, weekLabel);
 
   const { data: department, error: departmentError } = await supabase
     .from("departments")
-    .select("id, store_id")
+    .select("id, store_id, weekly_bay_target")
     .eq("id", departmentId)
     .maybeSingle();
 
@@ -171,6 +170,13 @@ export async function generateWeeklyRotations(
   if (!department?.store_id) {
     throw new Error("Department is missing store_id");
   }
+
+  const dbTarget = resolveWeeklyBayTarget(department.weekly_bay_target);
+  const override =
+    count != null && Number.isFinite(Number(count)) && Number(count) >= 1
+      ? Math.floor(Number(count))
+      : null;
+  const drawCount = override ?? dbTarget;
 
   const { reset, cycleNumber, pending } = await resetDepartmentCycleIfNeeded(
     supabase,
@@ -190,10 +196,10 @@ export async function generateWeeklyRotations(
   const carried = (carriedRows ?? []) as StoreLocation[];
   const pool: StoreLocation[] = [];
 
-  const carriedPick = pickRandom(carried, Math.min(count, carried.length));
+  const carriedPick = pickRandom(carried, Math.min(drawCount, carried.length));
   pool.push(...carriedPick);
 
-  const remaining = count - pool.length;
+  const remaining = drawCount - pool.length;
   if (remaining > 0) {
     const pendingAvailable = pending.filter(
       (p) => !pool.some((s) => s.id === p.id)
@@ -252,6 +258,7 @@ export async function generateWeeklyRotations(
     cycle_reset: reset,
     rotations: (rotations ?? []) as WeeklyRotation[],
     locations: (locations ?? []) as StoreLocation[],
+    weekly_bay_target: dbTarget,
   };
 }
 
@@ -292,7 +299,8 @@ export async function runWeeklyRotationForAllDepartments(
     if (error) throw new Error(error.message);
 
     for (const dept of (departments ?? []) as Department[]) {
-      const target = Math.max(1, Number(dept.weekly_bay_target) || 10);
+      // Always re-read target from this department row (null/0 → 10)
+      const target = resolveWeeklyBayTarget(dept.weekly_bay_target);
       const base: DepartmentCronResult = {
         department_id: dept.id,
         department_code: dept.code,
@@ -322,16 +330,18 @@ export async function runWeeklyRotationForAllDepartments(
           continue;
         }
 
+        // Draw count comes from departments.weekly_bay_target inside generate
         const generated = await generateWeeklyRotations(
           supabase,
           dept.id,
-          target,
+          null,
           weekLabel
         );
 
         results.push({
           ...base,
           ok: true,
+          weekly_bay_target: generated.weekly_bay_target,
           created: generated.rotations.length,
           cycle_number: generated.cycle_number,
           cycle_reset: generated.cycle_reset,
