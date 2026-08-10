@@ -55,6 +55,8 @@
 - [x] Add Supervisor issues crypto temp PIN via invite API (no hardcoded admin password)
 - [x] Associate floor role: checklist/barriers/specialty nav + dept-scoped Store Ops (no admin)
 - [x] Department master toggles + adaptive priority draw + showroom quick-touch zones
+- [x] Appliance suite categories + required sub_category on UPC link / audits / CSV export
+- [x] Dedicated `appliance_catalog` + `appliance_scans` tables, types, APIs, and Scanner UI
 
 ## Next
 - [ ] JWT / claim-based RLS enforcing `store_number` (+ department) server-side

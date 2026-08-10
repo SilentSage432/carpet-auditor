@@ -311,6 +311,7 @@ export function AuditReportModal({
                     <th className="px-2 py-2 font-bold">Item # / SKU</th>
                     <th className="px-2 py-2 font-bold">Description</th>
                     <th className="px-2 py-2 font-bold">Category</th>
+                    <th className="px-2 py-2 font-bold">Sub-cat</th>
                     <th className="px-2 py-2 font-bold">Loc</th>
                     <th className="px-2 py-2 font-bold">Qty / CLF</th>
                     <th className="px-2 py-2 font-bold">Audited By</th>
@@ -320,7 +321,7 @@ export function AuditReportModal({
                   {sorted.length === 0 ? (
                     <tr>
                       <td
-                        colSpan={7}
+                        colSpan={8}
                         className="px-2 py-6 text-center text-slate-500 print:text-black"
                       >
                         No audit entries to report.
@@ -344,6 +345,9 @@ export function AuditReportModal({
                             {a.carpet_name || "—"}
                           </td>
                           <td className="px-2 py-1.5">{a.category}</td>
+                          <td className="px-2 py-1.5">
+                            {a.sub_category || "—"}
+                          </td>
                           <td className="px-2 py-1.5">
                             {locationLabel(a.location_type)}
                           </td>

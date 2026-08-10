@@ -1,6 +1,10 @@
 import { uid } from "./uid";
 import type { CarpetAudit, CarpetAuditInsert, LocationType } from "./types";
-import { normalizeCategory } from "./types";
+import {
+  isApplianceCategory,
+  normalizeCategory,
+  resolveApplianceCategoryPair,
+} from "./types";
 import { getStoreNumber } from "./store";
 import { getSupabase } from "./supabase";
 import {
@@ -131,6 +135,10 @@ function mapRow(row: Record<string, unknown>): CarpetAudit {
     sku: String(row.sku ?? ""),
     carpet_name: String(row.carpet_name ?? row.notes ?? ""),
     category: normalizeCategory(row.category),
+    sub_category: isApplianceCategory(String(row.category ?? ""))
+      ? resolveApplianceCategoryPair(row.category, row.sub_category)
+          .sub_category
+      : String(row.sub_category ?? "").trim(),
     sims_location: String(row.sims_location ?? ""),
     location_type: locationType === "top_stock" ? "top_stock" : "sales_floor",
     measurement_inches: whole,
@@ -158,6 +166,7 @@ function auditPayload(record: CarpetAudit) {
     sku: record.sku,
     carpet_name: record.carpet_name,
     category: record.category,
+    sub_category: record.sub_category ?? "",
     sims_location: record.sims_location,
     location_type: record.location_type,
     measurement_inches: record.measurement_inches,
@@ -215,6 +224,10 @@ export async function saveAudit(input: CarpetAuditInsert): Promise<{
     sku: input.sku,
     carpet_name: input.carpet_name,
     category: normalizeCategory(input.category),
+    sub_category: isApplianceCategory(input.category)
+      ? resolveApplianceCategoryPair(input.category, input.sub_category)
+          .sub_category
+      : String(input.sub_category ?? "").trim(),
     sims_location: input.sims_location ?? "",
     location_type: input.location_type,
     measurement_inches: input.measurement_inches,
@@ -291,6 +304,7 @@ export function auditsToCsv(audits: CarpetAudit[]): string {
     "sku",
     "carpet_name",
     "category",
+    "sub_category",
     "sims_location",
     "location_type",
     "measurement_inches",
@@ -317,6 +331,7 @@ export function auditsToCsv(audits: CarpetAudit[]): string {
       a.sku,
       a.carpet_name,
       a.category,
+      a.sub_category ?? "",
       a.sims_location,
       a.location_type,
       a.measurement_inches,

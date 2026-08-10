@@ -1,5 +1,21 @@
 # DeptSync Hub — Development Journal
 
+## 2026-08-10 — Dedicated appliance_catalog + appliance_scans
+
+### Shipped
+- New tables `public.appliance_catalog` (`item_number`, `upc`, `description`, `category`, `sub_category`) and `public.appliance_scans` (`item_number`, `serial_number`, `location`, `category`, `sub_category`, `scanned_by`, `scanned_at`) with store scoping + migration backfill from legacy carpet_* appliance rows.
+- Types `ApplianceCatalogItem` / `ApplianceScan`; client libs `lib/appliance-catalog.ts` / `lib/appliance-scans.ts`; sync queue actions; API routes `GET|POST|DELETE /api/appliances/catalog` and `/api/appliances/scans` (CSV via `?format=csv`).
+- Top-level suites: Laundry · Refrigeration · Cooking / Ranges · Dishwashers · Microwaves / Venting; required sub chips on UPC link (`QuickAddApplianceModal`).
+- Appliance Scanner + Appliance Catalog sections own the new tables; CSV columns: Category, Sub-Category, Item #, Serial #, Location.
+
+## 2026-08-10 — Appliance suite categories + sub_category linking
+
+### Shipped
+- Top-level appliance suites: Laundry · Refrigeration · Cooking · Dishwashers · Microwaves (Washer/Dryer collapsed into Laundry).
+- Required sub-category chips on Quick-Add UPC→SKU link and Appliance audit / catalog forms (`ApplianceCategoryFields`).
+- `sub_category` on `carpet_catalog` / `carpet_audits` (migration `20260810_appliance_sub_category.sql`); CSV + audit report include Sub-category.
+- Legacy flat labels remapped on read + in migration (Washer→Laundry/Washer, Refrigerator→Refrigeration, etc.).
+
 ## 2026-08-10 — Store Map bay rows mobile UX
 
 ### Shipped

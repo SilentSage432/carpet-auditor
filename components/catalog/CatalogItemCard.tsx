@@ -35,6 +35,7 @@ export function CatalogItemCard({
             </p>
             <span className="rounded bg-slate-700/50 px-1.5 py-0.5 text-[9px] font-bold uppercase text-slate-300">
               {item.category}
+              {item.sub_category ? ` · ${item.sub_category}` : ""}
             </span>
             {item.upc_barcode ? (
               <span className="text-[9px] font-bold uppercase text-emerald-300">

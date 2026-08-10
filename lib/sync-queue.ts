@@ -14,10 +14,14 @@ export type SyncActionType =
   | "upsert_catalog"
   | "upsert_remnant"
   | "upsert_specialist"
+  | "upsert_appliance_catalog"
+  | "upsert_appliance_scan"
   | "delete_audit"
   | "delete_catalog"
   | "delete_remnant"
-  | "delete_specialist";
+  | "delete_specialist"
+  | "delete_appliance_catalog"
+  | "delete_appliance_scan";
 
 export type SyncAction = {
   id: string;
@@ -32,6 +36,8 @@ const LOCAL_KEYS: Record<string, string> = {
   carpet_catalog: "carpet_catalog_offline",
   carpet_remnants: "carpet_remnants_offline",
   store_specialists: "carpet_specialists_offline",
+  appliance_catalog: "appliance_catalog_offline",
+  appliance_scans: "appliance_scans_offline",
 };
 
 let flushing = false;
@@ -149,6 +155,22 @@ async function replayAction(action: SyncAction): Promise<void> {
       if (entityId) markLocalOnline(LOCAL_KEYS.carpet_catalog, entityId);
       return;
     }
+    case "upsert_appliance_catalog": {
+      const { error } = await supabase
+        .from("appliance_catalog")
+        .upsert(payload, { onConflict: "store_number,item_number" });
+      if (error) throw error;
+      if (entityId) markLocalOnline(LOCAL_KEYS.appliance_catalog, entityId);
+      return;
+    }
+    case "upsert_appliance_scan": {
+      const { error } = await supabase
+        .from("appliance_scans")
+        .upsert(payload, { onConflict: "id" });
+      if (error) throw error;
+      if (entityId) markLocalOnline(LOCAL_KEYS.appliance_scans, entityId);
+      return;
+    }
     case "upsert_remnant": {
       const { error } = await supabase
         .from("carpet_remnants")
@@ -195,6 +217,24 @@ async function replayAction(action: SyncAction): Promise<void> {
     case "delete_catalog": {
       const { error } = await supabase
         .from("carpet_catalog")
+        .delete()
+        .eq("id", entityId)
+        .eq("store_number", action.store_number);
+      if (error) throw error;
+      return;
+    }
+    case "delete_appliance_catalog": {
+      const { error } = await supabase
+        .from("appliance_catalog")
+        .delete()
+        .eq("id", entityId)
+        .eq("store_number", action.store_number);
+      if (error) throw error;
+      return;
+    }
+    case "delete_appliance_scan": {
+      const { error } = await supabase
+        .from("appliance_scans")
         .delete()
         .eq("id", entityId)
         .eq("store_number", action.store_number);

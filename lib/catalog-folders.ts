@@ -92,7 +92,7 @@ export function folderMeta(id: CatalogFolderId): CatalogFolderMeta {
 export function defaultCategoryForFolder(
   folderId: CatalogFolderId
 ): CatalogCategory {
-  if (folderId === "Appliances") return "Refrigerator";
+  if (folderId === "Appliances") return "Laundry";
   return folderId;
 }
 

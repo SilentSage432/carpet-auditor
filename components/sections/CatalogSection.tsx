@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { ApplianceCategoryFields } from "@/components/appliances/ApplianceCategoryFields";
 import { QuickAddCatalogModal } from "@/components/barcode/QuickAddCatalogModal";
 import { CatalogItemCard } from "@/components/catalog/CatalogItemCard";
 import { SimsLocationFinder } from "@/components/catalog/SimsLocationFinder";
@@ -34,6 +35,8 @@ import {
   ROLL_WIDTH_OPTIONS_FT,
   auditModeForCategory,
   isApplianceCategory,
+  isValidApplianceSubCategory,
+  normalizeApplianceCategory,
   normalizeCategory,
   normalizeRollWidthFt,
   type CarpetAudit,
@@ -66,6 +69,7 @@ export function CatalogSection({
   const [name, setName] = useState("");
   const [vendor, setVendor] = useState("");
   const [category, setCategory] = useState<CatalogCategory>("Carpet");
+  const [subCategory, setSubCategory] = useState("");
   const [simsLocation, setSimsLocation] = useState("");
   const [width, setWidth] = useState("12");
   const [sqftPerBox, setSqftPerBox] = useState("");
@@ -106,6 +110,7 @@ export function CatalogSection({
         item.carpet_name.toLowerCase().includes(q) ||
         item.vendor.toLowerCase().includes(q) ||
         item.category.toLowerCase().includes(q) ||
+        item.sub_category.toLowerCase().includes(q) ||
         item.default_sims_location.toLowerCase().includes(q)
       ) {
         return true;
@@ -133,7 +138,8 @@ export function CatalogSection({
 
   useEffect(() => {
     if (domainFilter === "appliances" && !isApplianceCategory(category)) {
-      setCategory("Refrigerator");
+      setCategory("Laundry");
+      setSubCategory("");
     }
   }, [domainFilter, category]);
 
@@ -177,6 +183,7 @@ export function CatalogSection({
     setName("");
     setVendor("");
     setCategory(nextCategory);
+    setSubCategory("");
     setSimsLocation("");
     setWidth(String(DEFAULT_ROLL_WIDTH_FT));
     setSqftPerBox("");
@@ -190,6 +197,7 @@ export function CatalogSection({
     setName(item.carpet_name);
     setVendor(item.vendor);
     setCategory(normalizeCategory(item.category));
+    setSubCategory(item.sub_category || "");
     setSimsLocation(item.default_sims_location);
     setWidth(String(normalizeRollWidthFt(item.roll_width_ft)));
     setSqftPerBox(item.sqft_per_box != null ? String(item.sqft_per_box) : "");
@@ -221,6 +229,13 @@ export function CatalogSection({
 
   async function handleSave() {
     if (!sku.trim() || !name.trim()) return;
+    if (
+      isApplianceCategory(category) &&
+      !isValidApplianceSubCategory(category, subCategory)
+    ) {
+      flash("Select a sub-category before saving");
+      return;
+    }
     setSaving(true);
     try {
       const sqft = toNumber(sqftPerBox, 0);
@@ -230,6 +245,7 @@ export function CatalogSection({
         carpet_name: name.trim(),
         vendor: vendor.trim(),
         category,
+        sub_category: isApplianceCategory(category) ? subCategory.trim() : "",
         default_sims_location: simsLocation.trim(),
         roll_width_ft: normalizeRollWidthFt(
           toNumber(width, DEFAULT_ROLL_WIDTH_FT)
@@ -289,6 +305,7 @@ export function CatalogSection({
       carpet_name: target.carpet_name,
       vendor: target.vendor,
       category: target.category,
+      sub_category: target.sub_category,
       default_sims_location: target.default_sims_location,
       roll_width_ft: target.roll_width_ft,
       sqft_per_box: target.sqft_per_box,
@@ -336,6 +353,7 @@ export function CatalogSection({
       <QuickAddCatalogModal
         open={quickAddBarcode != null}
         scannedBarcode={quickAddBarcode ?? ""}
+        domain={domainFilter === "appliances" ? "appliances" : "flooring"}
         onClose={() => setQuickAddBarcode(null)}
         onSaved={handleQuickAdded}
       />
@@ -471,6 +489,7 @@ export function CatalogSection({
               onChange={(e) => {
                 const next = normalizeCategory(e.target.value);
                 setCategory(next);
+                setSubCategory("");
                 if (auditModeForCategory(next) === "roll") {
                   setWidth((w) =>
                     w === "12" || w === "15" ? w : String(DEFAULT_ROLL_WIDTH_FT)
@@ -499,6 +518,18 @@ export function CatalogSection({
               ) : null}
             </select>
           </label>
+          {isApplianceCategory(category) ? (
+            <ApplianceCategoryFields
+              category={normalizeApplianceCategory(category)}
+              subCategory={subCategory}
+              hideCategorySelect
+              onCategoryChange={(next) => {
+                setCategory(next);
+                setSubCategory("");
+              }}
+              onSubCategoryChange={setSubCategory}
+            />
+          ) : null}
           <TextField
             label="Default SIMS Location"
             value={simsLocation}
@@ -574,7 +605,13 @@ export function CatalogSection({
             </button>
             <button
               type="button"
-              disabled={saving || !sku.trim() || !name.trim()}
+              disabled={
+                saving ||
+                !sku.trim() ||
+                !name.trim() ||
+                (isApplianceCategory(category) &&
+                  !isValidApplianceSubCategory(category, subCategory))
+              }
               onClick={() => void handleSave()}
               className="flex min-h-12 items-center justify-center rounded-xl bg-emerald-500 text-sm font-bold text-slate-950 disabled:opacity-40"
             >

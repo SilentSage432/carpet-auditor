@@ -7,6 +7,7 @@ import { BottomNavBar, AssociateSpecialtySwitcher } from "@/components/hub/HubCh
 import { NavigationHub } from "@/components/hub/NavigationHub";
 import { SpecialistModal } from "@/components/hub/SpecialistModal";
 import { CatalogSection } from "@/components/sections/CatalogSection";
+import { ApplianceCatalogSection } from "@/components/sections/ApplianceCatalogSection";
 import { CycleAuditSection } from "@/components/sections/CycleAuditSection";
 import { ApplianceAuditSection } from "@/components/sections/ApplianceAuditSection";
 import { RemnantSection } from "@/components/sections/RemnantSection";
@@ -22,6 +23,7 @@ import {
   updateAuthSessionSpecialist,
 } from "@/lib/auth-session";
 import { blurActiveInput } from "@/lib/focus-input";
+import { fetchApplianceCatalog } from "@/lib/appliance-catalog";
 import { fetchCatalog } from "@/lib/catalog";
 import { fetchRemnants } from "@/lib/remnants";
 import {
@@ -42,6 +44,7 @@ import {
 import { getStoreNumber, setStoreNumber, STORE_CHANGED_EVENT } from "@/lib/store";
 import { flushSyncQueue } from "@/lib/sync-queue";
 import type {
+  ApplianceCatalogItem,
   CatalogItem,
   HubSection,
   Remnant,
@@ -53,6 +56,9 @@ type Gate = "booting" | AuthWallMode | "ready";
 export default function DeptSyncHubPage() {
   const [section, setSection] = useState<HubSection>("audit");
   const [catalog, setCatalog] = useState<CatalogItem[]>([]);
+  const [applianceCatalog, setApplianceCatalog] = useState<
+    ApplianceCatalogItem[]
+  >([]);
   const [remnants, setRemnants] = useState<Remnant[]>([]);
   const [specialist, setSpecialist] = useState<StoreSpecialist | null>(null);
   const [specialists, setSpecialists] = useState<StoreSpecialist[]>([]);
@@ -113,13 +119,15 @@ export default function DeptSyncHubPage() {
   }, []);
 
   const loadStoreData = useCallback(async () => {
-    const [cat, rem, team] = await Promise.all([
+    const [cat, applianceCat, rem, team] = await Promise.all([
       fetchCatalog(),
+      fetchApplianceCatalog(),
       fetchRemnants(),
       fetchSpecialists(),
     ]);
     const roster = dedupeRoster(team);
     setCatalog(cat);
+    setApplianceCatalog(applianceCat);
     setRemnants(rem);
     setSpecialists(roster);
     setRosterReady(true);
@@ -385,11 +393,20 @@ export default function DeptSyncHubPage() {
               />
             )}
             {activeSection === "catalog" && canAccessSection(specialist, "catalog") && (
-              <CatalogSection
-                catalog={catalog}
-                onCatalogChange={setCatalog}
-                domainFilter={catalogDomain}
-              />
+              catalogDomain === "appliances" ? (
+                <ApplianceCatalogSection
+                  catalog={applianceCatalog}
+                  onCatalogChange={setApplianceCatalog}
+                />
+              ) : (
+                <CatalogSection
+                  catalog={catalog}
+                  onCatalogChange={setCatalog}
+                  domainFilter={
+                    catalogDomain === "all" ? "flooring" : catalogDomain
+                  }
+                />
+              )
             )}
             {activeSection === "remnants" &&
               canAccessSection(specialist, "remnants") && (
@@ -405,9 +422,9 @@ export default function DeptSyncHubPage() {
             {activeSection === "appliances" &&
               canAccessSection(specialist, "appliances") && (
                 <ApplianceAuditSection
-                  catalog={catalog}
-                  onCatalogChange={setCatalog}
-                  auditedBy={specialist?.name ?? ""}
+                  catalog={applianceCatalog}
+                  onCatalogChange={setApplianceCatalog}
+                  scannedBy={specialist?.name ?? ""}
                   activeSpecialist={specialist}
                 />
               )}

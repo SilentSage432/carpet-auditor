@@ -86,15 +86,18 @@ supabase/migrations/20260810_store_locations_type_unique.sql → location unique
 ## Sections (role-filtered)
 
 1. **Flooring Audit** — dual engine (roll CLF vs carton sq ft), scan-to-catalog, SIMS tags
-2. **Appliances Audit** — unit counts + appliance SIMS staging
-3. **Universal / Appliance Catalog** — master SKU list (domain-scoped) + Location Finder
+2. **Appliances Audit** — floor scans on `appliance_scans` + UPC links on `appliance_catalog`
+   - Suites: Laundry · Refrigeration · Cooking / Ranges · Dishwashers · Microwaves / Venting
+   - Required `sub_category` on UPC Quick-Add and scan log; CSV includes Sub-Category · Item # · Serial # · Location
+   - APIs: `/api/appliances/catalog`, `/api/appliances/scans`
+3. **Universal / Appliance Catalog** — flooring = `carpet_catalog`; appliances tab = `appliance_catalog`
 4. **Remnant Rack** — back-room remnant status + manager markdown
 5. **Master / Profile Settings** — store selector (Master Admin), queue, Supabase + localStorage
 
 ## Dual audit modes
 
 - **Mode A (Carpet / Sheet Vinyl)** — inches + fraction + rounds → CLF (`× 0.2625`)
-- **Mode B (LVP / Tile / Grout / Accessories / Hardwood)** — box count × sq ft per box
+- **Mode B (LVP / Tile / Grout / Accessories / Hardwood / Appliances)** — box/unit count × sq ft per box (appliances: unit count only)
 
 ## Offline
 

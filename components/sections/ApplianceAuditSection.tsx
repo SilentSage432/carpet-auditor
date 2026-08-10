@@ -1,42 +1,33 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { QuickAddCatalogModal } from "@/components/barcode/QuickAddCatalogModal";
-import { SimsLocationFinder } from "@/components/catalog/SimsLocationFinder";
+import { ApplianceCategoryFields } from "@/components/appliances/ApplianceCategoryFields";
+import { QuickAddApplianceModal } from "@/components/barcode/QuickAddApplianceModal";
 import { NumberField, TextField } from "@/components/ui/NumberField";
-import { AuditReportModal } from "@/components/hub/AuditReportModal";
 import {
-  resolveScan,
-  sanitizeBarcodeScan,
-} from "@/lib/barcode";
+  findApplianceByItemOrUpc,
+  resolveApplianceScan,
+  type ApplianceScanResolution,
+} from "@/lib/appliance-catalog";
 import {
-  findCatalogBySkuOrBarcode,
-} from "@/lib/catalog";
+  applianceScansToCsv,
+  deleteApplianceScan,
+  fetchApplianceScans,
+  isApplianceScanToday,
+  saveApplianceScan,
+} from "@/lib/appliance-scans";
+import { sanitizeBarcodeScan } from "@/lib/barcode";
 import { blurActiveInput } from "@/lib/focus-input";
 import { useGlobalBarcodeScanner } from "@/lib/hardware-scanner";
-import { toNumber } from "@/lib/number-input";
 import { playSuccessChime } from "@/lib/scan-feedback";
 import {
-  deleteAudit,
-  fetchAudits,
-  isToday,
-  saveAudit,
-} from "@/lib/storage";
-import {
-  APPLIANCE_CATEGORIES,
   APPLIANCE_SIMS_SUGGESTIONS,
-  isApplianceCategory,
-  normalizeApplianceCategory,
+  isValidApplianceSubCategory,
+  type ApplianceCatalogItem,
   type ApplianceCategory,
-  type CarpetAudit,
-  type CatalogItem,
-  type LocationType,
+  type ApplianceScan,
   type StoreSpecialist,
 } from "@/lib/types";
-
-function locationLabel(location: LocationType): string {
-  return location === "sales_floor" ? "Sales Floor" : "Top Stock";
-}
 
 function formatTime(iso: string): string {
   return new Date(iso).toLocaleString(undefined, {
@@ -67,69 +58,55 @@ const cardClass =
   "rounded-2xl border border-slate-800 bg-slate-900/90 p-4 shadow-lg shadow-black/20";
 
 type Props = {
-  catalog: CatalogItem[];
-  onCatalogChange: (items: CatalogItem[]) => void;
-  auditedBy: string;
+  catalog: ApplianceCatalogItem[];
+  onCatalogChange: (items: ApplianceCatalogItem[]) => void;
+  scannedBy: string;
   activeSpecialist: StoreSpecialist | null;
 };
 
 export function ApplianceAuditSection({
   catalog,
   onCatalogChange,
-  auditedBy,
+  scannedBy,
   activeSpecialist,
 }: Props) {
-  const skuInputRef = useRef<HTMLInputElement>(null);
-  const qtyInputRef = useRef<HTMLInputElement>(null);
+  const itemInputRef = useRef<HTMLInputElement>(null);
 
-  const [sku, setSku] = useState("");
-  const [name, setName] = useState("");
-  const [model, setModel] = useState("");
-  const [category, setCategory] = useState<ApplianceCategory>("Refrigerator");
-  const [simsLocation, setSimsLocation] = useState("");
-  const [location, setLocation] = useState<LocationType>("sales_floor");
-  const [unitCount, setUnitCount] = useState("1");
-  const [audits, setAudits] = useState<CarpetAudit[]>([]);
+  const [itemNumber, setItemNumber] = useState("");
+  const [serialNumber, setSerialNumber] = useState("");
+  const [description, setDescription] = useState("");
+  const [category, setCategory] = useState<ApplianceCategory>("Laundry");
+  const [subCategory, setSubCategory] = useState("");
+  const [location, setLocation] = useState("");
+  const [scans, setScans] = useState<ApplianceScan[]>([]);
   const [saving, setSaving] = useState(false);
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
   const [loaded, setLoaded] = useState(false);
   const [scanFlash, setScanFlash] = useState(false);
   const [quickAddBarcode, setQuickAddBarcode] = useState<string | null>(null);
-  const [simsFinderOpen, setSimsFinderOpen] = useState(false);
   const [showAll, setShowAll] = useState(false);
   const [summaryExpanded, setSummaryExpanded] = useState(false);
-  const [reportOpen, setReportOpen] = useState(false);
 
-  const unitNum = toNumber(unitCount, 0);
-
-  const applianceAudits = useMemo(
-    () => audits.filter((a) => isApplianceCategory(a.category)),
-    [audits]
+  const shiftScans = useMemo(
+    () => scans.filter((s) => isApplianceScanToday(s.scanned_at)),
+    [scans]
   );
-  const shiftAudits = useMemo(
-    () => applianceAudits.filter((a) => isToday(a.created_at)),
-    [applianceAudits]
-  );
-  const shiftUnits = useMemo(
-    () => shiftAudits.reduce((sum, a) => sum + (a.box_count ?? 0), 0),
-    [shiftAudits]
-  );
-  const visibleAudits = showAll ? applianceAudits : applianceAudits.slice(0, 5);
+  const visibleScans = showAll ? scans : scans.slice(0, 5);
 
   const catalogMatch = useMemo(
-    () => findCatalogBySkuOrBarcode(catalog, sku),
-    [catalog, sku]
+    () => findApplianceByItemOrUpc(catalog, itemNumber),
+    [catalog, itemNumber]
   );
 
   const dismissKeyboard = useCallback(() => {
-    blurActiveInput(skuInputRef);
+    blurActiveInput(itemInputRef);
   }, []);
 
   useEffect(() => {
     let cancelled = false;
-    void fetchAudits().then((rows) => {
+    void fetchApplianceScans().then((rows) => {
       if (!cancelled) {
-        setAudits(rows);
+        setScans(rows);
         setLoaded(true);
       }
     });
@@ -143,160 +120,140 @@ export function ApplianceAuditSection({
     window.setTimeout(() => setStatusMsg(null), 2800);
   }, []);
 
-  const applyCatalogItem = useCallback((item: CatalogItem) => {
-    setSku(item.sku);
-    setName(item.carpet_name);
-    setModel(item.vendor || "");
-    setCategory(normalizeApplianceCategory(item.category));
-    setSimsLocation(item.default_sims_location || "");
+  const applyCatalogItem = useCallback((item: ApplianceCatalogItem) => {
+    setItemNumber(item.item_number);
+    setDescription(item.description);
+    setCategory(item.category);
+    setSubCategory(item.sub_category ?? "");
     setScanFlash(true);
     playSuccessChime();
     window.setTimeout(() => setScanFlash(false), 900);
-    blurActiveInput(skuInputRef);
+    blurActiveInput(itemInputRef);
   }, []);
 
-  function handleSkuChange(raw: string) {
+  function handleItemChange(raw: string) {
     const next = sanitizeBarcodeScan(raw);
-    setSku(next);
-    const hit = findCatalogBySkuOrBarcode(catalog, next);
+    setItemNumber(next);
+    const hit = findApplianceByItemOrUpc(catalog, next);
     if (hit) {
-      setName(hit.carpet_name);
-      setModel(hit.vendor || "");
-      setCategory(normalizeApplianceCategory(hit.category));
-      setSimsLocation(hit.default_sims_location || "");
+      setDescription(hit.description);
+      setCategory(hit.category);
+      setSubCategory(hit.sub_category ?? "");
     } else {
-      setName("");
-      setModel("");
+      setDescription("");
     }
   }
 
-  function handleSkuLookup(raw: string) {
+  function handleItemLookup(raw: string) {
     const cleaned = sanitizeBarcodeScan(raw);
     if (!cleaned) return;
 
-    setSku(cleaned);
-    const resolution = resolveScan(catalog, cleaned);
+    setItemNumber(cleaned);
+    const resolution: ApplianceScanResolution = resolveApplianceScan(
+      catalog,
+      cleaned
+    );
     if (resolution.kind === "empty") return;
 
     if (resolution.kind === "matched") {
       applyCatalogItem(resolution.item);
-      flashStatus(`Matched ${resolution.item.sku}`);
+      flashStatus(`Matched ${resolution.item.item_number}`);
       return;
     }
 
     setQuickAddBarcode(resolution.scanned);
-    flashStatus("Unlinked barcode — Quick-Add appliance to SIMS catalog");
+    flashStatus("Unlinked barcode — link UPC to Item #");
   }
 
-  useGlobalBarcodeScanner(handleSkuLookup);
+  useGlobalBarcodeScanner(handleItemLookup);
 
-  function handleQuickAdded(item: CatalogItem) {
+  function handleQuickAdded(item: ApplianceCatalogItem) {
     const next = [
       item,
-      ...catalog.filter((c) => c.id !== item.id && c.sku !== item.sku),
-    ].sort((a, b) => a.sku.localeCompare(b.sku));
+      ...catalog.filter(
+        (c) => c.id !== item.id && c.item_number !== item.item_number
+      ),
+    ].sort((a, b) => a.item_number.localeCompare(b.item_number));
     onCatalogChange(next);
     setQuickAddBarcode(null);
-    setUnitCount("1");
     applyCatalogItem(item);
-    flashStatus(`Added ${item.sku} to SIMS catalog`);
+    flashStatus(`Linked ${item.item_number} in appliance catalog`);
   }
 
   function closeQuickAdd() {
     setQuickAddBarcode(null);
-    setSku("");
-    setName("");
-    setModel("");
+    setItemNumber("");
+    setDescription("");
     dismissKeyboard();
   }
 
   function resetForm() {
-    setSku("");
-    setName("");
-    setModel("");
-    setCategory("Refrigerator");
-    setSimsLocation("");
-    setLocation("sales_floor");
-    setUnitCount("1");
+    setItemNumber("");
+    setSerialNumber("");
+    setDescription("");
+    setCategory("Laundry");
+    setSubCategory("");
+    setLocation("");
     dismissKeyboard();
   }
 
-  function bumpUnits(delta: number) {
-    setUnitCount((v) => String(Math.max(0, toNumber(v, 0) + delta)));
-  }
-
-  const canLog = sku.trim().length > 0 && unitNum > 0 && !saving;
+  const canLog =
+    itemNumber.trim().length > 0 &&
+    isValidApplianceSubCategory(category, subCategory) &&
+    !saving;
 
   async function handleLog() {
     if (!canLog) return;
     setSaving(true);
     try {
-      const { record, offline } = await saveAudit({
-        sku: sku.trim(),
-        carpet_name: name.trim(),
+      const { record, offline } = await saveApplianceScan({
+        item_number: itemNumber.trim(),
+        serial_number: serialNumber.trim(),
+        location: location.trim(),
         category,
-        sims_location: simsLocation.trim(),
-        location_type: location,
-        measurement_inches: 0,
-        measurement_fraction: 0,
-        rounds: 0,
-        calculated_clf: 0,
-        box_count: unitNum,
-        calculated_sqft: null,
-        system_clf: null,
-        variance_clf: null,
-        audited_by: auditedBy,
+        sub_category: subCategory.trim(),
+        scanned_by: scannedBy || activeSpecialist?.name || "",
       });
-      setAudits((prev) => [record, ...prev.filter((a) => a.id !== record.id)]);
+      setScans((prev) => [record, ...prev.filter((s) => s.id !== record.id)]);
       playSuccessChime();
       resetForm();
       flashStatus(
         offline
-          ? `Saved ${unitNum} offline — form reset`
-          : `Logged ${unitNum} unit${unitNum === 1 ? "" : "s"} — form reset`
+          ? "Saved offline — form reset"
+          : "Appliance scan logged — form reset"
       );
     } catch {
-      flashStatus("Could not save appliance audit");
+      flashStatus("Could not save appliance scan");
     } finally {
       setSaving(false);
     }
   }
 
   async function handleDelete(id: string) {
-    await deleteAudit(id);
-    setAudits((prev) => prev.filter((a) => a.id !== id));
+    await deleteApplianceScan(id);
+    setScans((prev) => prev.filter((s) => s.id !== id));
     flashStatus("Entry removed");
+  }
+
+  function handleDownloadCsv() {
+    const rows = shiftScans.length > 0 ? shiftScans : scans;
+    const csv = applianceScansToCsv(rows);
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `appliance-inventory-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
   }
 
   return (
     <div className="space-y-4 overflow-x-hidden">
-      <QuickAddCatalogModal
+      <QuickAddApplianceModal
         open={quickAddBarcode != null}
         scannedBarcode={quickAddBarcode ?? ""}
-        domain="appliances"
         onClose={closeQuickAdd}
         onSaved={handleQuickAdded}
-      />
-      <SimsLocationFinder
-        open={simsFinderOpen}
-        onClose={() => {
-          setSimsFinderOpen(false);
-          dismissKeyboard();
-        }}
-        catalog={catalog}
-        audits={audits}
-      />
-      <AuditReportModal
-        open={reportOpen}
-        onClose={() => {
-          setReportOpen(false);
-          dismissKeyboard();
-        }}
-        kind="appliances"
-        departmentLabel="Appliance"
-        audits={shiftAudits.length > 0 ? shiftAudits : applianceAudits}
-        specialist={activeSpecialist}
-        auditedBy={auditedBy}
       />
 
       <section
@@ -310,9 +267,7 @@ export function ApplianceAuditSection({
           className="flex min-h-12 w-full items-center gap-2 px-3 py-2 text-left"
         >
           <span className="min-w-0 flex-1 truncate font-mono text-xs font-semibold tabular-nums text-slate-200 sm:text-sm">
-            🔌 {loaded ? shiftAudits.length : "—"} Logged
-            <span className="text-slate-500"> | </span>
-            {loaded ? shiftUnits : "—"} Units today
+            🔌 {loaded ? shiftScans.length : "—"} Scanned today
           </span>
           <span className="shrink-0 text-xs font-semibold text-emerald-400">
             {summaryExpanded ? "Collapse ▴" : "Expand ▾"}
@@ -320,43 +275,34 @@ export function ApplianceAuditSection({
         </button>
         {summaryExpanded ? (
           <div className="space-y-3 border-t border-slate-800 p-4">
-            <div className="grid grid-cols-2 gap-2">
-              <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-3">
-                <p className="text-[10px] font-medium uppercase tracking-wide text-slate-400">
-                  Entries
-                </p>
-                <p className="mt-1 font-mono text-2xl font-semibold tabular-nums text-slate-50">
-                  {loaded ? shiftAudits.length : "—"}
-                </p>
-              </div>
-              <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-3">
-                <p className="text-[10px] font-medium uppercase tracking-wide text-sky-400/80">
-                  Units today
-                </p>
-                <p className="mt-1 font-mono text-2xl font-semibold tabular-nums text-sky-300">
-                  {loaded ? shiftUnits : "—"}
-                </p>
-              </div>
+            <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-3">
+              <p className="text-[10px] font-medium uppercase tracking-wide text-slate-400">
+                Entries today
+              </p>
+              <p className="mt-1 font-mono text-2xl font-semibold tabular-nums text-slate-50">
+                {loaded ? shiftScans.length : "—"}
+              </p>
             </div>
             <button
               type="button"
-              onClick={() => setReportOpen(true)}
-              className="flex h-12 w-full items-center justify-center rounded-xl border border-sky-500/40 bg-sky-950/40 px-3 text-sm font-bold text-sky-200 active:scale-[0.98]"
+              onClick={handleDownloadCsv}
+              disabled={!loaded || scans.length === 0}
+              className="flex h-12 w-full items-center justify-center rounded-xl border border-sky-500/40 bg-sky-950/40 px-3 text-sm font-bold text-sky-200 active:scale-[0.98] disabled:opacity-40"
             >
-              📊 Export / Print Report
+              Download CSV Inventory
             </button>
           </div>
         ) : null}
       </section>
 
-      {statusMsg && (
+      {statusMsg ? (
         <p
           role="status"
           className="rounded-xl border border-emerald-500/30 bg-emerald-950/50 px-3 py-2 text-center text-sm font-medium text-emerald-200"
         >
           {statusMsg}
         </p>
-      )}
+      ) : null}
 
       <form
         id="appliance-audit-form"
@@ -368,81 +314,64 @@ export function ApplianceAuditSection({
       >
         <div className="flex items-center justify-between gap-2">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-400">
-            Appliance Unit Audit
+            Appliance Floor Scan
           </h2>
           <span className="rounded-lg border border-slate-700 bg-slate-950 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-sky-300">
-            Mode · Units
+            Serial · Location
           </span>
         </div>
 
         <NumberField
           label="Item # / SKU / Barcode"
           mode="digits"
-          value={sku}
-          onChange={handleSkuChange}
-          onScanCommit={handleSkuLookup}
+          value={itemNumber}
+          onChange={handleItemChange}
+          onScanCommit={handleItemLookup}
           flash={scanFlash}
           placeholder="Scan barcode or tap to type item #"
           leftIcon={<BarcodeIcon className="h-5 w-5" />}
-          inputRef={skuInputRef}
+          inputRef={itemInputRef}
         />
 
         <TextField
-          label="Appliance Name"
-          value={name}
-          onChange={setName}
+          label="Serial #"
+          value={serialNumber}
+          onChange={setSerialNumber}
+          placeholder="Scan or type serial number"
+        />
+
+        <TextField
+          label="Description"
+          value={description}
+          onChange={setDescription}
           placeholder="e.g. Whirlpool French Door"
         />
 
-        <TextField
-          label="Model #"
-          value={model}
-          onChange={setModel}
-          placeholder="e.g. WRF535SWHZ"
+        <ApplianceCategoryFields
+          category={category}
+          subCategory={subCategory}
+          onCategoryChange={(next) => {
+            setCategory(next);
+            setSubCategory("");
+          }}
+          onSubCategoryChange={setSubCategory}
         />
 
-        <label className="block space-y-1.5">
-          <span className="text-sm font-medium text-slate-200">Category</span>
-          <select
-            value={category}
-            onChange={(e) =>
-              setCategory(normalizeApplianceCategory(e.target.value))
-            }
-            className="min-h-12 w-full rounded-xl border border-slate-800 bg-slate-950 px-3 text-base text-slate-100"
-          >
-            {APPLIANCE_CATEGORIES.map((c) => (
-              <option key={c} value={c}>
-                {c}
-              </option>
-            ))}
-          </select>
-        </label>
-
         <div className="space-y-1.5">
-          <div className="flex items-end gap-2">
-            <TextField
-              className="min-w-0 flex-1"
-              label="SIMS Staging Location"
-              value={simsLocation}
-              onChange={setSimsLocation}
-              placeholder="e.g. Appliance Wall Bay 01"
-            />
-            <button
-              type="button"
-              onClick={() => setSimsFinderOpen(true)}
-              className="flex h-12 shrink-0 items-center justify-center rounded-xl border border-emerald-500/40 bg-emerald-950/40 px-3 text-xs font-semibold text-emerald-300 active:scale-95"
-            >
-              📍 SIMS
-            </button>
-          </div>
+          <TextField
+            label="Location"
+            value={location}
+            onChange={setLocation}
+            placeholder="e.g. Appliance Wall Bay 01"
+          />
           <div className="flex flex-wrap gap-1.5">
             {APPLIANCE_SIMS_SUGGESTIONS.map((tag) => (
               <button
                 key={tag}
                 type="button"
-                onClick={() => setSimsLocation(tag)}
+                onClick={() => setLocation(tag)}
                 className={`rounded-lg border px-2.5 py-1.5 text-[11px] font-semibold transition ${
-                  simsLocation === tag
+                  location === tag
                     ? "border-emerald-500/50 bg-emerald-950/50 text-emerald-300"
                     : "border-slate-700 bg-slate-950 text-slate-400 active:bg-slate-800"
                 }`}
@@ -455,124 +384,20 @@ export function ApplianceAuditSection({
 
         {catalogMatch ? (
           <p className="text-xs text-emerald-400">
-            Matched from SIMS catalog
-            {catalogMatch.upc_barcode ? " · barcode linked" : ""}
-            {catalogMatch.default_sims_location
-              ? ` · ${catalogMatch.default_sims_location}`
+            Matched from appliance catalog
+            {catalogMatch.upc ? " · barcode linked" : ""}
+            {catalogMatch.sub_category
+              ? ` · ${catalogMatch.category} / ${catalogMatch.sub_category}`
               : ""}
           </p>
         ) : null}
 
-        <fieldset>
-          <legend className="mb-1.5 text-sm font-medium text-slate-200">
-            Location Type
-          </legend>
-          <div
-            role="group"
-            className="grid grid-cols-2 gap-1 rounded-xl border border-slate-800 bg-slate-950 p-1"
-          >
-            {(
-              [
-                ["sales_floor", "Sales Floor"],
-                ["top_stock", "Top Stock"],
-              ] as const
-            ).map(([value, label]) => {
-              const active = location === value;
-              return (
-                <button
-                  key={value}
-                  type="button"
-                  onClick={() => setLocation(value)}
-                  className={`flex min-h-12 items-center justify-center rounded-lg text-sm font-semibold transition ${
-                    active
-                      ? "bg-emerald-500 text-slate-950 shadow"
-                      : "text-slate-400 hover:text-slate-100"
-                  }`}
-                >
-                  {label}
-                </button>
-              );
-            })}
-          </div>
-        </fieldset>
-
-        <fieldset className="space-y-2">
-          <legend className="text-sm font-medium text-slate-200">
-            Quantity / Unit Count
-          </legend>
-          <div className="flex w-full items-center gap-2.5">
-            <button
-              type="button"
-              aria-label="Decrease units"
-              onClick={() => bumpUnits(-1)}
-              className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl border border-slate-700 bg-slate-800 text-2xl font-bold text-slate-100 active:scale-95"
-            >
-              −
-            </button>
-            <NumberField
-              mode="integer"
-              value={unitCount}
-              onChange={setUnitCount}
-              placeholder="1"
-              center
-              className="min-w-0 flex-1"
-              aria-label="Unit count"
-              inputRef={qtyInputRef}
-            />
-            <button
-              type="button"
-              aria-label="Increase units"
-              onClick={() => bumpUnits(1)}
-              className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl border border-slate-700 bg-slate-800 text-2xl font-bold text-slate-100 active:scale-95"
-            >
-              +
-            </button>
-          </div>
-          <div className="grid grid-cols-3 gap-2">
-            {[1, 2, 3].map((n) => (
-              <button
-                key={n}
-                type="button"
-                onClick={() => setUnitCount(String(n))}
-                className={`flex min-h-12 items-center justify-center rounded-xl border font-mono text-sm font-semibold active:scale-95 ${
-                  unitNum === n
-                    ? "border-emerald-500 bg-emerald-500 text-slate-950"
-                    : "border-slate-800 bg-slate-950 text-emerald-400"
-                }`}
-              >
-                {n}
-              </button>
-            ))}
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            {[1, 5].map((n) => (
-              <button
-                key={`plus-${n}`}
-                type="button"
-                onClick={() => bumpUnits(n)}
-                className="flex min-h-12 items-center justify-center rounded-xl border border-slate-800 bg-slate-950 font-mono text-sm font-semibold text-sky-300 active:bg-slate-800"
-              >
-                +{n}
-              </button>
-            ))}
-          </div>
-          <div
-            aria-live="polite"
-            className="rounded-xl border border-sky-500/30 bg-gradient-to-br from-sky-950/50 to-slate-950 p-4 text-center"
-          >
-            <p className="font-mono text-3xl font-bold tabular-nums text-sky-300">
-              {unitNum || 0}{" "}
-              <span className="text-base font-semibold text-sky-300/80">
-                unit{unitNum === 1 ? "" : "s"}
-              </span>
-            </p>
-          </div>
-        </fieldset>
-
-        {auditedBy ? (
+        {scannedBy || activeSpecialist ? (
           <p className="text-center text-xs text-slate-500">
-            Logging as{" "}
-            <span className="font-semibold text-emerald-400">{auditedBy}</span>
+            Scanning as{" "}
+            <span className="font-semibold text-emerald-400">
+              {scannedBy || activeSpecialist?.name}
+            </span>
           </p>
         ) : (
           <p className="text-center text-xs text-amber-400">
@@ -592,88 +417,73 @@ export function ApplianceAuditSection({
         </button>
       </div>
 
-      <section className="space-y-3 overflow-x-hidden" aria-label="Appliance audit log">
+      <section className="space-y-3 overflow-x-hidden" aria-label="Appliance scan log">
         <div className="flex items-baseline justify-between gap-2 px-1">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-400">
-            Appliance log
+            Scan log
           </h2>
-          <span className="font-mono text-xs text-slate-500">
-            {applianceAudits.length}
-          </span>
+          <span className="font-mono text-xs text-slate-500">{scans.length}</span>
         </div>
 
-        {!loaded && (
+        {!loaded ? (
           <p className="rounded-2xl border border-slate-800 bg-slate-900/60 px-4 py-6 text-center text-sm text-slate-400">
-            Loading audits…
+            Loading scans…
           </p>
-        )}
+        ) : null}
 
-        {loaded && applianceAudits.length === 0 && (
+        {loaded && scans.length === 0 ? (
           <p className="rounded-2xl border border-dashed border-slate-700 bg-slate-900/60 px-4 py-8 text-center text-sm text-slate-400">
-            No appliance audits yet — scan a barcode to start.
+            No appliance scans yet — scan a barcode to start.
           </p>
-        )}
+        ) : null}
 
         <ul className="space-y-2">
-          {visibleAudits.map((audit) => (
+          {visibleScans.map((scan) => (
             <li
-              key={audit.id}
+              key={scan.id}
               className="flex gap-2 rounded-2xl border border-slate-800 bg-slate-900/90 p-3"
             >
               <div className="min-w-0 flex-1 space-y-1">
                 <div className="flex flex-wrap items-center gap-2">
                   <span className="font-mono text-base font-semibold text-slate-50">
-                    SKU {audit.sku}
+                    Item {scan.item_number}
                   </span>
                   <span className="rounded bg-slate-700/50 px-2 py-0.5 text-[10px] font-bold uppercase text-slate-300">
-                    {audit.category}
+                    {scan.category}
+                    {scan.sub_category ? ` · ${scan.sub_category}` : ""}
                   </span>
-                  <span
-                    className={`rounded px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${
-                      audit.location_type === "sales_floor"
-                        ? "bg-emerald-500/20 text-emerald-300"
-                        : "bg-amber-500/20 text-amber-300"
-                    }`}
-                  >
-                    {locationLabel(audit.location_type)}
-                  </span>
-                  {audit.offline && (
+                  {scan.offline ? (
                     <span className="rounded bg-orange-500/20 px-2 py-0.5 text-[10px] font-bold uppercase text-orange-300">
                       Offline
                     </span>
-                  )}
+                  ) : null}
                 </div>
-                {audit.carpet_name ? (
-                  <p className="truncate text-sm text-slate-300">
-                    {audit.carpet_name}
+                {scan.serial_number ? (
+                  <p className="font-mono text-xs text-sky-300">
+                    Serial {scan.serial_number}
                   </p>
                 ) : null}
-                {audit.sims_location ? (
+                {scan.location ? (
                   <p className="font-mono text-xs text-emerald-400/90">
-                    📍 {audit.sims_location}
+                    📍 {scan.location}
                   </p>
                 ) : null}
-                <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-                  <span className="font-mono text-lg font-bold tabular-nums text-sky-300">
-                    {audit.box_count ?? 0} units
-                  </span>
-                  <time
-                    dateTime={audit.created_at}
-                    className="font-mono text-xs text-slate-500"
-                  >
-                    {formatTime(audit.created_at)}
-                  </time>
-                </div>
-                {audit.audited_by ? (
+                <time
+                  dateTime={scan.scanned_at}
+                  className="font-mono text-xs text-slate-500"
+                >
+                  {formatTime(scan.scanned_at)}
+                </time>
+                {scan.scanned_by ? (
                   <p className="text-xs text-slate-500">
-                    Logged by {audit.audited_by}
+                    Logged by {scan.scanned_by}
                   </p>
                 ) : null}
               </div>
               <button
                 type="button"
-                aria-label={`Delete SKU ${audit.sku}`}
-                onClick={() => void handleDelete(audit.id)}
+                aria-label={`Delete item ${scan.item_number}`}
+                onClick={() => void handleDelete(scan.id)}
                 className="flex h-12 w-12 shrink-0 items-center justify-center self-center rounded-xl border border-red-500/40 text-sm font-semibold text-red-400"
               >
                 Del
@@ -682,7 +492,7 @@ export function ApplianceAuditSection({
           ))}
         </ul>
 
-        {applianceAudits.length > 5 && (
+        {scans.length > 5 ? (
           <button
             type="button"
             onClick={() => setShowAll((v) => !v)}
@@ -690,9 +500,9 @@ export function ApplianceAuditSection({
           >
             {showAll
               ? "Show Fewer Entries"
-              : `Show All Logged Entries (${applianceAudits.length})`}
+              : `Show All Logged Entries (${scans.length})`}
           </button>
-        )}
+        ) : null}
       </section>
     </div>
   );

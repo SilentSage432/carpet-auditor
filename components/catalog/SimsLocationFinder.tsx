@@ -51,7 +51,7 @@ export function SimsLocationFinder({ open, onClose, catalog, audits }: Props) {
                 📍 SIMS Location Finder
               </h2>
               <p className="mt-1 text-sm text-slate-400">
-                Search SKU, barcode, category, or SIMS tag (Bay 012, Refrigerator…)
+                Search SKU, barcode, category, or SIMS tag (Bay 012, Laundry…)
               </p>
             </div>
             <button

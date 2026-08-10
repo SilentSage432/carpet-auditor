@@ -151,3 +151,11 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 - Adaptive draw: `manual_priority_count` + `last_completed_at` age; Store Map ★ Week assigns + bumps priority
 - Showroom: `location_type=SHOWROOM_STACKOUT` + `audit_frequency_days`; dashboard Quick Touch card (not in weekly aisle draw)
 - Store Map bay rows: large S/T toggles; tap Bay label → bottom sheet (pin / history / edit zone)
+
+## Appliance categories (suite + sub)
+- **Tables:** `appliance_catalog` + `appliance_scans` (not carpet_*). Apply `supabase/migrations/20260810_appliance_catalog_scans.sql`
+- Top-level: Laundry · Refrigeration · Cooking / Ranges · Dishwashers · Microwaves / Venting
+- Sub required on Quick-Add UPC link / floor scan / catalog (Laundry → Washer | Dryer | Combo / Unit)
+- Types: `ApplianceCatalogItem`, `ApplianceScan` (`sub_category?`)
+- APIs: `/api/appliances/catalog`, `/api/appliances/scans` (`?format=csv`)
+- CSV columns: Category, Sub-Category, Item #, Serial #, Location, Scanned By, Scanned At, Store #

@@ -178,22 +178,60 @@ export const FLOORING_CATEGORIES = [
 
 export type FlooringCategory = (typeof FLOORING_CATEGORIES)[number];
 
-/** Home appliance inventory categories. */
+/** Home appliance inventory — top-level suites (Washer/Dryer collapsed into Laundry). */
 export const APPLIANCE_CATEGORIES = [
-  "Refrigerator",
-  "Washer",
-  "Dryer",
-  "Range / Stove",
-  "Dishwasher",
-  "Microwave",
-  "Range Hood",
-  "Freezer",
-  "Appliance Accessories",
+  "Laundry",
+  "Refrigeration",
+  "Cooking / Ranges",
+  "Dishwashers",
+  "Microwaves / Venting",
 ] as const;
 
 export type ApplianceCategory = (typeof APPLIANCE_CATEGORIES)[number];
 
-/** Unified catalog / audit category (flooring + appliances). */
+/** Sub-categories required when linking / logging appliances. */
+export const APPLIANCE_SUBCATEGORIES = {
+  Laundry: ["Washer", "Dryer", "Combo / Unit"],
+  Refrigeration: [
+    "French Door",
+    "Side-by-Side",
+    "Top Freezer",
+    "Bottom Freezer",
+    "Chest / Upright Freezer",
+    "Beverage / Compact",
+  ],
+  "Cooking / Ranges": ["Range / Stove", "Cooktop", "Wall Oven", "Range Hood"],
+  Dishwashers: ["Built-In", "Portable"],
+  "Microwaves / Venting": [
+    "Over-the-Range",
+    "Countertop",
+    "Built-In",
+    "Vent Hood",
+  ],
+} as const satisfies Record<ApplianceCategory, readonly string[]>;
+
+export type ApplianceSubCategory =
+  (typeof APPLIANCE_SUBCATEGORIES)[ApplianceCategory][number];
+
+export function applianceSubsForCategory(
+  category: ApplianceCategory | string
+): readonly string[] {
+  if ((APPLIANCE_CATEGORIES as readonly string[]).includes(category)) {
+    return APPLIANCE_SUBCATEGORIES[category as ApplianceCategory];
+  }
+  return [];
+}
+
+export function isValidApplianceSubCategory(
+  category: ApplianceCategory | string,
+  sub: string | null | undefined
+): boolean {
+  const value = String(sub ?? "").trim();
+  if (!value) return false;
+  return applianceSubsForCategory(category).includes(value);
+}
+
+/** Unified catalog / audit category (flooring + appliances for legacy carpet_* rows). */
 export type CatalogCategory = FlooringCategory | ApplianceCategory;
 
 export const CATALOG_CATEGORIES = [
@@ -225,13 +263,76 @@ export function normalizeRollWidthFt(
   return DEFAULT_ROLL_WIDTH_FT;
 }
 
+const LEGACY_APPLIANCE_MAP: Record<
+  string,
+  { category: ApplianceCategory; sub_category: string }
+> = {
+  refrigerator: { category: "Refrigeration", sub_category: "French Door" },
+  freezer: {
+    category: "Refrigeration",
+    sub_category: "Chest / Upright Freezer",
+  },
+  refrigeration: { category: "Refrigeration", sub_category: "French Door" },
+  washer: { category: "Laundry", sub_category: "Washer" },
+  dryer: { category: "Laundry", sub_category: "Dryer" },
+  laundry: { category: "Laundry", sub_category: "" },
+  cooking: { category: "Cooking / Ranges", sub_category: "Range / Stove" },
+  "cooking / ranges": {
+    category: "Cooking / Ranges",
+    sub_category: "Range / Stove",
+  },
+  "range / stove": {
+    category: "Cooking / Ranges",
+    sub_category: "Range / Stove",
+  },
+  range: { category: "Cooking / Ranges", sub_category: "Range / Stove" },
+  "range hood": { category: "Cooking / Ranges", sub_category: "Range Hood" },
+  dishwasher: { category: "Dishwashers", sub_category: "Built-In" },
+  dishwashers: { category: "Dishwashers", sub_category: "Built-In" },
+  microwave: { category: "Microwaves / Venting", sub_category: "Countertop" },
+  microwaves: { category: "Microwaves / Venting", sub_category: "Countertop" },
+  "microwaves / venting": {
+    category: "Microwaves / Venting",
+    sub_category: "Countertop",
+  },
+  "appliance accessories": {
+    category: "Cooking / Ranges",
+    sub_category: "Range / Stove",
+  },
+  "combo/unit": { category: "Laundry", sub_category: "Combo / Unit" },
+  "drink/compact": {
+    category: "Refrigeration",
+    sub_category: "Beverage / Compact",
+  },
+  "chest/upright freezer": {
+    category: "Refrigeration",
+    sub_category: "Chest / Upright Freezer",
+  },
+};
+
+const LEGACY_SUB_ALIASES: Record<string, string> = {
+  "combo/unit": "Combo / Unit",
+  "drink/compact": "Beverage / Compact",
+  "chest/upright freezer": "Chest / Upright Freezer",
+  "beverage / compact": "Beverage / Compact",
+  "chest / upright freezer": "Chest / Upright Freezer",
+  "combo / unit": "Combo / Unit",
+};
+
+function normalizeSubAlias(raw: string): string {
+  const key = raw.trim().toLowerCase();
+  return LEGACY_SUB_ALIASES[key] ?? raw.trim();
+}
+
 export function isApplianceCategory(
   category: string | null | undefined
 ): boolean {
-  return (
-    !!category &&
-    (APPLIANCE_CATEGORIES as readonly string[]).includes(category)
-  );
+  if (!category) return false;
+  if ((APPLIANCE_CATEGORIES as readonly string[]).includes(category)) {
+    return true;
+  }
+  const key = category.trim().toLowerCase();
+  return key in LEGACY_APPLIANCE_MAP;
 }
 
 /** Carpet & Sheet Vinyl (resilient roll) use CLF measurement; everything else uses unit/carton counts. */
@@ -245,6 +346,46 @@ export function auditModeForCategory(
   return isRollGoodsCategory(category ?? "Carpet") ? "roll" : "carton";
 }
 
+/**
+ * Map legacy or current labels onto top-level category + optional sub.
+ * Sub may be empty when only a top-level suite is known.
+ */
+export function resolveApplianceCategoryPair(
+  rawCategory: unknown,
+  rawSub?: unknown
+): { category: ApplianceCategory; sub_category: string } {
+  const categoryRaw = String(rawCategory ?? "").trim();
+  const subRaw = normalizeSubAlias(String(rawSub ?? "").trim());
+
+  if ((APPLIANCE_CATEGORIES as readonly string[]).includes(categoryRaw)) {
+    const category = categoryRaw as ApplianceCategory;
+    if (isValidApplianceSubCategory(category, subRaw)) {
+      return { category, sub_category: subRaw };
+    }
+    return { category, sub_category: "" };
+  }
+
+  const legacyKey = categoryRaw.toLowerCase();
+  if (legacyKey in LEGACY_APPLIANCE_MAP) {
+    const mapped = LEGACY_APPLIANCE_MAP[legacyKey]!;
+    if (isValidApplianceSubCategory(mapped.category, subRaw)) {
+      return { category: mapped.category, sub_category: subRaw };
+    }
+    return {
+      category: mapped.category,
+      sub_category: mapped.sub_category
+        ? normalizeSubAlias(mapped.sub_category)
+        : "",
+    };
+  }
+
+  if (/^range\s*\/?\s*stove$/i.test(categoryRaw)) {
+    return { category: "Cooking / Ranges", sub_category: "Range / Stove" };
+  }
+
+  return { category: "Laundry", sub_category: "" };
+}
+
 export function normalizeCategory(raw: unknown): CatalogCategory {
   const value = String(raw ?? "Carpet").trim();
   // Accept longer display aliases from older notes / imports
@@ -254,11 +395,8 @@ export function normalizeCategory(raw: unknown): CatalogCategory {
   ) {
     return "Sheet Vinyl";
   }
-  if (/^range\s*\/?\s*stove$/i.test(value) || /^range$/i.test(value)) {
-    return "Range / Stove";
-  }
-  if ((APPLIANCE_CATEGORIES as readonly string[]).includes(value)) {
-    return value as ApplianceCategory;
+  if (isApplianceCategory(value)) {
+    return resolveApplianceCategoryPair(value).category;
   }
   if ((FLOORING_CATEGORIES as readonly string[]).includes(value)) {
     return value as FlooringCategory;
@@ -270,12 +408,62 @@ export function normalizeCategory(raw: unknown): CatalogCategory {
 export function normalizeApplianceCategory(
   raw: unknown
 ): ApplianceCategory {
-  const normalized = normalizeCategory(raw);
-  if (isApplianceCategory(normalized)) {
-    return normalized as ApplianceCategory;
-  }
-  return "Refrigerator";
+  return resolveApplianceCategoryPair(raw).category;
 }
+
+export function normalizeApplianceSubCategory(
+  category: ApplianceCategory | string,
+  raw: unknown
+): string {
+  return resolveApplianceCategoryPair(category, raw).sub_category;
+}
+
+/** Canonical appliance master SKU / UPC link record (`public.appliance_catalog`). */
+export type ApplianceCatalogItem = {
+  id: string;
+  store_number: string;
+  item_number: string;
+  upc: string | null;
+  description: string;
+  category: ApplianceCategory;
+  sub_category?: string;
+  created_at: string;
+  updated_at: string;
+  offline?: boolean;
+};
+
+export type ApplianceCatalogItemInsert = Omit<
+  ApplianceCatalogItem,
+  "id" | "created_at" | "updated_at" | "offline" | "store_number" | "sub_category"
+> & {
+  id?: string;
+  store_number?: string;
+  sub_category?: string;
+};
+
+/** Floor scan log (`public.appliance_scans`). */
+export type ApplianceScan = {
+  id: string;
+  store_number: string;
+  item_number: string;
+  serial_number: string;
+  location: string;
+  category: ApplianceCategory;
+  sub_category?: string;
+  scanned_by: string;
+  scanned_at: string;
+  offline?: boolean;
+};
+
+export type ApplianceScanInsert = Omit<
+  ApplianceScan,
+  "id" | "scanned_at" | "offline" | "store_number" | "sub_category"
+> & {
+  id?: string;
+  store_number?: string;
+  scanned_at?: string;
+  sub_category?: string;
+};
 
 export type StoreSpecialist = {
   id: string;
@@ -307,6 +495,8 @@ export type CarpetAudit = {
   sku: string;
   carpet_name: string;
   category: CatalogCategory;
+  /** Appliance suite detail (e.g. Dryer); empty for flooring. */
+  sub_category: string;
   /** SIMS bay / aisle tag, e.g. "Aisle 14 - Bay 012". */
   sims_location: string;
   location_type: LocationType;
@@ -332,11 +522,12 @@ export type FlooringAudit = CarpetAudit;
 
 export type CarpetAuditInsert = Omit<
   CarpetAudit,
-  "id" | "created_at" | "offline" | "store_number"
+  "id" | "created_at" | "offline" | "store_number" | "sub_category"
 > & {
   id?: string;
   created_at?: string;
   store_number?: string;
+  sub_category?: string;
 };
 
 export type CatalogItem = {
@@ -346,6 +537,8 @@ export type CatalogItem = {
   carpet_name: string;
   vendor: string;
   category: CatalogCategory;
+  /** Appliance suite detail (e.g. Dryer); empty for flooring. */
+  sub_category: string;
   /** Default SIMS location tag for this SKU. */
   default_sims_location: string;
   roll_width_ft: number;
@@ -360,10 +553,11 @@ export type CatalogItem = {
 
 export type CatalogItemInsert = Omit<
   CatalogItem,
-  "id" | "created_at" | "updated_at" | "offline" | "store_number"
+  "id" | "created_at" | "updated_at" | "offline" | "store_number" | "sub_category"
 > & {
   id?: string;
   store_number?: string;
+  sub_category?: string;
 };
 
 export type RemnantStatus = "available" | "reserved" | "sold";

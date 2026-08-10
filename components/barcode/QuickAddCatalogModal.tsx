@@ -1,21 +1,23 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { ApplianceCategoryFields } from "@/components/appliances/ApplianceCategoryFields";
 import { NumberField, TextField } from "@/components/ui/NumberField";
 import { sanitizeBarcodeScan } from "@/lib/barcode";
 import { saveCatalogItem } from "@/lib/catalog";
 import { toNumber } from "@/lib/number-input";
 import { playQuickAddPrompt } from "@/lib/scan-feedback";
 import {
-  APPLIANCE_CATEGORIES,
   APPLIANCE_SIMS_SUGGESTIONS,
   DEFAULT_ROLL_WIDTH_FT,
   FLOORING_CATEGORIES,
   ROLL_WIDTH_OPTIONS_FT,
   auditModeForCategory,
+  isValidApplianceSubCategory,
   normalizeApplianceCategory,
   normalizeCategory,
   normalizeRollWidthFt,
+  type ApplianceCategory,
   type CatalogCategory,
   type CatalogItem,
 } from "@/lib/types";
@@ -41,30 +43,30 @@ export function QuickAddCatalogModal({
 }: Props) {
   const cleaned = sanitizeBarcodeScan(scannedBarcode);
   const isApplianceDomain = domain === "appliances";
-  const categoryOptions = isApplianceDomain
-    ? APPLIANCE_CATEGORIES
-    : FLOORING_CATEGORIES;
   const defaultCategory: CatalogCategory = isApplianceDomain
-    ? "Refrigerator"
+    ? "Laundry"
     : "Carpet";
 
   const [sku, setSku] = useState("");
   const [name, setName] = useState("");
   const [model, setModel] = useState("");
   const [category, setCategory] = useState<CatalogCategory>(defaultCategory);
+  const [subCategory, setSubCategory] = useState("");
   const [simsLocation, setSimsLocation] = useState("");
   const [specValue, setSpecValue] = useState("12");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const mode = auditModeForCategory(category);
+  const applianceCategory = normalizeApplianceCategory(category);
 
   useEffect(() => {
     if (!open) return;
     setSku("");
     setName("");
     setModel("");
-    setCategory(isApplianceDomain ? "Refrigerator" : "Carpet");
+    setCategory(isApplianceDomain ? "Laundry" : "Carpet");
+    setSubCategory("");
     setSimsLocation("");
     setSpecValue(String(DEFAULT_ROLL_WIDTH_FT));
     setError(null);
@@ -79,6 +81,13 @@ export function QuickAddCatalogModal({
       setError("Item # and product description are required");
       return;
     }
+    if (
+      isApplianceDomain &&
+      !isValidApplianceSubCategory(applianceCategory, subCategory)
+    ) {
+      setError("Select a sub-category before linking this UPC");
+      return;
+    }
     setSaving(true);
     setError(null);
     try {
@@ -91,6 +100,7 @@ export function QuickAddCatalogModal({
         carpet_name: name.trim(),
         vendor: isApplianceDomain ? model.trim() : "",
         category,
+        sub_category: isApplianceDomain ? subCategory.trim() : "",
         default_sims_location: simsLocation.trim(),
         roll_width_ft: mode === "roll"
           ? normalizeRollWidthFt(spec || DEFAULT_ROLL_WIDTH_FT)
@@ -110,6 +120,11 @@ export function QuickAddCatalogModal({
       setSaving(false);
     }
   }
+
+  const canSave =
+    Boolean(sku.trim() && name.trim()) &&
+    (!isApplianceDomain ||
+      isValidApplianceSubCategory(applianceCategory, subCategory));
 
   return (
     <div className="fixed inset-0 z-[60] flex items-end justify-center sm:items-center">
@@ -167,32 +182,40 @@ export function QuickAddCatalogModal({
               placeholder="e.g. WRF535SWHZ"
             />
           ) : null}
-          <label className="block space-y-1.5">
-            <span className="text-sm font-medium text-slate-200">Category</span>
-            <select
-              value={category}
-              onChange={(e) => {
-                const next = isApplianceDomain
-                  ? normalizeApplianceCategory(e.target.value)
-                  : normalizeCategory(e.target.value);
+          {isApplianceDomain ? (
+            <ApplianceCategoryFields
+              category={applianceCategory}
+              subCategory={subCategory}
+              onCategoryChange={(next: ApplianceCategory) => {
                 setCategory(next);
-                if (!isApplianceDomain) {
+                setSubCategory("");
+              }}
+              onSubCategoryChange={setSubCategory}
+            />
+          ) : (
+            <label className="block space-y-1.5">
+              <span className="text-sm font-medium text-slate-200">Category</span>
+              <select
+                value={category}
+                onChange={(e) => {
+                  const next = normalizeCategory(e.target.value);
+                  setCategory(next);
                   setSpecValue(
                     auditModeForCategory(next) === "roll"
                       ? String(DEFAULT_ROLL_WIDTH_FT)
                       : ""
                   );
-                }
-              }}
-              className="min-h-12 w-full rounded-xl border border-slate-800 bg-slate-950 px-3 text-base text-slate-100"
-            >
-              {categoryOptions.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-            </select>
-          </label>
+                }}
+                className="min-h-12 w-full rounded-xl border border-slate-800 bg-slate-950 px-3 text-base text-slate-100"
+              >
+                {FLOORING_CATEGORIES.map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
           <div className="space-y-1.5">
             <TextField
               label={
@@ -276,7 +299,7 @@ export function QuickAddCatalogModal({
 
         <button
           type="button"
-          disabled={saving || !sku.trim() || !name.trim()}
+          disabled={saving || !canSave}
           onClick={() => void handleSaveAndContinue()}
           className="mt-4 flex min-h-12 w-full items-center justify-center rounded-xl bg-emerald-500 text-sm font-bold text-slate-950 disabled:opacity-40"
         >

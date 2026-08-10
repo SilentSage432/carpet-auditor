@@ -1,7 +1,11 @@
 import { sanitizeBarcodeScan } from "./barcode";
 import { uid } from "./uid";
 import type { CatalogItem, CatalogItemInsert } from "./types";
-import { normalizeCategory } from "./types";
+import {
+  isApplianceCategory,
+  normalizeCategory,
+  resolveApplianceCategoryPair,
+} from "./types";
 import { getStoreNumber } from "./store";
 import { getSupabase } from "./supabase";
 import {
@@ -47,13 +51,19 @@ function mapRow(row: Record<string, unknown>): CatalogItem {
       ? null
       : Number(sqftRaw);
 
+  const category = normalizeCategory(row.category);
+  const sub_category = isApplianceCategory(category)
+    ? resolveApplianceCategoryPair(row.category, row.sub_category).sub_category
+    : String(row.sub_category ?? "").trim();
+
   return {
     id: String(row.id),
     store_number: String(row.store_number ?? getStoreNumber()),
     sku: String(row.sku ?? ""),
     carpet_name: String(row.carpet_name ?? ""),
     vendor: String(row.vendor ?? ""),
-    category: normalizeCategory(row.category),
+    category,
+    sub_category,
     default_sims_location: String(
       row.default_sims_location ?? row.sims_location ?? ""
     ),
@@ -127,6 +137,7 @@ function catalogPayload(record: CatalogItem) {
     carpet_name: record.carpet_name,
     vendor: record.vendor,
     category: record.category,
+    sub_category: record.sub_category ?? "",
     default_sims_location: record.default_sims_location,
     roll_width_ft: record.roll_width_ft,
     sqft_per_box: record.sqft_per_box,
@@ -183,6 +194,10 @@ export async function saveCatalogItem(input: CatalogItemInsert): Promise<{
     carpet_name: input.carpet_name.trim(),
     vendor: (input.vendor ?? "").trim(),
     category: normalizeCategory(input.category),
+    sub_category: isApplianceCategory(input.category)
+      ? resolveApplianceCategoryPair(input.category, input.sub_category)
+          .sub_category
+      : String(input.sub_category ?? "").trim(),
     default_sims_location: (input.default_sims_location ?? "").trim(),
     roll_width_ft: input.roll_width_ft ?? 12,
     sqft_per_box:
@@ -244,6 +259,7 @@ export async function clearCatalogBarcode(item: CatalogItem): Promise<{
     carpet_name: item.carpet_name,
     vendor: item.vendor,
     category: item.category,
+    sub_category: item.sub_category,
     default_sims_location: item.default_sims_location,
     roll_width_ft: item.roll_width_ft,
     sqft_per_box: item.sqft_per_box,

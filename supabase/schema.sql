@@ -165,12 +165,16 @@ alter table public.carpet_remnants
 alter table public.carpet_catalog
   add column if not exists category text not null default 'Carpet';
 alter table public.carpet_catalog
+  add column if not exists sub_category text not null default '';
+alter table public.carpet_catalog
   add column if not exists default_sims_location text not null default '';
 alter table public.carpet_catalog
   add column if not exists sqft_per_box numeric(12, 4);
 
 alter table public.carpet_audits
   add column if not exists category text not null default 'Carpet';
+alter table public.carpet_audits
+  add column if not exists sub_category text not null default '';
 alter table public.carpet_audits
   add column if not exists sims_location text not null default '';
 alter table public.carpet_audits
@@ -190,12 +194,16 @@ alter table public.carpet_remnants
 
 create index if not exists carpet_catalog_category_idx
   on public.carpet_catalog (category);
+create index if not exists carpet_catalog_sub_category_idx
+  on public.carpet_catalog (category, sub_category);
 create index if not exists carpet_catalog_sims_location_idx
   on public.carpet_catalog (default_sims_location);
 create index if not exists carpet_audits_sims_location_idx
   on public.carpet_audits (sims_location);
 create index if not exists carpet_audits_category_idx
   on public.carpet_audits (category);
+create index if not exists carpet_audits_sub_category_idx
+  on public.carpet_audits (category, sub_category);
 create index if not exists carpet_audits_sku_idx
   on public.carpet_audits (sku);
 
@@ -340,3 +348,65 @@ create unique index if not exists store_specialists_invite_token_uidx
   on public.store_specialists (invite_token)
   where invite_token is not null;
 
+
+-- ---------------------------------------------------------------------------
+-- Appliance catalog + floor scans (separate ownership from carpet_*)
+-- Apply: supabase/migrations/20260810_appliance_catalog_scans.sql
+-- ---------------------------------------------------------------------------
+
+create table if not exists public.appliance_catalog (
+  id uuid primary key default gen_random_uuid(),
+  store_number text not null default '0000',
+  item_number text not null,
+  upc text,
+  description text not null default '',
+  category text not null default 'Laundry',
+  sub_category text not null default '',
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create unique index if not exists appliance_catalog_store_item_uidx
+  on public.appliance_catalog (store_number, item_number);
+
+create index if not exists appliance_catalog_upc_idx
+  on public.appliance_catalog (upc)
+  where upc is not null;
+
+create index if not exists appliance_catalog_category_idx
+  on public.appliance_catalog (category, sub_category);
+
+create table if not exists public.appliance_scans (
+  id uuid primary key default gen_random_uuid(),
+  store_number text not null default '0000',
+  item_number text not null,
+  serial_number text not null default '',
+  location text not null default '',
+  category text not null default 'Laundry',
+  sub_category text not null default '',
+  scanned_by text not null default '',
+  scanned_at timestamptz not null default now()
+);
+
+create index if not exists appliance_scans_scanned_at_idx
+  on public.appliance_scans (scanned_at desc);
+
+create index if not exists appliance_scans_store_idx
+  on public.appliance_scans (store_number, scanned_at desc);
+
+create index if not exists appliance_scans_item_idx
+  on public.appliance_scans (item_number);
+
+create index if not exists appliance_scans_category_idx
+  on public.appliance_scans (category, sub_category);
+
+alter table public.appliance_catalog enable row level security;
+alter table public.appliance_scans enable row level security;
+
+drop policy if exists "anon_all_appliance_catalog" on public.appliance_catalog;
+create policy "anon_all_appliance_catalog"
+  on public.appliance_catalog for all to anon using (true) with check (true);
+
+drop policy if exists "anon_all_appliance_scans" on public.appliance_scans;
+create policy "anon_all_appliance_scans"
+  on public.appliance_scans for all to anon using (true) with check (true);

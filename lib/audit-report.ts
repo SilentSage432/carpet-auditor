@@ -95,7 +95,7 @@ export function computeReportMetrics(audits: CarpetAudit[]): AuditReportMetrics 
   };
 }
 
-/** Sort by SIMS bay, then category, then SKU. */
+/** Sort by SIMS bay, then category, sub-category, then SKU. */
 export function sortAuditsForReport(audits: CarpetAudit[]): CarpetAudit[] {
   return [...audits].sort((a, b) => {
     const bay = (a.sims_location || "zzz").localeCompare(
@@ -104,8 +104,17 @@ export function sortAuditsForReport(audits: CarpetAudit[]): CarpetAudit[] {
     if (bay !== 0) return bay;
     const cat = a.category.localeCompare(b.category);
     if (cat !== 0) return cat;
+    const sub = (a.sub_category || "").localeCompare(b.sub_category || "");
+    if (sub !== 0) return sub;
     return a.sku.localeCompare(b.sku);
   });
+}
+
+function categoryDisplay(a: CarpetAudit): string {
+  if (a.sub_category?.trim()) {
+    return `${a.category} · ${a.sub_category}`;
+  }
+  return a.category;
 }
 
 export function reportTitle(ctx: AuditReportContext): string {
@@ -193,7 +202,7 @@ export function buildEmailBody(ctx: AuditReportContext): string {
           ? ` | Var ${formatVariance(a.variance_clf)}`
           : "";
       lines.push(
-        `${a.sims_location || "—"} | SKU ${a.sku} | ${a.carpet_name || "—"} | ${a.category} | ${locationLabel(a.location_type)} | ${qtyDisplay(a)} | ${a.audited_by || "—"}${variance}`
+        `${a.sims_location || "—"} | SKU ${a.sku} | ${a.carpet_name || "—"} | ${categoryDisplay(a)} | ${locationLabel(a.location_type)} | ${qtyDisplay(a)} | ${a.audited_by || "—"}${variance}`
       );
     }
   }
@@ -235,16 +244,16 @@ export function buildClipboardSummary(ctx: AuditReportContext): string {
     "",
     "### Itemized Audit Breakdown",
     "",
-    "| SIMS Bay | Item # / SKU | Description | Category | Location | Qty / CLF | Audited By |",
-    "| --- | --- | --- | --- | --- | --- | --- |"
+    "| SIMS Bay | Item # / SKU | Description | Category | Sub-category | Location | Qty / CLF | Audited By |",
+    "| --- | --- | --- | --- | --- | --- | --- | --- |"
   );
 
   if (sorted.length === 0) {
-    lines.push("| — | — | No entries | — | — | — | — |");
+    lines.push("| — | — | No entries | — | — | — | — | — |");
   } else {
     for (const a of sorted) {
       lines.push(
-        `| ${a.sims_location || "—"} | ${a.sku} | ${a.carpet_name || "—"} | ${a.category} | ${locationLabel(a.location_type)} | ${qtyDisplay(a)} | ${a.audited_by || "—"} |`
+        `| ${a.sims_location || "—"} | ${a.sku} | ${a.carpet_name || "—"} | ${a.category} | ${a.sub_category || "—"} | ${locationLabel(a.location_type)} | ${qtyDisplay(a)} | ${a.audited_by || "—"} |`
       );
     }
   }
