@@ -1,5 +1,15 @@
 # DeptSync Hub — Development Journal
 
+## 2026-08-09 — Dynamic store_number (no hardcoded defaults)
+
+### Shipped
+- `lib/store.ts`: no fallback to `1234` / `1852`; blank when unset; `setStoreNumber` may clear.
+- Settings: free-edit draft + explicit **Save Store Number** (no blur/debounce auto-commit / lockout).
+- Session / biometric / active specialist: mismatch only when both sides have a store number.
+- Store-ops auth/resolve: require a real store number — never invent `#1234`.
+
+---
+
 ## 2026-08-09 — Single-session auth UX
 
 ### Shipped
@@ -25,7 +35,7 @@
 ### Shipped
 - Migration `20260809_multi_store.sql`: `stores` registry; `store_id` on `departments`, `store_locations`, `weekly_rotations`; department code unique per store; location unique `(department_id, aisle, bay)`.
 - Bulk generator upsert: `onConflict: 'department_id,aisle,bay'` with `status: PENDING`, `is_active: true`.
-- APIs resolve hub `store_number` → `stores.id` via `x-store-ops-store-number`; filter/associate by active store (default `#1234`).
+- APIs resolve hub `store_number` → `stores.id` via `x-store-ops-store-number`; filter/associate by active store (user-entered; no hardcoded default).
 - Cron iterates active stores, then each store’s active departments safely.
 
 ### Ownership

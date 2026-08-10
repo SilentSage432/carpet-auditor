@@ -4,7 +4,7 @@
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { DEFAULT_STORE_NUMBER, normalizeStoreNumber } from "@/lib/store";
+import { normalizeStoreNumber } from "@/lib/store";
 import { readableError } from "./errors";
 
 export type StoreRecord = {
@@ -42,9 +42,10 @@ export async function resolveStoreByNumber(
   storeNumber?: string | null
 ): Promise<StoreRecord> {
   try {
-    const normalized = normalizeStoreNumber(
-      storeNumber?.trim() || DEFAULT_STORE_NUMBER
-    );
+    const normalized = normalizeStoreNumber(storeNumber ?? "");
+    if (!normalized) {
+      throw new Error("Store number is required");
+    }
 
     const { data: existing, error: existingError } = await supabase
       .from("stores")
@@ -99,11 +100,7 @@ export async function listActiveStores(
       throw new Error(readableError(error, "Could not list active stores"));
     }
 
-    const stores = (data ?? []) as StoreRecord[];
-    if (stores.length > 0) return stores;
-
-    const fallback = await resolveStoreByNumber(supabase, DEFAULT_STORE_NUMBER);
-    return [fallback];
+    return (data ?? []) as StoreRecord[];
   } catch (error) {
     throw new Error(readableError(error, "Could not list active stores"));
   }

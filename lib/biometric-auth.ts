@@ -53,9 +53,12 @@ export function getStoredBiometricCredential(): BiometricCredentialRecord | null
     if (!parsed?.credentialId || !parsed?.specialistId) return null;
     // Store mismatch: hide for this store but do NOT delete — navigation / store
     // reads must not invalidate biometric enrollment.
+    // Blank active store must not hide a stored credential.
+    const activeStore = getStoreNumber();
     if (
+      activeStore &&
       parsed.storeNumber &&
-      normalizeStoreNumber(parsed.storeNumber) !== getStoreNumber()
+      normalizeStoreNumber(parsed.storeNumber) !== activeStore
     ) {
       return null;
     }

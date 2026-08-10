@@ -39,7 +39,7 @@ export function SessionGate({
 }: SessionGateProps) {
   const [specialist, setSpecialist] = useState<StoreSpecialist | null>(null);
   const [ready, setReady] = useState(false);
-  const [storeNumber, setStoreNumber] = useState("1234");
+  const [storeNumber, setStoreNumber] = useState("");
 
   useEffect(() => {
     const session = readAuthSession();

@@ -5,7 +5,7 @@ import type {
   StoreSpecialist,
 } from "./types";
 import { departmentMeta } from "./types";
-import { getStoreNumber } from "./store";
+import { getStoreNumber, normalizeStoreNumber } from "./store";
 import { getSupabase } from "./supabase";
 import {
   enqueueSyncAction,
@@ -519,7 +519,11 @@ export function getActiveSpecialist(): StoreSpecialist | null {
       localStorage.removeItem(ACTIVE_KEY);
       return null;
     }
-    if (member.store_number !== getStoreNumber()) return null;
+    const activeStore = getStoreNumber();
+    const memberStore = normalizeStoreNumber(String(member.store_number ?? ""));
+    if (activeStore && memberStore && memberStore !== activeStore) {
+      return null;
+    }
     return member;
   } catch {
     return null;

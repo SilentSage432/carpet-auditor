@@ -6,7 +6,7 @@
 
 import type { DepartmentScope, StoreSpecialist } from "@/lib/types";
 import { isMasterAdmin } from "@/lib/rbac";
-import { DEFAULT_STORE_NUMBER, normalizeStoreNumber } from "@/lib/store";
+import { normalizeStoreNumber } from "@/lib/store";
 import { toStoreOpsDepartmentCode } from "./department-codes";
 import type { StoreOpsUserRole } from "./types";
 
@@ -25,10 +25,9 @@ export function actorFromSpecialist(
 ): StoreOpsActor | null {
   if (!member) return null;
   const store = normalizeStoreNumber(
-    storeNumber?.trim() ||
-      member.store_number?.trim() ||
-      DEFAULT_STORE_NUMBER
+    storeNumber?.trim() || member.store_number?.trim() || ""
   );
+  if (!store) return null;
   if (isMasterAdmin(member)) {
     return {
       specialistId: member.id,
@@ -69,10 +68,10 @@ export function parseStoreOpsActor(request: Request): StoreOpsActor | null {
   const specialistId = request.headers.get("x-store-ops-specialist-id");
   const departmentCode = request.headers.get("x-store-ops-department-code");
   const storeNumber = normalizeStoreNumber(
-    request.headers.get("x-store-ops-store-number") || DEFAULT_STORE_NUMBER
+    request.headers.get("x-store-ops-store-number") || ""
   );
 
-  if (!specialistId) return null;
+  if (!specialistId || !storeNumber) return null;
   if (role === "super_admin") {
     return {
       specialistId,

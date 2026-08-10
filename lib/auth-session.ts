@@ -96,15 +96,29 @@ export function readAuthSession(): AuthSession | null {
     );
     if (!specialist) return null;
 
-    // Normalize store numbers — missing/empty store should not wipe the session
     const specialistStore = normalizeStoreNumber(
-      String(specialist.store_number || getStoreNumber())
+      String(specialist.store_number ?? "")
     );
     const activeStore = getStoreNumber();
-    if (specialistStore !== activeStore) {
+
+    // Only reject on a real mismatch when BOTH sides have a store number.
+    // Blank active store or blank session store must not wipe / lock the session.
+    if (
+      specialistStore &&
+      activeStore &&
+      specialistStore !== activeStore
+    ) {
       return null;
     }
-    specialist.store_number = specialistStore;
+
+    // Keep session store in sync with active store when one side is blank
+    if (activeStore) {
+      specialist.store_number = activeStore;
+    } else if (specialistStore) {
+      specialist.store_number = specialistStore;
+    } else {
+      specialist.store_number = "";
+    }
 
     const lastActiveTimestamp = Number(parsed.lastActiveTimestamp);
     const sessionToken = String(parsed.sessionToken ?? "");
@@ -147,12 +161,18 @@ export function updateAuthSessionSpecialist(
   if (!session) {
     return startAuthSession(specialist);
   }
+  const activeStore = getStoreNumber();
   const next: AuthSession = {
     ...session,
     specialist: {
       ...specialist,
       store_number: normalizeStoreNumber(
-        String(specialist.store_number || getStoreNumber())
+        String(
+          specialist.store_number ||
+            activeStore ||
+            session.specialist.store_number ||
+            ""
+        )
       ),
       must_change_credentials: Boolean(specialist.must_change_credentials),
     },

@@ -38,7 +38,7 @@ import {
   needsCredentialSetup,
   syncActiveSpecialistFromRoster,
 } from "@/lib/specialists";
-import { getStoreNumber, STORE_CHANGED_EVENT } from "@/lib/store";
+import { getStoreNumber, setStoreNumber, STORE_CHANGED_EVENT } from "@/lib/store";
 import { flushSyncQueue } from "@/lib/sync-queue";
 import type {
   CatalogItem,
@@ -60,7 +60,7 @@ export default function DeptSyncHubPage() {
   const [pinToast, setPinToast] = useState(false);
   const [syncToast, setSyncToast] = useState<string | null>(null);
   const [storeNumber, setStoreNumberState] = useState(() =>
-    typeof window === "undefined" ? "1234" : getStoreNumber()
+    typeof window === "undefined" ? "" : getStoreNumber()
   );
   const [gate, setGate] = useState<Gate>("booting");
   const [rosterReady, setRosterReady] = useState(false);
@@ -222,9 +222,21 @@ export default function DeptSyncHubPage() {
   }
 
   function handleAuthenticated(member: StoreSpecialist) {
-    upsertSpecialist(member);
-    startAuthSession(member);
-    unlockWorkspace(member);
+    // Adopt profile store when device store is unset — never invent a default.
+    const active = getStoreNumber();
+    const profileStore = String(member.store_number ?? "").trim();
+    let nextMember = member;
+    if (!active && profileStore) {
+      const saved = setStoreNumber(profileStore);
+      setStoreNumberState(saved);
+      nextMember = { ...member, store_number: saved };
+    } else if (active) {
+      nextMember = { ...member, store_number: active };
+      setStoreNumberState(active);
+    }
+    upsertSpecialist(nextMember);
+    startAuthSession(nextMember);
+    unlockWorkspace(nextMember);
   }
 
   function handleSelectSpecialist(member: StoreSpecialist) {

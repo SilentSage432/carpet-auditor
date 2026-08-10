@@ -113,3 +113,10 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 - `/verify-rotation` — supervisors confirm or report incomplete bays (CARRIED_OVER + exception reasons)
 - `/admin/exceptions` — Master Admin verification status + bottleneck log
 - APIs: `POST /api/rotations/verify`, `GET /api/rotations/exceptions`
+
+## Store number (dynamic)
+- Owner: `lib/store.ts` — localStorage `carpet_hub_store_number`; **no hardcoded `1234`/`1852`**
+- Blank allowed; Settings → free edit + **Save Store Number** (session stays active)
+- Session / active specialist / biometric only reject when both sides have different store numbers
+- Login adopts `store_profiles` / specialist `store_number` when device store is unset
+- Store-ops APIs require a real `x-store-ops-store-number` (no inventing defaults)

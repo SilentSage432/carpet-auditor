@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { AdminRosterManager } from "@/components/hub/AdminRosterManager";
 import { PushNotificationsCard } from "@/components/hub/PushNotificationsCard";
@@ -13,6 +13,7 @@ import { canManageStoreNumber, isMasterAdmin } from "@/lib/rbac";
 import { countLocalAudits } from "@/lib/storage";
 import {
   formatStoreLabel,
+  getStoreNumber,
   normalizeStoreNumber,
   setStoreNumber,
 } from "@/lib/store";
@@ -43,12 +44,15 @@ export function SettingsSection({
   onStoreNumberChange,
 }: Props) {
   const [ping, setPing] = useState<"idle" | "ok" | "fail" | "checking">("idle");
-  const [storeDraftOverride, setStoreDraftOverride] = useState<string | null>(
-    null
-  );
+  const [storeDraft, setStoreDraft] = useState(storeNumber);
+  const [storeSaveMsg, setStoreSaveMsg] = useState<string | null>(null);
   const [syncMsg, setSyncMsg] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
-  const storeSaveTimer = useRef<number | null>(null);
+
+  // Reflect localStorage / active store_number without inventing a default.
+  useEffect(() => {
+    setStoreDraft(storeNumber || getStoreNumber());
+  }, [storeNumber]);
 
   const configured = isSupabaseConfigured();
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
@@ -57,36 +61,25 @@ export function SettingsSection({
   const canEditStore = canManageStoreNumber(activeSpecialist);
   const canChangePin = Boolean(activeSpecialist);
   const pending = countPendingSync(storeNumber);
-  const storeDraft = storeDraftOverride ?? storeNumber;
 
   const localAudits = countLocalAudits();
   const localCatalog = countLocalCatalog();
   const localRemnants = countLocalRemnants();
 
-  function commitStore(raw: string) {
-    if (storeSaveTimer.current != null) {
-      window.clearTimeout(storeSaveTimer.current);
-      storeSaveTimer.current = null;
-    }
-    const next = setStoreNumber(raw);
+  function saveStoreNumber() {
+    const next = setStoreNumber(storeDraft);
     onStoreNumberChange(next);
-    setStoreDraftOverride(null);
+    setStoreDraft(next);
+    setStoreSaveMsg(
+      next
+        ? `Saved store number ${next}. Session stays active.`
+        : "Store number cleared. Session stays active."
+    );
+    window.setTimeout(() => setStoreSaveMsg(null), 3500);
   }
 
-  function handleStoreDraftChange(raw: string) {
-    setStoreDraftOverride(raw);
-    if (storeSaveTimer.current != null) {
-      window.clearTimeout(storeSaveTimer.current);
-    }
-    storeSaveTimer.current = window.setTimeout(() => {
-      const normalized = normalizeStoreNumber(raw);
-      if (normalized !== storeNumber) {
-        commitStore(raw);
-      } else {
-        setStoreDraftOverride(null);
-      }
-    }, 500);
-  }
+  const draftNormalized = normalizeStoreNumber(storeDraft);
+  const storeDirty = draftNormalized !== normalizeStoreNumber(storeNumber);
 
   async function testConnection() {
     setPing("checking");
@@ -151,27 +144,38 @@ export function SettingsSection({
                 type="text"
                 inputMode="numeric"
                 autoComplete="off"
-                placeholder="e.g. Store #1234"
+                placeholder="Enter your store number"
                 aria-label="Store Number / Location"
                 value={storeDraft}
                 onFocus={selectOnFocus}
-                onChange={(e) =>
-                  handleStoreDraftChange(e.target.value.replace(/\D/g, ""))
-                }
-                onBlur={() => commitStore(storeDraft)}
+                onChange={(e) => {
+                  setStoreDraft(e.target.value.replace(/\D/g, ""));
+                  setStoreSaveMsg(null);
+                }}
                 onKeyDown={(e) => {
                   if (e.key === "Enter") {
                     e.preventDefault();
-                    commitStore(storeDraft);
+                    saveStoreNumber();
                     e.currentTarget.blur();
                   }
                 }}
                 className="min-h-12 h-12 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 font-mono text-base font-semibold tabular-nums text-slate-100 outline-none transition focus:border-emerald-500"
               />
             </label>
+            <button
+              type="button"
+              onClick={saveStoreNumber}
+              disabled={!storeDirty && storeDraft === storeNumber}
+              className="min-h-11 w-full rounded-xl bg-emerald-600 px-4 text-sm font-semibold text-white transition hover:bg-emerald-500 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              Save Store Number
+            </button>
+            {storeSaveMsg ? (
+              <p className="text-xs text-emerald-400">{storeSaveMsg}</p>
+            ) : null}
             <p className="text-xs leading-relaxed text-slate-500">
-              Master Admin only. Audits, catalog, remnants, and specialists are
-              scoped by this store number for district isolation.
+              Master Admin only. Type freely and save — blank is allowed. Saving
+              updates this device&apos;s store scope without ending your session.
             </p>
           </>
         ) : (

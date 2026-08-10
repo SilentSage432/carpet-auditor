@@ -48,6 +48,7 @@
 - [x] Supervisor end-of-week verification + exception log (`/verify-rotation`, `/admin/exceptions`)
 - [x] Multi-store `store_id` on departments / locations / weekly rotations + per-store cron
 - [x] Bulk generator upsert on `(department_id, aisle, bay)`
+- [x] Dynamic store_number (no hardcoded frontend defaults; Settings free save)
 
 ## Next
 - [ ] JWT / claim-based RLS enforcing `store_number` (+ department) server-side
