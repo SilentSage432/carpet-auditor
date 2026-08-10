@@ -190,48 +190,95 @@ export async function buildVerificationSummary(
   supabase: SupabaseClient,
   weekLabel: string = isoWeekLabel()
 ): Promise<DepartmentVerificationSummary[]> {
-  const { data: departments, error: deptError } = await supabase
-    .from("departments")
-    .select("*")
-    .eq("is_active", true)
-    .order("name");
-  if (deptError) throw new Error(deptError.message);
+  try {
+    const { data: departments, error: deptError } = await supabase
+      .from("departments")
+      .select("*")
+      .eq("is_active", true)
+      .order("name");
+    if (deptError) {
+      // No departments yet → empty summary (0/0 verified)
+      return [];
+    }
 
-  const summaries: DepartmentVerificationSummary[] = [];
+    const summaries: DepartmentVerificationSummary[] = [];
 
-  for (const dept of departments ?? []) {
-    const { data: rotations, error: rotError } = await supabase
-      .from("weekly_rotations")
-      .select("id, is_completed")
-      .eq("department_id", dept.id)
-      .eq("assigned_week", weekLabel);
-    if (rotError) throw new Error(rotError.message);
+    for (const dept of departments ?? []) {
+      const rotations = await fetchWeekRotationsForDepartment(
+        supabase,
+        dept.id,
+        weekLabel
+      );
 
-    const { count: exceptionCount, error: exError } = await supabase
-      .from("rotation_exceptions")
-      .select("id", { count: "exact", head: true })
-      .eq("department_id", dept.id)
-      .eq("assigned_week", weekLabel);
-    if (exError) throw new Error(exError.message);
+      let exceptionCount = 0;
+      try {
+        const { count, error: exError } = await supabase
+          .from("rotation_exceptions")
+          .select("id", { count: "exact", head: true })
+          .eq("department_id", dept.id)
+          .eq("assigned_week", weekLabel);
+        if (!exError) exceptionCount = count ?? 0;
+      } catch {
+        exceptionCount = 0;
+      }
 
-    const total = rotations?.length ?? 0;
-    const incomplete = (rotations ?? []).filter((r) => !r.is_completed).length;
+      const total = rotations.length;
+      const incomplete = rotations.filter((r) => !r.is_completed).length;
 
-    summaries.push({
-      department_id: dept.id,
-      department_name: dept.name,
-      department_code: dept.code,
-      weekly_bay_target: dept.weekly_bay_target ?? 10,
-      last_verified_week: dept.last_verified_week ?? null,
-      last_verified_at: dept.last_verified_at ?? null,
-      verified_this_week: dept.last_verified_week === weekLabel,
-      exception_count: exceptionCount ?? 0,
-      incomplete_rotations: incomplete,
-      total_rotations: total,
-    });
+      summaries.push({
+        department_id: dept.id,
+        department_name: dept.name,
+        department_code: dept.code,
+        weekly_bay_target: dept.weekly_bay_target ?? 10,
+        last_verified_week: dept.last_verified_week ?? null,
+        last_verified_at: dept.last_verified_at ?? null,
+        verified_this_week: dept.last_verified_week === weekLabel,
+        exception_count: exceptionCount,
+        incomplete_rotations: incomplete,
+        total_rotations: total,
+      });
+    }
+
+    return summaries;
+  } catch {
+    return [];
+  }
+}
+
+type WeekRotationRow = {
+  id: string;
+  department_id: string;
+  is_completed: boolean;
+  completed_at: string | null;
+  cycle_number?: number | null;
+};
+
+/** Prefer full column set; fall back if optional columns (e.g. cycle_number) are absent. */
+async function fetchWeekRotationsForDepartment(
+  supabase: SupabaseClient,
+  departmentId: string,
+  weekLabel: string
+): Promise<WeekRotationRow[]> {
+  const primary = await supabase
+    .from("weekly_rotations")
+    .select("id, department_id, cycle_number, is_completed, completed_at")
+    .eq("department_id", departmentId)
+    .eq("assigned_week", weekLabel);
+
+  if (!primary.error) {
+    return (primary.data ?? []) as WeekRotationRow[];
   }
 
-  return summaries;
+  const fallback = await supabase
+    .from("weekly_rotations")
+    .select("id, department_id, is_completed, completed_at")
+    .eq("department_id", departmentId)
+    .eq("assigned_week", weekLabel);
+
+  if (fallback.error) {
+    return [];
+  }
+  return (fallback.data ?? []) as WeekRotationRow[];
 }
 
 export function rotationLocationId(

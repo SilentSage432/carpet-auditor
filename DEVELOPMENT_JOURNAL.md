@@ -1,5 +1,13 @@
 # DeptSync Hub — Development Journal
 
+## 2026-08-09 — Exception summary empty-week defaults
+
+### Shipped
+- `weekly_rotations` summary select: `id, department_id, cycle_number, is_completed, completed_at` (falls back if `cycle_number` absent).
+- Exception Log / `fetchExceptionSummary` try/catch defaults to empty summary + `[]` exceptions (UI shows 0/0 verified, 0 rows).
+
+---
+
 ## 2026-08-09 — Exception log store_locations select harden
 
 ### Shipped

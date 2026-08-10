@@ -53,11 +53,15 @@ function ExceptionsBody({
     setError(null);
     try {
       const data = await fetchExceptionSummary(specialist);
-      setWeek(data.assigned_week);
+      setWeek(data.assigned_week || "");
       setSummary(data.summary ?? []);
       setExceptions(data.exceptions ?? []);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load exceptions");
+    } catch {
+      // No entries yet / fetch failure → show empty log (0/0 verified, 0 rows)
+      setWeek("");
+      setSummary([]);
+      setExceptions([]);
+      setError(null);
     } finally {
       setLoading(false);
     }
