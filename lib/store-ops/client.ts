@@ -50,6 +50,8 @@ async function storeOpsFetch<T>(
 
     return body as T;
   } catch (error) {
+    // Preserve already-built Error messages — do not re-humanize / nest.
+    if (error instanceof Error) throw error;
     throw new Error(readableError(error, "Store Operations request failed"));
   }
 }

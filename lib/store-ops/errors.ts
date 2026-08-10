@@ -45,6 +45,17 @@ function humanizeSupabaseMessage(message: string): string {
 
   const lower = msg.toLowerCase();
 
+  // Already humanized — return as-is to avoid nested prefixes.
+  if (
+    lower.startsWith("database unique constraint mismatch") ||
+    lower.startsWith("that record already exists") ||
+    lower.startsWith("schema missing or out of date") ||
+    lower.startsWith("supabase credentials look wrong") ||
+    lower.startsWith("network error")
+  ) {
+    return msg;
+  }
+
   if (
     lower.includes("no unique") ||
     lower.includes("on conflict") ||

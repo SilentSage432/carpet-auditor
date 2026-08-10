@@ -1,5 +1,13 @@
 # DeptSync Hub — Development Journal
 
+## 2026-08-10 — Bulk Generator clean error messages
+
+### Shipped
+- Bulk location generate catch uses `err?.message || 'Failed to generate locations'` (no nested readableError rewrap).
+- `storeOpsFetch` / `bulkInsertLocations` / `readableError` skip re-humanizing already-built Error messages.
+
+---
+
 ## 2026-08-10 — Zebra rotations empty-week soft fail
 
 ### Shipped

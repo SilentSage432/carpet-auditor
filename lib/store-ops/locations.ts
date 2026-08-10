@@ -90,6 +90,7 @@ export async function bulkInsertLocations(
     }
     return (data ?? []) as StoreLocation[];
   } catch (error) {
+    if (error instanceof Error) throw error;
     throw new Error(readableError(error, "Bulk location upsert failed"));
   }
 }
