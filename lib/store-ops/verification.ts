@@ -133,8 +133,6 @@ export type ExceptionWithLocation = RotationException & {
     id: string;
     aisle: number;
     bay: number;
-    type: string;
-    status: string;
   } | null;
   departments: {
     id: string;
@@ -149,7 +147,7 @@ export async function listRotationExceptions(
 ): Promise<ExceptionWithLocation[]> {
   let query = supabase
     .from("rotation_exceptions")
-    .select("*, store_locations(id, aisle, bay, type, status), departments(id, name, code)")
+    .select("*, store_locations(id, aisle, bay), departments(id, name, code)")
     .order("created_at", { ascending: false })
     .limit(opts?.limit ?? 200);
 
@@ -161,7 +159,17 @@ export async function listRotationExceptions(
   }
 
   const { data, error } = await query;
-  if (error) throw new Error(error.message);
+  if (error) {
+    // Empty week / missing log table → treat as no exceptions yet
+    const msg = error.message ?? "";
+    if (
+      error.code === "PGRST116" ||
+      /0 rows|does not exist|could not find/i.test(msg)
+    ) {
+      return [];
+    }
+    throw new Error(msg);
+  }
   return (data ?? []) as ExceptionWithLocation[];
 }
 

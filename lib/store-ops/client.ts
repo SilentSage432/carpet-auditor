@@ -211,12 +211,46 @@ export async function fetchExceptionSummary(
       id: string;
       aisle: number;
       bay: number;
-      type: string;
-      status: string;
     } | null;
     departments: { id: string; name: string; code: string } | null;
   }>;
 }> {
   const qs = week ? `?week=${encodeURIComponent(week)}` : "";
-  return storeOpsFetch(`/api/rotations/exceptions${qs}`, specialist);
+  const data = await storeOpsFetch<{
+    assigned_week: string;
+    summary: Array<{
+      department_id: string;
+      department_name: string;
+      department_code: string;
+      weekly_bay_target: number;
+      last_verified_week: string | null;
+      last_verified_at: string | null;
+      verified_this_week: boolean;
+      exception_count: number;
+      incomplete_rotations: number;
+      total_rotations: number;
+    }>;
+    exceptions: Array<{
+      id: string;
+      department_id: string;
+      bay_id: string;
+      reason: string;
+      cycle_number: number;
+      assigned_week: string | null;
+      reported_by: string | null;
+      created_at: string;
+      store_locations: {
+        id: string;
+        aisle: number;
+        bay: number;
+      } | null;
+      departments: { id: string; name: string; code: string } | null;
+    }>;
+  }>(`/api/rotations/exceptions${qs}`, specialist);
+
+  return {
+    assigned_week: data.assigned_week,
+    summary: data.summary ?? [],
+    exceptions: data.exceptions ?? [],
+  };
 }

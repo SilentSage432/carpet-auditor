@@ -1,5 +1,13 @@
 # DeptSync Hub — Development Journal
 
+## 2026-08-09 — Exception log store_locations select harden
+
+### Shipped
+- `listRotationExceptions` joins `store_locations(id, aisle, bay)` only — no optional `type`/`status` columns.
+- Empty week / missing log returns `[]` instead of crashing the Exception Log page.
+
+---
+
 ## 2026-08-09 — Departments upsert onConflict = code
 
 ### Shipped

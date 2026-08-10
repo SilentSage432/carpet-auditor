@@ -54,8 +54,8 @@ function ExceptionsBody({
     try {
       const data = await fetchExceptionSummary(specialist);
       setWeek(data.assigned_week);
-      setSummary(data.summary);
-      setExceptions(data.exceptions);
+      setSummary(data.summary ?? []);
+      setExceptions(data.exceptions ?? []);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load exceptions");
     } finally {
@@ -166,7 +166,7 @@ function ExceptionsBody({
                     <p className="text-sm font-bold text-slate-50">
                       {ex.departments?.name ?? "Department"}
                       {ex.store_locations
-                        ? ` · Aisle ${ex.store_locations.aisle} Bay ${ex.store_locations.bay} [${ex.store_locations.type}]`
+                        ? ` · Aisle ${ex.store_locations.aisle} Bay ${ex.store_locations.bay}`
                         : ""}
                     </p>
                     <p className="mt-1 text-sm text-amber-200">{ex.reason}</p>

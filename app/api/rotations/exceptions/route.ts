@@ -39,7 +39,7 @@ export async function GET(request: Request) {
         assigned_week: week,
         store_id: store.id,
         summary,
-        exceptions,
+        exceptions: exceptions ?? [],
       });
     }
 
@@ -71,7 +71,7 @@ export async function GET(request: Request) {
       assigned_week: week,
       store_id: store.id,
       summary: [],
-      exceptions,
+      exceptions: exceptions ?? [],
     });
   } catch (err) {
     if (err instanceof StoreOpsAuthError) {
