@@ -6,6 +6,7 @@
 
 import type { DepartmentScope, StoreSpecialist } from "@/lib/types";
 import { isMasterAdmin } from "@/lib/rbac";
+import { DEFAULT_STORE_NUMBER, normalizeStoreNumber } from "@/lib/store";
 import { toStoreOpsDepartmentCode } from "./department-codes";
 import type { StoreOpsUserRole } from "./types";
 
@@ -14,17 +15,26 @@ export type StoreOpsActor = {
   role: StoreOpsUserRole;
   /** Store-ops departments.code (Lowe's / mapped hub scope). */
   departmentCode: string | null;
+  /** Hub store_number for multi-store scoping. */
+  storeNumber: string;
 };
 
 export function actorFromSpecialist(
-  member: StoreSpecialist | null | undefined
+  member: StoreSpecialist | null | undefined,
+  storeNumber?: string | null
 ): StoreOpsActor | null {
   if (!member) return null;
+  const store = normalizeStoreNumber(
+    storeNumber?.trim() ||
+      member.store_number?.trim() ||
+      DEFAULT_STORE_NUMBER
+  );
   if (isMasterAdmin(member)) {
     return {
       specialistId: member.id,
       role: "super_admin",
       departmentCode: null,
+      storeNumber: store,
     };
   }
   if (member.role === "Supervisor") {
@@ -36,6 +46,7 @@ export function actorFromSpecialist(
       specialistId: member.id,
       role: "department_supervisor",
       departmentCode: code,
+      storeNumber: store,
     };
   }
   return null;
@@ -46,6 +57,7 @@ export function storeOpsAuthHeaders(actor: StoreOpsActor): HeadersInit {
     "Content-Type": "application/json",
     "x-store-ops-role": actor.role,
     "x-store-ops-specialist-id": actor.specialistId,
+    "x-store-ops-store-number": actor.storeNumber,
     ...(actor.departmentCode
       ? { "x-store-ops-department-code": actor.departmentCode }
       : {}),
@@ -56,16 +68,25 @@ export function parseStoreOpsActor(request: Request): StoreOpsActor | null {
   const role = request.headers.get("x-store-ops-role");
   const specialistId = request.headers.get("x-store-ops-specialist-id");
   const departmentCode = request.headers.get("x-store-ops-department-code");
+  const storeNumber = normalizeStoreNumber(
+    request.headers.get("x-store-ops-store-number") || DEFAULT_STORE_NUMBER
+  );
 
   if (!specialistId) return null;
   if (role === "super_admin") {
-    return { specialistId, role: "super_admin", departmentCode: null };
+    return {
+      specialistId,
+      role: "super_admin",
+      departmentCode: null,
+      storeNumber,
+    };
   }
   if (role === "department_supervisor" && departmentCode) {
     return {
       specialistId,
       role: "department_supervisor",
       departmentCode,
+      storeNumber,
     };
   }
   return null;

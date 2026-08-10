@@ -21,7 +21,7 @@ export function BulkLocationGenerator({
   const [startBay, setStartBay] = useState("1");
   const [endBay, setEndBay] = useState("15");
   const [selling, setSelling] = useState(true);
-  const [topstock, setTopstock] = useState(true);
+  const [topstock, setTopstock] = useState(false);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -43,12 +43,11 @@ export function BulkLocationGenerator({
         types,
       });
 
-      const expected =
-        (Number(endBay) - Number(startBay) + 1) * Math.max(types.length, 1);
+      const expected = Number(endBay) - Number(startBay) + 1;
       setMessage(
         result.created > 0
-          ? `Created ${result.created} location tag${result.created === 1 ? "" : "s"} (duplicates skipped).`
-          : `No new tags — ${expected} already mapped for this aisle/bay range.`
+          ? `Upserted ${result.created} location${result.created === 1 ? "" : "s"} (one per aisle/bay; re-runs refresh PENDING).`
+          : `No locations written for this aisle/bay range (expected ${expected}).`
       );
       onGenerated();
     } catch (err) {
@@ -64,7 +63,9 @@ export function BulkLocationGenerator({
         Bulk Generator
       </h2>
       <p className="mt-1 text-sm text-slate-400">
-        Map an aisle bay range in one tap — Selling and Topstock tags created together.
+        Map an aisle bay range in one tap — one active location per aisle/bay
+        (unique on department, aisle, bay). Re-running upserts status back to
+        PENDING.
       </p>
 
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
@@ -121,22 +122,32 @@ export function BulkLocationGenerator({
       </div>
 
       <fieldset className="mt-4">
-        <legend className="mb-2 text-sm text-slate-300">Location Types</legend>
+        <legend className="mb-2 text-sm text-slate-300">
+          Location type (one per aisle/bay)
+        </legend>
         <div className="flex flex-wrap gap-4">
           <label className="flex min-h-12 items-center gap-2 text-sm text-slate-100">
             <input
-              type="checkbox"
-              checked={selling}
-              onChange={(e) => setSelling(e.target.checked)}
+              type="radio"
+              name="bulk-location-type"
+              checked={selling && !topstock}
+              onChange={() => {
+                setSelling(true);
+                setTopstock(false);
+              }}
               className="h-5 w-5 accent-emerald-500"
             />
             Selling
           </label>
           <label className="flex min-h-12 items-center gap-2 text-sm text-slate-100">
             <input
-              type="checkbox"
-              checked={topstock}
-              onChange={(e) => setTopstock(e.target.checked)}
+              type="radio"
+              name="bulk-location-type"
+              checked={topstock && !selling}
+              onChange={() => {
+                setSelling(false);
+                setTopstock(true);
+              }}
               className="h-5 w-5 accent-emerald-500"
             />
             Topstock

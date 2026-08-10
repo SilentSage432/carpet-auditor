@@ -15,6 +15,7 @@ export type RotationStatus =
 
 export type Department = {
   id: string;
+  store_id: string;
   name: string;
   code: string;
   weekly_bay_target: number;
@@ -26,6 +27,7 @@ export type Department = {
 
 export type StoreLocation = {
   id: string;
+  store_id: string;
   department_id: string;
   aisle: number;
   bay: number;
@@ -40,6 +42,7 @@ export type StoreLocation = {
 
 export type WeeklyRotation = {
   id: string;
+  store_id: string;
   department_id: string;
   location_id: string;
   assigned_week: string;

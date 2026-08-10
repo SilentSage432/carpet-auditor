@@ -9,7 +9,10 @@ import type {
   StoreLocationType,
 } from "./types";
 
-export function buildBulkLocationRows(input: BulkGenerateInput): Array<{
+export function buildBulkLocationRows(
+  input: BulkGenerateInput & { store_id: string }
+): Array<{
+  store_id: string;
   department_id: string;
   aisle: number;
   bay: number;
@@ -18,7 +21,8 @@ export function buildBulkLocationRows(input: BulkGenerateInput): Array<{
   cycle_number: number;
   is_active: boolean;
 }> {
-  const { department_id, aisle, start_bay, end_bay, types } = input;
+  const { store_id, department_id, aisle, start_bay, end_bay, types } = input;
+  if (!store_id) throw new Error("store_id is required");
   if (!department_id) throw new Error("department_id is required");
   if (!Number.isFinite(aisle) || aisle < 0) {
     throw new Error("aisle must be a non-negative integer");
@@ -33,7 +37,15 @@ export function buildBulkLocationRows(input: BulkGenerateInput): Array<{
     throw new Error("Select at least one location type");
   }
 
+  // Unique key is (department_id, aisle, bay) — one row per bay.
+  // When both types are selected, emit both as separate upserts would collide;
+  // prefer SELLING when both are checked, otherwise the single selected type.
+  const type: StoreLocationType = types.includes("SELLING")
+    ? "SELLING"
+    : types[0];
+
   const rows: Array<{
+    store_id: string;
     department_id: string;
     aisle: number;
     bay: number;
@@ -44,32 +56,28 @@ export function buildBulkLocationRows(input: BulkGenerateInput): Array<{
   }> = [];
 
   for (let bay = start_bay; bay <= end_bay; bay += 1) {
-    for (const type of types) {
-      rows.push({
-        department_id,
-        aisle,
-        bay,
-        type,
-        status: "PENDING",
-        cycle_number: 1,
-        is_active: true,
-      });
-    }
+    rows.push({
+      store_id,
+      department_id,
+      aisle,
+      bay,
+      type,
+      status: "PENDING",
+      cycle_number: 1,
+      is_active: true,
+    });
   }
   return rows;
 }
 
 export async function bulkInsertLocations(
   supabase: SupabaseClient,
-  input: BulkGenerateInput
+  input: BulkGenerateInput & { store_id: string }
 ): Promise<StoreLocation[]> {
-  const rows = buildBulkLocationRows(input);
+  const payload = buildBulkLocationRows(input);
   const { data, error } = await supabase
     .from("store_locations")
-    .upsert(rows, {
-      onConflict: "department_id,aisle,bay,type",
-      ignoreDuplicates: true,
-    })
+    .upsert(payload, { onConflict: "department_id,aisle,bay" })
     .select("*");
 
   if (error) throw new Error(error.message);

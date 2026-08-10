@@ -46,6 +46,8 @@
 - [x] Web Push subscriptions + dispatch on weekly rotation generate
 - [x] Automated weekly rotation cron (`/api/cron/weekly-rotation` + `weekly_bay_target`)
 - [x] Supervisor end-of-week verification + exception log (`/verify-rotation`, `/admin/exceptions`)
+- [x] Multi-store `store_id` on departments / locations / weekly rotations + per-store cron
+- [x] Bulk generator upsert on `(department_id, aisle, bay)`
 
 ## Next
 - [ ] JWT / claim-based RLS enforcing `store_number` (+ department) server-side
@@ -55,6 +57,7 @@
 - [ ] Conflict resolution UI when offline edits collide
 - [ ] Retire or wire orphan `MarryBarcodeModal`
 - [ ] Department-specific catalog category taxonomies beyond flooring/appliances
+- [ ] Optional dual SELLING+TOPSTOCK rows per aisle/bay (today: one row per aisle/bay)
 ## Non-goals
 - Pricing / margin engines
 - Replenishment recommendations

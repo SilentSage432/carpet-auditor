@@ -8,6 +8,7 @@ import {
   generateWeeklyRotations,
   resolveDepartmentIdByCode,
 } from "@/lib/store-ops/rotations";
+import { resolveStoreByNumber } from "@/lib/store-ops/stores";
 import { getSupabaseAdmin } from "@/lib/store-ops/supabase-admin";
 import { notifyDepartmentRotationBatch } from "@/lib/push/dispatch";
 import { isWebPushConfigured } from "@/lib/push/vapid";
@@ -21,7 +22,7 @@ import { supabaseAdminMissingMessage } from "@/lib/supabase/env";
  */
 export async function POST(request: Request) {
   try {
-    requireSuperAdmin(parseStoreOpsActor(request));
+    const actor = requireSuperAdmin(parseStoreOpsActor(request));
     const supabase = getSupabaseAdmin();
     if (!supabase) {
       return NextResponse.json(
@@ -29,6 +30,8 @@ export async function POST(request: Request) {
         { status: 503 }
       );
     }
+
+    const store = await resolveStoreByNumber(supabase, actor.storeNumber);
 
     const body = (await request.json()) as {
       department_id?: string;
@@ -39,13 +42,34 @@ export async function POST(request: Request) {
     let departmentId = body.department_id?.trim() || "";
     if (!departmentId && body.department_code) {
       departmentId =
-        (await resolveDepartmentIdByCode(supabase, body.department_code)) ?? "";
+        (await resolveDepartmentIdByCode(
+          supabase,
+          body.department_code,
+          store.id
+        )) ?? "";
     }
 
     if (!departmentId) {
       return NextResponse.json(
         { error: "department_id is required" },
         { status: 400 }
+      );
+    }
+
+    const { data: dept, error: deptError } = await supabase
+      .from("departments")
+      .select("id, store_id")
+      .eq("id", departmentId)
+      .eq("store_id", store.id)
+      .maybeSingle();
+
+    if (deptError) {
+      return NextResponse.json({ error: deptError.message }, { status: 500 });
+    }
+    if (!dept) {
+      return NextResponse.json(
+        { error: "Department not found for this store" },
+        { status: 404 }
       );
     }
 
@@ -87,6 +111,7 @@ export async function POST(request: Request) {
     return NextResponse.json({
       ...result,
       created: result.rotations.length,
+      store_id: store.id,
       push,
     });
   } catch (err) {

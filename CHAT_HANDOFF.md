@@ -62,6 +62,8 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 
 ## Multi-store
 - `lib/store.ts` (default `1234`); **store switch = Master Admin only** (Settings)
+- Store Operations: `stores` table UUID `store_id`; hub session `store_number` maps via `lib/store-ops/stores.ts`
+- Departments / locations / weekly rotations scoped by `store_id`; cron runs per active store
 
 ## Remnants / markdown
 - Aging badges; 60+ or elevated role → Apply Manager Markdown
@@ -80,9 +82,10 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
   - Super Admin: `/admin/store-map` · `/admin/supervisors` · `/dashboard` · `/settings`
   - Supervisor: `/dashboard` · `/department` · `/settings`
 - Quick Actions banner (Super Admin): Bulk Generate · Trigger Weekly Rotation · Manage Supervisors
-- `/admin/store-map` — bulk aisle/bay generator + grid deactivate toggles + Generate Week
+- `/admin/store-map` — bulk aisle/bay generator (upsert on `department_id,aisle,bay`) + grid deactivate toggles + Generate Week
 - `/dashboard` — Zebra checklist for this ISO week; checkbox → complete rotation + location COMPLETED (cool-down)
 - APIs under `/api/rotations/*`, `/api/store-locations*`, `/api/departments`, `/api/weekly-rotations`
+- Multi-store: apply `20260809_multi_store.sql`; requests send `x-store-ops-store-number`
 - Requires `SUPABASE_SERVICE_ROLE_KEY` for server routes (apply migration in Supabase SQL editor)
 
 ## Web Push (rotation phone alerts)

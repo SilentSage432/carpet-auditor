@@ -8,6 +8,7 @@ import {
   completeWeeklyRotation,
   resolveDepartmentIdByCode,
 } from "@/lib/store-ops/rotations";
+import { resolveStoreByNumber } from "@/lib/store-ops/stores";
 import { getSupabaseAdmin } from "@/lib/store-ops/supabase-admin";
 import { supabaseAdminMissingMessage } from "@/lib/supabase/env";
 
@@ -26,6 +27,8 @@ export async function POST(request: Request) {
         { status: 503 }
       );
     }
+
+    const store = await resolveStoreByNumber(supabase, actor.storeNumber);
 
     const body = (await request.json()) as { rotation_id?: string };
     const rotationId = body.rotation_id?.trim();
@@ -46,7 +49,8 @@ export async function POST(request: Request) {
       }
       expectedDepartmentId = await resolveDepartmentIdByCode(
         supabase,
-        actor.departmentCode
+        actor.departmentCode,
+        store.id
       );
       if (!expectedDepartmentId) {
         return NextResponse.json(

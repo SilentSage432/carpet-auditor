@@ -3,6 +3,7 @@
  */
 
 import type { StoreSpecialist } from "@/lib/types";
+import { getStoreNumber } from "@/lib/store";
 import { actorFromSpecialist, storeOpsAuthHeaders } from "./auth";
 import type {
   BulkGenerateInput,
@@ -16,7 +17,7 @@ async function storeOpsFetch<T>(
   specialist: StoreSpecialist,
   init?: RequestInit
 ): Promise<T> {
-  const actor = actorFromSpecialist(specialist);
+  const actor = actorFromSpecialist(specialist, getStoreNumber());
   if (!actor) {
     throw new Error("Store Operations access denied for this profile");
   }

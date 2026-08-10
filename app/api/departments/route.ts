@@ -7,6 +7,10 @@ import {
 } from "@/lib/store-ops/auth";
 import { requireSupabaseAdmin } from "@/lib/supabase/admin-response";
 import { resolveDepartmentIdByCode } from "@/lib/store-ops/rotations";
+import {
+  ensureDepartmentsForStore,
+  resolveStoreByNumber,
+} from "@/lib/store-ops/stores";
 
 export async function GET(request: Request) {
   try {
@@ -14,7 +18,14 @@ export async function GET(request: Request) {
     const { supabase, response } = requireSupabaseAdmin();
     if (!supabase) return response;
 
-    let query = supabase.from("departments").select("*").order("name");
+    const store = await resolveStoreByNumber(supabase, actor.storeNumber);
+    await ensureDepartmentsForStore(supabase, store.id);
+
+    let query = supabase
+      .from("departments")
+      .select("*")
+      .eq("store_id", store.id)
+      .order("name");
 
     if (actor.role === "department_supervisor" && actor.departmentCode) {
       query = query.eq("code", actor.departmentCode);
@@ -32,7 +43,11 @@ export async function GET(request: Request) {
       );
     }
 
-    return NextResponse.json({ departments: data ?? [] });
+    return NextResponse.json({
+      store_id: store.id,
+      store_number: store.store_number,
+      departments: data ?? [],
+    });
   } catch (err) {
     if (err instanceof StoreOpsAuthError) {
       return NextResponse.json({ error: err.message }, { status: err.status });
@@ -54,6 +69,8 @@ export async function PATCH(request: Request) {
     const actor = requireStoreOpsActor(parseStoreOpsActor(request));
     const { supabase, response } = requireSupabaseAdmin();
     if (!supabase) return response;
+
+    const store = await resolveStoreByNumber(supabase, actor.storeNumber);
 
     const body = (await request.json()) as {
       weekly_bay_target?: number;
@@ -80,7 +97,8 @@ export async function PATCH(request: Request) {
       }
       const ownId = await resolveDepartmentIdByCode(
         supabase,
-        actor.departmentCode
+        actor.departmentCode,
+        store.id
       );
       if (!ownId) {
         return NextResponse.json(
@@ -116,6 +134,7 @@ export async function PATCH(request: Request) {
       .from("departments")
       .update(patch)
       .eq("id", departmentId)
+      .eq("store_id", store.id)
       .select("*")
       .single();
 

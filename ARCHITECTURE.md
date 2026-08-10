@@ -35,6 +35,7 @@ lib/audit-report.ts               → Audit report metrics + email/clipboard com
 lib/hardware-scanner.ts           → Window-level Bluetooth/wedge barcode burst listener
 lib/rbac.ts                       → Department-scoped section / catalog visibility (compose only)
 lib/store.ts                      → Active store_number session
+lib/store-ops/stores.ts           → Resolve store_number → stores.id; ensure per-store departments
 lib/sync-queue.ts                 → Offline action queue + replay
 lib/network.ts                    → Online/offline badge state
 lib/sims.ts                       → SIMS location aggregation (compose only)
@@ -49,7 +50,7 @@ app/api/rotations/*               → Generate + complete rotation route handler
 app/api/store-locations*          → List / patch / bulk location APIs
 supabase/schema.sql               → Tables + multi-category + SIMS + store_number + RBAC columns + RLS
 supabase/migrations/20260809_store_operations_rbac.sql → departments, profiles, locations, weekly rotations + RLS
-```
+supabase/migrations/20260809_multi_store.sql → stores + store_id scoping + location unique (department_id,aisle,bay)```
 
 ## Ownership
 
@@ -60,7 +61,7 @@ supabase/migrations/20260809_store_operations_rbac.sql → departments, profiles
 | Cross-app Navigation Hub | `lib/nav-hub.ts` + `NavigationHub` |
 | Store Operations map + rotations | `lib/store-ops/*` + `/admin/store-map` + `/dashboard` |
 | Team roster (Master Admin) | `AdminRosterManager`, `lib/specialists.ts` (`is_active` soft-delete) |
-| Store context | `lib/store.ts` |
+| Store context | `lib/store.ts` + `lib/store-ops/stores.ts` |
 | Offline sync queue | `lib/sync-queue.ts` |
 | Shell caching | `public/sw.js` + `ServiceWorkerRegister` |
 | CLF / carton math | `lib/calc.ts` |

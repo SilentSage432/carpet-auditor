@@ -5,6 +5,7 @@ import {
   StoreOpsAuthError,
 } from "@/lib/store-ops/auth";
 import { resolveDepartmentIdByCode } from "@/lib/store-ops/rotations";
+import { resolveStoreByNumber } from "@/lib/store-ops/stores";
 import { getSupabaseAdmin } from "@/lib/store-ops/supabase-admin";
 import { isoWeekLabel } from "@/lib/store-ops/week";
 import { supabaseAdminMissingMessage } from "@/lib/supabase/env";
@@ -23,9 +24,16 @@ export async function GET(request: Request) {
       );
     }
 
+    const store = await resolveStoreByNumber(supabase, actor.storeNumber);
     const week = isoWeekLabel();
     const url = new URL(request.url);
     const departmentIdParam = url.searchParams.get("department_id");
+    const storeIdParam = url.searchParams.get("store_id");
+
+    const storeId =
+      actor.role === "super_admin" && storeIdParam
+        ? storeIdParam
+        : store.id;
 
     let departmentId: string | null = departmentIdParam;
 
@@ -38,7 +46,8 @@ export async function GET(request: Request) {
       }
       departmentId = await resolveDepartmentIdByCode(
         supabase,
-        actor.departmentCode
+        actor.departmentCode,
+        store.id
       );
       if (!departmentId) {
         return NextResponse.json(
@@ -52,6 +61,7 @@ export async function GET(request: Request) {
       .from("weekly_rotations")
       .select("*, store_locations(*)")
       .eq("assigned_week", week)
+      .eq("store_id", storeId)
       .order("created_at", { ascending: true });
 
     if (departmentId) {
@@ -65,6 +75,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json({
       assigned_week: week,
+      store_id: storeId,
       rotations: data ?? [],
     });
   } catch (err) {

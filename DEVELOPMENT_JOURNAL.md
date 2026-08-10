@@ -1,5 +1,22 @@
 # DeptSync Hub — Development Journal
 
+## 2026-08-09 — Multi-store store_id + bulk upsert fix
+
+### Shipped
+- Migration `20260809_multi_store.sql`: `stores` registry; `store_id` on `departments`, `store_locations`, `weekly_rotations`; department code unique per store; location unique `(department_id, aisle, bay)`.
+- Bulk generator upsert: `onConflict: 'department_id,aisle,bay'` with `status: PENDING`, `is_active: true`.
+- APIs resolve hub `store_number` → `stores.id` via `x-store-ops-store-number`; filter/associate by active store (default `#1234`).
+- Cron iterates active stores, then each store’s active departments safely.
+
+### Ownership
+| Concern | Owner |
+|---|---|
+| Store registry resolve | `lib/store-ops/stores.ts` |
+| Hub store_number session | `lib/store.ts` |
+| Bulk map upsert | `lib/store-ops/locations.ts` |
+
+---
+
 ## 2026-08-09 — Supervisor verification & exception logging
 
 ### Shipped

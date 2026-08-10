@@ -12,6 +12,7 @@ import {
 import { requireSupabaseAdmin } from "@/lib/supabase/admin-response";
 import { isoWeekLabel } from "@/lib/store-ops/week";
 import { resolveDepartmentIdByCode } from "@/lib/store-ops/rotations";
+import { resolveStoreByNumber } from "@/lib/store-ops/stores";
 
 /**
  * GET /api/rotations/exceptions
@@ -24,6 +25,7 @@ export async function GET(request: Request) {
     const { supabase, response } = requireSupabaseAdmin();
     if (!supabase) return response;
 
+    const store = await resolveStoreByNumber(supabase, actor.storeNumber);
     const url = new URL(request.url);
     const week = url.searchParams.get("week")?.trim() || isoWeekLabel();
 
@@ -35,6 +37,7 @@ export async function GET(request: Request) {
       ]);
       return NextResponse.json({
         assigned_week: week,
+        store_id: store.id,
         summary,
         exceptions,
       });
@@ -48,7 +51,8 @@ export async function GET(request: Request) {
     }
     const deptId = await resolveDepartmentIdByCode(
       supabase,
-      actor.departmentCode
+      actor.departmentCode,
+      store.id
     );
     if (!deptId) {
       return NextResponse.json(
@@ -65,6 +69,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json({
       assigned_week: week,
+      store_id: store.id,
       summary: [],
       exceptions,
     });

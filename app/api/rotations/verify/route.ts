@@ -5,6 +5,7 @@ import {
   StoreOpsAuthError,
 } from "@/lib/store-ops/auth";
 import { resolveDepartmentIdByCode } from "@/lib/store-ops/rotations";
+import { resolveStoreByNumber } from "@/lib/store-ops/stores";
 import { verifyWeeklyRotations } from "@/lib/store-ops/verification";
 import { requireSupabaseAdmin } from "@/lib/supabase/admin-response";
 import { isoWeekLabel } from "@/lib/store-ops/week";
@@ -19,6 +20,8 @@ export async function POST(request: Request) {
     const actor = requireStoreOpsActor(parseStoreOpsActor(request));
     const { supabase, response } = requireSupabaseAdmin();
     if (!supabase) return response;
+
+    const store = await resolveStoreByNumber(supabase, actor.storeNumber);
 
     const body = (await request.json()) as {
       department_id?: string;
@@ -43,7 +46,8 @@ export async function POST(request: Request) {
       }
       const ownId = await resolveDepartmentIdByCode(
         supabase,
-        actor.departmentCode
+        actor.departmentCode,
+        store.id
       );
       if (!ownId) {
         return NextResponse.json(
@@ -82,7 +86,7 @@ export async function POST(request: Request) {
       reportedBy: actor.specialistId,
     });
 
-    return NextResponse.json({ ok: true, ...result });
+    return NextResponse.json({ ok: true, store_id: store.id, ...result });
   } catch (err) {
     if (err instanceof StoreOpsAuthError) {
       return NextResponse.json({ error: err.message }, { status: err.status });

@@ -7,6 +7,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { StoreSpecialist } from "@/lib/types";
+import { getStoreNumber } from "@/lib/store";
 import { actorFromSpecialist, storeOpsAuthHeaders } from "@/lib/store-ops/auth";
 import {
   getExistingPushSubscription,
@@ -74,7 +75,7 @@ export function usePushNotifications(specialist: StoreSpecialist | null) {
       setState((s) => ({ ...s, error: "Sign in before enabling alerts" }));
       return;
     }
-    const actor = actorFromSpecialist(specialist);
+    const actor = actorFromSpecialist(specialist, getStoreNumber());
     if (!actor || actor.role !== "department_supervisor") {
       // Allow Master Admin to register too (optional monitoring), but primary = supervisors
       if (!actor) {
@@ -99,10 +100,11 @@ export function usePushNotifications(specialist: StoreSpecialist | null) {
 
       const subscription = await subscribeBrowserPush(vapidBody.publicKey);
       const headers = storeOpsAuthHeaders(
-        actorFromSpecialist(specialist) ?? {
+        actorFromSpecialist(specialist, getStoreNumber()) ?? {
           specialistId: specialist.id,
           role: "department_supervisor",
           departmentCode: specialist.assigned_department,
+          storeNumber: getStoreNumber(),
         }
       );
 
@@ -136,7 +138,7 @@ export function usePushNotifications(specialist: StoreSpecialist | null) {
     try {
       const endpoint = await unsubscribeBrowserPush();
       if (endpoint) {
-        const actor = actorFromSpecialist(specialist);
+        const actor = actorFromSpecialist(specialist, getStoreNumber());
         await fetch("/api/push/subscribe", {
           method: "DELETE",
           headers: storeOpsAuthHeaders(
@@ -144,6 +146,7 @@ export function usePushNotifications(specialist: StoreSpecialist | null) {
               specialistId: specialist.id,
               role: "department_supervisor",
               departmentCode: specialist.assigned_department,
+              storeNumber: getStoreNumber(),
             }
           ),
           body: JSON.stringify({ endpoint }),

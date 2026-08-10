@@ -7,6 +7,7 @@ import {
 } from "@/lib/store-ops/auth";
 import { getSupabaseAdmin } from "@/lib/store-ops/supabase-admin";
 import { resolveDepartmentIdByCode } from "@/lib/store-ops/rotations";
+import { resolveStoreByNumber } from "@/lib/store-ops/stores";
 import { supabaseAdminMissingMessage } from "@/lib/supabase/env";
 
 export async function GET(request: Request) {
@@ -20,12 +21,20 @@ export async function GET(request: Request) {
       );
     }
 
+    const store = await resolveStoreByNumber(supabase, actor.storeNumber);
     const url = new URL(request.url);
     const departmentIdParam = url.searchParams.get("department_id");
+    const storeIdParam = url.searchParams.get("store_id");
+
+    const storeId =
+      actor.role === "super_admin" && storeIdParam
+        ? storeIdParam
+        : store.id;
 
     let query = supabase
       .from("store_locations")
       .select("*")
+      .eq("store_id", storeId)
       .order("aisle")
       .order("bay");
 
@@ -35,7 +44,8 @@ export async function GET(request: Request) {
       }
       const deptId = await resolveDepartmentIdByCode(
         supabase,
-        actor.departmentCode
+        actor.departmentCode,
+        store.id
       );
       if (!deptId) {
         return NextResponse.json(
@@ -53,7 +63,10 @@ export async function GET(request: Request) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json({ locations: data ?? [] });
+    return NextResponse.json({
+      store_id: storeId,
+      locations: data ?? [],
+    });
   } catch (err) {
     if (err instanceof StoreOpsAuthError) {
       return NextResponse.json({ error: err.message }, { status: err.status });
@@ -76,6 +89,8 @@ export async function PATCH(request: Request) {
       );
     }
 
+    const store = await resolveStoreByNumber(supabase, actor.storeNumber);
+
     const body = (await request.json()) as {
       id?: string;
       is_active?: boolean;
@@ -90,6 +105,7 @@ export async function PATCH(request: Request) {
       .from("store_locations")
       .select("*")
       .eq("id", body.id)
+      .eq("store_id", store.id)
       .maybeSingle();
 
     if (fetchError) {
@@ -101,7 +117,11 @@ export async function PATCH(request: Request) {
 
     if (actor.role === "department_supervisor") {
       const deptId = actor.departmentCode
-        ? await resolveDepartmentIdByCode(supabase, actor.departmentCode)
+        ? await resolveDepartmentIdByCode(
+            supabase,
+            actor.departmentCode,
+            store.id
+          )
         : null;
       if (!deptId || existing.department_id !== deptId) {
         return NextResponse.json({ error: "Forbidden" }, { status: 403 });
@@ -123,6 +143,7 @@ export async function PATCH(request: Request) {
       .from("store_locations")
       .update(patch)
       .eq("id", body.id)
+      .eq("store_id", store.id)
       .select("*")
       .single();
 
