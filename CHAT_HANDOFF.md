@@ -67,7 +67,7 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 
 ## Store Operations upsert keys
 - `stores`: `onConflict: store_number` (payload: store_number, name, is_active)
-- `departments`: `onConflict: store_id,code` (multi-store; bare `code` is not unique across stores)
+- `departments`: `onConflict: code` (matches live UNIQUE on `code`)
 - `store_locations`: `onConflict: department_id,aisle,bay` (payload includes status PENDING, is_active true)
 - `weekly_rotations`: `onConflict: location_id,assigned_week`
 

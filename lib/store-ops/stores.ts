@@ -32,10 +32,9 @@ const DEPARTMENT_TEMPLATES: Array<{ name: string; code: string }> = [
 export const STORES_ON_CONFLICT = "store_number" as const;
 
 /**
- * Unique key on public.departments after multi-store.
- * Bare `code` is not unique across stores — conflict target must include store_id.
+ * Unique key on public.departments — matches live UNIQUE(code).
  */
-export const DEPARTMENTS_ON_CONFLICT = "store_id,code" as const;
+export const DEPARTMENTS_ON_CONFLICT = "code" as const;
 
 export async function resolveStoreByNumber(
   supabase: SupabaseClient,
