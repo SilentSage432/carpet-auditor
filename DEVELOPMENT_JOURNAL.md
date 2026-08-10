@@ -1,5 +1,15 @@
 # DeptSync Hub — Development Journal
 
+## 2026-08-10 — Store Map bay rows mobile UX
+
+### Shipped
+- Removed inline ★ Week / Show micro-buttons from S/T rows.
+- Assigned-week status shown as a non-clickable amber dot on the Bay label.
+- S/T switches use ≥44×44 touch targets.
+- Tap Bay label → bottom sheet: Pin to Current Week, View Audit Log/History, Edit Location Details.
+
+---
+
 ## 2026-08-10 — Dept toggles, adaptive priority, showroom zones
 
 ### Shipped

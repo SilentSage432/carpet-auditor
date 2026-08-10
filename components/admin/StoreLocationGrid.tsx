@@ -1,10 +1,12 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { Department, StoreLocation } from "@/lib/store-ops/types";
 import type { StoreSpecialist } from "@/lib/types";
 import {
   assignLocationsToWeek,
+  fetchBayLocationHistory,
+  type BayRotationHistoryRow,
   patchStoreLocation,
 } from "@/lib/store-ops/client";
 
@@ -34,6 +36,15 @@ type DepartmentGroup = {
   aisles: AisleGroup[];
 };
 
+type SheetBay = {
+  departmentId: string;
+  departmentName: string;
+  aisle: number;
+  pair: BayPair;
+};
+
+type SheetMode = "actions" | "history" | "edit";
+
 function buildBayPairs(locs: StoreLocation[]): BayPair[] {
   const byBay = new Map<number, BayPair>();
   for (const loc of locs) {
@@ -48,6 +59,23 @@ function buildBayPairs(locs: StoreLocation[]): BayPair[] {
   return [...byBay.values()].sort((a, b) => a.bay - b.bay);
 }
 
+function isInActiveRotation(loc: StoreLocation | null | undefined): boolean {
+  return loc?.status === "ASSIGNED";
+}
+
+function formatWhen(iso: string | null | undefined): string {
+  if (!iso) return "Never";
+  const t = Date.parse(iso);
+  if (!Number.isFinite(t)) return "Unknown";
+  return new Date(t).toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
 export function StoreLocationGrid({
   specialist,
   departments,
@@ -58,6 +86,7 @@ export function StoreLocationGrid({
   const [error, setError] = useState<string | null>(null);
   const [openDepts, setOpenDepts] = useState<Record<string, boolean>>({});
   const [openAisles, setOpenAisles] = useState<Record<string, boolean>>({});
+  const [sheetBay, setSheetBay] = useState<SheetBay | null>(null);
 
   const departmentGroups = useMemo((): DepartmentGroup[] => {
     const nameById = new Map(departments.map((d) => [d.id, d.name]));
@@ -99,6 +128,23 @@ export function StoreLocationGrid({
     );
   }, [locations, departments]);
 
+  // Keep sheet locators fresh after reload
+  const liveSheetBay = useMemo(() => {
+    if (!sheetBay) return null;
+    const group = departmentGroups.find(
+      (d) => d.departmentId === sheetBay.departmentId
+    );
+    const aisle = group?.aisles.find((a) => a.aisle === sheetBay.aisle);
+    const pair = aisle?.bays.find((b) => b.bay === sheetBay.pair.bay);
+    if (!group || !aisle || !pair) return sheetBay;
+    return {
+      departmentId: group.departmentId,
+      departmentName: group.departmentName,
+      aisle: aisle.aisle,
+      pair,
+    };
+  }, [sheetBay, departmentGroups]);
+
   function toggleDept(id: string) {
     setOpenDepts((prev) => ({ ...prev, [id]: !prev[id] }));
   }
@@ -122,41 +168,6 @@ export function StoreLocationGrid({
     }
   }
 
-  async function toggleShowroom(loc: StoreLocation) {
-    setPendingId(loc.id);
-    setError(null);
-    try {
-      const next =
-        (loc.location_type ?? "STANDARD") === "SHOWROOM_STACKOUT"
-          ? "STANDARD"
-          : "SHOWROOM_STACKOUT";
-      await patchStoreLocation(specialist, loc.id, {
-        location_type: next,
-        audit_frequency_days: next === "SHOWROOM_STACKOUT" ? 3 : 7,
-      });
-      onChanged();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not set zone");
-    } finally {
-      setPendingId(null);
-    }
-  }
-
-  async function priorityAdd(loc: StoreLocation) {
-    setPendingId(loc.id);
-    setError(null);
-    try {
-      await assignLocationsToWeek(specialist, [loc.id], loc.department_id);
-      onChanged();
-    } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Could not add bay to this week"
-      );
-    } finally {
-      setPendingId(null);
-    }
-  }
-
   if (locations.length === 0) {
     return (
       <section className="rounded-2xl border border-dashed border-slate-700 bg-slate-950/50 p-6 text-center">
@@ -175,8 +186,8 @@ export function StoreLocationGrid({
           Store Location Grid
         </h2>
         <p className="mt-1 text-sm text-slate-400">
-          Expand a department, then an aisle. Selling and Topstock share one bay
-          row. ★ adds to this week (+priority); 🏛 marks showroom / stack-out.
+          Expand a department, then an aisle. Tap a bay label for pin, history,
+          and zone edits. Use S / T switches to activate tags.
         </p>
       </div>
 
@@ -249,15 +260,44 @@ export function StoreLocationGrid({
 
                       {aisleOpen ? (
                         <ul className="divide-y divide-slate-800 border-t border-slate-800">
-                          {aisle.bays.map((pair) => (
-                            <li
-                              key={`${aisleKey}-bay-${pair.bay}`}
-                              className="space-y-1.5 px-3 py-2"
-                            >
-                              <div className="flex min-h-11 items-center gap-2">
-                                <p className="w-14 shrink-0 font-mono text-xs font-bold text-slate-400">
-                                  Bay {pair.bay}
-                                </p>
+                          {aisle.bays.map((pair) => {
+                            const inRotation =
+                              isInActiveRotation(pair.selling) ||
+                              isInActiveRotation(pair.topstock);
+                            return (
+                              <li
+                                key={`${aisleKey}-bay-${pair.bay}`}
+                                className="flex min-h-14 items-center gap-2 px-2 py-1.5"
+                              >
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    setSheetBay({
+                                      departmentId: dept.departmentId,
+                                      departmentName: dept.departmentName,
+                                      aisle: aisle.aisle,
+                                      pair,
+                                    })
+                                  }
+                                  className="flex min-h-11 min-w-[4.5rem] shrink-0 items-center gap-1.5 rounded-xl px-1.5 text-left active:bg-slate-800/80"
+                                  aria-label={`Bay ${pair.bay} actions`}
+                                >
+                                  {inRotation ? (
+                                    <span
+                                      className="inline-block h-2.5 w-2.5 shrink-0 rounded-full bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.7)]"
+                                      title="In this week's rotation"
+                                      aria-label="In this week's rotation"
+                                    />
+                                  ) : (
+                                    <span
+                                      className="inline-block h-2.5 w-2.5 shrink-0 rounded-full bg-slate-700"
+                                      aria-hidden
+                                    />
+                                  )}
+                                  <span className="font-mono text-xs font-bold text-slate-200">
+                                    Bay {pair.bay}
+                                  </span>
+                                </button>
                                 <div className="grid min-w-0 flex-1 grid-cols-2 gap-1.5">
                                   <TypeToggle
                                     label="S"
@@ -265,8 +305,6 @@ export function StoreLocationGrid({
                                     loc={pair.selling}
                                     pendingId={pendingId}
                                     onToggle={toggleActive}
-                                    onShowroom={toggleShowroom}
-                                    onPriorityAdd={priorityAdd}
                                   />
                                   <TypeToggle
                                     label="T"
@@ -274,13 +312,11 @@ export function StoreLocationGrid({
                                     loc={pair.topstock}
                                     pendingId={pendingId}
                                     onToggle={toggleActive}
-                                    onShowroom={toggleShowroom}
-                                    onPriorityAdd={priorityAdd}
                                   />
                                 </div>
-                              </div>
-                            </li>
-                          ))}
+                              </li>
+                            );
+                          })}
                         </ul>
                       ) : null}
                     </div>
@@ -291,6 +327,16 @@ export function StoreLocationGrid({
           </div>
         );
       })}
+
+      {liveSheetBay ? (
+        <BayActionsSheet
+          specialist={specialist}
+          bay={liveSheetBay}
+          onClose={() => setSheetBay(null)}
+          onChanged={onChanged}
+          onError={setError}
+        />
+      ) : null}
     </section>
   );
 }
@@ -301,21 +347,17 @@ function TypeToggle({
   loc,
   pendingId,
   onToggle,
-  onShowroom,
-  onPriorityAdd,
 }: {
   label: string;
   fullLabel: string;
   loc: StoreLocation | null;
   pendingId: string | null;
   onToggle: (loc: StoreLocation) => void;
-  onShowroom: (loc: StoreLocation) => void;
-  onPriorityAdd: (loc: StoreLocation) => void;
 }) {
   if (!loc) {
     return (
-      <div className="flex min-h-9 items-center gap-1.5 rounded-md border border-dashed border-slate-800 px-1.5 opacity-40">
-        <span className="font-mono text-[10px] font-bold text-slate-500">
+      <div className="flex min-h-11 items-center justify-center gap-1.5 rounded-xl border border-dashed border-slate-800 px-2 opacity-40">
+        <span className="font-mono text-xs font-bold text-slate-500">
           {label}
         </span>
         <span className="text-[10px] text-slate-600">—</span>
@@ -324,68 +366,419 @@ function TypeToggle({
   }
 
   const showroom = (loc.location_type ?? "STANDARD") === "SHOWROOM_STACKOUT";
-  const priority = Number(loc.manual_priority_count) || 0;
+  const inRotation = isInActiveRotation(loc);
 
   return (
     <div
-      className={`rounded-md border px-1.5 py-1 ${
+      className={`flex min-h-11 items-center justify-between gap-1 rounded-xl border px-1 ${
         showroom
-          ? "border-amber-500/40 bg-amber-950/30"
+          ? "border-amber-500/40 bg-amber-950/25"
           : "border-slate-800 bg-slate-900/80"
       } ${loc.is_active ? "" : "opacity-50"}`}
     >
-      <div className="flex min-h-8 items-center justify-between gap-1">
-        <div className="min-w-0">
-          <p className="font-mono text-[10px] font-bold text-emerald-400/90">
-            {label}
-            <span className="ml-1 font-sans font-medium text-slate-500">
-              {loc.status === "PENDING"
-                ? "P"
-                : loc.status === "ASSIGNED"
-                  ? "A"
-                  : loc.status.slice(0, 1)}
-              {priority > 0 ? ` ·★${priority}` : ""}
-              {showroom ? " ·🏛" : ""}
-            </span>
-          </p>
-        </div>
-        <button
-          type="button"
-          role="switch"
-          aria-checked={loc.is_active}
-          aria-label={`${fullLabel} bay ${loc.bay} ${loc.is_active ? "active" : "off"}`}
-          disabled={pendingId === loc.id}
-          onClick={() => onToggle(loc)}
-          className={`relative h-5 w-9 shrink-0 rounded-full transition ${
+      <div className="min-w-0 pl-1.5">
+        <p className="font-mono text-xs font-bold text-emerald-400/90">
+          {label}
+          <span className="ml-1 font-sans text-[10px] font-medium text-slate-500">
+            {inRotation ? "week" : loc.status === "PENDING" ? "ready" : loc.status.slice(0, 3).toLowerCase()}
+            {showroom ? " · show" : ""}
+          </span>
+        </p>
+      </div>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={loc.is_active}
+        aria-label={`${fullLabel} bay ${loc.bay} ${loc.is_active ? "active" : "off"}`}
+        disabled={pendingId === loc.id}
+        onClick={() => onToggle(loc)}
+        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl disabled:opacity-60"
+      >
+        <span
+          className={`relative block h-6 w-10 rounded-full transition ${
             loc.is_active ? "bg-emerald-500" : "bg-slate-600"
-          } disabled:opacity-60`}
+          }`}
         >
           <span
-            className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition ${
-              loc.is_active ? "left-[1rem]" : "left-0.5"
+            className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition ${
+              loc.is_active ? "left-[1.15rem]" : "left-0.5"
             }`}
           />
-        </button>
-      </div>
-      <div className="mt-1 flex gap-1">
-        <button
-          type="button"
-          disabled={pendingId === loc.id || showroom}
-          onClick={() => onPriorityAdd(loc)}
-          className="flex-1 rounded border border-emerald-500/30 py-0.5 text-[9px] font-bold text-emerald-200 disabled:opacity-40"
-          title="Add to this week's rotation (+priority)"
-        >
-          ★ Week
-        </button>
-        <button
-          type="button"
-          disabled={pendingId === loc.id}
-          onClick={() => onShowroom(loc)}
-          className="flex-1 rounded border border-amber-500/30 py-0.5 text-[9px] font-bold text-amber-100 disabled:opacity-40"
-          title="Toggle showroom / stack-out zone"
-        >
-          {showroom ? "Std" : "Show"}
-        </button>
+        </span>
+      </button>
+    </div>
+  );
+}
+
+function BayActionsSheet({
+  specialist,
+  bay,
+  onClose,
+  onChanged,
+  onError,
+}: {
+  specialist: StoreSpecialist;
+  bay: SheetBay;
+  onClose: () => void;
+  onChanged: () => void;
+  onError: (msg: string | null) => void;
+}) {
+  const [mode, setMode] = useState<SheetMode>("actions");
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+  const [historyLoc, setHistoryLoc] = useState<StoreLocation | null>(
+    bay.pair.selling ?? bay.pair.topstock
+  );
+  const [historyRows, setHistoryRows] = useState<BayRotationHistoryRow[]>([]);
+  const [historyLoading, setHistoryLoading] = useState(false);
+
+  const [editTargetId, setEditTargetId] = useState<string>(
+    (bay.pair.selling ?? bay.pair.topstock)?.id ?? ""
+  );
+  const editTarget =
+    [bay.pair.selling, bay.pair.topstock].find((l) => l?.id === editTargetId) ??
+    bay.pair.selling ??
+    bay.pair.topstock;
+  const [zoneDraft, setZoneDraft] = useState<"STANDARD" | "SHOWROOM_STACKOUT">(
+    (editTarget?.location_type as "STANDARD" | "SHOWROOM_STACKOUT") ??
+      "STANDARD"
+  );
+  const [freqDraft, setFreqDraft] = useState(
+    String(editTarget?.audit_frequency_days ?? 7)
+  );
+
+  useEffect(() => {
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, []);
+
+  useEffect(() => {
+    setMode("actions");
+    setMessage(null);
+    const first = bay.pair.selling ?? bay.pair.topstock;
+    setEditTargetId(first?.id ?? "");
+    setZoneDraft(
+      (first?.location_type as "STANDARD" | "SHOWROOM_STACKOUT") ?? "STANDARD"
+    );
+    setFreqDraft(String(first?.audit_frequency_days ?? 7));
+  }, [bay.departmentId, bay.aisle, bay.pair.bay, bay.pair.selling?.id, bay.pair.topstock?.id]);
+
+  useEffect(() => {
+    if (!editTarget) return;
+    setZoneDraft(
+      (editTarget.location_type as "STANDARD" | "SHOWROOM_STACKOUT") ??
+        "STANDARD"
+    );
+    setFreqDraft(String(editTarget.audit_frequency_days ?? 7));
+  }, [editTarget?.id]);
+
+  async function pinToWeek(loc: StoreLocation) {
+    setBusy(true);
+    setMessage(null);
+    onError(null);
+    try {
+      await assignLocationsToWeek(specialist, [loc.id], loc.department_id);
+      setMessage(
+        `${loc.type} pinned to this week (priority ${
+          (Number(loc.manual_priority_count) || 0) + 1
+        }).`
+      );
+      onChanged();
+    } catch (err) {
+      const msg =
+        err instanceof Error ? err.message : "Could not pin bay to this week";
+      setMessage(null);
+      onError(msg);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function openHistory(loc: StoreLocation) {
+    setMode("history");
+    setHistoryLoc(loc);
+    setHistoryLoading(true);
+    setMessage(null);
+    onError(null);
+    try {
+      const data = await fetchBayLocationHistory(specialist, loc.id);
+      setHistoryLoc(data.location);
+      setHistoryRows(data.rotations);
+    } catch (err) {
+      setHistoryRows([]);
+      onError(
+        err instanceof Error ? err.message : "Could not load bay history"
+      );
+    } finally {
+      setHistoryLoading(false);
+    }
+  }
+
+  async function saveEdit() {
+    if (!editTarget) return;
+    setBusy(true);
+    setMessage(null);
+    onError(null);
+    try {
+      const days = Math.max(1, Math.floor(Number(freqDraft)) || 7);
+      await patchStoreLocation(specialist, editTarget.id, {
+        location_type: zoneDraft,
+        audit_frequency_days: days,
+      });
+      setMessage("Location details saved.");
+      onChanged();
+      setMode("actions");
+    } catch (err) {
+      onError(
+        err instanceof Error ? err.message : "Could not save location details"
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  const pinTargets = [bay.pair.selling, bay.pair.topstock].filter(
+    (loc): loc is StoreLocation =>
+      Boolean(loc) &&
+      (loc!.location_type ?? "STANDARD") !== "SHOWROOM_STACKOUT"
+  );
+
+  return (
+    <div className="fixed inset-0 z-[80] flex flex-col justify-end bg-slate-950/75">
+      <button
+        type="button"
+        aria-label="Close bay actions"
+        className="absolute inset-0"
+        onClick={onClose}
+      />
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="bay-actions-title"
+        className="relative z-10 max-h-[88dvh] w-full overflow-y-auto rounded-t-2xl border-t-2 border-emerald-500/40 bg-slate-950 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 shadow-2xl"
+      >
+        <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-slate-600" />
+
+        <div className="mb-4 flex items-start justify-between gap-3">
+          <div>
+            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-emerald-400">
+              {bay.departmentName}
+            </p>
+            <h2
+              id="bay-actions-title"
+              className="mt-1 text-lg font-bold text-slate-50"
+            >
+              Aisle {bay.aisle} · Bay {bay.pair.bay}
+            </h2>
+            <p className="mt-0.5 text-sm text-slate-400">
+              {mode === "actions"
+                ? "Advanced bay actions"
+                : mode === "history"
+                  ? "Rotation history"
+                  : "Edit location details"}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex h-11 w-11 items-center justify-center rounded-xl border border-slate-700 text-slate-200"
+            aria-label="Close"
+          >
+            ✕
+          </button>
+        </div>
+
+        {message ? (
+          <p className="mb-3 rounded-xl border border-emerald-500/30 bg-emerald-950/40 px-3 py-2 text-sm text-emerald-200">
+            {message}
+          </p>
+        ) : null}
+
+        {mode === "actions" ? (
+          <div className="space-y-2">
+            {pinTargets.length === 0 ? (
+              <p className="rounded-xl border border-dashed border-slate-700 px-3 py-4 text-sm text-slate-400">
+                No standard aisle tags to pin (showroom zones use Quick Touch).
+              </p>
+            ) : (
+              pinTargets.map((loc) => (
+                <button
+                  key={loc.id}
+                  type="button"
+                  disabled={busy}
+                  onClick={() => void pinToWeek(loc)}
+                  className="flex min-h-14 w-full items-center justify-center rounded-xl bg-emerald-500 px-4 text-sm font-bold text-slate-950 disabled:opacity-50"
+                >
+                  Pin {loc.type === "SELLING" ? "Selling" : "Topstock"} to
+                  Current Week
+                </button>
+              ))
+            )}
+
+            {[bay.pair.selling, bay.pair.topstock]
+              .filter((loc): loc is StoreLocation => Boolean(loc))
+              .map((loc) => (
+                <button
+                  key={`hist-${loc.id}`}
+                  type="button"
+                  disabled={busy}
+                  onClick={() => void openHistory(loc)}
+                  className="flex min-h-14 w-full items-center justify-center rounded-xl border-2 border-slate-600 bg-slate-900 px-4 text-sm font-bold text-slate-100 disabled:opacity-50"
+                >
+                  View {loc.type === "SELLING" ? "Selling" : "Topstock"} Audit
+                  Log / History
+                </button>
+              ))}
+
+            <button
+              type="button"
+              disabled={busy || !editTarget}
+              onClick={() => setMode("edit")}
+              className="flex min-h-14 w-full items-center justify-center rounded-xl border-2 border-amber-500/40 bg-amber-950/30 px-4 text-sm font-bold text-amber-100 disabled:opacity-50"
+            >
+              Edit Location Details
+            </button>
+          </div>
+        ) : null}
+
+        {mode === "history" ? (
+          <div className="space-y-3">
+            <button
+              type="button"
+              onClick={() => setMode("actions")}
+              className="text-sm font-semibold text-emerald-300 underline-offset-2 hover:underline"
+            >
+              ← Back
+            </button>
+            {historyLoc ? (
+              <div className="rounded-xl border border-slate-800 bg-slate-900/80 px-3 py-3 text-sm text-slate-300">
+                <p className="font-semibold text-slate-100">
+                  {historyLoc.type} · cycle {historyLoc.cycle_number}
+                </p>
+                <p className="mt-1 font-mono text-xs text-slate-500">
+                  Status {historyLoc.status} · last completed{" "}
+                  {formatWhen(historyLoc.last_completed_at)}
+                </p>
+                <p className="mt-1 font-mono text-xs text-slate-500">
+                  Priority {historyLoc.manual_priority_count ?? 0} · zone{" "}
+                  {historyLoc.location_type ?? "STANDARD"}
+                </p>
+              </div>
+            ) : null}
+            {historyLoading ? (
+              <p className="text-sm text-slate-400">Loading history…</p>
+            ) : historyRows.length === 0 ? (
+              <p className="rounded-xl border border-dashed border-slate-700 px-3 py-6 text-center text-sm text-slate-400">
+                No weekly rotation history yet for this bay.
+              </p>
+            ) : (
+              <ul className="space-y-2">
+                {historyRows.map((row) => (
+                  <li
+                    key={row.id}
+                    className="rounded-xl border border-slate-800 bg-slate-900/70 px-3 py-3"
+                  >
+                    <p className="font-mono text-sm font-bold text-slate-100">
+                      {row.assigned_week}
+                    </p>
+                    <p className="mt-0.5 text-xs text-slate-400">
+                      {row.is_completed
+                        ? `Completed ${formatWhen(row.completed_at)}`
+                        : "Open / incomplete"}
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        ) : null}
+
+        {mode === "edit" && editTarget ? (
+          <div className="space-y-3">
+            <button
+              type="button"
+              onClick={() => setMode("actions")}
+              className="text-sm font-semibold text-emerald-300 underline-offset-2 hover:underline"
+            >
+              ← Back
+            </button>
+
+            {[bay.pair.selling, bay.pair.topstock]
+              .filter((loc): loc is StoreLocation => Boolean(loc))
+              .length > 1 ? (
+              <div className="grid grid-cols-2 gap-2">
+                {[bay.pair.selling, bay.pair.topstock]
+                  .filter((loc): loc is StoreLocation => Boolean(loc))
+                  .map((loc) => (
+                    <button
+                      key={loc.id}
+                      type="button"
+                      onClick={() => setEditTargetId(loc.id)}
+                      className={`min-h-12 rounded-xl border text-sm font-bold ${
+                        editTargetId === loc.id
+                          ? "border-emerald-400 bg-emerald-500/15 text-emerald-100"
+                          : "border-slate-700 text-slate-300"
+                      }`}
+                    >
+                      {loc.type === "SELLING" ? "Selling" : "Topstock"}
+                    </button>
+                  ))}
+              </div>
+            ) : null}
+
+            <fieldset>
+              <legend className="mb-1.5 text-sm font-medium text-slate-200">
+                Zone
+              </legend>
+              <div className="grid grid-cols-2 gap-2">
+                {(
+                  [
+                    ["STANDARD", "Standard aisle"],
+                    ["SHOWROOM_STACKOUT", "Showroom / stack-out"],
+                  ] as const
+                ).map(([value, label]) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => setZoneDraft(value)}
+                    className={`min-h-12 rounded-xl border px-2 text-xs font-bold ${
+                      zoneDraft === value
+                        ? "border-amber-400 bg-amber-500/15 text-amber-100"
+                        : "border-slate-700 text-slate-300"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </fieldset>
+
+            <label className="block space-y-1.5">
+              <span className="text-sm font-medium text-slate-200">
+                Audit frequency (days)
+              </span>
+              <input
+                type="number"
+                min={1}
+                max={90}
+                value={freqDraft}
+                onChange={(e) => setFreqDraft(e.target.value)}
+                className="min-h-12 w-full rounded-xl border border-slate-700 bg-slate-900 px-3 font-mono text-slate-100"
+              />
+            </label>
+
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => void saveEdit()}
+              className="flex min-h-14 w-full items-center justify-center rounded-xl bg-emerald-500 text-sm font-bold text-slate-950 disabled:opacity-50"
+            >
+              {busy ? "Saving…" : "Save location details"}
+            </button>
+          </div>
+        ) : null}
       </div>
     </div>
   );

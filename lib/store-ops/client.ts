@@ -111,6 +111,32 @@ export async function patchStoreLocation(
   return data.location;
 }
 
+export type BayRotationHistoryRow = {
+  id: string;
+  assigned_week: string;
+  is_completed: boolean;
+  completed_at: string | null;
+  created_at?: string;
+  location_id: string;
+};
+
+export async function fetchBayLocationHistory(
+  specialist: StoreSpecialist,
+  locationId: string
+): Promise<{ location: StoreLocation; rotations: BayRotationHistoryRow[] }> {
+  const data = await storeOpsFetch<{
+    location: StoreLocation;
+    rotations: BayRotationHistoryRow[];
+  }>(
+    `/api/store-locations/history?location_id=${encodeURIComponent(locationId)}`,
+    specialist
+  );
+  return {
+    location: data.location,
+    rotations: data.rotations ?? [],
+  };
+}
+
 export async function fetchThisWeekRotations(
   specialist: StoreSpecialist
 ): Promise<{

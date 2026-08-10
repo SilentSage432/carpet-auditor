@@ -150,3 +150,4 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 - Master toggles: Store Map Overview + Settings Department Overview (`departments.is_active`; Flooring default on)
 - Adaptive draw: `manual_priority_count` + `last_completed_at` age; Store Map ★ Week assigns + bumps priority
 - Showroom: `location_type=SHOWROOM_STACKOUT` + `audit_frequency_days`; dashboard Quick Touch card (not in weekly aisle draw)
+- Store Map bay rows: large S/T toggles; tap Bay label → bottom sheet (pin / history / edit zone)
