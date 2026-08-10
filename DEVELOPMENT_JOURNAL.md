@@ -1,5 +1,25 @@
 # DeptSync Hub — Development Journal
 
+## 2026-08-10 — Admin Invite Testing Harness
+
+### Shipped
+- Roster **Test Invite Flow** generates `test_mode` invite (`/invite?token=…&test=1`), opens harness modal with 6-digit PIN, welcome SMS preview, **Copy Invite Link**, **Copy Full SMS Text**.
+- SMS copy: `Welcome to DeptSync! Access your department portal here: [Link]. Your temporary PIN is: [PIN].`
+- `/invite` with `test=1`: console logs `Token Validated`, `PIN Reset Success`, `Biometric Prompt Fired`; complete is dry-run (token + temp PIN preserved for repeat rehearsals).
+
+---
+
+## 2026-08-10 — Supervisor Invite & Onboarding Engine
+
+### Shipped
+- Migration `20260810_supervisor_invite.sql`: `invite_token`, `invite_token_expires_at`, `must_change_pin`, `temp_pin_hash`, `phone_number` on `store_specialists`.
+- `POST /api/admin/invite-supervisor` — Super Admin issues 6-digit temp PIN (hashed) + UUID token; Twilio SMS when configured, else copyable `sms:` preview.
+- Public `GET/POST /api/invite/[token]` — preview, verify temp PIN, complete permanent PIN (clears invite fields).
+- `/invite?token=` onboarding: temp PIN → Create New PIN → Add to Home Screen (`beforeinstallprompt`) → WebAuthn Face ID / Fingerprint → Zebra dashboard.
+- Roster **Invite** action + invite preview card (PIN / URL / SMS copy).
+
+---
+
 ## 2026-08-10 — Mobile floor UX Waves A–C
 
 ### Wave A — Admin Tools drawer + DS lockdown

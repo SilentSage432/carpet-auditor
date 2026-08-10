@@ -162,7 +162,10 @@ export function mapRow(row: Record<string, unknown>): StoreSpecialist {
   const mustChange =
     row.must_change_credentials === true ||
     row.must_change_credentials === "true" ||
-    row.must_change_credentials === 1;
+    row.must_change_credentials === 1 ||
+    row.must_change_pin === true ||
+    row.must_change_pin === "true" ||
+    row.must_change_pin === 1;
 
   const isActiveRaw = row.is_active;
   const isActive =
@@ -171,6 +174,12 @@ export function mapRow(row: Record<string, unknown>): StoreSpecialist {
     isActiveRaw === 0
       ? false
       : true;
+
+  const phoneRaw = row.phone_number;
+  const phone =
+    phoneRaw == null || String(phoneRaw).trim() === ""
+      ? null
+      : String(phoneRaw).trim();
 
   return {
     id: String(row.id),
@@ -181,6 +190,12 @@ export function mapRow(row: Record<string, unknown>): StoreSpecialist {
     username,
     assigned_department: assigned,
     must_change_credentials: Boolean(mustChange),
+    must_change_pin: Boolean(
+      row.must_change_pin === true ||
+        row.must_change_pin === "true" ||
+        row.must_change_pin === 1
+    ),
+    phone_number: phone,
     is_active: isActive,
     created_at: String(row.created_at ?? new Date().toISOString()),
     offline: Boolean(row.offline),
@@ -354,6 +369,7 @@ export function isDefaultPin(member: StoreSpecialist): boolean {
 /** True when first-login credential customization is required. */
 export function needsCredentialSetup(member: StoreSpecialist): boolean {
   if (member.must_change_credentials) return true;
+  if (member.must_change_pin) return true;
   if (
     member.role === "Supervisor" &&
     member.username === DEFAULT_APPLIANCE_USERNAME &&

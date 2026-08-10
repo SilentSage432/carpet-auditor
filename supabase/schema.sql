@@ -318,5 +318,25 @@ create policy "Allow delete and update for store_specialists"
 -- Web Push: supabase/migrations/20260809_push_notifications.sql
 -- Weekly cron targets: supabase/migrations/20260809_weekly_rotation_cron.sql
 -- Verification exceptions: supabase/migrations/20260809_rotation_verification.sql
+-- Supervisor invite: supabase/migrations/20260810_supervisor_invite.sql
 -- ---------------------------------------------------------------------------
+
+alter table public.store_specialists
+  add column if not exists invite_token uuid;
+
+alter table public.store_specialists
+  add column if not exists invite_token_expires_at timestamptz;
+
+alter table public.store_specialists
+  add column if not exists must_change_pin boolean not null default false;
+
+alter table public.store_specialists
+  add column if not exists temp_pin_hash text;
+
+alter table public.store_specialists
+  add column if not exists phone_number text;
+
+create unique index if not exists store_specialists_invite_token_uidx
+  on public.store_specialists (invite_token)
+  where invite_token is not null;
 

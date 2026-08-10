@@ -19,6 +19,7 @@ import {
   saveSpecialist,
   updateSpecialistScope,
 } from "@/lib/specialists";
+import { inviteSupervisor } from "@/lib/store-ops/client";
 import {
   DEPARTMENT_META,
   OPERATIONAL_DEPARTMENTS,
@@ -40,6 +41,17 @@ type IssuedCredentials = {
   name: string;
   username: string;
   password: string;
+};
+
+type InviteResult = {
+  name: string;
+  username: string;
+  temporary_pin: string;
+  invite_url: string;
+  sms_link: string;
+  sms_body: string;
+  sms_status: string;
+  test_mode?: boolean;
 };
 
 function credentialsStatus(member: StoreSpecialist): {
@@ -70,6 +82,9 @@ export function AdminRosterManager({
   const [addOpen, setAddOpen] = useState(false);
   const [editTarget, setEditTarget] = useState<StoreSpecialist | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<StoreSpecialist | null>(null);
+  const [inviteTarget, setInviteTarget] = useState<StoreSpecialist | null>(null);
+  const [inviteResult, setInviteResult] = useState<InviteResult | null>(null);
+  const [testBusyId, setTestBusyId] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [toastTone, setToastTone] = useState<"ok" | "err">("ok");
@@ -105,6 +120,40 @@ export function AdminRosterManager({
       nextMember ? [nextMember, ...team] : team
     );
     onRosterChange(next);
+  }
+
+  async function handleTestInviteFlow(member: StoreSpecialist) {
+    if (!activeSpecialist) return;
+    setTestBusyId(member.id);
+    try {
+      const data = await inviteSupervisor(activeSpecialist, {
+        specialist_id: member.id,
+        test_mode: true,
+      });
+      await refreshRoster();
+      setInviteResult({
+        name: data.name,
+        username: data.username,
+        temporary_pin: data.temporary_pin,
+        invite_url: data.invite_url,
+        sms_link: data.sms_preview.sms_link,
+        sms_body: data.sms_preview.body,
+        sms_status: data.sms.ok
+          ? `SMS sent (${data.sms.sid})`
+          : data.sms.skipped
+            ? data.sms.reason
+            : `SMS failed: ${data.sms.reason}`,
+        test_mode: true,
+      });
+      flash(`🧪 Test invite ready for ${data.name}`);
+    } catch (err) {
+      flash(
+        err instanceof Error ? err.message : "Could not generate test invite",
+        "err"
+      );
+    } finally {
+      setTestBusyId(null);
+    }
   }
 
   async function handleReset(member: StoreSpecialist) {
@@ -204,7 +253,27 @@ export function AdminRosterManager({
                   {status.label}
                 </p>
               </div>
-              <div className="mt-3 grid grid-cols-3 gap-1.5">
+              <div className="mt-3 grid grid-cols-2 gap-1.5">
+                <button
+                  type="button"
+                  disabled={busyId === member.id || member.role === "MasterAdmin"}
+                  onClick={() => setInviteTarget(member)}
+                  className="flex min-h-11 items-center justify-center rounded-lg border border-emerald-500/40 text-[11px] font-semibold text-emerald-200 disabled:opacity-40"
+                >
+                  📨 Invite
+                </button>
+                <button
+                  type="button"
+                  disabled={
+                    busyId === member.id ||
+                    testBusyId === member.id ||
+                    member.role === "MasterAdmin"
+                  }
+                  onClick={() => void handleTestInviteFlow(member)}
+                  className="flex min-h-11 items-center justify-center rounded-lg border border-amber-400/50 text-[11px] font-semibold text-amber-100 disabled:opacity-40"
+                >
+                  {testBusyId === member.id ? "…" : "🧪 Test Invite Flow"}
+                </button>
                 <button
                   type="button"
                   disabled={busyId === member.id}
@@ -229,7 +298,7 @@ export function AdminRosterManager({
                       activeSpecialist?.id === member.id)
                   }
                   onClick={() => setDeleteTarget(member)}
-                  className="flex min-h-11 items-center justify-center rounded-lg border border-red-500/30 text-[11px] font-semibold text-red-300 disabled:opacity-40"
+                  className="col-span-2 flex min-h-11 items-center justify-center rounded-lg border border-red-500/30 text-[11px] font-semibold text-red-300 disabled:opacity-40"
                 >
                   🗑️ Delete
                 </button>
@@ -297,6 +366,26 @@ export function AdminRosterManager({
         onConfirm={() => void handleDelete()}
       />
 
+      <AdminInviteModal
+        open={inviteTarget != null}
+        member={inviteTarget}
+        actor={activeSpecialist}
+        onClose={() => setInviteTarget(null)}
+        onInvited={async (result) => {
+          await refreshRoster();
+          setInviteTarget(null);
+          setInviteResult(result);
+          flash(`📨 Invite ready for ${result.name}`);
+        }}
+      />
+
+      {inviteResult ? (
+        <TestInviteHarnessModal
+          result={inviteResult}
+          onClose={() => setInviteResult(null)}
+        />
+      ) : null}
+
       {issued ? (
         <IssuedCredentialsCard
           issued={issued}
@@ -304,6 +393,237 @@ export function AdminRosterManager({
         />
       ) : null}
     </section>
+  );
+}
+
+function TestInviteHarnessModal({
+  result,
+  onClose,
+}: {
+  result: InviteResult;
+  onClose: () => void;
+}) {
+  const [copied, setCopied] = useState<string | null>(null);
+  const isTest = Boolean(result.test_mode);
+
+  async function copy(label: string, value: string) {
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopied(label);
+      window.setTimeout(() => setCopied(null), 2000);
+    } catch {
+      setCopied(null);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-[85]" role="dialog" aria-modal="true">
+      <button
+        type="button"
+        className="absolute inset-0 bg-slate-950/75"
+        aria-label="Close invite preview"
+        onClick={onClose}
+      />
+      <div className="absolute inset-x-0 bottom-0 mx-auto max-h-[90dvh] w-full max-w-md overflow-y-auto rounded-t-2xl border-2 border-amber-400/50 bg-slate-900 p-5 sm:bottom-auto sm:top-1/2 sm:-translate-y-1/2 sm:rounded-2xl">
+        <div className="flex items-start justify-between gap-2">
+          <div>
+            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-amber-300">
+              {isTest ? "Admin testing harness" : "Supervisor invite"}
+            </p>
+            <h2 className="mt-1 text-lg font-bold text-slate-50">
+              {isTest ? "Test Invite Flow" : "Invite ready"}
+            </h2>
+            <p className="mt-1 text-sm text-slate-400">
+              {result.name} · @{result.username}
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-600 text-slate-200"
+            aria-label="Close"
+          >
+            ✕
+          </button>
+        </div>
+
+        {isTest ? (
+          <p className="mt-3 rounded-xl border border-amber-500/30 bg-amber-950/30 px-3 py-2 text-xs text-amber-100">
+            Dry-run link includes <code className="font-mono">test=1</code>.
+            Completing PIN reset on that URL will not burn the invite token —
+            reopen it to rehearse again.
+          </p>
+        ) : null}
+
+        <div className="mt-4 space-y-3">
+          <div className="rounded-xl border border-slate-700 bg-slate-950/70 px-3 py-3">
+            <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">
+              Temporary PIN (6-digit)
+            </p>
+            <p className="mt-1 font-mono text-2xl font-bold tracking-widest text-amber-200">
+              {result.temporary_pin}
+            </p>
+          </div>
+
+          <div className="rounded-xl border border-slate-700 bg-slate-950/70 px-3 py-3">
+            <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">
+              Full SMS text preview
+            </p>
+            <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-slate-200">
+              {result.sms_body}
+            </p>
+          </div>
+
+          <div className="grid gap-2">
+            <button
+              type="button"
+              onClick={() => void copy("link", result.invite_url)}
+              className="flex min-h-12 items-center justify-center rounded-xl border-2 border-emerald-500/50 bg-emerald-950/40 text-sm font-bold text-emerald-100"
+            >
+              {copied === "link" ? "Copied invite link" : "Copy Invite Link"}
+            </button>
+            <button
+              type="button"
+              onClick={() => void copy("sms", result.sms_body)}
+              className="flex min-h-12 items-center justify-center rounded-xl border-2 border-amber-400/50 bg-amber-950/30 text-sm font-bold text-amber-100"
+            >
+              {copied === "sms" ? "Copied SMS text" : "Copy Full SMS Text"}
+            </button>
+            <a
+              href={result.invite_url}
+              target="_blank"
+              rel="noreferrer"
+              className="flex min-h-12 items-center justify-center rounded-xl border border-slate-600 text-sm font-semibold text-slate-100"
+            >
+              Open invite page
+            </a>
+            <a
+              href={result.sms_link}
+              className="flex min-h-11 items-center justify-center text-sm font-semibold text-slate-400 underline-offset-2 hover:underline"
+            >
+              Open SMS app with draft
+            </a>
+          </div>
+
+          <p className="break-all font-mono text-[10px] text-slate-500">
+            {result.invite_url}
+          </p>
+          <p className="text-xs text-slate-500">{result.sms_status}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AdminInviteModal({
+  open,
+  member,
+  actor,
+  onClose,
+  onInvited,
+}: {
+  open: boolean;
+  member: StoreSpecialist | null;
+  actor: StoreSpecialist | null;
+  onClose: () => void;
+  onInvited: (result: InviteResult) => Promise<void>;
+}) {
+  const [phone, setPhone] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!open || !member) return;
+    setPhone(member.phone_number ?? "");
+    setError(null);
+  }, [open, member]);
+
+  if (!open || !member || !actor) return null;
+
+  const inviteActor = actor;
+  const inviteMember = member;
+
+  async function submit() {
+    setBusy(true);
+    setError(null);
+    try {
+      const data = await inviteSupervisor(inviteActor, {
+        specialist_id: inviteMember.id,
+        phone: phone.trim() || undefined,
+      });
+      await onInvited({
+        name: data.name,
+        username: data.username,
+        temporary_pin: data.temporary_pin,
+        invite_url: data.invite_url,
+        sms_link: data.sms_preview.sms_link,
+        sms_body: data.sms_preview.body,
+        sms_status: data.sms.ok
+          ? `SMS sent (${data.sms.sid})`
+          : data.sms.skipped
+            ? data.sms.reason
+            : `SMS failed: ${data.sms.reason}`,
+        test_mode: Boolean(data.test_mode),
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Invite failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-[80]" role="dialog" aria-modal="true">
+      <button
+        type="button"
+        className="absolute inset-0 bg-slate-950/70"
+        aria-label="Close invite"
+        onClick={onClose}
+      />
+      <div className="absolute inset-x-0 bottom-0 mx-auto max-w-md rounded-t-2xl border border-emerald-500/30 bg-slate-900 p-5 sm:bottom-auto sm:top-1/2 sm:-translate-y-1/2 sm:rounded-2xl">
+        <h2 className="text-lg font-bold text-slate-50">
+          Invite {inviteMember.name}
+        </h2>
+        <p className="mt-1 text-sm text-slate-400">
+          Issues a 6-digit temp PIN + /invite link (48h). Optionally SMS via
+          Twilio when configured.
+        </p>
+        <label className="mt-4 block space-y-1.5">
+          <span className="text-sm font-medium text-slate-200">
+            Mobile number (optional)
+          </span>
+          <input
+            type="tel"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
+            placeholder="+1 555 123 4567"
+            className="min-h-12 w-full rounded-xl border border-slate-700 bg-slate-950 px-3 text-slate-100"
+          />
+        </label>
+        {error ? (
+          <p className="mt-3 text-sm text-red-300" role="alert">
+            {error}
+          </p>
+        ) : null}
+        <div className="mt-4 grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={onClose}
+            className="min-h-12 rounded-xl border border-slate-600 text-sm font-semibold text-slate-200"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void submit()}
+            className="min-h-12 rounded-xl bg-emerald-500 text-sm font-bold text-slate-950 disabled:opacity-40"
+          >
+            {busy ? "Sending…" : "Generate Invite"}
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }
 

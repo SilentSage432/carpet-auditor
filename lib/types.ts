@@ -290,6 +290,10 @@ export type StoreSpecialist = {
   assigned_department: DepartmentScope | null;
   /** First-login must set custom username + password. */
   must_change_credentials: boolean;
+  /** Invite onboarding: must set a permanent PIN before dashboard access. */
+  must_change_pin?: boolean;
+  /** SMS invite destination (E.164 when set). */
+  phone_number?: string | null;
   /** Soft-delete flag — false means deactivated / removed from active roster. */
   is_active: boolean;
   created_at: string;

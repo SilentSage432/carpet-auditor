@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect } from "react";
+import { initPwaInstallCapture } from "@/lib/pwa-install";
 
 /** Registers the DeptSync Hub service worker for shell caching. */
 export function ServiceWorkerRegister() {
   useEffect(() => {
+    initPwaInstallCapture();
     if (typeof window === "undefined") return;
     if (!("serviceWorker" in navigator)) return;
 

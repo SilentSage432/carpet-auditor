@@ -132,3 +132,11 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 - Admin Tools drawer (Master only, defaults closed)
 - Dense bay/rotation rows; completed lists collapsed by default
 - Catalog/Remnant forms = bottom sheets; `/department` does not embed auditors
+
+## Supervisor Invite & Onboarding
+- Apply migration: `supabase/migrations/20260810_supervisor_invite.sql`
+- Master Admin: Roster → **Invite** → optional phone → temp PIN + `/invite?token=` link (Twilio if env set, else copyable SMS)
+- Env (optional): `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_FROM_NUMBER`, `NEXT_PUBLIC_APP_URL`
+- Onboarding steps: temp PIN → Create New PIN → Add to Home Screen → WebAuthn biometric → `/dashboard`
+- APIs: `POST /api/admin/invite-supervisor`, `GET|POST /api/invite/[token]`
+- **Test Invite Flow** (roster): dry-run `test_mode` → modal with PIN + welcome SMS + Copy Invite Link / Copy Full SMS Text; `/invite?test=1` preserves token after PIN reset

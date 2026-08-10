@@ -359,3 +359,45 @@ export async function fetchStoreHealth(
     };
   }
 }
+
+export type InviteSupervisorResult = {
+  ok: boolean;
+  test_mode?: boolean;
+  specialist_id: string;
+  username: string;
+  name: string;
+  department: string;
+  invite_token: string;
+  invite_url: string;
+  invite_expires_at: string;
+  temporary_pin: string;
+  phone: string | null;
+  sms:
+    | { ok: true; sid: string }
+    | { ok: false; skipped: true; reason: string }
+    | { ok: false; skipped: false; reason: string };
+  sms_preview: { body: string; sms_link: string };
+};
+
+export async function inviteSupervisor(
+  specialist: StoreSpecialist,
+  input: {
+    specialist_id?: string;
+    name?: string;
+    username?: string;
+    department?: string;
+    phone?: string;
+    role?: "Supervisor" | "Associate";
+    test_mode?: boolean;
+  }
+): Promise<InviteSupervisorResult> {
+  return storeOpsFetch<InviteSupervisorResult>(
+    "/api/admin/invite-supervisor",
+    specialist,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    }
+  );
+}
