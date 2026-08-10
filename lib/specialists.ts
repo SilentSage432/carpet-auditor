@@ -541,16 +541,64 @@ function specialistPayload(record: StoreSpecialist): Record<string, unknown> {
     name: record.name,
     role: record.role,
     pin_code: record.pin_code,
-    username: record.username,
-    assigned_department: record.assigned_department,
     must_change_credentials: record.must_change_credentials,
     is_active: record.is_active !== false,
     created_at: record.created_at,
   };
+  // Only include optional columns when they have real values (avoid undefined writes)
+  if (record.username != null && String(record.username).trim() !== "") {
+    payload.username = String(record.username).trim();
+  }
+  if (record.assigned_department !== undefined) {
+    payload.assigned_department = record.assigned_department;
+  }
   if (!isFallbackProfileId(record.id)) {
     payload.id = record.id;
   }
   return payload;
+}
+
+/**
+ * Build a partial DB update from an explicit patch only.
+ * Never sends undefined assigned_department / username.
+ */
+function buildSpecialistDbPatch(
+  patch: Partial<
+    Pick<
+      StoreSpecialist,
+      | "pin_code"
+      | "username"
+      | "must_change_credentials"
+      | "name"
+      | "assigned_department"
+      | "is_active"
+    >
+  >
+): Record<string, unknown> {
+  const update: Record<string, unknown> = {};
+  if (patch.pin_code !== undefined) {
+    update.pin_code = patch.pin_code;
+  }
+  if (
+    patch.username !== undefined &&
+    patch.username !== null &&
+    String(patch.username).trim() !== ""
+  ) {
+    update.username = String(patch.username).trim();
+  }
+  if (patch.must_change_credentials !== undefined) {
+    update.must_change_credentials = patch.must_change_credentials;
+  }
+  if (patch.name !== undefined && patch.name !== null && String(patch.name).trim() !== "") {
+    update.name = String(patch.name).trim();
+  }
+  if (patch.assigned_department !== undefined) {
+    update.assigned_department = patch.assigned_department;
+  }
+  if (patch.is_active !== undefined) {
+    update.is_active = patch.is_active;
+  }
+  return update;
 }
 
 export function isDatabaseUuid(id: string): boolean {
@@ -695,7 +743,8 @@ export async function saveSpecialist(input: {
 
 /**
  * Persist a new PIN without ever querying `.eq('id', fallbackString)`.
- * Resolves/creates a real UUID row, then updates state + localStorage.
+ * Writes only { pin_code, must_change_credentials: false }.
+ * Does not touch username or assigned_department.
  */
 export async function updateSpecialistPin(
   member: StoreSpecialist,
@@ -706,10 +755,93 @@ export async function updateSpecialistPin(
     throw new Error("PIN must be exactly 4 digits");
   }
 
-  return persistSpecialistFields(member, {
+  const store = member.store_number || getStoreNumber();
+  const supabase = getSupabase();
+  const profileLabel =
+    member.role === "MasterAdmin"
+      ? "Master Admin"
+      : member.role === "Supervisor"
+        ? "Supervisor"
+        : "Profile";
+
+  const nextLocal: StoreSpecialist = {
+    ...member,
     pin_code: pin,
     must_change_credentials: false,
-  });
+    store_number: store,
+  };
+
+  if (!supabase || shouldSaveOffline()) {
+    const offlineRecord: StoreSpecialist = { ...nextLocal, offline: true };
+    upsertLocal(offlineRecord);
+    enqueueSyncAction(
+      "upsert_specialist",
+      specialistPayload(offlineRecord),
+      store
+    );
+    setActiveSpecialist(offlineRecord);
+    return { record: offlineRecord, offline: true };
+  }
+
+  // Exact write payload: PIN + clear first-login flag only
+  // DB column is pin_code (app domain "pin")
+  const updatePayload = {
+    pin_code: pin,
+    must_change_credentials: false as const,
+  };
+
+  try {
+    let query = supabase.from(TABLE).update(updatePayload);
+
+    if (isDatabaseUuid(member.id) && !isFallbackProfileId(member.id)) {
+      query = query.eq("id", member.id).eq("store_number", store);
+    } else if (member.username?.trim()) {
+      query = query
+        .eq("store_number", store)
+        .eq("username", member.username.trim());
+    } else if (member.role === "MasterAdmin" || member.role === "Supervisor") {
+      query = query.eq("store_number", store).eq("role", member.role);
+      if (
+        member.role === "Supervisor" &&
+        member.assigned_department &&
+        member.assigned_department !== "all"
+      ) {
+        query = query.eq("assigned_department", member.assigned_department);
+      }
+    } else {
+      throw new Error(
+        `Could not locate ${profileLabel} row to update PIN (no id/username/role).`
+      );
+    }
+
+    const { data, error } = await query.select("*");
+
+    if (error) {
+      console.error("Failed to update store_specialists.pin_code:", error);
+      console.error("Failed to update PIN:", error.message);
+      throw new Error(error.message || `Could not update ${profileLabel} PIN.`);
+    }
+
+    if (!data || data.length === 0) {
+      // Fall back to full persist (may insert) when no row matched
+      return persistSpecialistFields(member, {
+        pin_code: pin,
+        must_change_credentials: false,
+      });
+    }
+
+    const saved = mapRow({
+      ...(data[0] as Record<string, unknown>),
+      offline: false,
+    });
+    upsertLocal(saved);
+    setActiveSpecialist(saved);
+    return { record: saved, offline: false };
+  } catch (err) {
+    console.error("Failed to update PIN:", err);
+    if (err instanceof Error && err.message.trim()) throw err;
+    throw new Error(`Could not update ${profileLabel} PIN. Please try again.`);
+  }
 }
 
 /** First-login / supervisor credential customization (username + password). */
@@ -873,18 +1005,24 @@ async function persistSpecialistFields(
   }
 
   async function insertProfile(): Promise<StoreSpecialist> {
+    const insertRow: Record<string, unknown> = {
+      name: displayName,
+      role: member.role,
+      pin_code: nextLocal.pin_code,
+      must_change_credentials: nextLocal.must_change_credentials,
+      is_active: nextLocal.is_active !== false,
+      store_number: store,
+    };
+    if (nextLocal.username != null && String(nextLocal.username).trim() !== "") {
+      insertRow.username = String(nextLocal.username).trim();
+    }
+    if (nextLocal.assigned_department !== undefined) {
+      insertRow.assigned_department = nextLocal.assigned_department;
+    }
+
     const { data, error } = await supabase!
       .from(TABLE)
-      .insert({
-        name: displayName,
-        role: member.role,
-        pin_code: nextLocal.pin_code,
-        username: nextLocal.username,
-        assigned_department: nextLocal.assigned_department,
-        must_change_credentials: nextLocal.must_change_credentials,
-        is_active: nextLocal.is_active !== false,
-        store_number: store,
-      })
+      .insert(insertRow)
       .select("*")
       .single();
 
@@ -909,13 +1047,7 @@ async function persistSpecialistFields(
       if (existing?.id && isDatabaseUuid(String(existing.id))) {
         const { data: updated, error: updErr } = await supabase!
           .from(TABLE)
-          .update({
-            pin_code: nextLocal.pin_code,
-            username: nextLocal.username,
-            assigned_department: nextLocal.assigned_department,
-            must_change_credentials: nextLocal.must_change_credentials,
-            is_active: nextLocal.is_active !== false,
-          })
+          .update(buildSpecialistDbPatch(patch))
           .eq("id", String(existing.id))
           .select("*")
           .single();
@@ -953,16 +1085,10 @@ async function persistSpecialistFields(
     if (!targetId) {
       saved = await insertProfile();
     } else {
-      // Update by id only — do not require username match
+      // Update only patched columns — never require or force assigned_department
       const { data, error } = await supabase
         .from(TABLE)
-        .update({
-          pin_code: nextLocal.pin_code,
-          username: nextLocal.username,
-          assigned_department: nextLocal.assigned_department,
-          must_change_credentials: nextLocal.must_change_credentials,
-          is_active: nextLocal.is_active !== false,
-        })
+        .update(buildSpecialistDbPatch(patch))
         .eq("id", targetId)
         .select("*");
 
