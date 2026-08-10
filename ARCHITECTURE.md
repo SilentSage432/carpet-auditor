@@ -50,7 +50,8 @@ app/api/rotations/*               → Generate + complete rotation route handler
 app/api/store-locations*          → List / patch / bulk location APIs
 supabase/schema.sql               → Tables + multi-category + SIMS + store_number + RBAC columns + RLS
 supabase/migrations/20260809_store_operations_rbac.sql → departments, profiles, locations, weekly rotations + RLS
-supabase/migrations/20260809_multi_store.sql → stores + store_id scoping + location unique (department_id,aisle,bay)```
+supabase/migrations/20260809_multi_store.sql → stores + store_id scoping
+supabase/migrations/20260810_store_locations_type_unique.sql → location unique (department_id,aisle,bay,type)```
 
 ## Ownership
 

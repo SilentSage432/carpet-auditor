@@ -5,11 +5,19 @@ import type { Department, StoreLocationType } from "@/lib/store-ops/types";
 import type { StoreSpecialist } from "@/lib/types";
 import { bulkGenerateLocations } from "@/lib/store-ops/client";
 
+type LocationMode = "BOTH" | "SELLING" | "TOPSTOCK";
+
 type Props = {
   specialist: StoreSpecialist;
   departments: Department[];
   onGenerated: () => void;
 };
+
+function typesForMode(mode: LocationMode): StoreLocationType[] {
+  if (mode === "BOTH") return ["SELLING", "TOPSTOCK"];
+  if (mode === "TOPSTOCK") return ["TOPSTOCK"];
+  return ["SELLING"];
+}
 
 export function BulkLocationGenerator({
   specialist,
@@ -20,8 +28,7 @@ export function BulkLocationGenerator({
   const [aisle, setAisle] = useState("1");
   const [startBay, setStartBay] = useState("1");
   const [endBay, setEndBay] = useState("15");
-  const [selling, setSelling] = useState(true);
-  const [topstock, setTopstock] = useState(false);
+  const [locationMode, setLocationMode] = useState<LocationMode>("BOTH");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -31,10 +38,7 @@ export function BulkLocationGenerator({
     setError(null);
     setMessage(null);
     try {
-      const types: StoreLocationType[] = [];
-      if (selling) types.push("SELLING");
-      if (topstock) types.push("TOPSTOCK");
-
+      const types = typesForMode(locationMode);
       const result = await bulkGenerateLocations(specialist, {
         department_id: departmentId,
         aisle: Number(aisle),
@@ -43,18 +47,21 @@ export function BulkLocationGenerator({
         types,
       });
 
-      const expected = Number(endBay) - Number(startBay) + 1;
+      const bayCount = Number(endBay) - Number(startBay) + 1;
+      const expected = bayCount * types.length;
       setMessage(
         result.created > 0
-          ? `Upserted ${result.created} location${result.created === 1 ? "" : "s"} (one per aisle/bay; re-runs refresh PENDING).`
+          ? `Upserted ${result.created} location${
+              result.created === 1 ? "" : "s"
+            } (${types.join(" + ")} per bay; re-runs refresh PENDING).`
           : `No locations written for this aisle/bay range (expected ${expected}).`
       );
       onGenerated();
     } catch (err) {
-      const message =
+      const next =
         (err as { message?: string } | null)?.message ||
         "Failed to generate locations";
-      setError(message);
+      setError(next);
     } finally {
       setBusy(false);
     }
@@ -66,9 +73,9 @@ export function BulkLocationGenerator({
         Bulk Generator
       </h2>
       <p className="mt-1 text-sm text-slate-400">
-        Map an aisle bay range in one tap — one active location per aisle/bay
-        (unique on department, aisle, bay). Re-running upserts status back to
-        PENDING.
+        Map an aisle bay range in one tap. BOTH writes Selling and Topstock for
+        each bay (unique on department, aisle, bay, type). Re-running upserts
+        status back to PENDING.
       </p>
 
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
@@ -125,42 +132,35 @@ export function BulkLocationGenerator({
       </div>
 
       <fieldset className="mt-4">
-        <legend className="mb-2 text-sm text-slate-300">
-          Location type (one per aisle/bay)
-        </legend>
+        <legend className="mb-2 text-sm text-slate-300">Location type</legend>
         <div className="flex flex-wrap gap-4">
-          <label className="flex min-h-12 items-center gap-2 text-sm text-slate-100">
-            <input
-              type="radio"
-              name="bulk-location-type"
-              checked={selling && !topstock}
-              onChange={() => {
-                setSelling(true);
-                setTopstock(false);
-              }}
-              className="h-5 w-5 accent-emerald-500"
-            />
-            Selling
-          </label>
-          <label className="flex min-h-12 items-center gap-2 text-sm text-slate-100">
-            <input
-              type="radio"
-              name="bulk-location-type"
-              checked={topstock && !selling}
-              onChange={() => {
-                setSelling(false);
-                setTopstock(true);
-              }}
-              className="h-5 w-5 accent-emerald-500"
-            />
-            Topstock
-          </label>
+          {(
+            [
+              { value: "BOTH", label: "Both (Selling + Topstock)" },
+              { value: "SELLING", label: "Selling" },
+              { value: "TOPSTOCK", label: "Topstock" },
+            ] as const
+          ).map((option) => (
+            <label
+              key={option.value}
+              className="flex min-h-12 items-center gap-2 text-sm text-slate-100"
+            >
+              <input
+                type="radio"
+                name="bulk-location-type"
+                checked={locationMode === option.value}
+                onChange={() => setLocationMode(option.value)}
+                className="h-5 w-5 accent-emerald-500"
+              />
+              {option.label}
+            </label>
+          ))}
         </div>
       </fieldset>
 
       <button
         type="button"
-        disabled={busy || !departmentId || (!selling && !topstock)}
+        disabled={busy || !departmentId}
         onClick={handleGenerate}
         className="mt-4 flex min-h-14 w-full items-center justify-center rounded-xl bg-emerald-500 px-4 text-base font-bold text-slate-950 transition active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
       >

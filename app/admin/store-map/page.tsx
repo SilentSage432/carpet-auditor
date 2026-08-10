@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { BulkLocationGenerator } from "@/components/admin/BulkLocationGenerator";
+import { ForceRotationModal } from "@/components/admin/ForceRotationModal";
 import { StoreLocationGrid } from "@/components/admin/StoreLocationGrid";
 import { NavigationHub } from "@/components/hub/NavigationHub";
 import { SessionGate } from "@/components/hub/SessionGate";
@@ -10,10 +11,10 @@ import { isMasterAdmin } from "@/lib/rbac";
 import {
   fetchDepartments,
   fetchStoreLocations,
-  generateRotations,
 } from "@/lib/store-ops/client";
 import { readableError } from "@/lib/store-ops/errors";
 import type { Department, StoreLocation } from "@/lib/store-ops/types";
+import { isoWeekLabel } from "@/lib/store-ops/week";
 import type { StoreSpecialist } from "@/lib/types";
 
 export default function StoreMapAdminPage() {
@@ -48,13 +49,9 @@ function StoreMapBody({
   const [locations, setLocations] = useState<StoreLocation[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [genDept, setGenDept] = useState("");
-  const [genCount, setGenCount] = useState("10");
-  const [genBusy, setGenBusy] = useState(false);
-  const [genMsg, setGenMsg] = useState<string | null>(null);
-  const [genError, setGenError] = useState<string | null>(null);
-  const bulkRef = useRef<HTMLElement>(null);
-  const weekRef = useRef<HTMLElement>(null);
+  const [mapMgmtOpen, setMapMgmtOpen] = useState(false);
+  const [forceOpen, setForceOpen] = useState(false);
+  const currentWeek = isoWeekLabel();
 
   const reload = useCallback(async (member: StoreSpecialist) => {
     setLoading(true);
@@ -66,7 +63,6 @@ function StoreMapBody({
       ]);
       setDepartments(depts);
       setLocations(locs);
-      setGenDept((current) => current || depts[0]?.id || "");
     } catch (err) {
       setError(readableError(err, "Failed to load store map"));
     } finally {
@@ -80,42 +76,38 @@ function StoreMapBody({
 
   useEffect(() => {
     const hash = window.location.hash;
-    if (hash === "#bulk-generate") {
-      bulkRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    if (hash === "#bulk-generate" || hash === "#map-management") {
+      setMapMgmtOpen(true);
     }
     if (hash === "#weekly-rotation") {
-      weekRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      setForceOpen(true);
     }
   }, [loading]);
 
-  async function handleGenerateWeek() {
-    if (!genDept) return;
-    setGenBusy(true);
-    setGenMsg(null);
-    setGenError(null);
-    try {
-      const result = await generateRotations(
-        specialist,
-        genDept,
-        Number(genCount)
-      );
-      setGenMsg(
-        `Week ${result.assigned_week}: assigned ${result.created} bay${
-          result.created === 1 ? "" : "s"
-        }${result.cycle_reset ? " (new cycle started)" : ""}.`
-      );
-      await reload(specialist);
-    } catch (err) {
-      setGenError(
-        readableError(
-          err,
-          "Weekly generate failed — map PENDING bays first, then retry"
-        )
-      );
-    } finally {
-      setGenBusy(false);
-    }
-  }
+  const departmentOverview = useMemo(() => {
+    return departments.map((dept) => {
+      const rows = locations.filter((l) => l.department_id === dept.id);
+      const active = rows.filter((l) => l.is_active).length;
+      const pending = rows.filter(
+        (l) => l.is_active && l.status === "PENDING"
+      ).length;
+      const assigned = rows.filter(
+        (l) => l.is_active && l.status === "ASSIGNED"
+      ).length;
+      const aisles = new Set(rows.map((l) => l.aisle)).size;
+      return {
+        id: dept.id,
+        name: dept.name,
+        code: dept.code,
+        total: rows.length,
+        active,
+        pending,
+        assigned,
+        aisles,
+        weeklyTarget: dept.weekly_bay_target ?? 10,
+      };
+    });
+  }, [departments, locations]);
 
   return (
     <div className="flex min-h-dvh flex-col">
@@ -129,13 +121,25 @@ function StoreMapBody({
       <main className="mx-auto w-full max-w-lg flex-1 px-3 pb-28 pt-4">
         <SuperAdminQuickActions
           specialist={specialist}
-          onBulkGenerate={() =>
-            bulkRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
-          }
-          onTriggerRotation={() =>
-            weekRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })
-          }
+          onBulkGenerate={() => {
+            setMapMgmtOpen(true);
+            window.requestAnimationFrame(() => {
+              document
+                .getElementById("map-management")
+                ?.scrollIntoView({ behavior: "smooth", block: "start" });
+            });
+          }}
+          onTriggerRotation={() => setForceOpen(true)}
         />
+
+        <section className="mb-5 rounded-2xl border border-emerald-500/30 bg-emerald-950/20 px-4 py-3">
+          <p className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-emerald-400">
+            Automated engine
+          </p>
+          <p className="mt-1 text-sm font-medium text-slate-100">
+            Automated Cron: Active · Last Draw: Current ISO Week ({currentWeek})
+          </p>
+        </section>
 
         {error ? (
           <p className="mb-4 rounded-xl border border-red-500/40 bg-red-950/40 px-4 py-3 text-sm text-red-200">
@@ -149,64 +153,86 @@ function StoreMapBody({
           </p>
         ) : null}
 
-        <div className="space-y-8">
-          <section id="bulk-generate" ref={bulkRef}>
-            <BulkLocationGenerator
-              specialist={specialist}
-              departments={departments}
-              onGenerated={() => void reload(specialist)}
-            />
+        <div className="space-y-6">
+          <section>
+            <h2 className="font-mono text-xs font-semibold uppercase tracking-[0.16em] text-emerald-400">
+              Department overview
+            </h2>
+            <p className="mt-1 text-sm text-slate-400">
+              High-level map status by department. Open Map Management to bulk
+              add aisles.
+            </p>
+
+            {loading ? (
+              <p className="mt-3 text-sm text-slate-400">Loading departments…</p>
+            ) : departmentOverview.length === 0 ? (
+              <p className="mt-3 rounded-2xl border border-dashed border-slate-700 px-4 py-6 text-center text-sm text-slate-400">
+                No departments yet. Seed departments, then use Map Management.
+              </p>
+            ) : (
+              <ul className="mt-3 space-y-2">
+                {departmentOverview.map((row) => (
+                  <li
+                    key={row.id}
+                    className="rounded-2xl border border-slate-700 bg-slate-900/80 px-4 py-3"
+                  >
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <p className="font-semibold text-slate-50">{row.name}</p>
+                        <p className="font-mono text-[11px] text-slate-400">
+                          {row.code} · target {row.weeklyTarget}/week
+                        </p>
+                      </div>
+                      <span className="shrink-0 rounded-lg bg-slate-800 px-2 py-1 font-mono text-[10px] font-bold text-slate-300">
+                        {row.aisles} aisle{row.aisles === 1 ? "" : "s"}
+                      </span>
+                    </div>
+                    <p className="mt-2 text-sm text-slate-300">
+                      {row.total} tags · {row.active} active · {row.pending}{" "}
+                      pending · {row.assigned} assigned
+                    </p>
+                  </li>
+                ))}
+              </ul>
+            )}
           </section>
 
           <section
-            id="weekly-rotation"
-            ref={weekRef}
-            className="rounded-2xl border border-slate-700 bg-slate-900/60 p-4"
+            id="map-management"
+            className="overflow-hidden rounded-2xl border border-slate-700 bg-slate-900/60"
           >
-            <h2 className="font-mono text-xs font-semibold uppercase tracking-[0.16em] text-emerald-400">
-              Weekly Rotation Engine
-            </h2>
-            <p className="mt-1 text-sm text-slate-400">
-              Randomly assign PENDING bays for this ISO week. Auto-resets the cycle when all bays are COMPLETED.
-            </p>
-            <div className="mt-3 grid gap-3 sm:grid-cols-[1fr_6rem_auto]">
-              <select
-                value={genDept}
-                onChange={(e) => setGenDept(e.target.value)}
-                className="rounded-xl border border-slate-700 bg-slate-950 px-3 py-3 text-slate-100"
+            <button
+              type="button"
+              id="bulk-generate"
+              aria-expanded={mapMgmtOpen}
+              onClick={() => setMapMgmtOpen((open) => !open)}
+              className="flex min-h-14 w-full items-center justify-between gap-3 px-4 py-3 text-left"
+            >
+              <div>
+                <p className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-emerald-400">
+                  Map Management &amp; Bulk Add
+                </p>
+                <p className="mt-0.5 text-sm text-slate-400">
+                  Expand to generate aisle/bay Selling + Topstock tags
+                </p>
+              </div>
+              <span
+                aria-hidden
+                className={`font-mono text-lg text-slate-300 transition ${
+                  mapMgmtOpen ? "rotate-180" : ""
+                }`}
               >
-                {departments.map((d) => (
-                  <option key={d.id} value={d.id}>
-                    {d.name}
-                  </option>
-                ))}
-              </select>
-              <input
-                type="number"
-                min={1}
-                value={genCount}
-                onChange={(e) => setGenCount(e.target.value)}
-                aria-label="Bay count"
-                className="rounded-xl border border-slate-700 bg-slate-950 px-3 py-3 font-mono text-slate-100"
-              />
-              <button
-                type="button"
-                disabled={genBusy || !genDept}
-                onClick={handleGenerateWeek}
-                className="min-h-12 rounded-xl bg-amber-500 px-4 font-bold text-slate-950 disabled:opacity-50"
-              >
-                {genBusy ? "…" : "Generate Week"}
-              </button>
-            </div>
-            {genMsg ? (
-              <p className="mt-2 text-sm text-amber-200" role="status">
-                {genMsg}
-              </p>
-            ) : null}
-            {genError ? (
-              <p className="mt-2 text-sm font-medium text-red-300" role="alert">
-                {genError}
-              </p>
+                ▾
+              </span>
+            </button>
+            {mapMgmtOpen ? (
+              <div className="border-t border-slate-800 px-3 pb-4 pt-3">
+                <BulkLocationGenerator
+                  specialist={specialist}
+                  departments={departments}
+                  onGenerated={() => void reload(specialist)}
+                />
+              </div>
             ) : null}
           </section>
 
@@ -222,6 +248,15 @@ function StoreMapBody({
           )}
         </div>
       </main>
+
+      <ForceRotationModal
+        open={forceOpen}
+        onClose={() => setForceOpen(false)}
+        specialist={specialist}
+        departments={departments}
+        initialDepartmentId={departments[0]?.id}
+        onForced={() => void reload(specialist)}
+      />
     </div>
   );
 }

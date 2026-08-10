@@ -1,5 +1,22 @@
 # DeptSync Hub — Development Journal
 
+## 2026-08-10 — Store Map overview + force-draw modal
+
+### Shipped
+- Primary Store Map: department overview + location grid; Bulk Generator in accordion **Map Management & Bulk Add**.
+- Weekly controls moved into **Trigger Weekly Rotation** modal; CTA **Force Draw New Rotation**; shows Automated Cron / current ISO week status.
+
+---
+
+## 2026-08-10 — Bulk Generator BOTH Selling + Topstock
+
+### Shipped
+- Location type radios: BOTH (default) / SELLING / TOPSTOCK — BOTH inserts two rows per bay.
+- Upsert `onConflict: department_id,aisle,bay,type`; migration `20260810_store_locations_type_unique.sql`.
+- Weekly Rotation Engine subtitle clarifies scheduled automation vs manual override panel.
+
+---
+
 ## 2026-08-10 — Bulk Generator clean error messages
 
 ### Shipped

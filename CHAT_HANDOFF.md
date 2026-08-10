@@ -68,7 +68,7 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 ## Store Operations upsert keys
 - `stores`: `onConflict: store_number` (payload: store_number, name, is_active)
 - `departments`: `onConflict: code` (matches live UNIQUE on `code`)
-- `store_locations`: `onConflict: department_id,aisle,bay` (payload includes status PENDING, is_active true)
+- `store_locations`: `onConflict: department_id,aisle,bay,type` (BOTH writes Selling + Topstock per bay; status PENDING)
 - `weekly_rotations`: `onConflict: location_id,assigned_week`
 
 ## Remnants / markdown
@@ -88,7 +88,7 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
   - Super Admin: `/admin/store-map` · `/admin/supervisors` · `/dashboard` · `/settings`
   - Supervisor: `/dashboard` · `/department` · `/settings`
 - Quick Actions banner (Super Admin): Bulk Generate · Trigger Weekly Rotation · Manage Supervisors
-- `/admin/store-map` — bulk aisle/bay generator (upsert on `department_id,aisle,bay`) + grid deactivate toggles + Generate Week
+- `/admin/store-map` — department overview + location grid; Bulk Add accordion; Trigger Weekly Rotation modal (**Force Draw New Rotation**)
 - `/dashboard` — Zebra checklist for this ISO week; checkbox → complete rotation + location COMPLETED (cool-down)
 - APIs under `/api/rotations/*`, `/api/store-locations*`, `/api/departments`, `/api/weekly-rotations`
 - Multi-store: apply `20260809_multi_store.sql`; requests send `x-store-ops-store-number`

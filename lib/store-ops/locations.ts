@@ -10,8 +10,9 @@ import type {
   StoreLocationType,
 } from "./types";
 
-/** Unique key on public.store_locations (multi-store migration). */
-export const STORE_LOCATIONS_ON_CONFLICT = "department_id,aisle,bay" as const;
+/** Unique key on public.store_locations — Selling + Topstock per aisle/bay. */
+export const STORE_LOCATIONS_ON_CONFLICT =
+  "department_id,aisle,bay,type" as const;
 
 export function buildBulkLocationRows(
   input: BulkGenerateInput & { store_id: string }
@@ -37,14 +38,17 @@ export function buildBulkLocationRows(
   if (start_bay > end_bay) {
     throw new Error("start_bay must be ≤ end_bay");
   }
-  if (!types.length) {
+
+  const uniqueTypes = Array.from(
+    new Set(
+      types.filter(
+        (t): t is StoreLocationType => t === "SELLING" || t === "TOPSTOCK"
+      )
+    )
+  );
+  if (!uniqueTypes.length) {
     throw new Error("Select at least one location type");
   }
-
-  // Unique key is (department_id, aisle, bay) — one row per bay.
-  const type: StoreLocationType = types.includes("SELLING")
-    ? "SELLING"
-    : types[0];
 
   const rows: Array<{
     store_id: string;
@@ -58,16 +62,18 @@ export function buildBulkLocationRows(
   }> = [];
 
   for (let bay = start_bay; bay <= end_bay; bay += 1) {
-    rows.push({
-      store_id,
-      department_id,
-      aisle,
-      bay,
-      type,
-      status: "PENDING",
-      cycle_number: 1,
-      is_active: true,
-    });
+    for (const type of uniqueTypes) {
+      rows.push({
+        store_id,
+        department_id,
+        aisle,
+        bay,
+        type,
+        status: "PENDING",
+        cycle_number: 1,
+        is_active: true,
+      });
+    }
   }
   return rows;
 }
@@ -84,9 +90,7 @@ export async function bulkInsertLocations(
       .select("*");
 
     if (error) {
-      throw new Error(
-        readableError(error, "Bulk location upsert failed")
-      );
+      throw new Error(readableError(error, "Bulk location upsert failed"));
     }
     return (data ?? []) as StoreLocation[];
   } catch (error) {

@@ -75,7 +75,8 @@ export function StoreLocationGrid({
     return (
       <section className="rounded-2xl border border-dashed border-slate-700 bg-slate-950/50 p-6 text-center">
         <p className="text-sm text-slate-400">
-          No store locations mapped yet. Use the bulk generator above.
+          No store locations mapped yet. Expand Map Management &amp; Bulk Add
+          to generate aisle tags.
         </p>
       </section>
     );
