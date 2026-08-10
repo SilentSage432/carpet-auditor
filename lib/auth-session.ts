@@ -4,7 +4,7 @@
  */
 
 import type { StoreSpecialist } from "./types";
-import { getStoreNumber } from "./store";
+import { getStoreNumber, normalizeStoreNumber } from "./store";
 import {
   getActiveSpecialist,
   mapRow,
@@ -12,6 +12,8 @@ import {
 } from "./specialists";
 
 const SESSION_KEY = "deptsync_auth_session";
+/** Tab-scoped flag: user already unlocked this sessionToken in this browser tab. */
+const WORKSPACE_UNLOCKED_KEY = "deptsync_workspace_unlocked";
 
 /** Lock after 8 hours of inactivity. */
 export const AUTH_SESSION_TIMEOUT_MS = 8 * 60 * 60 * 1000;
@@ -37,6 +39,41 @@ export function isAuthSessionExpired(
   return age > AUTH_SESSION_TIMEOUT_MS;
 }
 
+export function markWorkspaceUnlocked(sessionToken: string): void {
+  if (typeof window === "undefined") return;
+  try {
+    sessionStorage.setItem(WORKSPACE_UNLOCKED_KEY, sessionToken);
+  } catch {
+    /* private mode / blocked storage */
+  }
+}
+
+export function clearWorkspaceUnlocked(): void {
+  if (typeof window === "undefined") return;
+  try {
+    sessionStorage.removeItem(WORKSPACE_UNLOCKED_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
+/**
+ * True when this tab already completed login/unlock for the current session token
+ * and credentials do not require first-login setup.
+ */
+export function isWorkspaceUnlockedInTab(
+  session: AuthSession | null | undefined
+): boolean {
+  if (!session || typeof window === "undefined") return false;
+  if (isAuthSessionExpired(session)) return false;
+  if (session.specialist.must_change_credentials) return false;
+  try {
+    return sessionStorage.getItem(WORKSPACE_UNLOCKED_KEY) === session.sessionToken;
+  } catch {
+    return false;
+  }
+}
+
 export function readAuthSession(): AuthSession | null {
   if (typeof window === "undefined") return null;
   try {
@@ -57,9 +94,18 @@ export function readAuthSession(): AuthSession | null {
     const specialist = mapRow(
       parsed.specialist as Record<string, unknown>
     );
-    if (!specialist || specialist.store_number !== getStoreNumber()) {
+    if (!specialist) return null;
+
+    // Normalize store numbers — missing/empty store should not wipe the session
+    const specialistStore = normalizeStoreNumber(
+      String(specialist.store_number || getStoreNumber())
+    );
+    const activeStore = getStoreNumber();
+    if (specialistStore !== activeStore) {
       return null;
     }
+    specialist.store_number = specialistStore;
+
     const lastActiveTimestamp = Number(parsed.lastActiveTimestamp);
     const sessionToken = String(parsed.sessionToken ?? "");
     if (!sessionToken || !Number.isFinite(lastActiveTimestamp)) return null;
@@ -82,6 +128,7 @@ export function startAuthSession(specialist: StoreSpecialist): AuthSession {
     lastActiveTimestamp: Date.now(),
   };
   writeAuthSession(session);
+  markWorkspaceUnlocked(session.sessionToken);
   return session;
 }
 
@@ -102,7 +149,13 @@ export function updateAuthSessionSpecialist(
   }
   const next: AuthSession = {
     ...session,
-    specialist,
+    specialist: {
+      ...specialist,
+      store_number: normalizeStoreNumber(
+        String(specialist.store_number || getStoreNumber())
+      ),
+      must_change_credentials: Boolean(specialist.must_change_credentials),
+    },
     lastActiveTimestamp: Date.now(),
   };
   writeAuthSession(next);
@@ -111,6 +164,7 @@ export function updateAuthSessionSpecialist(
 
 export function clearAuthSession(): void {
   if (typeof window === "undefined") return;
+  clearWorkspaceUnlocked();
   localStorage.removeItem(SESSION_KEY);
   setActiveSpecialist(null);
 }

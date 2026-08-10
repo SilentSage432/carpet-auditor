@@ -5,7 +5,7 @@
  */
 
 import type { StoreSpecialist } from "./types";
-import { getStoreNumber } from "./store";
+import { getStoreNumber, normalizeStoreNumber } from "./store";
 
 const STORAGE_KEY = "deptsync_biometric_credential";
 
@@ -51,7 +51,12 @@ export function getStoredBiometricCredential(): BiometricCredentialRecord | null
     if (!raw) return null;
     const parsed = JSON.parse(raw) as BiometricCredentialRecord;
     if (!parsed?.credentialId || !parsed?.specialistId) return null;
-    if (parsed.storeNumber && parsed.storeNumber !== getStoreNumber()) {
+    // Store mismatch: hide for this store but do NOT delete — navigation / store
+    // reads must not invalidate biometric enrollment.
+    if (
+      parsed.storeNumber &&
+      normalizeStoreNumber(parsed.storeNumber) !== getStoreNumber()
+    ) {
       return null;
     }
     return parsed;

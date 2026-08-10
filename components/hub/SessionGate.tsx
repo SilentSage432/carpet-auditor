@@ -11,6 +11,7 @@ import {
   clearAuthSession,
   isAuthSessionExpired,
   readAuthSession,
+  touchAuthSession,
 } from "@/lib/auth-session";
 import { getStoreNumber } from "@/lib/store";
 import type { StoreSpecialist } from "@/lib/types";
@@ -41,12 +42,23 @@ export function SessionGate({
 
   useEffect(() => {
     const session = readAuthSession();
-    if (!session || isAuthSessionExpired(session)) {
+
+    if (session && isAuthSessionExpired(session)) {
+      // Only clear when the inactivity timeout actually elapsed
       clearAuthSession();
       setSpecialist(null);
+    } else if (session) {
+      // Valid local session — refresh activity and admit without PIN re-prompt.
+      // must_change_credentials setup is handled on the Hub AuthWall, not here.
+      const touched = touchAuthSession() ?? session;
+      setSpecialist(touched.specialist);
     } else {
-      setSpecialist(session.specialist);
+      // Missing session — do NOT clearAuthSession() here.
+      // Clearing on a null read wiped valid sessions when store_number
+      // normalization briefly mismatched during navigation.
+      setSpecialist(null);
     }
+
     setStoreNumber(getStoreNumber());
     setReady(true);
   }, []);

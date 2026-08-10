@@ -14,7 +14,10 @@ import { SettingsSection } from "@/components/sections/SettingsSection";
 import { DepartmentAuditSection } from "@/components/sections/DepartmentAuditSection";
 import {
   clearAuthSession,
+  clearWorkspaceUnlocked,
   isAuthSessionExpired,
+  isWorkspaceUnlockedInTab,
+  markWorkspaceUnlocked,
   readAuthSession,
   startAuthSession,
   touchAuthSession,
@@ -67,14 +70,17 @@ export default function DeptSyncHubPage() {
   const unlockWorkspace = useCallback((member: StoreSpecialist) => {
     setSpecialist(member);
     setSection(defaultSectionForMember(member));
-    if (needsCredentialSetup(member)) {
+    if (needsCredentialSetup(member) || member.must_change_credentials) {
       setGate("setup");
       return;
     }
+    const session = readAuthSession();
+    if (session) markWorkspaceUnlocked(session.sessionToken);
     setGate("ready");
   }, []);
 
   const lockToUnlock = useCallback((member: StoreSpecialist) => {
+    clearWorkspaceUnlocked();
     setSpecialist(member);
     setGate("unlock");
   }, []);
@@ -98,14 +104,24 @@ export default function DeptSyncHubPage() {
       const matched =
         syncActiveSpecialistFromRoster(roster) ?? session.specialist;
       updateAuthSessionSpecialist(matched);
+      const refreshed = readAuthSession() ?? session;
 
-      if (needsCredentialSetup(matched)) {
+      if (needsCredentialSetup(matched) || matched.must_change_credentials) {
         setSpecialist(matched);
         setGate("setup");
         return;
       }
 
-      // Valid remembered session → quick PIN / password unlock (zero trust on load).
+      // Same tab already unlocked this session → stay in workspace (Settings ↔ Hub).
+      // Hard refresh / new tab still requires PIN unlock (zero trust cold start).
+      if (isWorkspaceUnlockedInTab(refreshed)) {
+        touchAuthSession();
+        markWorkspaceUnlocked(refreshed.sessionToken);
+        setSpecialist(matched);
+        setGate("ready");
+        return;
+      }
+
       lockToUnlock(matched);
     },
     [lockToUnlock]
@@ -173,6 +189,7 @@ export default function DeptSyncHubPage() {
     function onActivity() {
       const next = touchAuthSession();
       if (!next) {
+        clearWorkspaceUnlocked();
         const session = readAuthSession();
         if (session?.specialist) lockToUnlock(session.specialist);
         else requireLogin();

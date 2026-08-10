@@ -136,7 +136,7 @@ function normalizeDepartment(raw: unknown, role: SpecialistRole): DepartmentScop
 }
 
 export function mapRow(row: Record<string, unknown>): StoreSpecialist {
-  const pinRaw = row.pin_code;
+  const pinRaw = row.pin_code ?? row.pin;
   const pin =
     pinRaw == null || String(pinRaw).trim() === ""
       ? null
