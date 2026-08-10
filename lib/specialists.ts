@@ -742,9 +742,8 @@ export async function saveSpecialist(input: {
 }
 
 /**
- * Persist a new PIN without ever querying `.eq('id', fallbackString)`.
- * Writes only { pin_code, must_change_credentials: false }.
- * Does not touch username or assigned_department.
+ * Persist a new PIN on store_profiles via update only (never insert/upsert).
+ * Payload: pin + pin_code + must_change_credentials: false.
  */
 export async function updateSpecialistPin(
   member: StoreSpecialist,
@@ -783,55 +782,53 @@ export async function updateSpecialistPin(
     return { record: offlineRecord, offline: true };
   }
 
-  // Exact write payload: PIN + clear first-login flag only
-  // DB column is pin_code (app domain "pin")
   const updatePayload = {
+    pin,
     pin_code: pin,
     must_change_credentials: false as const,
   };
 
-  try {
-    let query = supabase.from(TABLE).update(updatePayload);
+  const username = member.username?.trim() || "";
 
-    if (isDatabaseUuid(member.id) && !isFallbackProfileId(member.id)) {
-      query = query.eq("id", member.id).eq("store_number", store);
-    } else if (member.username?.trim()) {
-      query = query
-        .eq("store_number", store)
-        .eq("username", member.username.trim());
+  try {
+    let query = supabase.from("store_profiles").update(updatePayload);
+
+    if (username) {
+      query = query.eq("username", username);
+    } else if (isDatabaseUuid(member.id) && !isFallbackProfileId(member.id)) {
+      query = query.eq("id", member.id);
     } else if (member.role === "MasterAdmin" || member.role === "Supervisor") {
-      query = query.eq("store_number", store).eq("role", member.role);
-      if (
-        member.role === "Supervisor" &&
-        member.assigned_department &&
-        member.assigned_department !== "all"
-      ) {
-        query = query.eq("assigned_department", member.assigned_department);
-      }
+      query = query.eq("role", member.role);
+      if (store) query = query.eq("store_number", store);
     } else {
       throw new Error(
-        `Could not locate ${profileLabel} row to update PIN (no id/username/role).`
+        `Could not update ${profileLabel} PIN — username is required when id is unavailable.`
       );
     }
 
     const { data, error } = await query.select("*");
 
     if (error) {
-      console.error("Failed to update store_specialists.pin_code:", error);
+      console.error("Failed to update store_profiles PIN:", error);
       console.error("Failed to update PIN:", error.message);
       throw new Error(error.message || `Could not update ${profileLabel} PIN.`);
     }
 
     if (!data || data.length === 0) {
-      // Fall back to full persist (may insert) when no row matched
-      return persistSpecialistFields(member, {
-        pin_code: pin,
-        must_change_credentials: false,
-      });
+      console.error(
+        "Failed to update store_profiles PIN: no row matched",
+        username ? { username } : { id: member.id, role: member.role }
+      );
+      throw new Error(
+        `Could not find ${profileLabel} in store_profiles to update PIN.`
+      );
     }
 
+    const row = data[0] as Record<string, unknown>;
+    // Prefer pin_code; accept pin if present from store_profiles
     const saved = mapRow({
-      ...(data[0] as Record<string, unknown>),
+      ...row,
+      pin_code: row.pin_code ?? row.pin ?? pin,
       offline: false,
     });
     upsertLocal(saved);
