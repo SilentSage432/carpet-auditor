@@ -61,7 +61,7 @@ export function WeeklyRotationList({
           This Week&apos;s Assigned Rotation
         </p>
         <p className="mt-1 font-mono text-lg font-bold text-slate-50">
-          {assignedWeek}
+          {assignedWeek || "No week assigned"}
         </p>
         <p className="text-sm text-slate-400">
           {open.length} remaining · {done.length} complete

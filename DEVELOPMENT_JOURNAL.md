@@ -1,5 +1,13 @@
 # DeptSync Hub — Development Journal
 
+## 2026-08-10 — Zebra rotations empty-week soft fail
+
+### Shipped
+- `/api/weekly-rotations` selects safe columns; ignores null `assigned_week`; returns `[]` on schema/empty failures (no red schema toast).
+- Dashboard / `fetchThisWeekRotations` try/catch renders empty checklist when zero bays are assigned.
+
+---
+
 ## 2026-08-09 — Exception summary empty-week defaults
 
 ### Shipped

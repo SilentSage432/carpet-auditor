@@ -81,7 +81,8 @@ export type BulkGenerateInput = {
 };
 
 export function formatLocationLabel(
-  loc: Pick<StoreLocation, "aisle" | "bay" | "type">
+  loc: Pick<StoreLocation, "aisle" | "bay"> & { type?: string | null }
 ): string {
-  return `Aisle ${loc.aisle} - Bay ${loc.bay} [${loc.type}]`;
+  const base = `Aisle ${loc.aisle} - Bay ${loc.bay}`;
+  return loc.type ? `${base} [${loc.type}]` : base;
 }

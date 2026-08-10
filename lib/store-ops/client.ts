@@ -110,7 +110,28 @@ export async function fetchThisWeekRotations(
   assigned_week: string;
   rotations: WeeklyRotationWithLocation[];
 }> {
-  return storeOpsFetch("/api/weekly-rotations", specialist);
+  try {
+    const data = await storeOpsFetch<{
+      assigned_week?: string | null;
+      rotations?: WeeklyRotationWithLocation[] | null;
+    }>("/api/weekly-rotations", specialist);
+
+    const week = String(data.assigned_week ?? "").trim();
+    const rotations = Array.isArray(data.rotations)
+      ? data.rotations.filter((r) => Boolean(r?.assigned_week))
+      : [];
+
+    return {
+      assigned_week: week,
+      rotations,
+    };
+  } catch {
+    // Zero assignments / schema soft-fail — empty Zebra list, no red toast
+    return {
+      assigned_week: "",
+      rotations: [],
+    };
+  }
 }
 
 export async function completeRotation(

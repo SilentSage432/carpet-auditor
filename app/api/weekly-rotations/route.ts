@@ -10,8 +10,12 @@ import { getSupabaseAdmin } from "@/lib/store-ops/supabase-admin";
 import { isoWeekLabel } from "@/lib/store-ops/week";
 import { supabaseAdminMissingMessage } from "@/lib/supabase/env";
 
+const ROTATION_SELECT =
+  "id, department_id, location_id, assigned_week, is_completed, completed_at, created_at, store_locations(id, aisle, bay, status, cycle_number)";
+
 /**
  * GET /api/weekly-rotations — this week's assignments for the actor's department.
+ * Empty / missing assigned_week → smooth empty list (no schema toast).
  */
 export async function GET(request: Request) {
   try {
@@ -24,16 +28,34 @@ export async function GET(request: Request) {
       );
     }
 
-    const store = await resolveStoreByNumber(supabase, actor.storeNumber);
-    const week = isoWeekLabel();
+    const week = isoWeekLabel() || "";
+    if (!week) {
+      return NextResponse.json({
+        assigned_week: "",
+        store_id: null,
+        rotations: [],
+      });
+    }
+
+    let storeId: string | null = null;
+    try {
+      const store = await resolveStoreByNumber(supabase, actor.storeNumber);
+      storeId = store.id;
+    } catch {
+      // No store resolved yet — still return an empty week list
+      return NextResponse.json({
+        assigned_week: week,
+        store_id: null,
+        rotations: [],
+      });
+    }
+
     const url = new URL(request.url);
     const departmentIdParam = url.searchParams.get("department_id");
     const storeIdParam = url.searchParams.get("store_id");
 
-    const storeId =
-      actor.role === "super_admin" && storeIdParam
-        ? storeIdParam
-        : store.id;
+    const scopedStoreId =
+      actor.role === "super_admin" && storeIdParam ? storeIdParam : storeId;
 
     let departmentId: string | null = departmentIdParam;
 
@@ -47,7 +69,7 @@ export async function GET(request: Request) {
       departmentId = await resolveDepartmentIdByCode(
         supabase,
         actor.departmentCode,
-        store.id
+        storeId
       );
       if (!departmentId) {
         return NextResponse.json(
@@ -57,34 +79,80 @@ export async function GET(request: Request) {
       }
     }
 
-    let query = supabase
-      .from("weekly_rotations")
-      .select("*, store_locations(*)")
-      .eq("assigned_week", week)
-      .eq("store_id", storeId)
-      .order("created_at", { ascending: true });
-
-    if (departmentId) {
-      query = query.eq("department_id", departmentId);
-    }
-
-    const { data, error } = await query;
-    if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
-    }
+    const rotations = await fetchWeekRotations(supabase, {
+      week,
+      storeId: scopedStoreId,
+      departmentId,
+    });
 
     return NextResponse.json({
       assigned_week: week,
-      store_id: storeId,
-      rotations: data ?? [],
+      store_id: scopedStoreId,
+      rotations,
     });
   } catch (err) {
     if (err instanceof StoreOpsAuthError) {
       return NextResponse.json({ error: err.message }, { status: err.status });
     }
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Unknown error" },
-      { status: 500 }
-    );
+    // Soft-fail: zero rotations for the week — UI renders empty state
+    return NextResponse.json({
+      assigned_week: isoWeekLabel(),
+      store_id: null,
+      rotations: [],
+    });
   }
+}
+
+async function fetchWeekRotations(
+  supabase: NonNullable<ReturnType<typeof getSupabaseAdmin>>,
+  opts: {
+    week: string;
+    storeId: string | null;
+    departmentId: string | null;
+  }
+): Promise<unknown[]> {
+  // Prefer store-scoped query; fall back if store_id column is missing.
+  const attempts: Array<() => ReturnType<typeof buildQuery>> = [
+    () => buildQuery(supabase, opts, true),
+    () => buildQuery(supabase, opts, false),
+  ];
+
+  for (const attempt of attempts) {
+    const { data, error } = await attempt();
+    if (!error) {
+      return (data ?? []).filter(
+        (row) =>
+          row &&
+          typeof row === "object" &&
+          Boolean((row as { assigned_week?: string | null }).assigned_week)
+      );
+    }
+  }
+
+  // Schema / empty table — treat as no assignments this week
+  return [];
+}
+
+function buildQuery(
+  supabase: NonNullable<ReturnType<typeof getSupabaseAdmin>>,
+  opts: {
+    week: string;
+    storeId: string | null;
+    departmentId: string | null;
+  },
+  withStoreId: boolean
+) {
+  let query = supabase
+    .from("weekly_rotations")
+    .select(ROTATION_SELECT)
+    .eq("assigned_week", opts.week)
+    .order("created_at", { ascending: true });
+
+  if (withStoreId && opts.storeId) {
+    query = query.eq("store_id", opts.storeId);
+  }
+  if (opts.departmentId) {
+    query = query.eq("department_id", opts.departmentId);
+  }
+  return query;
 }

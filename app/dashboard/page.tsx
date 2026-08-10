@@ -49,10 +49,13 @@ function DashboardBody({
     setError(null);
     try {
       const data = await fetchThisWeekRotations(member);
-      setWeek(data.assigned_week);
-      setRotations(data.rotations);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load rotations");
+      setWeek(data.assigned_week || "");
+      setRotations(data.rotations ?? []);
+    } catch {
+      // Zero rotations / soft failure — render empty checklist, no schema toast
+      setWeek("");
+      setRotations([]);
+      setError(null);
     } finally {
       setLoading(false);
     }
