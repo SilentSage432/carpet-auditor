@@ -14,9 +14,7 @@ import { SettingsSection } from "@/components/sections/SettingsSection";
 import { DepartmentAuditSection } from "@/components/sections/DepartmentAuditSection";
 import {
   clearAuthSession,
-  clearWorkspaceUnlocked,
   isAuthSessionExpired,
-  isWorkspaceUnlockedInTab,
   markWorkspaceUnlocked,
   readAuthSession,
   startAuthSession,
@@ -79,53 +77,39 @@ export default function DeptSyncHubPage() {
     setGate("ready");
   }, []);
 
-  const lockToUnlock = useCallback((member: StoreSpecialist) => {
-    clearWorkspaceUnlocked();
-    setSpecialist(member);
-    setGate("unlock");
-  }, []);
-
   const requireLogin = useCallback(() => {
     clearAuthSession();
     setSpecialist(null);
     setGate("login");
   }, []);
 
-  const resolveGateFromSession = useCallback(
-    (roster: StoreSpecialist[]) => {
-      const session = readAuthSession();
-      if (!session || isAuthSessionExpired(session)) {
-        clearAuthSession();
-        setSpecialist(null);
-        setGate("login");
-        return;
-      }
+  const resolveGateFromSession = useCallback((roster: StoreSpecialist[]) => {
+    const session = readAuthSession();
+    if (!session || isAuthSessionExpired(session)) {
+      clearAuthSession();
+      setSpecialist(null);
+      setGate("login");
+      return;
+    }
 
-      const matched =
-        syncActiveSpecialistFromRoster(roster) ?? session.specialist;
-      updateAuthSessionSpecialist(matched);
-      const refreshed = readAuthSession() ?? session;
+    const matched =
+      syncActiveSpecialistFromRoster(roster) ?? session.specialist;
+    updateAuthSessionSpecialist(matched);
+    const refreshed = readAuthSession() ?? session;
 
-      if (needsCredentialSetup(matched) || matched.must_change_credentials) {
-        setSpecialist(matched);
-        setGate("setup");
-        return;
-      }
+    if (needsCredentialSetup(matched) || matched.must_change_credentials) {
+      setSpecialist(matched);
+      setGate("setup");
+      return;
+    }
 
-      // Same tab already unlocked this session → stay in workspace (Settings ↔ Hub).
-      // Hard refresh / new tab still requires PIN unlock (zero trust cold start).
-      if (isWorkspaceUnlockedInTab(refreshed)) {
-        touchAuthSession();
-        markWorkspaceUnlocked(refreshed.sessionToken);
-        setSpecialist(matched);
-        setGate("ready");
-        return;
-      }
-
-      lockToUnlock(matched);
-    },
-    [lockToUnlock]
-  );
+    // Single session: valid localStorage session → workspace (no PIN unlock).
+    // Re-auth only on missing/expired session (cold start without session, logout, 8h idle).
+    touchAuthSession();
+    markWorkspaceUnlocked(refreshed.sessionToken);
+    setSpecialist(matched);
+    setGate("ready");
+  }, []);
 
   const loadStoreData = useCallback(async () => {
     const [cat, rem, team] = await Promise.all([
@@ -156,13 +140,25 @@ export default function DeptSyncHubPage() {
   useEffect(() => {
     function onStoreChanged(event: Event) {
       const detail = (event as CustomEvent<string>).detail;
-      setStoreNumberState(detail || getStoreNumber());
-      requireLogin();
+      const nextStore = detail || getStoreNumber();
+      setStoreNumberState(nextStore);
+      // Single session: changing store number must NOT force re-login.
+      const session = readAuthSession();
+      if (session) {
+        const updated = updateAuthSessionSpecialist({
+          ...session.specialist,
+          store_number: nextStore,
+        });
+        if (updated) {
+          markWorkspaceUnlocked(updated.sessionToken);
+          setSpecialist(updated.specialist);
+        }
+      }
       void loadStoreData();
     }
     window.addEventListener(STORE_CHANGED_EVENT, onStoreChanged);
     return () => window.removeEventListener(STORE_CHANGED_EVENT, onStoreChanged);
-  }, [loadStoreData, requireLogin]);
+  }, [loadStoreData]);
 
   useEffect(() => {
     async function onOnline() {
@@ -182,17 +178,14 @@ export default function DeptSyncHubPage() {
     return () => window.removeEventListener("online", onOnline);
   }, [loadStoreData]);
 
-  // Inactivity watchdog — lock after 8h idle while unlocked.
+  // Inactivity watchdog — after 8h idle, require full login (app-level only).
   useEffect(() => {
     if (gate !== "ready") return;
 
     function onActivity() {
       const next = touchAuthSession();
       if (!next) {
-        clearWorkspaceUnlocked();
-        const session = readAuthSession();
-        if (session?.specialist) lockToUnlock(session.specialist);
-        else requireLogin();
+        requireLogin();
       }
     }
 
@@ -204,11 +197,7 @@ export default function DeptSyncHubPage() {
     const timer = window.setInterval(() => {
       const session = readAuthSession();
       if (!session || isAuthSessionExpired(session)) {
-        if (session?.specialist) {
-          lockToUnlock(session.specialist);
-        } else {
-          requireLogin();
-        }
+        requireLogin();
       }
     }, 60_000);
 
@@ -218,7 +207,7 @@ export default function DeptSyncHubPage() {
       }
       window.clearInterval(timer);
     };
-  }, [gate, lockToUnlock, requireLogin]);
+  }, [gate, requireLogin]);
 
   useEffect(() => {
     document.body.style.overflow =

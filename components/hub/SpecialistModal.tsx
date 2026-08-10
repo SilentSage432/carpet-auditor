@@ -1,18 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { PinKeypadModal } from "@/components/hub/PinKeypadModal";
 import { TextField } from "@/components/ui/NumberField";
 import {
   dedupeRoster,
   fetchSpecialists,
   getActiveSpecialist,
   isDefaultPin,
-  requiresPin,
   roleBadge,
   saveSpecialist,
-  usesPasswordUnlock,
-  verifyPin,
 } from "@/lib/specialists";
 import type { DepartmentScope, SpecialistRole, StoreSpecialist } from "@/lib/types";
 import {
@@ -36,9 +32,6 @@ export function SpecialistModal({ open, active, onClose, onSelect }: Props) {
   const [newDepartment, setNewDepartment] = useState<DepartmentScope>("flooring");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [pendingPinMember, setPendingPinMember] = useState<StoreSpecialist | null>(
-    null
-  );
 
   useEffect(() => {
     if (!open) return;
@@ -53,16 +46,13 @@ export function SpecialistModal({ open, active, onClose, onSelect }: Props) {
     };
   }, [open]);
 
-  if (!open && !pendingPinMember) return null;
+  if (!open) return null;
 
   const loading = team === null;
   const roster = team ?? [];
 
   function requestSelect(member: StoreSpecialist) {
-    if (requiresPin(member)) {
-      setPendingPinMember(member);
-      return;
-    }
+    // Single session: no action-level PIN — workspace is already unlocked.
     onSelect(member, { usedDefaultPin: isDefaultPin(member) });
     onClose();
   }
@@ -131,7 +121,7 @@ export function SpecialistModal({ open, active, onClose, onSelect }: Props) {
               Select Active Specialist
             </h2>
             <p className="mt-1 text-sm text-slate-400">
-              Supervisor profiles require a PIN. Associates switch instantly.
+              Switch the active profile for this session — no extra PIN needed.
             </p>
 
             {loading ? (
@@ -158,7 +148,6 @@ export function SpecialistModal({ open, active, onClose, onSelect }: Props) {
                           </span>
                           <span className="mt-0.5 block text-xs text-slate-400">
                             {roleBadge(member)}
-                            {requiresPin(member) ? " · PIN protected" : ""}
                           </span>
                         </span>
                         {selected ? (
@@ -287,41 +276,6 @@ export function SpecialistModal({ open, active, onClose, onSelect }: Props) {
           </div>
         </div>
       )}
-
-      <PinKeypadModal
-        key={pendingPinMember?.id ?? "pin-closed"}
-        open={pendingPinMember != null}
-        title={
-          pendingPinMember && usesPasswordUnlock(pendingPinMember)
-            ? "Enter Password"
-            : "Enter Supervisor PIN / Password"
-        }
-        subtitle={
-          pendingPinMember
-            ? `Unlock ${pendingPinMember.name}${
-                pendingPinMember.username
-                  ? ` · ${pendingPinMember.username}`
-                  : ""
-              }`
-            : undefined
-        }
-        mode={
-          pendingPinMember && usesPasswordUnlock(pendingPinMember)
-            ? "password"
-            : "pin"
-        }
-        verify={(pin) =>
-          pendingPinMember ? verifyPin(pendingPinMember, pin) : false
-        }
-        onClose={() => setPendingPinMember(null)}
-        onSuccess={() => {
-          if (!pendingPinMember) return;
-          const member = pendingPinMember;
-          setPendingPinMember(null);
-          onSelect(member, { usedDefaultPin: isDefaultPin(member) });
-          onClose();
-        }}
-      />
     </>
   );
 }

@@ -2,7 +2,8 @@
 
 /**
  * Shared auth gate for Store Ops / Navigation Hub route pages.
- * Composes hub auth-session; does not invent credentials.
+ * Single-session rule: admit when a valid auth session exists.
+ * Never prompts for PIN/biometrics — that only happens on Hub cold start / login.
  */
 
 import Link from "next/link";
@@ -48,8 +49,7 @@ export function SessionGate({
       clearAuthSession();
       setSpecialist(null);
     } else if (session) {
-      // Valid local session — refresh activity and admit without PIN re-prompt.
-      // must_change_credentials setup is handled on the Hub AuthWall, not here.
+      // Valid session → admit. No PIN / biometric re-check on route entry.
       const touched = touchAuthSession() ?? session;
       setSpecialist(touched.specialist);
     } else {

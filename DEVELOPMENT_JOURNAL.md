@@ -1,5 +1,15 @@
 # DeptSync Hub — Development Journal
 
+## 2026-08-09 — Single-session auth UX
+
+### Shipped
+- Valid localStorage session → Hub `ready` with no PIN unlock on cold start / navigation.
+- Removed action-level PIN gates (profile switch, manager markdown, discrepancy filter).
+- Store number change no longer forces re-login; session store_number updates in place.
+- SessionGate only admits/denies on session presence — never prompts credentials.
+
+---
+
 ## 2026-08-09 — Upsert constraint audit + readable errors
 
 ### Shipped

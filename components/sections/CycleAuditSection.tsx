@@ -5,16 +5,12 @@ import { QuickAddCatalogModal } from "@/components/barcode/QuickAddCatalogModal"
 import { SimsLocationFinder } from "@/components/catalog/SimsLocationFinder";
 import { NumberField, TextField } from "@/components/ui/NumberField";
 import { AuditReportModal } from "@/components/hub/AuditReportModal";
-import { PinKeypadModal } from "@/components/hub/PinKeypadModal";
 import {
   resolveScan,
   sanitizeBarcodeScan,
 } from "@/lib/barcode";
-import {
-  findSupervisor,
-  isSupervisor,
-  verifyPin,
-} from "@/lib/specialists";
+import { isSupervisor } from "@/lib/specialists";
+import { isMasterAdmin } from "@/lib/rbac";
 import {
   CLF_FACTOR,
   FRACTION_OPTIONS,
@@ -147,8 +143,6 @@ export function CycleAuditSection({
   const [filterSpecialist, setFilterSpecialist] = useState("all");
   const [filterLocation, setFilterLocation] = useState<"all" | LocationType>("all");
   const [filterDiscrepancies, setFilterDiscrepancies] = useState(false);
-  const [discrepancyUnlocked, setDiscrepancyUnlocked] = useState(false);
-  const [pinForDiscrepancy, setPinForDiscrepancy] = useState(false);
   const [draftRestored, setDraftRestored] = useState(false);
   const [summaryExpanded, setSummaryExpanded] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
@@ -162,7 +156,7 @@ export function CycleAuditSection({
   const auditMode = auditModeForCategory(category);
   const effectiveRollWidth = normalizeRollWidthFt(rollWidth);
   const canViewDiscrepancies =
-    isSupervisor(activeSpecialist) || discrepancyUnlocked;
+    isSupervisor(activeSpecialist) || isMasterAdmin(activeSpecialist);
 
   const wholeNum = toNumber(wholeInches, 0);
   const roundsNum = toNumber(rounds, 0);
@@ -623,26 +617,6 @@ export function CycleAuditSection({
         }}
         catalog={catalog}
         audits={audits}
-      />
-      <PinKeypadModal
-        key={pinForDiscrepancy ? "discrepancy-pin" : "discrepancy-closed"}
-        open={pinForDiscrepancy}
-        title="Supervisor PIN required"
-        subtitle="Unlock Discrepancies Only filter"
-        verify={(pin) => {
-          const supervisor = findSupervisor(specialists);
-          return supervisor ? verifyPin(supervisor, pin) : false;
-        }}
-        onClose={() => {
-          setPinForDiscrepancy(false);
-          dismissKeyboard();
-        }}
-        onSuccess={() => {
-          setDiscrepancyUnlocked(true);
-          setFilterDiscrepancies(true);
-          setPinForDiscrepancy(false);
-          dismissKeyboard();
-        }}
       />
       <AuditReportModal
         open={reportOpen}
@@ -1210,20 +1184,18 @@ export function CycleAuditSection({
             <input
               type="checkbox"
               checked={filterDiscrepancies && canViewDiscrepancies}
+              disabled={!canViewDiscrepancies}
               onChange={(e) => {
-                if (!canViewDiscrepancies) {
-                  setPinForDiscrepancy(true);
-                  return;
-                }
+                if (!canViewDiscrepancies) return;
                 setFilterDiscrepancies(e.target.checked);
               }}
-              className="h-5 w-5 accent-emerald-500"
+              className="h-5 w-5 accent-emerald-500 disabled:opacity-40"
             />
             <span className="min-w-0 text-sm text-slate-200">
               Discrepancies only
               {!canViewDiscrepancies ? (
-                <span className="mt-0.5 block text-xs text-amber-400">
-                  🛡️ Supervisor PIN required
+                <span className="mt-0.5 block text-xs text-slate-500">
+                  Supervisor / Master Admin session required
                 </span>
               ) : null}
             </span>

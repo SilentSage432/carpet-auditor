@@ -264,7 +264,8 @@ export function SettingsSection({
         )}
         {!supervisorSession && canChangePin ? (
           <p className="text-xs text-slate-500">
-            Discrepancy tools still require a Supervisor session or PIN unlock.
+            Discrepancy tools require a Supervisor or Master Admin session (no
+            extra PIN).
           </p>
         ) : null}
       </section>

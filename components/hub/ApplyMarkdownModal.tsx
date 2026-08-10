@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { PinKeypadModal } from "@/components/hub/PinKeypadModal";
 import { NumberField, TextField } from "@/components/ui/NumberField";
 import {
   clearanceBadgeLabel,
@@ -9,12 +8,9 @@ import {
   formatMoney,
 } from "@/lib/markdown";
 import { toNumber } from "@/lib/number-input";
+import { isMasterAdmin } from "@/lib/rbac";
 import { saveRemnant } from "@/lib/remnants";
-import {
-  findSupervisor,
-  isSupervisor,
-  verifyPin,
-} from "@/lib/specialists";
+import { findSupervisor, isSupervisor } from "@/lib/specialists";
 import type { Remnant, StoreSpecialist } from "@/lib/types";
 
 const PERCENT_CHIPS = [15, 25, 50] as const;
@@ -36,8 +32,8 @@ export function ApplyMarkdownModal({
   onClose,
   onApplied,
 }: Props) {
-  const supervisorSession = isSupervisor(activeSpecialist);
-  const [pinUnlocked, setPinUnlocked] = useState(false);
+  const authorized =
+    isSupervisor(activeSpecialist) || isMasterAdmin(activeSpecialist);
   const [mode, setMode] = useState<"percent" | "fixed">("percent");
   const [percent, setPercent] = useState<number>(25);
   const [fixedPrice, setFixedPrice] = useState("");
@@ -48,7 +44,6 @@ export function ApplyMarkdownModal({
 
   if (!open || !remnant) return null;
 
-  const authorized = supervisorSession || pinUnlocked;
   const estimatedValue =
     estimated.trim() === ""
       ? remnant.estimated_value
@@ -139,41 +134,42 @@ export function ApplyMarkdownModal({
   }
 
   return (
-    <>
-      <PinKeypadModal
-        key={authorized ? "md-auth-done" : "md-auth"}
-        open={!authorized}
-        title="Supervisor PIN required"
-        subtitle="Authorize manager markdown"
-        verify={(pin) => {
-          const supervisor = findSupervisor(specialists);
-          return supervisor ? verifyPin(supervisor, pin) : false;
-        }}
-        onClose={onClose}
-        onSuccess={() => setPinUnlocked(true)}
+    <div className="fixed inset-0 z-[75] flex items-end justify-center sm:items-center">
+      <button
+        type="button"
+        className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm"
+        aria-label="Close markdown modal"
+        onClick={onClose}
       />
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="markdown-title"
+        className="relative z-[76] max-h-[90dvh] w-full max-w-md overflow-y-auto rounded-t-2xl border border-slate-700 bg-slate-900 p-4 shadow-2xl sm:rounded-2xl"
+      >
+        <h2 id="markdown-title" className="text-lg font-bold text-slate-50">
+          🏷️ Apply Manager Markdown
+        </h2>
+        <p className="mt-1 text-sm text-slate-400">
+          {remnant.tag_number} · {remnant.carpet_name || remnant.sku}
+        </p>
 
-      {authorized ? (
-        <div className="fixed inset-0 z-[75] flex items-end justify-center sm:items-center">
-          <button
-            type="button"
-            className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm"
-            aria-label="Close markdown modal"
-            onClick={onClose}
-          />
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="markdown-title"
-            className="relative z-[76] max-h-[90dvh] w-full max-w-md overflow-y-auto rounded-t-2xl border border-slate-700 bg-slate-900 p-4 shadow-2xl sm:rounded-2xl"
-          >
-            <h2 id="markdown-title" className="text-lg font-bold text-slate-50">
-              🏷️ Apply Manager Markdown
-            </h2>
-            <p className="mt-1 text-sm text-slate-400">
-              {remnant.tag_number} · {remnant.carpet_name || remnant.sku}
+        {!authorized ? (
+          <div className="mt-4 space-y-3">
+            <p className="rounded-xl border border-amber-500/30 bg-amber-950/30 px-3 py-3 text-sm text-amber-100">
+              Manager markdown requires a Supervisor or Master Admin session.
+              Switch profile from the header — no extra PIN prompt.
             </p>
-
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex min-h-12 w-full items-center justify-center rounded-xl border border-slate-700 text-sm font-semibold text-slate-300"
+            >
+              Close
+            </button>
+          </div>
+        ) : (
+          <>
             <div className="mt-4 grid grid-cols-2 gap-2">
               <button
                 type="button"
@@ -268,7 +264,10 @@ export function ApplyMarkdownModal({
             ) : null}
 
             {error ? (
-              <p className="mt-2 text-center text-sm font-semibold text-red-400" role="alert">
+              <p
+                className="mt-2 text-center text-sm font-semibold text-red-400"
+                role="alert"
+              >
                 {error}
               </p>
             ) : null}
@@ -290,9 +289,9 @@ export function ApplyMarkdownModal({
                 {saving ? "Saving…" : "Apply Markdown"}
               </button>
             </div>
-          </div>
-        </div>
-      ) : null}
-    </>
+          </>
+        )}
+      </div>
+    </div>
   );
 }
