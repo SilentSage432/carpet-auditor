@@ -52,6 +52,7 @@
 - [x] Store Health Scorecard on Zebra dashboard (DS pace + Super Admin bottlenecks)
 - [x] Mobile floor UX Waves A–C: Admin Tools drawer, DS lockdown, dense lists, progressive disclosure
 - [x] Supervisor Invite & Onboarding (`/invite`, temp PIN hash, Twilio/SMS preview, PWA + WebAuthn)
+- [x] Add Supervisor issues crypto temp PIN via invite API (no hardcoded admin password)
 
 ## Next
 - [ ] JWT / claim-based RLS enforcing `store_number` (+ department) server-side

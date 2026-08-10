@@ -18,8 +18,8 @@ const TABLE = "store_specialists";
 
 export const DEFAULT_SUPERVISOR_PIN = "1234";
 export const DEFAULT_APPLIANCE_USERNAME = "amber_appliance";
+/** Historical Amber seed PIN — used only for seed + first-login detection. */
 export const DEFAULT_APPLIANCE_PASSWORD = "ChangeMe123";
-export const DEFAULT_TEMP_PASSWORD = "ChangeMe123";
 
 const PLACEHOLDER_NAMES = new Set([
   "alex",
@@ -1207,13 +1207,21 @@ export function findSupervisor(
   );
 }
 
-/** Reset to temporary password and force first-login credential change. */
+/**
+ * Reset to an explicit temporary PIN and force first-login credential change.
+ * Prefer Super Admin invite (`/api/admin/invite-supervisor`) so the PIN is
+ * cryptographically random and the invite/SMS preview owns delivery.
+ */
 export async function resetSpecialistCredentials(
   member: StoreSpecialist,
-  temporaryPassword = DEFAULT_TEMP_PASSWORD
+  temporaryPassword: string
 ): Promise<{ record: StoreSpecialist; offline: boolean }> {
+  const pin = temporaryPassword.trim();
+  if (pin.length < 4) {
+    throw new Error("Temporary PIN must be at least 4 characters");
+  }
   return persistSpecialistFields(member, {
-    pin_code: temporaryPassword,
+    pin_code: pin,
     must_change_credentials: true,
   });
 }

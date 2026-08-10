@@ -20,10 +20,10 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 
 ### Master Admin roster console
 - Roster CRUD lives on `/admin/supervisors` and **Admin Tools** (not permanent Settings chrome)
-- Add supervisor/associate with department, username suggest, temp password, first-login reset flag
-- Reset credentials / Edit scope / **Deactivate** (soft-delete `is_active: false` + optional hard delete)
+- **Add** creates via `POST /api/admin/invite-supervisor` — crypto 6-digit temp PIN (never typed by admin); invite/SMS preview shows the returned PIN
+- Reset / Invite re-issues the same invite path (random PIN + `/invite` link)
+- Edit scope / **Deactivate** (soft-delete `is_active: false` + optional hard delete)
 - Deactivated profiles stay out of active roster fetches; seed helpers respect tombstones so Amber is not revived
-- Shareable issued-login card after create/reset
 
 ### Admin Tools (Super Admin only)
 - Slide-over drawer defaults **closed** — header **Admin** chip, hamburger entry, or `openAdminTools()`

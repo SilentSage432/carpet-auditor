@@ -27,7 +27,7 @@ type InviteBody = {
   username?: string;
   department?: string;
   phone?: string;
-  role?: "Supervisor" | "Associate";
+  role?: "Supervisor" | "Associate" | "MasterAdmin";
   /**
    * Staging / Super Admin dry-run: append &test=1 to invite URL,
    * skip Twilio, and allow /invite to complete without burning the token.
@@ -61,8 +61,12 @@ export async function POST(request: Request) {
     let name = (body.name ?? "").trim();
     let username = (body.username ?? "").trim();
     let department = (body.department ?? "flooring").trim() as DepartmentScope;
-    let role: "Supervisor" | "Associate" =
-      body.role === "Associate" ? "Associate" : "Supervisor";
+    let role: "Supervisor" | "Associate" | "MasterAdmin" =
+      body.role === "Associate"
+        ? "Associate"
+        : body.role === "MasterAdmin"
+          ? "MasterAdmin"
+          : "Supervisor";
 
     if (rowId) {
       const { data: existing, error: loadErr } = await supabase
@@ -84,11 +88,14 @@ export async function POST(request: Request) {
         existing.role === "Associate"
           ? "Associate"
           : existing.role === "MasterAdmin"
-            ? "Supervisor"
+            ? "MasterAdmin"
             : "Supervisor";
     } else {
       if (!name) {
         return NextResponse.json({ error: "name is required" }, { status: 400 });
+      }
+      if (role === "MasterAdmin") {
+        department = "all";
       }
       if (!username) {
         username = suggestUsername(name, department);
@@ -119,7 +126,7 @@ export async function POST(request: Request) {
       name,
       username,
       role,
-      assigned_department: role === "Supervisor" ? department : department,
+      assigned_department: role === "MasterAdmin" ? "all" : department,
     };
 
     let saved: Record<string, unknown> | null = null;

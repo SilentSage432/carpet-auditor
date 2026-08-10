@@ -230,7 +230,7 @@ export function SpecialistModal({ open, active, onClose, onSelect }: Props) {
                   onChange={setNewPin}
                   placeholder={
                     newRole === "Supervisor" || newRole === "MasterAdmin"
-                      ? "e.g. 1234 or ChangeMe123"
+                      ? "e.g. 6-digit temp PIN"
                       : "Optional"
                   }
                 />

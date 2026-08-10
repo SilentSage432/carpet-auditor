@@ -8,15 +8,12 @@ import {
   suggestUsername,
 } from "@/lib/rbac";
 import {
-  DEFAULT_TEMP_PASSWORD,
   dedupeRoster,
   deleteSpecialist,
   fetchSpecialists,
   isDefaultPin,
   needsCredentialSetup,
-  resetSpecialistCredentials,
   roleBadge,
-  saveSpecialist,
   updateSpecialistScope,
 } from "@/lib/specialists";
 import { inviteSupervisor } from "@/lib/store-ops/client";
@@ -37,12 +34,6 @@ type Props = {
   onRosterChange: (roster: StoreSpecialist[]) => void;
 };
 
-type IssuedCredentials = {
-  name: string;
-  username: string;
-  password: string;
-};
-
 type InviteResult = {
   name: string;
   username: string;
@@ -53,6 +44,34 @@ type InviteResult = {
   sms_status: string;
   test_mode?: boolean;
 };
+
+function toInviteResult(data: {
+  name: string;
+  username: string;
+  temporary_pin: string;
+  invite_url: string;
+  sms_preview: { body: string; sms_link: string };
+  sms:
+    | { ok: true; sid: string }
+    | { ok: false; skipped: true; reason: string }
+    | { ok: false; skipped: false; reason: string };
+  test_mode?: boolean;
+}): InviteResult {
+  return {
+    name: data.name,
+    username: data.username,
+    temporary_pin: data.temporary_pin,
+    invite_url: data.invite_url,
+    sms_link: data.sms_preview.sms_link,
+    sms_body: data.sms_preview.body,
+    sms_status: data.sms.ok
+      ? `SMS sent (${data.sms.sid})`
+      : data.sms.skipped
+        ? data.sms.reason
+        : `SMS failed: ${data.sms.reason}`,
+    test_mode: Boolean(data.test_mode),
+  };
+}
 
 function credentialsStatus(member: StoreSpecialist): {
   label: string;
@@ -88,7 +107,6 @@ export function AdminRosterManager({
   const [busyId, setBusyId] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [toastTone, setToastTone] = useState<"ok" | "err">("ok");
-  const [issued, setIssued] = useState<IssuedCredentials | null>(null);
 
   const canManage = canManageTeamRoster(activeSpecialist);
 
@@ -131,20 +149,7 @@ export function AdminRosterManager({
         test_mode: true,
       });
       await refreshRoster();
-      setInviteResult({
-        name: data.name,
-        username: data.username,
-        temporary_pin: data.temporary_pin,
-        invite_url: data.invite_url,
-        sms_link: data.sms_preview.sms_link,
-        sms_body: data.sms_preview.body,
-        sms_status: data.sms.ok
-          ? `SMS sent (${data.sms.sid})`
-          : data.sms.skipped
-            ? data.sms.reason
-            : `SMS failed: ${data.sms.reason}`,
-        test_mode: true,
-      });
+      setInviteResult(toInviteResult({ ...data, test_mode: true }));
       flash(`🧪 Test invite ready for ${data.name}`);
     } catch (err) {
       flash(
@@ -157,18 +162,20 @@ export function AdminRosterManager({
   }
 
   async function handleReset(member: StoreSpecialist) {
+    if (!activeSpecialist) return;
     setBusyId(member.id);
     try {
-      const { record } = await resetSpecialistCredentials(member);
-      await refreshRoster(record);
-      setIssued({
-        name: record.name,
-        username: record.username || suggestUsername(record.name, record.assigned_department ?? "flooring"),
-        password: DEFAULT_TEMP_PASSWORD,
+      const data = await inviteSupervisor(activeSpecialist, {
+        specialist_id: member.id,
       });
-      flash(`🔑 Credentials reset for ${record.name}`);
-    } catch {
-      flash("Could not reset credentials");
+      await refreshRoster();
+      setInviteResult(toInviteResult(data));
+      flash(`🔑 New temp PIN issued for ${data.name}`);
+    } catch (err) {
+      flash(
+        err instanceof Error ? err.message : "Could not reset credentials",
+        "err"
+      );
     } finally {
       setBusyId(null);
     }
@@ -256,7 +263,7 @@ export function AdminRosterManager({
               <div className="mt-3 grid grid-cols-2 gap-1.5">
                 <button
                   type="button"
-                  disabled={busyId === member.id || member.role === "MasterAdmin"}
+                  disabled={busyId === member.id}
                   onClick={() => setInviteTarget(member)}
                   className="flex min-h-11 items-center justify-center rounded-lg border border-emerald-500/40 text-[11px] font-semibold text-emerald-200 disabled:opacity-40"
                 >
@@ -265,9 +272,7 @@ export function AdminRosterManager({
                 <button
                   type="button"
                   disabled={
-                    busyId === member.id ||
-                    testBusyId === member.id ||
-                    member.role === "MasterAdmin"
+                    busyId === member.id || testBusyId === member.id
                   }
                   onClick={() => void handleTestInviteFlow(member)}
                   className="flex min-h-11 items-center justify-center rounded-lg border border-amber-400/50 text-[11px] font-semibold text-amber-100 disabled:opacity-40"
@@ -333,11 +338,13 @@ export function AdminRosterManager({
       <AdminAddMemberModal
         open={addOpen}
         storeNumber={storeNumber}
+        actor={activeSpecialist}
         onClose={() => setAddOpen(false)}
-        onCreated={async (record, creds) => {
-          await refreshRoster(record);
-          setIssued(creds);
+        onCreated={async (result) => {
+          await refreshRoster();
           setAddOpen(false);
+          setInviteResult(result);
+          flash(`Account ready for ${result.name}`);
         }}
       />
 
@@ -383,13 +390,6 @@ export function AdminRosterManager({
         <TestInviteHarnessModal
           result={inviteResult}
           onClose={() => setInviteResult(null)}
-        />
-      ) : null}
-
-      {issued ? (
-        <IssuedCredentialsCard
-          issued={issued}
-          onDismiss={() => setIssued(null)}
         />
       ) : null}
     </section>
@@ -551,20 +551,7 @@ function AdminInviteModal({
         specialist_id: inviteMember.id,
         phone: phone.trim() || undefined,
       });
-      await onInvited({
-        name: data.name,
-        username: data.username,
-        temporary_pin: data.temporary_pin,
-        invite_url: data.invite_url,
-        sms_link: data.sms_preview.sms_link,
-        sms_body: data.sms_preview.body,
-        sms_status: data.sms.ok
-          ? `SMS sent (${data.sms.sid})`
-          : data.sms.skipped
-            ? data.sms.reason
-            : `SMS failed: ${data.sms.reason}`,
-        test_mode: Boolean(data.test_mode),
-      });
+      await onInvited(toInviteResult(data));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Invite failed");
     } finally {
@@ -627,51 +614,25 @@ function AdminInviteModal({
   );
 }
 
-function IssuedCredentialsCard({
-  issued,
-  onDismiss,
+function AdminAddMemberModal({
+  open,
+  storeNumber,
+  actor,
+  onClose,
+  onCreated,
 }: {
-  issued: IssuedCredentials;
-  onDismiss: () => void;
-}) {
-  return (
-    <div className="rounded-xl border border-emerald-500/40 bg-emerald-950/40 p-3">
-      <p className="text-sm font-bold text-emerald-200">Account Ready!</p>
-      <p className="mt-1 text-sm leading-relaxed text-emerald-100/90">
-        Share these credentials with{" "}
-        <span className="font-semibold">{issued.name}</span>:
-      </p>
-      <p className="mt-2 rounded-lg bg-slate-950/60 px-3 py-2 font-mono text-xs text-slate-100">
-        Username: {issued.username}
-        <br />
-        Temp Pass: {issued.password}
-      </p>
-      <button
-        type="button"
-        onClick={onDismiss}
-        className="mt-3 flex min-h-11 w-full items-center justify-center rounded-xl border border-emerald-500/30 text-sm font-semibold text-emerald-200"
-      >
-        Done
-      </button>
-    </div>
-  );
-}
-
-type AddProps = {
   open: boolean;
   storeNumber: string;
+  actor: StoreSpecialist | null;
   onClose: () => void;
-  onCreated: (record: StoreSpecialist, creds: IssuedCredentials) => void;
-};
-
-function AdminAddMemberModal({ open, storeNumber, onClose, onCreated }: AddProps) {
+  onCreated: (result: InviteResult) => Promise<void>;
+}) {
   const [name, setName] = useState("");
   const [role, setRole] = useState<SpecialistRole>("Supervisor");
   const [department, setDepartment] =
     useState<DepartmentScope>("plumbing");
   const [username, setUsername] = useState("");
-  const [password, setPassword] = useState(DEFAULT_TEMP_PASSWORD);
-  const [requireReset, setRequireReset] = useState(true);
+  const [phone, setPhone] = useState("");
   const [usernameTouched, setUsernameTouched] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -682,8 +643,7 @@ function AdminAddMemberModal({ open, storeNumber, onClose, onCreated }: AddProps
     setRole("Supervisor");
     setDepartment("plumbing");
     setUsername("");
-    setPassword(DEFAULT_TEMP_PASSWORD);
-    setRequireReset(true);
+    setPhone("");
     setUsernameTouched(false);
     setError(null);
   }, [open]);
@@ -699,6 +659,10 @@ function AdminAddMemberModal({ open, storeNumber, onClose, onCreated }: AddProps
   if (!open) return null;
 
   async function handleSave() {
+    if (!actor) {
+      setError("Sign in as Super Admin to issue invites");
+      return;
+    }
     if (!name.trim()) {
       setError("Enter a full name / name badge");
       return;
@@ -707,31 +671,30 @@ function AdminAddMemberModal({ open, storeNumber, onClose, onCreated }: AddProps
       setError("Enter an initial username");
       return;
     }
-    if (password.trim().length < 6) {
-      setError("Temporary password must be at least 6 characters");
-      return;
-    }
 
     setSaving(true);
     setError(null);
     try {
       const assigned = role === "MasterAdmin" ? "all" : department;
-      const { record } = await saveSpecialist({
+      const data = await inviteSupervisor(actor, {
         name: name.trim(),
-        role,
         username: username.trim(),
-        pin_code: password.trim(),
-        assigned_department: assigned,
-        must_change_credentials: requireReset,
-        store_number: storeNumber,
+        department: assigned,
+        phone: phone.trim() || undefined,
+        role:
+          role === "Associate"
+            ? "Associate"
+            : role === "MasterAdmin"
+              ? "MasterAdmin"
+              : "Supervisor",
       });
-      onCreated(record, {
-        name: record.name,
-        username: record.username || username.trim(),
-        password: password.trim(),
-      });
-    } catch {
-      setError("Could not create account. Try a different name/username.");
+      await onCreated(toInviteResult(data));
+    } catch (err) {
+      setError(
+        err instanceof Error
+          ? err.message
+          : "Could not create account. Try a different name/username."
+      );
     } finally {
       setSaving(false);
     }
@@ -755,7 +718,8 @@ function AdminAddMemberModal({ open, storeNumber, onClose, onCreated }: AddProps
           Add Department Supervisor / Specialist
         </h2>
         <p className="mt-1 text-sm text-slate-400">
-          Issues a login for {formatStoreLabel(storeNumber)}.
+          Issues a login for {formatStoreLabel(storeNumber)}. A secure temp PIN
+          and /invite link are generated on save.
         </p>
 
         <div className="mt-4 space-y-3">
@@ -827,29 +791,35 @@ function AdminAddMemberModal({ open, storeNumber, onClose, onCreated }: AddProps
             }}
             placeholder="e.g. dave_plumbing"
           />
-          <TextField
-            label="Temporary Password"
-            value={password}
-            onChange={setPassword}
-            placeholder={DEFAULT_TEMP_PASSWORD}
-          />
 
-          <label className="flex min-h-12 items-center gap-3 rounded-xl border border-slate-800 bg-slate-950/70 px-3">
-            <input
-              type="checkbox"
-              checked={requireReset}
-              onChange={(e) => setRequireReset(e.target.checked)}
-              className="h-5 w-5 accent-emerald-500"
-            />
-            <span className="text-sm font-medium text-slate-200">
-              Require Password Reset on First Login
+          <div className="rounded-xl border border-emerald-500/30 bg-emerald-950/20 px-3 py-3">
+            <span className="inline-flex items-center rounded-full border border-emerald-400/40 bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-100">
+              🎲 Auto-Generated 6-Digit PIN
             </span>
+            <p className="mt-2 text-xs leading-relaxed text-slate-400">
+              A cryptographically secure temporary PIN is created on save. You
+              will see that PIN in the invite / SMS preview — it is never typed
+              by an admin.
+            </p>
+          </div>
+
+          <label className="block space-y-1.5">
+            <span className="text-sm font-medium text-slate-200">
+              Mobile number (optional)
+            </span>
+            <input
+              type="tel"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder="+1 555 123 4567"
+              className="min-h-12 w-full rounded-xl border border-slate-700 bg-slate-950 px-3 text-slate-100"
+            />
           </label>
 
           <p className="text-xs text-slate-500">
             Store Number:{" "}
             <span className="font-mono text-emerald-400">{storeNumber}</span>{" "}
-            (auto-attached)
+            (auto-attached) · First login requires PIN reset via /invite
           </p>
         </div>
 
@@ -869,11 +839,11 @@ function AdminAddMemberModal({ open, storeNumber, onClose, onCreated }: AddProps
           </button>
           <button
             type="button"
-            disabled={saving}
+            disabled={saving || !actor}
             onClick={() => void handleSave()}
             className="flex min-h-12 items-center justify-center rounded-xl bg-emerald-500 text-sm font-bold text-slate-950 disabled:opacity-40"
           >
-            {saving ? "Saving…" : "Save & Issue Login"}
+            {saving ? "Issuing…" : "Save & Issue Invite"}
           </button>
         </div>
       </div>

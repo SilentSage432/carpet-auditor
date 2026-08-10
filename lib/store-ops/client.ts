@@ -387,7 +387,7 @@ export async function inviteSupervisor(
     username?: string;
     department?: string;
     phone?: string;
-    role?: "Supervisor" | "Associate";
+    role?: "Supervisor" | "Associate" | "MasterAdmin";
     test_mode?: boolean;
   }
 ): Promise<InviteSupervisorResult> {

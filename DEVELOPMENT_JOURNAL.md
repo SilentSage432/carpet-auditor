@@ -1,5 +1,14 @@
 # DeptSync Hub — Development Journal
 
+## 2026-08-10 — Auto-generated invite PIN on Add Supervisor
+
+### Shipped
+- Add Supervisor modal no longer accepts a typed default password (`ChangeMe123` removed from admin issue path).
+- Read-only **🎲 Auto-Generated 6-Digit PIN** badge; submit calls `/api/admin/invite-supervisor` and opens the invite/SMS preview with the returned `temporary_pin`.
+- Reset credentials also re-issues via invite (random PIN + preview). Invite API preserves `MasterAdmin` role.
+
+---
+
 ## 2026-08-10 — Admin Invite Testing Harness
 
 ### Shipped
