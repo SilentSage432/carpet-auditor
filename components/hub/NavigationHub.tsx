@@ -24,7 +24,7 @@ import {
   navRoleLinks,
   type NavHubLink,
 } from "@/lib/nav-hub";
-import { isMasterAdmin } from "@/lib/rbac";
+import { isAssociate, isMasterAdmin } from "@/lib/rbac";
 import { formatStoreLabel } from "@/lib/store";
 import type { StoreSpecialist } from "@/lib/types";
 
@@ -65,6 +65,8 @@ export function NavigationHub({
   const drawerId = useId();
   const userRef = useRef<HTMLDivElement>(null);
   const master = isMasterAdmin(specialist);
+  const associate = isAssociate(specialist);
+  const linksIncludeHub = links.some((link) => link.href === "/");
 
   useEffect(() => {
     setMenuOpen(false);
@@ -252,12 +254,12 @@ export function NavigationHub({
                     />
                   ) : null}
                   <Link
-                    href="/"
+                    href={associate ? "/settings" : "/"}
                     role="menuitem"
                     className="flex min-h-12 items-center rounded-xl px-3 text-sm font-semibold text-slate-200 hover:bg-slate-900"
                     onClick={() => setUserOpen(false)}
                   >
-                    Inventory Hub
+                    {associate ? "My Profile / PIN" : "Inventory Hub"}
                   </Link>
                   {onLogout ? (
                     <MenuAction
@@ -342,25 +344,27 @@ export function NavigationHub({
                   onNavigate={() => setMenuOpen(false)}
                 />
               ))}
-              <li>
-                <Link
-                  href="/"
-                  onClick={() => setMenuOpen(false)}
-                  className="flex min-h-16 items-center gap-3 rounded-2xl border border-slate-700 bg-slate-900/80 px-4 text-left"
-                >
-                  <span className="text-xl" aria-hidden>
-                    📊
-                  </span>
-                  <span>
-                    <span className="block text-sm font-bold text-slate-100">
-                      Inventory Hub
+              {!linksIncludeHub ? (
+                <li>
+                  <Link
+                    href="/"
+                    onClick={() => setMenuOpen(false)}
+                    className="flex min-h-16 items-center gap-3 rounded-2xl border border-slate-700 bg-slate-900/80 px-4 text-left"
+                  >
+                    <span className="text-xl" aria-hidden>
+                      📊
                     </span>
-                    <span className="block text-xs text-slate-400">
-                      Audits, catalog, remnants
+                    <span>
+                      <span className="block text-sm font-bold text-slate-100">
+                        Inventory Hub
+                      </span>
+                      <span className="block text-xs text-slate-400">
+                        Audits, catalog, remnants
+                      </span>
                     </span>
-                  </span>
-                </Link>
-              </li>
+                  </Link>
+                </li>
+              ) : null}
             </ul>
           </nav>
         </div>

@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
 import {
+  isDeptFloorActor,
   parseStoreOpsActor,
   requireStoreOpsActor,
   requireSuperAdmin,
+  requireSupervisorOrAdmin,
   StoreOpsAuthError,
 } from "@/lib/store-ops/auth";
 import { requireSupabaseAdmin } from "@/lib/supabase/admin-response";
@@ -28,7 +30,7 @@ export async function GET(request: Request) {
       .eq("store_id", store.id)
       .order("name");
 
-    if (actor.role === "department_supervisor" && actor.departmentCode) {
+    if (isDeptFloorActor(actor) && actor.departmentCode) {
       query = query.eq("code", actor.departmentCode);
     }
 
@@ -69,7 +71,8 @@ export async function GET(request: Request) {
  */
 export async function PATCH(request: Request) {
   try {
-    const actor = requireStoreOpsActor(parseStoreOpsActor(request));
+    // Associates cannot edit weekly bay targets.
+    const actor = requireSupervisorOrAdmin(parseStoreOpsActor(request));
     const { supabase, response } = requireSupabaseAdmin();
     if (!supabase) return response;
 

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { AuthWall, type AuthWallMode } from "@/components/auth/AuthWall";
 import { ChangePinModal } from "@/components/hub/ChangePinModal";
-import { BottomNavBar } from "@/components/hub/HubChrome";
+import { BottomNavBar, AssociateSpecialtySwitcher } from "@/components/hub/HubChrome";
 import { NavigationHub } from "@/components/hub/NavigationHub";
 import { SpecialistModal } from "@/components/hub/SpecialistModal";
 import { CatalogSection } from "@/components/sections/CatalogSection";
@@ -29,6 +29,7 @@ import {
   catalogDomainForMember,
   defaultSectionForMember,
   effectiveDepartment,
+  isAssociate,
   isGenericDepartment,
   sectionTitle,
 } from "@/lib/rbac";
@@ -276,6 +277,11 @@ export default function DeptSyncHubPage() {
   const catalogDomain = catalogDomainForMember(specialist);
   const dept = effectiveDepartment(specialist);
   const authenticated = gate === "ready" && specialist != null;
+  const associateSession = isAssociate(specialist);
+  const activeSection =
+    associateSession && section === "settings"
+      ? defaultSectionForMember(specialist)
+      : section;
 
   // Zero-access wall — hide all workspace chrome until auth succeeds.
   if (gate === "booting" || !rosterReady) {
@@ -309,13 +315,13 @@ export default function DeptSyncHubPage() {
   return (
     <div className="flex min-h-dvh flex-col">
       <NavigationHub
-        title={sectionTitle(section, specialist)}
+        title={sectionTitle(activeSection, specialist)}
         specialist={specialist}
         onOpenSpecialist={() => setSpecialistOpen(true)}
         onChangePin={specialist ? () => setChangePinOpen(true) : undefined}
         onLogout={handleLogout}
         storeNumber={storeNumber}
-        showBottomNav={false}
+        showBottomNav={associateSession}
       />
       <SpecialistModal
         open={specialistOpen}
@@ -353,14 +359,23 @@ export default function DeptSyncHubPage() {
         <>
           <div
             className={`mx-auto w-full max-w-md flex-1 overflow-x-hidden px-4 py-4 ${
-              section === "audit" ||
-              section === "appliances" ||
-              section === "department"
-                ? "pb-44"
-                : "pb-32"
+              associateSession
+                ? "pb-28"
+                : activeSection === "audit" ||
+                    activeSection === "appliances" ||
+                    activeSection === "department"
+                  ? "pb-44"
+                  : "pb-32"
             }`}
           >
-            {section === "audit" && canAccessSection(specialist, "audit") && (
+            {associateSession ? (
+              <AssociateSpecialtySwitcher
+                active={activeSection}
+                onSelect={handleSectionSelect}
+                specialist={specialist}
+              />
+            ) : null}
+            {activeSection === "audit" && canAccessSection(specialist, "audit") && (
               <CycleAuditSection
                 catalog={catalog}
                 onCatalogChange={setCatalog}
@@ -369,14 +384,14 @@ export default function DeptSyncHubPage() {
                 activeSpecialist={specialist}
               />
             )}
-            {section === "catalog" && canAccessSection(specialist, "catalog") && (
+            {activeSection === "catalog" && canAccessSection(specialist, "catalog") && (
               <CatalogSection
                 catalog={catalog}
                 onCatalogChange={setCatalog}
                 domainFilter={catalogDomain}
               />
             )}
-            {section === "remnants" &&
+            {activeSection === "remnants" &&
               canAccessSection(specialist, "remnants") && (
                 <RemnantSection
                   catalog={catalog}
@@ -387,7 +402,7 @@ export default function DeptSyncHubPage() {
                   activeSpecialist={specialist}
                 />
               )}
-            {section === "appliances" &&
+            {activeSection === "appliances" &&
               canAccessSection(specialist, "appliances") && (
                 <ApplianceAuditSection
                   catalog={catalog}
@@ -396,7 +411,7 @@ export default function DeptSyncHubPage() {
                   activeSpecialist={specialist}
                 />
               )}
-            {section === "department" &&
+            {activeSection === "department" &&
               canAccessSection(specialist, "department") &&
               isGenericDepartment(dept) && (
                 <DepartmentAuditSection
@@ -407,7 +422,8 @@ export default function DeptSyncHubPage() {
                   activeSpecialist={specialist}
                 />
               )}
-            {section === "settings" &&
+            {!associateSession &&
+              activeSection === "settings" &&
               canAccessSection(specialist, "settings") && (
                 <SettingsSection
                   catalogCount={catalog.length}
@@ -423,11 +439,13 @@ export default function DeptSyncHubPage() {
               )}
           </div>
 
-          <BottomNavBar
-            active={section}
-            onSelect={handleSectionSelect}
-            specialist={specialist}
-          />
+          {!associateSession ? (
+            <BottomNavBar
+              active={activeSection}
+              onSelect={handleSectionSelect}
+              specialist={specialist}
+            />
+          ) : null}
         </>
       ) : null}
     </div>

@@ -16,7 +16,7 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 |------|-------|------|
 | 👑 Master Admin | `assigned_department: all` | Flooring Audit · Appliances · Universal Catalog · Remnants · Master Settings |
 | 🛡️ Department Supervisor | e.g. Amber → `appliances`, Dave → `plumbing` | Dept audit/catalog/profile (flooring also gets Remnants) |
-| 👤 Floor Associate | inherits / assigned dept | Same as department supervisor for that dept |
+| 👤 Floor Associate | inherits / assigned dept | Checklist · Barriers · Specialty Tools · Profile (no Admin Tools) |
 
 ### Master Admin roster console
 - Roster CRUD lives on `/admin/supervisors` and **Admin Tools** (not permanent Settings chrome)
@@ -140,3 +140,7 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 - Onboarding steps: temp PIN → Create New PIN → Add to Home Screen → WebAuthn biometric → `/dashboard`
 - APIs: `POST /api/admin/invite-supervisor`, `GET|POST /api/invite/[token]`
 - **Test Invite Flow** (roster): dry-run `test_mode` → modal with PIN + welcome SMS + Copy Invite Link / Copy Full SMS Text; `/invite?test=1` preserves token after PIN reset
+
+## Associate floor role
+- Store Ops actor `associate`: read/complete dept rotations + locations; create exceptions via verify; **no** targets, invite, generate/reset, Admin Tools, `/admin/*`
+- Nav: Checklist · Barriers / Log · Specialty Tools · My Profile / PIN

@@ -21,7 +21,7 @@ export default function VerifyRotationPage() {
   return (
     <SessionGate
       allow={(m) => Boolean(actorFromSpecialist(m))}
-      denyMessage="Verification is for department supervisors and Master Admin."
+      denyMessage="Barriers / verification is for department associates, supervisors, and Master Admin."
     >
       {({ specialist, storeNumber, logout }) => (
         <VerifyBody
@@ -159,7 +159,9 @@ function VerifyBody({
   return (
     <div className="flex min-h-dvh flex-col">
       <NavigationHub
-        title="Verify Rotation"
+        title={
+          specialist.role === "Associate" ? "Barriers / Log" : "Verify Rotation"
+        }
         specialist={specialist}
         storeNumber={storeNumber}
         onLogout={logout}

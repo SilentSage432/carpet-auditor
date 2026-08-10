@@ -5,6 +5,7 @@
 
 import {
   effectiveDepartment,
+  isAssociate,
   isMasterAdmin,
 } from "@/lib/rbac";
 import { departmentMeta, type StoreSpecialist } from "@/lib/types";
@@ -35,6 +36,11 @@ export function navRoleBadge(member: StoreSpecialist | null | undefined): string
     const dept = effectiveDepartment(member);
     const code = DEPT_BADGE_CODE[dept] ?? "DEPT";
     return `[${code} DEPT]`;
+  }
+  if (isAssociate(member)) {
+    const dept = effectiveDepartment(member);
+    const code = DEPT_BADGE_CODE[dept] ?? "DEPT";
+    return `[${code} ASC]`;
   }
   return "[ASSOCIATE]";
 }
@@ -142,21 +148,35 @@ export function navRoleLinks(
     ];
   }
 
-  // Associates: settings + inventory hub only
+  // Associates: floor checklist + barriers + specialty auditors + profile only
   return [
     {
+      href: "/dashboard",
+      label: "My Department Checklist",
+      shortLabel: "Checklist",
+      icon: "📱",
+      description: "This week’s assigned rotation bays",
+    },
+    {
+      href: "/verify-rotation",
+      label: "Barriers / Log",
+      shortLabel: "Barriers",
+      icon: "🚧",
+      description: "Log barriers and review incomplete bays",
+    },
+    {
       href: "/",
-      label: "Inventory Hub",
-      shortLabel: "Hub",
-      icon: "📊",
-      description: "Department audit workspace",
+      label: "Specialty Tools",
+      shortLabel: "Tools",
+      icon: "🛠️",
+      description: "Flooring / appliance department auditors",
     },
     {
       href: "/settings",
-      label: "Settings",
-      shortLabel: "Settings",
-      icon: "⚙️",
-      description: "Profile and sync",
+      label: "My Profile / PIN",
+      shortLabel: "Profile",
+      icon: "🔐",
+      description: "Credentials and device sync",
     },
   ];
 }

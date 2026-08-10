@@ -121,6 +121,45 @@ type BottomNavBarProps = {
   specialist: StoreSpecialist | null;
 };
 
+/** In-page specialty tool switcher for Associates (ops bottom nav owns primary routes). */
+export function AssociateSpecialtySwitcher({
+  active,
+  onSelect,
+  specialist,
+}: BottomNavBarProps) {
+  const tabs = visibleNavTabs(specialist).filter((tab) => tab.id !== "settings");
+  if (tabs.length <= 1) return null;
+
+  return (
+    <div
+      role="tablist"
+      aria-label="Specialty tools"
+      className="mb-3 flex gap-1.5 overflow-x-auto pb-1"
+    >
+      {tabs.map((tab) => {
+        const isActive = tab.id === active;
+        return (
+          <button
+            key={tab.id}
+            type="button"
+            role="tab"
+            aria-selected={isActive}
+            onClick={() => onSelect(tab.id)}
+            className={`flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-2 text-xs font-bold transition ${
+              isActive
+                ? "border-emerald-400/60 bg-emerald-500/15 text-emerald-100"
+                : "border-slate-700 bg-slate-950/70 text-slate-400"
+            }`}
+          >
+            <span aria-hidden>{tab.icon}</span>
+            {tab.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 export function BottomNavBar({
   active,
   onSelect,

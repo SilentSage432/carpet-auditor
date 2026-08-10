@@ -3,7 +3,11 @@
  * Ownership: store-ops schema; presentation consumes, does not recompute cycle rules.
  */
 
-export type StoreOpsUserRole = "super_admin" | "department_supervisor";
+export type StoreOpsUserRole =
+  | "super_admin"
+  | "department_supervisor"
+  | "associate";
+
 
 export type StoreLocationType = "SELLING" | "TOPSTOCK";
 

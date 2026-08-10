@@ -16,7 +16,7 @@ export default function SupervisorDashboardPage() {
   return (
     <SessionGate
       allow={(m) => Boolean(actorFromSpecialist(m))}
-      denyMessage="Rotation dashboard is for department supervisors and Master Admin."
+      denyMessage="Rotation dashboard is for department associates, supervisors, and Master Admin."
     >
       {({ specialist, storeNumber, logout }) => (
         <DashboardBody

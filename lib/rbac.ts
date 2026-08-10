@@ -66,11 +66,24 @@ export function isMasterAdmin(
   return member?.role === "MasterAdmin";
 }
 
+export function isAssociate(
+  member: StoreSpecialist | null | undefined
+): boolean {
+  return member?.role === "Associate";
+}
+
 /** Elevated roles that manage PINs / markdown / filters. */
 export function hasElevatedAccess(
   member: StoreSpecialist | null | undefined
 ): boolean {
   return member?.role === "MasterAdmin" || member?.role === "Supervisor";
+}
+
+/** Admin Tools drawer + `/admin/*` chrome — Master Admin only. */
+export function canAccessAdminTools(
+  member: StoreSpecialist | null | undefined
+): boolean {
+  return isMasterAdmin(member);
 }
 
 export function canAccessSection(

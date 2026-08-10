@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import {
+  isDeptFloorActor,
   parseStoreOpsActor,
   requireStoreOpsActor,
   StoreOpsAuthError,
@@ -59,7 +60,7 @@ export async function GET(request: Request) {
 
     let departmentId: string | null = departmentIdParam;
 
-    if (actor.role === "department_supervisor") {
+    if (isDeptFloorActor(actor)) {
       if (!actor.departmentCode) {
         return NextResponse.json(
           { error: "No department assigned" },

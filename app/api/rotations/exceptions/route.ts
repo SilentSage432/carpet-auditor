@@ -17,7 +17,7 @@ import { resolveStoreByNumber } from "@/lib/store-ops/stores";
 /**
  * GET /api/rotations/exceptions
  * Super admin: full summary + exception log.
- * Supervisor: own department exceptions only.
+ * Supervisor / Associate: own department exceptions only.
  */
 export async function GET(request: Request) {
   try {

@@ -1,5 +1,13 @@
 # DeptSync Hub — Development Journal
 
+## 2026-08-10 — Associate floor permissions & nav
+
+### Shipped
+- Store Ops actor role `associate`: read dept weekly rotations / locations, complete bays, verify + create `rotation_exceptions`; denied targets PATCH, location admin PATCH, invite, generate/reset, Admin Tools / `/admin/*`.
+- Associate ops nav only: My Department Checklist, Barriers / Log, Specialty Tools, My Profile / PIN (in-page specialty switcher on `/`).
+
+---
+
 ## 2026-08-10 — Auto-generated invite PIN on Add Supervisor
 
 ### Shipped

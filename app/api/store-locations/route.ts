@@ -1,8 +1,10 @@
 import { NextResponse } from "next/server";
 import {
+  isDeptFloorActor,
   parseStoreOpsActor,
   requireStoreOpsActor,
   requireSuperAdmin,
+  requireSupervisorOrAdmin,
   StoreOpsAuthError,
 } from "@/lib/store-ops/auth";
 import { getSupabaseAdmin } from "@/lib/store-ops/supabase-admin";
@@ -38,7 +40,7 @@ export async function GET(request: Request) {
       .order("aisle")
       .order("bay");
 
-    if (actor.role === "department_supervisor") {
+    if (isDeptFloorActor(actor)) {
       if (!actor.departmentCode) {
         return NextResponse.json({ error: "No department assigned" }, { status: 403 });
       }
@@ -80,7 +82,8 @@ export async function GET(request: Request) {
 
 export async function PATCH(request: Request) {
   try {
-    const actor = requireStoreOpsActor(parseStoreOpsActor(request));
+    // Associates mark bays via /api/rotations/complete — not location admin PATCH.
+    const actor = requireSupervisorOrAdmin(parseStoreOpsActor(request));
     const supabase = getSupabaseAdmin();
     if (!supabase) {
       return NextResponse.json(

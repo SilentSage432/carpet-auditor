@@ -1,6 +1,6 @@
 /**
  * Hub session → Store Operations API authorization.
- * Composes existing MasterAdmin / Supervisor roles onto store-ops policies.
+ * Composes MasterAdmin / Supervisor / Associate onto store-ops policies.
  * Does not invent competitive or inventory data.
  */
 
@@ -36,19 +36,29 @@ export function actorFromSpecialist(
       storeNumber: store,
     };
   }
-  if (member.role === "Supervisor") {
+  if (member.role === "Supervisor" || member.role === "Associate") {
     const code = toStoreOpsDepartmentCode(
       member.assigned_department as DepartmentScope | string | null
     );
     if (!code) return null;
     return {
       specialistId: member.id,
-      role: "department_supervisor",
+      role:
+        member.role === "Associate" ? "associate" : "department_supervisor",
       departmentCode: code,
       storeNumber: store,
     };
   }
   return null;
+}
+
+/** Dept-scoped floor actors: supervisors + associates (not super admin). */
+export function isDeptFloorActor(
+  actor: StoreOpsActor | null | undefined
+): boolean {
+  return (
+    actor?.role === "department_supervisor" || actor?.role === "associate"
+  );
 }
 
 export function storeOpsAuthHeaders(actor: StoreOpsActor): HeadersInit {
@@ -80,10 +90,13 @@ export function parseStoreOpsActor(request: Request): StoreOpsActor | null {
       storeNumber,
     };
   }
-  if (role === "department_supervisor" && departmentCode) {
+  if (
+    (role === "department_supervisor" || role === "associate") &&
+    departmentCode
+  ) {
     return {
       specialistId,
-      role: "department_supervisor",
+      role: role as "department_supervisor" | "associate",
       departmentCode,
       storeNumber,
     };
@@ -94,6 +107,19 @@ export function parseStoreOpsActor(request: Request): StoreOpsActor | null {
 export function requireSuperAdmin(actor: StoreOpsActor | null): StoreOpsActor {
   if (!actor || actor.role !== "super_admin") {
     throw new StoreOpsAuthError("Super admin required", 403);
+  }
+  return actor;
+}
+
+/** Supervisor or Master Admin — not Associates (targets, location admin). */
+export function requireSupervisorOrAdmin(
+  actor: StoreOpsActor | null
+): StoreOpsActor {
+  if (
+    !actor ||
+    (actor.role !== "super_admin" && actor.role !== "department_supervisor")
+  ) {
+    throw new StoreOpsAuthError("Supervisor or super admin required", 403);
   }
   return actor;
 }

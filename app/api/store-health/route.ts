@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import {
+  isDeptFloorActor,
   parseStoreOpsActor,
   requireStoreOpsActor,
   StoreOpsAuthError,
@@ -32,8 +33,7 @@ export async function GET(request: Request) {
     const snapshot = await buildStoreHealthSnapshot(supabase, {
       storeId: store.id,
       weekLabel: week,
-      departmentCode:
-        actor.role === "department_supervisor" ? actor.departmentCode : null,
+      departmentCode: isDeptFloorActor(actor) ? actor.departmentCode : null,
       departmentId: null,
     });
 
