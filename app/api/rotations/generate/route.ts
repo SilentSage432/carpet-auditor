@@ -58,7 +58,7 @@ export async function POST(request: Request) {
 
     const { data: dept, error: deptError } = await supabase
       .from("departments")
-      .select("id, store_id, weekly_bay_target")
+      .select("id, store_id, weekly_bay_target, is_active")
       .eq("id", departmentId)
       .eq("store_id", store.id)
       .maybeSingle();
@@ -70,6 +70,15 @@ export async function POST(request: Request) {
       return NextResponse.json(
         { error: "Department not found for this store" },
         { status: 404 }
+      );
+    }
+    if (dept.is_active === false) {
+      return NextResponse.json(
+        {
+          error:
+            "Department is paused — activate it in Store Map / Settings before generating rotations",
+        },
+        { status: 400 }
       );
     }
 

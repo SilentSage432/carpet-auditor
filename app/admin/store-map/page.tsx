@@ -9,6 +9,7 @@ import { isMasterAdmin } from "@/lib/rbac";
 import {
   fetchDepartments,
   fetchStoreLocations,
+  updateDepartmentActive,
 } from "@/lib/store-ops/client";
 import { readableError } from "@/lib/store-ops/errors";
 import type { Department, StoreLocation } from "@/lib/store-ops/types";
@@ -48,6 +49,7 @@ function StoreMapBody({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isOverviewOpen, setIsOverviewOpen] = useState(false);
+  const [toggleBusyId, setToggleBusyId] = useState<string | null>(null);
   const currentWeek = isoWeekLabel();
 
   const reload = useCallback(async (member: StoreSpecialist) => {
@@ -86,6 +88,7 @@ function StoreMapBody({
         id: dept.id,
         name: dept.name,
         code: dept.code,
+        isActive: dept.is_active !== false,
         total: rows.length,
         active,
         pending,
@@ -95,6 +98,21 @@ function StoreMapBody({
       };
     });
   }, [departments, locations]);
+
+  async function toggleDepartment(deptId: string, next: boolean) {
+    setToggleBusyId(deptId);
+    setError(null);
+    try {
+      const updated = await updateDepartmentActive(specialist, deptId, next);
+      setDepartments((prev) =>
+        prev.map((d) => (d.id === updated.id ? updated : d))
+      );
+    } catch (err) {
+      setError(readableError(err, "Could not update department toggle"));
+    } finally {
+      setToggleBusyId(null);
+    }
+  }
 
   return (
     <div className="flex min-h-dvh flex-col">
@@ -178,7 +196,11 @@ function StoreMapBody({
                     {departmentOverview.map((row) => (
                       <li
                         key={row.id}
-                        className="rounded-2xl border border-slate-700 bg-slate-900/80 px-4 py-3"
+                        className={`rounded-2xl border px-4 py-3 ${
+                          row.isActive
+                            ? "border-slate-700 bg-slate-900/80"
+                            : "border-slate-800 bg-slate-950/50 opacity-75"
+                        }`}
                       >
                         <div className="flex items-start justify-between gap-2">
                           <div>
@@ -186,12 +208,34 @@ function StoreMapBody({
                               {row.name}
                             </p>
                             <p className="font-mono text-[11px] text-slate-400">
-                              {row.code} · target {row.weeklyTarget}/week
+                              {row.code} · target {row.weeklyTarget}/week ·{" "}
+                              {row.isActive ? "cron on" : "paused"}
                             </p>
                           </div>
-                          <span className="shrink-0 rounded-lg bg-slate-800 px-2 py-1 font-mono text-[10px] font-bold text-slate-300">
-                            {row.aisles} aisle{row.aisles === 1 ? "" : "s"}
-                          </span>
+                          <div className="flex shrink-0 items-center gap-2">
+                            <span className="rounded-lg bg-slate-800 px-2 py-1 font-mono text-[10px] font-bold text-slate-300">
+                              {row.aisles} aisle{row.aisles === 1 ? "" : "s"}
+                            </span>
+                            <button
+                              type="button"
+                              role="switch"
+                              aria-checked={row.isActive}
+                              aria-label={`${row.name} master toggle`}
+                              disabled={toggleBusyId === row.id}
+                              onClick={() =>
+                                void toggleDepartment(row.id, !row.isActive)
+                              }
+                              className={`relative h-7 w-12 rounded-full transition ${
+                                row.isActive ? "bg-emerald-500" : "bg-slate-600"
+                              } disabled:opacity-60`}
+                            >
+                              <span
+                                className={`absolute top-0.5 h-6 w-6 rounded-full bg-white transition ${
+                                  row.isActive ? "left-[1.35rem]" : "left-0.5"
+                                }`}
+                              />
+                            </button>
+                          </div>
                         </div>
                         <p className="mt-2 text-sm text-slate-300">
                           {row.total} tags · {row.active} active · {row.pending}{" "}

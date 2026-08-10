@@ -36,3 +36,54 @@ export function pickRandom<T>(items: T[], count: number): T[] {
   }
   return pool.slice(0, Math.max(0, count));
 }
+
+type WeightedPickable = {
+  manual_priority_count?: number | null;
+  last_completed_at?: string | null;
+};
+
+/**
+ * Adaptive draw: weight = (1 + manual_priority_count) × age_days
+ * (null last_completed_at ≈ never audited → high age). Oldest + highest
+ * manual frequency dominate selection without full determinism.
+ */
+export function pickWeightedByPriorityAndAge<T extends WeightedPickable>(
+  items: T[],
+  count: number
+): T[] {
+  const n = Math.max(0, Math.min(count, items.length));
+  if (n === 0) return [];
+  if (n >= items.length) return [...items];
+
+  const pool = [...items];
+  const picked: T[] = [];
+
+  while (picked.length < n && pool.length > 0) {
+    const weights = pool.map(adaptiveDrawWeight);
+    const total = weights.reduce((sum, w) => sum + w, 0);
+    let r = Math.random() * (total > 0 ? total : pool.length);
+    let idx = 0;
+    for (; idx < pool.length; idx += 1) {
+      r -= total > 0 ? weights[idx]! : 1;
+      if (r <= 0) break;
+    }
+    idx = Math.min(idx, pool.length - 1);
+    picked.push(pool[idx]!);
+    pool.splice(idx, 1);
+  }
+
+  return picked;
+}
+
+export function adaptiveDrawWeight(loc: WeightedPickable): number {
+  const priority = 1 + Math.max(0, Number(loc.manual_priority_count) || 0);
+  const last = loc.last_completed_at
+    ? Date.parse(loc.last_completed_at)
+    : Number.NaN;
+  // Never audited → treat as ~1 year old so they surface early
+  const ageMs = Number.isFinite(last)
+    ? Math.max(0, Date.now() - last)
+    : 365 * 86_400_000;
+  const ageDays = Math.max(1, ageMs / 86_400_000);
+  return priority * ageDays;
+}

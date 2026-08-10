@@ -53,6 +53,10 @@ export function ForceRotationModal({
 
   if (!open) return null;
 
+  const activeDepartments = departments.filter((d) => d.is_active !== false);
+  const deptOptions =
+    activeDepartments.length > 0 ? activeDepartments : departments;
+
   async function handleForceDraw() {
     if (!genDept) return;
     setGenBusy(true);
@@ -134,9 +138,10 @@ export function ForceRotationModal({
               onChange={(e) => setGenDept(e.target.value)}
               className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-3 text-slate-100"
             >
-              {departments.map((d) => (
+              {deptOptions.map((d) => (
                 <option key={d.id} value={d.id}>
                   {d.name}
+                  {d.is_active === false ? " (paused)" : ""}
                 </option>
               ))}
             </select>

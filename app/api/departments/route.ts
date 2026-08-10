@@ -65,13 +65,11 @@ export async function GET(request: Request) {
 
 /**
  * PATCH /api/departments
- * Body: { weekly_bay_target: number, department_id?: uuid }
- * Supervisors update their assigned department target; super admin may pass department_id.
- * Persists via update filtered by departments.id (and active store).
+ * Body may include weekly_bay_target and/or is_active (super admin).
+ * Supervisors may only update their department weekly_bay_target.
  */
 export async function PATCH(request: Request) {
   try {
-    // Associates cannot edit weekly bay targets.
     const actor = requireSupervisorOrAdmin(parseStoreOpsActor(request));
     const { supabase, response } = requireSupabaseAdmin();
     if (!supabase) return response;
@@ -84,12 +82,34 @@ export async function PATCH(request: Request) {
       is_active?: boolean;
     };
 
-    const target = Number(body.weekly_bay_target);
-    if (!Number.isFinite(target) || target < 1 || target > 500) {
+    const hasTarget = body.weekly_bay_target !== undefined;
+    const hasActive =
+      actor.role === "super_admin" && typeof body.is_active === "boolean";
+
+    if (!hasTarget && !hasActive) {
       return NextResponse.json(
-        { error: "weekly_bay_target must be an integer from 1–500" },
+        { error: "Provide weekly_bay_target and/or is_active" },
         { status: 400 }
       );
+    }
+
+    if (hasActive && actor.role !== "super_admin") {
+      return NextResponse.json(
+        { error: "Only Super Admin can toggle department active state" },
+        { status: 403 }
+      );
+    }
+
+    let targetNumber: number | undefined;
+    if (hasTarget) {
+      const target = Number(body.weekly_bay_target);
+      if (!Number.isFinite(target) || target < 1 || target > 500) {
+        return NextResponse.json(
+          { error: "weekly_bay_target must be an integer from 1–500" },
+          { status: 400 }
+        );
+      }
+      targetNumber = Math.floor(target);
     }
 
     let departmentId = body.department_id?.trim() || "";
@@ -119,6 +139,12 @@ export async function PATCH(request: Request) {
         );
       }
       departmentId = ownId;
+      if (!hasTarget) {
+        return NextResponse.json(
+          { error: "weekly_bay_target is required" },
+          { status: 400 }
+        );
+      }
     } else {
       requireSuperAdmin(actor);
       if (!departmentId) {
@@ -129,13 +155,9 @@ export async function PATCH(request: Request) {
       }
     }
 
-    const targetNumber = Math.floor(target);
-    const patch: { weekly_bay_target: number; is_active?: boolean } = {
-      weekly_bay_target: targetNumber,
-    };
-    if (actor.role === "super_admin" && typeof body.is_active === "boolean") {
-      patch.is_active = body.is_active;
-    }
+    const patch: { weekly_bay_target?: number; is_active?: boolean } = {};
+    if (targetNumber != null) patch.weekly_bay_target = targetNumber;
+    if (hasActive) patch.is_active = body.is_active;
 
     const { data, error } = await supabase
       .from("departments")
@@ -146,9 +168,9 @@ export async function PATCH(request: Request) {
       .maybeSingle();
 
     if (error) {
-      console.error("Failed to update weekly bay target:", error);
+      console.error("Failed to update department:", error);
       return NextResponse.json(
-        { error: readableError(error, "Could not save weekly bay target") },
+        { error: readableError(error, "Could not update department") },
         { status: 500 }
       );
     }

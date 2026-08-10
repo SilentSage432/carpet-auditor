@@ -6,7 +6,15 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Department, StoreLocation, WeeklyRotation } from "./types";
 import { listActiveStores } from "./stores";
-import { isoWeekLabel, pickRandom, resolveWeeklyBayTarget } from "./week";
+import {
+  isoWeekLabel,
+  pickWeightedByPriorityAndAge,
+  resolveWeeklyBayTarget,
+} from "./week";
+
+function isStandardAisleLocation(loc: StoreLocation): boolean {
+  return (loc.location_type ?? "STANDARD") !== "SHOWROOM_STACKOUT";
+}
 
 export type GenerateRotationsResult = {
   assigned_week: string;
@@ -42,9 +50,27 @@ async function loadPendingLocations(
     .eq("department_id", departmentId)
     .eq("is_active", true)
     .eq("status", "PENDING")
-    .eq("cycle_number", cycleNumber);
+    .eq("cycle_number", cycleNumber)
+    .neq("location_type", "SHOWROOM_STACKOUT");
 
-  if (error) throw new Error(error.message);
+  if (error) {
+    // Pre-migration fallback: location_type column may not exist yet
+    if (/location_type/i.test(error.message)) {
+      const fallback = await supabase
+        .from("store_locations")
+        .select("*")
+        .eq("department_id", departmentId)
+        .eq("is_active", true)
+        .eq("status", "PENDING")
+        .eq("cycle_number", cycleNumber);
+      if (fallback.error) throw new Error(fallback.error.message);
+      return {
+        locations: (fallback.data ?? []) as StoreLocation[],
+        cycleNumber,
+      };
+    }
+    throw new Error(error.message);
+  }
   return {
     locations: (data ?? []) as StoreLocation[],
     cycleNumber,
@@ -117,16 +143,19 @@ export async function resetDepartmentCycleIfNeeded(
 
   const { data: active, error: activeError } = await supabase
     .from("store_locations")
-    .select("id, status")
+    .select("id, status, location_type")
     .eq("department_id", departmentId)
     .eq("is_active", true);
 
   if (activeError) throw new Error(activeError.message);
-  if (!active || active.length === 0) {
+  const aisleActive = (active ?? []).filter(
+    (row) => (row.location_type ?? "STANDARD") !== "SHOWROOM_STACKOUT"
+  );
+  if (aisleActive.length === 0) {
     return { reset: false, cycleNumber, pending: [] };
   }
 
-  const allCompleted = active.every((row) => row.status === "COMPLETED");
+  const allCompleted = aisleActive.every((row) => row.status === "COMPLETED");
   if (!allCompleted) {
     return { reset: false, cycleNumber, pending: [] };
   }
@@ -140,9 +169,26 @@ export async function resetDepartmentCycleIfNeeded(
       updated_at: new Date().toISOString(),
     })
     .eq("department_id", departmentId)
-    .eq("is_active", true);
+    .eq("is_active", true)
+    .neq("location_type", "SHOWROOM_STACKOUT");
 
-  if (resetError) throw new Error(resetError.message);
+  if (resetError) {
+    // Pre-migration: no location_type — reset all active
+    if (/location_type/i.test(resetError.message)) {
+      const legacy = await supabase
+        .from("store_locations")
+        .update({
+          status: "PENDING",
+          cycle_number: nextCycle,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("department_id", departmentId)
+        .eq("is_active", true);
+      if (legacy.error) throw new Error(legacy.error.message);
+    } else {
+      throw new Error(resetError.message);
+    }
+  }
 
   const reloaded = await loadPendingLocations(supabase, departmentId);
   return {
@@ -189,23 +235,81 @@ export async function generateWeeklyRotations(
     .select("*")
     .eq("department_id", departmentId)
     .eq("is_active", true)
-    .eq("status", "CARRIED_OVER");
+    .eq("status", "CARRIED_OVER")
+    .neq("location_type", "SHOWROOM_STACKOUT");
 
-  if (carriedError) throw new Error(carriedError.message);
+  if (carriedError) {
+    if (/location_type/i.test(carriedError.message)) {
+      const legacy = await supabase
+        .from("store_locations")
+        .select("*")
+        .eq("department_id", departmentId)
+        .eq("is_active", true)
+        .eq("status", "CARRIED_OVER");
+      if (legacy.error) throw new Error(legacy.error.message);
+      // fall through with legacy data via reassignment below
+      const carried = (legacy.data ?? []) as StoreLocation[];
+      return finishGenerate(
+        supabase,
+        departmentId,
+        department,
+        weekLabel,
+        drawCount,
+        dbTarget,
+        cycleNumber,
+        reset,
+        pending,
+        carried
+      );
+    }
+    throw new Error(carriedError.message);
+  }
 
-  const carried = (carriedRows ?? []) as StoreLocation[];
+  return finishGenerate(
+    supabase,
+    departmentId,
+    department,
+    weekLabel,
+    drawCount,
+    dbTarget,
+    cycleNumber,
+    reset,
+    pending,
+    (carriedRows ?? []) as StoreLocation[]
+  );
+}
+
+async function finishGenerate(
+  supabase: SupabaseClient,
+  departmentId: string,
+  department: { id: string; store_id: string; weekly_bay_target?: unknown },
+  weekLabel: string,
+  drawCount: number,
+  dbTarget: number,
+  cycleNumber: number,
+  reset: boolean,
+  pending: StoreLocation[],
+  carried: StoreLocation[]
+): Promise<GenerateRotationsResult> {
   const pool: StoreLocation[] = [];
 
-  const carriedPick = pickRandom(carried, Math.min(drawCount, carried.length));
+  // CARRIED_OVER still first — then adaptive weights among them
+  const carriedPick = pickWeightedByPriorityAndAge(
+    carried.filter(isStandardAisleLocation),
+    Math.min(drawCount, carried.length)
+  );
   pool.push(...carriedPick);
 
   const remaining = drawCount - pool.length;
   if (remaining > 0) {
-    const pendingAvailable = pending.filter(
-      (p) => !pool.some((s) => s.id === p.id)
-    );
+    const pendingAvailable = pending
+      .filter(isStandardAisleLocation)
+      .filter((p) => !pool.some((s) => s.id === p.id));
     pool.push(
-      ...pickRandom(pendingAvailable, Math.min(remaining, pendingAvailable.length))
+      ...pickWeightedByPriorityAndAge(
+        pendingAvailable,
+        Math.min(remaining, pendingAvailable.length)
+      )
     );
   }
 
@@ -260,6 +364,149 @@ export async function generateWeeklyRotations(
     locations: (locations ?? []) as StoreLocation[],
     weekly_bay_target: dbTarget,
   };
+}
+
+/**
+ * Manually add specific bays to this week's rotation.
+ * Increments manual_priority_count so future adaptive draws favor them.
+ */
+export async function assignLocationsToCurrentWeek(
+  supabase: SupabaseClient,
+  departmentId: string,
+  locationIds: string[],
+  weekLabel: string = isoWeekLabel()
+): Promise<{
+  assigned_week: string;
+  rotations: WeeklyRotation[];
+  locations: StoreLocation[];
+}> {
+  const ids = [...new Set(locationIds.map((id) => id.trim()).filter(Boolean))];
+  if (ids.length === 0) {
+    throw new Error("location_ids are required");
+  }
+
+  const { data: department, error: departmentError } = await supabase
+    .from("departments")
+    .select("id, store_id, is_active")
+    .eq("id", departmentId)
+    .maybeSingle();
+
+  if (departmentError) throw new Error(departmentError.message);
+  if (!department?.store_id) {
+    throw new Error("Department is missing store_id");
+  }
+  if (department.is_active === false) {
+    throw new Error("Department is paused — activate it before assigning bays");
+  }
+
+  const { data: locs, error: locError } = await supabase
+    .from("store_locations")
+    .select("*")
+    .eq("department_id", departmentId)
+    .in("id", ids);
+
+  if (locError) throw new Error(locError.message);
+  const locations = (locs ?? []) as StoreLocation[];
+  if (locations.length !== ids.length) {
+    throw new Error("One or more locations were not found in this department");
+  }
+
+  const showroom = locations.filter(
+    (l) => (l.location_type ?? "STANDARD") === "SHOWROOM_STACKOUT"
+  );
+  if (showroom.length > 0) {
+    throw new Error(
+      "Showroom / stack-out bays use Quick Touch — not weekly aisle assignment"
+    );
+  }
+
+  const now = new Date().toISOString();
+
+  for (const loc of locations) {
+    const nextCount = Math.max(0, Number(loc.manual_priority_count) || 0) + 1;
+    const { error: bumpError } = await supabase
+      .from("store_locations")
+      .update({
+        status: "ASSIGNED",
+        manual_priority_count: nextCount,
+        updated_at: now,
+      })
+      .eq("id", loc.id);
+    if (bumpError) throw new Error(bumpError.message);
+  }
+
+  const rows = locations.map((loc) => ({
+    store_id: loc.store_id || department.store_id,
+    department_id: departmentId,
+    location_id: loc.id,
+    assigned_week: weekLabel,
+    is_completed: false,
+  }));
+
+  const { data: rotations, error: insertError } = await supabase
+    .from("weekly_rotations")
+    .upsert(rows, { onConflict: "location_id,assigned_week" })
+    .select("*");
+
+  if (insertError) {
+    throw new Error(`Weekly rotation upsert failed: ${insertError.message}`);
+  }
+
+  const { data: refreshed, error: refreshError } = await supabase
+    .from("store_locations")
+    .select("*")
+    .in("id", ids);
+
+  if (refreshError) throw new Error(refreshError.message);
+
+  return {
+    assigned_week: weekLabel,
+    rotations: (rotations ?? []) as WeeklyRotation[],
+    locations: (refreshed ?? []) as StoreLocation[],
+  };
+}
+
+/**
+ * Record a showroom / stack-out quick touch (independent of weekly aisle draw).
+ */
+export async function completeShowroomTouch(
+  supabase: SupabaseClient,
+  locationId: string,
+  expectedDepartmentId?: string | null
+): Promise<StoreLocation> {
+  const { data: existing, error: fetchError } = await supabase
+    .from("store_locations")
+    .select("*")
+    .eq("id", locationId)
+    .maybeSingle();
+
+  if (fetchError) throw new Error(fetchError.message);
+  if (!existing) throw new Error("Location not found");
+  if (
+    expectedDepartmentId &&
+    existing.department_id !== expectedDepartmentId
+  ) {
+    throw new Error("Location is outside your assigned department");
+  }
+  if ((existing.location_type ?? "STANDARD") !== "SHOWROOM_STACKOUT") {
+    throw new Error("Location is not a showroom / stack-out bay");
+  }
+
+  const now = new Date().toISOString();
+  const { data: location, error: locError } = await supabase
+    .from("store_locations")
+    .update({
+      last_completed_at: now,
+      updated_at: now,
+      // Keep PENDING so the rapid cycle stays independent of aisle status
+      status: "PENDING",
+    })
+    .eq("id", locationId)
+    .select("*")
+    .single();
+
+  if (locError) throw new Error(locError.message);
+  return location as StoreLocation;
 }
 
 export type DepartmentCronResult = {

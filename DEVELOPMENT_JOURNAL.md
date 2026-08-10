@@ -1,5 +1,15 @@
 # DeptSync Hub — Development Journal
 
+## 2026-08-10 — Dept toggles, adaptive priority, showroom zones
+
+### Shipped
+- Migration `20260810_dept_priority_showroom.sql`: departments default `is_active=false` except Flooring; `manual_priority_count`; `location_type` (`STANDARD`|`SHOWROOM_STACKOUT`) + `audit_frequency_days` (orthogonal to Selling/Topstock `type`).
+- Sunday cron already filters `departments.is_active`; Super Admin master toggles on Store Map Overview + Settings Department Overview.
+- Adaptive draw weights `(1 + manual_priority_count) × age_days` via `last_completed_at`; ★ Week on Store Map bumps priority and assigns to current week.
+- Showroom Quick Touch card on Zebra dashboard — rapid cycle independent of weekly aisle rotation.
+
+---
+
 ## 2026-08-10 — Associate floor permissions & nav
 
 ### Shipped

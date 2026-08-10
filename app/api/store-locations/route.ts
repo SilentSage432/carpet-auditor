@@ -98,6 +98,8 @@ export async function PATCH(request: Request) {
       id?: string;
       is_active?: boolean;
       status?: string;
+      location_type?: "STANDARD" | "SHOWROOM_STACKOUT";
+      audit_frequency_days?: number;
     };
 
     if (!body.id) {
@@ -129,6 +131,17 @@ export async function PATCH(request: Request) {
       if (!deptId || existing.department_id !== deptId) {
         return NextResponse.json({ error: "Forbidden" }, { status: 403 });
       }
+      // Supervisors may only toggle bay is_active
+      if (
+        body.location_type !== undefined ||
+        body.audit_frequency_days !== undefined ||
+        body.status !== undefined
+      ) {
+        return NextResponse.json(
+          { error: "Only Super Admin can edit zone / status fields" },
+          { status: 403 }
+        );
+      }
     } else {
       requireSuperAdmin(actor);
     }
@@ -138,8 +151,25 @@ export async function PATCH(request: Request) {
     };
     if (typeof body.is_active === "boolean") patch.is_active = body.is_active;
     if (body.status === "PENDING" || body.status === "ASSIGNED" || body.status === "COMPLETED") {
-      // Super admin only may force status; supervisors use complete API
       if (actor.role === "super_admin") patch.status = body.status;
+    }
+    if (actor.role === "super_admin") {
+      if (
+        body.location_type === "STANDARD" ||
+        body.location_type === "SHOWROOM_STACKOUT"
+      ) {
+        patch.location_type = body.location_type;
+      }
+      if (body.audit_frequency_days !== undefined) {
+        const days = Math.floor(Number(body.audit_frequency_days));
+        if (!Number.isFinite(days) || days < 1) {
+          return NextResponse.json(
+            { error: "audit_frequency_days must be ≥ 1" },
+            { status: 400 }
+          );
+        }
+        patch.audit_frequency_days = days;
+      }
     }
 
     const { data, error } = await supabase

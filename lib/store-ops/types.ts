@@ -11,6 +11,9 @@ export type StoreOpsUserRole =
 
 export type StoreLocationType = "SELLING" | "TOPSTOCK";
 
+/** Zone kind — orthogonal to Selling/Topstock `type`. */
+export type StoreLocationKind = "STANDARD" | "SHOWROOM_STACKOUT";
+
 export type RotationStatus =
   | "PENDING"
   | "ASSIGNED"
@@ -36,6 +39,10 @@ export type StoreLocation = {
   aisle: number;
   bay: number;
   type: StoreLocationType;
+  /** STANDARD aisle rotation vs SHOWROOM_STACKOUT rapid-touch zone. */
+  location_type?: StoreLocationKind;
+  audit_frequency_days?: number;
+  manual_priority_count?: number;
   status: RotationStatus;
   last_completed_at: string | null;
   cycle_number: number;
@@ -85,8 +92,27 @@ export type BulkGenerateInput = {
 };
 
 export function formatLocationLabel(
-  loc: Pick<StoreLocation, "aisle" | "bay"> & { type?: string | null }
+  loc: Pick<StoreLocation, "aisle" | "bay"> & {
+    type?: string | null;
+    location_type?: string | null;
+  }
 ): string {
   const base = `Aisle ${loc.aisle} - Bay ${loc.bay}`;
-  return loc.type ? `${base} [${loc.type}]` : base;
+  const parts = [loc.type, loc.location_type === "SHOWROOM_STACKOUT" ? "SHOWROOM" : null]
+    .filter(Boolean)
+    .join(" · ");
+  return parts ? `${base} [${parts}]` : base;
+}
+
+/** True when a showroom/stack-out bay is due for a quick touch. */
+export function isShowroomDue(
+  loc: Pick<StoreLocation, "last_completed_at" | "audit_frequency_days" | "location_type">
+): boolean {
+  if (loc.location_type !== "SHOWROOM_STACKOUT") return false;
+  const freq = Math.max(1, Number(loc.audit_frequency_days) || 7);
+  if (!loc.last_completed_at) return true;
+  const last = Date.parse(loc.last_completed_at);
+  if (!Number.isFinite(last)) return true;
+  const ageDays = (Date.now() - last) / 86_400_000;
+  return ageDays >= freq;
 }

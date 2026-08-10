@@ -144,3 +144,9 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 ## Associate floor role
 - Store Ops actor `associate`: read/complete dept rotations + locations; create exceptions via verify; **no** targets, invite, generate/reset, Admin Tools, `/admin/*`
 - Nav: Checklist · Barriers / Log · Specialty Tools · My Profile / PIN
+
+## Department toggles · adaptive priority · showroom
+- Apply `supabase/migrations/20260810_dept_priority_showroom.sql`
+- Master toggles: Store Map Overview + Settings Department Overview (`departments.is_active`; Flooring default on)
+- Adaptive draw: `manual_priority_count` + `last_completed_at` age; Store Map ★ Week assigns + bumps priority
+- Showroom: `location_type=SHOWROOM_STACKOUT` + `audit_frequency_days`; dashboard Quick Touch card (not in weekly aisle draw)

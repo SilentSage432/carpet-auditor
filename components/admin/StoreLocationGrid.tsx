@@ -3,7 +3,10 @@
 import { useMemo, useState } from "react";
 import type { Department, StoreLocation } from "@/lib/store-ops/types";
 import type { StoreSpecialist } from "@/lib/types";
-import { patchStoreLocation } from "@/lib/store-ops/client";
+import {
+  assignLocationsToWeek,
+  patchStoreLocation,
+} from "@/lib/store-ops/client";
 
 type Props = {
   specialist: StoreSpecialist;
@@ -119,6 +122,41 @@ export function StoreLocationGrid({
     }
   }
 
+  async function toggleShowroom(loc: StoreLocation) {
+    setPendingId(loc.id);
+    setError(null);
+    try {
+      const next =
+        (loc.location_type ?? "STANDARD") === "SHOWROOM_STACKOUT"
+          ? "STANDARD"
+          : "SHOWROOM_STACKOUT";
+      await patchStoreLocation(specialist, loc.id, {
+        location_type: next,
+        audit_frequency_days: next === "SHOWROOM_STACKOUT" ? 3 : 7,
+      });
+      onChanged();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not set zone");
+    } finally {
+      setPendingId(null);
+    }
+  }
+
+  async function priorityAdd(loc: StoreLocation) {
+    setPendingId(loc.id);
+    setError(null);
+    try {
+      await assignLocationsToWeek(specialist, [loc.id], loc.department_id);
+      onChanged();
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Could not add bay to this week"
+      );
+    } finally {
+      setPendingId(null);
+    }
+  }
+
   if (locations.length === 0) {
     return (
       <section className="rounded-2xl border border-dashed border-slate-700 bg-slate-950/50 p-6 text-center">
@@ -138,7 +176,7 @@ export function StoreLocationGrid({
         </h2>
         <p className="mt-1 text-sm text-slate-400">
           Expand a department, then an aisle. Selling and Topstock share one bay
-          row.
+          row. ★ adds to this week (+priority); 🏛 marks showroom / stack-out.
         </p>
       </div>
 
@@ -214,26 +252,32 @@ export function StoreLocationGrid({
                           {aisle.bays.map((pair) => (
                             <li
                               key={`${aisleKey}-bay-${pair.bay}`}
-                              className="flex min-h-11 items-center gap-2 px-3 py-1.5"
+                              className="space-y-1.5 px-3 py-2"
                             >
-                              <p className="w-14 shrink-0 font-mono text-xs font-bold text-slate-400">
-                                Bay {pair.bay}
-                              </p>
-                              <div className="grid min-w-0 flex-1 grid-cols-2 gap-1.5">
-                                <TypeToggle
-                                  label="S"
-                                  fullLabel="Selling"
-                                  loc={pair.selling}
-                                  pendingId={pendingId}
-                                  onToggle={toggleActive}
-                                />
-                                <TypeToggle
-                                  label="T"
-                                  fullLabel="Topstock"
-                                  loc={pair.topstock}
-                                  pendingId={pendingId}
-                                  onToggle={toggleActive}
-                                />
+                              <div className="flex min-h-11 items-center gap-2">
+                                <p className="w-14 shrink-0 font-mono text-xs font-bold text-slate-400">
+                                  Bay {pair.bay}
+                                </p>
+                                <div className="grid min-w-0 flex-1 grid-cols-2 gap-1.5">
+                                  <TypeToggle
+                                    label="S"
+                                    fullLabel="Selling"
+                                    loc={pair.selling}
+                                    pendingId={pendingId}
+                                    onToggle={toggleActive}
+                                    onShowroom={toggleShowroom}
+                                    onPriorityAdd={priorityAdd}
+                                  />
+                                  <TypeToggle
+                                    label="T"
+                                    fullLabel="Topstock"
+                                    loc={pair.topstock}
+                                    pendingId={pendingId}
+                                    onToggle={toggleActive}
+                                    onShowroom={toggleShowroom}
+                                    onPriorityAdd={priorityAdd}
+                                  />
+                                </div>
                               </div>
                             </li>
                           ))}
@@ -257,12 +301,16 @@ function TypeToggle({
   loc,
   pendingId,
   onToggle,
+  onShowroom,
+  onPriorityAdd,
 }: {
   label: string;
   fullLabel: string;
   loc: StoreLocation | null;
   pendingId: string | null;
   onToggle: (loc: StoreLocation) => void;
+  onShowroom: (loc: StoreLocation) => void;
+  onPriorityAdd: (loc: StoreLocation) => void;
 }) {
   if (!loc) {
     return (
@@ -275,37 +323,70 @@ function TypeToggle({
     );
   }
 
+  const showroom = (loc.location_type ?? "STANDARD") === "SHOWROOM_STACKOUT";
+  const priority = Number(loc.manual_priority_count) || 0;
+
   return (
     <div
-      className={`flex min-h-9 items-center justify-between gap-1 rounded-md border border-slate-800 bg-slate-900/80 px-1.5 ${
-        loc.is_active ? "" : "opacity-50"
-      }`}
+      className={`rounded-md border px-1.5 py-1 ${
+        showroom
+          ? "border-amber-500/40 bg-amber-950/30"
+          : "border-slate-800 bg-slate-900/80"
+      } ${loc.is_active ? "" : "opacity-50"}`}
     >
-      <div className="min-w-0">
-        <p className="font-mono text-[10px] font-bold text-emerald-400/90">
-          {label}
-          <span className="ml-1 font-sans font-medium text-slate-500">
-            {loc.status === "PENDING" ? "P" : loc.status === "ASSIGNED" ? "A" : loc.status.slice(0, 1)}
-          </span>
-        </p>
+      <div className="flex min-h-8 items-center justify-between gap-1">
+        <div className="min-w-0">
+          <p className="font-mono text-[10px] font-bold text-emerald-400/90">
+            {label}
+            <span className="ml-1 font-sans font-medium text-slate-500">
+              {loc.status === "PENDING"
+                ? "P"
+                : loc.status === "ASSIGNED"
+                  ? "A"
+                  : loc.status.slice(0, 1)}
+              {priority > 0 ? ` ·★${priority}` : ""}
+              {showroom ? " ·🏛" : ""}
+            </span>
+          </p>
+        </div>
+        <button
+          type="button"
+          role="switch"
+          aria-checked={loc.is_active}
+          aria-label={`${fullLabel} bay ${loc.bay} ${loc.is_active ? "active" : "off"}`}
+          disabled={pendingId === loc.id}
+          onClick={() => onToggle(loc)}
+          className={`relative h-5 w-9 shrink-0 rounded-full transition ${
+            loc.is_active ? "bg-emerald-500" : "bg-slate-600"
+          } disabled:opacity-60`}
+        >
+          <span
+            className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition ${
+              loc.is_active ? "left-[1rem]" : "left-0.5"
+            }`}
+          />
+        </button>
       </div>
-      <button
-        type="button"
-        role="switch"
-        aria-checked={loc.is_active}
-        aria-label={`${fullLabel} bay ${loc.bay} ${loc.is_active ? "active" : "off"}`}
-        disabled={pendingId === loc.id}
-        onClick={() => onToggle(loc)}
-        className={`relative h-5 w-9 shrink-0 rounded-full transition ${
-          loc.is_active ? "bg-emerald-500" : "bg-slate-600"
-        } disabled:opacity-60`}
-      >
-        <span
-          className={`absolute top-0.5 h-4 w-4 rounded-full bg-white transition ${
-            loc.is_active ? "left-[1rem]" : "left-0.5"
-          }`}
-        />
-      </button>
+      <div className="mt-1 flex gap-1">
+        <button
+          type="button"
+          disabled={pendingId === loc.id || showroom}
+          onClick={() => onPriorityAdd(loc)}
+          className="flex-1 rounded border border-emerald-500/30 py-0.5 text-[9px] font-bold text-emerald-200 disabled:opacity-40"
+          title="Add to this week's rotation (+priority)"
+        >
+          ★ Week
+        </button>
+        <button
+          type="button"
+          disabled={pendingId === loc.id}
+          onClick={() => onShowroom(loc)}
+          className="flex-1 rounded border border-amber-500/30 py-0.5 text-[9px] font-bold text-amber-100 disabled:opacity-40"
+          title="Toggle showroom / stack-out zone"
+        >
+          {showroom ? "Std" : "Show"}
+        </button>
+      </div>
     </div>
   );
 }

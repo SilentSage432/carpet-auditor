@@ -117,7 +117,8 @@ export async function ensureDepartmentsForStore(
       name: d.name,
       code: d.code,
       weekly_bay_target: 10,
-      is_active: true as const,
+      // Flooring on by default; other depts paused until Super Admin activates
+      is_active: d.code === "flooring",
     }));
 
     const { error } = await supabase.from("departments").upsert(rows, {

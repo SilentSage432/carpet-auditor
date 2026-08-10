@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { StoreHealthCard } from "@/components/StoreHealthCard";
+import { ShowroomQuickTouchCard } from "@/components/dashboard/ShowroomQuickTouchCard";
 import { WeeklyRotationList } from "@/components/dashboard/WeeklyRotationList";
 import { NavigationHub } from "@/components/hub/NavigationHub";
 import { SessionGate } from "@/components/hub/SessionGate";
@@ -78,6 +79,11 @@ function DashboardBody({
       <main className="mx-auto w-full max-w-lg flex-1 px-3 pb-28 pt-4">
         <StoreHealthCard specialist={specialist} refreshKey={healthKey} />
 
+        <ShowroomQuickTouchCard
+          specialist={specialist}
+          refreshKey={healthKey}
+          onTouched={() => setHealthKey((k) => k + 1)}
+        />
         {!isMasterAdmin(specialist) ? (
           <Link
             href="/verify-rotation"

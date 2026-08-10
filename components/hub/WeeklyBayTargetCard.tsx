@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   fetchDepartments,
+  updateDepartmentActive,
   updateDepartmentWeeklyTarget,
 } from "@/lib/store-ops/client";
 import { readableError } from "@/lib/store-ops/errors";
@@ -17,7 +18,7 @@ type Props = {
 
 const DEFAULT_TARGET = 10;
 
-/** Settings — per-department weekly bay count used by Sunday rotation cron. */
+/** Settings — per-department weekly bay count + Super Admin master toggles. */
 export function WeeklyBayTargetCard({ specialist }: Props) {
   const [departments, setDepartments] = useState<Department[]>([]);
   const [drafts, setDrafts] = useState<Record<string, string>>({});
@@ -88,14 +89,40 @@ export function WeeklyBayTargetCard({ specialist }: Props) {
     }
   }
 
+  async function toggleActive(dept: Department) {
+    if (!specialist || !master) return;
+    setBusyId(dept.id);
+    setError(null);
+    setMessage(null);
+    try {
+      const updated = await updateDepartmentActive(
+        specialist,
+        dept.id,
+        !dept.is_active
+      );
+      setDepartments((prev) =>
+        prev.map((d) => (d.id === updated.id ? updated : d))
+      );
+      setMessage(
+        updated.is_active
+          ? `${updated.name} activated — Sunday cron will include it.`
+          : `${updated.name} paused — Sunday cron will skip it.`
+      );
+    } catch (err) {
+      setError(readableError(err, "Could not update department toggle"));
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   return (
     <section className="space-y-3 rounded-2xl border border-emerald-500/25 bg-slate-900/90 p-4">
       <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-400">
-        Department weekly bay targets
+        {master ? "Department Overview" : "Department weekly bay targets"}
       </h2>
       <p className="text-sm text-slate-300">
         {master
-          ? "Set a custom weekly_bay_target for each department. The Sunday cron (and automated draw) reads this value per department — unassigned or 0 defaults to 10."
+          ? "Master toggles pause departments for Sunday cron and force draws. Weekly bay targets still drive adaptive aisle picks when a department is active."
           : "How many bays the Sunday rotation cron should assign for your department each week (default 10 if unset)."}
       </p>
 
@@ -107,10 +134,15 @@ export function WeeklyBayTargetCard({ specialist }: Props) {
             const draft = drafts[dept.id] ?? String(DEFAULT_TARGET);
             const current = resolveWeeklyBayTarget(dept.weekly_bay_target);
             const dirty = Number(draft) !== current;
+            const active = dept.is_active !== false;
             return (
               <li
                 key={dept.id}
-                className="rounded-xl border border-slate-800 bg-slate-950/60 p-3"
+                className={`rounded-xl border p-3 ${
+                  active
+                    ? "border-slate-800 bg-slate-950/60"
+                    : "border-slate-800/80 bg-slate-950/40 opacity-80"
+                }`}
               >
                 <div className="flex flex-wrap items-start justify-between gap-2">
                   <div>
@@ -119,8 +151,32 @@ export function WeeklyBayTargetCard({ specialist }: Props) {
                     </p>
                     <p className="font-mono text-[11px] text-slate-500">
                       {dept.code} · stored {current}/week
+                      {master
+                        ? active
+                          ? " · active"
+                          : " · paused"
+                        : ""}
                     </p>
                   </div>
+                  {master ? (
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={active}
+                      aria-label={`${dept.name} ${active ? "active" : "paused"}`}
+                      disabled={busyId === dept.id}
+                      onClick={() => void toggleActive(dept)}
+                      className={`relative h-7 w-12 shrink-0 rounded-full transition ${
+                        active ? "bg-emerald-500" : "bg-slate-600"
+                      } disabled:opacity-60`}
+                    >
+                      <span
+                        className={`absolute top-0.5 h-6 w-6 rounded-full bg-white transition ${
+                          active ? "left-[1.35rem]" : "left-0.5"
+                        }`}
+                      />
+                    </button>
+                  ) : null}
                 </div>
                 <div className="mt-3 flex gap-2">
                   <label className="min-w-0 flex-1 text-sm">

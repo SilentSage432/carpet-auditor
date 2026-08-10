@@ -93,7 +93,12 @@ export async function bulkGenerateLocations(
 export async function patchStoreLocation(
   specialist: StoreSpecialist,
   id: string,
-  patch: Partial<Pick<StoreLocation, "is_active" | "status">>
+  patch: Partial<
+    Pick<
+      StoreLocation,
+      "is_active" | "status" | "location_type" | "audit_frequency_days"
+    >
+  >
 ): Promise<StoreLocation> {
   const data = await storeOpsFetch<{ location: StoreLocation }>(
     "/api/store-locations",
@@ -179,6 +184,77 @@ export async function updateDepartmentWeeklyTarget(
     }
   );
   return data.department;
+}
+
+/** Super Admin — pause / activate a department for Sunday cron + force draw. */
+export async function updateDepartmentActive(
+  specialist: StoreSpecialist,
+  departmentId: string,
+  isActive: boolean
+): Promise<Department> {
+  const data = await storeOpsFetch<{ department: Department }>(
+    "/api/departments",
+    specialist,
+    {
+      method: "PATCH",
+      body: JSON.stringify({
+        department_id: departmentId,
+        is_active: isActive,
+      }),
+    }
+  );
+  return data.department;
+}
+
+/** Super Admin — add bay(s) to this week's rotation and bump adaptive priority. */
+export async function assignLocationsToWeek(
+  specialist: StoreSpecialist,
+  locationIds: string[],
+  departmentId?: string
+): Promise<{ assigned_week: string; created: number }> {
+  return storeOpsFetch("/api/rotations/assign", specialist, {
+    method: "POST",
+    body: JSON.stringify({
+      location_ids: locationIds,
+      ...(departmentId ? { department_id: departmentId } : {}),
+    }),
+  });
+}
+
+export async function fetchShowroomLocations(
+  specialist: StoreSpecialist,
+  departmentId?: string
+): Promise<{ locations: StoreLocation[]; due: StoreLocation[] }> {
+  const qs = departmentId
+    ? `?department_id=${encodeURIComponent(departmentId)}`
+    : "";
+  try {
+    const data = await storeOpsFetch<{
+      locations?: StoreLocation[];
+      due?: StoreLocation[];
+    }>(`/api/showroom-locations${qs}`, specialist);
+    return {
+      locations: data.locations ?? [],
+      due: data.due ?? [],
+    };
+  } catch {
+    return { locations: [], due: [] };
+  }
+}
+
+export async function completeShowroomLocation(
+  specialist: StoreSpecialist,
+  locationId: string
+): Promise<StoreLocation> {
+  const data = await storeOpsFetch<{ location: StoreLocation }>(
+    "/api/showroom-locations",
+    specialist,
+    {
+      method: "POST",
+      body: JSON.stringify({ location_id: locationId }),
+    }
+  );
+  return data.location;
 }
 
 export async function verifyWeeklyRotationBatch(
