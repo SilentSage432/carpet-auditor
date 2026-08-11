@@ -1,5 +1,11 @@
 # DeptSync Hub — Development Journal
 
+## 2026-08-11 — Appliance scan log filter layout polish
+
+### Fixed
+- Removed sticky/absolute filter bar that overlapped scan cards; static `flex flex-col gap-3` header with full-width search + horizontally scrollable pills (`no-scrollbar`).
+- Active pill uses `border-emerald-500 bg-emerald-950/40 text-emerald-400`; All shows `Showing All · N SKUs`.
+
 ## 2026-08-11 — Alphanumeric aisle codes (BW / RW / 12 / A1)
 
 ### Shipped

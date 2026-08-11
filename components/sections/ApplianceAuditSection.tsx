@@ -562,19 +562,26 @@ export function ApplianceAuditSection({
         )}
       </div>
 
-      <section className="space-y-3 overflow-x-hidden" aria-label="Appliance scan log">
-        <div className="flex items-baseline justify-between gap-2 px-1">
+      <section className="overflow-x-hidden" aria-label="Appliance scan log">
+        <div className="mb-3 flex items-baseline justify-between gap-2 px-1">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-400">
             Scan log
           </h2>
-          <span className="font-mono text-xs text-slate-500">
-            {aggregated.length} SKU · {filteredScans.length} units
-          </span>
+          {logFilter === "all" ? (
+            <span className="font-mono text-xs text-slate-500">
+              Showing All · {aggregated.length} SKU
+              {aggregated.length === 1 ? "" : "s"}
+            </span>
+          ) : (
+            <span className="font-mono text-xs text-slate-500">
+              {aggregated.length} SKU · {filteredScans.length} units
+            </span>
+          )}
         </div>
 
-        {/* Sticky categorical filter + quick search */}
-        <div className="sticky top-[4.25rem] z-20 -mx-1 space-y-2 rounded-2xl border border-slate-800 bg-slate-950/95 p-3 shadow-lg shadow-black/20 backdrop-blur-md">
-          <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-0.5">
+        {/* Static filter header — no sticky/absolute overlap with cards */}
+        <div className="relative z-10 mb-4 flex w-full flex-col gap-3">
+          <div className="no-scrollbar flex gap-2 overflow-x-auto pb-1">
             {APPLIANCE_SCAN_LOG_FILTERS.map((chip) => {
               const active = logFilter === chip.id;
               return (
@@ -584,7 +591,7 @@ export function ApplianceAuditSection({
                   onClick={() => setLogFilter(chip.id)}
                   className={`shrink-0 rounded-lg border px-3 py-2 text-[11px] font-semibold transition ${
                     active
-                      ? "border-emerald-500/50 bg-emerald-950/50 text-emerald-300"
+                      ? "border-emerald-500 bg-emerald-950/40 text-emerald-400"
                       : "border-slate-700 bg-slate-900 text-slate-400 active:bg-slate-800"
                   }`}
                 >
@@ -593,14 +600,19 @@ export function ApplianceAuditSection({
               );
             })}
           </div>
-          <TextField
-            label="Quick search"
-            value={logQuery}
-            onChange={setLogQuery}
-            placeholder="Filter by SKU or Location..."
-          />
+          <label className="block w-full">
+            <span className="sr-only">Quick search</span>
+            <input
+              type="search"
+              value={logQuery}
+              onChange={(e) => setLogQuery(e.target.value)}
+              placeholder="Filter by SKU or Location..."
+              className="w-full rounded-xl border border-slate-700 bg-slate-900 p-3 text-sm text-slate-100 outline-none placeholder:text-slate-500 focus:border-emerald-500"
+            />
+          </label>
         </div>
 
+        <div className="mt-2 space-y-2">
         {!loaded ? (
           <p className="rounded-2xl border border-slate-800 bg-slate-900/60 px-4 py-6 text-center text-sm text-slate-400">
             Loading scans…
@@ -749,6 +761,7 @@ export function ApplianceAuditSection({
               : `Show All SKUs (${aggregated.length})`}
           </button>
         ) : null}
+        </div>
       </section>
     </div>
   );

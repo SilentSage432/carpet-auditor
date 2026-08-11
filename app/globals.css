@@ -73,6 +73,16 @@ input[type="number"] {
   animation: pin-shake 0.4s ease-in-out;
 }
 
+/* Horizontal filter chips — hide scrollbar, keep swipe/scroll */
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
 /* Printable audit report — crisp B&W on letter paper */
 @media print {
   @page {
