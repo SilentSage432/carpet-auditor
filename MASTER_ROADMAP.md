@@ -60,6 +60,7 @@
 - [x] Appliance Scanner continuous mode (instant POST on detect + session counter)
 - [x] Appliance scan log SKU aggregation, category filter / search, in-line editor, summary+detail CSV
 - [x] Alphanumeric aisle codes (TEXT) + batch CSV aisle parser + Bulk Generator text input
+- [x] Appliance scan log category accordion summary with search-to-expand + 10/page SKU pagination
 
 ## Next
 - [ ] JWT / claim-based RLS enforcing `store_number` (+ department) server-side

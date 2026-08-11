@@ -12,11 +12,14 @@ import {
 } from "@/lib/appliance-catalog";
 import {
   aggregateApplianceScans,
+  applianceCategoryEmoji,
   APPLIANCE_SCAN_LOG_FILTERS,
+  APPLIANCE_SCAN_LOG_PAGE_SIZE,
   applyApplianceGroupEdit,
   applianceScansToCsv,
   deleteApplianceScan,
   fetchApplianceScans,
+  groupApplianceScansByCategory,
   isApplianceScanToday,
   matchesApplianceScanLogFilter,
   saveApplianceScan,
@@ -92,15 +95,23 @@ export function ApplianceAuditSection({
   const [loaded, setLoaded] = useState(false);
   const [scanFlash, setScanFlash] = useState(false);
   const [quickAddBarcode, setQuickAddBarcode] = useState<string | null>(null);
-  const [showAllGroups, setShowAllGroups] = useState(false);
   const [summaryExpanded, setSummaryExpanded] = useState(false);
   /** Scans successfully logged this browser session (continuous counter). */
   const [sessionTotal, setSessionTotal] = useState(0);
   const [logFilter, setLogFilter] =
     useState<ApplianceScanLogFilterId>("all");
   const [logQuery, setLogQuery] = useState("");
+  /** SKU cards with unit-detail expand (nested under category accordion). */
   const [expandedItems, setExpandedItems] = useState<Set<string>>(
     () => new Set()
+  );
+  /** Main category accordions — default all collapsed. */
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(
+    () => new Set()
+  );
+  /** Per-category page index for SKU pagination (0-based). */
+  const [categoryPages, setCategoryPages] = useState<Record<string, number>>(
+    {}
   );
   const [editingGroup, setEditingGroup] =
     useState<AggregatedApplianceScan | null>(null);
@@ -130,20 +141,48 @@ export function ApplianceAuditSection({
     return scans.filter((scan) => {
       if (!matchesApplianceScanLogFilter(scan, logFilter)) return false;
       if (!q) return true;
+      const description =
+        catalogDescriptions[scan.item_number]?.toLowerCase() ?? "";
       return (
         scan.item_number.toLowerCase().includes(q) ||
         scan.location.toLowerCase().includes(q) ||
-        scan.serial_number.toLowerCase().includes(q)
+        scan.serial_number.toLowerCase().includes(q) ||
+        scan.category.toLowerCase().includes(q) ||
+        String(scan.sub_category ?? "")
+          .toLowerCase()
+          .includes(q) ||
+        description.includes(q)
       );
     });
-  }, [scans, logFilter, logQuery]);
+  }, [scans, logFilter, logQuery, catalogDescriptions]);
 
   const aggregated = useMemo(
     () => aggregateApplianceScans(filteredScans, catalogDescriptions),
     [filteredScans, catalogDescriptions]
   );
 
-  const visibleGroups = showAllGroups ? aggregated : aggregated.slice(0, 8);
+  const categoryAccordions = useMemo(
+    () => groupApplianceScansByCategory(aggregated),
+    [aggregated]
+  );
+
+  const searchActive = logQuery.trim().length > 0;
+
+  // Clearing search restores default: all category accordions collapsed.
+  useEffect(() => {
+    if (searchActive) return;
+    setExpandedCategories(new Set());
+    setCategoryPages({});
+  }, [searchActive]);
+
+  // Search / barcode filter → expand only matching category accordions.
+  useEffect(() => {
+    if (!searchActive) return;
+    setExpandedCategories(
+      new Set(categoryAccordions.map((accordion) => accordion.category))
+    );
+    setCategoryPages({});
+  }, [searchActive, logQuery, categoryAccordions]);
 
   const catalogMatch = useMemo(
     () => findApplianceByItemOrUpc(catalog, itemNumber),
@@ -367,6 +406,21 @@ export function ApplianceAuditSection({
       else next.add(itemNumber);
       return next;
     });
+  }
+
+  function toggleCategory(category: string) {
+    // While searching, expansion is driven by matches — allow manual toggle too.
+    setExpandedCategories((prev) => {
+      const next = new Set(prev);
+      if (next.has(category)) next.delete(category);
+      else next.add(category);
+      return next;
+    });
+    setCategoryPages((prev) => ({ ...prev, [category]: 0 }));
+  }
+
+  function setCategoryPage(category: string, page: number) {
+    setCategoryPages((prev) => ({ ...prev, [category]: Math.max(0, page) }));
   }
 
   function handleDownloadCsv() {
@@ -625,142 +679,250 @@ export function ApplianceAuditSection({
           </p>
         ) : null}
 
-        {loaded && scans.length > 0 && aggregated.length === 0 ? (
+        {loaded && scans.length > 0 && categoryAccordions.length === 0 ? (
           <p className="rounded-2xl border border-dashed border-slate-700 bg-slate-900/60 px-4 py-8 text-center text-sm text-slate-400">
             No scans match this filter.
           </p>
         ) : null}
 
         <ul className="space-y-2">
-          {visibleGroups.map((group) => {
-            const expanded = expandedItems.has(group.item_number);
+          {categoryAccordions.map((accordion) => {
+            const categoryOpen = expandedCategories.has(accordion.category);
+            const page = categoryPages[accordion.category] ?? 0;
+            const pageCount = Math.max(
+              1,
+              Math.ceil(accordion.items.length / APPLIANCE_SCAN_LOG_PAGE_SIZE)
+            );
+            const safePage = Math.min(page, pageCount - 1);
+            const pageStart = safePage * APPLIANCE_SCAN_LOG_PAGE_SIZE;
+            const pageItems = accordion.items.slice(
+              pageStart,
+              pageStart + APPLIANCE_SCAN_LOG_PAGE_SIZE
+            );
+            const subSummary = accordion.subGroups
+              .map((g) => g.sub_category)
+              .slice(0, 3)
+              .join(" · ");
+
             return (
               <li
-                key={group.item_number}
+                key={accordion.category}
                 className="rounded-2xl border border-slate-800 bg-slate-900/90"
               >
-                <div className="flex gap-2 p-3">
-                  <button
-                    type="button"
-                    onClick={() => toggleExpanded(group.item_number)}
-                    aria-expanded={expanded}
-                    className="min-w-0 flex-1 space-y-1 text-left"
-                  >
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span className="font-mono text-base font-bold text-slate-50">
-                        Item {group.item_number}{" "}
-                        <span className="text-emerald-300">
-                          | Qty: {group.quantity}
-                        </span>
+                <button
+                  type="button"
+                  aria-expanded={categoryOpen}
+                  onClick={() => toggleCategory(accordion.category)}
+                  className="flex min-h-14 w-full items-center gap-3 px-3 py-3 text-left"
+                >
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-base font-bold text-slate-50">
+                      {applianceCategoryEmoji(accordion.category)}{" "}
+                      {accordion.category}{" "}
+                      <span className="font-semibold text-emerald-300">
+                        — {accordion.unitCount} unit
+                        {accordion.unitCount === 1 ? "" : "s"}
                       </span>
-                      <span className="rounded bg-slate-700/50 px-2 py-0.5 text-[10px] font-bold uppercase text-slate-300">
-                        {group.category}
-                        {group.sub_category ? ` · ${group.sub_category}` : ""}
-                      </span>
-                      {group.hasOffline ? (
-                        <span className="rounded bg-orange-500/20 px-2 py-0.5 text-[10px] font-bold uppercase text-orange-300">
-                          Offline
-                        </span>
-                      ) : null}
-                    </div>
-                    {group.description ? (
-                      <p className="truncate text-xs text-slate-400">
-                        {group.description}
-                      </p>
-                    ) : null}
-                    {group.locations.length > 0 ? (
-                      <p className="font-mono text-xs text-emerald-400/90">
-                        📍 {group.locations.join(" · ")}
-                      </p>
-                    ) : null}
-                    <p className="text-[11px] font-medium text-slate-500">
-                      {expanded
-                        ? "Hide unit details ▴"
-                        : `Show ${group.quantity} unit detail${
-                            group.quantity === 1 ? "" : "s"
-                          } ▾`}
-                    </p>
-                  </button>
-                  <div className="flex shrink-0 flex-col gap-1.5 self-center">
-                    <button
-                      type="button"
-                      aria-label={`Edit item ${group.item_number}`}
-                      onClick={() => setEditingGroup(group)}
-                      className="flex h-11 w-12 items-center justify-center rounded-xl border border-sky-500/40 text-sm font-semibold text-sky-300"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      type="button"
-                      aria-label={`Delete item ${group.item_number}`}
-                      onClick={() => setPendingDeleteGroup(group)}
-                      className="flex h-11 w-12 items-center justify-center rounded-xl border border-red-500/40 text-sm font-semibold text-red-400"
-                    >
-                      Del
-                    </button>
-                  </div>
-                </div>
+                    </span>
+                    <span className="mt-0.5 block truncate text-xs text-slate-500">
+                      {accordion.skuCount} SKU
+                      {accordion.skuCount === 1 ? "" : "s"}
+                      {subSummary ? ` · ${subSummary}` : ""}
+                      {accordion.subGroups.length > 3
+                        ? ` +${accordion.subGroups.length - 3}`
+                        : ""}
+                    </span>
+                  </span>
+                  <span className="shrink-0 text-xs font-semibold text-emerald-400">
+                    {categoryOpen ? "Collapse ▴" : "Expand ▾"}
+                  </span>
+                </button>
 
-                {expanded ? (
-                  <ul className="space-y-2 border-t border-slate-800 px-3 pb-3 pt-2">
-                    {group.scans.map((scan) => (
-                      <li
-                        key={scan.id}
-                        className="flex gap-2 rounded-xl border border-slate-800/80 bg-slate-950/60 p-2.5"
-                      >
-                        <div className="min-w-0 flex-1 space-y-0.5">
-                          {scan.serial_number ? (
-                            <p className="font-mono text-xs text-sky-300">
-                              Serial {scan.serial_number}
-                            </p>
-                          ) : (
-                            <p className="text-xs text-slate-500">No serial</p>
-                          )}
-                          {scan.location ? (
-                            <p className="font-mono text-xs text-emerald-400/90">
-                              📍 {scan.location}
-                            </p>
-                          ) : null}
-                          <time
-                            dateTime={scan.scanned_at}
-                            className="block font-mono text-xs text-slate-500"
-                          >
-                            {formatTime(scan.scanned_at)}
-                          </time>
-                          {scan.scanned_by ? (
-                            <p className="text-xs text-slate-500">
-                              Logged by {scan.scanned_by}
-                            </p>
-                          ) : null}
+                {categoryOpen ? (
+                  <div className="space-y-3 border-t border-slate-800 px-3 pb-3 pt-2">
+                    {accordion.subGroups.map((sub) => {
+                      const subItems = pageItems.filter(
+                        (item) =>
+                          (String(item.sub_category ?? "").trim() ||
+                            "Unspecified") === sub.sub_category
+                      );
+                      if (subItems.length === 0) return null;
+                      return (
+                        <div key={sub.sub_category} className="space-y-2">
+                          <p className="px-0.5 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                            {sub.sub_category}{" "}
+                            <span className="font-mono normal-case text-slate-500">
+                              · {sub.unitCount} unit
+                              {sub.unitCount === 1 ? "" : "s"}
+                            </span>
+                          </p>
+                          <ul className="space-y-2">
+                            {subItems.map((group) => {
+                              const expanded = expandedItems.has(
+                                group.item_number
+                              );
+                              return (
+                                <li
+                                  key={group.item_number}
+                                  className="rounded-xl border border-slate-800 bg-slate-950/70"
+                                >
+                                  <div className="flex gap-2 p-3">
+                                    <button
+                                      type="button"
+                                      onClick={() =>
+                                        toggleExpanded(group.item_number)
+                                      }
+                                      aria-expanded={expanded}
+                                      className="min-w-0 flex-1 space-y-1 text-left"
+                                    >
+                                      <div className="flex flex-wrap items-center gap-2">
+                                        <span className="font-mono text-base font-bold text-slate-50">
+                                          Item {group.item_number}{" "}
+                                          <span className="text-emerald-300">
+                                            | Qty: {group.quantity}
+                                          </span>
+                                        </span>
+                                        {group.hasOffline ? (
+                                          <span className="rounded bg-orange-500/20 px-2 py-0.5 text-[10px] font-bold uppercase text-orange-300">
+                                            Offline
+                                          </span>
+                                        ) : null}
+                                      </div>
+                                      {group.description ? (
+                                        <p className="truncate text-xs text-slate-400">
+                                          {group.description}
+                                        </p>
+                                      ) : null}
+                                      {group.locations.length > 0 ? (
+                                        <p className="font-mono text-xs text-emerald-400/90">
+                                          📍 {group.locations.join(" · ")}
+                                        </p>
+                                      ) : null}
+                                      <p className="text-[11px] font-medium text-slate-500">
+                                        {expanded
+                                          ? "Hide unit details ▴"
+                                          : `Show ${group.quantity} unit detail${
+                                              group.quantity === 1 ? "" : "s"
+                                            } ▾`}
+                                      </p>
+                                    </button>
+                                    <div className="flex shrink-0 flex-col gap-1.5 self-center">
+                                      <button
+                                        type="button"
+                                        aria-label={`Edit item ${group.item_number}`}
+                                        onClick={() => setEditingGroup(group)}
+                                        className="flex h-11 w-12 items-center justify-center rounded-xl border border-sky-500/40 text-sm font-semibold text-sky-300"
+                                      >
+                                        Edit
+                                      </button>
+                                      <button
+                                        type="button"
+                                        aria-label={`Delete item ${group.item_number}`}
+                                        onClick={() =>
+                                          setPendingDeleteGroup(group)
+                                        }
+                                        className="flex h-11 w-12 items-center justify-center rounded-xl border border-red-500/40 text-sm font-semibold text-red-400"
+                                      >
+                                        Del
+                                      </button>
+                                    </div>
+                                  </div>
+
+                                  {expanded ? (
+                                    <ul className="space-y-2 border-t border-slate-800 px-3 pb-3 pt-2">
+                                      {group.scans.map((scan) => (
+                                        <li
+                                          key={scan.id}
+                                          className="flex gap-2 rounded-xl border border-slate-800/80 bg-slate-900/80 p-2.5"
+                                        >
+                                          <div className="min-w-0 flex-1 space-y-0.5">
+                                            {scan.serial_number ? (
+                                              <p className="font-mono text-xs text-sky-300">
+                                                Serial {scan.serial_number}
+                                              </p>
+                                            ) : (
+                                              <p className="text-xs text-slate-500">
+                                                No serial
+                                              </p>
+                                            )}
+                                            {scan.location ? (
+                                              <p className="font-mono text-xs text-emerald-400/90">
+                                                📍 {scan.location}
+                                              </p>
+                                            ) : null}
+                                            <time
+                                              dateTime={scan.scanned_at}
+                                              className="block font-mono text-xs text-slate-500"
+                                            >
+                                              {formatTime(scan.scanned_at)}
+                                            </time>
+                                            {scan.scanned_by ? (
+                                              <p className="text-xs text-slate-500">
+                                                Logged by {scan.scanned_by}
+                                              </p>
+                                            ) : null}
+                                          </div>
+                                          <button
+                                            type="button"
+                                            aria-label={`Delete scan at ${formatTime(scan.scanned_at)}`}
+                                            onClick={() =>
+                                              void handleDeleteScan(scan.id)
+                                            }
+                                            className="flex h-10 w-10 shrink-0 items-center justify-center self-center rounded-lg border border-red-500/30 text-xs font-semibold text-red-400"
+                                          >
+                                            Del
+                                          </button>
+                                        </li>
+                                      ))}
+                                    </ul>
+                                  ) : null}
+                                </li>
+                              );
+                            })}
+                          </ul>
                         </div>
+                      );
+                    })}
+
+                    {accordion.items.length > APPLIANCE_SCAN_LOG_PAGE_SIZE ? (
+                      <div className="flex items-center justify-between gap-2 pt-1">
                         <button
                           type="button"
-                          aria-label={`Delete scan at ${formatTime(scan.scanned_at)}`}
-                          onClick={() => void handleDeleteScan(scan.id)}
-                          className="flex h-10 w-10 shrink-0 items-center justify-center self-center rounded-lg border border-red-500/30 text-xs font-semibold text-red-400"
+                          disabled={safePage <= 0}
+                          onClick={() =>
+                            setCategoryPage(
+                              accordion.category,
+                              safePage - 1
+                            )
+                          }
+                          className="flex min-h-11 flex-1 items-center justify-center rounded-xl border border-slate-700 text-sm font-semibold text-slate-200 disabled:opacity-40"
                         >
-                          Del
+                          Prev
                         </button>
-                      </li>
-                    ))}
-                  </ul>
+                        <span className="shrink-0 font-mono text-xs tabular-nums text-slate-500">
+                          {safePage + 1} / {pageCount}
+                        </span>
+                        <button
+                          type="button"
+                          disabled={safePage >= pageCount - 1}
+                          onClick={() =>
+                            setCategoryPage(
+                              accordion.category,
+                              safePage + 1
+                            )
+                          }
+                          className="flex min-h-11 flex-1 items-center justify-center rounded-xl border border-slate-700 text-sm font-semibold text-slate-200 disabled:opacity-40"
+                        >
+                          Next
+                        </button>
+                      </div>
+                    ) : null}
+                  </div>
                 ) : null}
               </li>
             );
           })}
         </ul>
-
-        {aggregated.length > 8 ? (
-          <button
-            type="button"
-            onClick={() => setShowAllGroups((v) => !v)}
-            className="flex min-h-12 w-full items-center justify-center rounded-xl border border-slate-700 bg-slate-900 text-sm font-semibold text-slate-200"
-          >
-            {showAllGroups
-              ? "Show Fewer SKUs"
-              : `Show All SKUs (${aggregated.length})`}
-          </button>
-        ) : null}
         </div>
       </section>
     </div>

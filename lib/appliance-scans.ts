@@ -428,6 +428,87 @@ export function aggregateApplianceScans(
   });
 }
 
+/** Accordion page size for SKU cards inside an expanded category. */
+export const APPLIANCE_SCAN_LOG_PAGE_SIZE = 10;
+
+export type ApplianceScanSubCategoryGroup = {
+  sub_category: string;
+  unitCount: number;
+  items: AggregatedApplianceScan[];
+};
+
+/** Top-level category accordion roll-up for the scan log. */
+export type ApplianceScanCategoryAccordion = {
+  category: string;
+  unitCount: number;
+  skuCount: number;
+  subGroups: ApplianceScanSubCategoryGroup[];
+  /** Flat SKU list used for pagination inside the expanded accordion. */
+  items: AggregatedApplianceScan[];
+};
+
+const CATEGORY_ACCORDION_EMOJI: Record<string, string> = {
+  Laundry: "🧺",
+  Refrigeration: "❄️",
+  "Cooking / Ranges": "🍳",
+  Dishwashers: "🍽️",
+  "Microwaves / Venting": "📡",
+};
+
+export function applianceCategoryEmoji(category: string): string {
+  return CATEGORY_ACCORDION_EMOJI[category] ?? "🔌";
+}
+
+/**
+ * Nest aggregated SKU cards under main category → sub_category for the
+ * collapsible scan-log summary view.
+ */
+export function groupApplianceScansByCategory(
+  items: AggregatedApplianceScan[]
+): ApplianceScanCategoryAccordion[] {
+  const byCategory = new Map<string, AggregatedApplianceScan[]>();
+  for (const item of items) {
+    const key = String(item.category || "Uncategorized");
+    const list = byCategory.get(key);
+    if (list) list.push(item);
+    else byCategory.set(key, [item]);
+  }
+
+  const accordions: ApplianceScanCategoryAccordion[] = [];
+  for (const [category, categoryItems] of byCategory) {
+    const bySub = new Map<string, AggregatedApplianceScan[]>();
+    for (const item of categoryItems) {
+      const sub = String(item.sub_category ?? "").trim() || "Unspecified";
+      const list = bySub.get(sub);
+      if (list) list.push(item);
+      else bySub.set(sub, [item]);
+    }
+
+    const subGroups: ApplianceScanSubCategoryGroup[] = [...bySub.entries()]
+      .map(([sub_category, subItems]) => ({
+        sub_category,
+        unitCount: subItems.reduce((sum, i) => sum + i.quantity, 0),
+        items: subItems.sort((a, b) => b.quantity - a.quantity),
+      }))
+      .sort((a, b) => b.unitCount - a.unitCount);
+
+    const flatItems = subGroups.flatMap((g) => g.items);
+    accordions.push({
+      category,
+      unitCount: flatItems.reduce((sum, i) => sum + i.quantity, 0),
+      skuCount: flatItems.length,
+      subGroups,
+      items: flatItems,
+    });
+  }
+
+  return accordions.sort((a, b) => {
+    const byUnits = b.unitCount - a.unitCount;
+    if (byUnits !== 0) return byUnits;
+    return a.category.localeCompare(b.category);
+  });
+}
+
 export async function updateApplianceScan(
   id: string,
   patch: Partial<

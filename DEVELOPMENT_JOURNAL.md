@@ -1,5 +1,12 @@
 # DeptSync Hub — Development Journal
 
+## 2026-08-11 — Appliance scan log category accordion + pagination
+
+### Shipped
+- Scan log groups by main category (collapsed by default) with sub-category sections and unit totals (`🍳 Cooking / Ranges — 42 units`).
+- Search / filter auto-expands only matching category accordions and hides non-matches.
+- Expanded groups paginate SKU cards at 10 per page (`Prev` / `Next`).
+
 ## 2026-08-11 — Appliance scan log filter layout polish
 
 ### Fixed
