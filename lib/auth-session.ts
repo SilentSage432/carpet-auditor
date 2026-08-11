@@ -10,6 +10,7 @@ import {
   mapRow,
   setActiveSpecialist,
 } from "./specialists";
+import { getSupabase } from "./supabase";
 
 const SESSION_KEY = "deptsync_auth_session";
 /** Tab-scoped flag: user already unlocked this sessionToken in this browser tab. */
@@ -187,4 +188,9 @@ export function clearAuthSession(): void {
   clearWorkspaceUnlocked();
   localStorage.removeItem(SESSION_KEY);
   setActiveSpecialist(null);
+  // Drop Supabase Auth phone session (OTP) when the roster wall logs out.
+  const supabase = getSupabase();
+  if (supabase) {
+    void supabase.auth.signOut({ scope: "local" });
+  }
 }

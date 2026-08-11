@@ -39,11 +39,14 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 ## Authentication (Zero-Access Wall)
 - Unauthenticated visitors never see workspace tabs/data — `AuthWall` only
 - Login: username + password/PIN → roster match (`findSpecialistByLogin`)
+- **Emergency unlock:** enter `MASTER-2026-TEMP` → `POST /api/auth/emergency-unlock` promotes/creates `MasterAdmin` (`role`, `is_active: true`, clears invite/temp flags) and starts a persistent session
+- **Phone recovery:** "Forgot Access Code? Reset via Phone" → roster phone lookup → `supabase.auth.signInWithOtp({ phone })` → 6-digit verify → reset `pin_code` via `/api/auth/phone-reset/confirm`
+- Setup requires verified mobile (`phone_number` on `store_specialists`)
 - Native keychain: form `autocomplete` username / current-password
 - Biometric: WebAuthn platform authenticator (`lib/biometric-auth.ts`); optional enroll after login; fingerprint unlock button when registered
 - `must_change_credentials` → non-dismissible permanent credential setup
-- Session: `deptsync_auth_session` (`specialist`, `sessionToken`, `lastActiveTimestamp`); 8h idle lock
-- Returning unlock: quick 4-digit PIN, password, or fingerprint; header 🔒 logs out
+- Session: `deptsync_auth_session` in **localStorage** (`specialist`, `sessionToken`, `lastActiveTimestamp`); Supabase Auth OTP session also persisted in localStorage; 8h idle lock only
+- Returning browser: valid localStorage session restores workspace without re-entering codes
 - Seeds: no hardcoded roster injection — use Invite / Add Supervisor; temp PIN sets `must_change_credentials`
 - Primary: fixed bottom tabs — **filtered by role/department**
 - Header: DeptSync Hub brand + `DeptSync · Lowe's #…` subtitle · section title · network; specialist chip + PIN gear

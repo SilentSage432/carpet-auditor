@@ -7,6 +7,7 @@ import type {
 import { departmentMeta } from "./types";
 import { getStoreNumber, normalizeStoreNumber } from "./store";
 import { getSupabase } from "./supabase";
+import { normalizePhoneE164 } from "./phone";
 import {
   enqueueSyncAction,
   shouldSaveOffline,
@@ -501,6 +502,9 @@ function specialistPayload(record: StoreSpecialist): Record<string, unknown> {
   if (record.assigned_department !== undefined) {
     payload.assigned_department = record.assigned_department;
   }
+  if (record.phone_number != null && String(record.phone_number).trim() !== "") {
+    payload.phone_number = String(record.phone_number).trim();
+  }
   if (!isFallbackProfileId(record.id)) {
     payload.id = record.id;
   }
@@ -521,6 +525,8 @@ function buildSpecialistDbPatch(
       | "name"
       | "assigned_department"
       | "is_active"
+      | "phone_number"
+      | "must_change_pin"
     >
   >
 ): Record<string, unknown> {
@@ -538,6 +544,9 @@ function buildSpecialistDbPatch(
   if (patch.must_change_credentials !== undefined) {
     update.must_change_credentials = patch.must_change_credentials;
   }
+  if (patch.must_change_pin !== undefined) {
+    update.must_change_pin = patch.must_change_pin;
+  }
   if (patch.name !== undefined && patch.name !== null && String(patch.name).trim() !== "") {
     update.name = String(patch.name).trim();
   }
@@ -546,6 +555,9 @@ function buildSpecialistDbPatch(
   }
   if (patch.is_active !== undefined) {
     update.is_active = patch.is_active;
+  }
+  if (patch.phone_number !== undefined) {
+    update.phone_number = patch.phone_number;
   }
   return update;
 }
@@ -795,10 +807,10 @@ export async function updateSpecialistPin(
   }
 }
 
-/** First-login / supervisor credential customization (username + password). */
+/** First-login / supervisor credential customization (username + password + optional phone). */
 export async function updateSpecialistCredentials(
   member: StoreSpecialist,
-  input: { username: string; password: string }
+  input: { username: string; password: string; phone?: string | null }
 ): Promise<{ record: StoreSpecialist; offline: boolean }> {
   const username = input.username.trim();
   const password = input.password.trim();
@@ -819,11 +831,31 @@ export async function updateSpecialistCredentials(
     throw new Error("Choose a custom username and password (not the defaults)");
   }
 
-  return persistSpecialistFields(member, {
+  const patch: Partial<
+    Pick<
+      StoreSpecialist,
+      | "username"
+      | "pin_code"
+      | "must_change_credentials"
+      | "must_change_pin"
+      | "phone_number"
+    >
+  > = {
     username,
     pin_code: password,
     must_change_credentials: false,
-  });
+    must_change_pin: false,
+  };
+
+  if (input.phone !== undefined) {
+    const phone = normalizePhoneE164(input.phone);
+    if (String(input.phone ?? "").trim() && !phone) {
+      throw new Error("Enter a valid mobile phone number");
+    }
+    patch.phone_number = phone;
+  }
+
+  return persistSpecialistFields(member, patch);
 }
 
 async function persistSpecialistFields(
@@ -831,7 +863,13 @@ async function persistSpecialistFields(
   patch: Partial<
     Pick<
       StoreSpecialist,
-      "pin_code" | "username" | "must_change_credentials" | "name" | "assigned_department"
+      | "pin_code"
+      | "username"
+      | "must_change_credentials"
+      | "must_change_pin"
+      | "name"
+      | "assigned_department"
+      | "phone_number"
     >
   >
 ): Promise<{ record: StoreSpecialist; offline: boolean }> {

@@ -63,10 +63,12 @@
 - [x] Appliance scan log category accordion summary with search-to-expand + 10/page SKU pagination
 - [x] Remove Catalog bottom-nav tab; `/catalog` → `/appliances` redirect
 - [x] Roster without hardcoded seed accounts; temp-credentials badge from DB flags only
+- [x] Emergency master unlock (`MASTER-2026-TEMP`) + phone SMS OTP access reset + persistent localStorage auth session
 
 ## Next
 - [ ] JWT / claim-based RLS enforcing `store_number` (+ department) server-side
 - [ ] Wire Supabase Auth sessions into `profiles` (replace header-based store-ops actor bridge)
+- [ ] Rotate off temporary `MASTER-2026-TEMP` emergency code after production recovery
 - [ ] Link push `user_id` to Supabase Auth profiles (retire specialist_id bridge when ready)
 - [ ] Background Sync API / periodic queue flush while tab backgrounded
 - [ ] Conflict resolution UI when offline edits collide

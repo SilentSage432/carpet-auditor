@@ -16,7 +16,15 @@ export function getSupabase(): SupabaseClient | null {
 
   const fingerprint = `${url}::${key.slice(0, 8)}::${key.length}`;
   if (!client || clientFingerprint !== fingerprint) {
-    client = createClient(url, key);
+    client = createClient(url, key, {
+      auth: {
+        // Persist Supabase Auth (phone OTP) session in localStorage alongside DeptSync roster session.
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: true,
+        storage: typeof window !== "undefined" ? window.localStorage : undefined,
+      },
+    });
     clientFingerprint = fingerprint;
   }
 

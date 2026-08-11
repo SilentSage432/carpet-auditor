@@ -4,6 +4,9 @@
  */
 
 import { createHash, randomBytes, randomInt, randomUUID } from "crypto";
+import { normalizePhoneE164 } from "@/lib/phone";
+
+export { normalizePhoneE164 };
 
 export const INVITE_TTL_HOURS = 48;
 
@@ -100,14 +103,3 @@ export function buildSmsLink(phoneE164: string | null | undefined, body: string)
   return `sms:?&body=${encoded}`;
 }
 
-export function normalizePhoneE164(raw: string | null | undefined): string | null {
-  if (!raw) return null;
-  const trimmed = raw.trim();
-  if (!trimmed) return null;
-  const digits = trimmed.replace(/\D/g, "");
-  if (digits.length === 10) return `+1${digits}`;
-  if (digits.length === 11 && digits.startsWith("1")) return `+${digits}`;
-  if (trimmed.startsWith("+") && digits.length >= 10) return `+${digits}`;
-  if (digits.length >= 10) return `+${digits}`;
-  return null;
-}

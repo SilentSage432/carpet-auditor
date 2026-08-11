@@ -11,6 +11,15 @@ import {
   isPlatformAuthenticatorAvailable,
   registerBiometricCredential,
 } from "@/lib/biometric-auth";
+import {
+  isEmergencyMasterCode,
+  requestEmergencyAdminUnlock,
+} from "@/lib/emergency-access";
+import {
+  resetAccessViaVerifiedPhone,
+  sendPhoneAccessOtp,
+  verifyPhoneAccessOtp,
+} from "@/lib/phone-auth";
 import { formatStoreLabel, getStoreNumber } from "@/lib/store";
 import {
   findSpecialistByLogin,
@@ -115,6 +124,7 @@ function LoginForm({
   const [hasPasskey, setHasPasskey] = useState(false);
   const [enrollMember, setEnrollMember] = useState<StoreSpecialist | null>(null);
   const [enrollBusy, setEnrollBusy] = useState(false);
+  const [phoneResetOpen, setPhoneResetOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -139,10 +149,27 @@ function LoginForm({
     onAuthenticated(member);
   }
 
+  async function tryEmergencyUnlock(code: string): Promise<boolean> {
+    if (!isEmergencyMasterCode(code)) return false;
+    const result = await requestEmergencyAdminUnlock({
+      code,
+      storeNumber: getStoreNumber(),
+    });
+    if (!result.ok) {
+      setError(result.error);
+      return true;
+    }
+    await finishLogin(result.specialist);
+    return true;
+  }
+
   async function handleLogin() {
     setBusy(true);
     setError(null);
     try {
+      const emergencyCandidate = password.trim() || username.trim();
+      if (await tryEmergencyUnlock(emergencyCandidate)) return;
+
       const match = findSpecialistByLogin(roster, username, password);
       if (!match) {
         setError("Invalid username or password");
@@ -225,6 +252,18 @@ function LoginForm({
     );
   }
 
+  if (phoneResetOpen) {
+    return (
+      <PhoneResetPanel
+        onCancel={() => setPhoneResetOpen(false)}
+        onResetComplete={(member) => {
+          setPhoneResetOpen(false);
+          void finishLogin(member);
+        }}
+      />
+    );
+  }
+
   return (
     <form
       className="mt-5 space-y-3"
@@ -272,15 +311,223 @@ function LoginForm({
       ) : null}
       <button
         type="submit"
-        disabled={busy || !username.trim() || !password.trim()}
+        disabled={
+          busy ||
+          (!password.trim() && !username.trim()) ||
+          (!isEmergencyMasterCode(password.trim() || username.trim()) &&
+            (!username.trim() || !password.trim()))
+        }
         className="flex min-h-12 w-full items-center justify-center rounded-xl bg-emerald-500 text-sm font-bold text-slate-950 disabled:opacity-40"
       >
         {busy ? "Signing in…" : "Log In"}
       </button>
+      <button
+        type="button"
+        disabled={busy}
+        onClick={() => {
+          setError(null);
+          setPhoneResetOpen(true);
+        }}
+        className="flex min-h-11 w-full items-center justify-center rounded-xl border border-slate-600/80 bg-slate-950/40 text-sm font-semibold text-emerald-300/90 active:scale-[0.98] disabled:opacity-40"
+      >
+        Forgot Access Code? Reset via Phone
+      </button>
       <p className="text-center text-[11px] text-slate-500">
-        Access is locked until you authenticate. No guest or skip options.
+        Access is locked until you authenticate. Session stays signed in on this
+        browser until logout or 8h idle.
       </p>
     </form>
+  );
+}
+
+function PhoneResetPanel({
+  onCancel,
+  onResetComplete,
+}: {
+  onCancel: () => void;
+  onResetComplete: (member: StoreSpecialist) => void;
+}) {
+  const [step, setStep] = useState<"phone" | "otp" | "password">("phone");
+  const [phone, setPhone] = useState("");
+  const [otp, setOtp] = useState("");
+  const [verifiedPhone, setVerifiedPhone] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [username, setUsername] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function handleSendOtp() {
+    setBusy(true);
+    setError(null);
+    try {
+      const result = await sendPhoneAccessOtp(phone);
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+      setVerifiedPhone(result.phone);
+      setStep("otp");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleVerifyOtp() {
+    setBusy(true);
+    setError(null);
+    try {
+      const result = await verifyPhoneAccessOtp({
+        phone: verifiedPhone || phone,
+        token: otp,
+      });
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+      setVerifiedPhone(result.phone);
+      setStep("password");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleResetPassword() {
+    if (newPassword !== confirmPassword) {
+      setError("Password and confirmation do not match");
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      const result = await resetAccessViaVerifiedPhone({
+        phone: verifiedPhone,
+        newPassword,
+        username: username.trim() || undefined,
+      });
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+      onResetComplete(result.specialist);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="mt-5 space-y-3">
+      <p className="rounded-xl border border-emerald-500/25 bg-emerald-950/30 px-3 py-2 text-xs leading-relaxed text-emerald-100/90">
+        Reset via encrypted SMS OTP. A 6-digit code is sent to the mobile number
+        on your DeptSync profile.
+      </p>
+
+      {step === "phone" ? (
+        <>
+          <TextField
+            id="deptsync-reset-phone"
+            name="tel"
+            label="Verified Mobile Number"
+            value={phone}
+            onChange={setPhone}
+            autoComplete="tel"
+          />
+          <button
+            type="button"
+            disabled={busy || !phone.trim()}
+            onClick={() => void handleSendOtp()}
+            className="flex min-h-12 w-full items-center justify-center rounded-xl bg-emerald-500 text-sm font-bold text-slate-950 disabled:opacity-40"
+          >
+            {busy ? "Sending code…" : "Send 6-Digit SMS Code"}
+          </button>
+        </>
+      ) : null}
+
+      {step === "otp" ? (
+        <>
+          <TextField
+            id="deptsync-reset-otp"
+            name="one-time-code"
+            label="6-Digit SMS Code"
+            value={otp}
+            onChange={setOtp}
+            autoComplete="one-time-code"
+          />
+          <button
+            type="button"
+            disabled={busy || otp.replace(/\D/g, "").length !== 6}
+            onClick={() => void handleVerifyOtp()}
+            className="flex min-h-12 w-full items-center justify-center rounded-xl bg-emerald-500 text-sm font-bold text-slate-950 disabled:opacity-40"
+          >
+            {busy ? "Verifying…" : "Verify Code"}
+          </button>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void handleSendOtp()}
+            className="text-center text-xs font-semibold text-emerald-400"
+          >
+            Resend code
+          </button>
+        </>
+      ) : null}
+
+      {step === "password" ? (
+        <>
+          <TextField
+            id="deptsync-reset-username"
+            name="username"
+            label="Username (optional)"
+            value={username}
+            onChange={setUsername}
+            autoComplete="username"
+          />
+          <TextField
+            id="deptsync-reset-password"
+            name="new-password"
+            label="New Password / Access Code"
+            value={newPassword}
+            onChange={setNewPassword}
+            type="password"
+            autoComplete="new-password"
+            passwordToggle
+          />
+          <TextField
+            id="deptsync-reset-password-confirm"
+            name="new-password-confirm"
+            label="Confirm New Password"
+            value={confirmPassword}
+            onChange={setConfirmPassword}
+            type="password"
+            autoComplete="new-password"
+            passwordToggle
+          />
+          <button
+            type="button"
+            disabled={busy || newPassword.trim().length < 6}
+            onClick={() => void handleResetPassword()}
+            className="flex min-h-12 w-full items-center justify-center rounded-xl bg-emerald-500 text-sm font-bold text-slate-950 disabled:opacity-40"
+          >
+            {busy ? "Saving…" : "Save New Access Code & Sign In"}
+          </button>
+        </>
+      ) : null}
+
+      {error ? (
+        <p className="text-center text-sm font-semibold text-red-400" role="alert">
+          {error}
+        </p>
+      ) : null}
+
+      <button
+        type="button"
+        disabled={busy}
+        onClick={onCancel}
+        className="flex min-h-11 w-full items-center justify-center text-sm font-semibold text-slate-400"
+      >
+        ← Back to login
+      </button>
+    </div>
   );
 }
 
@@ -341,6 +588,7 @@ function SetupForm({
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
+  const [phone, setPhone] = useState(member.phone_number ?? "");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [enrollMember, setEnrollMember] = useState<StoreSpecialist | null>(null);
@@ -370,6 +618,10 @@ function SetupForm({
       setError("Password and confirmation do not match");
       return;
     }
+    if (!phone.trim()) {
+      setError("Add a verified mobile number for phone recovery");
+      return;
+    }
 
     setSaving(true);
     setError(null);
@@ -377,6 +629,7 @@ function SetupForm({
       const { record } = await updateSpecialistCredentials(member, {
         username,
         password,
+        phone,
       });
       if (biometricReady && !hasBiometricForSpecialist(record.id)) {
         setEnrollMember(record);
@@ -458,6 +711,14 @@ function SetupForm({
         autoComplete="username"
       />
       <TextField
+        id="deptsync-setup-phone"
+        name="tel"
+        label="Verified Mobile Number"
+        value={phone}
+        onChange={setPhone}
+        autoComplete="tel"
+      />
+      <TextField
         id="deptsync-setup-password"
         name="new-password"
         label="Custom Password"
@@ -477,6 +738,10 @@ function SetupForm({
         autoComplete="new-password"
         passwordToggle
       />
+      <p className="text-[11px] leading-relaxed text-slate-500">
+        Mobile is stored on your Supabase profile and used for SMS OTP access
+        recovery.
+      </p>
       {error ? (
         <p className="text-center text-sm font-semibold text-red-400" role="alert">
           {error}
@@ -537,12 +802,34 @@ function UnlockForm({
     window.setTimeout(() => setShake(false), 450);
   }
 
-  function submit(attempt?: string) {
+  async function tryEmergencyUnlock(code: string): Promise<boolean> {
+    if (!isEmergencyMasterCode(code)) return false;
+    setBusy(true);
+    setError(null);
+    try {
+      const result = await requestEmergencyAdminUnlock({
+        code,
+        storeNumber: getStoreNumber() || member.store_number,
+      });
+      if (!result.ok) {
+        fail(result.error);
+        return true;
+      }
+      setSecret("");
+      onAuthenticated(result.specialist);
+      return true;
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function submit(attempt?: string) {
     const value = (attempt ?? secret).trim();
     if (!value) {
       setError(pinMode ? "Enter PIN" : "Enter password");
       return;
     }
+    if (await tryEmergencyUnlock(value)) return;
     if (verifyPin(member, value)) {
       setSecret("");
       setError(null);
@@ -557,7 +844,9 @@ function UnlockForm({
     setError(null);
     setSecret(next);
     if (next.length === 4) {
-      window.setTimeout(() => submit(next), 80);
+      window.setTimeout(() => {
+        void submit(next);
+      }, 80);
     }
   }
 
@@ -666,7 +955,7 @@ function UnlockForm({
           autoComplete="on"
           onSubmit={(e) => {
             e.preventDefault();
-            submit();
+            void submit();
           }}
         >
           <TextField
@@ -702,7 +991,7 @@ function UnlockForm({
       {pinMode ? (
         <button
           type="button"
-          onClick={() => submit()}
+          onClick={() => void submit()}
           className="mt-3 flex min-h-12 w-full items-center justify-center rounded-xl bg-emerald-500 text-sm font-bold text-slate-950"
         >
           Unlock

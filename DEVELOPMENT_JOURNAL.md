@@ -1,5 +1,12 @@
 # DeptSync Hub — Development Journal
 
+## 2026-08-11 — Emergency admin bypass + phone OTP recovery
+
+### Shipped
+- Temporary master code `MASTER-2026-TEMP` on AuthWall login/unlock → `POST /api/auth/emergency-unlock` sets `store_specialists` to Master Admin (`is_active`, clears invite/temp credential flags) and starts `deptsync_auth_session` in localStorage.
+- Profile setup requires verified mobile (`phone_number`); login offers **Forgot Access Code? Reset via Phone** using `supabase.auth.signInWithOtp` + verify → `/api/auth/phone-reset/confirm`.
+- Supabase browser client persists Auth sessions in localStorage (`persistSession` / `autoRefreshToken`); roster wall session already restored without re-auth until logout or 8h idle.
+
 ## 2026-08-11 — Roster: no hardcoded seeds + DB-driven temp credentials
 
 ### Fixed
