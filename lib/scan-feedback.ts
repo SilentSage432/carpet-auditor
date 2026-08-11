@@ -33,6 +33,17 @@ function tone(
   osc.stop(start + duration + 0.02);
 }
 
+/** Short haptic pulse when available (Zebra / mobile). */
+export function playSuccessHaptic(): void {
+  try {
+    if (typeof navigator !== "undefined" && typeof navigator.vibrate === "function") {
+      navigator.vibrate(40);
+    }
+  } catch {
+    /* haptic optional */
+  }
+}
+
 /** 🟢 High double-beep — valid scan match or audit logged. */
 export function playSuccessChime(): void {
   try {
@@ -45,6 +56,12 @@ export function playSuccessChime(): void {
   } catch {
     /* audio optional */
   }
+}
+
+/** Success chime + haptic for continuous floor scan confirmations. */
+export function playScanLoggedFeedback(): void {
+  playSuccessChime();
+  playSuccessHaptic();
 }
 
 /** 🟡 Soft pop — unlinked barcode opens Quick-Add. */

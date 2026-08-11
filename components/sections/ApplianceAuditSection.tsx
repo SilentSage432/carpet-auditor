@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ApplianceCategoryFields } from "@/components/appliances/ApplianceCategoryFields";
 import { QuickAddApplianceModal } from "@/components/barcode/QuickAddApplianceModal";
 import { NumberField, TextField } from "@/components/ui/NumberField";
 import {
@@ -19,12 +18,11 @@ import {
 import { sanitizeBarcodeScan } from "@/lib/barcode";
 import { blurActiveInput } from "@/lib/focus-input";
 import { useGlobalBarcodeScanner } from "@/lib/hardware-scanner";
-import { playSuccessChime } from "@/lib/scan-feedback";
+import { playScanLoggedFeedback } from "@/lib/scan-feedback";
 import {
   APPLIANCE_SIMS_SUGGESTIONS,
   isValidApplianceSubCategory,
   type ApplianceCatalogItem,
-  type ApplianceCategory,
   type ApplianceScan,
   type StoreSpecialist,
 } from "@/lib/types";
@@ -71,12 +69,13 @@ export function ApplianceAuditSection({
   activeSpecialist,
 }: Props) {
   const itemInputRef = useRef<HTMLInputElement>(null);
+  const serialRef = useRef("");
+  const locationRef = useRef("");
+  const savingRef = useRef(false);
 
   const [itemNumber, setItemNumber] = useState("");
   const [serialNumber, setSerialNumber] = useState("");
   const [description, setDescription] = useState("");
-  const [category, setCategory] = useState<ApplianceCategory>("Laundry");
-  const [subCategory, setSubCategory] = useState("");
   const [location, setLocation] = useState("");
   const [scans, setScans] = useState<ApplianceScan[]>([]);
   const [saving, setSaving] = useState(false);
@@ -87,6 +86,12 @@ export function ApplianceAuditSection({
   const [quickAddBarcode, setQuickAddBarcode] = useState<string | null>(null);
   const [showAll, setShowAll] = useState(false);
   const [summaryExpanded, setSummaryExpanded] = useState(false);
+  /** Scans successfully logged this browser session (continuous counter). */
+  const [sessionTotal, setSessionTotal] = useState(0);
+
+  serialRef.current = serialNumber;
+  locationRef.current = location;
+  savingRef.current = saving;
 
   const shiftScans = useMemo(
     () => scans.filter((s) => isApplianceScanToday(s.scanned_at)),
@@ -122,16 +127,71 @@ export function ApplianceAuditSection({
     window.setTimeout(() => setStatusMsg(null), tone === "error" ? 5000 : 2800);
   }, []);
 
-  const applyCatalogItem = useCallback((item: ApplianceCatalogItem) => {
-    setItemNumber(item.item_number);
-    setDescription(item.description);
-    setCategory(item.category);
-    setSubCategory(item.sub_category ?? "");
-    setScanFlash(true);
-    playSuccessChime();
-    window.setTimeout(() => setScanFlash(false), 900);
-    blurActiveInput(itemInputRef);
-  }, []);
+  /** Clear item fields for the next scan; keep location sticky for bay work. */
+  const clearForNextScan = useCallback(() => {
+    setItemNumber("");
+    setSerialNumber("");
+    setDescription("");
+    setScanFlash(false);
+    dismissKeyboard();
+    window.setTimeout(() => itemInputRef.current?.focus(), 50);
+  }, [dismissKeyboard]);
+
+  /**
+   * Continuous mode: POST to /api/appliances/scans immediately, then clear.
+   * Does not wait for a Submit button.
+   */
+  const commitScan = useCallback(
+    async (item: ApplianceCatalogItem) => {
+      if (savingRef.current) return;
+      if (!isValidApplianceSubCategory(item.category, item.sub_category)) {
+        setQuickAddBarcode(item.upc || item.item_number);
+        flashStatus("Select a sub-category to finish linking");
+        return;
+      }
+
+      setSaving(true);
+      try {
+        const { record, offline } = await saveApplianceScan({
+          item_number: item.item_number,
+          serial_number: serialRef.current.trim(),
+          location: locationRef.current.trim(),
+          category: item.category,
+          sub_category: String(item.sub_category ?? "").trim(),
+          scanned_by: scannedBy || activeSpecialist?.name || "",
+        });
+
+        setScans((prev) => [record, ...prev.filter((s) => s.id !== record.id)]);
+        setSessionTotal((n) => n + 1);
+        playScanLoggedFeedback();
+        setScanFlash(true);
+        window.setTimeout(() => setScanFlash(false), 600);
+        clearForNextScan();
+        flashStatus(
+          offline
+            ? `Logged ${item.item_number} offline — will sync`
+            : `Logged ${item.item_number}`
+        );
+
+        void fetchApplianceScans()
+          .then((refreshed) => setScans(refreshed))
+          .catch((refreshErr) => {
+            console.error(
+              "[ApplianceAudit] re-fetch after save failed",
+              refreshErr
+            );
+          });
+      } catch (err) {
+        const message =
+          err instanceof Error ? err.message : "Unknown error";
+        console.error("[ApplianceAudit] continuous save failed", err);
+        flashStatus(`Failed to save scan: ${message}`, "error");
+      } finally {
+        setSaving(false);
+      }
+    },
+    [activeSpecialist?.name, clearForNextScan, flashStatus, scannedBy]
+  );
 
   function handleItemChange(raw: string) {
     const next = sanitizeBarcodeScan(raw);
@@ -139,37 +199,50 @@ export function ApplianceAuditSection({
     const hit = findApplianceByItemOrUpc(catalog, next);
     if (hit) {
       setDescription(hit.description);
-      setCategory(hit.category);
-      setSubCategory(hit.sub_category ?? "");
     } else {
       setDescription("");
     }
   }
 
-  function handleItemLookup(raw: string) {
-    const cleaned = sanitizeBarcodeScan(raw);
-    if (!cleaned) return;
+  const handleItemLookup = useCallback(
+    (raw: string) => {
+      const cleaned = sanitizeBarcodeScan(raw);
+      if (!cleaned) return;
+      if (savingRef.current) return;
+      // Pause further hardware scans while the link modal is open.
+      if (quickAddBarcode != null) return;
 
-    setItemNumber(cleaned);
-    const resolution: ApplianceScanResolution = resolveApplianceScan(
-      catalog,
-      cleaned
-    );
-    if (resolution.kind === "empty") return;
+      setItemNumber(cleaned);
+      const resolution: ApplianceScanResolution = resolveApplianceScan(
+        catalog,
+        cleaned
+      );
+      if (resolution.kind === "empty") return;
 
-    if (resolution.kind === "matched") {
-      applyCatalogItem(resolution.item);
-      flashStatus(`Matched ${resolution.item.item_number}`);
-      return;
-    }
+      if (resolution.kind === "matched") {
+        const item = resolution.item;
+        setDescription(item.description);
 
-    setQuickAddBarcode(resolution.scanned);
-    flashStatus("Unlinked barcode — link UPC to Item #");
-  }
+        if (!isValidApplianceSubCategory(item.category, item.sub_category)) {
+          setQuickAddBarcode(item.upc || item.item_number);
+          flashStatus("Sub-category required — complete the link");
+          return;
+        }
+
+        void commitScan(item);
+        return;
+      }
+
+      // NEW / unrecognized — pause for subcategory (Quick-Add) modal.
+      setQuickAddBarcode(resolution.scanned);
+      flashStatus("New item — choose category & sub-category");
+    },
+    [catalog, commitScan, flashStatus, quickAddBarcode]
+  );
 
   useGlobalBarcodeScanner(handleItemLookup);
 
-  function handleQuickAdded(item: ApplianceCatalogItem) {
+  async function handleQuickAdded(item: ApplianceCatalogItem) {
     const next = [
       item,
       ...catalog.filter(
@@ -178,72 +251,12 @@ export function ApplianceAuditSection({
     ].sort((a, b) => a.item_number.localeCompare(b.item_number));
     onCatalogChange(next);
     setQuickAddBarcode(null);
-    applyCatalogItem(item);
-    flashStatus(`Linked ${item.item_number} in appliance catalog`);
+    await commitScan(item);
   }
 
   function closeQuickAdd() {
     setQuickAddBarcode(null);
-    setItemNumber("");
-    setDescription("");
-    dismissKeyboard();
-  }
-
-  function resetForm() {
-    setItemNumber("");
-    setSerialNumber("");
-    setDescription("");
-    setCategory("Laundry");
-    setSubCategory("");
-    setLocation("");
-    dismissKeyboard();
-  }
-
-  const canLog =
-    itemNumber.trim().length > 0 &&
-    isValidApplianceSubCategory(category, subCategory) &&
-    !saving;
-
-  async function handleLog() {
-    if (!canLog) return;
-    setSaving(true);
-    try {
-      const { record, offline } = await saveApplianceScan({
-        item_number: itemNumber.trim(),
-        serial_number: serialNumber.trim(),
-        location: location.trim(),
-        category,
-        sub_category: subCategory.trim(),
-        scanned_by: scannedBy || activeSpecialist?.name || "",
-      });
-
-      // Optimistic insert, then re-fetch so the log matches Supabase.
-      setScans((prev) => [record, ...prev.filter((s) => s.id !== record.id)]);
-      try {
-        const refreshed = await fetchApplianceScans();
-        setScans(refreshed);
-      } catch (refreshErr) {
-        console.error(
-          "[ApplianceAudit] re-fetch after save failed",
-          refreshErr
-        );
-      }
-
-      playSuccessChime();
-      resetForm();
-      flashStatus(
-        offline
-          ? "Saved offline — will sync when online"
-          : "Appliance scan logged — form reset"
-      );
-    } catch (err) {
-      const message =
-        err instanceof Error ? err.message : "Unknown error";
-      console.error("[ApplianceAudit] save failed", err);
-      flashStatus(`Failed to save scan: ${message}`, "error");
-    } finally {
-      setSaving(false);
-    }
+    clearForNextScan();
   }
 
   async function handleDelete(id: string) {
@@ -265,13 +278,34 @@ export function ApplianceAuditSection({
   }
 
   return (
-    <div className="space-y-4 overflow-x-hidden">
+    <div className="space-y-4 overflow-x-hidden pb-4">
       <QuickAddApplianceModal
         open={quickAddBarcode != null}
         scannedBarcode={quickAddBarcode ?? ""}
         onClose={closeQuickAdd}
-        onSaved={handleQuickAdded}
+        onSaved={(item) => void handleQuickAdded(item)}
       />
+
+      {/* Floating live session counter — continuous scan verification */}
+      <div
+        role="status"
+        aria-live="polite"
+        className="sticky top-0 z-30 -mx-1 rounded-2xl border border-sky-500/40 bg-sky-950/90 px-4 py-3 shadow-lg shadow-black/30 backdrop-blur-md"
+      >
+        <p className="text-center font-mono text-sm font-semibold tabular-nums text-sky-100 sm:text-base">
+          Session Total: {sessionTotal}{" "}
+          {sessionTotal === 1 ? "item" : "items"} scanned
+        </p>
+        {saving ? (
+          <p className="mt-0.5 text-center text-[11px] font-medium text-sky-300/80">
+            Logging to database…
+          </p>
+        ) : (
+          <p className="mt-0.5 text-center text-[11px] font-medium text-sky-300/70">
+            Continuous mode — scan barcode to log instantly
+          </p>
+        )}
+      </div>
 
       <section
         aria-label="Appliance shift summary"
@@ -325,20 +359,13 @@ export function ApplianceAuditSection({
         </p>
       ) : null}
 
-      <form
-        id="appliance-audit-form"
-        className={`${cardClass} space-y-4 overflow-x-auto`}
-        onSubmit={(e) => {
-          e.preventDefault();
-          void handleLog();
-        }}
-      >
+      <div className={`${cardClass} space-y-4 overflow-x-auto`}>
         <div className="flex items-center justify-between gap-2">
           <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-400">
             Appliance Floor Scan
           </h2>
-          <span className="rounded-lg border border-slate-700 bg-slate-950 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-sky-300">
-            Serial · Location
+          <span className="rounded-lg border border-emerald-700/50 bg-emerald-950/40 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-emerald-300">
+            Continuous
           </span>
         </div>
 
@@ -349,38 +376,30 @@ export function ApplianceAuditSection({
           onChange={handleItemChange}
           onScanCommit={handleItemLookup}
           flash={scanFlash}
-          placeholder="Scan barcode or tap to type item #"
+          placeholder="Scan barcode — auto-logs on detect"
           leftIcon={<BarcodeIcon className="h-5 w-5" />}
           inputRef={itemInputRef}
         />
 
         <TextField
-          label="Serial #"
+          label="Serial # (optional — applied to next scan)"
           value={serialNumber}
           onChange={setSerialNumber}
-          placeholder="Scan or type serial number"
+          placeholder="Scan or type serial before item barcode"
         />
 
-        <TextField
-          label="Description"
-          value={description}
-          onChange={setDescription}
-          placeholder="e.g. Whirlpool French Door"
-        />
-
-        <ApplianceCategoryFields
-          category={category}
-          subCategory={subCategory}
-          onCategoryChange={(next) => {
-            setCategory(next);
-            setSubCategory("");
-          }}
-          onSubCategoryChange={setSubCategory}
-        />
+        {description ? (
+          <p className="rounded-xl border border-slate-800 bg-slate-950/60 px-3 py-2 text-sm text-slate-300">
+            {description}
+            {catalogMatch?.sub_category
+              ? ` · ${catalogMatch.category} / ${catalogMatch.sub_category}`
+              : ""}
+          </p>
+        ) : null}
 
         <div className="space-y-1.5">
           <TextField
-            label="Location"
+            label="Location (sticky between scans)"
             value={location}
             onChange={setLocation}
             placeholder="e.g. Appliance Wall Bay 01"
@@ -403,16 +422,6 @@ export function ApplianceAuditSection({
           </div>
         </div>
 
-        {catalogMatch ? (
-          <p className="text-xs text-emerald-400">
-            Matched from appliance catalog
-            {catalogMatch.upc ? " · barcode linked" : ""}
-            {catalogMatch.sub_category
-              ? ` · ${catalogMatch.category} / ${catalogMatch.sub_category}`
-              : ""}
-          </p>
-        ) : null}
-
         {scannedBy || activeSpecialist ? (
           <p className="text-center text-xs text-slate-500">
             Scanning as{" "}
@@ -422,20 +431,9 @@ export function ApplianceAuditSection({
           </p>
         ) : (
           <p className="text-center text-xs text-amber-400">
-            Select an active specialist in the header before logging.
+            Select an active specialist in the header before scanning.
           </p>
         )}
-      </form>
-
-      <div className="fixed bottom-16 left-0 right-0 z-20 mx-auto w-full max-w-md border-t border-slate-800/80 bg-slate-950/90 p-3 backdrop-blur-md">
-        <button
-          type="submit"
-          form="appliance-audit-form"
-          disabled={!canLog}
-          className="flex h-12 w-full items-center justify-center rounded-xl bg-sky-400 text-base font-bold text-slate-950 transition enabled:active:scale-[0.98] enabled:hover:bg-sky-300 disabled:cursor-not-allowed disabled:opacity-40"
-        >
-          {saving ? "Logging…" : "Log Appliance & Reset"}
-        </button>
       </div>
 
       <section className="space-y-3 overflow-x-hidden" aria-label="Appliance scan log">

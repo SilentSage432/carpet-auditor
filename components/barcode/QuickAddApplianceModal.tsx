@@ -20,7 +20,10 @@ type Props = {
   onSaved: (item: ApplianceCatalogItem) => void;
 };
 
-/** UPC → Item # link toast for appliance_catalog (requires sub_category). */
+/**
+ * Pause continuous scan for NEW / unlinked items.
+ * Requires category + sub_category; then parent records appliance_scans.
+ */
 export function QuickAddApplianceModal({
   open,
   scannedBarcode,
@@ -28,6 +31,8 @@ export function QuickAddApplianceModal({
   onSaved,
 }: Props) {
   const cleaned = sanitizeBarcodeScan(scannedBarcode);
+  /** Long codes are treated as UPC; short codes as Item # / SKU. */
+  const isUpcScan = cleaned.length >= 8;
 
   const [itemNumber, setItemNumber] = useState("");
   const [description, setDescription] = useState("");
@@ -38,14 +43,14 @@ export function QuickAddApplianceModal({
 
   useEffect(() => {
     if (!open) return;
-    setItemNumber("");
+    setItemNumber(isUpcScan ? "" : cleaned);
     setDescription("");
     setCategory("Laundry");
     setSubCategory("");
     setError(null);
     setSaving(false);
     playQuickAddPrompt();
-  }, [open, cleaned]);
+  }, [open, cleaned, isUpcScan]);
 
   if (!open) return null;
 
@@ -59,7 +64,7 @@ export function QuickAddApplianceModal({
       return;
     }
     if (!isValidApplianceSubCategory(category, subCategory)) {
-      setError("Select a sub-category before linking this UPC");
+      setError("Select a sub-category before continuing");
       return;
     }
     setSaving(true);
@@ -68,7 +73,7 @@ export function QuickAddApplianceModal({
       const { record } = await saveApplianceCatalogItem({
         item_number: sanitizeBarcodeScan(itemNumber) || itemNumber.trim(),
         description: description.trim(),
-        upc: cleaned || null,
+        upc: isUpcScan && cleaned ? cleaned : null,
         category,
         sub_category: subCategory.trim(),
       });
@@ -98,13 +103,15 @@ export function QuickAddApplianceModal({
           id="quick-add-appliance-title"
           className="text-lg font-bold text-slate-50"
         >
-          Link UPC to Item #
+          {isUpcScan ? "Link UPC to Item #" : "New Appliance — Sub-Category"}
         </h2>
         <p className="mt-1 text-sm text-slate-400">
-          Unlinked barcode — save to appliance catalog and continue the scan.
+          {isUpcScan
+            ? "Unrecognized barcode — choose category & sub-category, then scan continues."
+            : "Unrecognized item — choose category & sub-category to log and continue."}
         </p>
         <p className="mt-3 rounded-xl border border-amber-500/30 bg-amber-950/30 px-3 py-2 font-mono text-sm font-semibold text-amber-200">
-          UPC {cleaned || "—"}
+          {isUpcScan ? `UPC ${cleaned || "—"}` : `Scanned ${cleaned || "—"}`}
         </p>
 
         <div className="mt-4 space-y-3">
@@ -142,7 +149,7 @@ export function QuickAddApplianceModal({
           onClick={() => void handleSaveAndContinue()}
           className="mt-4 flex min-h-12 w-full items-center justify-center rounded-xl bg-emerald-500 text-sm font-bold text-slate-950 disabled:opacity-40"
         >
-          {saving ? "Saving…" : "Save & Continue Scan"}
+          {saving ? "Saving…" : "Save, Log Scan & Continue"}
         </button>
         <button
           type="button"

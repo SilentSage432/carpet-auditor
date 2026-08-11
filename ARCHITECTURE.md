@@ -86,9 +86,10 @@ supabase/migrations/20260810_store_locations_type_unique.sql → location unique
 ## Sections (role-filtered)
 
 1. **Flooring Audit** — dual engine (roll CLF vs carton sq ft), scan-to-catalog, SIMS tags
-2. **Appliances Audit** — floor scans on `appliance_scans` + UPC links on `appliance_catalog`
+2. **Appliances Audit** — continuous floor scans on `appliance_scans` + UPC links on `appliance_catalog`
    - Suites: Laundry · Refrigeration · Cooking / Ranges · Dishwashers · Microwaves / Venting
    - Required `sub_category` on UPC Quick-Add and scan log; CSV includes Sub-Category · Item # · Serial # · Location
+   - Continuous mode: barcode detect → immediate `POST /api/appliances/scans`; session total counter; new items pause on Quick-Add then auto-log
    - APIs: `/api/appliances/catalog`, `/api/appliances/scans`
 3. **Universal / Appliance Catalog** — flooring = `carpet_catalog`; appliances tab = `appliance_catalog`
 4. **Remnant Rack** — back-room remnant status + manager markdown

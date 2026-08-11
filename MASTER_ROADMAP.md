@@ -57,6 +57,7 @@
 - [x] Department master toggles + adaptive priority draw + showroom quick-touch zones
 - [x] Appliance suite categories + required sub_category on UPC link / audits / CSV export
 - [x] Dedicated `appliance_catalog` + `appliance_scans` tables, types, APIs, and Scanner UI
+- [x] Appliance Scanner continuous mode (instant POST on detect + session counter)
 
 ## Next
 - [ ] JWT / claim-based RLS enforcing `store_number` (+ department) server-side

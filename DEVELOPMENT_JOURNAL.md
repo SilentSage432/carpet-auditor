@@ -1,5 +1,13 @@
 # DeptSync Hub — Development Journal
 
+## 2026-08-10 — Appliance Scanner continuous hands-free mode
+
+### Shipped
+- Barcode detect → immediate `POST /api/appliances/scans` (no "Log & Reset" / Submit gate).
+- Known `appliance_catalog` hits: success chime + haptic, session counter ++, clear for next scan (location sticky).
+- Unrecognized / missing sub_category: pause on Quick-Add modal → save catalog → auto-log scan → continue.
+- Sticky floating **Session Total: N items scanned** counter at top of Appliance Scanner.
+
 ## 2026-08-10 — Appliance scan save: no silent offline success
 
 ### Fixed
