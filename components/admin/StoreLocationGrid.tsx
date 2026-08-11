@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { compareAisles } from "@/lib/store-ops/aisle";
 import type { Department, StoreLocation } from "@/lib/store-ops/types";
 import type { StoreSpecialist } from "@/lib/types";
 import {
@@ -24,7 +25,7 @@ type BayPair = {
 };
 
 type AisleGroup = {
-  aisle: number;
+  aisle: string;
   locations: StoreLocation[];
   bays: BayPair[];
 };
@@ -39,7 +40,7 @@ type DepartmentGroup = {
 type SheetBay = {
   departmentId: string;
   departmentName: string;
-  aisle: number;
+  aisle: string;
   pair: BayPair;
 };
 
@@ -100,15 +101,16 @@ export function StoreLocationGrid({
 
     const groups: DepartmentGroup[] = [];
     for (const [departmentId, locs] of byDept) {
-      const byAisle = new Map<number, StoreLocation[]>();
+      const byAisle = new Map<string, StoreLocation[]>();
       for (const loc of locs) {
-        const list = byAisle.get(loc.aisle) ?? [];
+        const aisleKey = String(loc.aisle);
+        const list = byAisle.get(aisleKey) ?? [];
         list.push(loc);
-        byAisle.set(loc.aisle, list);
+        byAisle.set(aisleKey, list);
       }
 
       const aisles: AisleGroup[] = [...byAisle.entries()]
-        .sort((a, b) => a[0] - b[0])
+        .sort((a, b) => compareAisles(a[0], b[0]))
         .map(([aisle, aisleLocs]) => ({
           aisle,
           locations: aisleLocs,

@@ -2,6 +2,7 @@
  * Bulk store location generation + listing helpers (server).
  */
 
+import { isValidAisle, normalizeAisle } from "./aisle";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { readableError } from "./errors";
 import type {
@@ -19,18 +20,19 @@ export function buildBulkLocationRows(
 ): Array<{
   store_id: string;
   department_id: string;
-  aisle: number;
+  aisle: string;
   bay: number;
   type: StoreLocationType;
   status: "PENDING";
   cycle_number: number;
   is_active: true;
 }> {
-  const { store_id, department_id, aisle, start_bay, end_bay, types } = input;
+  const { store_id, department_id, start_bay, end_bay, types } = input;
+  const aisle = normalizeAisle(input.aisle);
   if (!store_id) throw new Error("store_id is required");
   if (!department_id) throw new Error("department_id is required");
-  if (!Number.isFinite(aisle) || aisle < 0) {
-    throw new Error("aisle must be a non-negative integer");
+  if (!isValidAisle(aisle)) {
+    throw new Error("aisle is required (alphanumeric code, e.g. BW, 12, A1)");
   }
   if (!Number.isFinite(start_bay) || !Number.isFinite(end_bay)) {
     throw new Error("start_bay and end_bay are required");
@@ -53,7 +55,7 @@ export function buildBulkLocationRows(
   const rows: Array<{
     store_id: string;
     department_id: string;
-    aisle: number;
+    aisle: string;
     bay: number;
     type: StoreLocationType;
     status: "PENDING";

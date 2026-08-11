@@ -334,7 +334,7 @@ export async function fetchExceptionSummary(
     created_at: string;
     store_locations: {
       id: string;
-      aisle: number;
+      aisle: string;
       bay: number;
     } | null;
     departments: { id: string; name: string; code: string } | null;
@@ -367,7 +367,7 @@ export async function fetchExceptionSummary(
         created_at: string;
         store_locations: {
           id: string;
-          aisle: number;
+          aisle: string;
           bay: number;
         } | null;
         departments: { id: string; name: string; code: string } | null;

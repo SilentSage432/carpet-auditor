@@ -131,7 +131,7 @@ export async function verifyWeeklyRotations(
 export type ExceptionWithLocation = RotationException & {
   store_locations: {
     id: string;
-    aisle: number;
+    aisle: string;
     bay: number;
   } | null;
   departments: {

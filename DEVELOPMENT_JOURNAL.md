@@ -1,5 +1,21 @@
 # DeptSync Hub — Development Journal
 
+## 2026-08-11 — Alphanumeric aisle codes (BW / RW / 12 / A1)
+
+### Shipped
+- `store_locations.aisle` is TEXT (migration `20260811_alphanumeric_aisle.sql`); values normalized `.trim().toUpperCase()`.
+- Bulk Generator aisle input is `type="text"` with live auto-caps (`bw 01` → `BW 01`).
+- Batch CSV parser (`lib/store-ops/aisle.ts` → `parseLocationBatchCsv`) accepts alphanumeric aisle strings — no `parseInt` / numeric-only validation on aisle.
+- Types + bulk API treat aisle as `string`; Store Map aisle groups sort with natural alphanumeric compare.
+
+## 2026-08-11 — Appliance scan log aggregation + editor + export
+
+### Shipped
+- Scan log UI groups by `item_number` with bold **Qty** on each card; expand for per-unit timestamps, serials, locations.
+- Sticky filter bar: category pills (All · Ranges/Cooktops · Wall Ovens · Refrigeration · …) + quick search (SKU / location).
+- In-line **Edit** modal: increment/decrement quantity, edit/append serials, bulk location/bay update for the SKU group (`PATCH` + create/delete under the hood).
+- CSV export now ships **SUMMARY** (`Item Number`, `Description`, `Category`, `Total Count Scanned`, `Locations Found`) plus **RAW DETAIL** audit trail columns.
+
 ## 2026-08-10 — Appliance Scanner continuous hands-free mode
 
 ### Shipped

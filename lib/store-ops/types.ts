@@ -36,7 +36,8 @@ export type StoreLocation = {
   id: string;
   store_id: string;
   department_id: string;
-  aisle: number;
+  /** Alphanumeric aisle code (BW, RW, 12, A1) — stored as TEXT. */
+  aisle: string;
   bay: number;
   type: StoreLocationType;
   /** STANDARD aisle rotation vs SHOWROOM_STACKOUT rapid-touch zone. */
@@ -85,7 +86,8 @@ export type RotationException = {
 
 export type BulkGenerateInput = {
   department_id: string;
-  aisle: number;
+  /** Alphanumeric aisle code (normalized uppercase on write). */
+  aisle: string;
   start_bay: number;
   end_bay: number;
   types: StoreLocationType[];

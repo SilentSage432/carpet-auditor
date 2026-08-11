@@ -14,6 +14,7 @@ import {
   isValidApplianceSubCategory,
   normalizeApplianceCategory,
   resolveApplianceCategoryPair,
+  type ApplianceCategory,
   type ApplianceScan,
   type ApplianceScanInsert,
 } from "./types";
@@ -313,9 +314,306 @@ export function isApplianceScanToday(iso: string): boolean {
   );
 }
 
-/** CSV for appliance inventory / audit sheets. */
-export function applianceScansToCsv(scans: ApplianceScan[]): string {
-  const header = [
+/** One SKU roll-up for high-volume scan log UI + summary export. */
+export type AggregatedApplianceScan = {
+  item_number: string;
+  category: ApplianceCategory;
+  sub_category?: string;
+  description: string;
+  quantity: number;
+  locations: string[];
+  scans: ApplianceScan[];
+  hasOffline: boolean;
+};
+
+export type ApplianceScanCsvOptions = {
+  /** item_number → catalog description for the summary sheet. */
+  descriptions?: Record<string, string>;
+};
+
+export type ApplianceGroupEditInput = {
+  item_number: string;
+  category: ApplianceCategory | string;
+  sub_category?: string;
+  targetQuantity: number;
+  location: string;
+  /** Serial slots aligned to quantity (pad/truncate as needed). */
+  serials: string[];
+  scanned_by: string;
+  existingScans: ApplianceScan[];
+};
+
+/** Category / suite chips for the sticky scan-log filter bar. */
+export const APPLIANCE_SCAN_LOG_FILTERS = [
+  { id: "all", label: "All" },
+  { id: "ranges-cooktops", label: "Ranges/Cooktops" },
+  { id: "wall-ovens", label: "Wall Ovens" },
+  { id: "refrigeration", label: "Refrigeration" },
+  { id: "laundry", label: "Laundry" },
+  { id: "dishwashers", label: "Dishwashers" },
+  { id: "microwaves", label: "Microwaves / Venting" },
+] as const;
+
+export type ApplianceScanLogFilterId =
+  (typeof APPLIANCE_SCAN_LOG_FILTERS)[number]["id"];
+
+export function matchesApplianceScanLogFilter(
+  scan: Pick<ApplianceScan, "category" | "sub_category">,
+  filterId: ApplianceScanLogFilterId
+): boolean {
+  const sub = String(scan.sub_category ?? "").trim();
+  switch (filterId) {
+    case "all":
+      return true;
+    case "ranges-cooktops":
+      return (
+        scan.category === "Cooking / Ranges" &&
+        (sub === "Range / Stove" || sub === "Cooktop" || !sub)
+      );
+    case "wall-ovens":
+      return sub === "Wall Oven";
+    case "refrigeration":
+      return scan.category === "Refrigeration";
+    case "laundry":
+      return scan.category === "Laundry";
+    case "dishwashers":
+      return scan.category === "Dishwashers";
+    case "microwaves":
+      return scan.category === "Microwaves / Venting";
+    default:
+      return true;
+  }
+}
+
+export function aggregateApplianceScans(
+  scans: ApplianceScan[],
+  descriptions: Record<string, string> = {}
+): AggregatedApplianceScan[] {
+  const byItem = new Map<string, ApplianceScan[]>();
+  for (const scan of scans) {
+    const key = scan.item_number.trim() || "(unknown)";
+    const list = byItem.get(key);
+    if (list) list.push(scan);
+    else byItem.set(key, [scan]);
+  }
+
+  const groups: AggregatedApplianceScan[] = [];
+  for (const [item_number, rows] of byItem) {
+    const sorted = [...rows].sort((a, b) =>
+      b.scanned_at.localeCompare(a.scanned_at)
+    );
+    const head = sorted[0];
+    const locations = [
+      ...new Set(
+        sorted.map((s) => s.location.trim()).filter(Boolean)
+      ),
+    ].sort((a, b) => a.localeCompare(b));
+
+    groups.push({
+      item_number,
+      category: head.category,
+      sub_category: head.sub_category,
+      description: descriptions[item_number] ?? "",
+      quantity: sorted.length,
+      locations,
+      scans: sorted,
+      hasOffline: sorted.some((s) => Boolean(s.offline)),
+    });
+  }
+
+  return groups.sort((a, b) => {
+    const qty = b.quantity - a.quantity;
+    if (qty !== 0) return qty;
+    return a.item_number.localeCompare(b.item_number);
+  });
+}
+
+export async function updateApplianceScan(
+  id: string,
+  patch: Partial<
+    Pick<
+      ApplianceScan,
+      "serial_number" | "location" | "scanned_by" | "category" | "sub_category"
+    >
+  >
+): Promise<ApplianceScan> {
+  const store = getStoreNumber();
+  const existing = readAllLocal().find((r) => r.id === id);
+  if (!existing) {
+    throw new Error("Scan not found");
+  }
+
+  const next: ApplianceScan = {
+    ...existing,
+    serial_number:
+      patch.serial_number !== undefined
+        ? String(patch.serial_number).trim()
+        : existing.serial_number,
+    location:
+      patch.location !== undefined
+        ? String(patch.location).trim()
+        : existing.location,
+    scanned_by:
+      patch.scanned_by !== undefined
+        ? String(patch.scanned_by).trim()
+        : existing.scanned_by,
+    category: patch.category
+      ? normalizeApplianceCategory(patch.category)
+      : existing.category,
+    sub_category:
+      patch.sub_category !== undefined
+        ? String(patch.sub_category).trim() || undefined
+        : existing.sub_category,
+  };
+
+  if (!isBrowserOnline()) {
+    upsertLocal({ ...next, offline: true });
+    enqueueSyncAction(
+      "upsert_appliance_scan",
+      {
+        id: next.id,
+        store_number: next.store_number,
+        item_number: next.item_number,
+        serial_number: next.serial_number,
+        location: next.location,
+        category: next.category,
+        sub_category: next.sub_category ?? "",
+        scanned_by: next.scanned_by,
+        scanned_at: next.scanned_at,
+      },
+      store
+    );
+    return { ...next, offline: true };
+  }
+
+  const res = await fetch("/api/appliances/scans", {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      "x-store-number": store,
+    },
+    body: JSON.stringify({
+      id,
+      store_number: store,
+      serial_number: next.serial_number,
+      location: next.location,
+      scanned_by: next.scanned_by,
+      category: next.category,
+      sub_category: next.sub_category ?? "",
+    }),
+  });
+
+  const json = (await res.json().catch(() => ({}))) as {
+    scan?: Record<string, unknown>;
+    error?: string;
+  };
+  if (!res.ok) {
+    throw new Error(json.error || `HTTP ${res.status}`);
+  }
+  if (!json.scan) {
+    throw new Error("API returned no scan row");
+  }
+  const saved = mapRow(json.scan);
+  upsertLocal({ ...saved, offline: false });
+  return saved;
+}
+
+/**
+ * Apply quantity / serial / location edits for one SKU group.
+ * Increments create new scan rows; decrements delete newest excess rows.
+ */
+export async function applyApplianceGroupEdit(
+  input: ApplianceGroupEditInput
+): Promise<ApplianceScan[]> {
+  const qty = Math.max(0, Math.floor(input.targetQuantity));
+  const location = input.location.trim();
+  const serials = input.serials.map((s) => String(s ?? "").trim());
+  while (serials.length < qty) serials.push("");
+  serials.length = qty;
+
+  const existing = [...input.existingScans].sort((a, b) =>
+    a.scanned_at.localeCompare(b.scanned_at)
+  );
+
+  // Drop newest first when reducing quantity.
+  const keep = existing.slice(0, qty);
+  const drop = existing.slice(qty);
+
+  for (const scan of drop) {
+    await deleteApplianceScan(scan.id);
+  }
+
+  const keptUpdated: ApplianceScan[] = [];
+  for (let i = 0; i < keep.length; i++) {
+    const scan = keep[i];
+    const serial = serials[i] ?? "";
+    if (scan.serial_number === serial && scan.location === location) {
+      keptUpdated.push(scan);
+      continue;
+    }
+    const updated = await updateApplianceScan(scan.id, {
+      serial_number: serial,
+      location,
+    });
+    keptUpdated.push(updated);
+  }
+
+  const created: ApplianceScan[] = [];
+  const category = normalizeApplianceCategory(input.category);
+  for (let i = keep.length; i < qty; i++) {
+    const { record } = await saveApplianceScan({
+      item_number: input.item_number,
+      serial_number: serials[i] ?? "",
+      location,
+      category,
+      sub_category: input.sub_category,
+      scanned_by: input.scanned_by,
+    });
+    created.push(record);
+  }
+
+  return [...keptUpdated, ...created].sort((a, b) =>
+    b.scanned_at.localeCompare(a.scanned_at)
+  );
+}
+
+function csvEscape(value: string | number | null | undefined): string {
+  const s = String(value ?? "");
+  if (/[",\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
+  return s;
+}
+
+/**
+ * Aggregated inventory CSV: SUMMARY sheet columns + RAW DETAIL audit trail.
+ * Spreadsheet apps open this as one workbook sheet with two labeled blocks.
+ */
+export function applianceScansToCsv(
+  scans: ApplianceScan[],
+  options: ApplianceScanCsvOptions = {}
+): string {
+  const descriptions = options.descriptions ?? {};
+  const groups = aggregateApplianceScans(scans, descriptions);
+
+  const summaryHeader = [
+    "Item Number",
+    "Description",
+    "Category",
+    "Total Count Scanned",
+    "Locations Found",
+  ];
+  const summaryRows = groups.map((g) =>
+    [
+      g.item_number,
+      g.description,
+      g.sub_category ? `${g.category} · ${g.sub_category}` : g.category,
+      g.quantity,
+      g.locations.join("; "),
+    ]
+      .map(csvEscape)
+      .join(",")
+  );
+
+  const detailHeader = [
     "Category",
     "Sub-Category",
     "Item #",
@@ -325,27 +623,34 @@ export function applianceScansToCsv(scans: ApplianceScan[]): string {
     "Scanned At",
     "Store #",
   ];
+  const detailRows = [...scans]
+    .sort((a, b) => {
+      const item = a.item_number.localeCompare(b.item_number);
+      if (item !== 0) return item;
+      return a.scanned_at.localeCompare(b.scanned_at);
+    })
+    .map((s) =>
+      [
+        s.category,
+        s.sub_category ?? "",
+        s.item_number,
+        s.serial_number,
+        s.location,
+        s.scanned_by,
+        s.scanned_at,
+        s.store_number,
+      ]
+        .map(csvEscape)
+        .join(",")
+    );
 
-  const escape = (value: string | number | null | undefined) => {
-    const s = String(value ?? "");
-    if (/[",\n]/.test(s)) return `"${s.replace(/"/g, '""')}"`;
-    return s;
-  };
-
-  const rows = scans.map((s) =>
-    [
-      s.category,
-      s.sub_category ?? "",
-      s.item_number,
-      s.serial_number,
-      s.location,
-      s.scanned_by,
-      s.scanned_at,
-      s.store_number,
-    ]
-      .map(escape)
-      .join(",")
-  );
-
-  return [header.join(","), ...rows].join("\n");
+  return [
+    "SUMMARY",
+    summaryHeader.join(","),
+    ...summaryRows,
+    "",
+    "RAW DETAIL",
+    detailHeader.join(","),
+    ...detailRows,
+  ].join("\n");
 }

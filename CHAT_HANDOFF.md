@@ -73,7 +73,7 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 ## Store Operations upsert keys
 - `stores`: `onConflict: store_number` (payload: store_number, name, is_active)
 - `departments`: `onConflict: code` (matches live UNIQUE on `code`)
-- `store_locations`: `onConflict: department_id,aisle,bay,type` (BOTH writes Selling + Topstock per bay; status PENDING)
+- `store_locations`: `onConflict: department_id,aisle,bay,type` (BOTH writes Selling + Topstock per bay; status PENDING). **`aisle` is alphanumeric TEXT** (`BW`, `RW`, `12`, `A1`) — apply `20260811_alphanumeric_aisle.sql`. Bulk Generator + batch CSV (`lib/store-ops/aisle.ts`) normalize with `.trim().toUpperCase()`; no numeric-only aisle validation.
 - `weekly_rotations`: `onConflict: location_id,assigned_week`
 
 ## Remnants / markdown
@@ -158,6 +158,7 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 - Sub required on Quick-Add UPC link / floor scan / catalog (Laundry → Washer | Dryer | Combo / Unit)
 - Types: `ApplianceCatalogItem`, `ApplianceScan` (`sub_category?`)
 - APIs: `/api/appliances/catalog`, `/api/appliances/scans` (`?format=csv`)
-- CSV columns: Category, Sub-Category, Item #, Serial #, Location, Scanned By, Scanned At, Store #
+- CSV export: **SUMMARY** (Item Number, Description, Category, Total Count Scanned, Locations Found) + **RAW DETAIL** (Category, Sub-Category, Item #, Serial #, Location, Scanned By, Scanned At, Store #)
 - Online scans POST `/api/appliances/scans` (service role); failures surface as `Failed to save scan: …` (no silent offline success)
 - **Continuous mode:** detect → POST immediately; no Submit button. Known SKU auto-logs; new/unlinked pauses on Quick-Add (sub_category) then logs + clears. Sticky **Session Total** counter at scanner top.
+- **Scan log UX:** aggregated by SKU with Qty; sticky category pills + SKU/location search; Edit modal for qty/serials/location; `PATCH /api/appliances/scans` for unit updates

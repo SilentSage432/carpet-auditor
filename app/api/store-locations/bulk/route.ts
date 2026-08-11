@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { normalizeAisle } from "@/lib/store-ops/aisle";
 import {
   parseStoreOpsActor,
   requireSuperAdmin,
@@ -26,7 +27,7 @@ export async function POST(request: Request) {
 
     const body = (await request.json()) as {
       department_id?: string;
-      aisle?: number;
+      aisle?: string | number;
       start_bay?: number;
       end_bay?: number;
       types?: StoreLocationType[];
@@ -64,7 +65,7 @@ export async function POST(request: Request) {
     const locations = await bulkInsertLocations(supabase, {
       store_id: dept.store_id as string,
       department_id: departmentId,
-      aisle: Number(body.aisle),
+      aisle: normalizeAisle(body.aisle),
       start_bay: Number(body.start_bay),
       end_bay: Number(body.end_bay),
       types: Array.isArray(body.types) ? body.types : [],

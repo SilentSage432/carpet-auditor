@@ -1,7 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ApplianceScanEditModal } from "@/components/appliances/ApplianceScanEditModal";
 import { QuickAddApplianceModal } from "@/components/barcode/QuickAddApplianceModal";
+import { ConfirmModal } from "@/components/hub/ConfirmModal";
 import { NumberField, TextField } from "@/components/ui/NumberField";
 import {
   findApplianceByItemOrUpc,
@@ -9,11 +11,17 @@ import {
   type ApplianceScanResolution,
 } from "@/lib/appliance-catalog";
 import {
+  aggregateApplianceScans,
+  APPLIANCE_SCAN_LOG_FILTERS,
+  applyApplianceGroupEdit,
   applianceScansToCsv,
   deleteApplianceScan,
   fetchApplianceScans,
   isApplianceScanToday,
+  matchesApplianceScanLogFilter,
   saveApplianceScan,
+  type AggregatedApplianceScan,
+  type ApplianceScanLogFilterId,
 } from "@/lib/appliance-scans";
 import { sanitizeBarcodeScan } from "@/lib/barcode";
 import { blurActiveInput } from "@/lib/focus-input";
@@ -84,20 +92,58 @@ export function ApplianceAuditSection({
   const [loaded, setLoaded] = useState(false);
   const [scanFlash, setScanFlash] = useState(false);
   const [quickAddBarcode, setQuickAddBarcode] = useState<string | null>(null);
-  const [showAll, setShowAll] = useState(false);
+  const [showAllGroups, setShowAllGroups] = useState(false);
   const [summaryExpanded, setSummaryExpanded] = useState(false);
   /** Scans successfully logged this browser session (continuous counter). */
   const [sessionTotal, setSessionTotal] = useState(0);
+  const [logFilter, setLogFilter] =
+    useState<ApplianceScanLogFilterId>("all");
+  const [logQuery, setLogQuery] = useState("");
+  const [expandedItems, setExpandedItems] = useState<Set<string>>(
+    () => new Set()
+  );
+  const [editingGroup, setEditingGroup] =
+    useState<AggregatedApplianceScan | null>(null);
+  const [editSaving, setEditSaving] = useState(false);
+  const [pendingDeleteGroup, setPendingDeleteGroup] =
+    useState<AggregatedApplianceScan | null>(null);
 
   serialRef.current = serialNumber;
   locationRef.current = location;
   savingRef.current = saving;
 
+  const catalogDescriptions = useMemo(() => {
+    const map: Record<string, string> = {};
+    for (const item of catalog) {
+      map[item.item_number] = item.description;
+    }
+    return map;
+  }, [catalog]);
+
   const shiftScans = useMemo(
     () => scans.filter((s) => isApplianceScanToday(s.scanned_at)),
     [scans]
   );
-  const visibleScans = showAll ? scans : scans.slice(0, 5);
+
+  const filteredScans = useMemo(() => {
+    const q = logQuery.trim().toLowerCase();
+    return scans.filter((scan) => {
+      if (!matchesApplianceScanLogFilter(scan, logFilter)) return false;
+      if (!q) return true;
+      return (
+        scan.item_number.toLowerCase().includes(q) ||
+        scan.location.toLowerCase().includes(q) ||
+        scan.serial_number.toLowerCase().includes(q)
+      );
+    });
+  }, [scans, logFilter, logQuery]);
+
+  const aggregated = useMemo(
+    () => aggregateApplianceScans(filteredScans, catalogDescriptions),
+    [filteredScans, catalogDescriptions]
+  );
+
+  const visibleGroups = showAllGroups ? aggregated : aggregated.slice(0, 8);
 
   const catalogMatch = useMemo(
     () => findApplianceByItemOrUpc(catalog, itemNumber),
@@ -259,15 +305,75 @@ export function ApplianceAuditSection({
     clearForNextScan();
   }
 
-  async function handleDelete(id: string) {
+  async function handleDeleteScan(id: string) {
     await deleteApplianceScan(id);
     setScans((prev) => prev.filter((s) => s.id !== id));
     flashStatus("Entry removed");
   }
 
+  async function confirmDeleteGroup() {
+    const group = pendingDeleteGroup;
+    setPendingDeleteGroup(null);
+    if (!group) return;
+    try {
+      for (const scan of group.scans) {
+        await deleteApplianceScan(scan.id);
+      }
+      setScans((prev) =>
+        prev.filter((s) => s.item_number !== group.item_number)
+      );
+      flashStatus(`Removed Item ${group.item_number} (${group.quantity})`);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unknown error";
+      flashStatus(`Failed to delete: ${message}`, "error");
+      void fetchApplianceScans().then(setScans);
+    }
+  }
+
+  async function handleSaveGroupEdit(input: {
+    targetQuantity: number;
+    location: string;
+    serials: string[];
+  }) {
+    if (!editingGroup) return;
+    setEditSaving(true);
+    try {
+      await applyApplianceGroupEdit({
+        item_number: editingGroup.item_number,
+        category: editingGroup.category,
+        sub_category: editingGroup.sub_category,
+        targetQuantity: input.targetQuantity,
+        location: input.location,
+        serials: input.serials,
+        scanned_by: scannedBy || activeSpecialist?.name || "",
+        existingScans: editingGroup.scans,
+      });
+      const refreshed = await fetchApplianceScans();
+      setScans(refreshed);
+      setEditingGroup(null);
+      flashStatus(`Updated Item ${editingGroup.item_number}`);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unknown error";
+      flashStatus(`Failed to update: ${message}`, "error");
+    } finally {
+      setEditSaving(false);
+    }
+  }
+
+  function toggleExpanded(itemNumber: string) {
+    setExpandedItems((prev) => {
+      const next = new Set(prev);
+      if (next.has(itemNumber)) next.delete(itemNumber);
+      else next.add(itemNumber);
+      return next;
+    });
+  }
+
   function handleDownloadCsv() {
     const rows = shiftScans.length > 0 ? shiftScans : scans;
-    const csv = applianceScansToCsv(rows);
+    const csv = applianceScansToCsv(rows, {
+      descriptions: catalogDescriptions,
+    });
     const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -284,6 +390,26 @@ export function ApplianceAuditSection({
         scannedBarcode={quickAddBarcode ?? ""}
         onClose={closeQuickAdd}
         onSaved={(item) => void handleQuickAdded(item)}
+      />
+
+      <ApplianceScanEditModal
+        open={editingGroup != null}
+        group={editingGroup}
+        saving={editSaving}
+        onClose={() => {
+          if (!editSaving) setEditingGroup(null);
+        }}
+        onSave={(input) => void handleSaveGroupEdit(input)}
+      />
+
+      <ConfirmModal
+        open={pendingDeleteGroup != null}
+        title={`Delete Item ${pendingDeleteGroup?.item_number ?? ""}?`}
+        message={`This removes all ${pendingDeleteGroup?.quantity ?? 0} scanned unit(s) for this SKU from the log.`}
+        confirmLabel="Delete all"
+        danger
+        onClose={() => setPendingDeleteGroup(null)}
+        onConfirm={() => void confirmDeleteGroup()}
       />
 
       {/* Floating live session counter — continuous scan verification */}
@@ -441,7 +567,38 @@ export function ApplianceAuditSection({
           <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-400">
             Scan log
           </h2>
-          <span className="font-mono text-xs text-slate-500">{scans.length}</span>
+          <span className="font-mono text-xs text-slate-500">
+            {aggregated.length} SKU · {filteredScans.length} units
+          </span>
+        </div>
+
+        {/* Sticky categorical filter + quick search */}
+        <div className="sticky top-[4.25rem] z-20 -mx-1 space-y-2 rounded-2xl border border-slate-800 bg-slate-950/95 p-3 shadow-lg shadow-black/20 backdrop-blur-md">
+          <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-0.5">
+            {APPLIANCE_SCAN_LOG_FILTERS.map((chip) => {
+              const active = logFilter === chip.id;
+              return (
+                <button
+                  key={chip.id}
+                  type="button"
+                  onClick={() => setLogFilter(chip.id)}
+                  className={`shrink-0 rounded-lg border px-3 py-2 text-[11px] font-semibold transition ${
+                    active
+                      ? "border-emerald-500/50 bg-emerald-950/50 text-emerald-300"
+                      : "border-slate-700 bg-slate-900 text-slate-400 active:bg-slate-800"
+                  }`}
+                >
+                  {chip.label}
+                </button>
+              );
+            })}
+          </div>
+          <TextField
+            label="Quick search"
+            value={logQuery}
+            onChange={setLogQuery}
+            placeholder="Filter by SKU or Location..."
+          />
         </div>
 
         {!loaded ? (
@@ -456,70 +613,140 @@ export function ApplianceAuditSection({
           </p>
         ) : null}
 
+        {loaded && scans.length > 0 && aggregated.length === 0 ? (
+          <p className="rounded-2xl border border-dashed border-slate-700 bg-slate-900/60 px-4 py-8 text-center text-sm text-slate-400">
+            No scans match this filter.
+          </p>
+        ) : null}
+
         <ul className="space-y-2">
-          {visibleScans.map((scan) => (
-            <li
-              key={scan.id}
-              className="flex gap-2 rounded-2xl border border-slate-800 bg-slate-900/90 p-3"
-            >
-              <div className="min-w-0 flex-1 space-y-1">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="font-mono text-base font-semibold text-slate-50">
-                    Item {scan.item_number}
-                  </span>
-                  <span className="rounded bg-slate-700/50 px-2 py-0.5 text-[10px] font-bold uppercase text-slate-300">
-                    {scan.category}
-                    {scan.sub_category ? ` · ${scan.sub_category}` : ""}
-                  </span>
-                  {scan.offline ? (
-                    <span className="rounded bg-orange-500/20 px-2 py-0.5 text-[10px] font-bold uppercase text-orange-300">
-                      Offline
-                    </span>
-                  ) : null}
-                </div>
-                {scan.serial_number ? (
-                  <p className="font-mono text-xs text-sky-300">
-                    Serial {scan.serial_number}
-                  </p>
-                ) : null}
-                {scan.location ? (
-                  <p className="font-mono text-xs text-emerald-400/90">
-                    📍 {scan.location}
-                  </p>
-                ) : null}
-                <time
-                  dateTime={scan.scanned_at}
-                  className="font-mono text-xs text-slate-500"
-                >
-                  {formatTime(scan.scanned_at)}
-                </time>
-                {scan.scanned_by ? (
-                  <p className="text-xs text-slate-500">
-                    Logged by {scan.scanned_by}
-                  </p>
-                ) : null}
-              </div>
-              <button
-                type="button"
-                aria-label={`Delete item ${scan.item_number}`}
-                onClick={() => void handleDelete(scan.id)}
-                className="flex h-12 w-12 shrink-0 items-center justify-center self-center rounded-xl border border-red-500/40 text-sm font-semibold text-red-400"
+          {visibleGroups.map((group) => {
+            const expanded = expandedItems.has(group.item_number);
+            return (
+              <li
+                key={group.item_number}
+                className="rounded-2xl border border-slate-800 bg-slate-900/90"
               >
-                Del
-              </button>
-            </li>
-          ))}
+                <div className="flex gap-2 p-3">
+                  <button
+                    type="button"
+                    onClick={() => toggleExpanded(group.item_number)}
+                    aria-expanded={expanded}
+                    className="min-w-0 flex-1 space-y-1 text-left"
+                  >
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-mono text-base font-bold text-slate-50">
+                        Item {group.item_number}{" "}
+                        <span className="text-emerald-300">
+                          | Qty: {group.quantity}
+                        </span>
+                      </span>
+                      <span className="rounded bg-slate-700/50 px-2 py-0.5 text-[10px] font-bold uppercase text-slate-300">
+                        {group.category}
+                        {group.sub_category ? ` · ${group.sub_category}` : ""}
+                      </span>
+                      {group.hasOffline ? (
+                        <span className="rounded bg-orange-500/20 px-2 py-0.5 text-[10px] font-bold uppercase text-orange-300">
+                          Offline
+                        </span>
+                      ) : null}
+                    </div>
+                    {group.description ? (
+                      <p className="truncate text-xs text-slate-400">
+                        {group.description}
+                      </p>
+                    ) : null}
+                    {group.locations.length > 0 ? (
+                      <p className="font-mono text-xs text-emerald-400/90">
+                        📍 {group.locations.join(" · ")}
+                      </p>
+                    ) : null}
+                    <p className="text-[11px] font-medium text-slate-500">
+                      {expanded
+                        ? "Hide unit details ▴"
+                        : `Show ${group.quantity} unit detail${
+                            group.quantity === 1 ? "" : "s"
+                          } ▾`}
+                    </p>
+                  </button>
+                  <div className="flex shrink-0 flex-col gap-1.5 self-center">
+                    <button
+                      type="button"
+                      aria-label={`Edit item ${group.item_number}`}
+                      onClick={() => setEditingGroup(group)}
+                      className="flex h-11 w-12 items-center justify-center rounded-xl border border-sky-500/40 text-sm font-semibold text-sky-300"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      aria-label={`Delete item ${group.item_number}`}
+                      onClick={() => setPendingDeleteGroup(group)}
+                      className="flex h-11 w-12 items-center justify-center rounded-xl border border-red-500/40 text-sm font-semibold text-red-400"
+                    >
+                      Del
+                    </button>
+                  </div>
+                </div>
+
+                {expanded ? (
+                  <ul className="space-y-2 border-t border-slate-800 px-3 pb-3 pt-2">
+                    {group.scans.map((scan) => (
+                      <li
+                        key={scan.id}
+                        className="flex gap-2 rounded-xl border border-slate-800/80 bg-slate-950/60 p-2.5"
+                      >
+                        <div className="min-w-0 flex-1 space-y-0.5">
+                          {scan.serial_number ? (
+                            <p className="font-mono text-xs text-sky-300">
+                              Serial {scan.serial_number}
+                            </p>
+                          ) : (
+                            <p className="text-xs text-slate-500">No serial</p>
+                          )}
+                          {scan.location ? (
+                            <p className="font-mono text-xs text-emerald-400/90">
+                              📍 {scan.location}
+                            </p>
+                          ) : null}
+                          <time
+                            dateTime={scan.scanned_at}
+                            className="block font-mono text-xs text-slate-500"
+                          >
+                            {formatTime(scan.scanned_at)}
+                          </time>
+                          {scan.scanned_by ? (
+                            <p className="text-xs text-slate-500">
+                              Logged by {scan.scanned_by}
+                            </p>
+                          ) : null}
+                        </div>
+                        <button
+                          type="button"
+                          aria-label={`Delete scan at ${formatTime(scan.scanned_at)}`}
+                          onClick={() => void handleDeleteScan(scan.id)}
+                          className="flex h-10 w-10 shrink-0 items-center justify-center self-center rounded-lg border border-red-500/30 text-xs font-semibold text-red-400"
+                        >
+                          Del
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                ) : null}
+              </li>
+            );
+          })}
         </ul>
 
-        {scans.length > 5 ? (
+        {aggregated.length > 8 ? (
           <button
             type="button"
-            onClick={() => setShowAll((v) => !v)}
+            onClick={() => setShowAllGroups((v) => !v)}
             className="flex min-h-12 w-full items-center justify-center rounded-xl border border-slate-700 bg-slate-900 text-sm font-semibold text-slate-200"
           >
-            {showAll
-              ? "Show Fewer Entries"
-              : `Show All Logged Entries (${scans.length})`}
+            {showAllGroups
+              ? "Show Fewer SKUs"
+              : `Show All SKUs (${aggregated.length})`}
           </button>
         ) : null}
       </section>

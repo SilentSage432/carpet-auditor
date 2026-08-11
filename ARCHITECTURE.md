@@ -51,7 +51,8 @@ app/api/store-locations*          → List / patch / bulk location APIs
 supabase/schema.sql               → Tables + multi-category + SIMS + store_number + RBAC columns + RLS
 supabase/migrations/20260809_store_operations_rbac.sql → departments, profiles, locations, weekly rotations + RLS
 supabase/migrations/20260809_multi_store.sql → stores + store_id scoping
-supabase/migrations/20260810_store_locations_type_unique.sql → location unique (department_id,aisle,bay,type)```
+supabase/migrations/20260810_store_locations_type_unique.sql → location unique (department_id,aisle,bay,type)
+supabase/migrations/20260811_alphanumeric_aisle.sql → store_locations.aisle INTEGER → TEXT (BW/RW/12/A1)
 
 ## Ownership
 
@@ -88,9 +89,11 @@ supabase/migrations/20260810_store_locations_type_unique.sql → location unique
 1. **Flooring Audit** — dual engine (roll CLF vs carton sq ft), scan-to-catalog, SIMS tags
 2. **Appliances Audit** — continuous floor scans on `appliance_scans` + UPC links on `appliance_catalog`
    - Suites: Laundry · Refrigeration · Cooking / Ranges · Dishwashers · Microwaves / Venting
-   - Required `sub_category` on UPC Quick-Add and scan log; CSV includes Sub-Category · Item # · Serial # · Location
+   - Required `sub_category` on UPC Quick-Add and scan log
+   - Scan log aggregated by SKU (Qty + expandable unit detail); sticky category filter + SKU/location search; Edit modal for qty/serials/bay
+   - CSV: SUMMARY (counts/locations) + RAW DETAIL audit trail
    - Continuous mode: barcode detect → immediate `POST /api/appliances/scans`; session total counter; new items pause on Quick-Add then auto-log
-   - APIs: `/api/appliances/catalog`, `/api/appliances/scans`
+   - APIs: `/api/appliances/catalog`, `/api/appliances/scans` (`GET|POST|PATCH|DELETE`)
 3. **Universal / Appliance Catalog** — flooring = `carpet_catalog`; appliances tab = `appliance_catalog`
 4. **Remnant Rack** — back-room remnant status + manager markdown
 5. **Master / Profile Settings** — store selector (Master Admin), queue, Supabase + localStorage

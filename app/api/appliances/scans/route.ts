@@ -52,7 +52,23 @@ export async function GET(request: Request) {
     );
 
     if (format === "csv") {
-      const csv = applianceScansToCsv(scans);
+      const descriptions: Record<string, string> = {};
+      const { data: catalogRows } = await supabase
+        .from("appliance_catalog")
+        .select("item_number, description")
+        .eq("store_number", store);
+      for (const row of catalogRows ?? []) {
+        const item = String(
+          (row as { item_number?: string }).item_number ?? ""
+        ).trim();
+        if (item) {
+          descriptions[item] = String(
+            (row as { description?: string }).description ?? ""
+          ).trim();
+        }
+      }
+
+      const csv = applianceScansToCsv(scans, { descriptions });
       return new NextResponse(csv, {
         status: 200,
         headers: {
@@ -160,6 +176,76 @@ export async function POST(request: Request) {
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
     console.error("[POST /api/appliances/scans] error", message, err);
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
+}
+
+/** PATCH /api/appliances/scans — update serial / location on an existing scan */
+export async function PATCH(request: Request) {
+  try {
+    const supabase = getSupabaseAdmin();
+    if (!supabase) {
+      return NextResponse.json(
+        { error: supabaseAdminMissingMessage() },
+        { status: 503 }
+      );
+    }
+
+    const body = (await request.json()) as Record<string, unknown>;
+    const id = String(body.id ?? "").trim();
+    const store = String(
+      body.store_number ?? storeFromRequest(request)
+    ).trim();
+
+    if (!id) {
+      return NextResponse.json({ error: "id is required" }, { status: 400 });
+    }
+
+    const updates: Record<string, string> = {};
+    if (body.serial_number !== undefined) {
+      updates.serial_number = String(body.serial_number ?? "").trim();
+    }
+    if (body.location !== undefined) {
+      updates.location = String(body.location ?? "").trim();
+    }
+    if (body.scanned_by !== undefined) {
+      updates.scanned_by = String(body.scanned_by ?? "").trim();
+    }
+    if (body.category !== undefined || body.sub_category !== undefined) {
+      const pair = resolveApplianceCategoryPair(
+        body.category,
+        body.sub_category
+      );
+      updates.category = normalizeApplianceCategory(pair.category);
+      updates.sub_category = pair.sub_category;
+    }
+
+    if (Object.keys(updates).length === 0) {
+      return NextResponse.json(
+        { error: "No fields to update" },
+        { status: 400 }
+      );
+    }
+
+    const { data, error } = await supabase
+      .from("appliance_scans")
+      .update(updates)
+      .eq("id", id)
+      .eq("store_number", store)
+      .select("*")
+      .single();
+
+    if (error) {
+      console.error("[PATCH /api/appliances/scans] failed", error);
+      throw new Error(error.message);
+    }
+
+    return NextResponse.json({
+      scan: mapApplianceScanRow(data as Record<string, unknown>),
+    });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown error";
+    console.error("[PATCH /api/appliances/scans] error", message);
     return NextResponse.json({ error: message }, { status: 500 });
   }
 }

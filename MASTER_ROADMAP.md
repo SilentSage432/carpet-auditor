@@ -58,6 +58,8 @@
 - [x] Appliance suite categories + required sub_category on UPC link / audits / CSV export
 - [x] Dedicated `appliance_catalog` + `appliance_scans` tables, types, APIs, and Scanner UI
 - [x] Appliance Scanner continuous mode (instant POST on detect + session counter)
+- [x] Appliance scan log SKU aggregation, category filter / search, in-line editor, summary+detail CSV
+- [x] Alphanumeric aisle codes (TEXT) + batch CSV aisle parser + Bulk Generator text input
 
 ## Next
 - [ ] JWT / claim-based RLS enforcing `store_number` (+ department) server-side
