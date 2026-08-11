@@ -159,3 +159,4 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 - Types: `ApplianceCatalogItem`, `ApplianceScan` (`sub_category?`)
 - APIs: `/api/appliances/catalog`, `/api/appliances/scans` (`?format=csv`)
 - CSV columns: Category, Sub-Category, Item #, Serial #, Location, Scanned By, Scanned At, Store #
+- Online scans POST `/api/appliances/scans` (service role); failures surface as `Failed to save scan: …` (no silent offline success)

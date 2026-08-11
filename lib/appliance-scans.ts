@@ -1,13 +1,17 @@
 /**
  * Appliance floor scans — owns public.appliance_scans.
  * Flooring cycle audits stay in lib/storage.ts (carpet_audits).
+ *
+ * Online saves go through POST /api/appliances/scans (service role) and throw
+ * on failure — never silently report success via the offline queue.
  */
 
 import { getStoreNumber } from "./store";
 import { getSupabase } from "./supabase";
-import { enqueueSyncAction, shouldSaveOffline } from "./sync-queue";
+import { enqueueSyncAction, isBrowserOnline } from "./sync-queue";
 import { uid } from "./uid";
 import {
+  isValidApplianceSubCategory,
   normalizeApplianceCategory,
   resolveApplianceCategoryPair,
   type ApplianceScan,
@@ -71,105 +75,207 @@ function upsertLocal(record: ApplianceScan): void {
   writeAllLocal(next);
 }
 
-function scanPayload(record: ApplianceScan) {
-  return {
-    id: record.id,
-    store_number: record.store_number,
-    item_number: record.item_number,
-    serial_number: record.serial_number,
-    location: record.location,
-    category: record.category,
-    sub_category: record.sub_category ?? "",
-    scanned_by: record.scanned_by,
-    scanned_at: record.scanned_at,
+/** Schema-aligned payload for appliance_scans insert / API body. */
+export function buildApplianceScanPayload(
+  input: ApplianceScanInsert,
+  store = input.store_number ?? getStoreNumber()
+): {
+  store_number: string;
+  item_number: string;
+  serial_number: string;
+  location: string;
+  category: string;
+  sub_category: string;
+  scanned_by: string;
+  scanned_at: string;
+  id?: string;
+} {
+  const pair = resolveApplianceCategoryPair(
+    input.category,
+    input.sub_category
+  );
+  const category = normalizeApplianceCategory(pair.category);
+  const sub_category = pair.sub_category;
+
+  if (!String(input.item_number ?? "").trim()) {
+    throw new Error("item_number is required");
+  }
+  if (!isValidApplianceSubCategory(category, sub_category)) {
+    throw new Error(
+      "Valid sub_category is required for the selected category"
+    );
+  }
+
+  const payload: {
+    store_number: string;
+    item_number: string;
+    serial_number: string;
+    location: string;
+    category: string;
+    sub_category: string;
+    scanned_by: string;
+    scanned_at: string;
+    id?: string;
+  } = {
+    store_number: store,
+    item_number: String(input.item_number).trim(),
+    serial_number: String(input.serial_number ?? "").trim(),
+    location: String(input.location ?? "").trim(),
+    category,
+    sub_category,
+    scanned_by: String(input.scanned_by ?? "").trim(),
+    scanned_at: input.scanned_at ?? new Date().toISOString(),
   };
+
+  if (input.id) {
+    payload.id = input.id;
+  }
+
+  return payload;
+}
+
+async function fetchScansViaApi(store: string): Promise<ApplianceScan[]> {
+  const res = await fetch(
+    `/api/appliances/scans?store_number=${encodeURIComponent(store)}`,
+    {
+      method: "GET",
+      headers: { "x-store-number": store },
+      cache: "no-store",
+    }
+  );
+  const json = (await res.json().catch(() => ({}))) as {
+    scans?: unknown[];
+    error?: string;
+  };
+  if (!res.ok) {
+    throw new Error(json.error || `Failed to load scans (${res.status})`);
+  }
+  return (json.scans ?? []).map((row) =>
+    mapRow(row as Record<string, unknown>)
+  );
 }
 
 export async function fetchApplianceScans(): Promise<ApplianceScan[]> {
   const store = getStoreNumber();
   const local = forStore(store);
-  const supabase = getSupabase();
-  if (!supabase || shouldSaveOffline()) return local;
 
-  try {
-    const { data, error } = await supabase
-      .from(TABLE)
-      .select("*")
-      .eq("store_number", store)
-      .order("scanned_at", { ascending: false });
-    if (error) throw error;
-    const remote = (data ?? []).map((row) =>
-      mapRow(row as Record<string, unknown>)
-    );
-    const offlineOnly = local.filter((r) => r.offline);
-    const merged = [
-      ...remote.filter((r) => !offlineOnly.some((o) => o.id === r.id)),
-      ...offlineOnly,
-    ].sort((a, b) => b.scanned_at.localeCompare(a.scanned_at));
-    writeAllLocal([
-      ...readAllLocal().filter((r) => r.store_number !== store),
-      ...merged,
-    ]);
-    return merged;
-  } catch {
-    return local;
+  if (isBrowserOnline()) {
+    try {
+      const remote = await fetchScansViaApi(store);
+      const offlineOnly = local.filter((r) => r.offline);
+      const merged = [
+        ...remote.filter((r) => !offlineOnly.some((o) => o.id === r.id)),
+        ...offlineOnly,
+      ].sort((a, b) => b.scanned_at.localeCompare(a.scanned_at));
+      writeAllLocal([
+        ...readAllLocal().filter((r) => r.store_number !== store),
+        ...merged,
+      ]);
+      return merged;
+    } catch (err) {
+      console.error("[appliance_scans] API fetch failed, trying client", err);
+    }
+
+    const supabase = getSupabase();
+    if (supabase) {
+      try {
+        const { data, error } = await supabase
+          .from(TABLE)
+          .select("*")
+          .eq("store_number", store)
+          .order("scanned_at", { ascending: false });
+        if (error) {
+          console.error("[appliance_scans] client fetch error", error);
+          throw error;
+        }
+        const remote = (data ?? []).map((row) =>
+          mapRow(row as Record<string, unknown>)
+        );
+        const offlineOnly = local.filter((r) => r.offline);
+        const merged = [
+          ...remote.filter((r) => !offlineOnly.some((o) => o.id === r.id)),
+          ...offlineOnly,
+        ].sort((a, b) => b.scanned_at.localeCompare(a.scanned_at));
+        writeAllLocal([
+          ...readAllLocal().filter((r) => r.store_number !== store),
+          ...merged,
+        ]);
+        return merged;
+      } catch (err) {
+        console.error("[appliance_scans] client fetch failed", err);
+      }
+    }
   }
+
+  return local;
 }
 
+/**
+ * Persist a floor scan. Online: direct POST /api/appliances/scans (throws on failure).
+ * Offline only: local queue — never pretends a failed online write succeeded.
+ */
 export async function saveApplianceScan(
   input: ApplianceScanInsert
 ): Promise<{ record: ApplianceScan; offline: boolean }> {
-  const now = new Date().toISOString();
   const store = input.store_number ?? getStoreNumber();
-  const pair = resolveApplianceCategoryPair(
-    input.category,
-    input.sub_category
-  );
+  const payload = buildApplianceScanPayload(input, store);
 
-  const record: ApplianceScan = {
-    id: input.id ?? uid(),
-    store_number: store,
-    item_number: String(input.item_number).trim(),
-    serial_number: String(input.serial_number ?? "").trim(),
-    location: String(input.location ?? "").trim(),
-    category: normalizeApplianceCategory(pair.category),
-    sub_category: pair.sub_category || undefined,
-    scanned_by: String(input.scanned_by ?? "").trim(),
-    scanned_at: input.scanned_at ?? now,
-    offline: false,
-  };
+  console.log("[appliance_scans] save payload", payload);
 
-  const supabase = getSupabase();
-  if (!supabase || shouldSaveOffline()) {
-    const offlineRecord = { ...record, offline: true };
+  // Truly offline — queue for later. Do not use this path to hide DB errors.
+  if (!isBrowserOnline()) {
+    const offlineRecord: ApplianceScan = {
+      id: payload.id ?? uid(),
+      store_number: payload.store_number,
+      item_number: payload.item_number,
+      serial_number: payload.serial_number,
+      location: payload.location,
+      category: normalizeApplianceCategory(payload.category),
+      sub_category: payload.sub_category || undefined,
+      scanned_by: payload.scanned_by,
+      scanned_at: payload.scanned_at,
+      offline: true,
+    };
     upsertLocal(offlineRecord);
-    enqueueSyncAction(
-      "upsert_appliance_scan",
-      scanPayload(offlineRecord),
-      store
-    );
+    enqueueSyncAction("upsert_appliance_scan", { ...payload, id: offlineRecord.id }, store);
     return { record: offlineRecord, offline: true };
   }
 
   try {
-    const { data, error } = await supabase
-      .from(TABLE)
-      .upsert(scanPayload(record), { onConflict: "id" })
-      .select("*")
-      .maybeSingle();
-    if (error) throw error;
-    const saved = data ? mapRow(data as Record<string, unknown>) : record;
-    upsertLocal(saved);
+    const res = await fetch("/api/appliances/scans", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "x-store-number": store,
+      },
+      body: JSON.stringify(payload),
+    });
+
+    const json = (await res.json().catch(() => ({}))) as {
+      scan?: Record<string, unknown>;
+      error?: string;
+    };
+
+    if (!res.ok) {
+      const message = json.error || `HTTP ${res.status}`;
+      console.error("[appliance_scans] API insert failed", message, json);
+      throw new Error(message);
+    }
+
+    if (!json.scan) {
+      console.error("[appliance_scans] API returned no scan row", json);
+      throw new Error("API returned no scan row");
+    }
+
+    const saved = mapRow(json.scan);
+    upsertLocal({ ...saved, offline: false });
+    console.log("[appliance_scans] saved", saved.id, saved.item_number);
     return { record: saved, offline: false };
-  } catch {
-    const offlineRecord = { ...record, offline: true };
-    upsertLocal(offlineRecord);
-    enqueueSyncAction(
-      "upsert_appliance_scan",
-      scanPayload(offlineRecord),
-      store
-    );
-    return { record: offlineRecord, offline: true };
+  } catch (err) {
+    const message =
+      err instanceof Error ? err.message : "Unknown save error";
+    console.error("[appliance_scans] save failed — not falling back to silent offline", err);
+    throw new Error(message);
   }
 }
 
@@ -177,19 +283,23 @@ export async function deleteApplianceScan(id: string): Promise<void> {
   const store = getStoreNumber();
   writeAllLocal(readAllLocal().filter((r) => r.id !== id));
 
-  const supabase = getSupabase();
-  if (!supabase || shouldSaveOffline()) {
+  if (!isBrowserOnline()) {
     enqueueSyncAction("delete_appliance_scan", { id }, store);
     return;
   }
 
-  const { error } = await supabase
-    .from(TABLE)
-    .delete()
-    .eq("id", id)
-    .eq("store_number", store);
-  if (error) {
-    enqueueSyncAction("delete_appliance_scan", { id }, store);
+  const res = await fetch(
+    `/api/appliances/scans?id=${encodeURIComponent(id)}&store_number=${encodeURIComponent(store)}`,
+    {
+      method: "DELETE",
+      headers: { "x-store-number": store },
+    }
+  );
+  if (!res.ok) {
+    const json = (await res.json().catch(() => ({}))) as { error?: string };
+    const message = json.error || `HTTP ${res.status}`;
+    console.error("[appliance_scans] delete failed", message);
+    throw new Error(message);
   }
 }
 

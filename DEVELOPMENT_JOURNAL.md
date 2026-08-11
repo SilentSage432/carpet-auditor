@@ -1,5 +1,12 @@
 # DeptSync Hub — Development Journal
 
+## 2026-08-10 — Appliance scan save: no silent offline success
+
+### Fixed
+- `saveApplianceScan` POSTs to `/api/appliances/scans` when online and **throws** on failure (removed catch→offline success path).
+- API insert uses explicit logging + thrown errors; schema body: `item_number`, `serial_number`, `location`, `category`, `sub_category`, `scanned_by`.
+- Scanner UI shows red toast `Failed to save scan: …` and re-fetches the scan list after a successful write.
+
 ## 2026-08-10 — Dedicated appliance_catalog + appliance_scans
 
 ### Shipped

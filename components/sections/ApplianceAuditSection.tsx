@@ -81,6 +81,7 @@ export function ApplianceAuditSection({
   const [scans, setScans] = useState<ApplianceScan[]>([]);
   const [saving, setSaving] = useState(false);
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
+  const [statusTone, setStatusTone] = useState<"ok" | "error">("ok");
   const [loaded, setLoaded] = useState(false);
   const [scanFlash, setScanFlash] = useState(false);
   const [quickAddBarcode, setQuickAddBarcode] = useState<string | null>(null);
@@ -115,9 +116,10 @@ export function ApplianceAuditSection({
     };
   }, []);
 
-  const flashStatus = useCallback((msg: string) => {
+  const flashStatus = useCallback((msg: string, tone: "ok" | "error" = "ok") => {
+    setStatusTone(tone);
     setStatusMsg(msg);
-    window.setTimeout(() => setStatusMsg(null), 2800);
+    window.setTimeout(() => setStatusMsg(null), tone === "error" ? 5000 : 2800);
   }, []);
 
   const applyCatalogItem = useCallback((item: ApplianceCatalogItem) => {
@@ -214,16 +216,31 @@ export function ApplianceAuditSection({
         sub_category: subCategory.trim(),
         scanned_by: scannedBy || activeSpecialist?.name || "",
       });
+
+      // Optimistic insert, then re-fetch so the log matches Supabase.
       setScans((prev) => [record, ...prev.filter((s) => s.id !== record.id)]);
+      try {
+        const refreshed = await fetchApplianceScans();
+        setScans(refreshed);
+      } catch (refreshErr) {
+        console.error(
+          "[ApplianceAudit] re-fetch after save failed",
+          refreshErr
+        );
+      }
+
       playSuccessChime();
       resetForm();
       flashStatus(
         offline
-          ? "Saved offline — form reset"
+          ? "Saved offline — will sync when online"
           : "Appliance scan logged — form reset"
       );
-    } catch {
-      flashStatus("Could not save appliance scan");
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Unknown error";
+      console.error("[ApplianceAudit] save failed", err);
+      flashStatus(`Failed to save scan: ${message}`, "error");
     } finally {
       setSaving(false);
     }
@@ -298,7 +315,11 @@ export function ApplianceAuditSection({
       {statusMsg ? (
         <p
           role="status"
-          className="rounded-xl border border-emerald-500/30 bg-emerald-950/50 px-3 py-2 text-center text-sm font-medium text-emerald-200"
+          className={`rounded-xl border px-3 py-2 text-center text-sm font-medium ${
+            statusTone === "error"
+              ? "border-red-500/40 bg-red-950/50 text-red-200"
+              : "border-emerald-500/30 bg-emerald-950/50 text-emerald-200"
+          }`}
         >
           {statusMsg}
         </p>

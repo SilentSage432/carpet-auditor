@@ -25,6 +25,7 @@ export async function GET(request: Request) {
   try {
     const supabase = getSupabaseAdmin();
     if (!supabase) {
+      console.error("[POST/GET appliances/scans] Supabase admin not configured");
       return NextResponse.json(
         { error: supabaseAdminMissingMessage() },
         { status: 503 }
@@ -42,6 +43,7 @@ export async function GET(request: Request) {
       .order("scanned_at", { ascending: false });
 
     if (error) {
+      console.error("[GET /api/appliances/scans] select failed", error);
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
@@ -62,6 +64,7 @@ export async function GET(request: Request) {
 
     return NextResponse.json({ store_number: store, scans });
   } catch (err) {
+    console.error("[GET /api/appliances/scans] unexpected", err);
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Unknown error" },
       { status: 500 }
@@ -74,6 +77,7 @@ export async function POST(request: Request) {
   try {
     const supabase = getSupabaseAdmin();
     if (!supabase) {
+      console.error("[POST /api/appliances/scans] Supabase admin not configured");
       return NextResponse.json(
         { error: supabaseAdminMissingMessage() },
         { status: 503 }
@@ -109,8 +113,8 @@ export async function POST(request: Request) {
       );
     }
 
-    const payload = {
-      id: body.id ? String(body.id) : undefined,
+    // Match public.appliance_scans columns exactly — omit id so DB generates uuid.
+    const payload: Record<string, string> = {
       store_number: store,
       item_number,
       serial_number,
@@ -122,25 +126,41 @@ export async function POST(request: Request) {
         ? String(body.scanned_at)
         : new Date().toISOString(),
     };
+    if (body.id) {
+      payload.id = String(body.id);
+    }
+
+    console.log("[POST /api/appliances/scans] insert", payload);
 
     const { data, error } = await supabase
       .from("appliance_scans")
-      .upsert(payload, { onConflict: "id" })
+      .insert(payload)
       .select("*")
-      .maybeSingle();
+      .single();
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      console.error("[POST /api/appliances/scans] insert failed", error);
+      throw new Error(error.message);
     }
 
+    if (!data) {
+      console.error("[POST /api/appliances/scans] insert returned no row");
+      throw new Error("Insert returned no row");
+    }
+
+    console.log(
+      "[POST /api/appliances/scans] ok",
+      (data as { id?: string }).id,
+      item_number
+    );
+
     return NextResponse.json({
-      scan: mapApplianceScanRow((data ?? payload) as Record<string, unknown>),
+      scan: mapApplianceScanRow(data as Record<string, unknown>),
     });
   } catch (err) {
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Unknown error" },
-      { status: 500 }
-    );
+    const message = err instanceof Error ? err.message : "Unknown error";
+    console.error("[POST /api/appliances/scans] error", message, err);
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
 
@@ -169,14 +189,14 @@ export async function DELETE(request: Request) {
       .eq("store_number", store);
 
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      console.error("[DELETE /api/appliances/scans] failed", error);
+      throw new Error(error.message);
     }
 
     return NextResponse.json({ ok: true });
   } catch (err) {
-    return NextResponse.json(
-      { error: err instanceof Error ? err.message : "Unknown error" },
-      { status: 500 }
-    );
+    const message = err instanceof Error ? err.message : "Unknown error";
+    console.error("[DELETE /api/appliances/scans] error", message);
+    return NextResponse.json({ error: message }, { status: 500 });
   }
 }
