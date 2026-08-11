@@ -1,7 +1,7 @@
 /**
- * Department-scoped RBAC — owns which hub sections and catalog domains
- * a profile may access. Presentation consumes; specialists ownership stays
- * in lib/specialists.ts.
+ * Department-scoped RBAC — owns which hub sections a profile may access.
+ * Catalog tab removed from bottom nav; SKU linking stays in Quick-Add / scan flows.
+ * Presentation consumes; specialists ownership stays in lib/specialists.ts.
  */
 
 import {
@@ -24,7 +24,6 @@ const ALL_TABS: NavTab[] = [
   { id: "audit", label: "Flooring", icon: "📊" },
   { id: "appliances", label: "Appliances", icon: "🔌" },
   { id: "department", label: "Dept Audit", icon: "🏬" },
-  { id: "catalog", label: "Catalog", icon: "🏷️" },
   { id: "remnants", label: "Remnants", icon: "📦" },
   { id: "settings", label: "Settings", icon: "⚙️" },
 ];
@@ -90,6 +89,8 @@ export function canAccessSection(
   member: StoreSpecialist | null | undefined,
   section: HubSection
 ): boolean {
+  // Catalog tab removed from hub navigation.
+  if (section === "catalog") return false;
   return visibleSections(member).includes(section);
 }
 
@@ -98,25 +99,25 @@ export function visibleSections(
   member: StoreSpecialist | null | undefined
 ): HubSection[] {
   if (isMasterAdmin(member)) {
-    return ["audit", "appliances", "catalog", "remnants", "settings"];
+    return ["audit", "appliances", "remnants", "settings"];
   }
 
   const dept = effectiveDepartment(member);
 
   if (dept === "appliances") {
-    return ["appliances", "catalog", "settings"];
+    return ["appliances", "settings"];
   }
 
   if (dept === "flooring") {
-    return ["audit", "catalog", "remnants", "settings"];
+    return ["audit", "remnants", "settings"];
   }
 
   if (dept === "all") {
-    return ["audit", "appliances", "catalog", "remnants", "settings"];
+    return ["audit", "appliances", "remnants", "settings"];
   }
 
   // Plumbing, electrical, lawn_garden, paint, millwork, building_materials, hardware
-  return ["department", "catalog", "settings"];
+  return ["department", "settings"];
 }
 
 /** Bottom-nav tabs filtered + labeled for the active role/department. */
@@ -134,15 +135,6 @@ export function visibleNavTabs(
         label: meta.shortLabel,
         icon: meta.icon,
       };
-    }
-    if (tab.id === "catalog" && dept === "appliances") {
-      return { ...tab, label: "Appliance Catalog" };
-    }
-    if (tab.id === "catalog" && isGenericDepartment(dept)) {
-      return { ...tab, label: `${meta.shortLabel} Catalog` };
-    }
-    if (tab.id === "catalog" && isMasterAdmin(member)) {
-      return { ...tab, label: "Catalog" };
     }
     if (tab.id === "settings" && isMasterAdmin(member)) {
       return { ...tab, label: "Master" };
@@ -179,14 +171,9 @@ export function sectionTitle(
   if (section === "department" && isGenericDepartment(dept)) {
     return `${meta.label} Audit`;
   }
-  if (section === "catalog" && dept === "appliances") {
-    return "Appliance Catalog";
-  }
-  if (section === "catalog" && isGenericDepartment(dept)) {
-    return `${meta.label} Catalog`;
-  }
-  if (section === "catalog" && isMasterAdmin(member)) {
-    return "Universal Catalog";
+  // Deprecated catalog tab — route callers to Appliances labeling.
+  if (section === "catalog") {
+    return "Appliances Audit";
   }
   if (section === "settings" && isMasterAdmin(member)) {
     return "Master Settings";

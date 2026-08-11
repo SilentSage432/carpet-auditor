@@ -53,7 +53,7 @@ export function NavigationHub({
   showBottomNav = true,
 }: NavigationHubProps) {
   const pathname = usePathname() || "/";
-  const network = useNetworkBadge();
+  const network = useNetworkBadge(storeNumber);
   const links = navRoleLinks(specialist);
   const [menuOpen, setMenuOpen] = useState(false);
   const [userOpen, setUserOpen] = useState(false);

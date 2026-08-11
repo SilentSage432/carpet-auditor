@@ -11,8 +11,6 @@ import {
   dedupeRoster,
   deleteSpecialist,
   fetchSpecialists,
-  isDefaultPin,
-  needsCredentialSetup,
   roleBadge,
   updateSpecialistScope,
 } from "@/lib/specialists";
@@ -77,10 +75,11 @@ function credentialsStatus(member: StoreSpecialist): {
   label: string;
   tone: "ok" | "temp";
 } {
-  if (needsCredentialSetup(member) || isDefaultPin(member)) {
+  // Driven only by DB flags — never by seed account identity / default PIN guess.
+  if (member.must_change_credentials || member.must_change_pin) {
     return { label: "🟡 Temporary Credentials Active", tone: "temp" };
   }
-  return { label: "🟢 First-Time Password Set", tone: "ok" };
+  return { label: "🟢 Credentials Set", tone: "ok" };
 }
 
 function displayName(member: StoreSpecialist): string {
@@ -228,6 +227,12 @@ export function AdminRosterManager({
       </div>
 
       <ul className="space-y-2">
+        {sorted.length === 0 ? (
+          <li className="rounded-xl border border-dashed border-slate-700 bg-slate-950/50 px-4 py-6 text-center text-sm text-slate-400">
+            No active roster profiles in the database for this store. Add a
+            supervisor or invite from Admin Tools.
+          </li>
+        ) : null}
         {sorted.map((member) => {
           const status = credentialsStatus(member);
           const dept = member.assigned_department;
@@ -305,7 +310,7 @@ export function AdminRosterManager({
                   onClick={() => setDeleteTarget(member)}
                   className="col-span-2 flex min-h-11 items-center justify-center rounded-lg border border-red-500/30 text-[11px] font-semibold text-red-300 disabled:opacity-40"
                 >
-                  🗑️ Delete
+                  🗑️ Delete User
                 </button>
               </div>
             </li>
@@ -361,13 +366,13 @@ export function AdminRosterManager({
 
       <ConfirmModal
         open={deleteTarget != null}
-        title="Remove team access?"
+        title="Delete user?"
         message={
           deleteTarget
-            ? `Deactivate ${deleteTarget.name}? They will no longer appear in the store roster.`
+            ? `Remove ${deleteTarget.name} from the store roster? Temporary / seed profiles are purged; database profiles are deactivated.`
             : ""
         }
-        confirmLabel="Deactivate"
+        confirmLabel="Delete User"
         danger
         onClose={() => setDeleteTarget(null)}
         onConfirm={() => void handleDelete()}

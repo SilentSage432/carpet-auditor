@@ -8,6 +8,8 @@ import { getSupabase } from "./supabase";
 import { uid } from "./uid";
 
 export const SYNC_QUEUE_KEY = "carpet_hub_sync_queue";
+/** Dispatched whenever the local queue is rewritten — header / Settings must listen. */
+export const SYNC_QUEUE_CHANGED_EVENT = "carpet-sync-queue-changed";
 
 export type SyncActionType =
   | "upsert_audit"
@@ -42,6 +44,11 @@ const LOCAL_KEYS: Record<string, string> = {
 
 let flushing = false;
 
+function notifyQueueChanged(): void {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent(SYNC_QUEUE_CHANGED_EVENT));
+}
+
 function readQueue(): SyncAction[] {
   if (typeof window === "undefined") return [];
   try {
@@ -57,7 +64,24 @@ function readQueue(): SyncAction[] {
 function writeQueue(actions: SyncAction[]): void {
   if (typeof window === "undefined") return;
   localStorage.setItem(SYNC_QUEUE_KEY, JSON.stringify(actions));
-  window.dispatchEvent(new CustomEvent("carpet-sync-queue-changed"));
+  notifyQueueChanged();
+}
+
+/** Explicitly empty the persisted queue and notify UI subscribers. */
+export function clearSyncQueue(): void {
+  writeQueue([]);
+}
+
+/**
+ * Drop every queued action for one store (or the whole queue when omitted)
+ * and force a UI refresh.
+ */
+export function purgeSyncQueue(storeNumber?: string): void {
+  if (!storeNumber) {
+    clearSyncQueue();
+    return;
+  }
+  writeQueue(readQueue().filter((a) => a.store_number !== storeNumber));
 }
 
 export function getSyncQueue(): SyncAction[] {
@@ -288,6 +312,8 @@ async function replayAction(action: SyncAction): Promise<void> {
 /**
  * Replay queued actions for the current store sequentially.
  * Returns the number of successfully synced actions.
+ * On full success for this store, the store's pending entries are purged and
+ * UI subscribers are notified immediately (header badge + Settings count).
  */
 export async function flushSyncQueue(
   storeNumber = getStoreNumber()
@@ -300,19 +326,37 @@ export async function flushSyncQueue(
   let synced = 0;
 
   try {
-    const pending = readQueue().filter((a) => a.store_number === storeNumber);
-    const remaining = readQueue().filter((a) => a.store_number !== storeNumber);
+    const snapshot = readQueue();
+    const pending = snapshot.filter((a) => a.store_number === storeNumber);
+    const otherStores = snapshot.filter((a) => a.store_number !== storeNumber);
 
+    if (pending.length === 0) {
+      // Normalize storage + force header/Settings to show 0 for this store.
+      writeQueue(otherStores);
+      return 0;
+    }
+
+    const failed: SyncAction[] = [];
     for (const action of pending) {
       try {
         await replayAction(action);
         synced += 1;
-      } catch {
-        remaining.push(action);
+      } catch (err) {
+        console.error("[sync-queue] replay failed", action.type, action.id, err);
+        failed.push(action);
       }
     }
 
-    writeQueue(remaining);
+    // Successful items are dropped; only failures + other stores remain.
+    const nextQueue = [...otherStores, ...failed];
+    writeQueue(nextQueue);
+
+    // Belt-and-suspenders: if this store is fully clear, re-notify so toast
+    // and badge update in the same turn even if a listener mounted late.
+    if (failed.length === 0) {
+      notifyQueueChanged();
+    }
+
     return synced;
   } finally {
     flushing = false;

@@ -44,6 +44,19 @@ function forStore(store = getStoreNumber()): ApplianceScan[] {
   return readAllLocal().filter((r) => r.store_number === store);
 }
 
+export function getLocalApplianceScans(store = getStoreNumber()): ApplianceScan[] {
+  return forStore(store);
+}
+
+export function countLocalApplianceScans(store = getStoreNumber()): number {
+  return forStore(store).length;
+}
+
+/** Drop locally cached appliance scans for a store (keeps other stores). */
+export function clearLocalApplianceScans(store = getStoreNumber()): void {
+  writeAllLocal(readAllLocal().filter((r) => r.store_number !== store));
+}
+
 export function mapApplianceScanRow(row: Record<string, unknown>): ApplianceScan {
   const pair = resolveApplianceCategoryPair(row.category, row.sub_category);
   return {

@@ -2,6 +2,7 @@ export type LocationType = "sales_floor" | "top_stock";
 
 export type HubSection =
   | "audit"
+  /** @deprecated Removed from bottom nav — redirects to appliances. */
   | "catalog"
   | "remnants"
   | "appliances"
@@ -621,11 +622,11 @@ export const HUB_SECTIONS: {
     description: "Roll CLF + carton / SIMS location audits",
   },
   {
-    id: "catalog",
-    label: "Universal Catalog",
-    title: "Universal Catalog",
-    icon: "🏷️",
-    description: "Master SKUs, barcodes & location tags",
+    id: "appliances",
+    label: "Appliances Audit",
+    title: "Appliances Audit",
+    icon: "🔌",
+    description: "Unit counts + appliance SIMS staging audits",
   },
   {
     id: "remnants",
@@ -633,13 +634,6 @@ export const HUB_SECTIONS: {
     title: "Remnant Rack",
     icon: "📦",
     description: "Back-room remnant inventory & status",
-  },
-  {
-    id: "appliances",
-    label: "Appliances Audit",
-    title: "Appliances Audit",
-    icon: "🔌",
-    description: "Unit counts + appliance SIMS staging audits",
   },
   {
     id: "department",

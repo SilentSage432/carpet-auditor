@@ -97,6 +97,11 @@ export function countLocalRemnants(): number {
   return forStore().length;
 }
 
+/** Drop locally cached remnants for the current store (keeps other stores). */
+export function clearLocalRemnants(store = getStoreNumber()): void {
+  writeAllLocal(readAllLocal().filter((r) => r.store_number !== store));
+}
+
 function remnantPayload(record: Remnant) {
   return {
     id: record.id,

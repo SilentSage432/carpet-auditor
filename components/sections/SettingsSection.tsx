@@ -1,16 +1,23 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useState } from "react";
 import { openAdminTools } from "@/components/hub/AdminToolsDrawer";
 import { PushNotificationsCard } from "@/components/hub/PushNotificationsCard";
 import { WeeklyBayTargetCard } from "@/components/hub/WeeklyBayTargetCard";
-import { countLocalCatalog } from "@/lib/catalog";
-import { countLocalRemnants } from "@/lib/remnants";
+import {
+  clearLocalApplianceScans,
+  countLocalApplianceScans,
+} from "@/lib/appliance-scans";
+import { usePendingSyncCount } from "@/lib/network";
+import { clearLocalRemnants, countLocalRemnants } from "@/lib/remnants";
 import { isSupervisor } from "@/lib/specialists";
 import { isMasterAdmin } from "@/lib/rbac";
-import { countLocalAudits } from "@/lib/storage";
 import { formatStoreLabel } from "@/lib/store";
-import { countPendingSync, flushSyncQueue } from "@/lib/sync-queue";
+import {
+  flushSyncQueue,
+  isBrowserOnline,
+  purgeSyncQueue,
+} from "@/lib/sync-queue";
 import { isSupabaseConfigured, getSupabase } from "@/lib/supabase";
 import type { StoreSpecialist } from "@/lib/types";
 
@@ -26,36 +33,47 @@ type Props = {
   onStoreNumberChange: (storeNumber: string) => void;
 };
 
+type ConnectionStatus = "idle" | "checking" | "ok" | "fail";
+
 /**
  * Settings — floor-first. Supervisors: PIN, own bay target, push, sync.
  * Master Admin setup (roster, store #, all-dept targets, diagnostics) lives in
  * Admin Tools drawer — not permanent page chrome.
  */
 export function SettingsSection({
-  catalogCount,
-  remnantCount,
   activeSpecialist,
   onOpenChangePin,
   storeNumber,
 }: Props) {
-  const [ping, setPing] = useState<"idle" | "ok" | "fail" | "checking">("idle");
+  const [ping, setPing] = useState<ConnectionStatus>("idle");
   const [syncMsg, setSyncMsg] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [deviceOpen, setDeviceOpen] = useState(false);
+  const [cacheTick, setCacheTick] = useState(0);
+  const [cacheMsg, setCacheMsg] = useState<string | null>(null);
 
   const configured = isSupabaseConfigured();
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
   const supervisorSession = isSupervisor(activeSpecialist);
   const masterSession = isMasterAdmin(activeSpecialist);
   const canChangePin = Boolean(activeSpecialist);
-  const pending = countPendingSync(storeNumber);
+  const pending = usePendingSyncCount(storeNumber);
 
-  const localAudits = countLocalAudits();
-  const localCatalog = countLocalCatalog();
-  const localRemnants = countLocalRemnants();
+  // cacheTick forces a re-read after Clear Local Cache.
+  void cacheTick;
+  const applianceAuditCache = countLocalApplianceScans(storeNumber);
+  const remnantInventoryCache = countLocalRemnants();
+
+  const refreshCacheCounts = useCallback(() => {
+    setCacheTick((n) => n + 1);
+  }, []);
 
   async function testConnection() {
     setPing("checking");
+    if (!isBrowserOnline()) {
+      setPing("fail");
+      return;
+    }
     const client = getSupabase();
     if (!client) {
       setPing("fail");
@@ -63,10 +81,8 @@ export function SettingsSection({
     }
     try {
       const { error } = await client
-        .from("carpet_audits")
-        .select("id")
-        .eq("store_number", storeNumber)
-        .limit(1);
+        .from("appliance_scans")
+        .select("count", { count: "exact", head: true });
       setPing(error ? "fail" : "ok");
     } catch {
       setPing("fail");
@@ -88,9 +104,14 @@ export function SettingsSection({
     }
   }
 
-  useEffect(() => {
-    // keep pending count reactive if store changes
-  }, [storeNumber]);
+  function clearLocalCache() {
+    clearLocalApplianceScans(storeNumber);
+    clearLocalRemnants(storeNumber);
+    purgeSyncQueue(storeNumber);
+    refreshCacheCounts();
+    setCacheMsg("Local operational caches cleared.");
+    window.setTimeout(() => setCacheMsg(null), 3000);
+  }
 
   return (
     <div className="space-y-4">
@@ -203,62 +224,96 @@ export function SettingsSection({
               ) : null}
             </div>
 
-            {masterSession ? (
-              <div>
-                <p className="text-sm font-semibold text-slate-400">Supabase</p>
-                <p className="mt-1 text-sm text-slate-300">
-                  {configured ? "Configured" : "Not configured (offline mode)"}
+            <div>
+              <p className="text-sm font-semibold text-slate-400">Connection</p>
+              {configured ? (
+                <p className="mt-1 break-all font-mono text-[10px] text-slate-500">
+                  {url}
                 </p>
-                {configured ? (
-                  <p className="mt-1 break-all font-mono text-[10px] text-slate-500">
-                    {url}
-                  </p>
-                ) : null}
-                <button
-                  type="button"
-                  onClick={() => void testConnection()}
-                  disabled={!configured || ping === "checking"}
-                  className="mt-2 flex min-h-12 w-full items-center justify-center rounded-xl border border-slate-700 bg-slate-950 text-sm font-semibold text-slate-100 disabled:opacity-40"
+              ) : (
+                <p className="mt-1 text-sm text-slate-400">
+                  Supabase not configured (offline mode)
+                </p>
+              )}
+              <div className="mt-2 flex items-center gap-2">
+                <span
+                  className={`inline-block h-2.5 w-2.5 shrink-0 rounded-full ${
+                    ping === "ok"
+                      ? "bg-emerald-400"
+                      : ping === "fail"
+                        ? "bg-red-400"
+                        : ping === "checking"
+                          ? "bg-amber-400"
+                          : "bg-slate-600"
+                  }`}
+                  aria-hidden
+                />
+                <p
+                  className={`text-sm font-semibold ${
+                    ping === "ok"
+                      ? "text-emerald-300"
+                      : ping === "fail"
+                        ? "text-red-300"
+                        : "text-slate-300"
+                  }`}
                 >
                   {ping === "checking"
                     ? "Checking…"
                     : ping === "ok"
-                      ? "Connection OK"
+                      ? "Connected (Database Live)"
                       : ping === "fail"
-                        ? "Connection failed — retry"
-                        : "Test connection"}
-                </button>
+                        ? "Offline / Unreachable"
+                        : configured
+                          ? "Not tested yet"
+                          : "Offline / Unreachable"}
+                </p>
               </div>
-            ) : null}
+              <button
+                type="button"
+                onClick={() => void testConnection()}
+                disabled={!configured || ping === "checking"}
+                className="mt-2 flex min-h-12 w-full items-center justify-center rounded-xl border border-slate-700 bg-slate-950 text-sm font-semibold text-slate-100 disabled:opacity-40"
+              >
+                {ping === "checking" ? "Checking…" : "Test Connection"}
+              </button>
+            </div>
 
             <div>
-              <p className="text-sm font-semibold text-slate-400">
-                Local storage
-              </p>
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-sm font-semibold text-slate-400">
+                  Local storage
+                </p>
+                <button
+                  type="button"
+                  onClick={clearLocalCache}
+                  className="rounded-lg border border-red-500/40 px-2.5 py-1.5 text-[11px] font-semibold text-red-300"
+                >
+                  Clear Local Cache
+                </button>
+              </div>
               <ul className="mt-2 space-y-1.5 text-sm text-slate-300">
                 <li className="flex justify-between gap-3 rounded-lg bg-slate-950/70 px-3 py-2">
-                  <span>Audit cache</span>
-                  <span className="font-mono text-emerald-400">{localAudits}</span>
-                </li>
-                <li className="flex justify-between gap-3 rounded-lg bg-slate-950/70 px-3 py-2">
-                  <span>Catalog cache</span>
+                  <span>Appliance Audit Cache</span>
                   <span className="font-mono text-emerald-400">
-                    {localCatalog}
+                    {applianceAuditCache}
                   </span>
                 </li>
                 <li className="flex justify-between gap-3 rounded-lg bg-slate-950/70 px-3 py-2">
-                  <span>Remnant cache</span>
+                  <span>Remnant Inventory Cache</span>
                   <span className="font-mono text-emerald-400">
-                    {localRemnants}
+                    {remnantInventoryCache}
                   </span>
                 </li>
                 <li className="flex justify-between gap-3 rounded-lg bg-slate-950/70 px-3 py-2">
-                  <span>Loaded catalog / remnants</span>
-                  <span className="font-mono text-slate-200">
-                    {catalogCount} / {remnantCount}
-                  </span>
+                  <span>Pending Queue</span>
+                  <span className="font-mono text-amber-300">{pending}</span>
                 </li>
               </ul>
+              {cacheMsg ? (
+                <p className="mt-2 text-center text-xs font-semibold text-emerald-300">
+                  {cacheMsg}
+                </p>
+              ) : null}
             </div>
           </div>
         ) : null}

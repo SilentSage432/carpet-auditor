@@ -94,7 +94,7 @@ supabase/migrations/20260811_alphanumeric_aisle.sql → store_locations.aisle IN
    - CSV: SUMMARY (counts/locations) + RAW DETAIL audit trail
    - Continuous mode: barcode detect → immediate `POST /api/appliances/scans`; session total counter; new items pause on Quick-Add then auto-log
    - APIs: `/api/appliances/catalog`, `/api/appliances/scans` (`GET|POST|PATCH|DELETE`)
-3. **Universal / Appliance Catalog** — flooring = `carpet_catalog`; appliances tab = `appliance_catalog`
+3. **Universal / Appliance Catalog** — removed from bottom nav; SKU linking remains via Quick-Add / scan flows (`carpet_catalog` / `appliance_catalog`). `/catalog` redirects to `/appliances`.
 4. **Remnant Rack** — back-room remnant status + manager markdown
 5. **Master / Profile Settings** — store selector (Master Admin), queue, Supabase + localStorage
 

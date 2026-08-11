@@ -6,8 +6,6 @@ import { ChangePinModal } from "@/components/hub/ChangePinModal";
 import { BottomNavBar, AssociateSpecialtySwitcher } from "@/components/hub/HubChrome";
 import { NavigationHub } from "@/components/hub/NavigationHub";
 import { SpecialistModal } from "@/components/hub/SpecialistModal";
-import { CatalogSection } from "@/components/sections/CatalogSection";
-import { ApplianceCatalogSection } from "@/components/sections/ApplianceCatalogSection";
 import { CycleAuditSection } from "@/components/sections/CycleAuditSection";
 import { ApplianceAuditSection } from "@/components/sections/ApplianceAuditSection";
 import { RemnantSection } from "@/components/sections/RemnantSection";
@@ -28,7 +26,6 @@ import { fetchCatalog } from "@/lib/catalog";
 import { fetchRemnants } from "@/lib/remnants";
 import {
   canAccessSection,
-  catalogDomainForMember,
   defaultSectionForMember,
   effectiveDepartment,
   isAssociate,
@@ -51,6 +48,22 @@ import type {
   StoreSpecialist,
 } from "@/lib/types";
 
+const HUB_SECTION_IDS: HubSection[] = [
+  "audit",
+  "appliances",
+  "remnants",
+  "department",
+  "settings",
+];
+
+function parseHubSectionParam(raw: string | null): HubSection | null {
+  if (!raw) return null;
+  if (raw === "catalog") return "appliances";
+  if ((HUB_SECTION_IDS as string[]).includes(raw)) {
+    return raw as HubSection;
+  }
+  return null;
+}
 type Gate = "booting" | AuthWallMode | "ready";
 
 export default function DeptSyncHubPage() {
@@ -74,7 +87,17 @@ export default function DeptSyncHubPage() {
 
   const unlockWorkspace = useCallback((member: StoreSpecialist) => {
     setSpecialist(member);
-    setSection(defaultSectionForMember(member));
+    const fromQuery =
+      typeof window !== "undefined"
+        ? parseHubSectionParam(
+            new URLSearchParams(window.location.search).get("section")
+          )
+        : null;
+    const next =
+      fromQuery && canAccessSection(member, fromQuery)
+        ? fromQuery
+        : defaultSectionForMember(member);
+    setSection(next === "catalog" ? "appliances" : next);
     if (needsCredentialSetup(member) || member.must_change_credentials) {
       setGate("setup");
       return;
@@ -276,20 +299,29 @@ export default function DeptSyncHubPage() {
   }
 
   function handleSectionSelect(next: HubSection) {
+    if (next === "catalog") {
+      next = "appliances";
+    }
     if (!canAccessSection(specialist, next)) return;
     blurActiveInput();
     touchAuthSession();
     setSection(next);
+    if (typeof window !== "undefined") {
+      const url = new URL(window.location.href);
+      url.searchParams.set("section", next);
+      window.history.replaceState({}, "", url.pathname + url.search);
+    }
   }
 
-  const catalogDomain = catalogDomainForMember(specialist);
   const dept = effectiveDepartment(specialist);
   const authenticated = gate === "ready" && specialist != null;
   const associateSession = isAssociate(specialist);
   const activeSection =
-    associateSession && section === "settings"
-      ? defaultSectionForMember(specialist)
-      : section;
+    section === "catalog"
+      ? "appliances"
+      : associateSession && section === "settings"
+        ? defaultSectionForMember(specialist)
+        : section;
 
   // Zero-access wall — hide all workspace chrome until auth succeeds.
   if (gate === "booting" || !rosterReady) {
@@ -391,22 +423,6 @@ export default function DeptSyncHubPage() {
                 specialists={specialists}
                 activeSpecialist={specialist}
               />
-            )}
-            {activeSection === "catalog" && canAccessSection(specialist, "catalog") && (
-              catalogDomain === "appliances" ? (
-                <ApplianceCatalogSection
-                  catalog={applianceCatalog}
-                  onCatalogChange={setApplianceCatalog}
-                />
-              ) : (
-                <CatalogSection
-                  catalog={catalog}
-                  onCatalogChange={setCatalog}
-                  domainFilter={
-                    catalogDomain === "all" ? "flooring" : catalogDomain
-                  }
-                />
-              )
             )}
             {activeSection === "remnants" &&
               canAccessSection(specialist, "remnants") && (

@@ -18,7 +18,7 @@ const TABLE = "store_specialists";
 
 export const DEFAULT_SUPERVISOR_PIN = "1234";
 export const DEFAULT_APPLIANCE_USERNAME = "amber_appliance";
-/** Historical Amber seed PIN — used only for seed + first-login detection. */
+/** Legacy Amber password — blocked on credential customize, not used for seeding. */
 export const DEFAULT_APPLIANCE_PASSWORD = "ChangeMe123";
 
 const PLACEHOLDER_NAMES = new Set([
@@ -29,54 +29,6 @@ const PLACEHOLDER_NAMES = new Set([
   "specialist 1",
   "specialist 2",
 ]);
-
-function flooringSupervisorSeed(store = getStoreNumber()): StoreSpecialist {
-  return {
-    id: `seed-supervisor-flooring-${store}`,
-    store_number: store,
-    name: "Flooring Supervisor",
-    role: "Supervisor",
-    pin_code: DEFAULT_SUPERVISOR_PIN,
-    username: "flooring_supervisor",
-    assigned_department: "flooring",
-    must_change_credentials: false,
-    is_active: true,
-    created_at: new Date(0).toISOString(),
-    offline: true,
-  };
-}
-
-function applianceSupervisorSeed(store = getStoreNumber()): StoreSpecialist {
-  return {
-    id: `seed-supervisor-appliances-${store}`,
-    store_number: store,
-    name: "Amber",
-    role: "Supervisor",
-    pin_code: DEFAULT_APPLIANCE_PASSWORD,
-    username: DEFAULT_APPLIANCE_USERNAME,
-    assigned_department: "appliances",
-    must_change_credentials: true,
-    is_active: true,
-    created_at: new Date(0).toISOString(),
-    offline: true,
-  };
-}
-
-function masterAdminSeed(store = getStoreNumber()): StoreSpecialist {
-  return {
-    id: `seed-master-admin-${store}`,
-    store_number: store,
-    name: "Master Admin",
-    role: "MasterAdmin",
-    pin_code: DEFAULT_SUPERVISOR_PIN,
-    username: "master_admin",
-    assigned_department: "all",
-    must_change_credentials: false,
-    is_active: true,
-    created_at: new Date(0).toISOString(),
-    offline: true,
-  };
-}
 
 function normalizeRole(raw: unknown): SpecialistRole {
   const value = String(raw ?? "").toLowerCase().trim();
@@ -209,11 +161,19 @@ function isPlaceholder(member: StoreSpecialist): boolean {
   return false;
 }
 
+/** Drop legacy offline seed profiles (seed-master-admin-*, Amber, etc.). */
+function isHardcodedSeedProfile(member: StoreSpecialist): boolean {
+  const id = String(member.id ?? "").toLowerCase();
+  if (id.startsWith("seed-")) return true;
+  if (id.startsWith("default-")) return true;
+  return false;
+}
+
 function preferSpecialist(a: StoreSpecialist, b: StoreSpecialist): StoreSpecialist {
   if (a.offline && !b.offline) return b;
   if (!a.offline && b.offline) return a;
-  const aSeed = a.id.startsWith("seed-");
-  const bSeed = b.id.startsWith("seed-");
+  const aSeed = isHardcodedSeedProfile(a);
+  const bSeed = isHardcodedSeedProfile(b);
   if (aSeed && !bSeed) return b;
   if (!aSeed && bSeed) return a;
   const aCustom = a.pin_code && a.pin_code !== DEFAULT_SUPERVISOR_PIN;
@@ -290,42 +250,18 @@ export function dedupeRoster(roster: StoreSpecialist[]): StoreSpecialist[] {
   });
 }
 
-function ensureRosterSeeds(
+/**
+ * Normalize a store roster from DB + local cache.
+ * Does NOT inject hardcoded Master Admin / Amber / Flooring Supervisor seeds.
+ */
+function normalizeStoreRoster(
   roster: StoreSpecialist[],
   store = getStoreNumber()
 ): StoreSpecialist[] {
   const scoped = roster.filter((m) => m.store_number === store);
-  const cleaned = dedupeRoster(scoped);
-
-  // Count inactive tombstones too — otherwise deleting Amber re-seeds her.
-  const hasMaster = cleaned.some((m) => m.role === "MasterAdmin");
-  const hasFlooringSup = cleaned.some(
-    (m) =>
-      m.role === "Supervisor" &&
-      (m.assigned_department === "flooring" ||
-        (!m.assigned_department && !/appliance|amber/i.test(m.name)))
+  return dedupeRoster(
+    scoped.filter((m) => !isPlaceholder(m) && !isHardcodedSeedProfile(m))
   );
-  const hasApplianceSup = cleaned.some(
-    (m) =>
-      m.role === "Supervisor" &&
-      (m.assigned_department === "appliances" ||
-        /appliance|amber/i.test(m.name + " " + (m.username ?? "")))
-  );
-
-  const seeds: StoreSpecialist[] = [];
-  if (!hasMaster) seeds.push(masterAdminSeed(store));
-  if (!hasFlooringSup) seeds.push(flooringSupervisorSeed(store));
-  if (!hasApplianceSup) seeds.push(applianceSupervisorSeed(store));
-
-  if (cleaned.length === 0 && seeds.length === 0) {
-    return [
-      masterAdminSeed(store),
-      flooringSupervisorSeed(store),
-      applianceSupervisorSeed(store),
-    ];
-  }
-
-  return dedupeRoster([...seeds, ...cleaned]);
 }
 
 /** Active roster only — deactivated profiles stay in storage as tombstones. */
@@ -366,18 +302,9 @@ export function isDefaultPin(member: StoreSpecialist): boolean {
   return false;
 }
 
-/** True when first-login credential customization is required. */
+/** True when first-login credential customization is required (DB flag only). */
 export function needsCredentialSetup(member: StoreSpecialist): boolean {
-  if (member.must_change_credentials) return true;
-  if (member.must_change_pin) return true;
-  if (
-    member.role === "Supervisor" &&
-    member.username === DEFAULT_APPLIANCE_USERNAME &&
-    member.pin_code === DEFAULT_APPLIANCE_PASSWORD
-  ) {
-    return true;
-  }
-  return false;
+  return Boolean(member.must_change_credentials || member.must_change_pin);
 }
 
 const PIN_REMIND_PREFIX = "carpet_pin_remind_later_";
@@ -416,15 +343,17 @@ function writeAllLocal(records: StoreSpecialist[]): void {
 }
 
 function readLocal(store = getStoreNumber()): StoreSpecialist[] {
-  return ensureRosterSeeds(
+  return normalizeStoreRoster(
     readAllLocal().filter((r) => r.store_number === store),
     store
   );
 }
 
 function writeLocal(records: StoreSpecialist[], store = getStoreNumber()): void {
-  const others = readAllLocal().filter((r) => r.store_number !== store);
-  const scoped = ensureRosterSeeds(records, store);
+  const others = readAllLocal().filter(
+    (r) => r.store_number !== store && !isHardcodedSeedProfile(r)
+  );
+  const scoped = normalizeStoreRoster(records, store);
   writeAllLocal([...others, ...scoped]);
 }
 
@@ -441,7 +370,7 @@ function upsertLocal(record: StoreSpecialist): StoreSpecialist[] {
     }
     return true;
   });
-  const next = ensureRosterSeeds([record, ...existing], store);
+  const next = normalizeStoreRoster([record, ...existing], store);
   writeLocal(next, store);
   return next;
 }
@@ -642,6 +571,7 @@ export function isFallbackProfileId(id: string): boolean {
 
 export async function fetchSpecialists(): Promise<StoreSpecialist[]> {
   const store = getStoreNumber();
+  // Drop legacy hardcoded offline seeds from localStorage on every load.
   const local = readLocal(store);
   writeLocal(local, store);
 
@@ -661,7 +591,7 @@ export async function fetchSpecialists(): Promise<StoreSpecialist[]> {
 
     const remote = (data ?? [])
       .map((row) => mapRow({ ...(row as Record<string, unknown>), offline: false }))
-      .filter((m) => !isPlaceholder(m));
+      .filter((m) => !isPlaceholder(m) && !isHardcodedSeedProfile(m));
 
     const remoteIds = new Set(remote.map((r) => String(r.id)));
     const remoteNames = new Set(remote.map((r) => r.name.toLowerCase()));
@@ -670,11 +600,15 @@ export async function fetchSpecialists(): Promise<StoreSpecialist[]> {
         r.offline &&
         !remoteIds.has(String(r.id)) &&
         !remoteNames.has(r.name.toLowerCase()) &&
-        !isPlaceholder(r)
+        !isPlaceholder(r) &&
+        !isHardcodedSeedProfile(r)
     );
 
-    // Keep inactive remote + local tombstones so ensureRosterSeeds does not revive them.
-    const merged = ensureRosterSeeds([...offlineOnly, ...remote, ...local], store);
+    // Prefer database roster; keep inactive remote rows as tombstones.
+    const merged = normalizeStoreRoster(
+      [...offlineOnly, ...remote],
+      store
+    );
     writeLocal(merged, store);
     return activeSpecialistsOnly(merged);
   } catch {
@@ -1266,7 +1200,21 @@ function deactivateLocal(
   member: StoreSpecialist,
   store = getStoreNumber()
 ): StoreSpecialist[] {
-  const scoped = readAllLocal().filter((r) => r.store_number === store);
+  const scoped = readAllLocal().filter(
+    (r) => r.store_number === store && !isHardcodedSeedProfile(r)
+  );
+
+  // Hardcoded seed / fallback IDs: purge entirely (do not keep as tombstone).
+  if (isHardcodedSeedProfile(member) || isFallbackProfileId(member.id)) {
+    const next = scoped.filter((r) => !sameSpecialistIdentity(r, member));
+    const normalized = normalizeStoreRoster(next, store);
+    const others = readAllLocal().filter(
+      (r) => r.store_number !== store && !isHardcodedSeedProfile(r)
+    );
+    writeAllLocal([...others, ...normalized]);
+    return normalized;
+  }
+
   let found = false;
   const next = scoped.map((r) => {
     if (sameSpecialistIdentity(r, member)) {
@@ -1283,10 +1231,12 @@ function deactivateLocal(
       offline: true,
     });
   }
-  const seeded = ensureRosterSeeds(next, store);
-  const others = readAllLocal().filter((r) => r.store_number !== store);
-  writeAllLocal([...others, ...seeded]);
-  return seeded;
+  const normalized = normalizeStoreRoster(next, store);
+  const others = readAllLocal().filter(
+    (r) => r.store_number !== store && !isHardcodedSeedProfile(r)
+  );
+  writeAllLocal([...others, ...normalized]);
+  return normalized;
 }
 
 /**

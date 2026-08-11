@@ -61,6 +61,8 @@
 - [x] Appliance scan log SKU aggregation, category filter / search, in-line editor, summary+detail CSV
 - [x] Alphanumeric aisle codes (TEXT) + batch CSV aisle parser + Bulk Generator text input
 - [x] Appliance scan log category accordion summary with search-to-expand + 10/page SKU pagination
+- [x] Remove Catalog bottom-nav tab; `/catalog` → `/appliances` redirect
+- [x] Roster without hardcoded seed accounts; temp-credentials badge from DB flags only
 
 ## Next
 - [ ] JWT / claim-based RLS enforcing `store_number` (+ department) server-side

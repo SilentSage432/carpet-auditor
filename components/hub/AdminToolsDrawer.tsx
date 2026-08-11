@@ -20,13 +20,14 @@ import { WeeklyBayTargetCard } from "@/components/hub/WeeklyBayTargetCard";
 import { selectOnFocus } from "@/lib/number-input";
 import { isMasterAdmin } from "@/lib/rbac";
 import { fetchDepartments } from "@/lib/store-ops/client";
+import { usePendingSyncCount } from "@/lib/network";
 import {
   formatStoreLabel,
   getStoreNumber,
   normalizeStoreNumber,
   setStoreNumber,
 } from "@/lib/store";
-import { countPendingSync, flushSyncQueue } from "@/lib/sync-queue";
+import { flushSyncQueue } from "@/lib/sync-queue";
 import { getSupabase, isSupabaseConfigured } from "@/lib/supabase";
 import type { Department } from "@/lib/store-ops/types";
 import type { StoreSpecialist } from "@/lib/types";
@@ -354,10 +355,14 @@ function DiagnosticsPanel({ storeNumber }: { storeNumber: string }) {
   const [syncing, setSyncing] = useState(false);
   const configured = isSupabaseConfigured();
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
-  const pending = countPendingSync(storeNumber);
+  const pending = usePendingSyncCount(storeNumber);
 
   async function testConnection() {
     setPing("checking");
+    if (!navigator.onLine) {
+      setPing("fail");
+      return;
+    }
     const client = getSupabase();
     if (!client) {
       setPing("fail");
@@ -365,10 +370,8 @@ function DiagnosticsPanel({ storeNumber }: { storeNumber: string }) {
     }
     try {
       const { error } = await client
-        .from("carpet_audits")
-        .select("id")
-        .eq("store_number", storeNumber)
-        .limit(1);
+        .from("appliance_scans")
+        .select("count", { count: "exact", head: true });
       setPing(error ? "fail" : "ok");
     } catch {
       setPing("fail");
@@ -420,19 +423,42 @@ function DiagnosticsPanel({ storeNumber }: { storeNumber: string }) {
             {url}
           </p>
         ) : null}
+        <div className="mt-2 flex items-center gap-2">
+          <span
+            className={`inline-block h-2.5 w-2.5 shrink-0 rounded-full ${
+              ping === "ok"
+                ? "bg-emerald-400"
+                : ping === "fail"
+                  ? "bg-red-400"
+                  : "bg-slate-600"
+            }`}
+            aria-hidden
+          />
+          <p
+            className={`text-sm font-semibold ${
+              ping === "ok"
+                ? "text-emerald-300"
+                : ping === "fail"
+                  ? "text-red-300"
+                  : "text-slate-300"
+            }`}
+          >
+            {ping === "checking"
+              ? "Checking…"
+              : ping === "ok"
+                ? "Connected (Database Live)"
+                : ping === "fail"
+                  ? "Offline / Unreachable"
+                  : "Not tested yet"}
+          </p>
+        </div>
         <button
           type="button"
           onClick={() => void testConnection()}
           disabled={!configured || ping === "checking"}
           className="mt-3 min-h-12 w-full rounded-xl border border-slate-700 bg-slate-950 text-sm font-semibold text-slate-100 disabled:opacity-40"
         >
-          {ping === "checking"
-            ? "Checking…"
-            : ping === "ok"
-              ? "Connection OK"
-              : ping === "fail"
-                ? "Connection failed — retry"
-                : "Test connection"}
+          {ping === "checking" ? "Checking…" : "Test Connection"}
         </button>
       </div>
     </section>

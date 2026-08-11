@@ -1,5 +1,30 @@
 # DeptSync Hub — Development Journal
 
+## 2026-08-11 — Roster: no hardcoded seeds + DB-driven temp credentials
+
+### Fixed
+- Removed auto-injection of Master Admin / Flooring Supervisor / Amber seed profiles (`ensureRosterSeeds`); roster renders `store_specialists` from Supabase (+ offline-only real profiles).
+- Legacy `seed-*` local rows are purged on fetch; **Delete User** removes unwanted profiles without revival.
+- "Temporary Credentials Active" badge uses only `must_change_credentials` / `must_change_pin` flags.
+
+## 2026-08-11 — Settings connection test + operational cache UI
+
+### Fixed / Shipped
+- Test Connection probes `appliance_scans` head count; shows **Connected (Database Live)** (green) or **Offline / Unreachable** (red).
+- Local storage panel lists Appliance Audit Cache · Remnant Inventory Cache · Pending Queue only (catalog cache removed) with one-tap **Clear Local Cache**.
+
+## 2026-08-11 — Offline sync queue counter reset
+
+### Fixed
+- `flushSyncQueue` drops successful actions and rewrites localStorage; when a store has zero remaining items it re-notifies UI subscribers.
+- Header badge + Settings/Admin pending counts use reactive `usePendingSyncCount` / `useNetworkBadge` listeners on `carpet-sync-queue-changed` so the toast and `0 queued` update together.
+
+## 2026-08-11 — Remove Catalog bottom-nav tab
+
+### Shipped
+- Catalog removed from Master Admin bottom nav; 4-up grid: Flooring · Appliances · Remnants · Master.
+- `/catalog` redirects to `/appliances` → `/?section=appliances`. Catalog section UI no longer mounted in the hub.
+
 ## 2026-08-11 — Appliance scan log category accordion + pagination
 
 ### Shipped

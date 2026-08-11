@@ -14,8 +14,8 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 ## RBAC (`lib/rbac.ts` + `lib/specialists.ts`)
 | Role | Scope | Tabs |
 |------|-------|------|
-| 👑 Master Admin | `assigned_department: all` | Flooring Audit · Appliances · Universal Catalog · Remnants · Master Settings |
-| 🛡️ Department Supervisor | e.g. Amber → `appliances`, Dave → `plumbing` | Dept audit/catalog/profile (flooring also gets Remnants) |
+| 👑 Master Admin | `assigned_department: all` | Flooring · Appliances · Remnants · Master |
+| 🛡️ Department Supervisor | e.g. Amber → `appliances`, Dave → `plumbing` | Dept audit / profile (flooring also gets Remnants) |
 | 👤 Floor Associate | inherits / assigned dept | Checklist · Barriers · Specialty Tools · Profile (no Admin Tools) |
 
 ### Master Admin roster console
@@ -33,7 +33,7 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 ### Departments
 `flooring` · `appliances` · `plumbing` · `electrical` · `lawn_garden` · `paint` · `millwork` · `building_materials` · `hardware` · `all`
 
-- Seeds: Master Admin (`master_admin` / `1234`), Flooring Supervisor (`flooring_supervisor` / `1234`), Amber appliances (`amber_appliance` / `ChangeMe123`, `must_change_credentials: true`)
+- Seeds: none auto-injected. Create Master / Supervisor profiles via invite / Add Supervisor; temporary PIN sets `must_change_credentials: true` until first-login change
 - First-login: non-dismissible AuthWall setup when `must_change_credentials` (no Remind Later)
 
 ## Authentication (Zero-Access Wall)
@@ -44,7 +44,7 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 - `must_change_credentials` → non-dismissible permanent credential setup
 - Session: `deptsync_auth_session` (`specialist`, `sessionToken`, `lastActiveTimestamp`); 8h idle lock
 - Returning unlock: quick 4-digit PIN, password, or fingerprint; header 🔒 logs out
-- Seeds: `master_admin` / `1234`, `flooring_supervisor` / `1234`, `amber_appliance` / `ChangeMe123` (must change)
+- Seeds: no hardcoded roster injection — use Invite / Add Supervisor; temp PIN sets `must_change_credentials`
 - Primary: fixed bottom tabs — **filtered by role/department**
 - Header: DeptSync Hub brand + `DeptSync · Lowe's #…` subtitle · section title · network; specialist chip + PIN gear
 - Cycle Audit / Appliances: hardware-scan ready without soft keyboard; sticky Log docked above bottom nav

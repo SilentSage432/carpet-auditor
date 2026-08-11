@@ -1,5 +1,5 @@
 /**
- * Inventory Hub chrome — bottom section tabs for audits/catalog/remnants.
+ * Inventory Hub chrome — bottom section tabs (Flooring / Appliances / Remnants / Master).
  * Cross-app Navigation Hub header lives in `NavigationHub.tsx`.
  * `HubHeader` kept as a thin alias for any legacy imports.
  */
@@ -33,7 +33,7 @@ export function HubHeader({
   onLogout,
   storeNumber,
 }: HubHeaderProps) {
-  const network = useNetworkBadge();
+  const network = useNetworkBadge(storeNumber);
   const title = sectionTitle(section, specialist);
 
   return (
@@ -166,12 +166,15 @@ export function BottomNavBar({
   specialist,
 }: BottomNavBarProps) {
   const tabs = visibleNavTabs(specialist);
+  // Master Admin: Flooring · Appliances · Remnants · Master (even 4-up).
   const cols =
     tabs.length <= 3
       ? "grid-cols-3"
       : tabs.length === 4
         ? "grid-cols-4"
-        : "grid-cols-5";
+        : tabs.length === 5
+          ? "grid-cols-5"
+          : "grid-cols-4";
 
   return (
     <nav
