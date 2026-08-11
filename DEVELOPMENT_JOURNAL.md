@@ -1,5 +1,11 @@
 # DeptSync Hub — Development Journal
 
+## 2026-08-11 — Emergency unlock: update-only (no username insert clash)
+
+### Fixed
+- `POST /api/auth/emergency-unlock` never `.insert()`s; finds existing `store_specialists` by username (`master_admin`) / name / MasterAdmin role and `.update()`s unlock flags only.
+- Preserves existing username to avoid `store_specialist_username_key`; on miss or update failure still returns a local Master Admin specialist so `MASTER-2026-TEMP` authenticates immediately.
+
 ## 2026-08-11 — Emergency admin bypass + phone OTP recovery
 
 ### Shipped

@@ -75,7 +75,7 @@ supabase/migrations/20260811_alphanumeric_aisle.sql → store_locations.aisle IN
 | SIMS location stock | `lib/sims.ts`, `SimsLocationFinder` |
 | Specialists session / credentials | `lib/specialists.ts`, `SpecialistModal` |
 | Zero-access auth wall / idle lock | `lib/auth-session.ts`, `components/auth/AuthWall.tsx` |
-| Emergency master unlock | `lib/emergency-access.ts`, `POST /api/auth/emergency-unlock` |
+| Emergency master unlock | `lib/emergency-access.ts`, `POST /api/auth/emergency-unlock` (update-only; local session fallback) |
 | Phone SMS OTP recovery | `lib/phone-auth.ts`, `lib/phone.ts`, `POST /api/auth/phone-reset/*` |
 | Biometric / WebAuthn unlock | `lib/biometric-auth.ts`, `AuthWall` |
 | PIN change / default notice | `ChangePinModal` |

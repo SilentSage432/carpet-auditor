@@ -39,7 +39,7 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 ## Authentication (Zero-Access Wall)
 - Unauthenticated visitors never see workspace tabs/data — `AuthWall` only
 - Login: username + password/PIN → roster match (`findSpecialistByLogin`)
-- **Emergency unlock:** enter `MASTER-2026-TEMP` → `POST /api/auth/emergency-unlock` promotes/creates `MasterAdmin` (`role`, `is_active: true`, clears invite/temp flags) and starts a persistent session
+- **Emergency unlock:** enter `MASTER-2026-TEMP` → immediate local Master Admin session; `POST /api/auth/emergency-unlock` **updates only** the existing roster row (by username/name/role — never insert) and clears temp/lock flags
 - **Phone recovery:** "Forgot Access Code? Reset via Phone" → roster phone lookup → `supabase.auth.signInWithOtp({ phone })` → 6-digit verify → reset `pin_code` via `/api/auth/phone-reset/confirm`
 - Setup requires verified mobile (`phone_number` on `store_specialists`)
 - Native keychain: form `autocomplete` username / current-password

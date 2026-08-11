@@ -151,6 +151,7 @@ function LoginForm({
 
   async function tryEmergencyUnlock(code: string): Promise<boolean> {
     if (!isEmergencyMasterCode(code)) return false;
+    // Immediate local Master Admin session — no secondary PIN / insert gate.
     const result = await requestEmergencyAdminUnlock({
       code,
       storeNumber: getStoreNumber(),
@@ -807,6 +808,7 @@ function UnlockForm({
     setBusy(true);
     setError(null);
     try {
+      // Immediate local Master Admin session — bypass PIN + never require insert.
       const result = await requestEmergencyAdminUnlock({
         code,
         storeNumber: getStoreNumber() || member.store_number,
