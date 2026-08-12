@@ -12,10 +12,6 @@ import {
   registerBiometricCredential,
 } from "@/lib/biometric-auth";
 import {
-  isEmergencyMasterCode,
-  requestEmergencyAdminUnlock,
-} from "@/lib/emergency-access";
-import {
   resetAccessViaVerifiedPhone,
   sendPhoneAccessOtp,
   verifyPhoneAccessOtp,
@@ -153,28 +149,10 @@ function LoginForm({
     onAuthenticated(member);
   }
 
-  async function tryEmergencyUnlock(code: string): Promise<boolean> {
-    if (!isEmergencyMasterCode(code)) return false;
-    // Immediate local Master Admin session — no secondary PIN / insert gate.
-    const result = await requestEmergencyAdminUnlock({
-      code,
-      storeNumber: getStoreNumber(),
-    });
-    if (!result.ok) {
-      setError(result.error);
-      return true;
-    }
-    await finishLogin(result.specialist);
-    return true;
-  }
-
   async function handleLogin() {
     setBusy(true);
     setError(null);
     try {
-      const emergencyCandidate = password.trim() || username.trim();
-      if (await tryEmergencyUnlock(emergencyCandidate)) return;
-
       const match = findSpecialistByLogin(roster, username, password);
       if (!match) {
         setError("Invalid username or password");
@@ -316,12 +294,7 @@ function LoginForm({
       ) : null}
       <button
         type="submit"
-        disabled={
-          busy ||
-          (!password.trim() && !username.trim()) ||
-          (!isEmergencyMasterCode(password.trim() || username.trim()) &&
-            (!username.trim() || !password.trim()))
-        }
+        disabled={busy || !username.trim() || !password.trim()}
         className="btn-primary-glow flex min-h-[44px] w-full items-center justify-center rounded-xl text-sm disabled:opacity-40"
       >
         {busy ? "Signing in…" : "Log In"}
@@ -807,35 +780,12 @@ function UnlockForm({
     window.setTimeout(() => setShake(false), 450);
   }
 
-  async function tryEmergencyUnlock(code: string): Promise<boolean> {
-    if (!isEmergencyMasterCode(code)) return false;
-    setBusy(true);
-    setError(null);
-    try {
-      // Immediate local Master Admin session — bypass PIN + never require insert.
-      const result = await requestEmergencyAdminUnlock({
-        code,
-        storeNumber: getStoreNumber() || member.store_number,
-      });
-      if (!result.ok) {
-        fail(result.error);
-        return true;
-      }
-      setSecret("");
-      onAuthenticated(result.specialist);
-      return true;
-    } finally {
-      setBusy(false);
-    }
-  }
-
   async function submit(attempt?: string) {
     const value = (attempt ?? secret).trim();
     if (!value) {
       setError(pinMode ? "Enter PIN" : "Enter password");
       return;
     }
-    if (await tryEmergencyUnlock(value)) return;
     if (verifyPin(member, value)) {
       setSecret("");
       setError(null);

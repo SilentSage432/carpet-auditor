@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import {
   isDeptFloorActor,
-  parseStoreOpsActor,
+  resolveStoreOpsActor,
   requireStoreOpsActor,
   StoreOpsAuthError,
 } from "@/lib/store-ops/auth";
@@ -20,7 +20,7 @@ const ROTATION_SELECT =
  */
 export async function GET(request: Request) {
   try {
-    const actor = requireStoreOpsActor(parseStoreOpsActor(request));
+    const actor = requireStoreOpsActor(await resolveStoreOpsActor(request));
     const supabase = getSupabaseAdmin();
     if (!supabase) {
       return NextResponse.json(

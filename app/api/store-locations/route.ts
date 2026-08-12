@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import {
   isDeptFloorActor,
-  parseStoreOpsActor,
+  resolveStoreOpsActor,
   requireStoreOpsActor,
   requireSuperAdmin,
   requireSupervisorOrAdmin,
@@ -14,7 +14,7 @@ import { supabaseAdminMissingMessage } from "@/lib/supabase/env";
 
 export async function GET(request: Request) {
   try {
-    const actor = requireStoreOpsActor(parseStoreOpsActor(request));
+    const actor = requireStoreOpsActor(await resolveStoreOpsActor(request));
     const supabase = getSupabaseAdmin();
     if (!supabase) {
       return NextResponse.json(
@@ -83,7 +83,7 @@ export async function GET(request: Request) {
 export async function PATCH(request: Request) {
   try {
     // Associates mark bays via /api/rotations/complete — not location admin PATCH.
-    const actor = requireSupervisorOrAdmin(parseStoreOpsActor(request));
+    const actor = requireSupervisorOrAdmin(await resolveStoreOpsActor(request));
     const supabase = getSupabaseAdmin();
     if (!supabase) {
       return NextResponse.json(

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { normalizeAisle } from "@/lib/store-ops/aisle";
 import {
-  parseStoreOpsActor,
+  resolveStoreOpsActor,
   requireSuperAdmin,
   StoreOpsAuthError,
 } from "@/lib/store-ops/auth";
@@ -14,7 +14,7 @@ import { supabaseAdminMissingMessage } from "@/lib/supabase/env";
 
 export async function POST(request: Request) {
   try {
-    const actor = requireSuperAdmin(parseStoreOpsActor(request));
+    const actor = requireSuperAdmin(await resolveStoreOpsActor(request));
     const supabase = getSupabaseAdmin();
     if (!supabase) {
       return NextResponse.json(

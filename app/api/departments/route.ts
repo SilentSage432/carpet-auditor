@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import {
   isDeptFloorActor,
-  parseStoreOpsActor,
+  resolveStoreOpsActor,
   requireStoreOpsActor,
   requireSuperAdmin,
   requireSupervisorOrAdmin,
@@ -17,7 +17,7 @@ import {
 
 export async function GET(request: Request) {
   try {
-    const actor = requireStoreOpsActor(parseStoreOpsActor(request));
+    const actor = requireStoreOpsActor(await resolveStoreOpsActor(request));
     const { supabase, response } = requireSupabaseAdmin();
     if (!supabase) return response;
 
@@ -70,7 +70,7 @@ export async function GET(request: Request) {
  */
 export async function PATCH(request: Request) {
   try {
-    const actor = requireSupervisorOrAdmin(parseStoreOpsActor(request));
+    const actor = requireSupervisorOrAdmin(await resolveStoreOpsActor(request));
     const { supabase, response } = requireSupabaseAdmin();
     if (!supabase) return response;
 

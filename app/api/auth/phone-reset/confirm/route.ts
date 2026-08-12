@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { normalizePhoneE164, phonesMatch } from "@/lib/phone";
 import { mapRow } from "@/lib/specialists";
+import { linkAuthUserToSpecialistProfile } from "@/lib/store-ops/link-auth-profile";
 import { requireSupabaseAdmin } from "@/lib/supabase/admin-response";
 import type { StoreSpecialist } from "@/lib/types";
 
@@ -13,7 +14,8 @@ type Body = {
 /**
  * POST /api/auth/phone-reset/confirm
  * Requires Bearer access token from supabase.auth.verifyOtp (SMS).
- * Resets store_specialists pin/username for the phone-matched active profile.
+ * Resets store_specialists pin/username for the phone-matched active profile
+ * and links auth.users.id → public.profiles (+ JWT app_metadata claims).
  */
 export async function POST(request: Request) {
   try {
@@ -117,6 +119,25 @@ export async function POST(request: Request) {
     }
 
     const specialist = mapRow(updated as Record<string, unknown>) as StoreSpecialist;
+
+    try {
+      await linkAuthUserToSpecialistProfile(supabase, {
+        authUserId: userData.user.id,
+        email: userData.user.email,
+        specialist,
+      });
+    } catch (linkErr) {
+      return NextResponse.json(
+        {
+          error:
+            linkErr instanceof Error
+              ? linkErr.message
+              : "Credentials reset but Auth profile link failed",
+        },
+        { status: 500 }
+      );
+    }
+
     return NextResponse.json({ ok: true, specialist });
   } catch (err) {
     return NextResponse.json(

@@ -79,11 +79,11 @@ export async function upsertPushSubscription(
 export async function deletePushSubscription(
   supabase: SupabaseClient,
   endpoint: string,
-  specialistId?: string | null
+  userId?: string | null
 ): Promise<void> {
   let query = supabase.from("push_subscriptions").delete().eq("endpoint", endpoint);
-  if (specialistId) {
-    query = query.eq("specialist_id", specialistId);
+  if (userId) {
+    query = query.eq("user_id", userId);
   }
   const { error } = await query;
   if (error) throw new Error(error.message);

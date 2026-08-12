@@ -6,7 +6,7 @@ import {
 } from "@/lib/ai/gemini";
 import {
   isDeptFloorActor,
-  parseStoreOpsActor,
+  resolveStoreOpsActor,
   requireStoreOpsActor,
   StoreOpsAuthError,
 } from "@/lib/store-ops/auth";
@@ -32,7 +32,7 @@ import { supabaseAdminMissingMessage } from "@/lib/supabase/env";
  */
 export async function POST(request: Request) {
   try {
-    const actor = requireStoreOpsActor(parseStoreOpsActor(request));
+    const actor = requireStoreOpsActor(await resolveStoreOpsActor(request));
     const supabase = getSupabaseAdmin();
     if (!supabase) {
       return NextResponse.json(

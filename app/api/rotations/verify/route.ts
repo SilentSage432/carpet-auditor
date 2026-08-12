@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import {
   isDeptFloorActor,
-  parseStoreOpsActor,
+  resolveStoreOpsActor,
   requireStoreOpsActor,
   StoreOpsAuthError,
 } from "@/lib/store-ops/auth";
@@ -18,7 +18,7 @@ import type { ExceptionReason } from "@/lib/store-ops/types";
  */
 export async function POST(request: Request) {
   try {
-    const actor = requireStoreOpsActor(parseStoreOpsActor(request));
+    const actor = requireStoreOpsActor(await resolveStoreOpsActor(request));
     const { supabase, response } = requireSupabaseAdmin();
     if (!supabase) return response;
 

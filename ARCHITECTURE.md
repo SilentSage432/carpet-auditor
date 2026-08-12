@@ -35,10 +35,10 @@ components/hub/AdminDepartmentSwitcher.tsx → Master Admin working-dept pin
 components/admin/SundayAuditStagingCard.tsx → Glowing pending Sunday Flooring audit CTA
 components/admin/SundayAuditAssignmentModal.tsx → Assign Flooring specialists to staged bays
 lib/admin-department-context.ts       → Master Admin working department pin (local)
-lib/store-ops/sunday-audit.ts         → Sunday Flooring staging + assignment overlay
+lib/store-ops/sunday-audit.ts         → Sunday Flooring staging + Supabase sunday_bay_assignments
+lib/store-ops/manager-notes.ts        → Manager notes Supabase CRUD + realtime (JWT-scoped)
 lib/store-ops/ai-bay-scan.ts          → Visual bay scan prompt / normalize / local fallback
 lib/store-ops/ai-note-summary.ts      → Manager note + S Pen synthesis prompt / normalize / fallback
-lib/store-ops/manager-notes.ts        → Offline manager note list (aligned to manager_notes table)
 components/store-ops/ManagerNotesWorkspace.tsx → S Pen canvas + synthesize action items UI
 app/manager-notes/page.tsx            → Hub route for Manager Notes workspace
 app/api/store-ops/ai-note-summary     → Gemini Flash manager note synthesis
@@ -68,6 +68,9 @@ supabase/migrations/20260809_multi_store.sql → stores + store_id scoping
 supabase/migrations/20260810_store_locations_type_unique.sql → location unique (department_id,aisle,bay,type)
 supabase/migrations/20260811_alphanumeric_aisle.sql → store_locations.aisle INTEGER → TEXT (BW/RW/12/A1)
 supabase/migrations/20260811_manager_notes.sql → manager_notes (S Pen canvas + AI action items)
+supabase/migrations/20260812_jwt_rls_policies.sql → JWT claims hook + store/department RLS
+supabase/migrations/20260812_manager_notes.sql → durable manager_notes (store_number/department/author) + JWT RLS
+supabase/migrations/20260812_sunday_bay_assignments.sql → sunday specialist↔bay assignments + JWT RLS
 
 ## Ownership
 
@@ -95,8 +98,9 @@ supabase/migrations/20260811_manager_notes.sql → manager_notes (S Pen canvas +
 | SIMS location stock | `lib/sims.ts`, `SimsLocationFinder` |
 | Specialists session / credentials | `lib/specialists.ts`, `SpecialistModal` |
 | Zero-access auth wall / idle lock | `lib/auth-session.ts`, `components/auth/AuthWall.tsx` |
-| Emergency master unlock | `lib/emergency-access.ts`, `POST /api/auth/emergency-unlock` (update-only; local session fallback) |
-| Phone SMS OTP recovery | `lib/phone-auth.ts`, `lib/phone.ts`, `POST /api/auth/phone-reset/*` |
+| Store Ops Auth (JWT → profiles) | `lib/store-ops/auth.ts`, `lib/supabase/server.ts`, `lib/supabase/browser.ts`, `link-auth-profile.ts` |
+| JWT / RLS policies | `supabase/migrations/20260812_jwt_rls_policies.sql` (Custom Access Token Hook + store/dept isolation) |
+| Phone SMS OTP recovery + profile link | `lib/phone-auth.ts`, `lib/phone.ts`, `POST /api/auth/phone-reset/*` |
 | Biometric / WebAuthn unlock | `lib/biometric-auth.ts`, `AuthWall` |
 | PIN change / default notice | `ChangePinModal` |
 | Manager markdown | `lib/markdown.ts`, `ApplyMarkdownModal` |

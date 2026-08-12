@@ -28,7 +28,7 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 - **Appliance Anomaly Detection:** `POST /api/appliances/ai-anomaly` + `ApplianceAnomalyWidget` on Appliance Audit (duplicate serials, distant locations, category mismatch, missing high-value floor models)
 - **Catalog Taxonomies:** `lib/catalog/taxonomies.ts` (D21–D28 / D35 / D52 defaults) + `POST /api/catalog/ai-taxonomy` + Admin Tools `TaxonomyManagerModal`; folder accordions on Department Audit + `/department`
 - **AI Visual Bay Scan:** `POST /api/store-ops/ai-bay-scan` + `lib/store-ops/ai-bay-scan.ts` + `VisualBayScannerModal` — Gemini multimodal carton/pallet/hazard read on Store Map bay sheet + Cycle Audit
-- **Manager Notes & S Pen:** `POST /api/store-ops/ai-note-summary` + `lib/store-ops/ai-note-summary.ts` + `ManagerNotesWorkspace` — stylus canvas PNG + Gemini executive summary / action items; Admin Tools + `/manager-notes`
+- **Manager Notes & S Pen:** `POST /api/store-ops/ai-note-summary` + `lib/store-ops/manager-notes.ts` (Supabase CRUD + realtime) + `ManagerNotesWorkspace` — stylus canvas PNG + Gemini action items; Admin Tools + `/manager-notes`
 
 ## RBAC (`lib/rbac.ts` + `lib/specialists.ts`)
 | Role | Scope | Tabs |
@@ -52,6 +52,7 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 
 ### Sunday Flooring Cycle Audit
 - Staging card + assignment modal: open weekly Flooring bays → assign from Flooring roster; Auto-Assign All to Me; Stage/Draw 12
+- Assignments persist in `sunday_bay_assignments` (JWT store/dept RLS); `bay_id` = `weekly_rotations.id`; ISO week → `week_starting` Monday
 - Entry points: `/dashboard`, Cycle Audit tab, Admin Tools, `/flooring` deep link
 
 ### Departments
@@ -62,20 +63,25 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 
 ## Authentication (Zero-Access Wall)
 - Unauthenticated visitors never see workspace tabs/data — `AuthWall` only
-- Login: username + password/PIN → roster match (`findSpecialistByLogin`)
-- **Emergency unlock:** enter `MASTER-2026-TEMP` → immediate local Master Admin session; `POST /api/auth/emergency-unlock` **updates only** the existing roster row (by username/name/role — never insert) and clears temp/lock flags
-- **Phone recovery:** "Forgot Access Code? Reset via Phone" → roster phone lookup → `supabase.auth.signInWithOtp({ phone })` → 6-digit verify → reset `pin_code` via `/api/auth/phone-reset/confirm`
+- Login: username + password/PIN → roster match (`findSpecialistByLogin`) — hub UI session only
+- **Store Ops identity:** Supabase Auth session required (`Authorization: Bearer` from phone OTP / Auth). `resolveStoreOpsActor` loads `profiles` where `id = auth.users.id` (no `x-store-ops-*` trust headers; emergency `MASTER-2026-TEMP` removed)
+- **Phone recovery / Auth link:** "Forgot Access Code? Reset via Phone" → roster phone lookup → `signInWithOtp` → verify → `/api/auth/phone-reset/confirm` resets PIN **and** upserts `profiles` + JWT `app_metadata` (`store_number`, `department`, `role`) via `linkAuthUserToSpecialistProfile`
 - Setup requires verified mobile (`phone_number` on `store_specialists`)
 - Native keychain: form `autocomplete` username / current-password
 - Biometric: WebAuthn platform authenticator (`lib/biometric-auth.ts`); optional enroll after login; fingerprint unlock button when registered
 - `must_change_credentials` → non-dismissible permanent credential setup
-- Session: `deptsync_auth_session` in **localStorage** (`specialist`, `sessionToken`, `lastActiveTimestamp`); Supabase Auth OTP session also persisted in localStorage; 8h idle lock only
-- Returning browser: valid localStorage session restores workspace without re-entering codes
+- Session: `deptsync_auth_session` in **localStorage** (roster UI); Supabase Auth session in localStorage for API Bearer tokens; 8h idle lock on hub session
+- Returning browser: valid localStorage hub session restores workspace; Store Ops APIs still need a live Supabase Auth session
 - Seeds: no hardcoded roster injection — use Invite / Add Supervisor; temp PIN sets `must_change_credentials`
 - Primary: fixed bottom tabs — **filtered by role/department**
 - Header: DeptSync Hub brand + `DeptSync · Lowe's #…` subtitle · section title · network; specialist chip + PIN gear
 - Cycle Audit / Appliances: hardware-scan ready without soft keyboard; sticky Log docked above bottom nav
 
+## Store Ops auth transport
+- Client: `storeOpsAuthHeadersAsync` → `Authorization: Bearer` from `getSupabaseAccessToken()` (`lib/supabase` localStorage session)
+- Server: `getRequestAuthUser` (Bearer or cookie) → `resolveStoreOpsActor` → `profiles`
+- Push subscribe: `user_id` = Auth profile id; `specialist_id` null
+- SQL: `supabase/migrations/20260812_jwt_rls_policies.sql` — Custom Access Token Hook + store/department RLS on locations, rotations, exceptions, manager_notes, etc.
 ## Scan-to-Catalog
 - SKU / UPC resolve via `lib/barcode.ts` → `carpet_catalog`
 - Soft keyboard: **tap-to-type only** (no auto-focus on tab switch)
@@ -129,8 +135,10 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 - `POST /api/store-ops/ai-bay-scan` — multimodal bay photo → carton/pallet estimates, cleanliness score, detected issues (Store Ops actor)
 - `POST /api/store-ops/ai-note-summary` — manager note + optional S Pen PNG → executive summary + action items (Store Ops actor)
 - APIs under `/api/rotations/*`, `/api/store-locations*`, `/api/departments`, `/api/weekly-rotations`
-- Multi-store: apply `20260809_multi_store.sql`; requests send `x-store-ops-store-number`
-- Manager notes table: apply `20260811_manager_notes.sql` (UUID `store_id`; client list persists in localStorage until server CRUD is wired)
+- Multi-store: apply `20260809_multi_store.sql`; store scope comes from JWT `app_metadata.store_number` / `profiles.store_number`
+- Manager notes: apply `20260811_manager_notes.sql` + `20260812_manager_notes.sql` (durable Supabase CRUD; JWT store/dept RLS)
+- Sunday bay assignments: apply `20260812_sunday_bay_assignments.sql`
+- JWT claims / RLS helpers: apply `20260812_jwt_rls_policies.sql` + enable Custom Access Token Hook
 - Requires `SUPABASE_SERVICE_ROLE_KEY` for server routes (apply migration in Supabase SQL editor)
 
 ## Web Push (rotation phone alerts)
@@ -158,7 +166,7 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 - Blank allowed; Master edits via **Admin Tools → Store Number** (session stays active)
 - Session / active specialist / biometric only reject when both sides have different store numbers
 - Login adopts `store_profiles` / specialist `store_number` when device store is unset
-- Store-ops APIs require a real `x-store-ops-store-number` (no inventing defaults)
+- Store-ops APIs require a live Supabase Auth session linked to `profiles` (phone OTP → `linkAuthUserToSpecialistProfile`); store scope from JWT claims, not client headers
 
 ## Mobile floor UX (Waves A–C)
 - Floor job first: Dashboard = pace + checklist; no permanent Super Admin quick-action strip

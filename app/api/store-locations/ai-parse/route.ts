@@ -10,7 +10,7 @@ import {
   type AiParseResult,
 } from "@/lib/store-ops/ai-parse";
 import {
-  parseStoreOpsActor,
+  resolveStoreOpsActor,
   requireSuperAdmin,
   StoreOpsAuthError,
 } from "@/lib/store-ops/auth";
@@ -18,7 +18,7 @@ import { readableError } from "@/lib/store-ops/errors";
 
 export async function POST(request: Request) {
   try {
-    requireSuperAdmin(parseStoreOpsActor(request));
+    requireSuperAdmin(await resolveStoreOpsActor(request));
 
     if (!isGeminiConfigured()) {
       return NextResponse.json(

@@ -8,7 +8,7 @@
 import { useCallback, useEffect, useState } from "react";
 import type { StoreSpecialist } from "@/lib/types";
 import { getStoreNumber } from "@/lib/store";
-import { actorFromSpecialist, storeOpsAuthHeaders } from "@/lib/store-ops/auth";
+import { actorFromSpecialist, storeOpsAuthHeadersAsync } from "@/lib/store-ops/auth";
 import {
   getExistingPushSubscription,
   isPushSupported,
@@ -99,13 +99,8 @@ export function usePushNotifications(specialist: StoreSpecialist | null) {
       }
 
       const subscription = await subscribeBrowserPush(vapidBody.publicKey);
-      const headers = storeOpsAuthHeaders(
-        actorFromSpecialist(specialist, getStoreNumber()) ?? {
-          specialistId: specialist.id,
-          role: "department_supervisor",
-          departmentCode: specialist.assigned_department,
-          storeNumber: getStoreNumber(),
-        }
+      const headers = await storeOpsAuthHeadersAsync(
+        actorFromSpecialist(specialist, getStoreNumber())
       );
 
       const res = await fetch("/api/push/subscribe", {
@@ -141,14 +136,7 @@ export function usePushNotifications(specialist: StoreSpecialist | null) {
         const actor = actorFromSpecialist(specialist, getStoreNumber());
         await fetch("/api/push/subscribe", {
           method: "DELETE",
-          headers: storeOpsAuthHeaders(
-            actor ?? {
-              specialistId: specialist.id,
-              role: "department_supervisor",
-              departmentCode: specialist.assigned_department,
-              storeNumber: getStoreNumber(),
-            }
-          ),
+          headers: await storeOpsAuthHeadersAsync(actor),
           body: JSON.stringify({ endpoint }),
         });
       }

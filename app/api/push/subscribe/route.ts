@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import {
-  parseStoreOpsActor,
+  resolveStoreOpsActor,
   requireStoreOpsActor,
   StoreOpsAuthError,
 } from "@/lib/store-ops/auth";
@@ -27,11 +27,11 @@ function isValidSubscription(raw: unknown): raw is PushSubscriptionJSON {
 /**
  * POST /api/push/subscribe
  * Body: { subscription: PushSubscriptionJSON }
- * Saves endpoint for the signed-in supervisor (hub actor headers).
+ * Saves endpoint for the signed-in Auth profile (user_id = profiles.id).
  */
 export async function POST(request: Request) {
   try {
-    const actor = requireStoreOpsActor(parseStoreOpsActor(request));
+    const actor = requireStoreOpsActor(await resolveStoreOpsActor(request));
     const supabase = getSupabaseAdmin();
     if (!supabase) {
       return NextResponse.json(
@@ -50,9 +50,9 @@ export async function POST(request: Request) {
 
     const row = await upsertPushSubscription(supabase, {
       subscription: body.subscription,
-      specialistId: actor.specialistId,
+      specialistId: null,
       departmentCode: actor.departmentCode,
-      userId: null,
+      userId: actor.userId,
     });
 
     return NextResponse.json({ ok: true, id: row.id });
@@ -73,7 +73,7 @@ export async function POST(request: Request) {
  */
 export async function DELETE(request: Request) {
   try {
-    const actor = requireStoreOpsActor(parseStoreOpsActor(request));
+    const actor = requireStoreOpsActor(await resolveStoreOpsActor(request));
     const supabase = getSupabaseAdmin();
     if (!supabase) {
       return NextResponse.json(
@@ -88,7 +88,7 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: "endpoint is required" }, { status: 400 });
     }
 
-    await deletePushSubscription(supabase, endpoint, actor.specialistId);
+    await deletePushSubscription(supabase, endpoint, actor.userId ?? undefined);
     return NextResponse.json({ ok: true });
   } catch (err) {
     if (err instanceof StoreOpsAuthError) {

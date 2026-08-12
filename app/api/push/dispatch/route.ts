@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import {
-  parseStoreOpsActor,
+  resolveStoreOpsActor,
   requireSuperAdmin,
   StoreOpsAuthError,
 } from "@/lib/store-ops/auth";
@@ -16,7 +16,7 @@ import { supabaseAdminMissingMessage } from "@/lib/supabase/env";
  */
 export async function POST(request: Request) {
   try {
-    requireSuperAdmin(parseStoreOpsActor(request));
+    requireSuperAdmin(await resolveStoreOpsActor(request));
     if (!isWebPushConfigured()) {
       return NextResponse.json(
         { error: "Web Push VAPID keys are not configured" },

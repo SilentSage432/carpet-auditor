@@ -1,5 +1,28 @@
 # DeptSync Hub — Development Journal
 
+## 2026-08-12 — Phase 1: Security & Identity Handshake
+
+### Shipped
+- Removed emergency unlock (`MASTER-2026-TEMP`, `lib/emergency-access.ts`, `POST /api/auth/emergency-unlock`) from AuthWall and the API surface.
+- Store Ops actor resolution is Supabase Auth only: `getRequestAuthUser` → `profiles` (`id = auth.users.id`); `x-store-ops-*` headers are no longer trusted (`parseStoreOpsActor` always null).
+- Client APIs send `Authorization: Bearer` via `storeOpsAuthHeadersAsync` / `getSupabaseAccessToken` (same localStorage session as phone OTP).
+- Push subscribe maps `user_id` to Auth profile id; `specialist_id` cleared on upsert.
+- Phone reset confirm links Auth user → `profiles` + JWT `app_metadata` (`linkAuthUserToSpecialistProfile`).
+- Migration `supabase/migrations/20260812_jwt_rls_policies.sql`: defensive JWT/RLS (table existence checks, `store_number` isolation), Custom Access Token Hook, `sync_profile_app_metadata`.
+- **Applied in Supabase:** Phase 1 SQL + Custom Access Token Hook enabled.
+
+## 2026-08-12 — Phase 2: Data Durability & UI Cleanup
+
+### Shipped
+- Migration `supabase/migrations/20260812_manager_notes.sql` — durable `manager_notes` with `store_number`, `department`, `author_id`, `category`, `updated_at`; JWT store/dept RLS; preserves S Pen / AI columns from 20260811.
+- `lib/store-ops/manager-notes.ts` — Supabase list/upsert/delete + realtime subscribe; optimistic UI in `ManagerNotesWorkspace`.
+- Migration `supabase/migrations/20260812_sunday_bay_assignments.sql` — `sunday_bay_assignments` unique per store/dept/week/bay; JWT RLS; `roster_specialist_id` bridge to hub roster.
+- `lib/store-ops/sunday-audit.ts` — server sync via Supabase (ISO week → `week_starting` Monday); staging card + assignment modal optimistic writes + realtime.
+- Retired orphan `components/barcode/MarryBarcodeModal.tsx` (superseded by Quick-Add / scan link flow).
+
+### Ops follow-up
+- Apply both Phase 2 migrations (after Phase 1 JWT helpers). Enable Realtime on `manager_notes` and `sunday_bay_assignments` if not auto-enabled.
+
 ## 2026-08-11 — Native mobile: splash theme, haptics, offline banner
 
 ### Shipped

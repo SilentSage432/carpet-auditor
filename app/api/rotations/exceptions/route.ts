@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import {
-  parseStoreOpsActor,
+  resolveStoreOpsActor,
   requireStoreOpsActor,
   requireSuperAdmin,
   StoreOpsAuthError,
@@ -21,7 +21,7 @@ import { resolveStoreByNumber } from "@/lib/store-ops/stores";
  */
 export async function GET(request: Request) {
   try {
-    const actor = requireStoreOpsActor(parseStoreOpsActor(request));
+    const actor = requireStoreOpsActor(await resolveStoreOpsActor(request));
     const { supabase, response } = requireSupabaseAdmin();
     if (!supabase) return response;
 

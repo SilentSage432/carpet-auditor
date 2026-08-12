@@ -63,7 +63,7 @@
 - [x] Appliance scan log category accordion summary with search-to-expand + 10/page SKU pagination
 - [x] Remove Catalog bottom-nav tab; `/catalog` → `/appliances` redirect
 - [x] Roster without hardcoded seed accounts; temp-credentials badge from DB flags only
-- [x] Emergency master unlock (`MASTER-2026-TEMP`) + phone SMS OTP access reset + persistent localStorage auth session
+- [x] Emergency master unlock removed — Supabase Auth session is the only Store Ops identity path
 - [x] Obsidian-glass design system (globals utilities + NavigationHub / Bulk Generator / audit section cards)
 - [x] Gemini AI integration layer (`lib/ai/gemini.ts` + `@google/generative-ai` + env keys)
 - [x] AI Pre-Flight Bulk Generator (`/api/store-locations/ai-parse` + Confirm → bulk upsert)
@@ -78,17 +78,15 @@
 - [x] Manager Notes & S Pen Canvas (`/api/store-ops/ai-note-summary` + `ManagerNotesWorkspace` + `20260811_manager_notes.sql`)
 - [x] Mobile UI polish — Lucide bottom nav (4–5 tabs + More), compact header status chip, shared `h-12` action button tokens
 - [x] Native mobile shell — splash `#090d16`, haptics (`utils/haptics`), offline queue banner + reconnect flush
+- [x] Phase 1 Security & Identity Handshake — remove emergency unlock; Store Ops via Supabase Auth JWT → `profiles`; push `user_id`; JWT/RLS migration `20260812_jwt_rls_policies.sql`
+- [x] Phase 2 Data Durability — Manager Notes + Sunday bay assignments on Supabase; retire `MarryBarcodeModal`
 
 ## Next
-- [ ] JWT / claim-based RLS enforcing `store_number` (+ department) server-side
-- [ ] Wire Supabase Auth sessions into `profiles` (replace header-based store-ops actor bridge)
-- [ ] Rotate off temporary `MASTER-2026-TEMP` emergency code after production recovery
-- [ ] Link push `user_id` to Supabase Auth profiles (retire specialist_id bridge when ready)
+- [x] Apply Phase 1 JWT/RLS migration in Supabase + enable Custom Access Token Hook
+- [ ] Apply Phase 2 migrations (`20260812_manager_notes.sql`, `20260812_sunday_bay_assignments.sql`) + Realtime on notes/assignments tables
+- [ ] Production recovery: ensure every active roster member has phone OTP → linked `profiles` row before relying on Store Ops APIs
 - [ ] Background Sync API / periodic queue flush while tab backgrounded
 - [ ] Conflict resolution UI when offline edits collide
-- [ ] Retire or wire orphan `MarryBarcodeModal`
-- [ ] Persist Sunday specialist bay assignments server-side (today: local store/week overlay)
-- [ ] Persist Manager Notes to Supabase (`manager_notes`) beyond localStorage list
 - [ ] Additional Gemini product surfaces beyond current AI ops widgets
 ## Non-goals
 - Pricing / margin engines

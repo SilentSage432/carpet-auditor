@@ -12,7 +12,7 @@ import {
   type NoteSummaryResult,
 } from "@/lib/store-ops/ai-note-summary";
 import {
-  parseStoreOpsActor,
+  resolveStoreOpsActor,
   requireStoreOpsActor,
   StoreOpsAuthError,
 } from "@/lib/store-ops/auth";
@@ -24,7 +24,7 @@ import { readableError } from "@/lib/store-ops/errors";
  */
 export async function POST(request: Request) {
   try {
-    requireStoreOpsActor(parseStoreOpsActor(request));
+    requireStoreOpsActor(await resolveStoreOpsActor(request));
 
     const body = (await request.json()) as {
       title?: string;

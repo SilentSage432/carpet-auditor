@@ -11,7 +11,7 @@ import {
 } from "@/lib/invite";
 import { suggestUsername } from "@/lib/rbac";
 import {
-  parseStoreOpsActor,
+  resolveStoreOpsActor,
   requireSuperAdmin,
   StoreOpsAuthError,
 } from "@/lib/store-ops/auth";
@@ -41,7 +41,7 @@ type InviteBody = {
  */
 export async function POST(request: Request) {
   try {
-    const actor = requireSuperAdmin(parseStoreOpsActor(request));
+    const actor = requireSuperAdmin(await resolveStoreOpsActor(request));
     const { supabase, response } = requireSupabaseAdmin();
     if (!supabase) return response;
 

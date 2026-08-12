@@ -4,7 +4,7 @@
 
 import type { StoreSpecialist } from "@/lib/types";
 import { getStoreNumber } from "@/lib/store";
-import { actorFromSpecialist, storeOpsAuthHeaders } from "./auth";
+import { actorFromSpecialist, storeOpsAuthHeadersAsync } from "./auth";
 import { readableError } from "./errors";
 import type {
   BulkGenerateInput,
@@ -24,10 +24,11 @@ async function storeOpsFetch<T>(
       throw new Error("Store Operations access denied for this profile");
     }
 
+    const authHeaders = await storeOpsAuthHeadersAsync(actor);
     const res = await fetch(path, {
       ...init,
       headers: {
-        ...storeOpsAuthHeaders(actor),
+        ...authHeaders,
         ...(init?.headers ?? {}),
       },
     });
