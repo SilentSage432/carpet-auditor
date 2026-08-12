@@ -1,7 +1,8 @@
 /* DeptSync Hub — offline shell cache */
-const CACHE_VERSION = "deptsync-shell-v2-push";
+const CACHE_VERSION = "deptsync-shell-v3-manifest";
 const SHELL_ASSETS = [
   "/",
+  "/manifest.json",
   "/manifest.webmanifest",
   "/icons/icon-192.png",
   "/icons/icon-512.png",
@@ -40,7 +41,8 @@ function isStaticAsset(url) {
     path.endsWith(".svg") ||
     path.endsWith(".webp") ||
     path.endsWith(".ico") ||
-    path === "/manifest.webmanifest"
+    path === "/manifest.webmanifest" ||
+    path === "/manifest.json"
   );
 }
 

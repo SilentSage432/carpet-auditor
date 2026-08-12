@@ -10,6 +10,7 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 - Header: brand `DeptSync Hub` · subtitle `DeptSync · Lowe's #{store}` · section title · network
 - Header badge: `DeptSyncBadge` (stacked boxes + barcode, emerald/amber on dark)
 - Icons: `public/icons/icon-192.png`, `icon-512.png`, `apple-touch-icon.png`
+- PWA manifest: `app/manifest.ts` → `/manifest.webmanifest`; static `public/manifest.json` → `/manifest.json` (TWA / Bubblewrap)
 - **Obsidian-glass UI:** void `#09090b`; utilities in `app/globals.css` (`.glass-card`, `.glass-panel`, `.glass-input`, `.glass-backdrop`, `.glass-void`, `.btn-primary-glow`, status pills / bay glows). Emerald primary / cyan secondary accents. AuthWall, Store Map, NavigationHub, audit cards, Bulk Generator, and overlay modals consume these tokens.
 
 ## AI (`lib/ai/gemini.ts`)
