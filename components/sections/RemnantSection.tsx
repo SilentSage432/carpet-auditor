@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import { ApplyMarkdownModal } from "@/components/hub/ApplyMarkdownModal";
 import { ConfirmModal } from "@/components/hub/ConfirmModal";
 import { TextPromptModal } from "@/components/hub/TextPromptModal";
+import { FlooringAIInsightBanner } from "@/components/flooring/FlooringAIInsightBanner";
 import { findCatalogBySkuOrBarcode } from "@/lib/catalog";
 import { agingBadge, daysOld } from "@/lib/aging";
 import {
@@ -282,6 +283,14 @@ export function RemnantSection({
           setDeleteTargetId(null);
           if (id) void handleDelete(id);
         }}
+      />
+
+      <FlooringAIInsightBanner
+        remnants={remnants}
+        specialists={specialists}
+        activeSpecialist={activeSpecialist}
+        onRemnantsChange={onRemnantsChange}
+        onRequestMarkdown={setMarkdownTarget}
       />
 
       <div className="flex gap-2 overflow-x-auto pb-1">

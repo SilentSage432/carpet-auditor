@@ -1,5 +1,28 @@
 # DeptSync Hub — Development Journal
 
+## 2026-08-11 — Zebra Shift Intelligence Briefing
+
+### Shipped
+- `POST /api/store-health/ai-summary` — builds briefing from `buildStoreHealthSnapshot` (pace, bottlenecks, exceptions); Gemini 3-bullet executive brief; local metrics fallback without API key.
+- Domain module `lib/store-ops/shift-briefing.ts` + client `fetchShiftBriefing`.
+- `ShiftBriefingCard` glass banner atop `/dashboard` with emerald glow, priority department, tap refresh + pull-to-refresh.
+
+## 2026-08-11 — Flooring AI Remnant Aging & Variance Intelligence
+
+### Shipped
+- `POST /api/flooring/ai-insights` — Gemini Flash analyzes cycle audit variance + remnant inventory against 30/60/90+ age bands; local aging fallback when `GEMINI_API_KEY` missing.
+- Domain module `lib/flooring/ai-insights.ts` composes `lib/aging` + `lib/variance`; markdown math stays in `lib/markdown`.
+- `agingBand()` added to `lib/aging.ts` (0-29 / 30-59 / 60-89 / 90+).
+- `FlooringAIInsightBanner` glass card on Flooring Cycle Audit + Remnants with one-touch **Apply Recommended Markdown** → `computeMarkdown` + `saveRemnant`.
+
+## 2026-08-11 — AI Pre-Flight for Bulk Location Generator
+
+### Shipped
+- `POST /api/store-locations/ai-parse` — Super Admin only; Gemini parses messy aisle/bay text or CSV into structured locations + `corrections_made`.
+- Shared normalizer `lib/store-ops/ai-parse.ts` enforces `isValidAisle` / bay swap / department code allow-list after model output.
+- Client helper `aiParseLocations`; Bulk Generator gains **✨ AI Pre-Flight** tab with glass preview table and **Confirm & Bulk Create** → existing `/api/store-locations/bulk` (`bulkGenerateLocations` → `bulkInsertLocations`).
+- Requires `GEMINI_API_KEY` (503 when missing).
+
 ## 2026-08-11 — Gemini AI integration layer
 
 ### Shipped

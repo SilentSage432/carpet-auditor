@@ -422,6 +422,8 @@ export default function DeptSyncHubPage() {
                 auditedBy={specialist?.name ?? ""}
                 specialists={specialists}
                 activeSpecialist={specialist}
+                remnants={remnants}
+                onRemnantsChange={setRemnants}
               />
             )}
             {activeSection === "remnants" &&

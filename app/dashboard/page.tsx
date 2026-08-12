@@ -7,6 +7,7 @@ import { ShowroomQuickTouchCard } from "@/components/dashboard/ShowroomQuickTouc
 import { WeeklyRotationList } from "@/components/dashboard/WeeklyRotationList";
 import { NavigationHub } from "@/components/hub/NavigationHub";
 import { SessionGate } from "@/components/hub/SessionGate";
+import { ShiftBriefingCard } from "@/components/store-ops/ShiftBriefingCard";
 import { actorFromSpecialist } from "@/lib/store-ops/auth";
 import { fetchThisWeekRotations } from "@/lib/store-ops/client";
 import type { WeeklyRotationWithLocation } from "@/lib/store-ops/types";
@@ -77,6 +78,7 @@ function DashboardBody({
       />
 
       <main className="mx-auto w-full max-w-lg flex-1 px-3 pb-28 pt-4">
+        <ShiftBriefingCard specialist={specialist} refreshKey={healthKey} />
         <StoreHealthCard specialist={specialist} refreshKey={healthKey} />
 
         <ShowroomQuickTouchCard

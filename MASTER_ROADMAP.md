@@ -66,6 +66,9 @@
 - [x] Emergency master unlock (`MASTER-2026-TEMP`) + phone SMS OTP access reset + persistent localStorage auth session
 - [x] Obsidian-glass design system (globals utilities + NavigationHub / Bulk Generator / audit section cards)
 - [x] Gemini AI integration layer (`lib/ai/gemini.ts` + `@google/generative-ai` + env keys)
+- [x] AI Pre-Flight Bulk Generator (`/api/store-locations/ai-parse` + Confirm → bulk upsert)
+- [x] Flooring AI Remnant Aging & Variance Intelligence (`/api/flooring/ai-insights` + banner CTA)
+- [x] Zebra Shift Intelligence Briefing (`/api/store-health/ai-summary` + `ShiftBriefingCard`)
 
 ## Next
 - [ ] JWT / claim-based RLS enforcing `store_number` (+ department) server-side
@@ -77,7 +80,7 @@
 - [ ] Retire or wire orphan `MarryBarcodeModal`
 - [ ] Department-specific catalog category taxonomies beyond flooring/appliances
 - [ ] Extend glassification to remaining modals / AuthWall / Store Map chrome (optional polish pass)
-- [ ] First product feature composing `callGeminiFlash` (vision / structured ops assist)
+- [ ] Additional Gemini product surfaces beyond location Pre-Flight / flooring insights / shift briefing
 ## Non-goals
 - Pricing / margin engines
 - Replenishment recommendations

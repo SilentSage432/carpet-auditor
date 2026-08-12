@@ -1,5 +1,8 @@
 export type AgingTier = "new" | "promote" | "clearance";
 
+/** Fine-grained age bands for AI / ops reporting (includes 90+ clearance). */
+export type AgingBand = "0-29" | "30-59" | "60-89" | "90+";
+
 export function daysOld(createdAtIso: string, now = new Date()): number {
   const created = new Date(createdAtIso).getTime();
   if (Number.isNaN(created)) return 0;
@@ -13,6 +16,13 @@ export function classifyAging(days: number): AgingTier {
   return "new";
 }
 
+export function agingBand(days: number): AgingBand {
+  if (days >= 90) return "90+";
+  if (days >= 60) return "60-89";
+  if (days >= 30) return "30-59";
+  return "0-29";
+}
+
 export function agingBadge(days: number): {
   tier: AgingTier;
   label: string;
@@ -20,9 +30,13 @@ export function agingBadge(days: number): {
 } {
   const tier = classifyAging(days);
   if (tier === "clearance") {
+    const band = agingBand(days);
     return {
       tier,
-      label: `🔴 ${days}d — Needs Clearance Discount / Manager Markdown`,
+      label:
+        band === "90+"
+          ? `🔴 ${days}d — 90+ day clearance / Manager Markdown`
+          : `🔴 ${days}d — Needs Clearance Discount / Manager Markdown`,
       className: "bg-red-500/20 text-red-300 border-red-500/40",
     };
   }

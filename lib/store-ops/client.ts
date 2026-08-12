@@ -90,6 +90,35 @@ export async function bulkGenerateLocations(
   });
 }
 
+export type AiParsedLocationClient = {
+  department_code: string;
+  aisle: string;
+  start_bay: number;
+  end_bay: number;
+  type: "SELLING" | "TOPSTOCK" | "BOTH";
+};
+
+export type AiParseLocationsResult = {
+  locations: AiParsedLocationClient[];
+  corrections_made: string[];
+};
+
+/** Super Admin — Gemini Pre-Flight parse of messy aisle/bay text or CSV. */
+export async function aiParseLocations(
+  specialist: StoreSpecialist,
+  input: {
+    text: string;
+    known_department_codes?: string[];
+    default_department_code?: string;
+  }
+): Promise<AiParseLocationsResult> {
+  return storeOpsFetch("/api/store-locations/ai-parse", specialist, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+}
+
 export async function patchStoreLocation(
   specialist: StoreSpecialist,
   id: string,
@@ -460,6 +489,30 @@ export async function fetchStoreHealth(
       },
     };
   }
+}
+
+export type ShiftBriefingClient = {
+  headline: string;
+  bullets: [string, string, string];
+  priority_department: string;
+  assigned_week?: string;
+  source?: "gemini" | "local";
+};
+
+/** Zebra Shift Intelligence Briefing from store health metrics. */
+export async function fetchShiftBriefing(
+  specialist: StoreSpecialist,
+  week?: string
+): Promise<ShiftBriefingClient> {
+  return storeOpsFetch<ShiftBriefingClient>(
+    "/api/store-health/ai-summary",
+    specialist,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(week ? { week } : {}),
+    }
+  );
 }
 
 export type InviteSupervisorResult = {

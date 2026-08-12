@@ -19,6 +19,9 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 - Inline images accept raw base64 or `data:image/...;base64,...` (prefix stripped)
 - JSON regex extraction for object/array payloads from fenced or chatty model replies
 - Does not recommend or own institutional knowledge — callers compose prompts
+- **AI Pre-Flight (Bulk Generator):** `POST /api/store-locations/ai-parse` + `lib/store-ops/ai-parse.ts` normalize to `{ locations, corrections_made }`; UI tab confirms via existing bulk upsert
+- **Flooring AI Insights:** `POST /api/flooring/ai-insights` + `lib/flooring/ai-insights.ts` + `FlooringAIInsightBanner` on Cycle Audit / Remnants; applies markdown via `lib/markdown` + `saveRemnant`; age bands via `agingBand()` (30/60/90+)
+- **Zebra Shift Briefing:** `POST /api/store-health/ai-summary` + `ShiftBriefingCard` on `/dashboard` (composes `lib/store-ops/health` snapshot → 3-bullet briefing)
 
 ## RBAC (`lib/rbac.ts` + `lib/specialists.ts`)
 | Role | Scope | Tabs |

@@ -3,7 +3,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { QuickAddCatalogModal } from "@/components/barcode/QuickAddCatalogModal";
 import { SimsLocationFinder } from "@/components/catalog/SimsLocationFinder";
+import { FlooringAIInsightBanner } from "@/components/flooring/FlooringAIInsightBanner";
 import { NumberField, TextField } from "@/components/ui/NumberField";
+import { ApplyMarkdownModal } from "@/components/hub/ApplyMarkdownModal";
 import { AuditReportModal } from "@/components/hub/AuditReportModal";
 import {
   resolveScan,
@@ -58,6 +60,7 @@ import {
   type CarpetAudit,
   type CatalogItem,
   type LocationType,
+  type Remnant,
   type StoreSpecialist,
 } from "@/lib/types";
 import {
@@ -106,6 +109,8 @@ type Props = {
   auditedBy: string;
   specialists: StoreSpecialist[];
   activeSpecialist: StoreSpecialist | null;
+  remnants: Remnant[];
+  onRemnantsChange: (items: Remnant[]) => void;
 };
 
 export function CycleAuditSection({
@@ -114,6 +119,8 @@ export function CycleAuditSection({
   auditedBy,
   specialists,
   activeSpecialist,
+  remnants,
+  onRemnantsChange,
 }: Props) {
   const measureInputRef = useRef<HTMLInputElement>(null);
   const boxCountInputRef = useRef<HTMLInputElement>(null);
@@ -145,6 +152,7 @@ export function CycleAuditSection({
   const [draftRestored, setDraftRestored] = useState(false);
   const [summaryExpanded, setSummaryExpanded] = useState(false);
   const [reportOpen, setReportOpen] = useState(false);
+  const [markdownTarget, setMarkdownTarget] = useState<Remnant | null>(null);
   const [simsFinderOpen, setSimsFinderOpen] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
@@ -630,6 +638,30 @@ export function CycleAuditSection({
         audits={shiftAudits.length > 0 ? shiftAudits : audits}
         specialist={activeSpecialist}
         auditedBy={auditedBy}
+      />
+      <ApplyMarkdownModal
+        key={markdownTarget?.id ?? "cycle-markdown-closed"}
+        open={markdownTarget != null}
+        remnant={markdownTarget}
+        specialists={specialists}
+        activeSpecialist={activeSpecialist}
+        onClose={() => setMarkdownTarget(null)}
+        onApplied={(record) => {
+          onRemnantsChange([
+            record,
+            ...remnants.filter((r) => r.id !== record.id),
+          ]);
+          setMarkdownTarget(null);
+        }}
+      />
+
+      <FlooringAIInsightBanner
+        remnants={remnants}
+        audits={shiftAudits.length > 0 ? shiftAudits : audits}
+        specialists={specialists}
+        activeSpecialist={activeSpecialist}
+        onRemnantsChange={onRemnantsChange}
+        onRequestMarkdown={setMarkdownTarget}
       />
 
       {undoToast ? (
