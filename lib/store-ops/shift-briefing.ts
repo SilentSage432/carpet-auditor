@@ -17,6 +17,19 @@ export type ShiftBriefing = {
   priority_department: string;
 };
 
+/** Soft empty state when Supabase Auth session is missing (no hard 401 for Zebra card). */
+export function buildSessionRefreshShiftBriefing(): ShiftBriefing {
+  return {
+    headline: "Refresh Auth to load shift intel",
+    bullets: [
+      "Supabase Auth session required — use phone OTP / Forgot Access to link your profile.",
+      "Hub PIN login alone does not authorize Store Ops APIs.",
+      "After signing in, pull to refresh or tap re-analyze for a live briefing.",
+    ],
+    priority_department: "Storewide",
+  };
+}
+
 export function buildShiftBriefingPrompt(
   snapshot: StoreHealthSnapshot,
   telemetry?: StoreAuditTelemetry | null

@@ -7,7 +7,9 @@ import {
   CheckSquare,
   ChevronDown,
   List,
+  Mic,
   Sparkles,
+  Square,
   Type,
 } from "lucide-react";
 import { selectOnFocus } from "@/lib/number-input";
@@ -25,9 +27,12 @@ type Props = {
   saveStatus: "idle" | "saving" | "saved" | "error";
   title: string;
   onTitleChange: (value: string) => void;
+  recording: boolean;
+  speechSupported: boolean;
+  onToggleRecord: () => void;
 };
 
-/** Compact sticky row: title + formatting + Gemini Copilot. */
+/** Compact sticky row: title + formatting + mic + Gemini Copilot. */
 export function FloorPadToolbar({
   editor,
   busy,
@@ -35,6 +40,9 @@ export function FloorPadToolbar({
   saveStatus,
   title,
   onTitleChange,
+  recording,
+  speechSupported,
+  onToggleRecord,
 }: Props) {
   const saveLabel =
     saveStatus === "saving"
@@ -123,7 +131,43 @@ export function FloorPadToolbar({
 
       <button
         type="button"
-        disabled={busy || !editor}
+        disabled={busy || !editor || (!speechSupported && !recording)}
+        onClick={onToggleRecord}
+        title={
+          recording
+            ? "Stop & Parse"
+            : speechSupported
+              ? "Voice dictation"
+              : "Voice dictation unavailable"
+        }
+        aria-label={recording ? "Stop and parse dictation" : "Start voice dictation"}
+        aria-pressed={recording}
+        className={`inline-flex h-8 shrink-0 items-center gap-1.5 rounded-md border px-2 text-[11px] font-semibold disabled:opacity-50 ${
+          recording
+            ? "border-rose-500/60 bg-rose-950/50 text-rose-100 shadow-[0_0_18px_-6px_rgba(244,63,94,0.65)]"
+            : "border-zinc-700/80 bg-zinc-900/80 text-zinc-200"
+        }`}
+      >
+        {recording ? (
+          <>
+            <span
+              className="floor-pad-rec-dot h-2 w-2 shrink-0 rounded-full bg-rose-500"
+              aria-hidden
+            />
+            <Square className="h-3 w-3 fill-current" aria-hidden />
+            <span className="hidden sm:inline">Stop &amp; Parse</span>
+          </>
+        ) : (
+          <>
+            <Mic className="h-3.5 w-3.5" aria-hidden />
+            <span className="hidden sm:inline">Mic</span>
+          </>
+        )}
+      </button>
+
+      <button
+        type="button"
+        disabled={busy || !editor || recording}
         onClick={onGemini}
         className="inline-flex h-8 shrink-0 items-center gap-1 rounded-md border border-emerald-500/45 bg-emerald-950/50 px-2 text-[11px] font-semibold text-emerald-200 shadow-[0_0_16px_-8px_rgba(16,185,129,0.55)] disabled:opacity-50"
       >

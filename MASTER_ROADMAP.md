@@ -85,7 +85,7 @@
 
 ## Next
 - [x] Apply Phase 1 JWT/RLS migration in Supabase + enable Custom Access Token Hook
-- [ ] Apply Phase 2 migrations (`20260812_manager_notes.sql`, `20260812_sunday_bay_assignments.sql`, `20260812_manager_notes_archive.sql`, **`20260812_fix_manager_notes_rls.sql`**) + Realtime on notes/assignments tables
+- [ ] Apply Phase 2 migrations (`20260812_manager_notes.sql`, `20260812_sunday_bay_assignments.sql`, `20260812_manager_notes_archive.sql`, `20260812_fix_manager_notes_rls.sql`, **`20260812_manager_notes_metadata.sql`**) + Realtime on notes/assignments tables
 - [ ] Production recovery: ensure every active roster member has phone OTP → linked `profiles` row before relying on Store Ops APIs
 - [ ] Additional Gemini product surfaces beyond current AI ops widgets
 ## Non-goals

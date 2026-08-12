@@ -376,3 +376,21 @@ input[type="number"] {
   pointer-events: none;
 }
 
+@keyframes floor-pad-rec-pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+    box-shadow: 0 0 0 0 rgba(244, 63, 94, 0.55);
+  }
+  50% {
+    opacity: 0.55;
+    transform: scale(0.92);
+    box-shadow: 0 0 0 6px rgba(244, 63, 94, 0);
+  }
+}
+
+.floor-pad-rec-dot {
+  animation: floor-pad-rec-pulse 1.1s ease-in-out infinite;
+}
+

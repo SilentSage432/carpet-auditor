@@ -11,12 +11,33 @@ export type NoteExtractInput = {
   bay?: number | null;
 };
 
+/** Structured entities extracted from note text by Gemini Copilot. */
+export type NoteExtractMetadata = {
+  appliance_serials: Array<Record<string, any>>;
+  carpet_remnants: Array<Record<string, any>>;
+  operational_hotspots: Array<Record<string, any>>;
+  vendor_mentions: string[];
+  /** ISO date (YYYY-MM-DD) when a re-audit / follow-up was mentioned. */
+  follow_up_date: string | null;
+};
+
 export type NoteExtractResult = {
   tasks: string[];
   aisle: string | null;
   bay: number | null;
   executive_summary: string;
+  metadata: NoteExtractMetadata;
 };
+
+export function emptyNoteExtractMetadata(): NoteExtractMetadata {
+  return {
+    appliance_serials: [],
+    carpet_remnants: [],
+    operational_hotspots: [],
+    vendor_mentions: [],
+    follow_up_date: null,
+  };
+}
 
 export function buildNoteExtractPrompt(input: NoteExtractInput): string {
   const title = String(input.title ?? "").trim() || "(untitled)";
@@ -30,7 +51,7 @@ export function buildNoteExtractPrompt(input: NoteExtractInput): string {
 
   return `You are DeptSync Hub's Executive Floor Pad copilot for a Lowe's retail store.
 
-Analyze the manager note and extract actionable floor tasks plus location tags.
+Analyze the manager note and extract actionable floor tasks, location tags, and structured floor metadata.
 
 Context already known:
 - department_code=${dept}
@@ -43,23 +64,42 @@ ${content}
 
 Rules:
 1. Extract concrete action items the floor team should complete. Prefer short imperative tasks.
-2. Do not invent SKUs, aisles, or bays that are not evidenced in the note.
+2. Do not invent SKUs, aisles, bays, serials, brands, or hazards that are not evidenced in the note.
 3. If aisle/bay tags are missing in context but clearly stated in the note, return them.
 4. If aisle/bay are already provided, keep them unless the note clearly corrects them.
 5. Strip HTML to meaning; ignore formatting chrome.
+6. Populate metadata only from evidenced text:
+   - appliance_serials: serials and/or model numbers with dwell/location details when mentioned
+   - carpet_remnants: remnant / roll lengths, brands, and missing-tag alerts
+   - operational_hotspots: bay physical issues (top-stock clutter, pricing errors, safety hazards, etc.)
+   - vendor_mentions: brand / vendor names mentioned
+   - follow_up_date: any re-audit / follow-up timing (e.g. "re-check on Friday", "follow up in 2 days") as ISO YYYY-MM-DD relative to today when possible, else null
 
 Return ONLY valid JSON (no markdown fences):
 {
   "executive_summary": "One or two observational sentences.",
   "tasks": ["Concrete next step", "Another next step"],
   "aisle": "BW" | null,
-  "bay": 4 | null
+  "bay": 4 | null,
+  "metadata": {
+    "appliance_serials": [
+      { "serial": "ABC123", "model": "WRF535SWHZ", "location": "Aisle 12 Bay 4", "details": "floor model dwell" }
+    ],
+    "carpet_remnants": [
+      { "length_clf": 12.5, "brand": "Stainmaster", "missing_tag": true, "details": "end-cap remnant" }
+    ],
+    "operational_hotspots": [
+      { "issue": "Top-stock clutter", "bay": "Bay 7", "severity": "medium", "details": "leaning cartons" }
+    ],
+    "vendor_mentions": ["Mohawk", "Whirlpool"],
+    "follow_up_date": "2026-08-15"
+  }
 }`;
 }
 
-function asRecord(value: unknown): Record<string, unknown> | null {
+function asRecord(value: unknown): Record<string, any> | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
-  return value as Record<string, unknown>;
+  return value as Record<string, any>;
 }
 
 function normalizeAisle(raw: unknown): string | null {
@@ -76,6 +116,121 @@ function normalizeBay(raw: unknown): number | null {
   const n = Number(raw);
   if (!Number.isFinite(n) || n < 0) return null;
   return Math.floor(n);
+}
+
+function normalizeObjectList(raw: unknown, max = 24): Array<Record<string, any>> {
+  if (!Array.isArray(raw)) return [];
+  const out: Array<Record<string, any>> = [];
+  for (const item of raw) {
+    if (typeof item === "string") {
+      const s = item.trim();
+      if (s) out.push({ details: s.slice(0, 240) });
+    } else {
+      const row = asRecord(item);
+      if (row && Object.keys(row).length > 0) {
+        out.push(row);
+      }
+    }
+    if (out.length >= max) break;
+  }
+  return out;
+}
+
+function normalizeStringList(raw: unknown, max = 40): string[] {
+  if (!Array.isArray(raw)) return [];
+  const out: string[] = [];
+  for (const item of raw) {
+    const s = String(item ?? "").trim();
+    if (s && !out.includes(s)) out.push(s.slice(0, 80));
+    if (out.length >= max) break;
+  }
+  return out;
+}
+
+export function normalizeNoteExtractMetadata(
+  raw: unknown
+): NoteExtractMetadata {
+  const root = asRecord(raw) ?? {};
+  const nested = asRecord(root.metadata) ?? root;
+  return {
+    appliance_serials: normalizeObjectList(
+      nested.appliance_serials ?? nested.serials ?? nested.appliances
+    ),
+    carpet_remnants: normalizeObjectList(
+      nested.carpet_remnants ?? nested.remnants
+    ),
+    operational_hotspots: normalizeObjectList(
+      nested.operational_hotspots ?? nested.hotspots ?? nested.issues
+    ),
+    vendor_mentions: normalizeStringList(
+      nested.vendor_mentions ?? nested.vendors ?? nested.brands
+    ),
+    follow_up_date: normalizeFollowUpDate(
+      nested.follow_up_date ?? nested.followup_date ?? nested.re_audit_date
+    ),
+  };
+}
+
+function normalizeFollowUpDate(raw: unknown): string | null {
+  if (raw == null || raw === "") return null;
+  const s = String(raw).trim();
+  if (!s || s.toLowerCase() === "null" || s.toLowerCase() === "none") {
+    return null;
+  }
+  const iso = s.match(/^(\d{4}-\d{2}-\d{2})/);
+  if (iso) return iso[1];
+  const parsed = Date.parse(s);
+  if (!Number.isFinite(parsed)) return s.slice(0, 40);
+  return new Date(parsed).toISOString().slice(0, 10);
+}
+
+/** Local heuristic for "in N days" / weekday follow-ups. */
+export function extractLocalFollowUpDate(
+  text: string,
+  now = new Date()
+): string | null {
+  const combined = String(text ?? "");
+  const inDays = combined.match(
+    /\b(?:follow[\s-]?up|re-?check|re-?audit|check back)\s+(?:in\s+)?(\d{1,2})\s+days?\b/i
+  );
+  if (inDays) {
+    const d = new Date(now);
+    d.setDate(d.getDate() + Number(inDays[1]));
+    return d.toISOString().slice(0, 10);
+  }
+
+  const tomorrow = /\b(?:follow[\s-]?up|re-?check|re-?audit).{0,24}\btomorrow\b/i.test(
+    combined
+  );
+  if (tomorrow) {
+    const d = new Date(now);
+    d.setDate(d.getDate() + 1);
+    return d.toISOString().slice(0, 10);
+  }
+
+  const weekday = combined.match(
+    /\b(?:follow[\s-]?up|re-?check|re-?audit|check).{0,24}\b(monday|tuesday|wednesday|thursday|friday|saturday|sunday)\b/i
+  );
+  if (weekday) {
+    const names = [
+      "sunday",
+      "monday",
+      "tuesday",
+      "wednesday",
+      "thursday",
+      "friday",
+      "saturday",
+    ];
+    const target = names.indexOf(weekday[1].toLowerCase());
+    if (target >= 0) {
+      const d = new Date(now);
+      const delta = (target - d.getDay() + 7) % 7 || 7;
+      d.setDate(d.getDate() + delta);
+      return d.toISOString().slice(0, 10);
+    }
+  }
+
+  return null;
 }
 
 export function normalizeNoteExtractResult(
@@ -121,6 +276,7 @@ export function normalizeNoteExtractResult(
     tasks,
     aisle: aisleKnown || aisleFromModel,
     bay: bayKnown ?? bayFromModel,
+    metadata: normalizeNoteExtractMetadata(root),
   };
 }
 
@@ -158,6 +314,51 @@ export function buildLocalNoteExtract(
     tasks.push("Inspect flagged bay condition and clear hazard if present");
   }
 
+  const metadata = emptyNoteExtractMetadata();
+
+  const serialMatches = Array.from(
+    combined.matchAll(/\b(?:serial|s\/n|sn)\s*[:#]?\s*([A-Z0-9-]{5,24})\b/gi),
+    (m) => m[1].toUpperCase()
+  );
+  for (const serial of serialMatches.slice(0, 8)) {
+    metadata.appliance_serials.push({ serial, details: "Detected in note text" });
+  }
+
+  const remnantMatch = combined.match(
+    /\b(\d+(?:\.\d+)?)\s*(?:clf|ft|feet)\b.*?\b(remnant|roll|vinyl|carpet)\b/i
+  );
+  if (remnantMatch || /\bremnant\b/i.test(combined)) {
+    metadata.carpet_remnants.push({
+      length_clf: remnantMatch ? Number(remnantMatch[1]) : undefined,
+      missing_tag: /\b(missing|untagged|no tag)\b/i.test(combined),
+      details: "Remnant mention detected locally",
+    });
+  }
+
+  if (/\b(hazard|lean|clutter|top.?stock|pricing|spill|block)\b/i.test(combined)) {
+    metadata.operational_hotspots.push({
+      issue: "Operational hotspot flagged in note",
+      bay:
+        bayKnown != null
+          ? `Bay ${bayKnown}`
+          : bayMatch
+            ? `Bay ${bayMatch[1]}`
+            : undefined,
+      details: "Local heuristic extract",
+    });
+  }
+
+  const vendorHits = Array.from(
+    combined.matchAll(
+      /\b(Mohawk|Stainmaster|Shaw|Whirlpool|GE|Samsung|LG|Maytag|Frigidaire|Bosch|Karastan|Phenix)\b/gi
+    ),
+    (m) => m[1]
+  );
+  metadata.vendor_mentions = vendorHits.filter(
+    (v, i, a) => a.findIndex((x) => x.toLowerCase() === v.toLowerCase()) === i
+  );
+  metadata.follow_up_date = extractLocalFollowUpDate(combined);
+
   return {
     executive_summary: title
       ? `Local extract for “${title.slice(0, 60)}” (Gemini key missing). Confirm tasks on the floor.`
@@ -165,6 +366,7 @@ export function buildLocalNoteExtract(
     tasks,
     aisle: aisleKnown || (aisleMatch ? aisleMatch[1].toUpperCase() : null),
     bay: bayKnown ?? (bayMatch ? Number(bayMatch[1]) : null),
+    metadata,
   };
 }
 

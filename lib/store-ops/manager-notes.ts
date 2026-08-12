@@ -29,6 +29,8 @@ export type ManagerNote = {
   created_by: string;
   completed_task_indexes?: number[];
   is_archived: boolean;
+  /** Gemini Copilot structured extract (JSONB). */
+  metadata?: Record<string, any>;
 };
 
 export type ManagerNoteDraft = {
@@ -40,6 +42,7 @@ export type ManagerNoteDraft = {
   canvas_data_url?: string | null;
   category?: ManagerNoteCategory;
   is_archived?: boolean;
+  metadata?: Record<string, any>;
 };
 
 type ManagerNoteRow = {
@@ -62,6 +65,7 @@ type ManagerNoteRow = {
   created_by?: string | null;
   completed_task_indexes?: number[] | null;
   is_archived?: boolean | null;
+  metadata?: Record<string, any> | null;
 };
 
 function requireClient() {
@@ -103,6 +107,10 @@ export function mapManagerNoteRow(row: ManagerNoteRow): ManagerNote {
       ? row.completed_task_indexes
       : [],
     is_archived: Boolean(row.is_archived),
+    metadata:
+      row.metadata && typeof row.metadata === "object" && !Array.isArray(row.metadata)
+        ? (row.metadata as Record<string, any>)
+        : {},
   };
 }
 
@@ -123,6 +131,7 @@ export function emptyDraft(departmentCode: string): ManagerNoteDraft {
     canvas_data_url: null,
     category: "general",
     is_archived: false,
+    metadata: {},
   };
 }
 
@@ -192,6 +201,10 @@ export async function saveManagerNote(
     created_by: note.created_by,
     completed_task_indexes: note.completed_task_indexes ?? [],
     is_archived: Boolean(note.is_archived),
+    metadata:
+      note.metadata && typeof note.metadata === "object" && !Array.isArray(note.metadata)
+        ? note.metadata
+        : {},
     updated_at: new Date().toISOString(),
   };
 

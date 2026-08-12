@@ -7,7 +7,6 @@ import {
 import {
   isDeptFloorActor,
   resolveStoreOpsActor,
-  requireStoreOpsActor,
   StoreOpsAuthError,
 } from "@/lib/store-ops/auth-server";
 import { readableError } from "@/lib/store-ops/errors";
@@ -17,6 +16,7 @@ import {
 } from "@/lib/store-ops/health";
 import {
   buildLocalShiftBriefing,
+  buildSessionRefreshShiftBriefing,
   buildShiftBriefingPrompt,
   normalizeShiftBriefing,
   type ShiftBriefing,
@@ -25,14 +25,32 @@ import { resolveStoreByNumber } from "@/lib/store-ops/stores";
 import { getSupabaseAdmin } from "@/lib/store-ops/supabase-admin";
 import { isoWeekLabel } from "@/lib/store-ops/week";
 import { supabaseAdminMissingMessage } from "@/lib/supabase/env";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 /**
  * POST /api/store-health/ai-summary
  * Zebra Shift Intelligence Briefing from current store health metrics.
+ *
+ * Auth: Bearer (localStorage session) or cookie session via createSupabaseServerClient.
+ * Missing session → soft 200 fallback (prompt to refresh Auth), not a hard 401.
  */
 export async function POST(request: Request) {
   try {
-    const actor = requireStoreOpsActor(await resolveStoreOpsActor(request));
+    // Ensure cookie-bound server client is available for session forwarding
+    // when the request has no Authorization header (SSR / cookie Auth).
+    await createSupabaseServerClient();
+
+    const actor = await resolveStoreOpsActor(request);
+    if (!actor) {
+      const soft = buildSessionRefreshShiftBriefing();
+      return NextResponse.json({
+        ...soft,
+        assigned_week: isoWeekLabel(),
+        source: "session" as const,
+        auth_required: true,
+      });
+    }
+
     const supabase = getSupabaseAdmin();
     if (!supabase) {
       return NextResponse.json(
@@ -97,7 +115,14 @@ export async function POST(request: Request) {
     });
   } catch (err) {
     if (err instanceof StoreOpsAuthError) {
-      return NextResponse.json({ error: err.message }, { status: err.status });
+      const soft = buildSessionRefreshShiftBriefing();
+      return NextResponse.json({
+        ...soft,
+        assigned_week: isoWeekLabel(),
+        source: "session" as const,
+        auth_required: true,
+        hint: err.message,
+      });
     }
     console.error("[store-health/ai-summary]", err);
     return NextResponse.json(

@@ -95,6 +95,7 @@ export function ExecutiveFloorPad({
   const selectedIdRef = useRef(selectedId);
   const notesRef = useRef(notes);
   const summaryRef = useRef<string | null>(null);
+  const metadataRef = useRef<Record<string, any>>({});
   const skipAutosaveRef = useRef(false);
   const createdAtRef = useRef<string | null>(null);
 
@@ -133,6 +134,7 @@ export function ExecutiveFloorPad({
     });
     setContentKey(`new-${Date.now()}`);
     setSummary(null);
+    metadataRef.current = {};
     setError(null);
     setStatus(null);
     setSaveStatus("idle");
@@ -190,6 +192,10 @@ export function ExecutiveFloorPad({
       canvas_data_url: null,
       ai_summary: summaryRef.current ?? existing?.ai_summary ?? null,
       action_items: existing?.action_items ?? null,
+      metadata:
+        Object.keys(metadataRef.current).length > 0
+          ? metadataRef.current
+          : existing?.metadata ?? {},
       created_by:
         existing?.created_by ||
         specialist.username ||
@@ -254,6 +260,7 @@ export function ExecutiveFloorPad({
     });
     setContentKey(note.id);
     setSummary(note.ai_summary);
+    metadataRef.current = note.metadata ?? {};
     setError(null);
     setStatus(null);
     setSaveStatus("idle");
@@ -262,7 +269,7 @@ export function ExecutiveFloorPad({
     }, 50);
   }
 
-  async function onGeminiCopilot() {
+  async function runGeminiCopilot(contentOverride?: string) {
     setBusy(true);
     setError(null);
     setStatus(null);
@@ -274,32 +281,44 @@ export function ExecutiveFloorPad({
         );
       }
 
+      const contentForExtract = contentOverride ?? draftRef.current.content;
+      const draftSnap = draftRef.current;
+
       const result = await extractTasksAndTag({
         accessToken: token,
-        title: draft.title,
-        content: draft.content,
-        department_code: draft.department_code,
-        aisle: draft.aisle?.trim() || undefined,
-        bay: draft.bay,
+        title: draftSnap.title,
+        content: contentForExtract,
+        department_code: draftSnap.department_code,
+        aisle: draftSnap.aisle?.trim() || undefined,
+        bay: draftSnap.bay,
       });
 
-      const nextHtml = appendTaskCheckboxesHtml(draft.content, result.tasks);
+      const nextHtml = appendTaskCheckboxesHtml(
+        contentForExtract,
+        result.tasks
+      );
       skipAutosaveRef.current = true;
       summaryRef.current = result.executive_summary;
+      metadataRef.current = result.metadata ?? {};
       setSummary(result.executive_summary);
       const nextDraft: ManagerNoteDraft = {
-        ...draft,
+        ...draftSnap,
         content: nextHtml,
-        aisle: result.aisle ?? draft.aisle ?? "",
-        bay: result.bay ?? draft.bay ?? null,
+        aisle: result.aisle ?? draftSnap.aisle ?? "",
+        bay: result.bay ?? draftSnap.bay ?? null,
+        metadata: result.metadata ?? {},
       };
       draftRef.current = nextDraft;
       setDraft(nextDraft);
       setContentKey(`gemini-${Date.now()}`);
+      const followUp =
+        result.metadata?.follow_up_date != null
+          ? ` · follow-up ${result.metadata.follow_up_date}`
+          : "";
       setStatus(
         result.source === "gemini"
-          ? "Gemini Copilot extracted tasks & tags"
-          : "Local extract (Gemini key missing)"
+          ? `Gemini Copilot extracted tasks, tags & metadata${followUp}`
+          : `Local extract (Gemini key missing)${followUp}`
       );
       window.setTimeout(() => {
         skipAutosaveRef.current = false;
@@ -310,6 +329,20 @@ export function ExecutiveFloorPad({
     } finally {
       setBusy(false);
     }
+  }
+
+  async function onGeminiCopilot() {
+    await runGeminiCopilot();
+  }
+
+  async function onVoiceParse(htmlWithTranscript: string) {
+    draftRef.current = {
+      ...draftRef.current,
+      content: htmlWithTranscript,
+    };
+    setDraft((d) => ({ ...d, content: htmlWithTranscript }));
+    setStatus("Voice captured — parsing with Gemini Copilot…");
+    await runGeminiCopilot(htmlWithTranscript);
   }
 
   async function onArchive() {
@@ -432,6 +465,8 @@ export function ExecutiveFloorPad({
           onChange={(html) => setDraft((d) => ({ ...d, content: html }))}
           busy={busy}
           onGemini={() => void onGeminiCopilot()}
+          onVoiceParse={(html) => void onVoiceParse(html)}
+          onSpeechError={(message) => setError(message)}
           saveStatus={saveStatus}
           title={draft.title}
           onTitleChange={(value) =>

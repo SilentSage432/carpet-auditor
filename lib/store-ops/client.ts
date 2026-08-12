@@ -499,7 +499,8 @@ export type ShiftBriefingClient = {
   bullets: [string, string, string];
   priority_department: string;
   assigned_week?: string;
-  source?: "gemini" | "local";
+  source?: "gemini" | "local" | "session";
+  auth_required?: boolean;
 };
 
 /** Zebra Shift Intelligence Briefing from store health metrics + velocity. */
@@ -511,21 +512,40 @@ export async function fetchShiftBriefing(
     telemetry?: import("@/lib/store-ops/telemetry").StoreAuditTelemetry | null;
   }
 ): Promise<ShiftBriefingClient> {
-  return storeOpsFetch<ShiftBriefingClient>(
-    "/api/store-health/ai-summary",
-    specialist,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        ...(options?.week ? { week: options.week } : {}),
-        ...(options?.snapshot ? { snapshot: options.snapshot } : {}),
-        ...(options?.telemetry !== undefined
-          ? { telemetry: options.telemetry }
-          : {}),
-      }),
+  try {
+    return await storeOpsFetch<ShiftBriefingClient>(
+      "/api/store-health/ai-summary",
+      specialist,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          ...(options?.week ? { week: options.week } : {}),
+          ...(options?.snapshot ? { snapshot: options.snapshot } : {}),
+          ...(options?.telemetry !== undefined
+            ? { telemetry: options.telemetry }
+            : {}),
+        }),
+      }
+    );
+  } catch (err) {
+    const message = String((err as { message?: string } | null)?.message ?? "");
+    if (/unauthorized|auth session|sign in|401/i.test(message)) {
+      return {
+        headline: "Refresh Auth to load shift intel",
+        bullets: [
+          "Supabase Auth session required — use phone OTP / Forgot Access to link your profile.",
+          "Hub PIN login alone does not authorize Store Ops APIs.",
+          "After signing in, pull to refresh or tap re-analyze for a live briefing.",
+        ],
+        priority_department: "Storewide",
+        assigned_week: options?.week || options?.snapshot?.assigned_week,
+        source: "session",
+        auth_required: true,
+      };
     }
-  );
+    throw err;
+  }
 }
 
 export type InviteSupervisorResult = {

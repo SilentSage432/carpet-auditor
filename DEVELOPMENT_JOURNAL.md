@@ -1,5 +1,25 @@
 # DeptSync Hub — Development Journal
 
+## 2026-08-12 — Soft-fail Shift Intelligence Briefing auth
+
+### Shipped
+- `POST /api/store-health/ai-summary` warms `createSupabaseServerClient` (cookie session) and returns a 200 session-refresh briefing when Auth is missing instead of hard 401.
+- `fetchShiftBriefing` client mirrors the soft fallback; `ShiftBriefingCard` shows an amber OTP refresh prompt.
+
+## 2026-08-12 — Floor Pad voice dictation + follow_up_date
+
+### Shipped
+- Mic / Stop & Parse control on Floor Pad toolbar (Web Speech API) with pulsing rec indicator.
+- Stop appends transcript to TipTap then auto-runs `extractTasksAndTag` (aisle/bay, tasks, metadata).
+- Metadata now includes `follow_up_date` (ISO) from Gemini + local weekday / “in N days” heuristics.
+
+## 2026-08-12 — Floor Pad Gemini metadata extract
+
+### Shipped
+- Gemini Copilot prompt/schema now returns structured `metadata`: appliance_serials, carpet_remnants, operational_hotspots, vendor_mentions (`lib/store-ops/ai-note-extract.ts`).
+- Migration `20260812_manager_notes_metadata.sql` — `manager_notes.metadata` JSONB + GIN index.
+- `ManagerNote.metadata?: Record<string, any>` persisted on save/upsert; Floor Pad stamps metadata from Copilot into autosave.
+
 ## 2026-08-12 — Fix manager_notes RLS (Floor Pad upserts)
 
 ### Shipped

@@ -115,7 +115,11 @@ export function ShiftBriefingCard({ specialist, refreshKey }: Props) {
           {briefing?.assigned_week ? (
             <p className="mt-0.5 font-mono text-[10px] text-emerald-500/80">
               Week {briefing.assigned_week}
-              {briefing.source === "local" ? " · local metrics" : ""}
+              {briefing.source === "local"
+                ? " · local metrics"
+                : briefing.source === "session"
+                  ? " · auth refresh needed"
+                  : ""}
             </p>
           ) : null}
         </div>
@@ -162,6 +166,12 @@ export function ShiftBriefingCard({ specialist, refreshKey }: Props) {
                 </li>
               ))}
             </ul>
+            {briefing.auth_required || briefing.source === "session" ? (
+              <p className="mt-3 rounded-lg border border-amber-500/35 bg-amber-950/30 px-3 py-2 text-xs leading-snug text-amber-100">
+                Sign in with phone OTP (Forgot Access) so Store Ops can read your
+                Auth session, then tap refresh.
+              </p>
+            ) : null}
             {error ? (
               <p className="mt-2 text-xs text-amber-300/90" role="status">
                 Refresh note: {error}
