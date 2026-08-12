@@ -1,5 +1,13 @@
 # DeptSync Hub — Development Journal
 
+## 2026-08-12 — Soft-fail Store Map / Bulk Admin auth
+
+### Shipped
+- `GET /api/departments` + `GET /api/store-locations` warm `createSupabaseServerClient` and return empty lists + `auth_required` instead of hard 401 UI blockers.
+- Bulk generate keeps 401 for writes but returns a structured Auth hint; Bulk + Admin Tools show OTP refresh copy.
+- Store Map amber banner with Retry; env helpers also accept `SUPABASE_URL` / `SUPABASE_ANON_KEY` aliases.
+- Verified `.env.local`: `NEXT_PUBLIC_SUPABASE_URL` + `SUPABASE_SERVICE_ROLE_KEY` are set.
+
 ## 2026-08-12 — Soft-fail Shift Intelligence Briefing auth
 
 ### Shipped

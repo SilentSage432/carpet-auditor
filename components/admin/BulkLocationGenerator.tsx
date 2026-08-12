@@ -31,6 +31,14 @@ function typesForMode(mode: LocationMode): StoreLocationType[] {
   return ["SELLING"];
 }
 
+function bulkAuthFriendlyError(err: unknown, fallback: string): string {
+  const next = (err as { message?: string } | null)?.message || fallback;
+  if (/unauthorized|auth session|phone otp/i.test(next)) {
+    return "Sign in with phone OTP (Forgot Access) before Bulk Generate, then retry.";
+  }
+  return next;
+}
+
 export function BulkLocationGenerator({
   specialist,
   departments,
@@ -93,10 +101,7 @@ export function BulkLocationGenerator({
       );
       onGenerated();
     } catch (err) {
-      const next =
-        (err as { message?: string } | null)?.message ||
-        "Failed to generate locations";
-      setError(next);
+      setError(bulkAuthFriendlyError(err, "Failed to generate locations"));
     } finally {
       setBusy(false);
     }
@@ -166,10 +171,7 @@ export function BulkLocationGenerator({
       }
       onGenerated();
     } catch (err) {
-      setError(
-        (err as { message?: string } | null)?.message ||
-          "Failed to parse / load CSV batch"
-      );
+      setError(bulkAuthFriendlyError(err, "Failed to parse / load CSV batch"));
     } finally {
       setBusy(false);
     }
@@ -195,10 +197,7 @@ export function BulkLocationGenerator({
         } parsed`
       );
     } catch (err) {
-      setError(
-        (err as { message?: string } | null)?.message ||
-          "AI Pre-Flight parse failed"
-      );
+      setError(bulkAuthFriendlyError(err, "AI Pre-Flight parse failed"));
     } finally {
       setBusy(false);
     }
@@ -265,10 +264,7 @@ export function BulkLocationGenerator({
       setAiCorrections([]);
       onGenerated();
     } catch (err) {
-      setError(
-        (err as { message?: string } | null)?.message ||
-          "Confirm & bulk create failed"
-      );
+      setError(bulkAuthFriendlyError(err, "Confirm & bulk create failed"));
     } finally {
       setBusy(false);
     }

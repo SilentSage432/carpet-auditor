@@ -2,19 +2,31 @@ import { NextResponse } from "next/server";
 import {
   isDeptFloorActor,
   resolveStoreOpsActor,
-  requireStoreOpsActor,
   requireSuperAdmin,
   requireSupervisorOrAdmin,
   StoreOpsAuthError,
 } from "@/lib/store-ops/auth-server";
+import { storeOpsAuthRequiredBody } from "@/lib/store-ops/auth-soft";
 import { getSupabaseAdmin } from "@/lib/store-ops/supabase-admin";
 import { resolveDepartmentIdByCode } from "@/lib/store-ops/rotations";
 import { resolveStoreByNumber } from "@/lib/store-ops/stores";
 import { supabaseAdminMissingMessage } from "@/lib/supabase/env";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export async function GET(request: Request) {
   try {
-    const actor = requireStoreOpsActor(await resolveStoreOpsActor(request));
+    // Cookie-bound client for SSR / cookie Auth; Bearer still preferred from client.
+    await createSupabaseServerClient();
+    const actor = await resolveStoreOpsActor(request);
+    if (!actor) {
+      return NextResponse.json(
+        storeOpsAuthRequiredBody({
+          store_id: null,
+          locations: [],
+        })
+      );
+    }
+
     const supabase = getSupabaseAdmin();
     if (!supabase) {
       return NextResponse.json(
@@ -71,7 +83,13 @@ export async function GET(request: Request) {
     });
   } catch (err) {
     if (err instanceof StoreOpsAuthError) {
-      return NextResponse.json({ error: err.message }, { status: err.status });
+      return NextResponse.json(
+        storeOpsAuthRequiredBody({
+          store_id: null,
+          locations: [],
+          hint: err.message,
+        })
+      );
     }
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Unknown error" },

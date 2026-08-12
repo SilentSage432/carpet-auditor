@@ -22,7 +22,11 @@ import { WeeklyBayTargetCard } from "@/components/hub/WeeklyBayTargetCard";
 import { ManagerNotesWorkspace } from "@/components/store-ops/ManagerNotesWorkspace";
 import { selectOnFocus } from "@/lib/number-input";
 import { isMasterAdmin } from "@/lib/rbac";
-import { fetchDepartments } from "@/lib/store-ops/client";
+import { fetchDepartmentsDetailed } from "@/lib/store-ops/client";
+import {
+  isStoreOpsAuthFailureMessage,
+  STORE_OPS_AUTH_HINT,
+} from "@/lib/store-ops/auth-soft";
 import { findFlooringDepartment } from "@/lib/store-ops/sunday-audit";
 import { usePendingSyncCount } from "@/lib/network";
 import {
@@ -87,12 +91,21 @@ export function AdminToolsDrawer({
   const reloadDepts = useCallback(async () => {
     if (!isMasterAdmin(specialist)) return;
     try {
-      const list = await fetchDepartments(specialist);
-      setDepartments(list);
-      setLoadError(null);
-    } catch {
+      const result = await fetchDepartmentsDetailed(specialist);
+      setDepartments(result.items);
+      setLoadError(
+        result.authRequired
+          ? result.hint || STORE_OPS_AUTH_HINT
+          : null
+      );
+    } catch (err) {
       setDepartments([]);
-      setLoadError("Could not load departments for admin tools.");
+      const message = String((err as { message?: string } | null)?.message ?? "");
+      setLoadError(
+        isStoreOpsAuthFailureMessage(message)
+          ? STORE_OPS_AUTH_HINT
+          : "Could not load departments for admin tools."
+      );
     }
   }, [specialist]);
 
@@ -183,7 +196,13 @@ export function AdminToolsDrawer({
             ) : null}
 
             {loadError ? (
-              <p className="mb-3 rounded-xl border border-red-500/40 bg-red-950/40 px-3 py-2 text-sm text-red-200">
+              <p
+                className={`mb-3 rounded-xl border px-3 py-2 text-sm ${
+                  /auth session|phone otp|forgot access/i.test(loadError)
+                    ? "border-amber-500/40 bg-amber-950/35 text-amber-100"
+                    : "border-red-500/40 bg-red-950/40 text-red-200"
+                }`}
+              >
                 {loadError}
               </p>
             ) : null}

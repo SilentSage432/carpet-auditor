@@ -5,16 +5,33 @@ import {
   requireSuperAdmin,
   StoreOpsAuthError,
 } from "@/lib/store-ops/auth-server";
+import {
+  STORE_OPS_AUTH_HINT,
+  storeOpsAuthRequiredBody,
+} from "@/lib/store-ops/auth-soft";
 import { readableError } from "@/lib/store-ops/errors";
 import { bulkInsertLocations } from "@/lib/store-ops/locations";
 import { getSupabaseAdmin } from "@/lib/store-ops/supabase-admin";
 import { resolveStoreByNumber } from "@/lib/store-ops/stores";
 import type { StoreLocationType } from "@/lib/store-ops/types";
 import { supabaseAdminMissingMessage } from "@/lib/supabase/env";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export async function POST(request: Request) {
   try {
-    const actor = requireSuperAdmin(await resolveStoreOpsActor(request));
+    await createSupabaseServerClient();
+    const actor = await resolveStoreOpsActor(request);
+    if (!actor) {
+      return NextResponse.json(
+        storeOpsAuthRequiredBody({
+          error: STORE_OPS_AUTH_HINT,
+          created: 0,
+          locations: [],
+        }),
+        { status: 401 }
+      );
+    }
+    requireSuperAdmin(actor);
     const supabase = getSupabaseAdmin();
     if (!supabase) {
       return NextResponse.json(

@@ -19,7 +19,9 @@ const PLACEHOLDER_KEYS = [
 ];
 
 export function getSupabaseUrl(): string | null {
-  const url = trimEnv(process.env.NEXT_PUBLIC_SUPABASE_URL);
+  const url = trimEnv(
+    process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL
+  );
   if (!url) return null;
   if (PLACEHOLDER_URLS.some((p) => url.includes(p))) return null;
   if (!/^https:\/\/[a-z0-9-]+\.supabase\.co\/?$/i.test(url) && !url.startsWith("http://127.0.0.1") && !url.startsWith("http://localhost")) {
@@ -30,7 +32,9 @@ export function getSupabaseUrl(): string | null {
 }
 
 export function getSupabaseAnonKey(): string | null {
-  const key = trimEnv(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
+  const key = trimEnv(
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY
+  );
   if (!key) return null;
   if (PLACEHOLDER_KEYS.some((p) => key.toLowerCase().includes(p))) return null;
   return key;

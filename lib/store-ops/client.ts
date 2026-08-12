@@ -5,6 +5,10 @@
 import type { StoreSpecialist } from "@/lib/types";
 import { getStoreNumber } from "@/lib/store";
 import { actorFromSpecialist, storeOpsAuthHeadersAsync } from "./auth";
+import {
+  isStoreOpsAuthFailureMessage,
+  STORE_OPS_AUTH_HINT,
+} from "./auth-soft";
 import { readableError } from "./errors";
 import type {
   BulkGenerateInput,
@@ -36,6 +40,7 @@ async function storeOpsFetch<T>(
     const body = (await res.json().catch(() => ({}))) as {
       error?: string;
       hint?: string;
+      auth_required?: boolean;
       [key: string]: unknown;
     };
 
@@ -57,28 +62,84 @@ async function storeOpsFetch<T>(
   }
 }
 
+export type StoreOpsListResult<T> = {
+  items: T[];
+  authRequired: boolean;
+  hint?: string;
+};
+
 export async function fetchDepartments(
   specialist: StoreSpecialist
 ): Promise<Department[]> {
-  const data = await storeOpsFetch<{ departments: Department[] }>(
-    "/api/departments",
-    specialist
-  );
-  return data.departments;
+  const result = await fetchDepartmentsDetailed(specialist);
+  return result.items;
+}
+
+/** Departments list with soft Auth signal for Store Map / Admin Tools. */
+export async function fetchDepartmentsDetailed(
+  specialist: StoreSpecialist
+): Promise<StoreOpsListResult<Department>> {
+  try {
+    const data = await storeOpsFetch<{
+      departments: Department[];
+      auth_required?: boolean;
+      hint?: string;
+    }>("/api/departments", specialist);
+    return {
+      items: data.departments ?? [],
+      authRequired: Boolean(data.auth_required),
+      hint: data.hint,
+    };
+  } catch (err) {
+    const message = String((err as { message?: string } | null)?.message ?? "");
+    if (isStoreOpsAuthFailureMessage(message)) {
+      return {
+        items: [],
+        authRequired: true,
+        hint: STORE_OPS_AUTH_HINT,
+      };
+    }
+    throw err;
+  }
 }
 
 export async function fetchStoreLocations(
   specialist: StoreSpecialist,
   departmentId?: string
 ): Promise<StoreLocation[]> {
+  const result = await fetchStoreLocationsDetailed(specialist, departmentId);
+  return result.items;
+}
+
+export async function fetchStoreLocationsDetailed(
+  specialist: StoreSpecialist,
+  departmentId?: string
+): Promise<StoreOpsListResult<StoreLocation>> {
   const qs = departmentId
     ? `?department_id=${encodeURIComponent(departmentId)}`
     : "";
-  const data = await storeOpsFetch<{ locations: StoreLocation[] }>(
-    `/api/store-locations${qs}`,
-    specialist
-  );
-  return data.locations;
+  try {
+    const data = await storeOpsFetch<{
+      locations: StoreLocation[];
+      auth_required?: boolean;
+      hint?: string;
+    }>(`/api/store-locations${qs}`, specialist);
+    return {
+      items: data.locations ?? [],
+      authRequired: Boolean(data.auth_required),
+      hint: data.hint,
+    };
+  } catch (err) {
+    const message = String((err as { message?: string } | null)?.message ?? "");
+    if (isStoreOpsAuthFailureMessage(message)) {
+      return {
+        items: [],
+        authRequired: true,
+        hint: STORE_OPS_AUTH_HINT,
+      };
+    }
+    throw err;
+  }
 }
 
 export async function bulkGenerateLocations(

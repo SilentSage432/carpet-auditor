@@ -8,10 +8,14 @@ import { SessionGate } from "@/components/hub/SessionGate";
 import { VisualBayScannerModal } from "@/components/store-ops/VisualBayScannerModal";
 import { isMasterAdmin } from "@/lib/rbac";
 import {
-  fetchDepartments,
-  fetchStoreLocations,
+  fetchDepartmentsDetailed,
+  fetchStoreLocationsDetailed,
   updateDepartmentActive,
 } from "@/lib/store-ops/client";
+import {
+  isStoreOpsAuthFailureMessage,
+  STORE_OPS_AUTH_HINT,
+} from "@/lib/store-ops/auth-soft";
 import { readableError } from "@/lib/store-ops/errors";
 import type { Department, StoreLocation } from "@/lib/store-ops/types";
 import { isoWeekLabel } from "@/lib/store-ops/week";
@@ -49,6 +53,7 @@ function StoreMapBody({
   const [locations, setLocations] = useState<StoreLocation[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [authRequired, setAuthRequired] = useState(false);
   const [isOverviewOpen, setIsOverviewOpen] = useState(false);
   const [toggleBusyId, setToggleBusyId] = useState<string | null>(null);
   const [bayScanOpen, setBayScanOpen] = useState(false);
@@ -57,15 +62,26 @@ function StoreMapBody({
   const reload = useCallback(async (member: StoreSpecialist) => {
     setLoading(true);
     setError(null);
+    setAuthRequired(false);
     try {
       const [depts, locs] = await Promise.all([
-        fetchDepartments(member),
-        fetchStoreLocations(member),
+        fetchDepartmentsDetailed(member),
+        fetchStoreLocationsDetailed(member),
       ]);
-      setDepartments(depts);
-      setLocations(locs);
+      setDepartments(depts.items);
+      setLocations(locs.items);
+      if (depts.authRequired || locs.authRequired) {
+        setAuthRequired(true);
+      }
     } catch (err) {
-      setError(readableError(err, "Failed to load store map"));
+      const message = readableError(err, "Failed to load store map");
+      if (isStoreOpsAuthFailureMessage(message)) {
+        setAuthRequired(true);
+        setDepartments([]);
+        setLocations([]);
+      } else {
+        setError(message);
+      }
     } finally {
       setLoading(false);
     }
@@ -145,6 +161,23 @@ function StoreMapBody({
           <span aria-hidden>📷</span>
           Snap Bay AI Audit
         </button>
+
+        {authRequired ? (
+          <p className="glass-card mb-4 border-amber-500/40 bg-amber-950/25 px-4 py-3 text-sm text-amber-100">
+            {STORE_OPS_AUTH_HINT}
+            <span className="mt-1 block text-amber-200/75">
+              Hub PIN login alone is not enough for Store Map / Bulk tools. After
+              phone OTP, tap refresh or reopen this page.
+            </span>
+            <button
+              type="button"
+              onClick={() => void reload(specialist)}
+              className="mt-3 min-h-11 rounded-xl border border-amber-500/45 bg-amber-950/40 px-3 text-xs font-semibold text-amber-100"
+            >
+              Retry after Auth
+            </button>
+          </p>
+        ) : null}
 
         {error ? (
           <p className="glass-card mb-4 border-rose-500/40 px-4 py-3 text-sm text-rose-200">

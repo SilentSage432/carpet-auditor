@@ -2,11 +2,11 @@ import { NextResponse } from "next/server";
 import {
   isDeptFloorActor,
   resolveStoreOpsActor,
-  requireStoreOpsActor,
   requireSuperAdmin,
   requireSupervisorOrAdmin,
   StoreOpsAuthError,
 } from "@/lib/store-ops/auth-server";
+import { storeOpsAuthRequiredBody } from "@/lib/store-ops/auth-soft";
 import { requireSupabaseAdmin } from "@/lib/supabase/admin-response";
 import { readableError } from "@/lib/store-ops/errors";
 import { resolveDepartmentIdByCode } from "@/lib/store-ops/rotations";
@@ -14,10 +14,22 @@ import {
   ensureDepartmentsForStore,
   resolveStoreByNumber,
 } from "@/lib/store-ops/stores";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export async function GET(request: Request) {
   try {
-    const actor = requireStoreOpsActor(await resolveStoreOpsActor(request));
+    await createSupabaseServerClient();
+    const actor = await resolveStoreOpsActor(request);
+    if (!actor) {
+      return NextResponse.json(
+        storeOpsAuthRequiredBody({
+          store_id: null,
+          store_number: null,
+          departments: [],
+        })
+      );
+    }
+
     const { supabase, response } = requireSupabaseAdmin();
     if (!supabase) return response;
 
@@ -53,7 +65,14 @@ export async function GET(request: Request) {
     });
   } catch (err) {
     if (err instanceof StoreOpsAuthError) {
-      return NextResponse.json({ error: err.message }, { status: err.status });
+      return NextResponse.json(
+        storeOpsAuthRequiredBody({
+          store_id: null,
+          store_number: null,
+          departments: [],
+          hint: err.message,
+        })
+      );
     }
     console.error("[departments GET]", err);
     return NextResponse.json(
