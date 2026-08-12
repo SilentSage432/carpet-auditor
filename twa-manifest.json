@@ -13,8 +13,8 @@
   "backgroundColor": "#09090B",
   "enableNotifications": true,
   "startUrl": "/",
-  "iconUrl": "/Users/silentsage/Desktop/carpet-auditor/public/icons/icon-512.png",
-  "maskableIconUrl": "/Users/silentsage/Desktop/carpet-auditor/public/icons/icon-512.png",
+  "iconUrl": "public/icons/icon-512.png",
+  "maskableIconUrl": "public/icons/icon-512.png",
   "splashScreenFadeOutDuration": 300,
   "signingKey": {
     "path": "/Users/silentsage/Desktop/carpet-auditor/android.keystore",
