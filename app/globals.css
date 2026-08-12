@@ -305,6 +305,17 @@ input[type="number"] {
 
 /* ── Executive Floor Pad (TipTap) ── */
 
+.floor-pad-editor {
+  min-height: 0;
+}
+
+.floor-pad-canvas .tiptap,
+.floor-pad-canvas .ProseMirror,
+.floor-pad-prose.ProseMirror {
+  min-height: 80dvh;
+  height: 100%;
+}
+
 .floor-pad-prose p {
   margin: 0.35em 0;
 }

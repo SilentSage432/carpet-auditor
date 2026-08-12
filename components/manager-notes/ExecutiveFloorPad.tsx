@@ -24,10 +24,10 @@ import {
   type ManagerNoteDraft,
 } from "@/lib/store-ops/manager-notes";
 import { getSupabaseAccessToken } from "@/lib/supabase/client";
-import { selectOnFocus } from "@/lib/number-input";
 import type { StoreSpecialist } from "@/lib/types";
 import { FloorPadEditor } from "./FloorPadEditor";
 import { FloorPadHeaderPills } from "./FloorPadHeaderPills";
+import { loadFloorPadFonts } from "./fonts";
 
 const AUTOSAVE_MS = 700;
 
@@ -143,6 +143,7 @@ export function ExecutiveFloorPad({
 
   useEffect(() => {
     if (!open) return;
+    loadFloorPadFonts();
     void reloadNotes();
     resetDraft();
     document.body.style.overflow = "hidden";
@@ -342,6 +343,8 @@ export function ExecutiveFloorPad({
 
   if (!open) return null;
 
+  const hasFooterChrome = Boolean(error || status || summary || selectedId);
+
   return (
     <div className="fixed inset-0 z-[80] flex flex-col bg-[#090d16]">
       <div
@@ -359,32 +362,49 @@ export function ExecutiveFloorPad({
         aria-labelledby={titleId}
         className="relative z-10 flex h-dvh w-full flex-col"
       >
-        <header className="flex shrink-0 items-start gap-3 border-b border-zinc-800/80 px-4 pb-3 pt-[max(0.75rem,env(safe-area-inset-top))] backdrop-blur-md">
-          <div className="min-w-0 flex-1">
-            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.18em] text-emerald-300/90">
-              Executive Floor Pad
-            </p>
-            <h2 id={titleId} className="text-xl font-bold tracking-tight text-zinc-50">
-              DeptSync Notes
-            </h2>
+        <header className="shrink-0 border-b border-zinc-800/80 px-3 pb-1.5 pt-[max(0.45rem,env(safe-area-inset-top))] backdrop-blur-md">
+          <div className="flex items-center gap-2">
+            <div className="min-w-0 flex-1">
+              <h2
+                id={titleId}
+                className="truncate text-base font-bold tracking-tight text-zinc-50"
+              >
+                <span className="mr-2 font-mono text-[9px] font-bold uppercase tracking-[0.16em] text-emerald-300/90">
+                  Floor Pad
+                </span>
+                DeptSync Notes
+              </h2>
+            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-zinc-700 text-zinc-200"
+              aria-label="Close"
+            >
+              <X className="h-4 w-4" />
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="btn-icon-touch flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-zinc-700 text-zinc-200"
-            aria-label="Close"
-          >
-            <X className="h-5 w-5" />
-          </button>
+          <div className="mt-1.5">
+            <FloorPadHeaderPills
+              department={draft.department_code}
+              aisle={draft.aisle ?? ""}
+              bay={draft.bay ?? null}
+              onDepartmentChange={(department_code) =>
+                setDraft((d) => ({ ...d, department_code }))
+              }
+              onAisleChange={(aisle) => setDraft((d) => ({ ...d, aisle }))}
+              onBayChange={(bay) => setDraft((d) => ({ ...d, bay }))}
+            />
+          </div>
         </header>
 
-        <div className="flex shrink-0 gap-2 overflow-x-auto border-b border-zinc-800/60 px-3 py-2">
+        <div className="no-scrollbar flex shrink-0 gap-1.5 overflow-x-auto border-b border-zinc-800/50 px-2 py-1">
           <button
             type="button"
             onClick={resetDraft}
-            className="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-xl border border-emerald-500/40 bg-emerald-950/40 px-3 text-xs font-semibold text-emerald-200"
+            className="inline-flex h-8 shrink-0 items-center gap-1 rounded-lg border border-emerald-500/40 bg-emerald-950/40 px-2.5 text-[11px] font-semibold text-emerald-200"
           >
-            <Plus className="h-3.5 w-3.5" />
+            <Plus className="h-3 w-3" />
             New
           </button>
           {notes.map((n) => (
@@ -392,41 +412,18 @@ export function ExecutiveFloorPad({
               key={n.id}
               type="button"
               onClick={() => loadNote(n)}
-              className={`min-h-11 max-w-[10rem] shrink-0 truncate rounded-xl border px-3 text-left text-xs font-semibold ${
+              className={`h-8 max-w-[9rem] shrink-0 truncate rounded-lg border px-2.5 text-left text-[11px] font-semibold ${
                 selectedId === n.id
                   ? "border-cyan-400/60 bg-cyan-950/50 text-cyan-100"
                   : "border-zinc-700 bg-zinc-950/60 text-zinc-300"
               }`}
             >
               {n.title || "Untitled"}
-              <span className="mt-0.5 block truncate font-normal text-[10px] text-zinc-500">
+              <span className="ml-1 font-normal text-[9px] text-zinc-500">
                 {formatWhen(n.updated_at || n.created_at)}
               </span>
             </button>
           ))}
-        </div>
-
-        <FloorPadHeaderPills
-          department={draft.department_code}
-          aisle={draft.aisle ?? ""}
-          bay={draft.bay ?? null}
-          onDepartmentChange={(department_code) =>
-            setDraft((d) => ({ ...d, department_code }))
-          }
-          onAisleChange={(aisle) => setDraft((d) => ({ ...d, aisle }))}
-          onBayChange={(bay) => setDraft((d) => ({ ...d, bay }))}
-        />
-
-        <div className="px-3 pt-2">
-          <input
-            className="glass-input min-h-11 w-full text-base font-semibold"
-            value={draft.title}
-            onChange={(e) =>
-              setDraft((d) => ({ ...d, title: e.target.value }))
-            }
-            placeholder="Note title"
-            onFocus={selectOnFocus}
-          />
         </div>
 
         <FloorPadEditor
@@ -436,43 +433,51 @@ export function ExecutiveFloorPad({
           busy={busy}
           onGemini={() => void onGeminiCopilot()}
           saveStatus={saveStatus}
+          title={draft.title}
+          onTitleChange={(value) =>
+            setDraft((d) => ({ ...d, title: value }))
+          }
         />
 
-        <footer className="shrink-0 space-y-2 border-t border-zinc-800/80 px-3 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] backdrop-blur-md">
-          {error ? (
-            <p className="rounded-xl border border-rose-500/40 bg-rose-950/40 px-3 py-2 text-sm text-rose-200">
-              {error}
-            </p>
-          ) : null}
-          {status ? (
-            <p className="text-xs text-emerald-300">{status}</p>
-          ) : null}
-          {summary ? (
-            <p className="rounded-xl border border-cyan-500/25 bg-cyan-950/20 px-3 py-2 text-sm leading-relaxed text-zinc-200">
-              {summary}
-            </p>
-          ) : null}
-          {selectedId ? (
-            <div className="flex gap-2">
-              <button
-                type="button"
-                onClick={() => void onArchive()}
-                className="inline-flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-xl border border-amber-500/40 bg-amber-950/30 text-sm font-semibold text-amber-100"
-              >
-                <Archive className="h-4 w-4" />
-                Archive
-              </button>
-              <button
-                type="button"
-                onClick={() => void onDeleteSelected()}
-                className="inline-flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-xl border border-zinc-700 text-sm font-semibold text-zinc-400"
-              >
-                <Trash2 className="h-4 w-4" />
-                Delete
-              </button>
-            </div>
-          ) : null}
-        </footer>
+        {hasFooterChrome ? (
+          <footer className="shrink-0 space-y-1.5 border-t border-zinc-800/80 px-2 py-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] backdrop-blur-md">
+            {error ? (
+              <p className="rounded-lg border border-rose-500/40 bg-rose-950/40 px-2.5 py-1.5 text-xs text-rose-200">
+                {error}
+              </p>
+            ) : null}
+            {status && !error ? (
+              <p className="text-[11px] text-emerald-300">{status}</p>
+            ) : null}
+            {summary ? (
+              <p className="line-clamp-2 rounded-lg border border-cyan-500/25 bg-cyan-950/20 px-2.5 py-1.5 text-xs leading-snug text-zinc-300">
+                {summary}
+              </p>
+            ) : null}
+            {selectedId ? (
+              <div className="flex gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => void onArchive()}
+                  className="inline-flex h-9 flex-1 items-center justify-center gap-1 rounded-lg border border-amber-500/40 bg-amber-950/30 text-xs font-semibold text-amber-100"
+                >
+                  <Archive className="h-3.5 w-3.5" />
+                  Archive
+                </button>
+                <button
+                  type="button"
+                  onClick={() => void onDeleteSelected()}
+                  className="inline-flex h-9 flex-1 items-center justify-center gap-1 rounded-lg border border-zinc-700 text-xs font-semibold text-zinc-400"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  Delete
+                </button>
+              </div>
+            ) : null}
+          </footer>
+        ) : (
+          <div className="pb-[max(0.25rem,env(safe-area-inset-bottom))]" />
+        )}
       </section>
     </div>
   );

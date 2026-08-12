@@ -11,6 +11,7 @@ type Props = {
   onBayChange: (value: number | null) => void;
 };
 
+/** Single horizontal scrollable pill bar for Dept / Aisle / Bay. */
 export function FloorPadHeaderPills({
   department,
   aisle,
@@ -20,19 +21,19 @@ export function FloorPadHeaderPills({
   onBayChange,
 }: Props) {
   return (
-    <div className="flex flex-wrap items-center gap-2 px-3 pt-2">
+    <div className="no-scrollbar flex items-center gap-1.5 overflow-x-auto">
       <PillField
         label="Dept"
         value={department}
         onChange={(v) => onDepartmentChange(v.trim().toLowerCase())}
-        className="min-w-[6.5rem] font-mono"
+        className="w-[6.5rem] font-mono"
         placeholder="flooring"
       />
       <PillField
         label="Aisle"
         value={aisle}
         onChange={(v) => onAisleChange(v.toUpperCase())}
-        className="min-w-[4.5rem] font-mono uppercase"
+        className="w-[3.75rem] font-mono uppercase"
         placeholder="BW"
       />
       <PillField
@@ -42,7 +43,7 @@ export function FloorPadHeaderPills({
           const raw = v.replace(/\D/g, "");
           onBayChange(raw ? Number(raw) : null);
         }}
-        className="min-w-[3.5rem] font-mono"
+        className="w-[2.75rem] font-mono"
         placeholder="4"
         inputMode="numeric"
       />
@@ -66,8 +67,8 @@ function PillField({
   inputMode?: React.HTMLAttributes<HTMLInputElement>["inputMode"];
 }) {
   return (
-    <label className="inline-flex min-h-9 items-center gap-1.5 rounded-full border border-cyan-500/35 bg-cyan-950/25 px-2.5 py-1 shadow-[0_0_18px_-10px_rgba(34,211,238,0.45)]">
-      <span className="font-mono text-[9px] font-bold uppercase tracking-[0.14em] text-cyan-400/90">
+    <label className="inline-flex h-7 shrink-0 items-center gap-1 rounded-full border border-cyan-500/35 bg-cyan-950/30 px-2 shadow-[0_0_14px_-10px_rgba(34,211,238,0.4)]">
+      <span className="font-mono text-[8px] font-bold uppercase tracking-[0.12em] text-cyan-400/90">
         {label}
       </span>
       <input
@@ -76,7 +77,7 @@ function PillField({
         onFocus={selectOnFocus}
         placeholder={placeholder}
         inputMode={inputMode}
-        className={`w-auto min-w-[2.5rem] bg-transparent text-xs font-semibold text-zinc-100 outline-none placeholder:text-zinc-600 ${className ?? ""}`}
+        className={`bg-transparent text-[11px] font-semibold text-zinc-100 outline-none placeholder:text-zinc-600 ${className ?? ""}`}
       />
     </label>
   );

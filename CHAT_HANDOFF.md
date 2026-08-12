@@ -28,7 +28,7 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 - **Appliance Anomaly Detection:** `POST /api/appliances/ai-anomaly` + `ApplianceAnomalyWidget` on Appliance Audit (duplicate serials, distant locations, category mismatch, missing high-value floor models)
 - **Catalog Taxonomies:** `lib/catalog/taxonomies.ts` (D21–D28 / D35 / D52 defaults) + `POST /api/catalog/ai-taxonomy` + Admin Tools `TaxonomyManagerModal`; folder accordions on Department Audit + `/department`
 - **AI Visual Bay Scan:** `POST /api/store-ops/ai-bay-scan` + `lib/store-ops/ai-bay-scan.ts` + `VisualBayScannerModal` — Gemini multimodal carton/pallet/hazard read on Store Map bay sheet + Cycle Audit
-- **Manager Notes / Executive Floor Pad:** `POST /api/store-ops/ai-note-summary` (legacy synthesize) + Server Action `extractTasksAndTag` (`app/actions/manager-notes.ts`) + `lib/store-ops/ai-note-extract.ts` + `lib/store-ops/manager-notes.ts` (Supabase CRUD + realtime + archive) + `components/manager-notes/ExecutiveFloorPad` — TipTap rich pad, Gemini Copilot tasks/tags, debounced autosave; Admin Tools + `/manager-notes`
+- **Manager Notes / Executive Floor Pad:** `POST /api/store-ops/ai-note-summary` (legacy synthesize) + Server Action `extractTasksAndTag` (`app/actions/manager-notes.ts`) + `lib/store-ops/ai-note-extract.ts` + `lib/store-ops/manager-notes.ts` (Supabase CRUD + realtime + archive) + `components/manager-notes/ExecutiveFloorPad` — dense TipTap pad (sticky title/toolbar, ≥80dvh canvas, 15 Google Fonts with live typeface picker), Gemini Copilot tasks/tags, debounced autosave; Admin Tools + `/manager-notes`
 
 ## RBAC (`lib/rbac.ts` + `lib/specialists.ts`)
 | Role | Scope | Tabs |

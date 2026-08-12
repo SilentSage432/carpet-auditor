@@ -1,5 +1,13 @@
 # DeptSync Hub — Development Journal
 
+## 2026-08-12 — Floor Pad layout densify + expanded font suite
+
+### Shipped
+- Collapsed Dept/Aisle/Bay into one horizontal pill bar under the Floor Pad title; title + formatting + Gemini merged into a single sticky toolbar row.
+- TipTap `.ProseMirror` canvas targets ≥80dvh writing height; chrome/footer compacted.
+- Dynamic Google Fonts load on pad open (15 faces: Inter/Montserrat/Poppins/Open Sans, Merriweather/Playfair/Lora/Cormorant, Roboto Mono/Fira Code/JetBrains Mono, Caveat/Kalam/Dancing Script/Shadows Into Light).
+- Custom font picker renders each option in its own typeface.
+
 ## 2026-08-12 — Executive Floor Pad (rich-text Manager Notes)
 
 ### Shipped

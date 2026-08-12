@@ -22,8 +22,9 @@ type Props = {
   busy: boolean;
   onGemini: () => void;
   saveStatus: "idle" | "saving" | "saved" | "error";
-  /** Bump to force editor content sync when loading another note. */
   contentKey: string;
+  title: string;
+  onTitleChange: (value: string) => void;
 };
 
 export function FloorPadEditor({
@@ -33,6 +34,8 @@ export function FloorPadEditor({
   onGemini,
   saveStatus,
   contentKey,
+  title,
+  onTitleChange,
 }: Props) {
   const editor = useEditor({
     immediatelyRender: false,
@@ -54,7 +57,7 @@ export function FloorPadEditor({
     editorProps: {
       attributes: {
         class:
-          "floor-pad-prose min-h-[50dvh] max-w-none px-4 py-4 text-[15px] leading-relaxed text-zinc-100 outline-none focus:outline-none",
+          "floor-pad-prose ProseMirror min-h-[80dvh] max-w-none px-4 py-3 text-[15px] leading-relaxed text-zinc-100 outline-none focus:outline-none",
       },
     },
     onUpdate: ({ editor: ed }) => {
@@ -71,15 +74,17 @@ export function FloorPadEditor({
   }, [contentKey, editor]); // eslint-disable-line react-hooks/exhaustive-deps -- sync only on note switch
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col">
+    <div className="floor-pad-editor flex min-h-0 flex-1 flex-col">
       <FloorPadToolbar
         editor={editor}
         busy={busy}
         onGemini={onGemini}
         saveStatus={saveStatus}
+        title={title}
+        onTitleChange={onTitleChange}
       />
-      <div className="min-h-0 flex-1 overflow-y-auto bg-gradient-to-b from-zinc-950/40 via-transparent to-emerald-950/10">
-        <EditorContent editor={editor} />
+      <div className="floor-pad-canvas min-h-0 flex-1 overflow-y-auto bg-gradient-to-b from-zinc-950/30 via-transparent to-emerald-950/10">
+        <EditorContent editor={editor} className="h-full min-h-[80dvh]" />
       </div>
     </div>
   );
