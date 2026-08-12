@@ -1,25 +1,27 @@
 /**
- * Sunday Flooring Cycle Audit staging + specialist assignment overlay.
- * Composes weekly_rotations (bay engine) — does not recompute rotation generation.
- * Person assignments persist locally per store/week until a server column exists.
+ * Sunday Flooring Cycle Audit staging + specialist assignment.
+ * Composes weekly_rotations (bay engine); assignments persist in sunday_bay_assignments.
  */
 
+import { getSupabase } from "@/lib/supabase";
 import { getStoreNumber } from "@/lib/store";
 import {
   formatLocationLabel,
   type Department,
   type WeeklyRotationWithLocation,
 } from "@/lib/store-ops/types";
-import { isoWeekLabel } from "@/lib/store-ops/week";
+import { isoWeekLabel, isoWeekToMondayDate } from "@/lib/store-ops/week";
 import type { StoreSpecialist } from "@/lib/types";
 
-const ASSIGNMENT_KEY = "deptsync_sunday_audit_assignments";
 export const SUNDAY_AUDIT_EVENT = "deptsync:sunday-audit-assignments";
+export const SUNDAY_DEPARTMENT = "flooring";
 
 export type SundayBayAssignment = {
   specialist_id: string;
   specialist_name: string;
   assigned_at: string;
+  assigned_specialist_id?: string | null;
+  status?: string;
 };
 
 export type SundayAssignmentMap = Record<string, SundayBayAssignment>;
@@ -32,81 +34,245 @@ export type SundayStagedBay = {
   assignment: SundayBayAssignment | null;
 };
 
-function storageKey(storeNumber: string, week: string): string {
-  return `${storeNumber || "store"}:${week}`;
-}
+type SundayBayAssignmentRow = {
+  id: string;
+  store_number: string;
+  department: string;
+  week_starting: string;
+  bay_id: string;
+  assigned_specialist_id: string | null;
+  roster_specialist_id: string | null;
+  specialist_name: string | null;
+  status: string;
+  created_at: string;
+  updated_at?: string | null;
+};
 
-function readAll(): Record<string, SundayAssignmentMap> {
-  if (typeof window === "undefined") return {};
-  try {
-    const raw = window.localStorage.getItem(ASSIGNMENT_KEY);
-    if (!raw) return {};
-    const parsed = JSON.parse(raw) as unknown;
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-      return {};
-    }
-    return parsed as Record<string, SundayAssignmentMap>;
-  } catch {
-    return {};
+function requireClient() {
+  const supabase = getSupabase();
+  if (!supabase) {
+    throw new Error("Database not configured");
   }
+  return supabase;
 }
 
-function writeAll(map: Record<string, SundayAssignmentMap>) {
+function emitSundayEvent() {
   if (typeof window === "undefined") return;
-  window.localStorage.setItem(ASSIGNMENT_KEY, JSON.stringify(map));
   window.dispatchEvent(new CustomEvent(SUNDAY_AUDIT_EVENT));
 }
 
-export function getSundayAssignments(
-  week: string,
-  storeNumber = getStoreNumber()
-): SundayAssignmentMap {
-  return readAll()[storageKey(storeNumber, week)] ?? {};
+function mapRow(row: SundayBayAssignmentRow): SundayBayAssignment | null {
+  const rosterId = String(row.roster_specialist_id ?? "").trim();
+  const profileId = row.assigned_specialist_id
+    ? String(row.assigned_specialist_id)
+    : "";
+  const specialistId = rosterId || profileId;
+  if (!specialistId || row.status === "cleared") return null;
+  return {
+    specialist_id: specialistId,
+    specialist_name: String(row.specialist_name ?? "").trim() || "Specialist",
+    assigned_at: String(row.updated_at ?? row.created_at),
+    assigned_specialist_id: profileId || null,
+    status: row.status,
+  };
 }
 
-export function setSundayBayAssignment(
-  week: string,
-  rotationId: string,
-  assignment: SundayBayAssignment | null,
-  storeNumber = getStoreNumber()
-): void {
-  const all = readAll();
-  const key = storageKey(storeNumber, week);
-  const bucket = { ...(all[key] ?? {}) };
-  if (!assignment) delete bucket[rotationId];
-  else bucket[rotationId] = assignment;
-  all[key] = bucket;
-  writeAll(all);
-}
+async function resolveProfileIdForRoster(
+  rosterSpecialistId: string
+): Promise<string | null> {
+  const supabase = requireClient();
+  try {
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    if (user?.id) {
+      const { data: self } = await supabase
+        .from("profiles")
+        .select("id, specialist_id")
+        .eq("id", user.id)
+        .maybeSingle();
+      if (
+        self?.id &&
+        String(self.specialist_id ?? "") === String(rosterSpecialistId)
+      ) {
+        return String(self.id);
+      }
+    }
 
-export function clearSundayBayAssignment(
-  week: string,
-  rotationId: string,
-  storeNumber = getStoreNumber()
-): void {
-  setSundayBayAssignment(week, rotationId, null, storeNumber);
-}
-
-export function autoAssignSundayBaysToSpecialist(
-  week: string,
-  rotationIds: string[],
-  specialist: StoreSpecialist,
-  storeNumber = getStoreNumber()
-): number {
-  const all = readAll();
-  const key = storageKey(storeNumber, week);
-  const bucket = { ...(all[key] ?? {}) };
-  const stamp = new Date().toISOString();
-  for (const id of rotationIds) {
-    bucket[id] = {
-      specialist_id: String(specialist.id),
-      specialist_name: specialist.name,
-      assigned_at: stamp,
-    };
+    const { data } = await supabase
+      .from("profiles")
+      .select("id")
+      .eq("specialist_id", rosterSpecialistId)
+      .maybeSingle();
+    return data?.id ? String(data.id) : null;
+  } catch {
+    return null;
   }
-  all[key] = bucket;
-  writeAll(all);
-  return rotationIds.length;
+}
+
+export async function fetchSundayAssignments(
+  week: string,
+  storeNumber = getStoreNumber(),
+  department = SUNDAY_DEPARTMENT
+): Promise<SundayAssignmentMap> {
+  const supabase = requireClient();
+  const store = String(storeNumber ?? "").trim();
+  if (!store || !week) return {};
+
+  const weekStarting = isoWeekToMondayDate(week);
+  const { data, error } = await supabase
+    .from("sunday_bay_assignments")
+    .select("*")
+    .eq("store_number", store)
+    .eq("department", department)
+    .eq("week_starting", weekStarting)
+    .neq("status", "cleared");
+
+  if (error) {
+    throw new Error(error.message || "Could not load Sunday bay assignments");
+  }
+
+  const map: SundayAssignmentMap = {};
+  for (const row of (data as SundayBayAssignmentRow[] | null) ?? []) {
+    const assignment = mapRow(row);
+    if (assignment) map[String(row.bay_id)] = assignment;
+  }
+  return map;
+}
+
+/** @deprecated Prefer fetchSundayAssignments — sync local overlay removed. */
+export function getSundayAssignments(
+  _week: string,
+  _storeNumber = getStoreNumber()
+): SundayAssignmentMap {
+  return {};
+}
+
+export async function setSundayBayAssignment(
+  week: string,
+  bayId: string,
+  assignment: SundayBayAssignment | null,
+  storeNumber = getStoreNumber(),
+  department = SUNDAY_DEPARTMENT
+): Promise<void> {
+  const supabase = requireClient();
+  const store = String(storeNumber ?? "").trim();
+  if (!store || !week || !bayId) return;
+
+  const weekStarting = isoWeekToMondayDate(week);
+
+  if (!assignment) {
+    const { error } = await supabase.from("sunday_bay_assignments").upsert(
+      {
+        store_number: store,
+        department,
+        week_starting: weekStarting,
+        bay_id: bayId,
+        assigned_specialist_id: null,
+        roster_specialist_id: null,
+        specialist_name: "",
+        status: "cleared",
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "store_number,department,week_starting,bay_id" }
+    );
+    if (error) throw new Error(error.message || "Could not clear assignment");
+    emitSundayEvent();
+    return;
+  }
+
+  const profileId =
+    assignment.assigned_specialist_id ||
+    (await resolveProfileIdForRoster(assignment.specialist_id));
+
+  const { error } = await supabase.from("sunday_bay_assignments").upsert(
+    {
+      store_number: store,
+      department,
+      week_starting: weekStarting,
+      bay_id: bayId,
+      assigned_specialist_id: profileId,
+      roster_specialist_id: assignment.specialist_id,
+      specialist_name: assignment.specialist_name,
+      status: "assigned",
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "store_number,department,week_starting,bay_id" }
+  );
+
+  if (error) throw new Error(error.message || "Could not save assignment");
+  emitSundayEvent();
+}
+
+export async function clearSundayBayAssignment(
+  week: string,
+  bayId: string,
+  storeNumber = getStoreNumber(),
+  department = SUNDAY_DEPARTMENT
+): Promise<void> {
+  await setSundayBayAssignment(week, bayId, null, storeNumber, department);
+}
+
+export async function autoAssignSundayBaysToSpecialist(
+  week: string,
+  bayIds: string[],
+  specialist: StoreSpecialist,
+  storeNumber = getStoreNumber(),
+  department = SUNDAY_DEPARTMENT
+): Promise<number> {
+  const stamp = new Date().toISOString();
+  const profileId = await resolveProfileIdForRoster(String(specialist.id));
+  for (const bayId of bayIds) {
+    await setSundayBayAssignment(
+      week,
+      bayId,
+      {
+        specialist_id: String(specialist.id),
+        specialist_name: specialist.name,
+        assigned_at: stamp,
+        assigned_specialist_id: profileId,
+        status: "assigned",
+      },
+      storeNumber,
+      department
+    );
+  }
+  return bayIds.length;
+}
+
+export function subscribeSundayBayAssignments(
+  storeNumber: string,
+  week: string,
+  onChange: () => void,
+  department = SUNDAY_DEPARTMENT
+): () => void {
+  const supabase = getSupabase();
+  if (!supabase || !storeNumber || !week) return () => undefined;
+
+  let weekStarting: string;
+  try {
+    weekStarting = isoWeekToMondayDate(week);
+  } catch {
+    return () => undefined;
+  }
+
+  const channel = supabase
+    .channel(`sunday_bay:${storeNumber}:${department}:${weekStarting}`)
+    .on(
+      "postgres_changes",
+      {
+        event: "*",
+        schema: "public",
+        table: "sunday_bay_assignments",
+        filter: `store_number=eq.${storeNumber}`,
+      },
+      () => onChange()
+    )
+    .subscribe();
+
+  return () => {
+    void supabase.removeChannel(channel);
+  };
 }
 
 export function findFlooringDepartment(

@@ -25,6 +25,26 @@ export function isoWeekLabel(date: Date = new Date()): string {
   return `${year}-W${String(weekNo).padStart(2, "0")}`;
 }
 
+/**
+ * Monday (UTC date string YYYY-MM-DD) for an ISO week label like "2026-W32".
+ * Used by sunday_bay_assignments.week_starting.
+ */
+export function isoWeekToMondayDate(weekLabel: string): string {
+  const m = /^(\d{4})-W(\d{1,2})$/i.exec(String(weekLabel ?? "").trim());
+  if (!m) {
+    throw new Error(`Invalid ISO week label: ${weekLabel}`);
+  }
+  const year = Number(m[1]);
+  const week = Number(m[2]);
+  const jan4 = new Date(Date.UTC(year, 0, 4));
+  const day = jan4.getUTCDay() || 7;
+  const mondayWeek1 = new Date(jan4);
+  mondayWeek1.setUTCDate(jan4.getUTCDate() - day + 1);
+  const monday = new Date(mondayWeek1);
+  monday.setUTCDate(mondayWeek1.getUTCDate() + (week - 1) * 7);
+  return monday.toISOString().slice(0, 10);
+}
+
 /** Fisher–Yates shuffle (in place) then return first `count` items. */
 export function pickRandom<T>(items: T[], count: number): T[] {
   const pool = [...items];

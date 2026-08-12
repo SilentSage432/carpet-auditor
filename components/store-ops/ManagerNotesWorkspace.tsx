@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Manager Notes & S Pen Canvas workspace — presentation + local note list.
+ * Manager Notes & S Pen Canvas workspace — presentation + Supabase note list.
  * Synthesis owned by POST /api/store-ops/ai-note-summary + lib/store-ops/ai-note-summary.
  */
 
@@ -24,6 +24,7 @@ import {
   emptyDraft,
   listManagerNotes,
   saveManagerNote,
+  subscribeManagerNotes,
   type ManagerNote,
   type ManagerNoteDraft,
 } from "@/lib/store-ops/manager-notes";
@@ -107,9 +108,21 @@ export function ManagerNotesWorkspace({
   const [checked, setChecked] = useState<Set<number>>(new Set());
   const [status, setStatus] = useState<string | null>(null);
 
-  const reloadNotes = useCallback(() => {
-    setNotes(listManagerNotes(storeNumber));
+  const reloadNotes = useCallback(async () => {
+    try {
+      const rows = await listManagerNotes(storeNumber);
+      setNotes(rows);
+    } catch (err) {
+      setError(readableError(err, "Could not load manager notes"));
+    }
   }, [storeNumber]);
+
+  useEffect(() => {
+    if (!open) return;
+    return subscribeManagerNotes(storeNumber, () => {
+      void reloadNotes();
+    });
+  }, [open, storeNumber, reloadNotes]);
 
   const resizeCanvas = useCallback(() => {
     const canvas = canvasRef.current;
@@ -212,7 +225,7 @@ export function ManagerNotesWorkspace({
 
   useEffect(() => {
     if (!open) return;
-    reloadNotes();
+    void reloadNotes();
     resetDraft();
     document.body.style.overflow = "hidden";
     const onResize = () => resizeCanvas();
@@ -369,7 +382,10 @@ export function ManagerNotesWorkspace({
         id: selectedId ?? createManagerNoteId(),
         store_id: null,
         store_number: storeNumber,
+        department: draft.department_code || defaultDept,
         department_code: draft.department_code || defaultDept,
+        author_id: null,
+        category: "audit",
         aisle: draft.aisle?.trim() || null,
         bay: bayNum ?? null,
         title: draft.title.trim() || "Untitled note",
@@ -379,17 +395,41 @@ export function ManagerNotesWorkspace({
         action_items: result.action_items,
         created_by: specialist.username || specialist.name || specialist.id,
         created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
         completed_task_indexes: [],
       };
-      saveManagerNote(note);
+      const previous = notes;
+      setNotes((prev) => {
+        const idx = prev.findIndex((n) => n.id === note.id);
+        if (idx >= 0) {
+          const next = [...prev];
+          next[idx] = note;
+          return next;
+        }
+        return [note, ...prev];
+      });
       setSelectedId(note.id);
-      setDraft((d) => ({ ...d, canvas_data_url: canvasUrl || null }));
-      reloadNotes();
-      setStatus(
-        result.source === "gemini"
-          ? "Synthesized with Gemini Flash"
-          : "Local synthesis (Gemini key missing)"
-      );
+      try {
+        const saved = await saveManagerNote(note);
+        setNotes((prev) => {
+          const idx = prev.findIndex((n) => n.id === saved.id);
+          if (idx >= 0) {
+            const next = [...prev];
+            next[idx] = saved;
+            return next;
+          }
+          return [saved, ...prev];
+        });
+        setDraft((d) => ({ ...d, canvas_data_url: canvasUrl || null }));
+        setStatus(
+          result.source === "gemini"
+            ? "Synthesized with Gemini Flash"
+            : "Local synthesis (Gemini key missing)"
+        );
+      } catch (saveErr) {
+        setNotes(previous);
+        throw saveErr;
+      }
     } catch (err) {
       setError(readableError(err, "Could not synthesize action items"));
     } finally {
@@ -405,9 +445,16 @@ export function ManagerNotesWorkspace({
       if (selectedId) {
         const existing = notes.find((n) => n.id === selectedId);
         if (existing) {
-          saveManagerNote({
+          const optimistic = {
             ...existing,
             completed_task_indexes: [...next],
+          };
+          setNotes((rows) =>
+            rows.map((n) => (n.id === selectedId ? optimistic : n))
+          );
+          void saveManagerNote(optimistic).catch((err) => {
+            setError(readableError(err, "Could not update action items"));
+            void reloadNotes();
           });
         }
       }
@@ -415,11 +462,17 @@ export function ManagerNotesWorkspace({
     });
   }
 
-  function onDeleteSelected() {
+  async function onDeleteSelected() {
     if (!selectedId) return;
-    deleteManagerNote(selectedId);
-    reloadNotes();
+    const previous = notes;
+    setNotes((prev) => prev.filter((n) => n.id !== selectedId));
     resetDraft();
+    try {
+      await deleteManagerNote(selectedId);
+    } catch (err) {
+      setNotes(previous);
+      setError(readableError(err, "Could not delete note"));
+    }
   }
 
   if (!open) return null;
@@ -753,7 +806,7 @@ export function ManagerNotesWorkspace({
           {selectedId ? (
             <button
               type="button"
-              onClick={onDeleteSelected}
+              onClick={() => void onDeleteSelected()}
               className="mt-4 min-h-11 w-full rounded-xl border border-zinc-700 text-sm font-semibold text-zinc-400"
             >
               Delete this note

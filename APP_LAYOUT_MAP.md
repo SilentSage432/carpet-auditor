@@ -306,7 +306,7 @@ Stacked cards (~1.5–2 handheld screens):
 | **QuickAddCatalogModal** | `QuickAddCatalogModal.tsx` | Unlinked scan (Audit + Catalog) | Bottom sheet; Save & Continue |
 | **SimsLocationFinder** | `SimsLocationFinder.tsx` | Catalog CTA + Audit 📍 SIMS Stock | Search drawer / dialog |
 | **ApplyMarkdownModal** | `ApplyMarkdownModal.tsx` | Remnant markdown CTA | % Off / Fixed $ + preview |
-| **MarryBarcodeModal** | `MarryBarcodeModal.tsx` | *Not currently wired* | Orphan — Select Existing / Create New (superseded by Quick-Add) |
+| **Quick-AddCatalogModal** | `QuickAddCatalogModal.tsx` | Cycle Audit / scan flows | Link unlinked barcode → catalog (supersedes retired MarryBarcodeModal) |
 | **VisualBayScannerModal** | `store-ops/VisualBayScannerModal.tsx` | Store Map CTA / bay sheet / Cycle Audit **📷 Snap Bay AI Audit** | Camera or upload → Gemini scan beam → results drawer (z-90) |
 | **ManagerNotesWorkspace** | `store-ops/ManagerNotesWorkspace.tsx` | Admin Tools / `/manager-notes` / `#manager-notes` | S Pen canvas + note editor → Gemini action items (z-80) |
 | Pin / Sync toasts | `app/page.tsx` | PIN save / online flush | Fixed top status pills |
@@ -367,11 +367,11 @@ flowchart TD
 - **Remnant cards** pack aging + clearance + status + offline + 4–5 action buttons — dense on a 390px-wide screen.
 - **Header** packs brand, title, network, specialist, PIN, and menu — readable but tight on small phones when names are long (truncate helps).
 - **Remnant / Catalog inline forms** still push lists down while open.
-- **MarryBarcodeModal** remains an unused orphan (superseded by Quick-Add / TextPromptModal link flow).
+- Unlinked barcode linking uses **Quick-AddCatalogModal** (MarryBarcodeModal retired).
 
 ### D.4 Follow-ups
 
-1. Retire or wire `MarryBarcodeModal`.
+1. ~~Retire or wire `MarryBarcodeModal`~~ — retired (Phase 2).
 2. Optional: lift supervisor filters nearer the shift log header without crowding the scan form.
 ---
 
@@ -398,7 +398,6 @@ components/sections/CatalogSection.tsx
 components/sections/RemnantSection.tsx
 components/sections/SettingsSection.tsx
 components/barcode/QuickAddCatalogModal.tsx
-components/barcode/MarryBarcodeModal.tsx   (orphan)
 components/catalog/SimsLocationFinder.tsx
 components/ui/NumberField.tsx              NumberField + TextField
 ```

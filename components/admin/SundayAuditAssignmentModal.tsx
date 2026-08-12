@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Sunday Flooring Cycle Audit assignment drawer — presentation + local assignment persist.
+ * Sunday Flooring Cycle Audit assignment drawer — presentation + Supabase assignments.
  * Bay list composes weekly_rotations; generation stays in Force Rotation / cron.
  */
 
@@ -16,16 +16,18 @@ import {
   autoAssignSundayBaysToSpecialist,
   buildSundayStagedBays,
   clearSundayBayAssignment,
+  fetchSundayAssignments,
   filterFlooringRotations,
   findFlooringDepartment,
   flooringRoster,
-  getSundayAssignments,
   pendingSundayAssignmentCount,
   setSundayBayAssignment,
+  subscribeSundayBayAssignments,
   SUNDAY_AUDIT_EVENT,
   sundayStagingHeadline,
   type SundayStagedBay,
 } from "@/lib/store-ops/sunday-audit";
+import { getStoreNumber } from "@/lib/store";
 import { fetchSpecialists } from "@/lib/specialists";
 import type { Department } from "@/lib/store-ops/types";
 import type { StoreSpecialist } from "@/lib/types";
@@ -68,7 +70,10 @@ export function SundayAuditAssignmentModal({
         rotData.rotations,
         flooring?.id
       );
-      const assignments = getSundayAssignments(rotData.assigned_week);
+      const assignments = await fetchSundayAssignments(
+        rotData.assigned_week,
+        getStoreNumber()
+      );
       setWeek(rotData.assigned_week);
       setBays(buildSundayStagedBays(flooringRots, assignments));
       setRoster(flooringRoster(specialists));
@@ -86,6 +91,13 @@ export function SundayAuditAssignmentModal({
     if (!open) return;
     void reload();
   }, [open, reload]);
+
+  useEffect(() => {
+    if (!open || !week) return;
+    return subscribeSundayBayAssignments(getStoreNumber(), week, () => {
+      void reload();
+    });
+  }, [open, week, reload]);
 
   useEffect(() => {
     if (!open) return;
@@ -121,49 +133,62 @@ export function SundayAuditAssignmentModal({
     week,
   });
 
-  function handleAssign(rotationId: string, specialistId: string) {
+  async function handleAssign(rotationId: string, specialistId: string) {
     if (!week) return;
+    const previous = bays;
     if (!specialistId) {
-      clearSundayBayAssignment(week, rotationId);
       setBays((prev) =>
         prev.map((b) =>
           b.rotation.id === rotationId ? { ...b, assignment: null } : b
         )
       );
-      onChanged?.();
+      try {
+        await clearSundayBayAssignment(week, rotationId);
+        onChanged?.();
+      } catch (err) {
+        setBays(previous);
+        setError(readableError(err, "Could not clear assignment"));
+      }
       return;
     }
     const member = roster.find((m) => String(m.id) === specialistId);
     if (!member) return;
-    setSundayBayAssignment(week, rotationId, {
+    const assignment = {
       specialist_id: String(member.id),
       specialist_name: member.name,
       assigned_at: new Date().toISOString(),
-    });
+    };
     setBays((prev) =>
       prev.map((b) =>
-        b.rotation.id === rotationId
-          ? {
-              ...b,
-              assignment: {
-                specialist_id: String(member.id),
-                specialist_name: member.name,
-                assigned_at: new Date().toISOString(),
-              },
-            }
-          : b
+        b.rotation.id === rotationId ? { ...b, assignment } : b
       )
     );
-    onChanged?.();
+    try {
+      await setSundayBayAssignment(week, rotationId, assignment);
+      onChanged?.();
+    } catch (err) {
+      setBays(previous);
+      setError(readableError(err, "Could not save assignment"));
+    }
   }
 
-  function handleAutoAssignMe() {
+  async function handleAutoAssignMe() {
     if (!week || bays.length === 0) return;
     const ids = bays.map((b) => b.rotation.id);
-    const n = autoAssignSundayBaysToSpecialist(week, ids, specialist);
-    setStatus(`Auto-assigned ${n} bay${n === 1 ? "" : "s"} to you (Flooring DS).`);
-    void reload();
-    onChanged?.();
+    setBusy(true);
+    setError(null);
+    try {
+      const n = await autoAssignSundayBaysToSpecialist(week, ids, specialist);
+      setStatus(
+        `Auto-assigned ${n} bay${n === 1 ? "" : "s"} to you (Flooring DS).`
+      );
+      await reload();
+      onChanged?.();
+    } catch (err) {
+      setError(readableError(err, "Could not auto-assign bays"));
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function handleGenerateFlooring() {
@@ -236,7 +261,7 @@ export function SundayAuditAssignmentModal({
             <button
               type="button"
               disabled={busy || bays.length === 0}
-              onClick={handleAutoAssignMe}
+              onClick={() => void handleAutoAssignMe()}
               className="btn-primary-glow flex min-h-[44px] items-center justify-center rounded-xl px-3 text-sm disabled:opacity-40"
             >
               Auto-Assign All to Me (Flooring DS)
@@ -313,7 +338,7 @@ export function SundayAuditAssignmentModal({
                       className="glass-input min-h-[44px] text-sm font-semibold"
                       value={bay.assignment?.specialist_id ?? ""}
                       onChange={(e) =>
-                        handleAssign(bay.rotation.id, e.target.value)
+                        void handleAssign(bay.rotation.id, e.target.value)
                       }
                     >
                       <option value="">Unassigned</option>

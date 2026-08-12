@@ -10,14 +10,15 @@ import { SundayAuditAssignmentModal } from "@/components/admin/SundayAuditAssign
 import { fetchDepartments, fetchThisWeekRotations } from "@/lib/store-ops/client";
 import {
   buildSundayStagedBays,
+  fetchSundayAssignments,
   filterFlooringRotations,
   findFlooringDepartment,
-  getSundayAssignments,
   pendingSundayAssignmentCount,
   shouldShowSundayStaging,
   SUNDAY_AUDIT_EVENT,
   sundayStagingHeadline,
 } from "@/lib/store-ops/sunday-audit";
+import { getStoreNumber } from "@/lib/store";
 import {
   isFlooringWorkingContext,
   workingDepartment,
@@ -55,7 +56,10 @@ export function SundayAuditStagingCard({
         rotData.rotations,
         flooring?.id
       );
-      const assignments = getSundayAssignments(rotData.assigned_week);
+      const assignments = await fetchSundayAssignments(
+        rotData.assigned_week,
+        getStoreNumber()
+      );
       const bays = buildSundayStagedBays(flooringRots, assignments);
       setWeek(rotData.assigned_week);
       setOpenCount(bays.length);
