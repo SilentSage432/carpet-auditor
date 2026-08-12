@@ -3,7 +3,7 @@ import {
   resolveStoreOpsActor,
   requireSuperAdmin,
   StoreOpsAuthError,
-} from "@/lib/store-ops/auth";
+} from "@/lib/store-ops/auth-server";
 import { resolveStoreByNumber } from "@/lib/store-ops/stores";
 import { requireSupabaseAdmin } from "@/lib/supabase/admin-response";
 import { readableError } from "@/lib/store-ops/errors";

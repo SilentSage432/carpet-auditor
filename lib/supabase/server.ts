@@ -1,7 +1,11 @@
 /**
  * Server Supabase clients — cookie/Bearer Auth session resolution.
- * Owns transport only; Store Ops actor mapping lives in lib/store-ops/auth.
+ * Owns transport only; Store Ops actor mapping lives in lib/store-ops/auth-server.
+ *
+ * Never import this module from Client Components.
  */
+
+import "server-only";
 
 import { createServerClient } from "@supabase/ssr";
 import { createClient, type SupabaseClient, type User } from "@supabase/supabase-js";

@@ -1,5 +1,13 @@
 # DeptSync Hub — Development Journal
 
+## 2026-08-12 — Phase 3: Offline Resilience & Conflict Resolution
+
+### Shipped
+- `components/offline/ConflictResolutionModal.tsx` — side-by-side Local vs Server conflict UI (Keep Local / Accept Server).
+- `lib/sync-conflict.ts` — conflict events + SyncConflictError; flush pauses for supervisor choice.
+- `lib/sync-queue.ts` — transaction UUIDs, optimistic timestamps, exponential backoff retries, version/409 conflict detection, `installSyncAutoFlush` on `online` + `visibilitychange` + `focus`.
+- Orphan sweep: removed unused `DefaultPinNotice`, `FirstLoginCredentialsModal`, and PIN “Remind Later” helpers (AuthWall owns setup).
+
 ## 2026-08-12 — Phase 1: Security & Identity Handshake
 
 ### Shipped

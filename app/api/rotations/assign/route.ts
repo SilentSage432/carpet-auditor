@@ -3,7 +3,7 @@ import {
   resolveStoreOpsActor,
   requireSuperAdmin,
   StoreOpsAuthError,
-} from "@/lib/store-ops/auth";
+} from "@/lib/store-ops/auth-server";
 import { assignLocationsToCurrentWeek } from "@/lib/store-ops/rotations";
 import { resolveStoreByNumber } from "@/lib/store-ops/stores";
 import { requireSupabaseAdmin } from "@/lib/supabase/admin-response";

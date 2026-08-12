@@ -8,7 +8,11 @@
 import { useEffect, useState } from "react";
 import { usePendingSyncCount } from "@/lib/network";
 import { getStoreNumber } from "@/lib/store";
-import { flushSyncQueue, isBrowserOnline } from "@/lib/sync-queue";
+import {
+  installSyncAutoFlush,
+  isBrowserOnline,
+  SYNC_QUEUE_CHANGED_EVENT,
+} from "@/lib/sync-queue";
 import { hapticPulse } from "@/utils/haptics";
 
 type BannerState =
@@ -27,46 +31,53 @@ export function OfflineNetworkBanner() {
     function showOffline() {
       setState({
         kind: "offline",
-        pending: pending,
+        pending,
       });
     }
 
-    async function onOnline() {
-      setState({ kind: "flushing" });
-      try {
-        const synced = await flushSyncQueue(storeNumber);
-        hapticPulse("success");
+    const uninstall = installSyncAutoFlush({
+      getStore: () => getStoreNumber(),
+      onFlushStart: () => {
+        if (isBrowserOnline()) setState({ kind: "flushing" });
+      },
+      onFlushComplete: (synced) => {
+        if (!isBrowserOnline()) {
+          showOffline();
+          return;
+        }
         if (synced > 0) {
+          hapticPulse("success");
           setState({ kind: "synced", count: synced });
           window.setTimeout(() => setState({ kind: "hidden" }), 2800);
         } else {
           setState({ kind: "hidden" });
         }
-      } catch {
-        setState({ kind: "hidden" });
-      }
-    }
+      },
+    });
 
     function onOffline() {
       showOffline();
     }
 
-    window.addEventListener("online", onOnline);
+    function onQueueChanged() {
+      if (!isBrowserOnline()) showOffline();
+    }
+
     window.addEventListener("offline", onOffline);
+    window.addEventListener(SYNC_QUEUE_CHANGED_EVENT, onQueueChanged);
 
     if (!isBrowserOnline()) {
       showOffline();
     }
 
     return () => {
-      window.removeEventListener("online", onOnline);
+      uninstall();
       window.removeEventListener("offline", onOffline);
+      window.removeEventListener(SYNC_QUEUE_CHANGED_EVENT, onQueueChanged);
     };
-    // pending intentionally omitted from online handler deps — read at event time via queue
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [storeNumber]);
 
-  // Keep offline pending count live while banner is visible.
   useEffect(() => {
     if (state.kind !== "offline") return;
     setState({ kind: "offline", pending });

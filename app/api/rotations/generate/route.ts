@@ -3,7 +3,7 @@ import {
   resolveStoreOpsActor,
   requireSuperAdmin,
   StoreOpsAuthError,
-} from "@/lib/store-ops/auth";
+} from "@/lib/store-ops/auth-server";
 import {
   generateWeeklyRotations,
   resolveDepartmentIdByCode,

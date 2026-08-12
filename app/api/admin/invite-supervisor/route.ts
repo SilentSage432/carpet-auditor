@@ -14,7 +14,7 @@ import {
   resolveStoreOpsActor,
   requireSuperAdmin,
   StoreOpsAuthError,
-} from "@/lib/store-ops/auth";
+} from "@/lib/store-ops/auth-server";
 import { readableError } from "@/lib/store-ops/errors";
 import { requireSupabaseAdmin } from "@/lib/supabase/admin-response";
 import { sendInviteSms } from "@/lib/twilio-sms";

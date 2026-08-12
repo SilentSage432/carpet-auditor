@@ -9,7 +9,8 @@ components/hub/HubChrome.tsx      → Sticky header (legacy) + role-filtered inv
 components/hub/NavigationHub.tsx  → Cross-app Navigation Hub (hamburger, role badge, ops bottom nav)
 components/hub/NavIcons.tsx       → Shared Lucide icons for ops + inventory bottom bars
 components/hub/HapticsListener.tsx → Delegated vibrate pulses for taps / toggles / tabs
-components/hub/OfflineNetworkBanner.tsx → Offline toast + reconnect flushSyncQueue
+components/hub/OfflineNetworkBanner.tsx → Offline toast + installSyncAutoFlush callbacks
+components/offline/ConflictResolutionModal.tsx → Local vs Server sync conflict chooser
 utils/haptics.ts                  → navigator.vibrate wrapper (light/medium/success)
 components/hub/SuperAdminQuickActions.tsx → Bulk / Trigger Rotation / Manage Supervisors banner
 components/hub/SessionGate.tsx    → Auth gate for Store Ops route pages
@@ -50,7 +51,8 @@ lib/hardware-scanner.ts           → Window-level Bluetooth/wedge barcode burst
 lib/rbac.ts                       → Department-scoped section / catalog visibility (compose only)
 lib/store.ts                      → Active store_number session
 lib/store-ops/stores.ts           → Resolve store_number → stores.id; ensure per-store departments
-lib/sync-queue.ts                 → Offline action queue + replay
+lib/sync-queue.ts                 → Offline queue + backoff + conflict pause + auto-flush
+lib/sync-conflict.ts              → SyncConflictError + conflict event bus
 lib/network.ts                    → Online/offline badge state
 lib/sims.ts                       → SIMS location aggregation (compose only)
 lib/markdown.ts                   → Clearance price math + badge label
@@ -83,7 +85,7 @@ supabase/migrations/20260812_sunday_bay_assignments.sql → sunday specialist↔
 | Manager notes + S Pen synthesis | `lib/store-ops/ai-note-summary.ts`, `manager-notes.ts`, `ManagerNotesWorkspace` |
 | Team roster (Master Admin) | `AdminRosterManager`, `lib/specialists.ts` (`is_active` soft-delete) |
 | Store context | `lib/store.ts` + `lib/store-ops/stores.ts` |
-| Offline sync queue | `lib/sync-queue.ts` |
+| Offline sync queue | `lib/sync-queue.ts`, `lib/sync-conflict.ts`, `ConflictResolutionModal` |
 | Shell caching | `public/sw.js` + `ServiceWorkerRegister` |
 | CLF / carton math | `lib/calc.ts` |
 | Number typing UX | `lib/number-input.ts` + `NumberField` |
@@ -131,9 +133,11 @@ supabase/migrations/20260812_sunday_bay_assignments.sql → sunday specialist↔
 
 ## Offline
 
-Writes fall back to localStorage and enqueue into `carpet_hub_sync_queue`.
+Writes fall back to localStorage and enqueue into `carpet_hub_sync_queue`
+(with `transaction_id`, `optimistic_at`, exponential backoff).
 Mid-scan form drafts persist via `carpet_hub_audit_draft`.
-On `online`, `flushSyncQueue()` replays pending actions for the active store.
+`installSyncAutoFlush` replays on `online`, tab focus, and `visibilitychange`.
+Version mismatches / HTTP 409 pause for `ConflictResolutionModal` (keep local vs accept server).
 The service worker caches the app shell for instant cold starts without connectivity.
 
 ## Schema note

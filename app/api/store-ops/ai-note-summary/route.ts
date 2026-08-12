@@ -15,7 +15,7 @@ import {
   resolveStoreOpsActor,
   requireStoreOpsActor,
   StoreOpsAuthError,
-} from "@/lib/store-ops/auth";
+} from "@/lib/store-ops/auth-server";
 import { readableError } from "@/lib/store-ops/errors";
 
 /**

@@ -4,7 +4,7 @@ import {
   resolveStoreOpsActor,
   requireSuperAdmin,
   StoreOpsAuthError,
-} from "@/lib/store-ops/auth";
+} from "@/lib/store-ops/auth-server";
 import { readableError } from "@/lib/store-ops/errors";
 import { bulkInsertLocations } from "@/lib/store-ops/locations";
 import { getSupabaseAdmin } from "@/lib/store-ops/supabase-admin";

@@ -2,11 +2,7 @@
 
 import { useState } from "react";
 import { NumberField } from "@/components/ui/NumberField";
-import {
-  clearPinRemindLater,
-  updateSpecialistPin,
-  verifyPin,
-} from "@/lib/specialists";
+import { updateSpecialistPin, verifyPin } from "@/lib/specialists";
 import type { StoreSpecialist } from "@/lib/types";
 
 type Props = {
@@ -61,7 +57,6 @@ export function ChangePinModal({ open, member, onClose, onUpdated }: Props) {
     setError(null);
     try {
       const { record } = await updateSpecialistPin(member, newPin);
-      clearPinRemindLater(record.id);
       onUpdated(record);
       setToast(true);
       window.setTimeout(() => {

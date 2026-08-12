@@ -12,7 +12,7 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 - Icons: `public/icons/icon-192.png`, `icon-512.png`, `apple-touch-icon.png`
 - PWA manifest: `app/manifest.ts` → `/manifest.webmanifest`; static `public/manifest.json` → `/manifest.json` (TWA / Bubblewrap)
 - **Obsidian-glass UI:** void `#090d16`; utilities in `app/globals.css` (`.glass-card`, `.glass-panel`, `.glass-input`, `.glass-backdrop`, `.glass-void`, `.btn-primary-glow`, `.btn-grid-action-*`, `.pb-safe`, status pills / bay glows). Emerald primary / cyan secondary accents. Lucide SVG nav icons (`NavIcons`) — no emoji bottom tabs.
-- **Native shell:** haptics via `utils/haptics.ts` + `HapticsListener`; offline toast `OfflineNetworkBanner` flushes sync queue on reconnect; PWA/TWA splash theme `#090d16`
+- **Native shell:** haptics via `utils/haptics.ts` + `HapticsListener`; offline toast `OfflineNetworkBanner` + `ConflictResolutionModal`; sync auto-flush on online/visibility/focus; PWA/TWA splash theme `#090d16`
 
 ## AI (`lib/ai/gemini.ts`)
 - Server-only Gemini Flash client (`@google/generative-ai`)
@@ -96,7 +96,10 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 - Appliances: unit count + SIMS staging; Model # on catalog `vendor`
 
 ## Offline & PWA
-- Service worker `public/sw.js`; sync queue `carpet_hub_sync_queue`
+- Service worker `public/sw.js`; sync queue `carpet_hub_sync_queue` (`lib/sync-queue.ts`)
+- Queue actions carry `transaction_id`, `optimistic_at`, retry backoff (`next_retry_at`), optional `base_updated_at`
+- `installSyncAutoFlush` — flush on `online`, `visibilitychange` (visible), and `focus`
+- Version/409 conflicts → `ConflictResolutionModal` (Keep Local force-overwrite vs Accept Server)
 - Header: Online / Offline Mode + pending count
 
 ## Multi-store

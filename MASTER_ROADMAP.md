@@ -80,13 +80,12 @@
 - [x] Native mobile shell — splash `#090d16`, haptics (`utils/haptics`), offline queue banner + reconnect flush
 - [x] Phase 1 Security & Identity Handshake — remove emergency unlock; Store Ops via Supabase Auth JWT → `profiles`; push `user_id`; JWT/RLS migration `20260812_jwt_rls_policies.sql`
 - [x] Phase 2 Data Durability — Manager Notes + Sunday bay assignments on Supabase; retire `MarryBarcodeModal`
+- [x] Phase 3 Offline Resilience — conflict resolution UI, sync backoff + auto-flush on online/focus, orphan PIN-remind modals removed
 
 ## Next
 - [x] Apply Phase 1 JWT/RLS migration in Supabase + enable Custom Access Token Hook
 - [ ] Apply Phase 2 migrations (`20260812_manager_notes.sql`, `20260812_sunday_bay_assignments.sql`) + Realtime on notes/assignments tables
 - [ ] Production recovery: ensure every active roster member has phone OTP → linked `profiles` row before relying on Store Ops APIs
-- [ ] Background Sync API / periodic queue flush while tab backgrounded
-- [ ] Conflict resolution UI when offline edits collide
 - [ ] Additional Gemini product surfaces beyond current AI ops widgets
 ## Non-goals
 - Pricing / margin engines

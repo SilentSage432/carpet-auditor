@@ -302,7 +302,7 @@ Stacked cards (~1.5–2 handheld screens):
 | **SpecialistModal** | `SpecialistModal.tsx` | Header chip; auto if no specialist | Bottom sheet / dialog; roster + Add Team Member |
 | **PinKeypadModal** | `PinKeypadModal.tsx` | Supervisor select; discrepancy filter; markdown gate | 3×4 keypad, z-70 |
 | **ChangePinModal** | `ChangePinModal.tsx` | Header ⚙️ / Settings | Current + New + Confirm PIN, z-75 |
-| **DefaultPinNotice** | `DefaultPinNotice.tsx` | Default PIN `1234` still active | Banner above bottom nav |
+| **ChangePinModal** | `ChangePinModal.tsx` | Profile PIN gear | Change 4-digit PIN (AuthWall owns first-login setup) |
 | **QuickAddCatalogModal** | `QuickAddCatalogModal.tsx` | Unlinked scan (Audit + Catalog) | Bottom sheet; Save & Continue |
 | **SimsLocationFinder** | `SimsLocationFinder.tsx` | Catalog CTA + Audit 📍 SIMS Stock | Search drawer / dialog |
 | **ApplyMarkdownModal** | `ApplyMarkdownModal.tsx` | Remnant markdown CTA | % Off / Fixed $ + preview |

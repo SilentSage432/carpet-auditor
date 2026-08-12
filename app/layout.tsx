@@ -3,6 +3,7 @@ import { Barlow, JetBrains_Mono } from "next/font/google";
 import { HapticsListener } from "@/components/hub/HapticsListener";
 import { OfflineNetworkBanner } from "@/components/hub/OfflineNetworkBanner";
 import { ServiceWorkerRegister } from "@/components/hub/ServiceWorkerRegister";
+import { ConflictResolutionModal } from "@/components/offline/ConflictResolutionModal";
 import "./globals.css";
 
 const barlow = Barlow({
@@ -61,6 +62,7 @@ export default function RootLayout({
         <ServiceWorkerRegister />
         <HapticsListener />
         <OfflineNetworkBanner />
+        <ConflictResolutionModal />
         {children}
       </body>
     </html>

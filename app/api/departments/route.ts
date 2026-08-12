@@ -6,7 +6,7 @@ import {
   requireSuperAdmin,
   requireSupervisorOrAdmin,
   StoreOpsAuthError,
-} from "@/lib/store-ops/auth";
+} from "@/lib/store-ops/auth-server";
 import { requireSupabaseAdmin } from "@/lib/supabase/admin-response";
 import { readableError } from "@/lib/store-ops/errors";
 import { resolveDepartmentIdByCode } from "@/lib/store-ops/rotations";

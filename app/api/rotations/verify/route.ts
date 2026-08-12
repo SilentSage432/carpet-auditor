@@ -4,7 +4,7 @@ import {
   resolveStoreOpsActor,
   requireStoreOpsActor,
   StoreOpsAuthError,
-} from "@/lib/store-ops/auth";
+} from "@/lib/store-ops/auth-server";
 import { resolveDepartmentIdByCode } from "@/lib/store-ops/rotations";
 import { resolveStoreByNumber } from "@/lib/store-ops/stores";
 import { verifyWeeklyRotations } from "@/lib/store-ops/verification";

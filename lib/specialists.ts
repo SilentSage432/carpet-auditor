@@ -308,23 +308,6 @@ export function needsCredentialSetup(member: StoreSpecialist): boolean {
   return Boolean(member.must_change_credentials || member.must_change_pin);
 }
 
-const PIN_REMIND_PREFIX = "carpet_pin_remind_later_";
-
-export function wasPinRemindLater(memberId: string): boolean {
-  if (typeof window === "undefined") return false;
-  return sessionStorage.getItem(`${PIN_REMIND_PREFIX}${memberId}`) === "1";
-}
-
-export function setPinRemindLater(memberId: string): void {
-  if (typeof window === "undefined") return;
-  sessionStorage.setItem(`${PIN_REMIND_PREFIX}${memberId}`, "1");
-}
-
-export function clearPinRemindLater(memberId: string): void {
-  if (typeof window === "undefined") return;
-  sessionStorage.removeItem(`${PIN_REMIND_PREFIX}${memberId}`);
-}
-
 function readAllLocal(): StoreSpecialist[] {
   if (typeof window === "undefined") return [];
   try {
