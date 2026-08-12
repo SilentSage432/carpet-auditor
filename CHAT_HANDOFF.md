@@ -200,7 +200,7 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 - Store Map bay rows: large S/T toggles; tap Bay label → bottom sheet (pin / history / edit zone)
 
 ## Appliance categories (suite + sub)
-- **Tables:** `appliance_catalog` + `appliance_scans` (not carpet_*). Apply `supabase/migrations/20260810_appliance_catalog_scans.sql`
+- **Tables:** `appliance_catalog` + `appliance_scans` (not carpet_*). Apply `supabase/migrations/20260810_appliance_catalog_scans.sql` then `enable_rls_flagged_tables.sql` (RLS on appliances + `store_specialists` + verify all public tables)
 - Top-level: Laundry · Refrigeration · Cooking / Ranges · Dishwashers · Microwaves / Venting
 - Sub required on Quick-Add UPC link / floor scan / catalog (Laundry → Washer | Dryer | Combo / Unit)
 - Types: `ApplianceCatalogItem`, `ApplianceScan` (`sub_category?`)

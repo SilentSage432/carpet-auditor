@@ -1,5 +1,12 @@
 # DeptSync Hub — Development Journal
 
+## 2026-08-12 — Enable RLS on flagged public tables
+
+### Shipped
+- Migration `supabase/migrations/enable_rls_flagged_tables.sql` — `ENABLE ROW LEVEL SECURITY` on `appliance_catalog`, `appliance_scans`, `store_specialists` (gap from appliance migration / schema-only roster RLS).
+- Loop enables RLS on any remaining `public` base tables, then asserts none lack `relrowsecurity`.
+- Keeps permissive anon/authenticated policies on the flagged hub tables so floor PWA access is not locked out.
+
 ## 2026-08-12 — Immersive Snap Bay AI Audit camera
 
 ### Shipped
