@@ -37,18 +37,18 @@ export function HubHeader({
   const title = sectionTitle(section, specialist);
 
   return (
-    <header className="sticky top-0 z-40 border-b border-slate-800 bg-slate-950/95 backdrop-blur">
+    <header className="glass-panel sticky top-0 z-40 shadow-lg shadow-black/30">
       <div className="mx-auto flex min-h-14 max-w-md items-center gap-2 px-3 py-1.5">
         <DeptSyncBadge size="sm" />
         <div className="min-w-0 flex-1">
-          <p className="truncate font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-400">
+          <p className="glass-subtitle truncate text-emerald-400">
             DeptSync Hub
           </p>
-          <p className="truncate text-[10px] font-semibold text-slate-400">
+          <p className="glass-muted truncate text-[10px] font-semibold">
             DeptSync
             {storeNumber ? ` · ${formatStoreLabel(storeNumber)}` : ""}
           </p>
-          <h1 className="truncate text-base font-bold text-slate-50">
+          <h1 className="glass-title truncate text-base">
             {title}
           </h1>
           <p
@@ -73,7 +73,7 @@ export function HubHeader({
           <button
             type="button"
             onClick={onOpenSpecialist}
-            className="flex h-12 max-w-[8.5rem] items-center gap-1.5 rounded-xl border border-emerald-500/30 bg-emerald-950/40 px-2.5 text-left transition active:scale-95"
+            className="flex h-12 max-w-[8.5rem] items-center gap-1.5 rounded-xl border border-emerald-500/40 bg-emerald-950/40 px-2.5 text-left backdrop-blur-sm transition active:scale-95"
             aria-label="Switch active specialist"
           >
             <span aria-hidden>
@@ -93,7 +93,7 @@ export function HubHeader({
               onClick={onChangePin}
               aria-label="Change PIN"
               title="Change PIN"
-              className="flex h-12 w-11 items-center justify-center rounded-xl border border-slate-700 bg-slate-900 text-slate-100 transition active:scale-95"
+              className="flex h-12 w-11 items-center justify-center rounded-xl border border-zinc-700/80 bg-zinc-900/80 text-zinc-100 transition active:scale-95"
             >
               ⚙️
             </button>
@@ -104,7 +104,7 @@ export function HubHeader({
               onClick={onLogout}
               aria-label="Log out and lock DeptSync"
               title="Log out"
-              className="flex h-12 w-11 items-center justify-center rounded-xl border border-red-500/40 bg-red-950/40 text-sm font-bold text-red-300 transition active:scale-95"
+              className="flex h-12 w-11 items-center justify-center rounded-xl border border-rose-500/40 bg-rose-950/40 text-sm font-bold text-rose-300 transition active:scale-95"
             >
               🔒
             </button>
@@ -179,7 +179,7 @@ export function BottomNavBar({
   return (
     <nav
       aria-label="Primary"
-      className="fixed bottom-0 left-0 right-0 z-30 mx-auto max-w-md border-t border-slate-800 bg-slate-900/95 pb-[env(safe-area-inset-bottom)] backdrop-blur-md"
+      className="fixed bottom-0 left-0 right-0 z-30 mx-auto max-w-md border-t border-zinc-800/80 bg-zinc-900/90 pb-[env(safe-area-inset-bottom)] backdrop-blur-md shadow-[0_-8px_32px_-12px_rgba(0,0,0,0.55)]"
     >
       <div className={`grid ${cols}`}>
         {tabs.map((tab) => {

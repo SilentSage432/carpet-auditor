@@ -10,6 +10,15 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 - Header: brand `DeptSync Hub` · subtitle `DeptSync · Lowe's #{store}` · section title · network
 - Header badge: `DeptSyncBadge` (stacked boxes + barcode, emerald/amber on dark)
 - Icons: `public/icons/icon-192.png`, `icon-512.png`, `apple-touch-icon.png`
+- **Obsidian-glass UI:** void `#09090b`; utilities in `app/globals.css` (`.glass-card`, `.glass-panel`, `.glass-input`, `.btn-primary-glow`, status pills). Emerald primary / cyan secondary accents. NavigationHub + audit cards + Bulk Generator consume these tokens.
+
+## AI (`lib/ai/gemini.ts`)
+- Server-only Gemini Flash client (`@google/generative-ai`)
+- Env: `GEMINI_API_KEY`, `GEMINI_MODEL` (default `gemini-3.5-flash`) — never `NEXT_PUBLIC_`
+- Exports: `callGeminiFlash(prompt, inlineImage?)`, `callGeminiFlashJson`, `extractGeminiJsonText` / `parseGeminiJson`, `isGeminiConfigured`
+- Inline images accept raw base64 or `data:image/...;base64,...` (prefix stripped)
+- JSON regex extraction for object/array payloads from fenced or chatty model replies
+- Does not recommend or own institutional knowledge — callers compose prompts
 
 ## RBAC (`lib/rbac.ts` + `lib/specialists.ts`)
 | Role | Scope | Tabs |

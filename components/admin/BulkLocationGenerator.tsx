@@ -166,11 +166,9 @@ export function BulkLocationGenerator({
   }
 
   return (
-    <section className="rounded-2xl border border-emerald-500/25 bg-slate-900/80 p-4 shadow-lg shadow-emerald-950/20">
-      <h2 className="font-mono text-xs font-semibold uppercase tracking-[0.16em] text-emerald-400">
-        Bulk Generator
-      </h2>
-      <p className="mt-1 text-sm text-slate-400">
+    <section className="glass-card space-y-1 p-4">
+      <h2 className="glass-subtitle text-emerald-400">Bulk Generator</h2>
+      <p className="glass-muted mt-1 text-sm">
         Map an aisle bay range in one tap. Aisle accepts alphanumeric codes
         (BW, RW, LW, GC, 12, A1). BOTH writes Selling and Topstock for each bay
         (unique on department, aisle, bay, type). Re-running upserts status
@@ -179,11 +177,11 @@ export function BulkLocationGenerator({
 
       <div className="mt-4 grid gap-3 sm:grid-cols-2">
         <label className="block text-sm">
-          <span className="mb-1 block text-slate-300">Department</span>
+          <span className="mb-1 block text-zinc-300">Department</span>
           <select
             value={departmentId}
             onChange={(e) => setDepartmentId(e.target.value)}
-            className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-3 text-slate-100 outline-none focus:border-emerald-500"
+            className="glass-input"
           >
             {departments.map((d) => (
               <option key={d.id} value={d.id}>
@@ -194,7 +192,7 @@ export function BulkLocationGenerator({
         </label>
 
         <label className="block text-sm">
-          <span className="mb-1 block text-slate-300">Aisle</span>
+          <span className="mb-1 block text-zinc-300">Aisle</span>
           <input
             type="text"
             inputMode="text"
@@ -204,59 +202,66 @@ export function BulkLocationGenerator({
             value={aisle}
             onChange={(e) => setAisle(formatAisleInput(e.target.value))}
             onBlur={() => setAisle(normalizeAisle(aisle))}
-            className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-3 font-mono uppercase text-slate-100 outline-none focus:border-emerald-500"
+            className="glass-input font-mono uppercase"
           />
         </label>
 
         <label className="block text-sm">
-          <span className="mb-1 block text-slate-300">Start Bay</span>
+          <span className="mb-1 block text-zinc-300">Start Bay</span>
           <input
             type="number"
             inputMode="numeric"
             min={0}
             value={startBay}
             onChange={(e) => setStartBay(e.target.value)}
-            className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-3 font-mono text-slate-100 outline-none focus:border-emerald-500"
+            className="glass-input font-mono"
           />
         </label>
 
         <label className="block text-sm">
-          <span className="mb-1 block text-slate-300">End Bay</span>
+          <span className="mb-1 block text-zinc-300">End Bay</span>
           <input
             type="number"
             inputMode="numeric"
             min={0}
             value={endBay}
             onChange={(e) => setEndBay(e.target.value)}
-            className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-3 font-mono text-slate-100 outline-none focus:border-emerald-500"
+            className="glass-input font-mono"
           />
         </label>
       </div>
 
       <fieldset className="mt-4">
-        <legend className="mb-2 text-sm text-slate-300">Location type</legend>
-        <div className="flex flex-wrap gap-4">
+        <legend className="mb-2 text-sm text-zinc-300">Location type</legend>
+        <div className="flex flex-wrap gap-3">
           {(
             [
               { value: "BOTH", label: "Both (Selling + Topstock)" },
               { value: "SELLING", label: "Selling" },
               { value: "TOPSTOCK", label: "Topstock" },
             ] as const
-          ).map((option) => (
-            <label
-              key={option.value}
-              className="flex min-h-12 items-center gap-2 text-sm text-slate-100"
-            >
-              <input
-                type="radio"
-                name="bulk-location-type"
-                checked={locationMode === option.value}
-                onChange={() => setLocationMode(option.value)}
-                className="h-5 w-5 accent-emerald-500"
-              />
-              {option.label}
-            </label>
-          ))}
+          ).map((option) => {
+            const selected = locationMode === option.value;
+            return (
+              <label
+                key={option.value}
+                className={`flex min-h-12 cursor-pointer items-center gap-2 rounded-xl border px-3 text-sm transition ${
+                  selected
+                    ? "border-emerald-500/50 bg-emerald-950/40 text-emerald-100 ring-1 ring-emerald-500/30"
+                    : "border-zinc-800/80 bg-zinc-950/50 text-zinc-100"
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="bulk-location-type"
+                  checked={selected}
+                  onChange={() => setLocationMode(option.value)}
+                  className="h-5 w-5 accent-emerald-500"
+                />
+                {option.label}
+              </label>
+            );
+          })}
         </div>
       </fieldset>
 
@@ -264,33 +269,36 @@ export function BulkLocationGenerator({
         type="button"
         disabled={busy || !departmentId || !isValidAisle(aisle)}
         onClick={handleGenerate}
-        className="mt-4 flex min-h-14 w-full items-center justify-center rounded-xl bg-emerald-500 px-4 text-base font-bold text-slate-950 transition active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50"
+        className="btn-primary-glow mt-4 flex min-h-14 w-full items-center justify-center rounded-xl px-4 text-base"
       >
         {busy ? "Generating…" : "Generate Locations"}
       </button>
 
-      <div className="mt-6 space-y-3 border-t border-slate-800 pt-4">
-        <h3 className="font-mono text-[11px] font-semibold uppercase tracking-[0.14em] text-slate-400">
-          Batch CSV load
-        </h3>
-        <p className="text-xs text-slate-500">
+      <div className="mt-6 space-y-3 border-t border-zinc-800/80 pt-4">
+        <h3 className="glass-subtitle">Batch CSV load</h3>
+        <p className="text-xs text-zinc-500">
           Columns:{" "}
-          <span className="font-mono text-slate-400">
+          <span className="font-mono text-zinc-400">
             aisle, start_bay, end_bay[, types][, department_code]
           </span>
           . Aisle values are text (never numeric-only). Example:{" "}
-          <span className="font-mono text-slate-400">BW,1,15,BOTH</span>
+          <span className="font-mono text-zinc-400">BW,1,15,BOTH</span>
         </p>
-        <textarea
-          value={csvText}
-          onChange={(e) => setCsvText(e.target.value)}
-          rows={5}
-          spellCheck={false}
-          placeholder={
-            "aisle,start_bay,end_bay,types\nBW,1,15,BOTH\nRW,1,10,BOTH\n12,1,20,SELLING"
-          }
-          className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-3 font-mono text-xs text-slate-100 outline-none focus:border-emerald-500"
-        />
+        <div className="rounded-2xl border border-dashed border-cyan-500/30 bg-zinc-950/60 p-3 ring-0 transition focus-within:border-cyan-500/50 focus-within:ring-1 focus-within:ring-cyan-500/30">
+          <textarea
+            value={csvText}
+            onChange={(e) => setCsvText(e.target.value)}
+            rows={5}
+            spellCheck={false}
+            placeholder={
+              "aisle,start_bay,end_bay,types\nBW,1,15,BOTH\nRW,1,10,BOTH\n12,1,20,SELLING"
+            }
+            className="w-full resize-y rounded-xl border-0 bg-transparent px-1 py-1 font-mono text-xs text-zinc-100 outline-none placeholder:text-zinc-600"
+          />
+          <p className="glass-muted mt-2 text-center text-[10px] font-semibold uppercase tracking-wider">
+            Dropzone · paste or upload CSV
+          </p>
+        </div>
         <div className="flex flex-wrap gap-2">
           <input
             ref={fileRef}
@@ -303,7 +311,7 @@ export function BulkLocationGenerator({
             type="button"
             disabled={busy}
             onClick={() => fileRef.current?.click()}
-            className="flex min-h-12 flex-1 items-center justify-center rounded-xl border border-slate-700 px-3 text-sm font-semibold text-slate-200 disabled:opacity-50"
+            className="flex min-h-12 flex-1 items-center justify-center rounded-xl border border-zinc-700/80 bg-zinc-900/60 px-3 text-sm font-semibold text-zinc-200 backdrop-blur-sm disabled:opacity-50"
           >
             Upload CSV
           </button>
@@ -311,7 +319,7 @@ export function BulkLocationGenerator({
             type="button"
             disabled={busy || !csvText.trim()}
             onClick={() => void handleCsvBatch()}
-            className="flex min-h-12 flex-1 items-center justify-center rounded-xl border border-sky-500/40 bg-sky-950/40 px-3 text-sm font-bold text-sky-200 disabled:opacity-50"
+            className="flex min-h-12 flex-1 items-center justify-center rounded-xl border border-cyan-500/40 bg-cyan-950/40 px-3 text-sm font-bold text-cyan-200 shadow-lg shadow-cyan-950/30 disabled:opacity-50"
           >
             {busy ? "Loading…" : "Load CSV batch"}
           </button>
@@ -324,7 +332,7 @@ export function BulkLocationGenerator({
         </p>
       ) : null}
       {error ? (
-        <p className="mt-3 text-sm font-medium text-red-300" role="alert">
+        <p className="mt-3 text-sm font-medium text-rose-300" role="alert">
           {error}
         </p>
       ) : null}

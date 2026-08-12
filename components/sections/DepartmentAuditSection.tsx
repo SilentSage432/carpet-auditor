@@ -35,8 +35,7 @@ type Props = {
   activeSpecialist: StoreSpecialist | null;
 };
 
-const cardClass =
-  "rounded-2xl border border-slate-800 bg-slate-900/90 p-4 shadow-lg shadow-black/20";
+const cardClass = "glass-card p-4";
 
 function locationLabel(location: LocationType): string {
   return location === "sales_floor" ? "Sales Floor" : "Top Stock";
@@ -342,10 +341,10 @@ export function DepartmentAuditSection({
         }}
       >
         <div className="flex items-center justify-between gap-2">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-400">
+          <h2 className="glass-subtitle">
             {meta.label} Unit Audit
           </h2>
-          <span className="rounded-lg border border-slate-700 bg-slate-950 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-sky-300">
+          <span className="glass-pill-cyan">
             Mode · Units
           </span>
         </div>
@@ -465,7 +464,7 @@ export function DepartmentAuditSection({
             type="button"
             disabled={!canLog}
             onClick={() => void handleLog()}
-            className="flex min-h-14 items-center justify-center rounded-2xl bg-emerald-500 text-sm font-bold text-slate-950 shadow-lg disabled:opacity-40"
+            className="btn-primary-glow flex min-h-14 items-center justify-center rounded-2xl text-sm disabled:opacity-40"
           >
             {saving ? "Saving…" : `Log ${meta.shortLabel} & Reset`}
           </button>
@@ -480,11 +479,11 @@ export function DepartmentAuditSection({
       </div>
 
       <section className={`${cardClass} space-y-2 pb-24`}>
-        <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-400">
+        <h3 className="glass-subtitle">
           Today · {meta.label}
         </h3>
         {displayShift.length === 0 ? (
-          <p className="text-sm text-slate-500">
+          <p className="text-sm text-zinc-500">
             No {meta.label.toLowerCase()} units logged yet this shift.
           </p>
         ) : (

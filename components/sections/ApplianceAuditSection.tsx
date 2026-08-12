@@ -63,8 +63,7 @@ function BarcodeIcon({ className }: { className?: string }) {
   );
 }
 
-const cardClass =
-  "rounded-2xl border border-slate-800 bg-slate-900/90 p-4 shadow-lg shadow-black/20";
+const cardClass = "glass-card p-4";
 
 type Props = {
   catalog: ApplianceCatalogItem[];
@@ -470,7 +469,7 @@ export function ApplianceAuditSection({
       <div
         role="status"
         aria-live="polite"
-        className="sticky top-0 z-30 -mx-1 rounded-2xl border border-sky-500/40 bg-sky-950/90 px-4 py-3 shadow-lg shadow-black/30 backdrop-blur-md"
+        className="sticky top-0 z-30 -mx-1 rounded-2xl border border-cyan-500/40 bg-zinc-900/90 px-4 py-3 shadow-lg shadow-black/30 backdrop-blur-xl"
       >
         <p className="text-center font-mono text-sm font-semibold tabular-nums text-sky-100 sm:text-base">
           Session Total: {sessionTotal}{" "}
@@ -489,7 +488,7 @@ export function ApplianceAuditSection({
 
       <section
         aria-label="Appliance shift summary"
-        className="overflow-x-auto rounded-2xl border border-slate-800 bg-slate-900/90 shadow-lg shadow-black/20"
+        className="overflow-x-auto glass-card shadow-lg shadow-black/20"
       >
         <button
           type="button"
@@ -541,10 +540,10 @@ export function ApplianceAuditSection({
 
       <div className={`${cardClass} space-y-4 overflow-x-auto`}>
         <div className="flex items-center justify-between gap-2">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-400">
+          <h2 className="glass-subtitle">
             Appliance Floor Scan
           </h2>
-          <span className="rounded-lg border border-emerald-700/50 bg-emerald-950/40 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-emerald-300">
+          <span className="glass-pill-cyan">
             Continuous
           </span>
         </div>
@@ -618,7 +617,7 @@ export function ApplianceAuditSection({
 
       <section className="overflow-x-hidden" aria-label="Appliance scan log">
         <div className="mb-3 flex items-baseline justify-between gap-2 px-1">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-400">
+          <h2 className="glass-subtitle">
             Scan log
           </h2>
           {logFilter === "all" ? (
@@ -645,7 +644,7 @@ export function ApplianceAuditSection({
                   onClick={() => setLogFilter(chip.id)}
                   className={`shrink-0 rounded-lg border px-3 py-2 text-[11px] font-semibold transition ${
                     active
-                      ? "border-emerald-500 bg-emerald-950/40 text-emerald-400"
+                      ? "border-emerald-500/50 bg-emerald-950/40 text-emerald-300 ring-1 ring-emerald-500/30"
                       : "border-slate-700 bg-slate-900 text-slate-400 active:bg-slate-800"
                   }`}
                 >
@@ -668,19 +667,19 @@ export function ApplianceAuditSection({
 
         <div className="mt-2 space-y-2">
         {!loaded ? (
-          <p className="rounded-2xl border border-slate-800 bg-slate-900/60 px-4 py-6 text-center text-sm text-slate-400">
+          <p className="glass-card border-dashed px-4 py-6 text-center text-sm text-zinc-400">
             Loading scans…
           </p>
         ) : null}
 
         {loaded && scans.length === 0 ? (
-          <p className="rounded-2xl border border-dashed border-slate-700 bg-slate-900/60 px-4 py-8 text-center text-sm text-slate-400">
+          <p className="glass-card border-dashed px-4 py-8 text-center text-sm text-zinc-400">
             No appliance scans yet — scan a barcode to start.
           </p>
         ) : null}
 
         {loaded && scans.length > 0 && categoryAccordions.length === 0 ? (
-          <p className="rounded-2xl border border-dashed border-slate-700 bg-slate-900/60 px-4 py-8 text-center text-sm text-slate-400">
+          <p className="glass-card border-dashed px-4 py-8 text-center text-sm text-zinc-400">
             No scans match this filter.
           </p>
         ) : null}
@@ -707,7 +706,7 @@ export function ApplianceAuditSection({
             return (
               <li
                 key={accordion.category}
-                className="rounded-2xl border border-slate-800 bg-slate-900/90"
+                className="glass-card rounded-2xl"
               >
                 <button
                   type="button"

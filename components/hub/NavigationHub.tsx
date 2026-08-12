@@ -125,7 +125,7 @@ export function NavigationHub({
 
   return (
     <>
-      <header className="sticky top-0 z-40 border-b-2 border-emerald-500/40 bg-slate-950">
+      <header className="glass-panel sticky top-0 z-40 border-b border-zinc-800/80 shadow-lg shadow-black/30">
         <div className="mx-auto flex min-h-[3.75rem] max-w-lg items-center gap-2 px-2 py-1.5 sm:px-3">
           <button
             type="button"
@@ -133,7 +133,7 @@ export function NavigationHub({
             aria-expanded={menuOpen}
             aria-controls={drawerId}
             aria-label="Open navigation menu"
-            className="flex h-14 w-14 shrink-0 flex-col items-center justify-center gap-1.5 rounded-xl border-2 border-slate-100/90 bg-slate-900 text-slate-50 transition active:scale-95"
+            className="flex h-14 w-14 shrink-0 flex-col items-center justify-center gap-1.5 rounded-xl border border-zinc-700/80 bg-zinc-900/80 text-zinc-50 transition active:scale-95 focus-visible:border-emerald-500/50 focus-visible:ring-1 focus-visible:ring-emerald-500/30"
           >
             <span className="block h-0.5 w-6 rounded bg-current" />
             <span className="block h-0.5 w-6 rounded bg-current" />
@@ -150,7 +150,7 @@ export function NavigationHub({
                 setAdminForce(false);
                 setAdminOpen(true);
               }}
-              className="flex h-11 shrink-0 items-center rounded-xl border-2 border-amber-400/60 bg-amber-950/50 px-2 font-mono text-[10px] font-bold uppercase tracking-wide text-amber-200"
+              className="flex h-11 shrink-0 items-center rounded-xl border border-amber-400/50 bg-amber-950/40 px-2 font-mono text-[10px] font-bold uppercase tracking-wider text-amber-200 backdrop-blur-sm"
               aria-label="Open Admin Tools"
             >
               Admin
@@ -158,15 +158,15 @@ export function NavigationHub({
           ) : null}
 
           <div className="min-w-0 flex-1">
-            <p className="truncate font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-emerald-400">
+            <p className="glass-subtitle truncate text-emerald-400">
               DeptSync Hub
               {storeNumber ? ` · ${formatStoreLabel(storeNumber)}` : ""}
             </p>
-            <h1 className="truncate text-base font-bold leading-tight text-slate-50">
+            <h1 className="glass-title truncate text-base leading-tight">
               {title}
             </h1>
             {subtitle ? (
-              <p className="truncate text-[10px] font-semibold text-slate-400">
+              <p className="glass-muted truncate text-[10px] font-semibold">
                 {subtitle}
               </p>
             ) : (
@@ -196,7 +196,7 @@ export function NavigationHub({
               aria-expanded={userOpen}
               aria-controls={userMenuId}
               aria-label="User menu"
-              className="flex min-h-14 max-w-[9.5rem] flex-col items-stretch justify-center rounded-xl border-2 border-emerald-400/50 bg-emerald-950/50 px-2.5 py-1 text-left transition active:scale-95"
+              className="flex min-h-14 max-w-[9.5rem] flex-col items-stretch justify-center rounded-xl border border-emerald-500/40 bg-emerald-950/40 px-2.5 py-1 text-left backdrop-blur-sm transition active:scale-95 focus-visible:border-emerald-500/50 focus-visible:ring-1 focus-visible:ring-emerald-500/30"
             >
               <span className="font-mono text-[9px] font-bold leading-none tracking-wide text-amber-300">
                 {roleBadge}
@@ -210,16 +210,16 @@ export function NavigationHub({
               <div
                 id={userMenuId}
                 role="menu"
-                className="absolute right-0 top-[calc(100%+0.35rem)] z-50 w-64 overflow-hidden rounded-2xl border-2 border-slate-600 bg-slate-950 shadow-xl"
+                className="glass-card absolute right-0 top-[calc(100%+0.35rem)] z-50 w-64 overflow-hidden"
               >
-                <div className="border-b border-slate-800 bg-slate-900 px-4 py-3">
+                <div className="border-b border-zinc-800/80 bg-zinc-950/50 px-4 py-3">
                   <p className="font-mono text-[10px] font-bold tracking-wide text-amber-300">
                     {roleBadge}
                   </p>
-                  <p className="mt-1 text-sm font-bold text-slate-50">
+                  <p className="glass-title mt-1 text-sm">
                     {specialist?.name ?? "Locked"}
                   </p>
-                  <p className="mt-0.5 break-all font-mono text-xs text-slate-400">
+                  <p className="glass-muted mt-0.5 break-all font-mono text-xs">
                     {loginId}
                   </p>
                 </div>
@@ -256,7 +256,7 @@ export function NavigationHub({
                   <Link
                     href={associate ? "/settings" : "/"}
                     role="menuitem"
-                    className="flex min-h-12 items-center rounded-xl px-3 text-sm font-semibold text-slate-200 hover:bg-slate-900"
+                    className="flex min-h-12 items-center rounded-xl px-3 text-sm font-semibold text-zinc-200 hover:bg-zinc-800/60"
                     onClick={() => setUserOpen(false)}
                   >
                     {associate ? "My Profile / PIN" : "Inventory Hub"}
@@ -289,11 +289,11 @@ export function NavigationHub({
           <nav
             id={drawerId}
             aria-label="Navigation Hub"
-            className="absolute inset-y-0 left-0 flex w-[min(100%,22rem)] flex-col border-r-2 border-emerald-500/40 bg-slate-950"
+            className="absolute inset-y-0 left-0 flex w-[min(100%,22rem)] flex-col border-r border-zinc-800/80 bg-zinc-950/95 backdrop-blur-xl shadow-2xl shadow-black/50"
           >
-            <div className="flex items-center justify-between border-b border-slate-800 px-4 py-4">
+            <div className="flex items-center justify-between border-b border-zinc-800/80 px-4 py-4">
               <div>
-                <p className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-emerald-400">
+                <p className="glass-subtitle text-emerald-400">
                   Navigation Hub
                 </p>
                 <p className="mt-1 font-mono text-xs font-bold text-amber-300">
@@ -303,7 +303,7 @@ export function NavigationHub({
               <button
                 type="button"
                 onClick={() => setMenuOpen(false)}
-                className="flex h-12 w-12 items-center justify-center rounded-xl border-2 border-slate-600 text-lg font-bold text-slate-100"
+                className="flex h-12 w-12 items-center justify-center rounded-xl border border-zinc-700/80 bg-zinc-900/80 text-lg font-bold text-zinc-100 transition focus-visible:border-emerald-500/50 focus-visible:ring-1 focus-visible:ring-emerald-500/30"
                 aria-label="Close menu"
               >
                 ✕
@@ -320,7 +320,7 @@ export function NavigationHub({
                       setAdminForce(false);
                       setAdminOpen(true);
                     }}
-                    className="flex min-h-16 w-full items-center gap-3 rounded-2xl border-2 border-amber-400/50 bg-amber-950/30 px-4 text-left"
+                    className="flex min-h-16 w-full items-center gap-3 rounded-2xl border border-amber-400/40 bg-amber-950/30 px-4 text-left backdrop-blur-sm"
                   >
                     <span className="text-xl" aria-hidden>
                       ⚡
@@ -349,16 +349,16 @@ export function NavigationHub({
                   <Link
                     href="/"
                     onClick={() => setMenuOpen(false)}
-                    className="flex min-h-16 items-center gap-3 rounded-2xl border border-slate-700 bg-slate-900/80 px-4 text-left"
+                    className="glass-card flex min-h-16 items-center gap-3 px-4 text-left"
                   >
                     <span className="text-xl" aria-hidden>
                       📊
                     </span>
                     <span>
-                      <span className="block text-sm font-bold text-slate-100">
+                      <span className="block text-sm font-bold text-zinc-100">
                         Inventory Hub
                       </span>
-                      <span className="block text-xs text-slate-400">
+                      <span className="glass-muted block text-xs">
                         Audits, catalog, remnants
                       </span>
                     </span>
@@ -415,8 +415,8 @@ function MenuAction({
       onClick={onClick}
       className={`flex min-h-12 w-full items-center rounded-xl px-3 text-left text-sm font-semibold ${
         danger
-          ? "text-red-300 hover:bg-red-950/50"
-          : "text-slate-200 hover:bg-slate-900"
+          ? "text-rose-300 hover:bg-rose-950/50"
+          : "text-zinc-200 hover:bg-zinc-800/60"
       }`}
     >
       {label}
@@ -439,10 +439,10 @@ function NavDrawerItem({
         href={link.href}
         onClick={onNavigate}
         aria-current={active ? "page" : undefined}
-        className={`flex min-h-16 items-center gap-3 rounded-2xl border-2 px-4 text-left transition ${
+        className={`flex min-h-16 items-center gap-3 rounded-2xl border px-4 text-left backdrop-blur-sm transition ${
           active
-            ? "border-emerald-400 bg-emerald-950/50 text-emerald-100"
-            : "border-slate-700 bg-slate-900/80 text-slate-100"
+            ? "border-emerald-500/50 bg-emerald-950/45 text-emerald-100 ring-1 ring-emerald-500/30"
+            : "border-zinc-800/80 bg-zinc-900/70 text-zinc-100"
         }`}
       >
         <span className="text-xl" aria-hidden>
@@ -452,7 +452,7 @@ function NavDrawerItem({
           <span className="block text-sm font-bold leading-tight">
             {link.label}
           </span>
-          <span className="mt-0.5 block text-xs text-slate-400">
+          <span className="glass-muted mt-0.5 block text-xs">
             {link.description}
           </span>
         </span>
@@ -478,7 +478,7 @@ function OpsBottomNav({
   return (
     <nav
       aria-label="Store Operations"
-      className="fixed bottom-0 left-0 right-0 z-30 mx-auto max-w-lg border-t-2 border-emerald-500/30 bg-slate-950 pb-[env(safe-area-inset-bottom)]"
+      className="fixed bottom-0 left-0 right-0 z-30 mx-auto max-w-lg border-t border-zinc-800/80 bg-zinc-900/90 pb-[env(safe-area-inset-bottom)] backdrop-blur-md shadow-[0_-8px_32px_-12px_rgba(0,0,0,0.55)]"
     >
       <div className={`grid ${cols}`}>
         {links.map((link) => {
@@ -489,7 +489,7 @@ function OpsBottomNav({
               href={link.href}
               aria-current={active ? "page" : undefined}
               className={`relative flex min-h-[4.25rem] flex-col items-center justify-center gap-1 px-1 pb-1.5 pt-2 ${
-                active ? "text-emerald-300" : "text-slate-400 active:text-slate-200"
+                active ? "text-emerald-300" : "text-zinc-400 active:text-zinc-200"
               }`}
             >
               {active ? (

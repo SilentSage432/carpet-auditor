@@ -25,10 +25,13 @@ export function formatVariance(variance: number): string {
 }
 
 export function varianceBadgeClass(kind: VarianceKind): string {
-  if (kind === "match") return "bg-emerald-500/20 text-emerald-300 border-emerald-500/30";
-  if (kind === "shortage") return "bg-red-500/20 text-red-300 border-red-500/40";
-  if (kind === "overage") return "bg-amber-500/20 text-amber-300 border-amber-500/40";
-  return "bg-slate-700/40 text-slate-400 border-slate-700";
+  if (kind === "match")
+    return "border-emerald-500/40 bg-emerald-500/15 text-emerald-300";
+  if (kind === "shortage")
+    return "border-rose-500/40 bg-rose-500/15 text-rose-300";
+  if (kind === "overage")
+    return "border-amber-500/40 bg-amber-500/15 text-amber-300";
+  return "border-zinc-700/80 bg-zinc-800/50 text-zinc-400";
 }
 
 export function varianceLabel(kind: VarianceKind): string {

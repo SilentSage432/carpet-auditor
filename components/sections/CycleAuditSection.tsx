@@ -98,8 +98,7 @@ function BarcodeIcon({ className }: { className?: string }) {
   );
 }
 
-const cardClass =
-  "rounded-2xl border border-slate-800 bg-slate-900/90 p-4 shadow-lg shadow-black/20";
+const cardClass = "glass-card p-4";
 
 type Props = {
   catalog: CatalogItem[];
@@ -636,7 +635,7 @@ export function CycleAuditSection({
       {undoToast ? (
         <div
           role="status"
-          className="fixed bottom-32 left-3 right-3 z-40 mx-auto flex max-w-md items-center gap-2 rounded-2xl border border-emerald-500/40 bg-slate-900/95 px-3 py-3 shadow-2xl shadow-black/40 backdrop-blur-md"
+          className="fixed bottom-32 left-3 right-3 z-40 mx-auto flex max-w-md items-center gap-2 rounded-2xl border border-emerald-500/40 bg-zinc-900/90 px-3 py-3 shadow-2xl shadow-black/40 backdrop-blur-xl"
         >
           <p className="min-w-0 flex-1 truncate text-sm font-medium text-slate-100">
             {undoToast.label}
@@ -653,7 +652,7 @@ export function CycleAuditSection({
 
       <section
         aria-label="Shift summary"
-        className="overflow-x-auto rounded-2xl border border-slate-800 bg-slate-900/90 shadow-lg shadow-black/20"
+        className="overflow-x-auto glass-card shadow-lg shadow-black/20"
       >
         <button
           type="button"
@@ -755,10 +754,10 @@ export function CycleAuditSection({
         }}
       >
         <div className="flex items-center justify-between gap-2">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-400">
+          <h2 className="glass-subtitle">
             Scan-to-Catalog Audit
           </h2>
-          <span className="rounded-lg border border-slate-700 bg-slate-950 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-emerald-400">
+          <span className="glass-pill-emerald">
             {auditMode === "roll" ? "Mode A · Rolls" : "Mode B · Cartons"}
           </span>
         </div>
@@ -1107,7 +1106,7 @@ export function CycleAuditSection({
         />
         {liveVariance != null && (
           <div
-            className={`rounded-xl border px-3 py-3 text-center text-sm font-semibold ${varianceBadgeClass(liveVarianceKind)}`}
+            className={`rounded-xl border px-3 py-3 text-center text-sm font-semibold backdrop-blur-sm ${varianceBadgeClass(liveVarianceKind)}`}
           >
             {liveVarianceKind === "match" && "🟢 "}
             {liveVarianceKind === "shortage" && "🔴 "}
@@ -1142,7 +1141,7 @@ export function CycleAuditSection({
           type="submit"
           form="cycle-audit-form"
           disabled={!canLog}
-          className="flex h-12 w-full items-center justify-center rounded-xl bg-emerald-500 text-base font-bold text-slate-950 transition enabled:active:scale-[0.98] enabled:hover:bg-emerald-400 disabled:cursor-not-allowed disabled:opacity-40"
+          className="flex h-12 w-full items-center justify-center rounded-xl btn-primary-glow px-4 text-base disabled:cursor-not-allowed disabled:opacity-40"
         >
           {saving
             ? "Logging…"
@@ -1154,32 +1153,32 @@ export function CycleAuditSection({
 
       <section className="space-y-3 overflow-x-hidden" aria-label="Shift audit log">
         <div className="flex items-baseline justify-between gap-2 px-1">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-400">
+          <h2 className="glass-subtitle">
             Shift log
           </h2>
-          <span className="font-mono text-xs text-slate-500">
+          <span className="font-mono text-xs text-zinc-500">
             {filteredAudits.length}/{audits.length}
           </span>
         </div>
 
-        <div className="overflow-hidden rounded-xl border border-slate-800 bg-slate-900/90">
+        <div className="glass-card overflow-hidden !rounded-xl">
           <button
             type="button"
             aria-expanded={filtersOpen}
             onClick={() => setFiltersOpen((o) => !o)}
-            className="flex min-h-11 w-full items-center justify-between px-3 text-left text-xs font-semibold uppercase tracking-wide text-slate-500"
+            className="flex min-h-11 w-full items-center justify-between px-3 text-left text-xs font-semibold uppercase tracking-wider text-zinc-500"
           >
             Filters
             <span aria-hidden>{filtersOpen ? "▲" : "▼"}</span>
           </button>
           {filtersOpen ? (
-            <div className="space-y-2 border-t border-slate-800 p-3">
+            <div className="space-y-2 border-t border-zinc-800/80 p-3">
           <label className="block space-y-1">
-            <span className="text-xs text-slate-400">Specialist</span>
+            <span className="text-xs text-zinc-400">Specialist</span>
             <select
               value={filterSpecialist}
               onChange={(e) => setFilterSpecialist(e.target.value)}
-              className="min-h-12 w-full rounded-xl border border-slate-800 bg-slate-950 px-3 text-base text-slate-100"
+              className="glass-input min-h-12 text-base"
             >
               <option value="all">All</option>
               {specialistOptions.map((name) => (
@@ -1234,14 +1233,14 @@ export function CycleAuditSection({
         )}
 
         {loaded && filteredAudits.length === 0 && (
-          <p className="rounded-2xl border border-dashed border-slate-700 bg-slate-900/60 px-4 py-8 text-center text-sm text-slate-400">
+          <p className="glass-card border-dashed px-4 py-8 text-center text-sm text-zinc-400">
             {audits.length === 0
               ? "No audits logged yet — scan a barcode to start."
               : "No entries match the current filters."}
           </p>
         )}
 
-        <ul className="divide-y divide-slate-800 overflow-hidden rounded-xl border border-slate-800 bg-slate-900/90">
+        <ul className="glass-card divide-y divide-zinc-800/80 overflow-hidden !rounded-xl !p-0">
           {visibleAudits.map((audit) => {
             const kind = classifyVariance(audit.variance_clf);
             const isCarton =
@@ -1252,27 +1251,39 @@ export function CycleAuditSection({
                 className="flex min-h-11 items-center gap-2 px-3 py-2"
               >
                 <div className="min-w-0 flex-1">
-                  <p className="truncate font-mono text-sm font-semibold text-slate-50">
+                  <p className="truncate font-mono text-sm font-semibold text-white">
                     {audit.sku}
-                    <span className="ml-2 font-sans text-[10px] font-bold uppercase text-slate-500">
+                    <span className="ml-2 font-sans text-[10px] font-bold uppercase text-zinc-500">
                       {locationLabel(audit.location_type)}
                     </span>
+                    {kind !== "none" ? (
+                      <span
+                        className={`ml-2 align-middle ${
+                          kind === "match"
+                            ? "glass-pill-emerald"
+                            : kind === "shortage"
+                              ? "glass-pill-rose"
+                              : "glass-pill-amber"
+                        }`}
+                      >
+                        {varianceLabel(kind)}
+                      </span>
+                    ) : null}
                   </p>
-                  <p className="truncate text-[11px] text-slate-500">
+                  <p className="truncate text-[11px] text-zinc-500">
                     {isCarton
                       ? `${audit.box_count} units · ${formatSqFt(audit.calculated_sqft ?? 0)} sq ft`
                       : `${formatClf(audit.calculated_clf)} CLF`}
                     {audit.variance_clf != null
                       ? ` · ${formatVariance(audit.variance_clf)}`
                       : ""}
-                    {kind !== "match" && kind ? ` · ${kind}` : ""}
                   </p>
                 </div>
                 <button
                   type="button"
                   aria-label={`Delete SKU ${audit.sku}`}
                   onClick={() => void handleDelete(audit.id)}
-                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-red-500/30 text-xs font-bold text-red-300"
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-rose-500/30 text-xs font-bold text-rose-300"
                 >
                   ✕
                 </button>

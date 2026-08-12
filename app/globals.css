@@ -1,16 +1,18 @@
 @import "tailwindcss";
 
 :root {
-  --background: #020617;
-  --foreground: #e2e8f0;
-  --surface: #0f172a;
-  --surface-raised: #1e293b;
-  --border: #1e293b;
+  /* Obsidian void — DeptSync glassification */
+  --background: #09090b;
+  --foreground: #f4f4f5;
+  --surface: #18181b;
+  --surface-raised: #27272a;
+  --border: #27272a;
   --accent: #34d399;
-  --accent-strong: #10b981;
+  --accent-strong: #059669;
+  --accent-cyan: #22d3ee;
   --success: #34d399;
   --danger: #f87171;
-  --muted: #94a3b8;
+  --muted: #a1a1aa;
 }
 
 @theme inline {
@@ -21,6 +23,7 @@
   --color-border: var(--border);
   --color-accent: var(--accent);
   --color-accent-strong: var(--accent-strong);
+  --color-accent-cyan: var(--accent-cyan);
   --color-success: var(--success);
   --color-danger: var(--danger);
   --color-muted: var(--muted);
@@ -29,14 +32,71 @@
 }
 
 body {
-  background-color: #020617;
+  background-color: #09090b;
   background-image:
-    radial-gradient(ellipse 100% 60% at 50% -10%, rgb(6 78 59 / 0.35) 0%, transparent 50%),
-    radial-gradient(ellipse 70% 40% at 100% 100%, rgb(15 23 42 / 0.9) 0%, transparent 45%);
+    radial-gradient(ellipse 100% 55% at 50% -12%, rgb(6 78 59 / 0.28) 0%, transparent 52%),
+    radial-gradient(ellipse 55% 35% at 100% 100%, rgb(8 51 68 / 0.35) 0%, transparent 48%),
+    radial-gradient(ellipse 40% 30% at 0% 80%, rgb(24 24 27 / 0.9) 0%, transparent 50%);
   color: var(--foreground);
   font-family: var(--font-barlow), ui-sans-serif, sans-serif;
   min-height: 100dvh;
   overflow-x: hidden;
+}
+
+/* ── Obsidian-glass design system ── */
+
+.glass-card {
+  @apply bg-zinc-900/80 backdrop-blur-xl border border-zinc-800/80 rounded-2xl shadow-xl shadow-black/40 text-zinc-100;
+}
+
+.glass-panel {
+  @apply bg-zinc-900/90 backdrop-blur-md border-b border-zinc-800;
+}
+
+.glass-input {
+  @apply w-full rounded-xl border border-zinc-700/80 bg-zinc-950/80 px-3 py-3 text-zinc-100 outline-none transition
+    focus:border-emerald-500/50 focus:ring-1 focus:ring-emerald-500/30;
+}
+
+.btn-primary-glow {
+  @apply bg-emerald-600 hover:bg-emerald-500 text-white font-semibold shadow-lg shadow-emerald-950/50
+    transition active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50;
+}
+
+.glass-focus {
+  @apply border-emerald-500/50 ring-1 ring-emerald-500/30;
+}
+
+.glass-title {
+  @apply text-white font-bold tracking-tight;
+}
+
+.glass-subtitle {
+  @apply text-zinc-400 text-xs font-semibold uppercase tracking-wider;
+}
+
+.glass-muted {
+  @apply text-zinc-400;
+}
+
+.glass-pill {
+  @apply inline-flex items-center rounded-full border px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider;
+}
+
+.glass-pill-emerald {
+  @apply inline-flex items-center rounded-full border px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider border-emerald-500/40 bg-emerald-500/15 text-emerald-300;
+}
+
+.glass-pill-cyan {
+  @apply inline-flex items-center rounded-full border px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider border-cyan-500/40 bg-cyan-500/15 text-cyan-300;
+}
+
+.glass-pill-amber {
+  @apply inline-flex items-center rounded-full border px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider border-amber-500/40 bg-amber-500/15 text-amber-300;
+}
+
+.glass-pill-rose {
+  @apply inline-flex items-center rounded-full border px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider border-rose-500/40 bg-rose-500/15 text-rose-300;
 }
 
 input[type="number"]::-webkit-inner-spin-button,

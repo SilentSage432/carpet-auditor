@@ -64,6 +64,8 @@
 - [x] Remove Catalog bottom-nav tab; `/catalog` → `/appliances` redirect
 - [x] Roster without hardcoded seed accounts; temp-credentials badge from DB flags only
 - [x] Emergency master unlock (`MASTER-2026-TEMP`) + phone SMS OTP access reset + persistent localStorage auth session
+- [x] Obsidian-glass design system (globals utilities + NavigationHub / Bulk Generator / audit section cards)
+- [x] Gemini AI integration layer (`lib/ai/gemini.ts` + `@google/generative-ai` + env keys)
 
 ## Next
 - [ ] JWT / claim-based RLS enforcing `store_number` (+ department) server-side
@@ -74,6 +76,8 @@
 - [ ] Conflict resolution UI when offline edits collide
 - [ ] Retire or wire orphan `MarryBarcodeModal`
 - [ ] Department-specific catalog category taxonomies beyond flooring/appliances
+- [ ] Extend glassification to remaining modals / AuthWall / Store Map chrome (optional polish pass)
+- [ ] First product feature composing `callGeminiFlash` (vision / structured ops assist)
 ## Non-goals
 - Pricing / margin engines
 - Replenishment recommendations

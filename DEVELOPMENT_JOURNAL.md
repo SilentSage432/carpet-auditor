@@ -1,5 +1,23 @@
 # DeptSync Hub — Development Journal
 
+## 2026-08-11 — Gemini AI integration layer
+
+### Shipped
+- Added `@google/generative-ai` dependency.
+- Server-only helper `lib/ai/gemini.ts`: `callGeminiFlash`, `callGeminiFlashJson`, `extractGeminiJsonText` / `parseGeminiJson`, `isGeminiConfigured`.
+- Env: `GEMINI_API_KEY`, `GEMINI_MODEL` (default `gemini-3.5-flash`) in `.env.local` (gitignored).
+- Owns transport + JSON extraction only; product prompts / API routes compose on top.
+
+## 2026-08-11 — Obsidian-glass design system (glassification)
+
+### Shipped
+- Global tokens shifted to obsidian void (`#09090b` / zinc-950) with emerald + cyan glow accents in `app/globals.css`.
+- Utility classes: `.glass-card`, `.glass-panel`, `.glass-input`, `.btn-primary-glow`, `.glass-focus`, typography helpers, status pills.
+- Applied to `NavigationHub` / `HubChrome` headers + drawers + bottom nav (backdrop-blur glass panels).
+- `BulkLocationGenerator` form + CSV dropzone glassified with emerald focus rings and cyan batch CTA.
+- Flooring / Appliances / Dept Audit section cards use `.glass-card` + emerald/cyan mode pills; variance accents updated in `lib/variance.ts`.
+- No changes to sync queue, Supabase clients, or audit state logic.
+
 ## 2026-08-11 — Emergency unlock: update-only (no username insert clash)
 
 ### Fixed
