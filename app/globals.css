@@ -303,3 +303,65 @@ input[type="number"] {
   }
 }
 
+/* ── Executive Floor Pad (TipTap) ── */
+
+.floor-pad-prose p {
+  margin: 0.35em 0;
+}
+
+.floor-pad-prose ul:not([data-type="taskList"]) {
+  list-style: disc;
+  padding-left: 1.25rem;
+  margin: 0.5em 0;
+}
+
+.floor-pad-prose ol {
+  list-style: decimal;
+  padding-left: 1.25rem;
+  margin: 0.5em 0;
+}
+
+.floor-pad-prose ul[data-type="taskList"] {
+  list-style: none;
+  padding-left: 0;
+  margin: 0.65em 0;
+}
+
+.floor-pad-prose ul[data-type="taskList"] li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  margin: 0.35em 0;
+}
+
+.floor-pad-prose ul[data-type="taskList"] li > label {
+  display: flex;
+  align-items: center;
+  margin-top: 0.15rem;
+}
+
+.floor-pad-prose ul[data-type="taskList"] li > label input[type="checkbox"] {
+  width: 1.15rem;
+  height: 1.15rem;
+  accent-color: #10b981;
+  cursor: pointer;
+}
+
+.floor-pad-prose ul[data-type="taskList"] li > div {
+  flex: 1;
+  min-width: 0;
+}
+
+.floor-pad-prose ul[data-type="taskList"] li[data-checked="true"] > div {
+  text-decoration: line-through;
+  color: #a1a1aa;
+}
+
+.floor-pad-prose .is-empty::before {
+  color: #71717a;
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  pointer-events: none;
+}
+

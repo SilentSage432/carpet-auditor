@@ -37,12 +37,16 @@ components/admin/SundayAuditStagingCard.tsx → Glowing pending Sunday Flooring 
 components/admin/SundayAuditAssignmentModal.tsx → Assign Flooring specialists to staged bays
 lib/admin-department-context.ts       → Master Admin working department pin (local)
 lib/store-ops/sunday-audit.ts         → Sunday Flooring staging + Supabase sunday_bay_assignments
-lib/store-ops/manager-notes.ts        → Manager notes Supabase CRUD + realtime (JWT-scoped)
+lib/store-ops/manager-notes.ts        → Manager notes Supabase CRUD + realtime + archive (JWT-scoped)
 lib/store-ops/ai-bay-scan.ts          → Visual bay scan prompt / normalize / local fallback
-lib/store-ops/ai-note-summary.ts      → Manager note + S Pen synthesis prompt / normalize / fallback
-components/store-ops/ManagerNotesWorkspace.tsx → S Pen canvas + synthesize action items UI
-app/manager-notes/page.tsx            → Hub route for Manager Notes workspace
-app/api/store-ops/ai-note-summary     → Gemini Flash manager note synthesis
+lib/store-ops/ai-note-summary.ts      → Legacy manager note synthesis prompt / normalize / fallback
+lib/store-ops/ai-note-extract.ts      → Floor Pad Gemini Extract Tasks & Tag prompt / normalize / fallback
+app/actions/manager-notes.ts          → Server Action extractTasksAndTag (Bearer token auth)
+components/manager-notes/*            → Executive Floor Pad (TipTap rich text + Copilot + archive)
+components/store-ops/ManagerNotesWorkspace.tsx → Compatibility re-export of ExecutiveFloorPad
+app/manager-notes/page.tsx            → Hub route for Executive Floor Pad
+app/api/store-ops/ai-note-summary     → Gemini Flash manager note synthesis (legacy API)
+supabase/migrations/20260812_manager_notes_archive.sql → manager_notes.is_archived
 app/flooring/page.tsx                 → Deep link → Cycle Audit + D23 pin
 lib/auth-session.ts               → Auth session token + inactivity lock
 lib/biometric-auth.ts             → WebAuthn fingerprint / Face ID register + assert
@@ -82,7 +86,7 @@ supabase/migrations/20260812_sunday_bay_assignments.sql → sunday specialist↔
 | Department RBAC / tab visibility | `lib/rbac.ts` |
 | Cross-app Navigation Hub | `lib/nav-hub.ts` + `NavigationHub` |
 | Store Operations map + rotations | `lib/store-ops/*` + `/admin/store-map` + `/dashboard` |
-| Manager notes + S Pen synthesis | `lib/store-ops/ai-note-summary.ts`, `manager-notes.ts`, `ManagerNotesWorkspace` |
+| Manager notes / Executive Floor Pad | `lib/store-ops/ai-note-extract.ts`, `manager-notes.ts`, `app/actions/manager-notes.ts`, `components/manager-notes/*` |
 | Team roster (Master Admin) | `AdminRosterManager`, `lib/specialists.ts` (`is_active` soft-delete) |
 | Store context | `lib/store.ts` + `lib/store-ops/stores.ts` |
 | Offline sync queue | `lib/sync-queue.ts`, `lib/sync-conflict.ts`, `ConflictResolutionModal` |

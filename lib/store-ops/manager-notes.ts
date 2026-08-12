@@ -1,6 +1,6 @@
 /**
  * Manager notes — Supabase persistence + types aligned to manager_notes table.
- * Owns durable note CRUD / realtime; does not own Gemini synthesis.
+ * Owns durable note CRUD / realtime / archive; does not own Gemini synthesis.
  */
 
 import { getSupabase } from "@/lib/supabase";
@@ -12,7 +12,7 @@ export type ManagerNote = {
   id: string;
   store_number: string;
   department: string;
-  /** Alias of department for S Pen workspace / legacy callers. */
+  /** Alias of department for Floor Pad / legacy callers. */
   department_code: string;
   author_id: string | null;
   content: string;
@@ -28,6 +28,7 @@ export type ManagerNote = {
   action_items: NoteActionItem[] | null;
   created_by: string;
   completed_task_indexes?: number[];
+  is_archived: boolean;
 };
 
 export type ManagerNoteDraft = {
@@ -38,6 +39,7 @@ export type ManagerNoteDraft = {
   bay?: number | null;
   canvas_data_url?: string | null;
   category?: ManagerNoteCategory;
+  is_archived?: boolean;
 };
 
 type ManagerNoteRow = {
@@ -59,6 +61,7 @@ type ManagerNoteRow = {
   action_items?: NoteActionItem[] | null;
   created_by?: string | null;
   completed_task_indexes?: number[] | null;
+  is_archived?: boolean | null;
 };
 
 function requireClient() {
@@ -99,6 +102,7 @@ export function mapManagerNoteRow(row: ManagerNoteRow): ManagerNote {
     completed_task_indexes: Array.isArray(row.completed_task_indexes)
       ? row.completed_task_indexes
       : [],
+    is_archived: Boolean(row.is_archived),
   };
 }
 
@@ -118,12 +122,14 @@ export function emptyDraft(departmentCode: string): ManagerNoteDraft {
     bay: null,
     canvas_data_url: null,
     category: "general",
+    is_archived: false,
   };
 }
 
 export async function listManagerNotes(
   storeNumber: string,
-  department?: string | null
+  department?: string | null,
+  options?: { includeArchived?: boolean }
 ): Promise<ManagerNote[]> {
   const supabase = requireClient();
   const store = String(storeNumber ?? "").trim();
@@ -135,6 +141,10 @@ export async function listManagerNotes(
     .eq("store_number", store)
     .order("created_at", { ascending: false })
     .limit(200);
+
+  if (!options?.includeArchived) {
+    query = query.eq("is_archived", false);
+  }
 
   const dept = String(department ?? "").trim();
   if (dept && dept !== "all") {
@@ -172,6 +182,7 @@ export async function saveManagerNote(
     action_items: note.action_items,
     created_by: note.created_by,
     completed_task_indexes: note.completed_task_indexes ?? [],
+    is_archived: Boolean(note.is_archived),
     updated_at: new Date().toISOString(),
   };
 
@@ -183,6 +194,13 @@ export async function saveManagerNote(
 
   if (error) throw new Error(error.message || "Could not save manager note");
   return mapManagerNoteRow(data as ManagerNoteRow);
+}
+
+export async function archiveManagerNote(
+  note: ManagerNote,
+  archived = true
+): Promise<ManagerNote> {
+  return saveManagerNote({ ...note, is_archived: archived });
 }
 
 export async function deleteManagerNote(id: string): Promise<void> {

@@ -76,6 +76,7 @@
 - [x] Sunday Flooring Cycle Audit staging + Master Admin department context switcher
 - [x] AI Visual Bay Scan (`/api/store-ops/ai-bay-scan` + `VisualBayScannerModal` on Store Map / Cycle Audit)
 - [x] Manager Notes & S Pen Canvas (`/api/store-ops/ai-note-summary` + `ManagerNotesWorkspace` + `20260811_manager_notes.sql`)
+- [x] Executive Floor Pad — full-screen TipTap rich notes, Gemini Extract Tasks & Tag Server Action, `is_archived`, debounced autosave (`components/manager-notes/` + `20260812_manager_notes_archive.sql`)
 - [x] Mobile UI polish — Lucide bottom nav (4–5 tabs + More), compact header status chip, shared `h-12` action button tokens
 - [x] Native mobile shell — splash `#090d16`, haptics (`utils/haptics`), offline queue banner + reconnect flush
 - [x] Phase 1 Security & Identity Handshake — remove emergency unlock; Store Ops via Supabase Auth JWT → `profiles`; push `user_id`; JWT/RLS migration `20260812_jwt_rls_policies.sql`
@@ -84,7 +85,7 @@
 
 ## Next
 - [x] Apply Phase 1 JWT/RLS migration in Supabase + enable Custom Access Token Hook
-- [ ] Apply Phase 2 migrations (`20260812_manager_notes.sql`, `20260812_sunday_bay_assignments.sql`) + Realtime on notes/assignments tables
+- [ ] Apply Phase 2 migrations (`20260812_manager_notes.sql`, `20260812_sunday_bay_assignments.sql`, `20260812_manager_notes_archive.sql`) + Realtime on notes/assignments tables
 - [ ] Production recovery: ensure every active roster member has phone OTP → linked `profiles` row before relying on Store Ops APIs
 - [ ] Additional Gemini product surfaces beyond current AI ops widgets
 ## Non-goals

@@ -292,7 +292,7 @@ function Menu({
       <ToolButton onClick={onBulk}>Bulk Generate Aisles</ToolButton>
       <ToolButton onClick={onSunday}>Sunday Rotation Engine</ToolButton>
       <ToolButton onClick={onForce}>Trigger Weekly Rotation</ToolButton>
-      <ToolButton onClick={onNotes}>Manager Notes &amp; S Pen</ToolButton>
+      <ToolButton onClick={onNotes}>Executive Floor Pad</ToolButton>
       <ToolButton onClick={onTaxonomy}>Catalog Taxonomies</ToolButton>
       <ToolButton onClick={onTargets}>All-Department Bay Targets</ToolButton>
       <ToolButton onClick={onStore}>Store Number / Location</ToolButton>

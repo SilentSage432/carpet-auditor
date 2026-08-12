@@ -3,14 +3,14 @@
 import { useState } from "react";
 import { NavigationHub } from "@/components/hub/NavigationHub";
 import { SessionGate } from "@/components/hub/SessionGate";
-import { ManagerNotesWorkspace } from "@/components/store-ops/ManagerNotesWorkspace";
+import { ExecutiveFloorPad } from "@/components/manager-notes";
 import { actorFromSpecialist } from "@/lib/store-ops/auth";
 import { isMasterAdmin } from "@/lib/rbac";
 import type { StoreSpecialist } from "@/lib/types";
 
 /**
- * Manager Notes & S Pen — hub route for supervisors + Master Admin.
- * Presentation opens ManagerNotesWorkspace; synthesis owned by AI route.
+ * Executive Floor Pad — hub route for supervisors + Master Admin.
+ * Presentation opens full-screen rich-text pad; Gemini via Server Action.
  */
 export default function ManagerNotesPage() {
   return (
@@ -19,7 +19,7 @@ export default function ManagerNotesPage() {
         Boolean(actorFromSpecialist(m)) &&
         (isMasterAdmin(m) || m.role === "Supervisor")
       }
-      denyMessage="Manager Notes is for department supervisors and Master Admin."
+      denyMessage="Executive Floor Pad is for department supervisors and Master Admin."
     >
       {({ specialist, storeNumber, logout }) => (
         <ManagerNotesBody
@@ -46,8 +46,8 @@ function ManagerNotesBody({
   return (
     <div className="flex min-h-dvh flex-col">
       <NavigationHub
-        title="Manager Notes"
-        subtitle="S Pen canvas + Gemini action items"
+        title="Executive Floor Pad"
+        subtitle="Rich notes · Gemini Copilot · archive"
         specialist={specialist}
         storeNumber={storeNumber}
         onLogout={logout}
@@ -59,23 +59,23 @@ function ManagerNotesBody({
             Floor workspace
           </p>
           <h1 className="mt-1 text-xl font-bold text-zinc-50">
-            Manager Notes &amp; S Pen
+            Executive Floor Pad
           </h1>
           <p className="mt-2 text-sm leading-relaxed text-zinc-400">
-            Capture aisle/bay context, annotate with stylus, and synthesize
-            glowing action items with Gemini Flash.
+            Full-screen rich-text notes with Dept / Aisle / Bay pills, Gemini
+            task extraction, debounced autosave, and durable archive.
           </p>
           <button
             type="button"
             onClick={() => setOpen(true)}
             className="btn-primary-glow mt-4 flex min-h-14 w-full items-center justify-center rounded-xl text-base"
           >
-            Open Notes Workspace
+            Open Floor Pad
           </button>
         </section>
       </main>
 
-      <ManagerNotesWorkspace
+      <ExecutiveFloorPad
         open={open}
         onClose={() => setOpen(false)}
         specialist={specialist}

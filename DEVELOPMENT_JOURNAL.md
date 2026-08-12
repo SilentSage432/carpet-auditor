@@ -1,5 +1,16 @@
 # DeptSync Hub — Development Journal
 
+## 2026-08-12 — Executive Floor Pad (rich-text Manager Notes)
+
+### Shipped
+- Replaced S Pen canvas workspace with full-screen **Executive Floor Pad** under `components/manager-notes/` (TipTap rich text).
+- Typography toolbar: Inter / Roboto Mono / Merriweather / Caveat, sizes, bold, bullets, checkable task lists.
+- Compact auto-filling Dept / Aisle / Bay header pills.
+- Gemini Copilot Server Action `extractTasksAndTag` (`app/actions/manager-notes.ts`) — appends task checkboxes + fills missing aisle/bay; domain in `lib/store-ops/ai-note-extract.ts`.
+- Migration `20260812_manager_notes_archive.sql` — `is_archived` for durable archive without cluttering active shift list.
+- Debounced autosave (~700ms) on keystroke via Supabase upsert; Archive action on selected notes.
+- Compatibility shim: `components/store-ops/ManagerNotesWorkspace.tsx` re-exports Floor Pad.
+
 ## 2026-08-12 — Phase 3: Offline Resilience & Conflict Resolution
 
 ### Shipped

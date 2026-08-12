@@ -1,5 +1,12 @@
 import type { Metadata, Viewport } from "next";
-import { Barlow, JetBrains_Mono } from "next/font/google";
+import {
+  Barlow,
+  Caveat,
+  Inter,
+  JetBrains_Mono,
+  Merriweather,
+  Roboto_Mono,
+} from "next/font/google";
 import { HapticsListener } from "@/components/hub/HapticsListener";
 import { OfflineNetworkBanner } from "@/components/hub/OfflineNetworkBanner";
 import { ServiceWorkerRegister } from "@/components/hub/ServiceWorkerRegister";
@@ -16,6 +23,29 @@ const jetbrains = JetBrains_Mono({
   variable: "--font-jetbrains",
   subsets: ["latin"],
   weight: ["400", "500", "600", "700"],
+});
+
+const inter = Inter({
+  variable: "--font-inter",
+  subsets: ["latin"],
+});
+
+const robotoMono = Roboto_Mono({
+  variable: "--font-roboto-mono",
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+});
+
+const merriweather = Merriweather({
+  variable: "--font-merriweather",
+  subsets: ["latin"],
+  weight: ["400", "700"],
+});
+
+const caveat = Caveat({
+  variable: "--font-caveat",
+  subsets: ["latin"],
+  weight: ["400", "600", "700"],
 });
 
 export const metadata: Metadata = {
@@ -57,7 +87,10 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${barlow.variable} ${jetbrains.variable} h-full antialiased`}>
+    <html
+      lang="en"
+      className={`${barlow.variable} ${jetbrains.variable} ${inter.variable} ${robotoMono.variable} ${merriweather.variable} ${caveat.variable} h-full antialiased`}
+    >
       <body className="min-h-full flex flex-col">
         <ServiceWorkerRegister />
         <HapticsListener />

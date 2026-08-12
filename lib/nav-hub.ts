@@ -110,10 +110,10 @@ export function navRoleLinks(
       },
       {
         href: "/manager-notes",
-        label: "Manager Notes & S Pen",
+        label: "Executive Floor Pad",
         shortLabel: "Notes",
         icon: "notes",
-        description: "Floor notes + stylus canvas + AI action items",
+        description: "Rich-text floor notes + Gemini Copilot",
         overflow: true,
       },
       {
@@ -153,10 +153,10 @@ export function navRoleLinks(
       },
       {
         href: "/manager-notes",
-        label: "Manager Notes & S Pen",
+        label: "Executive Floor Pad",
         shortLabel: "Notes",
         icon: "notes",
-        description: "Floor notes + stylus canvas + AI action items",
+        description: "Rich-text floor notes + Gemini Copilot",
         overflow: true,
       },
       {

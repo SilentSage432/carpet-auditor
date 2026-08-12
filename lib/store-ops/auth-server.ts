@@ -5,8 +5,12 @@
 
 import "server-only";
 
+import type { User } from "@supabase/supabase-js";
 import { normalizeStoreNumber } from "@/lib/store";
-import { getRequestAuthUser } from "@/lib/supabase/server";
+import {
+  createSupabaseUserClient,
+  getRequestAuthUser,
+} from "@/lib/supabase/server";
 import { getSupabaseAdmin } from "@/lib/store-ops/supabase-admin";
 import type { StoreOpsActor } from "./auth";
 import type { StoreOpsUserRole } from "./types";
@@ -37,16 +41,7 @@ function mapProfileRole(role: string): StoreOpsUserRole | null {
   return null;
 }
 
-/**
- * Resolve Store Ops actor from Supabase Auth session (cookie or Bearer).
- * Loads public.profiles linked to auth.users.id — no x-store-ops-* trust.
- */
-export async function resolveStoreOpsActor(
-  request: Request
-): Promise<StoreOpsActor | null> {
-  const auth = await getRequestAuthUser(request);
-  if (!auth) return null;
-
+async function actorFromAuthUser(user: User): Promise<StoreOpsActor | null> {
   const admin = getSupabaseAdmin();
   if (!admin) return null;
 
@@ -55,7 +50,7 @@ export async function resolveStoreOpsActor(
     .select(
       "id, role, assigned_department_id, store_number, specialist_id, departments:assigned_department_id(code)"
     )
-    .eq("id", auth.user.id)
+    .eq("id", user.id)
     .maybeSingle();
 
   if (error || !profile) return null;
@@ -64,7 +59,7 @@ export async function resolveStoreOpsActor(
   const role = mapProfileRole(String(row.role ?? ""));
   if (!role) return null;
 
-  const meta = auth.user.app_metadata ?? {};
+  const meta = user.app_metadata ?? {};
   const claimStore = normalizeStoreNumber(
     String(meta.store_number ?? row.store_number ?? "")
   );
@@ -88,4 +83,32 @@ export async function resolveStoreOpsActor(
     departmentCode: role === "super_admin" ? null : departmentCode,
     storeNumber: claimStore,
   };
+}
+
+/**
+ * Resolve Store Ops actor from Supabase Auth session (cookie or Bearer).
+ * Loads public.profiles linked to auth.users.id — no x-store-ops-* trust.
+ */
+export async function resolveStoreOpsActor(
+  request: Request
+): Promise<StoreOpsActor | null> {
+  const auth = await getRequestAuthUser(request);
+  if (!auth) return null;
+  return actorFromAuthUser(auth.user);
+}
+
+/**
+ * Resolve actor from a Bearer access token (Server Actions / localStorage sessions).
+ */
+export async function resolveStoreOpsActorFromToken(
+  accessToken: string
+): Promise<StoreOpsActor | null> {
+  const token = String(accessToken ?? "").trim();
+  if (!token) return null;
+
+  const client = createSupabaseUserClient(token);
+  if (!client) return null;
+  const { data, error } = await client.auth.getUser(token);
+  if (error || !data.user) return null;
+  return actorFromAuthUser(data.user);
 }

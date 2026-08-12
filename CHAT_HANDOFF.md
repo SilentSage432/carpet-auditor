@@ -28,7 +28,7 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 - **Appliance Anomaly Detection:** `POST /api/appliances/ai-anomaly` + `ApplianceAnomalyWidget` on Appliance Audit (duplicate serials, distant locations, category mismatch, missing high-value floor models)
 - **Catalog Taxonomies:** `lib/catalog/taxonomies.ts` (D21–D28 / D35 / D52 defaults) + `POST /api/catalog/ai-taxonomy` + Admin Tools `TaxonomyManagerModal`; folder accordions on Department Audit + `/department`
 - **AI Visual Bay Scan:** `POST /api/store-ops/ai-bay-scan` + `lib/store-ops/ai-bay-scan.ts` + `VisualBayScannerModal` — Gemini multimodal carton/pallet/hazard read on Store Map bay sheet + Cycle Audit
-- **Manager Notes & S Pen:** `POST /api/store-ops/ai-note-summary` + `lib/store-ops/manager-notes.ts` (Supabase CRUD + realtime) + `ManagerNotesWorkspace` — stylus canvas PNG + Gemini action items; Admin Tools + `/manager-notes`
+- **Manager Notes / Executive Floor Pad:** `POST /api/store-ops/ai-note-summary` (legacy synthesize) + Server Action `extractTasksAndTag` (`app/actions/manager-notes.ts`) + `lib/store-ops/ai-note-extract.ts` + `lib/store-ops/manager-notes.ts` (Supabase CRUD + realtime + archive) + `components/manager-notes/ExecutiveFloorPad` — TipTap rich pad, Gemini Copilot tasks/tags, debounced autosave; Admin Tools + `/manager-notes`
 
 ## RBAC (`lib/rbac.ts` + `lib/specialists.ts`)
 | Role | Scope | Tabs |
@@ -46,7 +46,7 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 
 ### Admin Tools (Super Admin only)
 - Slide-over drawer defaults **closed** — header **Admin** chip, hamburger entry, or `openAdminTools()`
-- Owns: Bulk Generate, **Sunday Rotation Engine** (Flooring cycle assign), Trigger Weekly Rotation, **Manager Notes & S Pen**, Catalog Taxonomies (AI generate / refresh), all-dept bay targets, store number, device diagnostics, links to Store Map / Supervisors / Exceptions
+- Owns: Bulk Generate, **Sunday Rotation Engine** (Flooring cycle assign), Trigger Weekly Rotation, **Executive Floor Pad**, Catalog Taxonomies (AI generate / refresh), all-dept bay targets, store number, device diagnostics, links to Store Map / Supervisors / Exceptions
 - Department Supervisors never see Admin Tools chrome
 - Master Admin header: **My Department Context** pin (Full Store / D23 Flooring / D35 Appliances / …) — filters dashboard Flooring focus without dropping Master privileges
 
@@ -132,14 +132,14 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
   - Associate primary: Zebra · Barriers · Tools · Profile
 - Quick Actions banner (Super Admin): Bulk Generate · Trigger Weekly Rotation · Manage Supervisors
 - `/admin/store-map` — department overview + location grid; Bulk Add accordion; Trigger Weekly Rotation modal (**Force Draw New Rotation**); **📷 Snap Bay AI Audit** (Gemini visual scan) on page + bay actions sheet
-- `/manager-notes` — Manager Notes & S Pen workspace (stylus canvas + Gemini action-item synthesis); also Admin Tools entry + `#manager-notes`
+- `/manager-notes` — Executive Floor Pad (TipTap rich notes + Gemini Copilot Extract Tasks & Tag + archive); also Admin Tools entry + `#manager-notes`
 - `/dashboard` — Store Health Scorecard (top) + Zebra checklist for this ISO week; checkbox → complete rotation + location COMPLETED (cool-down)
 - `GET /api/store-health` — weekly pace + bottleneck aggregation for DS / Super Admin
 - `POST /api/store-ops/ai-bay-scan` — multimodal bay photo → carton/pallet estimates, cleanliness score, detected issues (Store Ops actor)
 - `POST /api/store-ops/ai-note-summary` — manager note + optional S Pen PNG → executive summary + action items (Store Ops actor)
 - APIs under `/api/rotations/*`, `/api/store-locations*`, `/api/departments`, `/api/weekly-rotations`
 - Multi-store: apply `20260809_multi_store.sql`; store scope comes from JWT `app_metadata.store_number` / `profiles.store_number`
-- Manager notes: apply `20260811_manager_notes.sql` + `20260812_manager_notes.sql` (durable Supabase CRUD; JWT store/dept RLS)
+- Manager notes: apply `20260811_manager_notes.sql` + `20260812_manager_notes.sql` + `20260812_manager_notes_archive.sql` (`is_archived`; durable Supabase CRUD; JWT store/dept RLS)
 - Sunday bay assignments: apply `20260812_sunday_bay_assignments.sql`
 - JWT claims / RLS helpers: apply `20260812_jwt_rls_policies.sql` + enable Custom Access Token Hook
 - Requires `SUPABASE_SERVICE_ROLE_KEY` for server routes (apply migration in Supabase SQL editor)
