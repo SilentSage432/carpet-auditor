@@ -11,7 +11,8 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 - Header badge: `DeptSyncBadge` (stacked boxes + barcode, emerald/amber on dark)
 - Icons: `public/icons/icon-192.png`, `icon-512.png`, `apple-touch-icon.png`
 - PWA manifest: `app/manifest.ts` → `/manifest.webmanifest`; static `public/manifest.json` → `/manifest.json` (TWA / Bubblewrap)
-- **Obsidian-glass UI:** void `#09090b`; utilities in `app/globals.css` (`.glass-card`, `.glass-panel`, `.glass-input`, `.glass-backdrop`, `.glass-void`, `.btn-primary-glow`, `.btn-grid-action-*`, `.pb-safe`, status pills / bay glows). Emerald primary / cyan secondary accents. Lucide SVG nav icons (`NavIcons`) — no emoji bottom tabs.
+- **Obsidian-glass UI:** void `#090d16`; utilities in `app/globals.css` (`.glass-card`, `.glass-panel`, `.glass-input`, `.glass-backdrop`, `.glass-void`, `.btn-primary-glow`, `.btn-grid-action-*`, `.pb-safe`, status pills / bay glows). Emerald primary / cyan secondary accents. Lucide SVG nav icons (`NavIcons`) — no emoji bottom tabs.
+- **Native shell:** haptics via `utils/haptics.ts` + `HapticsListener`; offline toast `OfflineNetworkBanner` flushes sync queue on reconnect; PWA/TWA splash theme `#090d16`
 
 ## AI (`lib/ai/gemini.ts`)
 - Server-only Gemini Flash client (`@google/generative-ai`)

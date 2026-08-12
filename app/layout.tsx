@@ -1,5 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Barlow, JetBrains_Mono } from "next/font/google";
+import { HapticsListener } from "@/components/hub/HapticsListener";
+import { OfflineNetworkBanner } from "@/components/hub/OfflineNetworkBanner";
 import { ServiceWorkerRegister } from "@/components/hub/ServiceWorkerRegister";
 import "./globals.css";
 
@@ -44,7 +46,7 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
-  themeColor: "#09090b",
+  themeColor: "#090d16",
   viewportFit: "cover",
 };
 
@@ -57,6 +59,8 @@ export default function RootLayout({
     <html lang="en" className={`${barlow.variable} ${jetbrains.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col">
         <ServiceWorkerRegister />
+        <HapticsListener />
+        <OfflineNetworkBanner />
         {children}
       </body>
     </html>

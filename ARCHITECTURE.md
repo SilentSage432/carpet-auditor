@@ -8,6 +8,9 @@ public/sw.js                      → Offline shell cache strategies
 components/hub/HubChrome.tsx      → Sticky header (legacy) + role-filtered inventory bottom nav
 components/hub/NavigationHub.tsx  → Cross-app Navigation Hub (hamburger, role badge, ops bottom nav)
 components/hub/NavIcons.tsx       → Shared Lucide icons for ops + inventory bottom bars
+components/hub/HapticsListener.tsx → Delegated vibrate pulses for taps / toggles / tabs
+components/hub/OfflineNetworkBanner.tsx → Offline toast + reconnect flushSyncQueue
+utils/haptics.ts                  → navigator.vibrate wrapper (light/medium/success)
 components/hub/SuperAdminQuickActions.tsx → Bulk / Trigger Rotation / Manage Supervisors banner
 components/hub/SessionGate.tsx    → Auth gate for Store Ops route pages
 lib/nav-hub.ts                    → Role-aware Store Ops route menus + compact role badges + overflow/More

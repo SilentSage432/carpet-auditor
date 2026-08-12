@@ -1,5 +1,12 @@
 # DeptSync Hub — Development Journal
 
+## 2026-08-11 — Native mobile: splash theme, haptics, offline banner
+
+### Shipped
+- PWA splash/theme aligned to `#090d16` (`public/manifest.json`, `app/manifest.ts`, layout `themeColor`, CSS void, TWA colors).
+- `utils/haptics.ts` + root `HapticsListener` — short `navigator.vibrate` pulse on buttons, switches, and nav tabs.
+- `OfflineNetworkBanner` floating toast when offline; auto `flushSyncQueue` on reconnect with synced confirmation.
+
 ## 2026-08-11 — Mobile UI polish: SVG bottom nav, header, action buttons
 
 ### Shipped

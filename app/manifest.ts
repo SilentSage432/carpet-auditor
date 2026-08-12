@@ -8,8 +8,8 @@ export default function manifest(): MetadataRoute.Manifest {
       "Department & SIMS Inventory Audit Suite for Lowe's Stores",
     start_url: "/",
     display: "standalone",
-    background_color: "#09090B",
-    theme_color: "#09090B",
+    background_color: "#090d16",
+    theme_color: "#090d16",
     orientation: "portrait-primary",
     icons: [
       {

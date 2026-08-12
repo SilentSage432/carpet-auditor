@@ -4,13 +4,13 @@
   "name": "DeptSync Hub",
   "launcherName": "DeptSync",
   "display": "fullscreen",
-  "themeColor": "#09090B",
+  "themeColor": "#090d16",
   "themeColorDark": "#000000",
   "navigationColor": "#000000",
   "navigationColorDark": "#000000",
   "navigationDividerColor": "#000000",
   "navigationDividerColorDark": "#000000",
-  "backgroundColor": "#09090B",
+  "backgroundColor": "#090d16",
   "enableNotifications": true,
   "startUrl": "/",
   "iconUrl": "https://deptsync-hub.vercel.app/icons/icon-512.png",
@@ -20,8 +20,8 @@
     "path": "/Users/silentsage/Desktop/carpet-auditor/android.keystore",
     "alias": "android"
   },
-  "appVersionName": "1",
-  "appVersionCode": 1,
+  "appVersionName": "2",
+  "appVersionCode": 2,
   "shortcuts": [],
   "generatorApp": "bubblewrap-cli",
   "webManifestUrl": "http://localhost:3000/manifest.json",
@@ -47,5 +47,5 @@
   "fileHandlers": [],
   "launchHandlerClientMode": "",
   "displayOverride": [],
-  "appVersion": "1"
+  "appVersion": "2"
 }
