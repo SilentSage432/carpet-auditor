@@ -1,5 +1,14 @@
 # DeptSync Hub — Development Journal
 
+## 2026-08-12 — Hub PIN → Auth bridge (Master Admin unlock)
+
+### Shipped
+- `POST /api/auth/hub-bridge` + `lib/store-ops/hub-bridge.ts` — service-role verifies roster PIN, ensures Auth user + `profiles` link, mints Supabase session (no phone OTP).
+- Client `hub-bridge-client.ts` + AuthWall login/setup/unlock call `setSession` after PIN verify.
+- Cold restore without Auth JWT forces PIN unlock wall so Store Ops (Admin Tools, map, briefing, invites) unlock with Hub PIN alone.
+- Biometric paths require an existing Auth session (otherwise PIN once).
+- Soft-fail banners retargeted to Hub PIN unlock copy; phone OTP remains optional recovery.
+
 ## 2026-08-12 — Soft-fail Store Map / Bulk Admin auth
 
 ### Shipped

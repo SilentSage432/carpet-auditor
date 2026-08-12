@@ -277,7 +277,7 @@ export function ExecutiveFloorPad({
       const token = await getSupabaseAccessToken();
       if (!token) {
         throw new Error(
-          "Sign in with phone OTP so Store Ops can call Gemini Copilot"
+          "Sign in with Hub PIN so Gemini Copilot can authorize"
         );
       }
 

@@ -1,6 +1,7 @@
 /**
  * Link auth.users → public.profiles (id = auth uid) and inject JWT app_metadata.
- * Called after phone OTP verify / credential reset so Store Ops APIs can resolve the actor.
+ * Called after Hub PIN bridge / phone OTP verify / credential reset so Store
+ * Ops APIs can resolve the actor.
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";

@@ -40,6 +40,7 @@ import {
 } from "@/lib/specialists";
 import { getStoreNumber, setStoreNumber, STORE_CHANGED_EVENT } from "@/lib/store";
 import { flushSyncQueue } from "@/lib/sync-queue";
+import { getSupabase } from "@/lib/supabase";
 import type {
   ApplianceCatalogItem,
   CatalogItem,
@@ -113,7 +114,7 @@ export default function DeptSyncHubPage() {
     setGate("login");
   }, []);
 
-  const resolveGateFromSession = useCallback((roster: StoreSpecialist[]) => {
+  const resolveGateFromSession = useCallback(async (roster: StoreSpecialist[]) => {
     const session = readAuthSession();
     if (!session || isAuthSessionExpired(session)) {
       clearAuthSession();
@@ -133,8 +134,18 @@ export default function DeptSyncHubPage() {
       return;
     }
 
-    // Single session: valid localStorage session → workspace (no PIN unlock).
-    // Re-auth only on missing/expired session (cold start without session, logout, 8h idle).
+    // Hub UI session alone is not enough for Store Ops — require a live
+    // Supabase Auth JWT (minted by Hub PIN bridge or phone recovery).
+    const supabase = getSupabase();
+    const { data: authData } = supabase
+      ? await supabase.auth.getSession()
+      : { data: { session: null } };
+    if (!authData.session?.access_token) {
+      setSpecialist(matched);
+      setGate("unlock");
+      return;
+    }
+
     touchAuthSession();
     markWorkspaceUnlocked(refreshed.sessionToken);
     setSpecialist(matched);

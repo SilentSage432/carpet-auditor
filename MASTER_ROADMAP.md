@@ -81,12 +81,13 @@
 - [x] Native mobile shell — splash `#090d16`, haptics (`utils/haptics`), offline queue banner + reconnect flush
 - [x] Phase 1 Security & Identity Handshake — remove emergency unlock; Store Ops via Supabase Auth JWT → `profiles`; push `user_id`; JWT/RLS migration `20260812_jwt_rls_policies.sql`
 - [x] Phase 2 Data Durability — Manager Notes + Sunday bay assignments on Supabase; retire `MarryBarcodeModal`
-- [x] Phase 3 Offline Resilience — conflict resolution UI, sync backoff + auto-flush on online/focus, orphan PIN-remind modals removed
+- [x] Hub PIN → Auth bridge — Master Admin / supervisors mint Store Ops JWT via PIN (`/api/auth/hub-bridge`); phone OTP optional recovery only
+- [x] Soft-fail Store Ops reads when JWT missing (briefing / map / departments) + Hub PIN unlock copy
 
 ## Next
 - [x] Apply Phase 1 JWT/RLS migration in Supabase + enable Custom Access Token Hook
 - [ ] Apply Phase 2 migrations (`20260812_manager_notes.sql`, `20260812_sunday_bay_assignments.sql`, `20260812_manager_notes_archive.sql`, `20260812_fix_manager_notes_rls.sql`, **`20260812_manager_notes_metadata.sql`**) + Realtime on notes/assignments tables
-- [ ] Production recovery: ensure every active roster member has phone OTP → linked `profiles` row before relying on Store Ops APIs
+- [ ] Confirm every Master Admin has `store_number` set so Hub bridge can link `profiles`
 - [ ] Additional Gemini product surfaces beyond current AI ops widgets
 ## Non-goals
 - Pricing / margin engines

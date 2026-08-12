@@ -176,7 +176,7 @@ export async function saveManagerNote(
 
   if (authError || !user?.id) {
     throw new Error(
-      "Sign in with phone OTP required to save manager notes (authenticated Supabase session)"
+      "Sign in with Hub PIN required to save manager notes (Store Ops Auth session)"
     );
   }
 

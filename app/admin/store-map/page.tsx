@@ -166,15 +166,16 @@ function StoreMapBody({
           <p className="glass-card mb-4 border-amber-500/40 bg-amber-950/25 px-4 py-3 text-sm text-amber-100">
             {STORE_OPS_AUTH_HINT}
             <span className="mt-1 block text-amber-200/75">
-              Hub PIN login alone is not enough for Store Map / Bulk tools. After
-              phone OTP, tap refresh or reopen this page.
+              Enter your Hub PIN on the unlock screen (or sign out and back in).
+              That mints Store Ops Auth automatically — phone OTP is optional
+              recovery only.
             </span>
             <button
               type="button"
               onClick={() => void reload(specialist)}
               className="mt-3 min-h-11 rounded-xl border border-amber-500/45 bg-amber-950/40 px-3 text-xs font-semibold text-amber-100"
             >
-              Retry after Auth
+              Retry after Hub sign-in
             </button>
           </p>
         ) : null}

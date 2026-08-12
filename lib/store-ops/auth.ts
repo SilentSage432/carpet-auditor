@@ -114,7 +114,7 @@ export function requireSupervisorOrAdmin(
 export function requireStoreOpsActor(actor: StoreOpsActor | null): StoreOpsActor {
   if (!actor) {
     throw new StoreOpsAuthError(
-      "Unauthorized — Supabase Auth session required (phone OTP / signed-in profile)",
+      "Unauthorized — Hub PIN Auth session missing. Sign in again with your Hub PIN/password.",
       401
     );
   }

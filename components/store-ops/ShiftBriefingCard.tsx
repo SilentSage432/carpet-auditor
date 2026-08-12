@@ -168,8 +168,8 @@ export function ShiftBriefingCard({ specialist, refreshKey }: Props) {
             </ul>
             {briefing.auth_required || briefing.source === "session" ? (
               <p className="mt-3 rounded-lg border border-amber-500/35 bg-amber-950/30 px-3 py-2 text-xs leading-snug text-amber-100">
-                Sign in with phone OTP (Forgot Access) so Store Ops can read your
-                Auth session, then tap refresh.
+                Unlock with your Hub PIN/password to mint Store Ops Auth, then
+                tap refresh. Phone OTP is optional recovery only.
               </p>
             ) : null}
             {error ? (

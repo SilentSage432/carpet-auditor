@@ -63,23 +63,25 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 
 ## Authentication (Zero-Access Wall)
 - Unauthenticated visitors never see workspace tabs/data — `AuthWall` only
-- Login: username + password/PIN → roster match (`findSpecialistByLogin`) — hub UI session only
-- **Store Ops identity:** Supabase Auth session required (`Authorization: Bearer` from phone OTP / Auth). `resolveStoreOpsActor` loads `profiles` where `id = auth.users.id` (no `x-store-ops-*` trust headers; emergency `MASTER-2026-TEMP` removed)
-- **Phone recovery / Auth link:** "Forgot Access Code? Reset via Phone" → roster phone lookup → `signInWithOtp` → verify → `/api/auth/phone-reset/confirm` resets PIN **and** upserts `profiles` + JWT `app_metadata` (`store_number`, `department`, `role`) via `linkAuthUserToSpecialistProfile`
+- Login / unlock: username + password/PIN → roster match (`findSpecialistByLogin` / `verifyPin`)
+- **Hub PIN → Auth bridge (primary Store Ops unlock):** after PIN verify, client calls `POST /api/auth/hub-bridge` (`lib/store-ops/hub-bridge.ts` + `hub-bridge-client.ts`) which service-role verifies the roster PIN, ensures `auth.users` + `profiles` link, and mints a real Supabase Auth session (`setSession`). Master Admin / supervisors never need phone OTP for Admin Tools, Store Map, briefing, or invites.
+- **Store Ops identity:** `resolveStoreOpsActor` loads `profiles` where `id = auth.users.id` from Bearer/cookie JWT (no `x-store-ops-*` trust headers; emergency unlock removed). API data paths use service role **after** actor resolve.
+- **Returning session:** hub `deptsync_auth_session` alone is not enough — cold restore without a live Supabase Auth JWT forces the PIN unlock wall so bridge can mint Auth.
+- **Phone recovery (optional):** "Forgot Access Code? Reset via Phone" → OTP → `/api/auth/phone-reset/confirm` + `linkAuthUserToSpecialistProfile`
 - Setup requires verified mobile (`phone_number` on `store_specialists`)
 - Native keychain: form `autocomplete` username / current-password
-- Biometric: WebAuthn platform authenticator (`lib/biometric-auth.ts`); optional enroll after login; fingerprint unlock button when registered
+- Biometric: WebAuthn; requires an existing Store Ops Auth session (otherwise PIN once after fingerprint)
 - `must_change_credentials` → non-dismissible permanent credential setup
-- Session: `deptsync_auth_session` in **localStorage** (roster UI); Supabase Auth session in localStorage for API Bearer tokens; 8h idle lock on hub session
-- Returning browser: valid localStorage hub session restores workspace; Store Ops APIs still need a live Supabase Auth session
+- Session: `deptsync_auth_session` (hub UI) + Supabase Auth localStorage (API Bearer); 8h idle lock on hub session
 - Seeds: no hardcoded roster injection — use Invite / Add Supervisor; temp PIN sets `must_change_credentials`
 - Primary: fixed bottom tabs — **filtered by role/department**
 - Header: DeptSync Hub brand + `DeptSync · Lowe's #…` subtitle · section title · network; specialist chip + PIN gear
 - Cycle Audit / Appliances: hardware-scan ready without soft keyboard; sticky Log docked above bottom nav
 
 ## Store Ops auth transport
-- Client: `storeOpsAuthHeadersAsync` → `Authorization: Bearer` from `getSupabaseAccessToken()` (`lib/supabase` localStorage session)
-- Server: `getRequestAuthUser` (Bearer or cookie) → `resolveStoreOpsActor` → `profiles`
+- Client: `storeOpsAuthHeadersAsync` → `Authorization: Bearer` from Hub-bridge or phone Auth session
+- Server: `getRequestAuthUser` (Bearer or cookie) → `resolveStoreOpsActor` → `profiles` → service-role DB client
+- Soft-fail reads (`auth_required` + hint) only when JWT missing; after Hub PIN unlock banners should clear
 - Push subscribe: `user_id` = Auth profile id; `specialist_id` null
 - SQL: `supabase/migrations/20260812_jwt_rls_policies.sql` — Custom Access Token Hook + store/department RLS on locations, rotations, exceptions, manager_notes, etc.
 ## Scan-to-Catalog
@@ -169,7 +171,7 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 - Blank allowed; Master edits via **Admin Tools → Store Number** (session stays active)
 - Session / active specialist / biometric only reject when both sides have different store numbers
 - Login adopts `store_profiles` / specialist `store_number` when device store is unset
-- Store-ops APIs require a live Supabase Auth session linked to `profiles` (phone OTP → `linkAuthUserToSpecialistProfile`); store scope from JWT claims, not client headers
+- Store-ops APIs require a live Supabase Auth session linked to `profiles` (Hub PIN bridge or phone OTP → `linkAuthUserToSpecialistProfile`); store scope from JWT claims, not client headers
 
 ## Mobile floor UX (Waves A–C)
 - Floor job first: Dashboard = pace + checklist; no permanent Super Admin quick-action strip

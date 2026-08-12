@@ -593,10 +593,10 @@ export async function fetchShiftBriefing(
     const message = String((err as { message?: string } | null)?.message ?? "");
     if (/unauthorized|auth session|sign in|401/i.test(message)) {
       return {
-        headline: "Refresh Auth to load shift intel",
+        headline: "Sign in again to load shift intel",
         bullets: [
-          "Supabase Auth session required — use phone OTP / Forgot Access to link your profile.",
-          "Hub PIN login alone does not authorize Store Ops APIs.",
+          "Store Ops Auth session missing — unlock with your Hub PIN/password to mint an Auth token.",
+          "Master Admin no longer needs phone OTP for briefing, map, or admin tools.",
           "After signing in, pull to refresh or tap re-analyze for a live briefing.",
         ],
         priority_department: "Storewide",

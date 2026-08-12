@@ -25,6 +25,8 @@ import {
   updateSpecialistCredentials,
   verifyPin,
 } from "@/lib/specialists";
+import { tryEstablishHubBridgeSession } from "@/lib/store-ops/hub-bridge-client";
+import { getSupabase } from "@/lib/supabase";
 import type { StoreSpecialist } from "@/lib/types";
 
 export type AuthWallMode = "login" | "setup" | "unlock";
@@ -140,8 +142,16 @@ function LoginForm({
     };
   }, []);
 
-  async function finishLogin(member: StoreSpecialist) {
-    const available = biometricReady || (await isPlatformAuthenticatorAvailable());
+  async function finishLogin(member: StoreSpecialist, pin?: string) {
+    if (pin) {
+      const bridgeError = await tryEstablishHubBridgeSession(member, pin);
+      if (bridgeError) {
+        setError(bridgeError);
+        return;
+      }
+    }
+    const available =
+      biometricReady || (await isPlatformAuthenticatorAvailable());
     if (available && !hasBiometricForSpecialist(member.id)) {
       setEnrollMember(member);
       return;
@@ -158,7 +168,7 @@ function LoginForm({
         setError("Invalid username or password");
         return;
       }
-      await finishLogin(match);
+      await finishLogin(match, password.trim());
     } finally {
       setBusy(false);
     }
@@ -175,6 +185,16 @@ function LoginForm({
         clearStoredBiometricCredential();
         setHasPasskey(false);
         setError("Saved fingerprint login is no longer valid. Sign in with password.");
+        return;
+      }
+      const supabase = getSupabase();
+      const { data } = supabase
+        ? await supabase.auth.getSession()
+        : { data: { session: null } };
+      if (!data.session?.access_token) {
+        setError(
+          "Fingerprint unlocked the Hub — enter your PIN/password once to unlock Admin Tools and Store Ops."
+        );
         return;
       }
       onAuthenticated(match);
@@ -609,6 +629,14 @@ function SetupForm({
         password,
         phone,
       });
+      const bridgeError = await tryEstablishHubBridgeSession(
+        record,
+        password.trim()
+      );
+      if (bridgeError) {
+        setError(bridgeError);
+        return;
+      }
       if (biometricReady && !hasBiometricForSpecialist(record.id)) {
         setEnrollMember(record);
         return;
@@ -787,9 +815,19 @@ function UnlockForm({
       return;
     }
     if (verifyPin(member, value)) {
-      setSecret("");
+      setBusy(true);
       setError(null);
-      onAuthenticated(member);
+      try {
+        const bridgeError = await tryEstablishHubBridgeSession(member, value);
+        if (bridgeError) {
+          fail(bridgeError);
+          return;
+        }
+        setSecret("");
+        onAuthenticated(member);
+      } finally {
+        setBusy(false);
+      }
       return;
     }
     fail(pinMode ? "Incorrect PIN" : "Incorrect password");
@@ -817,6 +855,16 @@ function UnlockForm({
         setError("Fingerprint login belongs to a different user");
         return;
       }
+      const supabase = getSupabase();
+      const { data } = supabase
+        ? await supabase.auth.getSession()
+        : { data: { session: null } };
+      if (!data.session?.access_token) {
+        setError(
+          "Enter your PIN/password once to unlock Admin Tools and Store Ops, then fingerprint works again."
+        );
+        return;
+      }
       onAuthenticated(match);
     } catch (err) {
       if (err instanceof DOMException && err.name === "NotAllowedError") {
@@ -837,6 +885,10 @@ function UnlockForm({
     <div className={`mt-5 ${shake ? "animate-pin-shake" : ""}`}>
       <p className="mb-3 text-center text-xs text-zinc-400">
         {roleBadge(member)}
+      </p>
+      <p className="mb-3 text-center text-xs text-zinc-500">
+        Enter your Hub PIN/password to unlock Store Ops (Admin Tools, map,
+        briefing).
       </p>
 
       {showBiometric ? (

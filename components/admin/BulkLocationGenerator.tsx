@@ -33,8 +33,8 @@ function typesForMode(mode: LocationMode): StoreLocationType[] {
 
 function bulkAuthFriendlyError(err: unknown, fallback: string): string {
   const next = (err as { message?: string } | null)?.message || fallback;
-  if (/unauthorized|auth session|phone otp/i.test(next)) {
-    return "Sign in with phone OTP (Forgot Access) before Bulk Generate, then retry.";
+  if (/unauthorized|auth session|phone otp|hub pin/i.test(next)) {
+    return "Sign out and sign back in with your Hub PIN/password, then retry Bulk Generate.";
   }
   return next;
 }
