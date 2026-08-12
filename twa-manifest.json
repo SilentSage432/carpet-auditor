@@ -24,7 +24,7 @@
   "appVersionCode": 1,
   "shortcuts": [],
   "generatorApp": "bubblewrap-cli",
-  "webManifestUrl": "https://deptsync-hub.vercel.app/manifest.json",
+  "webManifestUrl": "./public/manifest.json",
   "fallbackType": "customtabs",
   "features": {
     "locationDelegation": {
