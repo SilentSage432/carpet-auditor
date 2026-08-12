@@ -14,6 +14,7 @@ import {
 import { formatStoreLabel } from "@/lib/store";
 import type { HubSection, StoreSpecialist } from "@/lib/types";
 import { DeptSyncBadge } from "@/components/hub/DeptSyncBadge";
+import { NavIcon } from "@/components/hub/NavIcons";
 
 type HubHeaderProps = {
   section: HubSection;
@@ -145,13 +146,13 @@ export function AssociateSpecialtySwitcher({
             role="tab"
             aria-selected={isActive}
             onClick={() => onSelect(tab.id)}
-            className={`flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-2 text-xs font-bold transition ${
+            className={`flex h-11 shrink-0 items-center gap-1.5 rounded-full border px-3 text-xs font-bold transition ${
               isActive
                 ? "border-emerald-400/60 bg-emerald-500/15 text-emerald-100"
-                : "border-slate-700 bg-slate-950/70 text-slate-400"
+                : "border-zinc-700 bg-zinc-950/70 text-zinc-400"
             }`}
           >
-            <span aria-hidden>{tab.icon}</span>
+            <NavIcon id={tab.icon} className="h-3.5 w-3.5" />
             {tab.label}
           </button>
         );
@@ -179,7 +180,7 @@ export function BottomNavBar({
   return (
     <nav
       aria-label="Primary"
-      className="fixed bottom-0 left-0 right-0 z-30 mx-auto max-w-md border-t border-zinc-800/80 bg-zinc-900/90 pb-[env(safe-area-inset-bottom)] backdrop-blur-md shadow-[0_-8px_32px_-12px_rgba(0,0,0,0.55)]"
+      className="fixed bottom-0 left-0 right-0 z-30 mx-auto max-w-md border-t border-zinc-800/80 bg-zinc-900/95 pb-safe backdrop-blur-md shadow-[0_-8px_32px_-12px_rgba(0,0,0,0.55)]"
     >
       <div className={`grid ${cols}`}>
         {tabs.map((tab) => {
@@ -190,10 +191,10 @@ export function BottomNavBar({
               type="button"
               onClick={() => onSelect(tab.id)}
               aria-current={isActive ? "page" : undefined}
-              className={`relative flex min-h-16 flex-col items-center justify-center gap-0.5 px-0.5 pb-1.5 pt-2 transition ${
+              className={`relative flex h-16 flex-col items-center justify-center gap-1 px-0.5 pt-1.5 transition ${
                 isActive
-                  ? "text-emerald-300 [text-shadow:0_0_12px_rgba(16,185,129,0.55)]"
-                  : "text-slate-400 active:text-slate-200"
+                  ? "text-emerald-300"
+                  : "text-zinc-400 active:text-zinc-200"
               }`}
             >
               {isActive ? (
@@ -202,10 +203,8 @@ export function BottomNavBar({
                   aria-hidden
                 />
               ) : null}
-              <span className="text-base leading-none sm:text-lg" aria-hidden>
-                {tab.icon}
-              </span>
-              <span className="max-w-full truncate text-[9px] font-bold uppercase tracking-wide sm:text-[10px]">
+              <NavIcon id={tab.icon} className="h-5 w-5" />
+              <span className="max-w-full truncate text-[10px] font-bold uppercase tracking-wide">
                 {tab.label}
               </span>
             </button>

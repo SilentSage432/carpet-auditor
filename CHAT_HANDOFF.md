@@ -11,7 +11,7 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 - Header badge: `DeptSyncBadge` (stacked boxes + barcode, emerald/amber on dark)
 - Icons: `public/icons/icon-192.png`, `icon-512.png`, `apple-touch-icon.png`
 - PWA manifest: `app/manifest.ts` → `/manifest.webmanifest`; static `public/manifest.json` → `/manifest.json` (TWA / Bubblewrap)
-- **Obsidian-glass UI:** void `#09090b`; utilities in `app/globals.css` (`.glass-card`, `.glass-panel`, `.glass-input`, `.glass-backdrop`, `.glass-void`, `.btn-primary-glow`, status pills / bay glows). Emerald primary / cyan secondary accents. AuthWall, Store Map, NavigationHub, audit cards, Bulk Generator, and overlay modals consume these tokens.
+- **Obsidian-glass UI:** void `#09090b`; utilities in `app/globals.css` (`.glass-card`, `.glass-panel`, `.glass-input`, `.glass-backdrop`, `.glass-void`, `.btn-primary-glow`, `.btn-grid-action-*`, `.pb-safe`, status pills / bay glows). Emerald primary / cyan secondary accents. Lucide SVG nav icons (`NavIcons`) — no emoji bottom tabs.
 
 ## AI (`lib/ai/gemini.ts`)
 - Server-only Gemini Flash client (`@google/generative-ai`)
@@ -116,9 +116,10 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
   - `departments`, `profiles` (auth.users + `super_admin` / `department_supervisor`), `store_locations` (SELLING/TOPSTOCK + cycle status), `weekly_rotations`
   - RLS: super_admin all; supervisors read/update own `assigned_department_id`
 - Hub bridge: Master Admin → super_admin; Supervisor → department_supervisor (via `departments.code` = hub `assigned_department`)
-- **Navigation Hub** (`lib/nav-hub.ts` + `NavigationHub.tsx`): role-aware hamburger + ops bottom tabs
-  - Super Admin: `/admin/store-map` · `/admin/supervisors` · `/dashboard` · `/manager-notes` · `/settings`
-  - Supervisor: `/dashboard` · `/department` · `/manager-notes` · `/settings`
+- **Navigation Hub** (`lib/nav-hub.ts` + `NavigationHub.tsx`): role-aware hamburger + ops bottom tabs (Lucide SVG, max 5; Notes/Settings in More sheet)
+  - Super Admin primary: Map · Team · Alerts · Zebra · More
+  - Supervisor primary: Zebra · Verify · Dept · More
+  - Associate primary: Zebra · Barriers · Tools · Profile
 - Quick Actions banner (Super Admin): Bulk Generate · Trigger Weekly Rotation · Manage Supervisors
 - `/admin/store-map` — department overview + location grid; Bulk Add accordion; Trigger Weekly Rotation modal (**Force Draw New Rotation**); **📷 Snap Bay AI Audit** (Gemini visual scan) on page + bay actions sheet
 - `/manager-notes` — Manager Notes & S Pen workspace (stylus canvas + Gemini action-item synthesis); also Admin Tools entry + `#manager-notes`

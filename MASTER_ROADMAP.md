@@ -76,6 +76,7 @@
 - [x] Sunday Flooring Cycle Audit staging + Master Admin department context switcher
 - [x] AI Visual Bay Scan (`/api/store-ops/ai-bay-scan` + `VisualBayScannerModal` on Store Map / Cycle Audit)
 - [x] Manager Notes & S Pen Canvas (`/api/store-ops/ai-note-summary` + `ManagerNotesWorkspace` + `20260811_manager_notes.sql`)
+- [x] Mobile UI polish — Lucide bottom nav (4–5 tabs + More), compact header status chip, shared `h-12` action button tokens
 
 ## Next
 - [ ] JWT / claim-based RLS enforcing `store_number` (+ department) server-side

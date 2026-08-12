@@ -243,18 +243,20 @@ export function AdminRosterManager({
           return (
             <li
               key={member.id}
-              className="rounded-xl border border-slate-800 bg-slate-950/70 p-3"
+              className="glass-card !rounded-xl p-3"
             >
               <div className="min-w-0">
-                <p className="truncate font-semibold text-slate-50">
+                <p className="glass-title truncate text-sm">
                   {displayName(member)}
                 </p>
-                <p className="mt-1 text-xs text-slate-400">{roleBadge(member)}</p>
-                <p className="mt-0.5 text-xs text-slate-400">
-                  {deptBadge.icon} {deptBadge.label}
+                <p className="mt-1 font-mono text-[10px] font-bold uppercase tracking-wider text-amber-300/90">
+                  {roleBadge(member)}
+                </p>
+                <p className="mt-0.5 text-xs text-zinc-400">
+                  {deptBadge.label}
                   {deptBadge.description ? ` · ${deptBadge.description}` : ""}
                 </p>
-                <p className="mt-1 truncate font-mono text-[11px] text-slate-500">
+                <p className="mt-1 truncate font-mono text-[11px] text-zinc-500">
                   {member.username ? `@${member.username}` : "No username"}
                 </p>
                 <p
@@ -270,9 +272,9 @@ export function AdminRosterManager({
                   type="button"
                   disabled={busyId === member.id}
                   onClick={() => setInviteTarget(member)}
-                  className="flex min-h-11 items-center justify-center rounded-lg border border-emerald-500/40 text-[11px] font-semibold text-emerald-200 disabled:opacity-40"
+                  className="btn-grid-action-emerald"
                 >
-                  📨 Invite
+                  Invite
                 </button>
                 <button
                   type="button"
@@ -280,25 +282,25 @@ export function AdminRosterManager({
                     busyId === member.id || testBusyId === member.id
                   }
                   onClick={() => void handleTestInviteFlow(member)}
-                  className="flex min-h-11 items-center justify-center rounded-lg border border-amber-400/50 text-[11px] font-semibold text-amber-100 disabled:opacity-40"
+                  className="btn-grid-action-amber"
                 >
-                  {testBusyId === member.id ? "…" : "🧪 Test Invite Flow"}
+                  {testBusyId === member.id ? "…" : "Test Invite"}
                 </button>
                 <button
                   type="button"
                   disabled={busyId === member.id}
                   onClick={() => void handleReset(member)}
-                  className="flex min-h-11 items-center justify-center rounded-lg border border-amber-500/30 text-[11px] font-semibold text-amber-200 disabled:opacity-40"
+                  className="btn-grid-action-amber"
                 >
-                  🔑 Reset
+                  Reset
                 </button>
                 <button
                   type="button"
                   disabled={busyId === member.id}
                   onClick={() => setEditTarget(member)}
-                  className="flex min-h-11 items-center justify-center rounded-lg border border-slate-600 text-[11px] font-semibold text-slate-200 disabled:opacity-40"
+                  className="btn-grid-action-neutral"
                 >
-                  ✏️ Edit
+                  Edit
                 </button>
                 <button
                   type="button"
@@ -308,9 +310,9 @@ export function AdminRosterManager({
                       activeSpecialist?.id === member.id)
                   }
                   onClick={() => setDeleteTarget(member)}
-                  className="col-span-2 flex min-h-11 items-center justify-center rounded-lg border border-red-500/30 text-[11px] font-semibold text-red-300 disabled:opacity-40"
+                  className="btn-grid-action-danger col-span-2"
                 >
-                  🗑️ Delete User
+                  Delete User
                 </button>
               </div>
             </li>
@@ -321,7 +323,7 @@ export function AdminRosterManager({
       <button
         type="button"
         onClick={() => setAddOpen(true)}
-        className="flex min-h-12 w-full items-center justify-center rounded-xl bg-emerald-500 text-sm font-bold text-slate-950"
+        className="btn-primary-glow flex w-full items-center justify-center text-sm font-bold"
       >
         + Add Department Supervisor / Specialist
       </button>

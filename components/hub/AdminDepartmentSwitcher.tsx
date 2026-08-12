@@ -78,7 +78,7 @@ export function AdminDepartmentSwitcher({
             key={opt}
             type="button"
             onClick={() => pin(opt)}
-            className={`min-h-[44px] shrink-0 rounded-xl border px-2.5 text-[10px] font-bold uppercase tracking-wide transition active:scale-[0.98] ${
+            className={`h-11 shrink-0 rounded-xl border px-2.5 text-[10px] font-bold uppercase tracking-wide transition active:scale-[0.98] ${
               active
                 ? opt === "flooring"
                   ? "border-emerald-500/55 bg-emerald-950/55 text-emerald-100 shadow-[0_0_16px_-6px_rgba(16,185,129,0.6)]"

@@ -59,8 +59,56 @@ body {
 }
 
 .btn-primary-glow {
-  @apply bg-emerald-600 hover:bg-emerald-500 text-white font-semibold shadow-lg shadow-emerald-950/50
+  @apply h-12 min-h-12 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold shadow-lg shadow-emerald-950/50
     transition active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-50;
+}
+
+.btn-secondary-glass {
+  @apply h-12 min-h-12 rounded-xl border border-zinc-700/80 bg-zinc-950/70 text-sm font-semibold text-zinc-100
+    transition active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-40
+    focus-visible:border-emerald-500/50 focus-visible:ring-1 focus-visible:ring-emerald-500/30;
+}
+
+.btn-grid-action {
+  @apply flex h-12 min-h-12 items-center justify-center rounded-xl border text-xs font-semibold
+    transition active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-40;
+}
+
+.btn-grid-action-emerald {
+  @apply flex h-12 min-h-12 items-center justify-center rounded-xl border text-xs font-semibold
+    transition active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-40
+    border-emerald-500/40 bg-emerald-950/30 text-emerald-200;
+}
+
+.btn-grid-action-amber {
+  @apply flex h-12 min-h-12 items-center justify-center rounded-xl border text-xs font-semibold
+    transition active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-40
+    border-amber-500/40 bg-amber-950/25 text-amber-100;
+}
+
+.btn-grid-action-neutral {
+  @apply flex h-12 min-h-12 items-center justify-center rounded-xl border text-xs font-semibold
+    transition active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-40
+    border-zinc-600/80 bg-zinc-950/50 text-zinc-200;
+}
+
+.btn-grid-action-danger {
+  @apply flex h-12 min-h-12 items-center justify-center rounded-xl border text-xs font-semibold
+    transition active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-40
+    border-rose-500/35 bg-rose-950/25 text-rose-300;
+}
+
+.btn-icon-touch {
+  @apply flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-zinc-700/80 bg-zinc-900/80 text-zinc-50
+    transition active:scale-95 focus-visible:border-emerald-500/50 focus-visible:ring-1 focus-visible:ring-emerald-500/30;
+}
+
+.pb-safe {
+  padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+}
+
+.pt-safe {
+  padding-top: max(0.25rem, env(safe-area-inset-top));
 }
 
 .glass-focus {

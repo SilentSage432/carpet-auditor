@@ -1,5 +1,14 @@
 # DeptSync Hub — Development Journal
 
+## 2026-08-11 — Mobile UI polish: SVG bottom nav, header, action buttons
+
+### Shipped
+- Lucide React icons via `components/hub/NavIcons.tsx`; replaced emoji bottom-nav / drawer glyphs.
+- Navigation Hub bottom bar capped at 4–5 tabs; Notes/Settings overflow into a More sheet (`lib/nav-hub` `overflow` flag).
+- Header consolidates Online / queued / role into one status chip; department context pills stay single-row `overflow-x-auto no-scrollbar`.
+- Safe-area utility `.pb-safe`; shared button tokens (`.btn-primary-glow` h-12, `.btn-grid-action-*`, `.btn-icon-touch`).
+- Roster action grid + primary Add Supervisor CTA normalized to touch targets and glass accents.
+
 ## 2026-08-11 — Manager Notes & S Pen Canvas (Gemini synthesis)
 
 ### Shipped

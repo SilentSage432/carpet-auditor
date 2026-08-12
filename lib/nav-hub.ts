@@ -9,6 +9,7 @@ import {
   isMasterAdmin,
 } from "@/lib/rbac";
 import { departmentMeta, type StoreSpecialist } from "@/lib/types";
+import type { NavIconId } from "@/components/hub/NavIcons";
 
 export type NavHubHref =
   | "/admin/store-map"
@@ -25,8 +26,10 @@ export type NavHubLink = {
   href: NavHubHref;
   label: string;
   shortLabel: string;
-  icon: string;
+  icon: NavIconId;
   description: string;
+  /** When true, route is available via More sheet / drawer, not the primary bottom bar. */
+  overflow?: boolean;
 };
 
 /** Compact role chip for Zebra header / user menu, e.g. [SUPER ADMIN] or [FLR DEPT]. */
@@ -80,44 +83,46 @@ export function navRoleLinks(
       {
         href: "/admin/store-map",
         label: "Store Map & Bulk Generator",
-        shortLabel: "Store Map",
-        icon: "🗺️",
+        shortLabel: "Map",
+        icon: "map",
         description: "Map aisles and generate bay tags",
       },
       {
         href: "/admin/supervisors",
         label: "Supervisor & Role Management",
-        shortLabel: "Supervisors",
-        icon: "👥",
+        shortLabel: "Team",
+        icon: "users",
         description: "Issue and manage department logins",
       },
       {
         href: "/admin/exceptions",
         label: "Exception Log",
-        shortLabel: "Exceptions",
-        icon: "⚠️",
+        shortLabel: "Alerts",
+        icon: "alert",
         description: "Weekly verification & bottlenecks",
       },
       {
         href: "/dashboard",
         label: "Zebra Floor View",
         shortLabel: "Zebra",
-        icon: "📱",
+        icon: "zebra",
         description: "This week’s assigned bay checklist",
       },
       {
         href: "/manager-notes",
         label: "Manager Notes & S Pen",
         shortLabel: "Notes",
-        icon: "📝",
+        icon: "notes",
         description: "Floor notes + stylus canvas + AI action items",
+        overflow: true,
       },
       {
         href: "/settings",
         label: "Settings & Config",
         shortLabel: "Settings",
-        icon: "⚙️",
+        icon: "settings",
         description: "Store context, sync, and credentials",
+        overflow: true,
       },
     ];
   }
@@ -128,37 +133,39 @@ export function navRoleLinks(
       {
         href: "/dashboard",
         label: "My Department Zebra Checklist",
-        shortLabel: "Checklist",
-        icon: "📱",
+        shortLabel: "Zebra",
+        icon: "zebra",
         description: "This week’s assigned rotation bays",
       },
       {
         href: "/verify-rotation",
         label: "Verify & Report Exceptions",
         shortLabel: "Verify",
-        icon: "✅",
+        icon: "shield",
         description: "End-of-week confirmation / incomplete bays",
       },
       {
         href: "/department",
         label: "Department Overview",
         shortLabel: dept.shortLabel,
-        icon: dept.icon,
+        icon: "building",
         description: `${dept.label} ops overview + Hub link`,
       },
       {
         href: "/manager-notes",
         label: "Manager Notes & S Pen",
         shortLabel: "Notes",
-        icon: "📝",
+        icon: "notes",
         description: "Floor notes + stylus canvas + AI action items",
+        overflow: true,
       },
       {
         href: "/settings",
         label: "Settings",
         shortLabel: "Settings",
-        icon: "⚙️",
+        icon: "settings",
         description: "Profile, PIN, and sync",
+        overflow: true,
       },
     ];
   }
@@ -168,38 +175,58 @@ export function navRoleLinks(
     {
       href: "/dashboard",
       label: "My Department Checklist",
-      shortLabel: "Checklist",
-      icon: "📱",
+      shortLabel: "Zebra",
+      icon: "zebra",
       description: "This week’s assigned rotation bays",
     },
     {
       href: "/verify-rotation",
       label: "Barriers / Log",
       shortLabel: "Barriers",
-      icon: "🚧",
+      icon: "barrier",
       description: "Log barriers and review incomplete bays",
     },
     {
       href: "/",
       label: "Specialty Tools",
       shortLabel: "Tools",
-      icon: "🛠️",
+      icon: "tools",
       description: "Flooring / appliance department auditors",
     },
     {
       href: "/settings",
       label: "My Profile / PIN",
       shortLabel: "Profile",
-      icon: "🔐",
+      icon: "lock",
       description: "Credentials and device sync",
     },
   ];
+}
+
+/** Primary bottom-bar links (excludes overflow / More sheet routes). */
+export function navPrimaryLinks(links: NavHubLink[]): NavHubLink[] {
+  return links.filter((link) => !link.overflow);
+}
+
+/** Overflow routes shown under More. */
+export function navOverflowLinks(links: NavHubLink[]): NavHubLink[] {
+  return links.filter((link) => link.overflow);
 }
 
 export function isNavHubPathActive(
   pathname: string,
   href: NavHubHref
 ): boolean {
-  if (href === "/") return pathname === "/";
+  if (href === "/") return pathname === "/" || pathname === "";
   return pathname === href || pathname.startsWith(`${href}/`);
+}
+
+/** True when an overflow route is active (highlights More tab). */
+export function isNavOverflowActive(
+  pathname: string,
+  links: NavHubLink[]
+): boolean {
+  return navOverflowLinks(links).some((link) =>
+    isNavHubPathActive(pathname, link.href)
+  );
 }

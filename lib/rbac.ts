@@ -13,19 +13,20 @@ import {
   type StoreSpecialist,
   HUB_SECTIONS,
 } from "./types";
+import type { NavIconId } from "@/components/hub/NavIcons";
 
 export type NavTab = {
   id: HubSection;
   label: string;
-  icon: string;
+  icon: NavIconId;
 };
 
 const ALL_TABS: NavTab[] = [
-  { id: "audit", label: "Flooring", icon: "📊" },
-  { id: "appliances", label: "Appliances", icon: "🔌" },
-  { id: "department", label: "Dept Audit", icon: "🏬" },
-  { id: "remnants", label: "Remnants", icon: "📦" },
-  { id: "settings", label: "Settings", icon: "⚙️" },
+  { id: "audit", label: "Flooring", icon: "grid" },
+  { id: "appliances", label: "Appliances", icon: "tools" },
+  { id: "department", label: "Dept Audit", icon: "building" },
+  { id: "remnants", label: "Remnants", icon: "notes" },
+  { id: "settings", label: "Settings", icon: "settings" },
 ];
 
 /** True for departments that use the generic unit-count department workspace. */
@@ -133,7 +134,7 @@ export function visibleNavTabs(
       return {
         ...tab,
         label: meta.shortLabel,
-        icon: meta.icon,
+        icon: "building" as const,
       };
     }
     if (tab.id === "settings" && isMasterAdmin(member)) {

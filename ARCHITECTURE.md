@@ -7,9 +7,10 @@ app/manifest.ts                   → short_name DeptSync · Department & SIMS A
 public/sw.js                      → Offline shell cache strategies
 components/hub/HubChrome.tsx      → Sticky header (legacy) + role-filtered inventory bottom nav
 components/hub/NavigationHub.tsx  → Cross-app Navigation Hub (hamburger, role badge, ops bottom nav)
+components/hub/NavIcons.tsx       → Shared Lucide icons for ops + inventory bottom bars
 components/hub/SuperAdminQuickActions.tsx → Bulk / Trigger Rotation / Manage Supervisors banner
 components/hub/SessionGate.tsx    → Auth gate for Store Ops route pages
-lib/nav-hub.ts                    → Role-aware Store Ops route menus + compact role badges
+lib/nav-hub.ts                    → Role-aware Store Ops route menus + compact role badges + overflow/More
 lib/push/*                        → Web Push subscribe + VAPID dispatch for rotation alerts
 app/admin/store-map/page.tsx      → Super Admin aisle/bay bulk mapper + weekly generate
 app/admin/supervisors/page.tsx    → Supervisor & role management console
