@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { ApplianceAnomalyWidget } from "@/components/appliances/ApplianceAnomalyWidget";
 import { ApplianceScanEditModal } from "@/components/appliances/ApplianceScanEditModal";
 import { QuickAddApplianceModal } from "@/components/barcode/QuickAddApplianceModal";
 import { ConfirmModal } from "@/components/hub/ConfirmModal";
@@ -485,6 +486,16 @@ export function ApplianceAuditSection({
           </p>
         )}
       </div>
+
+      <ApplianceAnomalyWidget
+        scans={loaded ? (shiftScans.length > 0 ? shiftScans : scans) : []}
+        catalog={catalog}
+        onFocusSku={(sku) => {
+          setLogQuery(sku);
+          setLogFilter("all");
+          setSummaryExpanded(false);
+        }}
+      />
 
       <section
         aria-label="Appliance shift summary"

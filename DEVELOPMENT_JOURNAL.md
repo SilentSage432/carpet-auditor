@@ -1,5 +1,11 @@
 # DeptSync Hub — Development Journal
 
+## 2026-08-11 — Appliance Scan Anomaly Detection
+
+### Shipped
+- `POST /api/appliances/ai-anomaly` — Gemini Flash anomaly detection over `appliance_scans` + `appliance_catalog`; local heuristics fallback when key missing (duplicate serials / distant locations / category mismatch / unscanned high-value models).
+- Domain module `lib/appliances/ai-anomaly.ts`; widget `ApplianceAnomalyWidget` mounted in `ApplianceAuditSection` with emerald/amber/rose status glow and Zebra `min-h-[44px]` actions.
+
 ## 2026-08-11 — Zebra Shift Intelligence Briefing
 
 ### Shipped

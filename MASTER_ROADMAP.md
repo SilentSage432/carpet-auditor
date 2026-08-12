@@ -69,6 +69,7 @@
 - [x] AI Pre-Flight Bulk Generator (`/api/store-locations/ai-parse` + Confirm → bulk upsert)
 - [x] Flooring AI Remnant Aging & Variance Intelligence (`/api/flooring/ai-insights` + banner CTA)
 - [x] Zebra Shift Intelligence Briefing (`/api/store-health/ai-summary` + `ShiftBriefingCard`)
+- [x] Appliance Scan Anomaly Detection (`/api/appliances/ai-anomaly` + `ApplianceAnomalyWidget`)
 
 ## Next
 - [ ] JWT / claim-based RLS enforcing `store_number` (+ department) server-side
@@ -80,7 +81,7 @@
 - [ ] Retire or wire orphan `MarryBarcodeModal`
 - [ ] Department-specific catalog category taxonomies beyond flooring/appliances
 - [ ] Extend glassification to remaining modals / AuthWall / Store Map chrome (optional polish pass)
-- [ ] Additional Gemini product surfaces beyond location Pre-Flight / flooring insights / shift briefing
+- [ ] Additional Gemini product surfaces beyond the four AI ops widgets
 ## Non-goals
 - Pricing / margin engines
 - Replenishment recommendations
