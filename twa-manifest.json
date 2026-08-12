@@ -24,7 +24,7 @@
   "appVersionCode": 1,
   "shortcuts": [],
   "generatorApp": "bubblewrap-cli",
-  "webManifestUrl": "https://your-deptsync-url.vercel.app/manifest.json",
+  "webManifestUrl": "https://deptsync-hub.vercel.app/manifest.json",
   "fallbackType": "customtabs",
   "features": {
     "locationDelegation": {
@@ -37,7 +37,7 @@
   "enableSiteSettingsShortcut": true,
   "isChromeOSOnly": false,
   "isMetaQuest": false,
-  "fullScopeUrl": "https://your-deptsync-url.vercel.app/",
+  "fullScopeUrl": "https://deptsync-hub.vercel.app/",
   "minSdkVersion": 21,
   "orientation": "portrait-primary",
   "fingerprints": [],
