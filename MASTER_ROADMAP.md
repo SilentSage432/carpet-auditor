@@ -75,6 +75,7 @@
 - [x] Store Audit Velocity & Health Telemetry Chart (`StoreHealthChart` + `lib/store-ops/telemetry` on `/dashboard` / store-health)
 - [x] Sunday Flooring Cycle Audit staging + Master Admin department context switcher
 - [x] AI Visual Bay Scan (`/api/store-ops/ai-bay-scan` + `VisualBayScannerModal` on Store Map / Cycle Audit)
+- [x] Immersive Snap Bay camera overlay — full-screen `object-cover` video, top/bottom HUD, WebRTC rear-cam cascade + connecting pulse
 - [x] Manager Notes & S Pen Canvas (`/api/store-ops/ai-note-summary` + `ManagerNotesWorkspace` + `20260811_manager_notes.sql`)
 - [x] Executive Floor Pad — full-screen TipTap rich notes, Gemini Extract Tasks & Tag Server Action, `is_archived`, debounced autosave (`components/manager-notes/` + `20260812_manager_notes_archive.sql`)
 - [x] Mobile UI polish — Lucide bottom nav (4–5 tabs + More), compact header status chip, shared `h-12` action button tokens

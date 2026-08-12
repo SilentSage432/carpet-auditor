@@ -1,5 +1,13 @@
 # DeptSync Hub — Development Journal
 
+## 2026-08-12 — Immersive Snap Bay AI Audit camera
+
+### Shipped
+- `VisualBayScannerModal` rebuilt as full-screen (`100dvh`) immersive overlay — live `<video>` is `object-cover` edge-to-edge (Carb Buddy–style).
+- Top glass header (title + Aisle/Bay) and bottom camera-app control cluster (shutter / Open Live Camera + Upload Photo); close ✕ top-right.
+- WebRTC cascade: `facingMode: { exact: "environment" }` → `facingMode: "environment"` → `video: true`; `playsInline` + `muted` + `autoPlay` with post-mount attach.
+- Pulsing red connecting indicator while the rear camera initializes.
+
 ## 2026-08-12 — Master Admin bootstrap + Hub-bridge resilience
 
 ### Shipped

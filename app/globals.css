@@ -179,6 +179,22 @@ body {
   animation: visual-bay-scan-sweep 1.6s ease-in-out infinite;
 }
 
+.visual-bay-cam-pulse {
+  animation: visual-bay-cam-pulse 1.1s ease-in-out infinite;
+}
+
+@keyframes visual-bay-cam-pulse {
+  0%,
+  100% {
+    opacity: 0.45;
+    transform: scale(0.85);
+  }
+  50% {
+    opacity: 1;
+    transform: scale(1.15);
+  }
+}
+
 @keyframes visual-bay-scan-sweep {
   0% {
     top: 8%;
