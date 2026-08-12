@@ -691,12 +691,13 @@ export async function saveSpecialist(input: {
 }
 
 /**
- * Persist a new PIN on store_profiles via update only (never insert/upsert).
- * Payload: pin + pin_code + must_change_credentials: false.
+ * Persist a new PIN via service-role API (store_specialists + store_profiles upsert).
+ * Falls back to local/offline queue when the API is unreachable.
  */
 export async function updateSpecialistPin(
   member: StoreSpecialist,
-  newPin: string
+  newPin: string,
+  currentPin?: string
 ): Promise<{ record: StoreSpecialist; offline: boolean }> {
   const pin = newPin.trim();
   if (!/^\d{4}$/.test(pin)) {
@@ -704,7 +705,6 @@ export async function updateSpecialistPin(
   }
 
   const store = member.store_number || getStoreNumber();
-  const supabase = getSupabase();
   const profileLabel =
     member.role === "MasterAdmin"
       ? "Master Admin"
@@ -719,7 +719,7 @@ export async function updateSpecialistPin(
     store_number: store,
   };
 
-  if (!supabase || shouldSaveOffline()) {
+  if (shouldSaveOffline()) {
     const offlineRecord: StoreSpecialist = { ...nextLocal, offline: true };
     upsertLocal(offlineRecord);
     enqueueSyncAction(
@@ -731,53 +731,40 @@ export async function updateSpecialistPin(
     return { record: offlineRecord, offline: true };
   }
 
-  const updatePayload = {
-    pin,
-    pin_code: pin,
-    must_change_credentials: false as const,
-  };
-
-  const username = member.username?.trim() || "";
-
   try {
-    let query = supabase.from("store_profiles").update(updatePayload);
+    const { getSupabaseAccessToken } = await import("@/lib/supabase/client");
+    const token = await getSupabaseAccessToken();
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+    if (token) headers.Authorization = `Bearer ${token}`;
 
-    if (username) {
-      query = query.eq("username", username);
-    } else if (isDatabaseUuid(member.id) && !isFallbackProfileId(member.id)) {
-      query = query.eq("id", member.id);
-    } else if (member.role === "MasterAdmin" || member.role === "Supervisor") {
-      query = query.eq("role", member.role);
-      if (store) query = query.eq("store_number", store);
-    } else {
+    const res = await fetch("/api/auth/reset-pin", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        specialist_id: member.id,
+        username: member.username,
+        store_number: store || undefined,
+        current_pin: currentPin ?? member.pin_code ?? undefined,
+        new_pin: pin,
+      }),
+    });
+
+    const body = (await res.json().catch(() => ({}))) as {
+      error?: string;
+      specialist?: Record<string, unknown>;
+    };
+
+    if (!res.ok || !body.specialist) {
       throw new Error(
-        `Could not update ${profileLabel} PIN — username is required when id is unavailable.`
+        body.error || `Could not update ${profileLabel} PIN (${res.status})`
       );
     }
 
-    const { data, error } = await query.select("*");
-
-    if (error) {
-      console.error("Failed to update store_profiles PIN:", error);
-      console.error("Failed to update PIN:", error.message);
-      throw new Error(error.message || `Could not update ${profileLabel} PIN.`);
-    }
-
-    if (!data || data.length === 0) {
-      console.error(
-        "Failed to update store_profiles PIN: no row matched",
-        username ? { username } : { id: member.id, role: member.role }
-      );
-      throw new Error(
-        `Could not find ${profileLabel} in store_profiles to update PIN.`
-      );
-    }
-
-    const row = data[0] as Record<string, unknown>;
-    // Prefer pin_code; accept pin if present from store_profiles
     const saved = mapRow({
-      ...row,
-      pin_code: row.pin_code ?? row.pin ?? pin,
+      ...body.specialist,
+      pin_code: body.specialist.pin_code ?? body.specialist.pin ?? pin,
       offline: false,
     });
     upsertLocal(saved);

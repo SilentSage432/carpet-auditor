@@ -1,5 +1,12 @@
 # DeptSync Hub — Development Journal
 
+## 2026-08-12 — Master Admin PIN reset via service-role API
+
+### Shipped
+- `POST /api/auth/reset-pin` + `lib/store-ops/reset-pin.ts` — Super Admin Bearer or `current_pin` auth; service-role writes `store_specialists.pin_code` and **UPSERTs** `store_profiles` (creates Master Admin row when missing).
+- `updateSpecialistPin` / Change PIN modal now call the API (no more update-only `store_profiles` miss).
+- Best-effort sync of linked `profiles.pin_code` + Auth password for Hub bridge continuity.
+
 ## 2026-08-12 — Enable RLS on flagged public tables
 
 ### Shipped

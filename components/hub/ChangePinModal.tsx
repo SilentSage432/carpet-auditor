@@ -56,7 +56,11 @@ export function ChangePinModal({ open, member, onClose, onUpdated }: Props) {
     setSaving(true);
     setError(null);
     try {
-      const { record } = await updateSpecialistPin(member, newPin);
+      const { record } = await updateSpecialistPin(
+        member,
+        newPin,
+        currentPin.trim()
+      );
       onUpdated(record);
       setToast(true);
       window.setTimeout(() => {
