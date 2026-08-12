@@ -139,7 +139,7 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 - `POST /api/store-ops/ai-note-summary` — manager note + optional S Pen PNG → executive summary + action items (Store Ops actor)
 - APIs under `/api/rotations/*`, `/api/store-locations*`, `/api/departments`, `/api/weekly-rotations`
 - Multi-store: apply `20260809_multi_store.sql`; store scope comes from JWT `app_metadata.store_number` / `profiles.store_number`
-- Manager notes: apply `20260811_manager_notes.sql` + `20260812_manager_notes.sql` + `20260812_manager_notes_archive.sql` (`is_archived`; durable Supabase CRUD; JWT store/dept RLS)
+- Manager notes: apply `20260811_manager_notes.sql` + `20260812_manager_notes.sql` + `20260812_manager_notes_archive.sql` + **`20260812_fix_manager_notes_rls.sql`** (authenticated CRUD; `author_id` from Auth)
 - Sunday bay assignments: apply `20260812_sunday_bay_assignments.sql`
 - JWT claims / RLS helpers: apply `20260812_jwt_rls_policies.sql` + enable Custom Access Token Hook
 - Requires `SUPABASE_SERVICE_ROLE_KEY` for server routes (apply migration in Supabase SQL editor)

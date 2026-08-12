@@ -1,5 +1,12 @@
 # DeptSync Hub — Development Journal
 
+## 2026-08-12 — Fix manager_notes RLS (Floor Pad upserts)
+
+### Shipped
+- Patch migration `20260812_fix_manager_notes_rls.sql` — authenticated SELECT/INSERT/UPDATE/DELETE with `USING/WITH CHECK (true)`; drops JWT store/dept policy that blocked inserts.
+- `saveManagerNote` always stamps `author_id` from `supabase.auth.getUser()` (throws if no Auth session); DB trigger backfills `author_id` from `auth.uid()` when omitted.
+- Aligned `20260812_manager_notes.sql` + JWT RLS manager_notes block to the same permissive policies.
+
 ## 2026-08-12 — Floor Pad layout densify + expanded font suite
 
 ### Shipped

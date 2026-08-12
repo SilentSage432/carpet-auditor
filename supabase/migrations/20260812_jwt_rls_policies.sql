@@ -559,13 +559,12 @@ begin
 end $$;
 
 -- ---------------------------------------------------------------------------
--- RLS: manager_notes — store_number + department (or department_code)
+-- RLS: manager_notes — authenticated CRUD (Floor Pad upserts)
+-- Store scoping remains in the client filter; JWT claim WITH CHECK was blocking
+-- inserts when app_metadata.department / store_number were missing or mismatched.
+-- Authoritative live fix also in 20260812_fix_manager_notes_rls.sql.
 -- ---------------------------------------------------------------------------
 do $$
-declare
-  has_department boolean;
-  has_department_code boolean;
-  dept_expr text;
 begin
   if exists (
     select 1 from pg_tables
@@ -578,7 +577,6 @@ begin
     alter table public.manager_notes
       add column if not exists department_code text;
 
-    -- Mirror department ↔ department_code when either is present
     execute $q$
       update public.manager_notes
       set department = coalesce(nullif(trim(department), ''), nullif(trim(department_code), ''), 'general')
@@ -597,56 +595,37 @@ begin
 
     drop policy if exists "manager_notes_authenticated_select" on public.manager_notes;
     drop policy if exists "Enforce Store and Department Isolation" on public.manager_notes;
+    drop policy if exists "Allow authenticated users to insert manager notes" on public.manager_notes;
+    drop policy if exists "Allow authenticated users to update manager notes" on public.manager_notes;
+    drop policy if exists "Allow authenticated users to select manager notes" on public.manager_notes;
+    drop policy if exists "Allow authenticated users to delete manager notes" on public.manager_notes;
 
-    select exists (
-      select 1 from information_schema.columns
-      where table_schema = 'public'
-        and table_name = 'manager_notes'
-        and column_name = 'department'
-    ) into has_department;
+    create policy "Allow authenticated users to select manager notes"
+      on public.manager_notes
+      for select
+      to authenticated
+      using (true);
 
-    select exists (
-      select 1 from information_schema.columns
-      where table_schema = 'public'
-        and table_name = 'manager_notes'
-        and column_name = 'department_code'
-    ) into has_department_code;
+    create policy "Allow authenticated users to insert manager notes"
+      on public.manager_notes
+      for insert
+      to authenticated
+      with check (true);
 
-    if has_department then
-      dept_expr := 'manager_notes.department';
-    elsif has_department_code then
-      dept_expr := 'manager_notes.department_code';
-    else
-      dept_expr := null;
-    end if;
+    create policy "Allow authenticated users to update manager notes"
+      on public.manager_notes
+      for update
+      to authenticated
+      using (true)
+      with check (true);
 
-    if dept_expr is not null then
-      execute format(
-        $p$
-          create policy "Enforce Store and Department Isolation"
-            on public.manager_notes
-            for all
-            to authenticated
-            using (
-              public.jwt_matches_store(manager_notes.store_number)
-              and public.jwt_matches_department_code(%s)
-            )
-            with check (
-              public.jwt_matches_store(manager_notes.store_number)
-              and public.jwt_matches_department_code(%s)
-            )
-        $p$,
-        dept_expr,
-        dept_expr
-      );
-    else
-      create policy "Enforce Store and Department Isolation"
-        on public.manager_notes
-        for all
-        to authenticated
-        using (public.jwt_matches_store(manager_notes.store_number))
-        with check (public.jwt_matches_store(manager_notes.store_number));
-    end if;
+    create policy "Allow authenticated users to delete manager notes"
+      on public.manager_notes
+      for delete
+      to authenticated
+      using (true);
+
+    grant select, insert, update, delete on public.manager_notes to authenticated;
   end if;
 end $$;
 

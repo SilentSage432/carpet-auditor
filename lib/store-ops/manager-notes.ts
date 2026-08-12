@@ -162,15 +162,24 @@ export async function saveManagerNote(
   const supabase = requireClient();
   const {
     data: { user },
+    error: authError,
   } = await supabase.auth.getUser();
 
+  if (authError || !user?.id) {
+    throw new Error(
+      "Sign in with phone OTP required to save manager notes (authenticated Supabase session)"
+    );
+  }
+
   const department = String(note.department || note.department_code || "").trim();
+  // Always stamp author_id from the live Auth user (RLS / ownership).
+  const authorId = user.id;
   const payload = {
     id: note.id,
     store_number: String(note.store_number).trim(),
     department,
     department_code: department,
-    author_id: note.author_id || user?.id || null,
+    author_id: authorId,
     content: note.content ?? "",
     category: normalizeCategory(note.category),
     store_id: note.store_id,
