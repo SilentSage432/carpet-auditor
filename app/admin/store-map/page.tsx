@@ -213,12 +213,12 @@ function StoreMapBody({
                             : "border-zinc-800 bg-zinc-950/50 opacity-75"
                         }`}
                       >
-                        <div className="flex items-start justify-between gap-2">
-                          <div>
-                            <p className="font-semibold text-white">
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate font-semibold text-white">
                               {row.name}
                             </p>
-                            <p className="font-mono text-[11px] text-zinc-400">
+                            <p className="truncate font-mono text-[11px] text-zinc-400">
                               {row.code} · target {row.weeklyTarget}/week ·{" "}
                               {row.isActive ? "cron on" : "paused"}
                             </p>
@@ -236,7 +236,7 @@ function StoreMapBody({
                               onClick={() =>
                                 void toggleDepartment(row.id, !row.isActive)
                               }
-                              className={`relative h-7 w-12 rounded-full transition ${
+                              className={`relative h-7 w-12 shrink-0 rounded-full transition ${
                                 row.isActive ? "bg-emerald-500" : "bg-zinc-600"
                               } disabled:opacity-60`}
                             >

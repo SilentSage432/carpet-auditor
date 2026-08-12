@@ -144,12 +144,12 @@ export function WeeklyBayTargetCard({ specialist }: Props) {
                     : "border-slate-800/80 bg-slate-950/40 opacity-80"
                 }`}
               >
-                <div className="flex flex-wrap items-start justify-between gap-2">
-                  <div>
-                    <p className="text-sm font-semibold text-slate-50">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-semibold text-slate-50">
                       {dept.name}
                     </p>
-                    <p className="font-mono text-[11px] text-slate-500">
+                    <p className="truncate font-mono text-[11px] text-slate-500">
                       {dept.code} · stored {current}/week
                       {master
                         ? active
