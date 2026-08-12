@@ -1,10 +1,15 @@
 /**
  * Zebra Shift Intelligence Briefing — owns briefing shape + prompt/normalize.
  * Composes StoreHealthSnapshot from lib/store-ops/health (does not recompute pace).
+ * Optionally folds active-shift velocity telemetry into the Gemini prompt.
  * Gemini owns transport; presentation renders bullets only.
  */
 
 import type { StoreHealthSnapshot } from "@/lib/store-ops/health";
+import {
+  compactTelemetryForPrompt,
+  type StoreAuditTelemetry,
+} from "@/lib/store-ops/telemetry";
 
 export type ShiftBriefing = {
   headline: string;
@@ -12,7 +17,13 @@ export type ShiftBriefing = {
   priority_department: string;
 };
 
-export function buildShiftBriefingPrompt(snapshot: StoreHealthSnapshot): string {
+export function buildShiftBriefingPrompt(
+  snapshot: StoreHealthSnapshot,
+  telemetry?: StoreAuditTelemetry | null
+): string {
+  const velocity = compactTelemetryForPrompt(
+    telemetry ?? snapshot.telemetry ?? null
+  );
   const compact = {
     assigned_week: snapshot.assigned_week,
     scope: snapshot.scope,
@@ -44,12 +55,16 @@ export function buildShiftBriefingPrompt(snapshot: StoreHealthSnapshot): string 
       department: b.department_name,
       reason: b.reason,
     })),
+    audit_velocity: velocity,
   };
 
   return `You are DeptSync Hub's Zebra Shift Intelligence analyst for Lowe's Store Operations.
 
 Write a 3-bullet executive operational briefing for a handheld/Zebra screen at shift start.
-Be concrete and observational — pace, open bays, bottlenecks, exceptions. Do not invent departments or counts not in the data. Keep each bullet ≤110 characters. No markdown fences.
+Be concrete and observational — pace, open bays, bottlenecks, exceptions, and today's audit velocity trajectory (06:00–22:00) when audit_velocity is present.
+Do not invent departments or counts not in the data. Keep each bullet ≤110 characters. No markdown fences.
+
+When audit_velocity is present, synthesize the trajectory curve into at least one bullet (ahead/behind target pace, exception-hour spikes, or flooring/appliances divergence).
 
 Return ONLY valid JSON:
 {
@@ -87,7 +102,7 @@ export function normalizeShiftBriefing(
   const headline = String(root.headline ?? "").trim();
   const priority = String(root.priority_department ?? "").trim();
 
-  const fallback = buildLocalShiftBriefing(snapshot);
+  const fallback = buildLocalShiftBriefing(snapshot, snapshot.telemetry);
 
   return {
     headline: headline || fallback.headline,
@@ -98,10 +113,14 @@ export function normalizeShiftBriefing(
 
 /** Institutional fallback when Gemini is unavailable — composes health snapshot only. */
 export function buildLocalShiftBriefing(
-  snapshot: StoreHealthSnapshot
+  snapshot: StoreHealthSnapshot,
+  telemetry?: StoreAuditTelemetry | null
 ): ShiftBriefing {
   const { totals, departments, bottleneck_summary, department, assigned_week } =
     snapshot;
+  const velocity =
+    telemetry ?? snapshot.telemetry ?? null;
+  const overall = velocity?.series.find((s) => s.key === "overall");
 
   const lagging = [...departments].sort((a, b) => {
     if (a.completion_pct !== b.completion_pct) {
@@ -126,11 +145,17 @@ export function buildLocalShiftBriefing(
       ? `${totals.open} open bay${totals.open === 1 ? "" : "s"} · Week ${assigned_week}`
       : `Week ${assigned_week} · Rotation clear`;
 
+  const velocityBullet = overall
+    ? overall.ahead_behind_pct >= 0
+      ? `Shift velocity ${overall.current_velocity_pct}% vs ${overall.current_target_pct}% target (+${overall.ahead_behind_pct} pts).`
+      : `Shift velocity ${overall.current_velocity_pct}% — ${Math.abs(overall.ahead_behind_pct)} pts behind ${overall.current_target_pct}% target.`
+    : topBottleneck
+      ? `Bottleneck: ${topBottleneck.label} ×${topBottleneck.count} exception${topBottleneck.count === 1 ? "" : "s"}.`
+      : "No exception bottlenecks logged this week.";
+
   const bullets = padBullets([
     `Pace: ${paceLabel}.`,
-    topBottleneck
-      ? `Bottleneck: ${topBottleneck.label} ×${topBottleneck.count} exception${topBottleneck.count === 1 ? "" : "s"}.`
-      : "No exception bottlenecks logged this week.",
+    velocityBullet,
     lagging && lagging.open > 0
       ? `Priority: ${lagging.department_name} — ${lagging.open} open of ${lagging.assigned} (target ${lagging.weekly_bay_target}).`
       : department

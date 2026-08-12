@@ -107,7 +107,7 @@ export function SpecialistModal({ open, active, onClose, onSelect }: Props) {
         <div className="fixed inset-0 z-[60] flex items-end justify-center sm:items-center">
           <button
             type="button"
-            className="absolute inset-0 bg-slate-950/75 backdrop-blur-sm"
+            className="absolute inset-0 bg-black/60 backdrop-blur-md"
             aria-label="Close specialist picker"
             onClick={onClose}
           />
@@ -115,17 +115,17 @@ export function SpecialistModal({ open, active, onClose, onSelect }: Props) {
             role="dialog"
             aria-modal="true"
             aria-labelledby="specialist-title"
-            className="relative z-[61] max-h-[90dvh] w-full max-w-md overflow-y-auto rounded-t-2xl border border-slate-700 bg-slate-900 p-4 shadow-2xl sm:rounded-2xl"
+            className="relative z-[61] max-h-[90dvh] w-full max-w-md overflow-y-auto glass-card rounded-t-2xl !rounded-b-none border-emerald-500/20 p-4 sm:!rounded-2xl"
           >
-            <h2 id="specialist-title" className="text-lg font-bold text-slate-50">
+            <h2 id="specialist-title" className="text-lg font-bold text-white">
               Select Active Specialist
             </h2>
-            <p className="mt-1 text-sm text-slate-400">
+            <p className="mt-1 text-sm text-zinc-400">
               Switch the active profile for this session — no extra PIN needed.
             </p>
 
             {loading ? (
-              <p className="mt-6 text-center text-sm text-slate-500">Loading team…</p>
+              <p className="mt-6 text-center text-sm text-zinc-500">Loading team…</p>
             ) : (
               <ul className="mt-4 max-h-64 space-y-1 overflow-y-auto">
                 {roster.map((member) => {
@@ -139,14 +139,14 @@ export function SpecialistModal({ open, active, onClose, onSelect }: Props) {
                         className={`flex min-h-14 w-full items-center justify-between gap-2 rounded-xl px-3 py-2 text-left ${
                           selected
                             ? "bg-emerald-500/20 ring-1 ring-emerald-500/50"
-                            : "bg-slate-950/70 hover:bg-slate-800"
+                            : "bg-zinc-950/70 hover:bg-zinc-800"
                         }`}
                       >
                         <span className="min-w-0">
-                          <span className="block truncate font-semibold text-slate-50">
+                          <span className="block truncate font-semibold text-white">
                             {member.name}
                           </span>
-                          <span className="mt-0.5 block text-xs text-slate-400">
+                          <span className="mt-0.5 block text-xs text-zinc-400">
                             {roleBadge(member)}
                           </span>
                         </span>
@@ -163,7 +163,7 @@ export function SpecialistModal({ open, active, onClose, onSelect }: Props) {
             )}
 
             {adding ? (
-              <div className="mt-4 space-y-3 rounded-xl border border-slate-800 bg-slate-950/70 p-3">
+              <div className="mt-4 space-y-3 rounded-xl border border-zinc-800 bg-zinc-950/70 p-3">
                 <TextField
                   label="Name"
                   value={newName}
@@ -171,10 +171,10 @@ export function SpecialistModal({ open, active, onClose, onSelect }: Props) {
                   placeholder='e.g. Alex'
                 />
                 <fieldset>
-                  <legend className="mb-1.5 text-sm font-medium text-slate-200">
+                  <legend className="mb-1.5 text-sm font-medium text-zinc-200">
                     Role
                   </legend>
-                  <div className="grid grid-cols-3 gap-1 rounded-xl border border-slate-800 bg-slate-950 p-1">
+                  <div className="grid grid-cols-3 gap-1 rounded-xl border border-zinc-800 bg-zinc-950 p-1">
                     {(
                       [
                         ["Associate", "👤"],
@@ -188,8 +188,8 @@ export function SpecialistModal({ open, active, onClose, onSelect }: Props) {
                         onClick={() => setNewRole(value)}
                         className={`flex min-h-12 items-center justify-center rounded-lg text-xs font-semibold ${
                           newRole === value
-                            ? "bg-emerald-500 text-slate-950"
-                            : "text-slate-400"
+                            ? "bg-emerald-500 text-zinc-950"
+                            : "text-zinc-400"
                         }`}
                       >
                         {label}
@@ -199,7 +199,7 @@ export function SpecialistModal({ open, active, onClose, onSelect }: Props) {
                 </fieldset>
                 {(newRole === "Supervisor" || newRole === "Associate") && (
                   <label className="block space-y-1.5">
-                    <span className="text-sm font-medium text-slate-200">
+                    <span className="text-sm font-medium text-zinc-200">
                       Department
                     </span>
                     <select
@@ -207,7 +207,7 @@ export function SpecialistModal({ open, active, onClose, onSelect }: Props) {
                       onChange={(e) =>
                         setNewDepartment(e.target.value as DepartmentScope)
                       }
-                      className="min-h-12 w-full rounded-xl border border-slate-800 bg-slate-950 px-3 text-base text-slate-100"
+                      className="min-h-12 w-full rounded-xl border border-zinc-800 bg-zinc-950 px-3 text-base text-zinc-100"
                     >
                       {OPERATIONAL_DEPARTMENTS.map((id) => {
                         const meta = DEPARTMENT_META[id];
@@ -238,7 +238,7 @@ export function SpecialistModal({ open, active, onClose, onSelect }: Props) {
                   <button
                     type="button"
                     onClick={() => setAdding(false)}
-                    className="flex min-h-12 items-center justify-center rounded-xl border border-slate-700 text-sm font-semibold text-slate-300"
+                    className="flex min-h-12 items-center justify-center rounded-xl border border-zinc-700 text-sm font-semibold text-zinc-300"
                   >
                     Cancel
                   </button>
@@ -246,7 +246,7 @@ export function SpecialistModal({ open, active, onClose, onSelect }: Props) {
                     type="button"
                     disabled={saving}
                     onClick={() => void handleAdd()}
-                    className="flex min-h-12 items-center justify-center rounded-xl bg-emerald-500 text-sm font-bold text-slate-950 disabled:opacity-40"
+                    className="flex min-h-12 items-center justify-center btn-primary-glow rounded-xl text-sm disabled:opacity-40"
                   >
                     {saving ? "Saving…" : "Save"}
                   </button>
@@ -269,7 +269,7 @@ export function SpecialistModal({ open, active, onClose, onSelect }: Props) {
             <button
               type="button"
               onClick={onClose}
-              className="mt-3 flex min-h-12 w-full items-center justify-center rounded-xl border border-slate-700 text-sm font-semibold text-slate-300"
+              className="mt-3 flex min-h-12 w-full items-center justify-center rounded-xl border border-zinc-700 text-sm font-semibold text-zinc-300"
             >
               Close
             </button>

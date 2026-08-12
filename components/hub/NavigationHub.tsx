@@ -7,7 +7,7 @@
  */
 
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useId, useRef, useState } from "react";
 import {
   ADMIN_TOOLS_EVENT,
@@ -15,7 +15,13 @@ import {
   type AdminToolsEventDetail,
   type AdminToolsSection,
 } from "@/components/hub/AdminToolsDrawer";
+import { AdminDepartmentSwitcher } from "@/components/hub/AdminDepartmentSwitcher";
 import { DeptSyncBadge } from "@/components/hub/DeptSyncBadge";
+import {
+  adminWorkingDepartmentLabel,
+  readAdminWorkingDepartment,
+  ADMIN_DEPT_CONTEXT_EVENT,
+} from "@/lib/admin-department-context";
 import { useNetworkBadge } from "@/lib/network";
 import {
   isNavHubPathActive,
@@ -53,6 +59,7 @@ export function NavigationHub({
   showBottomNav = true,
 }: NavigationHubProps) {
   const pathname = usePathname() || "/";
+  const router = useRouter();
   const network = useNetworkBadge(storeNumber);
   const links = navRoleLinks(specialist);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -61,6 +68,8 @@ export function NavigationHub({
   const [adminSection, setAdminSection] =
     useState<AdminToolsSection>("menu");
   const [adminForce, setAdminForce] = useState(false);
+  const [adminSunday, setAdminSunday] = useState(false);
+  const [workingLabel, setWorkingLabel] = useState("Full Store");
   const userMenuId = useId();
   const drawerId = useId();
   const userRef = useRef<HTMLDivElement>(null);
@@ -74,10 +83,24 @@ export function NavigationHub({
   }, [pathname]);
 
   useEffect(() => {
+    function refreshWorking() {
+      setWorkingLabel(adminWorkingDepartmentLabel(readAdminWorkingDepartment()));
+    }
+    refreshWorking();
+    window.addEventListener(ADMIN_DEPT_CONTEXT_EVENT, refreshWorking);
+    window.addEventListener("storage", refreshWorking);
+    return () => {
+      window.removeEventListener(ADMIN_DEPT_CONTEXT_EVENT, refreshWorking);
+      window.removeEventListener("storage", refreshWorking);
+    };
+  }, []);
+
+  useEffect(() => {
     function onAdminEvent(e: Event) {
       const detail = (e as CustomEvent<AdminToolsEventDetail>).detail ?? {};
       setAdminSection(detail.section ?? "menu");
       setAdminForce(Boolean(detail.openForceRotation));
+      setAdminSunday(Boolean(detail.openSundayAudit));
       setAdminOpen(true);
     }
     window.addEventListener(ADMIN_TOOLS_EVENT, onAdminEvent);
@@ -90,14 +113,22 @@ export function NavigationHub({
     if (hash === "bulk-generate" || hash === "map-management") {
       setAdminSection("bulk");
       setAdminForce(false);
+      setAdminSunday(false);
       setAdminOpen(true);
     } else if (hash === "weekly-rotation") {
       setAdminSection("menu");
       setAdminForce(true);
+      setAdminSunday(false);
+      setAdminOpen(true);
+    } else if (hash === "sunday-audit" || hash === "sunday-rotation") {
+      setAdminSection("menu");
+      setAdminForce(false);
+      setAdminSunday(true);
       setAdminOpen(true);
     } else if (hash === "admin-tools") {
       setAdminSection("menu");
       setAdminForce(false);
+      setAdminSunday(false);
       setAdminOpen(true);
     }
   }, [master, pathname]);
@@ -148,6 +179,7 @@ export function NavigationHub({
               onClick={() => {
                 setAdminSection("menu");
                 setAdminForce(false);
+                setAdminSunday(false);
                 setAdminOpen(true);
               }}
               className="flex h-11 shrink-0 items-center rounded-xl border border-amber-400/50 bg-amber-950/40 px-2 font-mono text-[10px] font-bold uppercase tracking-wider text-amber-200 backdrop-blur-sm"
@@ -161,6 +193,7 @@ export function NavigationHub({
             <p className="glass-subtitle truncate text-emerald-400">
               DeptSync Hub
               {storeNumber ? ` · ${formatStoreLabel(storeNumber)}` : ""}
+              {master ? ` · ${workingLabel}` : ""}
             </p>
             <h1 className="glass-title truncate text-base leading-tight">
               {title}
@@ -276,6 +309,26 @@ export function NavigationHub({
             ) : null}
           </div>
         </div>
+        {master && specialist ? (
+          <div className="mx-auto max-w-lg border-t border-zinc-800/60 px-2 py-2 sm:px-3">
+            <p className="mb-1 font-mono text-[9px] font-bold uppercase tracking-[0.14em] text-amber-300/90">
+              My Department Context
+            </p>
+            <AdminDepartmentSwitcher
+              specialist={specialist}
+              compact
+              onPinnedNavigate={(section) => {
+                if (pathname === "/" || pathname === "") {
+                  router.push(`/?section=${section}`);
+                } else if (section === "audit") {
+                  router.push("/flooring");
+                } else {
+                  router.push(`/?section=${section}`);
+                }
+              }}
+            />
+          </div>
+        ) : null}
       </header>
 
       {menuOpen ? (
@@ -380,6 +433,7 @@ export function NavigationHub({
           onClose={() => {
             setAdminOpen(false);
             setAdminForce(false);
+            setAdminSunday(false);
             if (typeof window !== "undefined" && window.location.hash) {
               history.replaceState(
                 null,
@@ -393,6 +447,7 @@ export function NavigationHub({
           onStoreNumberChange={onStoreNumberChange}
           initialSection={adminSection}
           openForceRotationOnMount={adminForce}
+          openSundayAuditOnMount={adminSunday}
         />
       ) : null}
     </>

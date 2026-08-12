@@ -87,7 +87,7 @@ export function ForceRotationModal({
   }
 
   return (
-    <div className="fixed inset-0 z-[80] flex items-end justify-center bg-slate-950/80 backdrop-blur-sm sm:items-center">
+    <div className="fixed inset-0 z-[80] flex items-end justify-center bg-black/60 backdrop-blur-md sm:items-center">
       <button
         type="button"
         aria-label="Close"
@@ -98,7 +98,7 @@ export function ForceRotationModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby="force-rotation-title"
-        className="relative z-[81] w-full max-w-md rounded-t-2xl border border-amber-500/40 bg-slate-900 p-5 shadow-2xl sm:rounded-2xl"
+        className="relative z-[81] w-full max-w-md glass-card rounded-t-2xl !rounded-b-none border-amber-500/40 p-5 sm:!rounded-2xl"
       >
         <div className="flex items-start justify-between gap-3">
           <div>
@@ -107,7 +107,7 @@ export function ForceRotationModal({
             </p>
             <h2
               id="force-rotation-title"
-              className="mt-1 text-lg font-bold text-slate-50"
+              className="glass-title mt-1 text-lg"
             >
               Trigger Weekly Rotation
             </h2>
@@ -115,7 +115,7 @@ export function ForceRotationModal({
           <button
             type="button"
             onClick={onClose}
-            className="min-h-10 min-w-10 rounded-xl border border-slate-700 text-slate-300"
+            className="min-h-[44px] min-w-[44px] rounded-xl border border-zinc-700 text-zinc-300"
             aria-label="Close dialog"
           >
             ✕
@@ -125,18 +125,18 @@ export function ForceRotationModal({
         <p className="mt-3 rounded-xl border border-emerald-500/25 bg-emerald-950/30 px-3 py-2 text-sm text-emerald-200">
           Automated Cron: Active · Last Draw: Current ISO Week ({currentWeek})
         </p>
-        <p className="mt-2 text-sm text-slate-400">
+        <p className="mt-2 text-sm text-zinc-400">
           Automated rotation runs weekly on schedule. Use this panel for manual
           overrides or initial department setup.
         </p>
 
         <div className="mt-4 space-y-3">
           <label className="block text-sm">
-            <span className="mb-1 block text-slate-300">Department</span>
+            <span className="glass-label mb-1 block">Department</span>
             <select
               value={genDept}
               onChange={(e) => setGenDept(e.target.value)}
-              className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-3 text-slate-100"
+              className="glass-input min-h-[44px] text-sm font-semibold"
             >
               {deptOptions.map((d) => (
                 <option key={d.id} value={d.id}>
@@ -147,20 +147,20 @@ export function ForceRotationModal({
             </select>
           </label>
           <label className="block text-sm">
-            <span className="mb-1 block text-slate-300">Bay count</span>
+            <span className="glass-label mb-1 block">Bay count</span>
             <input
               type="number"
               min={1}
               value={genCount}
               onChange={(e) => setGenCount(e.target.value)}
-              className="w-full rounded-xl border border-slate-700 bg-slate-950 px-3 py-3 font-mono text-slate-100"
+              className="glass-input min-h-[44px] font-mono text-sm font-semibold"
             />
           </label>
           <button
             type="button"
             disabled={genBusy || !genDept}
             onClick={handleForceDraw}
-            className="flex min-h-14 w-full items-center justify-center rounded-xl bg-amber-500 px-4 text-base font-bold text-slate-950 disabled:opacity-50"
+            className="flex min-h-[44px] w-full items-center justify-center rounded-xl border border-amber-400/50 bg-amber-500/90 px-4 text-base font-bold text-zinc-950 shadow-lg shadow-amber-950/40 disabled:opacity-50"
           >
             {genBusy ? "Drawing…" : "Force Draw New Rotation"}
           </button>

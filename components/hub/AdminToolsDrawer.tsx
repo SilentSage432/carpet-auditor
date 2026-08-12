@@ -16,10 +16,13 @@ import {
 } from "react";
 import { BulkLocationGenerator } from "@/components/admin/BulkLocationGenerator";
 import { ForceRotationModal } from "@/components/admin/ForceRotationModal";
+import { SundayAuditAssignmentModal } from "@/components/admin/SundayAuditAssignmentModal";
+import { TaxonomyManagerModal } from "@/components/catalog/TaxonomyManagerModal";
 import { WeeklyBayTargetCard } from "@/components/hub/WeeklyBayTargetCard";
 import { selectOnFocus } from "@/lib/number-input";
 import { isMasterAdmin } from "@/lib/rbac";
 import { fetchDepartments } from "@/lib/store-ops/client";
+import { findFlooringDepartment } from "@/lib/store-ops/sunday-audit";
 import { usePendingSyncCount } from "@/lib/network";
 import {
   formatStoreLabel,
@@ -44,6 +47,7 @@ export const ADMIN_TOOLS_EVENT = "deptsync:admin-tools";
 export type AdminToolsEventDetail = {
   section?: AdminToolsSection;
   openForceRotation?: boolean;
+  openSundayAudit?: boolean;
 };
 
 type Props = {
@@ -54,6 +58,7 @@ type Props = {
   onStoreNumberChange?: (storeNumber: string) => void;
   initialSection?: AdminToolsSection;
   openForceRotationOnMount?: boolean;
+  openSundayAuditOnMount?: boolean;
 };
 
 export function AdminToolsDrawer({
@@ -64,11 +69,14 @@ export function AdminToolsDrawer({
   onStoreNumberChange,
   initialSection = "menu",
   openForceRotationOnMount = false,
+  openSundayAuditOnMount = false,
 }: Props) {
   const titleId = useId();
   const [section, setSection] = useState<AdminToolsSection>(initialSection);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [forceOpen, setForceOpen] = useState(false);
+  const [taxonomyOpen, setTaxonomyOpen] = useState(false);
+  const [sundayOpen, setSundayOpen] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   const reloadDepts = useCallback(async () => {
@@ -87,20 +95,30 @@ export function AdminToolsDrawer({
     if (!open) return;
     setSection(initialSection);
     setForceOpen(openForceRotationOnMount);
+    setSundayOpen(openSundayAuditOnMount);
+    setTaxonomyOpen(false);
     void reloadDepts();
-  }, [open, initialSection, openForceRotationOnMount, reloadDepts]);
+  }, [
+    open,
+    initialSection,
+    openForceRotationOnMount,
+    openSundayAuditOnMount,
+    reloadDepts,
+  ]);
 
   useEffect(() => {
     if (!open) return;
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") {
-        if (forceOpen) setForceOpen(false);
+        if (sundayOpen) setSundayOpen(false);
+        else if (taxonomyOpen) setTaxonomyOpen(false);
+        else if (forceOpen) setForceOpen(false);
         else onClose();
       }
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [open, forceOpen, onClose]);
+  }, [open, forceOpen, taxonomyOpen, sundayOpen, onClose]);
 
   useEffect(() => {
     if (!open) return;
@@ -166,6 +184,8 @@ export function AdminToolsDrawer({
               <Menu
                 onBulk={() => setSection("bulk")}
                 onForce={() => setForceOpen(true)}
+                onSunday={() => setSundayOpen(true)}
+                onTaxonomy={() => setTaxonomyOpen(true)}
                 onTargets={() => setSection("targets")}
                 onStore={() => setSection("store")}
                 onDiagnostics={() => setSection("diagnostics")}
@@ -208,11 +228,24 @@ export function AdminToolsDrawer({
         onClose={() => setForceOpen(false)}
         specialist={specialist}
         departments={departments}
-        initialDepartmentId={departments[0]?.id}
+        initialDepartmentId={
+          findFlooringDepartment(departments)?.id ?? departments[0]?.id
+        }
         onForced={() => {
           setForceOpen(false);
           void reloadDepts();
         }}
+      />
+      <SundayAuditAssignmentModal
+        open={sundayOpen}
+        onClose={() => setSundayOpen(false)}
+        specialist={specialist}
+        onChanged={() => void reloadDepts()}
+      />
+      <TaxonomyManagerModal
+        open={taxonomyOpen}
+        onClose={() => setTaxonomyOpen(false)}
+        departments={departments}
       />
     </>
   );
@@ -221,6 +254,8 @@ export function AdminToolsDrawer({
 function Menu({
   onBulk,
   onForce,
+  onSunday,
+  onTaxonomy,
   onTargets,
   onStore,
   onDiagnostics,
@@ -228,6 +263,8 @@ function Menu({
 }: {
   onBulk: () => void;
   onForce: () => void;
+  onSunday: () => void;
+  onTaxonomy: () => void;
   onTargets: () => void;
   onStore: () => void;
   onDiagnostics: () => void;
@@ -236,7 +273,9 @@ function Menu({
   return (
     <div className="grid gap-2">
       <ToolButton onClick={onBulk}>Bulk Generate Aisles</ToolButton>
+      <ToolButton onClick={onSunday}>Sunday Rotation Engine</ToolButton>
       <ToolButton onClick={onForce}>Trigger Weekly Rotation</ToolButton>
+      <ToolButton onClick={onTaxonomy}>Catalog Taxonomies</ToolButton>
       <ToolButton onClick={onTargets}>All-Department Bay Targets</ToolButton>
       <ToolButton onClick={onStore}>Store Number / Location</ToolButton>
       <Link

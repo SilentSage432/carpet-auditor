@@ -8,6 +8,7 @@
 import { useCallback, useEffect, useRef, useState, type TouchEvent } from "react";
 import {
   fetchShiftBriefing,
+  fetchStoreHealth,
   type ShiftBriefingClient,
 } from "@/lib/store-ops/client";
 import type { StoreSpecialist } from "@/lib/types";
@@ -47,7 +48,11 @@ export function ShiftBriefingCard({ specialist, refreshKey }: Props) {
     setLoading(true);
     setError(null);
     try {
-      const next = await fetchShiftBriefing(specialist);
+      const snapshot = await fetchStoreHealth(specialist);
+      const next = await fetchShiftBriefing(specialist, {
+        snapshot,
+        telemetry: snapshot.telemetry ?? null,
+      });
       setBriefing(next);
     } catch (err) {
       setError(

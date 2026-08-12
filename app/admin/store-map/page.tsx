@@ -5,6 +5,7 @@ import { StoreLocationGrid } from "@/components/admin/StoreLocationGrid";
 import { openAdminTools } from "@/components/hub/AdminToolsDrawer";
 import { NavigationHub } from "@/components/hub/NavigationHub";
 import { SessionGate } from "@/components/hub/SessionGate";
+import { VisualBayScannerModal } from "@/components/store-ops/VisualBayScannerModal";
 import { isMasterAdmin } from "@/lib/rbac";
 import {
   fetchDepartments,
@@ -50,6 +51,7 @@ function StoreMapBody({
   const [error, setError] = useState<string | null>(null);
   const [isOverviewOpen, setIsOverviewOpen] = useState(false);
   const [toggleBusyId, setToggleBusyId] = useState<string | null>(null);
+  const [bayScanOpen, setBayScanOpen] = useState(false);
   const currentWeek = isoWeekLabel();
 
   const reload = useCallback(async (member: StoreSpecialist) => {
@@ -124,21 +126,30 @@ function StoreMapBody({
       />
 
       <main className="mx-auto w-full max-w-lg flex-1 px-3 pb-28 pt-4">
-        <p className="mb-3 font-mono text-[11px] text-slate-400">
+        <p className="mb-3 font-mono text-[11px] text-zinc-400">
           Cron active · ISO week {currentWeek} ·{" "}
           <button
             type="button"
             onClick={() => openAdminTools({ section: "bulk" })}
-            className="font-semibold text-amber-200 underline-offset-2 hover:underline"
+            className="font-semibold text-amber-300 underline-offset-2 hover:underline"
           >
             Bulk generate / Admin tools
           </button>
         </p>
 
+        <button
+          type="button"
+          onClick={() => setBayScanOpen(true)}
+          className="btn-primary-glow mb-4 flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl px-4 text-sm"
+        >
+          <span aria-hidden>📷</span>
+          Snap Bay AI Audit
+        </button>
+
         {error ? (
-          <p className="mb-4 rounded-xl border border-red-500/40 bg-red-950/40 px-4 py-3 text-sm text-red-200">
+          <p className="glass-card mb-4 border-rose-500/40 px-4 py-3 text-sm text-rose-200">
             {error}
-            <span className="mt-1 block text-red-200/70">
+            <span className="mt-1 block text-rose-200/70">
               Check <code className="font-mono text-xs">.env.local</code> has
               real Supabase URL + service role key (not placeholders), restart{" "}
               <code className="font-mono text-xs">npm run dev</code>, and confirm
@@ -148,12 +159,12 @@ function StoreMapBody({
         ) : null}
 
         <div className="space-y-6">
-          <section className="overflow-hidden rounded-2xl border border-slate-700 bg-slate-900/60">
+          <section className="glass-card overflow-hidden !p-0">
             <button
               type="button"
               aria-expanded={isOverviewOpen}
               onClick={() => setIsOverviewOpen((open) => !open)}
-              className="flex min-h-14 w-full items-center justify-between gap-3 px-4 py-3 text-left"
+              className="flex min-h-[44px] w-full items-center justify-between gap-3 px-4 py-3 text-left"
             >
               <div className="min-w-0 flex-1">
                 <p className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-emerald-400">
@@ -161,7 +172,7 @@ function StoreMapBody({
                 </p>
                 {!isOverviewOpen ? (
                   <p className="mt-1">
-                    <span className="inline-flex rounded-lg bg-slate-800 px-2 py-1 font-mono text-[11px] font-semibold text-slate-200">
+                    <span className="inline-flex rounded-lg border border-zinc-700/80 bg-zinc-950/70 px-2 py-1 font-mono text-[11px] font-semibold text-zinc-200">
                       {loading
                         ? "Loading…"
                         : `${departmentOverview.length} Department${
@@ -170,24 +181,24 @@ function StoreMapBody({
                     </span>
                   </p>
                 ) : (
-                  <p className="mt-0.5 text-sm text-slate-400">
+                  <p className="mt-0.5 text-sm text-zinc-400">
                     High-level map status by department
                   </p>
                 )}
               </div>
               <span
                 aria-hidden
-                className="shrink-0 font-mono text-base text-slate-300"
+                className="shrink-0 font-mono text-base text-zinc-300"
               >
                 {isOverviewOpen ? "▲" : "▼"}
               </span>
             </button>
             {isOverviewOpen ? (
-              <div className="border-t border-slate-800 px-3 pb-4 pt-3">
+              <div className="border-t border-zinc-800/80 px-3 pb-4 pt-3">
                 {loading ? (
-                  <p className="text-sm text-slate-400">Loading departments…</p>
+                  <p className="text-sm text-zinc-400">Loading departments…</p>
                 ) : departmentOverview.length === 0 ? (
-                  <p className="rounded-2xl border border-dashed border-slate-700 px-4 py-6 text-center text-sm text-slate-400">
+                  <p className="rounded-2xl border border-dashed border-zinc-700 px-4 py-6 text-center text-sm text-zinc-400">
                     No departments yet. Seed departments, then use Admin Tools →
                     Bulk Generate.
                   </p>
@@ -198,22 +209,22 @@ function StoreMapBody({
                         key={row.id}
                         className={`rounded-2xl border px-4 py-3 ${
                           row.isActive
-                            ? "border-slate-700 bg-slate-900/80"
-                            : "border-slate-800 bg-slate-950/50 opacity-75"
+                            ? "border-zinc-700/80 bg-zinc-900/70"
+                            : "border-zinc-800 bg-zinc-950/50 opacity-75"
                         }`}
                       >
                         <div className="flex items-start justify-between gap-2">
                           <div>
-                            <p className="font-semibold text-slate-50">
+                            <p className="font-semibold text-white">
                               {row.name}
                             </p>
-                            <p className="font-mono text-[11px] text-slate-400">
+                            <p className="font-mono text-[11px] text-zinc-400">
                               {row.code} · target {row.weeklyTarget}/week ·{" "}
                               {row.isActive ? "cron on" : "paused"}
                             </p>
                           </div>
                           <div className="flex shrink-0 items-center gap-2">
-                            <span className="rounded-lg bg-slate-800 px-2 py-1 font-mono text-[10px] font-bold text-slate-300">
+                            <span className="glass-pill-cyan !rounded-lg px-2 py-1 font-mono text-[10px] !normal-case tracking-normal">
                               {row.aisles} aisle{row.aisles === 1 ? "" : "s"}
                             </span>
                             <button
@@ -226,7 +237,7 @@ function StoreMapBody({
                                 void toggleDepartment(row.id, !row.isActive)
                               }
                               className={`relative h-7 w-12 rounded-full transition ${
-                                row.isActive ? "bg-emerald-500" : "bg-slate-600"
+                                row.isActive ? "bg-emerald-500" : "bg-zinc-600"
                               } disabled:opacity-60`}
                             >
                               <span
@@ -237,7 +248,7 @@ function StoreMapBody({
                             </button>
                           </div>
                         </div>
-                        <p className="mt-2 text-sm text-slate-300">
+                        <p className="mt-2 text-sm text-zinc-300">
                           {row.total} tags · {row.active} active · {row.pending}{" "}
                           pending · {row.assigned} assigned
                         </p>
@@ -250,7 +261,7 @@ function StoreMapBody({
           </section>
 
           {loading ? (
-            <p className="text-sm text-slate-400">Loading locations…</p>
+            <p className="text-sm text-zinc-400">Loading locations…</p>
           ) : (
             <StoreLocationGrid
               specialist={specialist}
@@ -261,6 +272,12 @@ function StoreMapBody({
           )}
         </div>
       </main>
+
+      <VisualBayScannerModal
+        open={bayScanOpen}
+        onClose={() => setBayScanOpen(false)}
+        specialist={specialist}
+      />
     </div>
   );
 }

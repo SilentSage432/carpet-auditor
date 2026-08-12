@@ -44,6 +44,7 @@ export async function POST(request: Request) {
     const body = (await request.json().catch(() => ({}))) as {
       week?: string;
       snapshot?: StoreHealthSnapshot;
+      telemetry?: StoreHealthSnapshot["telemetry"];
       allow_local_fallback?: boolean;
     };
 
@@ -64,6 +65,8 @@ export async function POST(request: Request) {
             departmentId: null,
           });
 
+    const telemetry = body.telemetry ?? snapshot.telemetry ?? null;
+
     if (!isGeminiConfigured()) {
       if (body.allow_local_fallback === false) {
         return NextResponse.json(
@@ -74,7 +77,7 @@ export async function POST(request: Request) {
           { status: 503 }
         );
       }
-      const local = buildLocalShiftBriefing(snapshot);
+      const local = buildLocalShiftBriefing(snapshot, telemetry);
       return NextResponse.json({
         ...local,
         assigned_week: snapshot.assigned_week,
@@ -82,7 +85,7 @@ export async function POST(request: Request) {
       });
     }
 
-    const prompt = buildShiftBriefingPrompt(snapshot);
+    const prompt = buildShiftBriefingPrompt(snapshot, telemetry);
     const rawText = await callGeminiFlash(prompt);
     const parsed = parseGeminiJson<unknown>(rawText, "object");
     const briefing: ShiftBriefing = normalizeShiftBriefing(parsed, snapshot);

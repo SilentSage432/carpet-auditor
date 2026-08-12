@@ -1,8 +1,14 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect, useState } from "react";
+import { TaxonomyDrillDown } from "@/components/catalog/TaxonomyDrillDown";
 import { NavigationHub } from "@/components/hub/NavigationHub";
 import { SessionGate } from "@/components/hub/SessionGate";
+import {
+  getTaxonomyForHubDepartment,
+  type DepartmentTaxonomy,
+} from "@/lib/catalog/taxonomies";
 import {
   effectiveDepartment,
   isMasterAdmin,
@@ -40,7 +46,24 @@ function DepartmentBody({
   logout: () => void;
 }) {
   const dept = effectiveDepartment(specialist);
-  const meta = departmentMeta(dept);
+  const meta = departmentMeta(dept === "all" ? "flooring" : dept);
+  const [taxonomy, setTaxonomy] = useState<DepartmentTaxonomy | null>(null);
+
+  useEffect(() => {
+    function reload() {
+      const scope = dept === "all" ? "flooring" : dept;
+      setTaxonomy(
+        getTaxonomyForHubDepartment(scope, { includeOverrides: true })
+      );
+    }
+    reload();
+    window.addEventListener("deptsync:taxonomies-changed", reload);
+    window.addEventListener("storage", reload);
+    return () => {
+      window.removeEventListener("deptsync:taxonomies-changed", reload);
+      window.removeEventListener("storage", reload);
+    };
+  }, [dept]);
 
   return (
     <div className="flex min-h-dvh flex-col">
@@ -50,8 +73,8 @@ function DepartmentBody({
         storeNumber={storeNumber}
         onLogout={logout}
       />
-      <main className="mx-auto w-full max-w-lg flex-1 px-3 pb-28 pt-4">
-        <div className="mb-4 rounded-2xl border border-emerald-500/25 bg-slate-900/70 px-4 py-3">
+      <main className="mx-auto w-full max-w-lg flex-1 space-y-4 px-3 pb-28 pt-4">
+        <div className="mb-1 rounded-2xl border border-emerald-500/25 bg-slate-900/70 px-4 py-3">
           <p className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-emerald-400">
             Department Overview
           </p>
@@ -60,6 +83,8 @@ function DepartmentBody({
           </p>
           <p className="mt-1 text-sm text-slate-400">{meta.description}</p>
         </div>
+
+        {taxonomy ? <TaxonomyDrillDown taxonomy={taxonomy} /> : null}
 
         <div className="grid gap-2">
           <Link

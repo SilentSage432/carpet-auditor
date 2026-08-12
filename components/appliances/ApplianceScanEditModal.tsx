@@ -79,7 +79,7 @@ export function ApplianceScanEditModal({
     <div className="fixed inset-0 z-[60] flex items-end justify-center sm:items-center">
       <button
         type="button"
-        className="absolute inset-0 bg-slate-950/75 backdrop-blur-sm"
+        className="absolute inset-0 bg-black/60 backdrop-blur-md"
         aria-label="Close"
         onClick={onClose}
         disabled={saving}
@@ -88,15 +88,15 @@ export function ApplianceScanEditModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby="appliance-scan-edit-title"
-        className="relative z-[61] max-h-[90vh] w-full max-w-md overflow-y-auto rounded-t-2xl border border-slate-700 bg-slate-900 p-4 shadow-2xl sm:rounded-2xl"
+        className="relative z-[61] max-h-[90vh] w-full max-w-md overflow-y-auto glass-card rounded-t-2xl !rounded-b-none border-emerald-500/20 p-4 sm:!rounded-2xl"
       >
         <h2
           id="appliance-scan-edit-title"
-          className="text-lg font-bold text-slate-50"
+          className="text-lg font-bold text-white"
         >
           Edit Item {group.item_number}
         </h2>
-        <p className="mt-1 text-sm text-slate-400">
+        <p className="mt-1 text-sm text-zinc-400">
           {group.description ||
             `${group.category}${
               group.sub_category ? ` · ${group.sub_category}` : ""
@@ -105,7 +105,7 @@ export function ApplianceScanEditModal({
 
         <div className="mt-4 space-y-4">
           <div className="space-y-2">
-            <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+            <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
               Total quantity
             </p>
             <div className="flex items-center gap-2">
@@ -114,7 +114,7 @@ export function ApplianceScanEditModal({
                 aria-label="Decrease quantity"
                 onClick={() => bump(-1)}
                 disabled={quantity <= 0 || saving}
-                className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-slate-700 text-xl font-bold text-slate-200 disabled:opacity-40"
+                className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-zinc-700 text-xl font-bold text-zinc-200 disabled:opacity-40"
               >
                 −
               </button>
@@ -134,7 +134,7 @@ export function ApplianceScanEditModal({
                 aria-label="Increase quantity"
                 onClick={() => bump(1)}
                 disabled={saving}
-                className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-slate-700 text-xl font-bold text-slate-200 disabled:opacity-40"
+                className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-zinc-700 text-xl font-bold text-zinc-200 disabled:opacity-40"
               >
                 +
               </button>
@@ -157,7 +157,7 @@ export function ApplianceScanEditModal({
                   className={`rounded-lg border px-2.5 py-1.5 text-[11px] font-semibold transition ${
                     location === tag
                       ? "border-emerald-500/50 bg-emerald-950/50 text-emerald-300"
-                      : "border-slate-700 bg-slate-950 text-slate-400 active:bg-slate-800"
+                      : "border-zinc-700 bg-zinc-950 text-zinc-400 active:bg-zinc-800"
                   }`}
                 >
                   {tag}
@@ -168,7 +168,7 @@ export function ApplianceScanEditModal({
 
           <div className="space-y-2">
             <div className="flex items-center justify-between gap-2">
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+              <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
                 Serial numbers
               </p>
               <button
@@ -181,7 +181,7 @@ export function ApplianceScanEditModal({
               </button>
             </div>
             {quantity === 0 ? (
-              <p className="rounded-xl border border-dashed border-slate-700 px-3 py-3 text-center text-xs text-slate-500">
+              <p className="rounded-xl border border-dashed border-zinc-700 px-3 py-3 text-center text-xs text-zinc-500">
                 Quantity 0 removes all units for this SKU.
               </p>
             ) : (
@@ -206,7 +206,7 @@ export function ApplianceScanEditModal({
             type="button"
             onClick={onClose}
             disabled={saving}
-            className="flex h-12 items-center justify-center rounded-xl border border-slate-700 text-sm font-semibold text-slate-300 disabled:opacity-40"
+            className="flex h-12 items-center justify-center rounded-xl border border-zinc-700 text-sm font-semibold text-zinc-300 disabled:opacity-40"
           >
             Cancel
           </button>
@@ -214,7 +214,7 @@ export function ApplianceScanEditModal({
             type="button"
             onClick={submit}
             disabled={saving}
-            className="flex h-12 items-center justify-center rounded-xl bg-emerald-500 text-sm font-bold text-slate-950 disabled:opacity-40"
+            className="flex h-12 items-center justify-center btn-primary-glow rounded-xl text-sm disabled:opacity-40"
           >
             {saving ? "Saving…" : "Save changes"}
           </button>

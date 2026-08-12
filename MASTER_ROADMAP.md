@@ -70,6 +70,11 @@
 - [x] Flooring AI Remnant Aging & Variance Intelligence (`/api/flooring/ai-insights` + banner CTA)
 - [x] Zebra Shift Intelligence Briefing (`/api/store-health/ai-summary` + `ShiftBriefingCard`)
 - [x] Appliance Scan Anomaly Detection (`/api/appliances/ai-anomaly` + `ApplianceAnomalyWidget`)
+- [x] Department-specific catalog category taxonomies + AI Taxonomy Generator (`lib/catalog/taxonomies.ts`, `/api/catalog/ai-taxonomy`, `TaxonomyManagerModal`)
+- [x] Extend glassification to AuthWall / Store Map chrome / remaining overlay modals
+- [x] Store Audit Velocity & Health Telemetry Chart (`StoreHealthChart` + `lib/store-ops/telemetry` on `/dashboard` / store-health)
+- [x] Sunday Flooring Cycle Audit staging + Master Admin department context switcher
+- [x] AI Visual Bay Scan (`/api/store-ops/ai-bay-scan` + `VisualBayScannerModal` on Store Map / Cycle Audit)
 
 ## Next
 - [ ] JWT / claim-based RLS enforcing `store_number` (+ department) server-side
@@ -79,9 +84,8 @@
 - [ ] Background Sync API / periodic queue flush while tab backgrounded
 - [ ] Conflict resolution UI when offline edits collide
 - [ ] Retire or wire orphan `MarryBarcodeModal`
-- [ ] Department-specific catalog category taxonomies beyond flooring/appliances
-- [ ] Extend glassification to remaining modals / AuthWall / Store Map chrome (optional polish pass)
-- [ ] Additional Gemini product surfaces beyond the four AI ops widgets
+- [ ] Persist Sunday specialist bay assignments server-side (today: local store/week overlay)
+- [ ] Additional Gemini product surfaces beyond current AI ops widgets
 ## Non-goals
 - Pricing / margin engines
 - Replenishment recommendations

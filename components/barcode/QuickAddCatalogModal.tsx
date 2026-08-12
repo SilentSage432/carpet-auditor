@@ -130,7 +130,7 @@ export function QuickAddCatalogModal({
     <div className="fixed inset-0 z-[60] flex items-end justify-center sm:items-center">
       <button
         type="button"
-        className="absolute inset-0 bg-slate-950/75 backdrop-blur-sm"
+        className="absolute inset-0 bg-black/60 backdrop-blur-md"
         aria-label="Close quick-add dialog"
         onClick={onClose}
       />
@@ -138,12 +138,12 @@ export function QuickAddCatalogModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby="quick-add-title"
-        className="relative z-[61] max-h-[92dvh] w-full max-w-md overflow-y-auto rounded-t-2xl border border-slate-700 bg-slate-900 p-4 shadow-2xl sm:rounded-2xl"
+        className="relative z-[61] max-h-[92dvh] w-full max-w-md overflow-y-auto glass-card rounded-t-2xl !rounded-b-none border-emerald-500/20 p-4 sm:!rounded-2xl"
       >
-        <h2 id="quick-add-title" className="text-lg font-bold text-slate-50">
+        <h2 id="quick-add-title" className="text-lg font-bold text-white">
           ⚡ Quick-Add to SIMS Catalog
         </h2>
-        <p className="mt-1 text-sm text-slate-400">
+        <p className="mt-1 text-sm text-zinc-400">
           {isApplianceDomain
             ? "Unlinked barcode — add this appliance to the store master list and continue the audit."
             : "Unlinked barcode — add it to the store master list and continue the audit."}
@@ -194,7 +194,7 @@ export function QuickAddCatalogModal({
             />
           ) : (
             <label className="block space-y-1.5">
-              <span className="text-sm font-medium text-slate-200">Category</span>
+              <span className="text-sm font-medium text-zinc-200">Category</span>
               <select
                 value={category}
                 onChange={(e) => {
@@ -206,7 +206,7 @@ export function QuickAddCatalogModal({
                       : ""
                   );
                 }}
-                className="min-h-12 w-full rounded-xl border border-slate-800 bg-slate-950 px-3 text-base text-slate-100"
+                className="min-h-12 w-full rounded-xl border border-zinc-800 bg-zinc-950 px-3 text-base text-zinc-100"
               >
                 {FLOORING_CATEGORIES.map((c) => (
                   <option key={c} value={c}>
@@ -241,7 +241,7 @@ export function QuickAddCatalogModal({
                     className={`rounded-lg border px-2.5 py-1.5 text-[11px] font-semibold transition ${
                       simsLocation === tag
                         ? "border-emerald-500/50 bg-emerald-950/50 text-emerald-300"
-                        : "border-slate-700 bg-slate-950 text-slate-400"
+                        : "border-zinc-700 bg-zinc-950 text-zinc-400"
                     }`}
                   >
                     {tag}
@@ -252,12 +252,12 @@ export function QuickAddCatalogModal({
           </div>
           {!isApplianceDomain && mode === "roll" ? (
             <fieldset>
-              <legend className="mb-1.5 text-sm font-medium text-slate-200">
+              <legend className="mb-1.5 text-sm font-medium text-zinc-200">
                 Roll Width
               </legend>
               <div
                 role="group"
-                className="grid grid-cols-2 gap-1 rounded-xl border border-slate-800 bg-slate-950 p-1"
+                className="grid grid-cols-2 gap-1 rounded-xl border border-zinc-800 bg-zinc-950 p-1"
               >
                 {ROLL_WIDTH_OPTIONS_FT.map((ft) => {
                   const active =
@@ -271,8 +271,8 @@ export function QuickAddCatalogModal({
                       onClick={() => setSpecValue(String(ft))}
                       className={`flex min-h-12 items-center justify-center rounded-lg font-mono text-sm font-semibold transition ${
                         active
-                          ? "bg-emerald-500 text-slate-950 shadow"
-                          : "text-slate-400 hover:text-slate-100"
+                          ? "bg-emerald-500 text-zinc-950 shadow"
+                          : "text-zinc-400 hover:text-zinc-100"
                       }`}
                     >
                       {ft} ft
@@ -301,14 +301,14 @@ export function QuickAddCatalogModal({
           type="button"
           disabled={saving || !canSave}
           onClick={() => void handleSaveAndContinue()}
-          className="mt-4 flex min-h-12 w-full items-center justify-center rounded-xl bg-emerald-500 text-sm font-bold text-slate-950 disabled:opacity-40"
+          className="mt-4 flex min-h-12 w-full items-center justify-center btn-primary-glow rounded-xl text-sm disabled:opacity-40"
         >
           {saving ? "Saving…" : "Save & Continue Audit"}
         </button>
         <button
           type="button"
           onClick={onClose}
-          className="mt-2 flex min-h-12 w-full items-center justify-center rounded-xl border border-slate-700 text-sm font-semibold text-slate-300"
+          className="mt-2 flex min-h-12 w-full items-center justify-center rounded-xl border border-zinc-700 text-sm font-semibold text-zinc-300"
         >
           Cancel
         </button>

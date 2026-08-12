@@ -47,7 +47,7 @@ type NumberFieldProps = {
 } & ScanCapableProps;
 
 const baseInput =
-  "min-h-12 h-12 w-full rounded-xl border border-slate-800 bg-slate-950 px-4 text-base font-semibold text-slate-100 outline-none transition focus:border-emerald-500";
+  "min-h-12 h-12 w-full rounded-xl border border-zinc-700/80 bg-zinc-950/80 px-4 text-base font-semibold text-zinc-100 outline-none transition focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/50";
 
 function assignRef<T>(ref: Ref<T> | undefined, node: T | null) {
   if (!ref) return;
@@ -184,7 +184,7 @@ export function NumberField({
   const input = (
     <div className="relative">
       {leftIcon ? (
-        <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-slate-500">
+        <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-zinc-500">
           {leftIcon}
         </span>
       ) : null}
@@ -231,7 +231,7 @@ export function NumberField({
 
   return (
     <label className={`block space-y-1.5 ${className ?? ""}`}>
-      <span className="text-sm font-medium text-slate-200">{label}</span>
+      <span className="glass-label">{label}</span>
       {input}
     </label>
   );
@@ -333,7 +333,7 @@ export function TextField({
   const input = (
     <div className="relative">
       {leftIcon ? (
-        <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-slate-500">
+        <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-zinc-500">
           {leftIcon}
         </span>
       ) : null}
@@ -375,7 +375,7 @@ export function TextField({
           aria-label={showPassword ? "Hide password" : "Show password"}
           aria-pressed={showPassword}
           onClick={() => setShowPassword((v) => !v)}
-          className="absolute inset-y-0 right-1 flex w-11 items-center justify-center rounded-lg text-slate-400 transition active:scale-95 active:bg-slate-800 hover:text-slate-200"
+          className="absolute inset-y-0 right-1 flex w-11 items-center justify-center rounded-lg text-zinc-400 transition active:scale-95 active:bg-zinc-800 hover:text-zinc-200"
         >
           <EyeIcon open={showPassword} />
         </button>
@@ -387,7 +387,7 @@ export function TextField({
 
   return (
     <label className={`block space-y-1.5 ${className ?? ""}`}>
-      <span className="text-sm font-medium text-slate-200">{label}</span>
+      <span className="glass-label">{label}</span>
       {input}
     </label>
   );

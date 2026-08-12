@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { QuickAddCatalogModal } from "@/components/barcode/QuickAddCatalogModal";
 import { SimsLocationFinder } from "@/components/catalog/SimsLocationFinder";
 import { FlooringAIInsightBanner } from "@/components/flooring/FlooringAIInsightBanner";
+import { SundayAuditStagingCard } from "@/components/admin/SundayAuditStagingCard";
+import { VisualBayScannerModal } from "@/components/store-ops/VisualBayScannerModal";
 import { NumberField, TextField } from "@/components/ui/NumberField";
 import { ApplyMarkdownModal } from "@/components/hub/ApplyMarkdownModal";
 import { AuditReportModal } from "@/components/hub/AuditReportModal";
@@ -154,6 +156,7 @@ export function CycleAuditSection({
   const [reportOpen, setReportOpen] = useState(false);
   const [markdownTarget, setMarkdownTarget] = useState<Remnant | null>(null);
   const [simsFinderOpen, setSimsFinderOpen] = useState(false);
+  const [bayScanOpen, setBayScanOpen] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [undoToast, setUndoToast] = useState<{
@@ -663,6 +666,33 @@ export function CycleAuditSection({
         onRemnantsChange={onRemnantsChange}
         onRequestMarkdown={setMarkdownTarget}
       />
+
+      {activeSpecialist ? (
+        <SundayAuditStagingCard
+          specialist={activeSpecialist}
+          forceShow
+        />
+      ) : null}
+
+      {activeSpecialist ? (
+        <button
+          type="button"
+          onClick={() => setBayScanOpen(true)}
+          className="btn-primary-glow flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl px-4 text-sm"
+        >
+          <span aria-hidden>📷</span>
+          Snap Bay AI Audit
+        </button>
+      ) : null}
+
+      {activeSpecialist ? (
+        <VisualBayScannerModal
+          open={bayScanOpen}
+          onClose={() => setBayScanOpen(false)}
+          specialist={activeSpecialist}
+          meta={{ department_code: "flooring" }}
+        />
+      ) : null}
 
       {undoToast ? (
         <div

@@ -307,6 +307,7 @@ Stacked cards (~1.5–2 handheld screens):
 | **SimsLocationFinder** | `SimsLocationFinder.tsx` | Catalog CTA + Audit 📍 SIMS Stock | Search drawer / dialog |
 | **ApplyMarkdownModal** | `ApplyMarkdownModal.tsx` | Remnant markdown CTA | % Off / Fixed $ + preview |
 | **MarryBarcodeModal** | `MarryBarcodeModal.tsx` | *Not currently wired* | Orphan — Select Existing / Create New (superseded by Quick-Add) |
+| **VisualBayScannerModal** | `store-ops/VisualBayScannerModal.tsx` | Store Map CTA / bay sheet / Cycle Audit **📷 Snap Bay AI Audit** | Camera or upload → Gemini scan beam → results drawer (z-90) |
 | Pin / Sync toasts | `app/page.tsx` | PIN save / online flush | Fixed top status pills |
 
 ### Z-index stack

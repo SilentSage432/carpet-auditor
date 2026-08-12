@@ -1,17 +1,31 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { SundayAuditStagingCard } from "@/components/admin/SundayAuditStagingCard";
 import { StoreHealthCard } from "@/components/StoreHealthCard";
 import { ShowroomQuickTouchCard } from "@/components/dashboard/ShowroomQuickTouchCard";
 import { WeeklyRotationList } from "@/components/dashboard/WeeklyRotationList";
 import { NavigationHub } from "@/components/hub/NavigationHub";
 import { SessionGate } from "@/components/hub/SessionGate";
 import { ShiftBriefingCard } from "@/components/store-ops/ShiftBriefingCard";
+import { StoreHealthChart } from "@/components/store-ops/StoreHealthChart";
+import {
+  ADMIN_DEPT_CONTEXT_EVENT,
+  isFlooringWorkingContext,
+  workingDepartment,
+} from "@/lib/admin-department-context";
+import { isMasterAdmin } from "@/lib/rbac";
 import { actorFromSpecialist } from "@/lib/store-ops/auth";
-import { fetchThisWeekRotations } from "@/lib/store-ops/client";
+import {
+  fetchDepartments,
+  fetchThisWeekRotations,
+} from "@/lib/store-ops/client";
+import {
+  filterFlooringRotations,
+  findFlooringDepartment,
+} from "@/lib/store-ops/sunday-audit";
 import type { WeeklyRotationWithLocation } from "@/lib/store-ops/types";
-import { effectiveDepartment, isMasterAdmin } from "@/lib/rbac";
 import { departmentMeta, type StoreSpecialist } from "@/lib/types";
 
 export default function SupervisorDashboardPage() {
@@ -42,18 +56,30 @@ function DashboardBody({
 }) {
   const [week, setWeek] = useState("");
   const [rotations, setRotations] = useState<WeeklyRotationWithLocation[]>([]);
+  const [flooringDeptId, setFlooringDeptId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [healthKey, setHealthKey] = useState(0);
-  const dept = departmentMeta(effectiveDepartment(specialist));
+  const [contextTick, setContextTick] = useState(0);
+  const working = workingDepartment(specialist);
+  const dept = departmentMeta(working === "all" ? "flooring" : working);
+  const flooringFocus =
+    isFlooringWorkingContext(specialist) ||
+    (!isMasterAdmin(specialist) &&
+      (specialist.assigned_department === "flooring" ||
+        specialist.assigned_department == null));
 
   const reload = useCallback(async (member: StoreSpecialist) => {
     setLoading(true);
     setError(null);
     try {
-      const data = await fetchThisWeekRotations(member);
+      const [data, depts] = await Promise.all([
+        fetchThisWeekRotations(member),
+        fetchDepartments(member).catch(() => []),
+      ]);
       setWeek(data.assigned_week || "");
       setRotations(data.rotations ?? []);
+      setFlooringDeptId(findFlooringDepartment(depts)?.id ?? null);
       setHealthKey((k) => k + 1);
     } catch {
       setWeek("");
@@ -66,7 +92,20 @@ function DashboardBody({
 
   useEffect(() => {
     void reload(specialist);
-  }, [specialist, reload]);
+  }, [specialist, reload, contextTick]);
+
+  useEffect(() => {
+    function onCtx() {
+      setContextTick((n) => n + 1);
+    }
+    window.addEventListener(ADMIN_DEPT_CONTEXT_EVENT, onCtx);
+    return () => window.removeEventListener(ADMIN_DEPT_CONTEXT_EVENT, onCtx);
+  }, []);
+
+  const displayRotations = useMemo(() => {
+    if (!flooringFocus || !flooringDeptId) return rotations;
+    return filterFlooringRotations(rotations, flooringDeptId);
+  }, [rotations, flooringFocus, flooringDeptId]);
 
   return (
     <div className="flex min-h-dvh flex-col">
@@ -78,7 +117,13 @@ function DashboardBody({
       />
 
       <main className="mx-auto w-full max-w-lg flex-1 px-3 pb-28 pt-4">
+        <SundayAuditStagingCard
+          specialist={specialist}
+          refreshKey={healthKey}
+          forceShow={flooringFocus || isMasterAdmin(specialist)}
+        />
         <ShiftBriefingCard specialist={specialist} refreshKey={healthKey} />
+        <StoreHealthChart specialist={specialist} refreshKey={healthKey} />
         <StoreHealthCard specialist={specialist} refreshKey={healthKey} />
 
         <ShowroomQuickTouchCard
@@ -103,21 +148,27 @@ function DashboardBody({
         )}
 
         {error ? (
-          <p className="mb-4 rounded-xl border border-red-500/40 bg-red-950/40 px-3 py-2 text-sm text-red-200">
+          <p className="mb-4 rounded-xl border border-rose-500/40 bg-rose-950/40 px-3 py-2 text-sm text-rose-200">
             {error}
           </p>
         ) : null}
 
-        {loading ? (
-          <p className="text-sm text-slate-400">Loading this week&apos;s bays…</p>
-        ) : (
-          <WeeklyRotationList
-            specialist={specialist}
-            assignedWeek={week}
-            rotations={rotations}
-            onRefresh={() => void reload(specialist)}
-          />
-        )}
+        <section className="mb-3">
+          <p className="glass-subtitle mb-2 text-emerald-400">
+            Pending Cycle Audits
+            {flooringFocus ? " · D23 Flooring" : ""}
+          </p>
+          {loading ? (
+            <p className="text-sm text-zinc-400">Loading this week&apos;s bays…</p>
+          ) : (
+            <WeeklyRotationList
+              specialist={specialist}
+              assignedWeek={week}
+              rotations={displayRotations}
+              onRefresh={() => void reload(specialist)}
+            />
+          )}
+        </section>
       </main>
     </div>
   );

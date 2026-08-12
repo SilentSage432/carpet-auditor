@@ -8,11 +8,19 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { QuickAddCatalogModal } from "@/components/barcode/QuickAddCatalogModal";
+import {
+  TaxonomyDrillDown,
+  type TaxonomySelection,
+} from "@/components/catalog/TaxonomyDrillDown";
 import { SimsLocationFinder } from "@/components/catalog/SimsLocationFinder";
 import { NumberField, TextField } from "@/components/ui/NumberField";
 import { AuditReportModal } from "@/components/hub/AuditReportModal";
 import { resolveScan, sanitizeBarcodeScan } from "@/lib/barcode";
 import { findCatalogBySkuOrBarcode } from "@/lib/catalog";
+import {
+  getTaxonomyForHubDepartment,
+  type DepartmentTaxonomy,
+} from "@/lib/catalog/taxonomies";
 import { blurActiveInput } from "@/lib/focus-input";
 import { useGlobalBarcodeScanner } from "@/lib/hardware-scanner";
 import { toNumber } from "@/lib/number-input";
@@ -26,6 +34,12 @@ import {
   type OperationalDepartment,
   type StoreSpecialist,
 } from "@/lib/types";
+
+function loadTaxonomy(
+  department: OperationalDepartment
+): DepartmentTaxonomy | null {
+  return getTaxonomyForHubDepartment(department, { includeOverrides: true });
+}
 
 type Props = {
   department: OperationalDepartment;
@@ -76,6 +90,11 @@ export function DepartmentAuditSection({
   const [reportOpen, setReportOpen] = useState(false);
   const [summaryExpanded, setSummaryExpanded] = useState(false);
   const [showAll, setShowAll] = useState(false);
+  const [taxonomy, setTaxonomy] = useState<DepartmentTaxonomy | null>(() =>
+    loadTaxonomy(department)
+  );
+  const [taxonomySelection, setTaxonomySelection] =
+    useState<TaxonomySelection | null>(null);
 
   const simsSuggestions = useMemo(
     () => [
@@ -90,6 +109,26 @@ export function DepartmentAuditSection({
   const dismissKeyboard = useCallback(() => {
     blurActiveInput(skuInputRef);
   }, []);
+
+  useEffect(() => {
+    setTaxonomy(loadTaxonomy(department));
+    setTaxonomySelection(null);
+  }, [department]);
+
+  useEffect(() => {
+    function onTaxonomyChange() {
+      setTaxonomy(loadTaxonomy(department));
+    }
+    window.addEventListener("deptsync:taxonomies-changed", onTaxonomyChange);
+    window.addEventListener("storage", onTaxonomyChange);
+    return () => {
+      window.removeEventListener(
+        "deptsync:taxonomies-changed",
+        onTaxonomyChange
+      );
+      window.removeEventListener("storage", onTaxonomyChange);
+    };
+  }, [department]);
 
   useEffect(() => {
     let cancelled = false;
@@ -115,11 +154,21 @@ export function DepartmentAuditSection({
       department.replace(/_/g, " "),
       department,
     ];
-    return shiftAudits.filter((a) => {
+    let rows = shiftAudits.filter((a) => {
       const hay = `${a.sims_location} ${a.carpet_name}`.toLowerCase();
       return needles.some((n) => n && hay.includes(n));
     });
-  }, [shiftAudits, meta, department]);
+    if (taxonomySelection?.subcategory) {
+      const sub = taxonomySelection.subcategory.toLowerCase();
+      const cat = taxonomySelection.category.name.toLowerCase();
+      rows = rows.filter((a) => {
+        const hay =
+          `${a.sub_category} ${a.carpet_name} ${a.sims_location}`.toLowerCase();
+        return hay.includes(sub) || hay.includes(cat);
+      });
+    }
+    return rows;
+  }, [shiftAudits, meta, department, taxonomySelection]);
 
   const shiftUnits = displayShift.reduce(
     (sum, a) => sum + (a.box_count ?? 0),
@@ -206,10 +255,15 @@ export function DepartmentAuditSection({
       const tag =
         simsLocation.trim() ||
         `${meta.label} Bay`;
+      const sub =
+        taxonomySelection?.subcategory?.trim() ||
+        taxonomySelection?.category.name ||
+        "";
       const { record, offline } = await saveAudit({
         sku: sku.trim(),
         carpet_name: name.trim() || `${meta.label} Item`,
         category: "Accessories",
+        sub_category: sub,
         sims_location: tag,
         location_type: location,
         measurement_inches: 0,
@@ -324,6 +378,34 @@ export function DepartmentAuditSection({
         ) : null}
       </section>
 
+      {taxonomy ? (
+        <div className="space-y-2">
+          <TaxonomyDrillDown
+            taxonomy={taxonomy}
+            selected={taxonomySelection}
+            onSelect={setTaxonomySelection}
+          />
+          {taxonomySelection ? (
+            <p className="px-1 text-xs text-zinc-400">
+              Folder filter:{" "}
+              <span className="font-semibold text-emerald-300">
+                {taxonomySelection.category.name}
+                {taxonomySelection.subcategory
+                  ? ` / ${taxonomySelection.subcategory}`
+                  : ""}
+              </span>
+              <button
+                type="button"
+                onClick={() => setTaxonomySelection(null)}
+                className="ml-2 font-semibold text-zinc-500 underline"
+              >
+                Clear
+              </button>
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+
       {statusMsg ? (
         <p
           role="status"
@@ -348,6 +430,16 @@ export function DepartmentAuditSection({
             Mode · Units
           </span>
         </div>
+
+        {taxonomySelection?.subcategory ? (
+          <p className="rounded-xl border border-cyan-500/30 bg-cyan-950/30 px-3 py-2 text-xs text-cyan-100">
+            Logging under{" "}
+            <span className="font-semibold">
+              {taxonomySelection.category.name} /{" "}
+              {taxonomySelection.subcategory}
+            </span>
+          </p>
+        ) : null}
 
         <NumberField
           label="Item # / SKU / Barcode"
@@ -499,7 +591,9 @@ export function DepartmentAuditSection({
                       {a.sku} · {a.carpet_name || meta.label}
                     </p>
                     <p className="text-xs text-slate-400">
-                      {a.box_count ?? 0} units · {locationLabel(a.location_type)} ·{" "}
+                      {a.box_count ?? 0} units
+                      {a.sub_category ? ` · ${a.sub_category}` : ""} ·{" "}
+                      {locationLabel(a.location_type)} ·{" "}
                       {a.sims_location || "—"} · {formatTime(a.created_at)}
                     </p>
                   </div>

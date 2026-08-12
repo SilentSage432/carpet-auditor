@@ -135,7 +135,7 @@ export function AuditReportModal({
     <div className="fixed inset-0 z-[70] flex items-end justify-center sm:items-center print:static print:inset-auto print:z-auto print:block">
       <button
         type="button"
-        className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm print:hidden"
+        className="absolute inset-0 bg-black/60 backdrop-blur-md print:hidden"
         aria-label="Close report"
         onClick={onClose}
       />
@@ -144,10 +144,10 @@ export function AuditReportModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby="audit-report-title"
-        className="relative z-[71] flex max-h-[92dvh] w-full max-w-3xl flex-col overflow-hidden rounded-t-2xl border border-slate-700 bg-slate-900 shadow-2xl sm:rounded-2xl print:max-h-none print:max-w-none print:overflow-visible print:rounded-none print:border-0 print:bg-white print:shadow-none"
+        className="relative z-[71] glass-card flex max-h-[92dvh] w-full max-w-3xl flex-col overflow-hidden !rounded-t-2xl !rounded-b-none border-emerald-500/20 sm:!rounded-2xl print:max-h-none print:max-w-none print:overflow-visible print:rounded-none print:border-0 print:bg-white print:shadow-none"
       >
         {/* Screen-only chrome */}
-        <div className="no-print shrink-0 space-y-3 border-b border-slate-800 p-4">
+        <div className="no-print shrink-0 space-y-3 border-b border-zinc-800 p-4">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
               <p className="text-[10px] font-bold uppercase tracking-wide text-emerald-400">
@@ -155,18 +155,18 @@ export function AuditReportModal({
               </p>
               <h2
                 id="audit-report-title"
-                className="mt-0.5 truncate text-lg font-bold text-slate-50"
+                className="mt-0.5 truncate text-lg font-bold text-white"
               >
                 📊 Audit Report
               </h2>
-              <p className="mt-0.5 truncate text-xs text-slate-400">
+              <p className="mt-0.5 truncate text-xs text-zinc-400">
                 {reportSubject(ctx)}
               </p>
             </div>
             <button
               type="button"
               onClick={onClose}
-              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-700 text-slate-300"
+              className="flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center rounded-xl border border-zinc-700 text-zinc-300"
               aria-label="Close"
             >
               ✕
@@ -191,7 +191,7 @@ export function AuditReportModal({
             <button
               type="button"
               onClick={() => void handleCopy()}
-              className="flex min-h-12 items-center justify-center gap-1.5 rounded-xl border border-slate-600 bg-slate-800 px-3 text-sm font-bold text-slate-100 active:scale-[0.98]"
+              className="flex min-h-12 items-center justify-center gap-1.5 rounded-xl border border-zinc-600 bg-zinc-800 px-3 text-sm font-bold text-zinc-100 active:scale-[0.98]"
             >
               {copied ? "✓ Copied" : "📋 Copy Summary"}
             </button>
@@ -212,16 +212,16 @@ export function AuditReportModal({
           id="audit-report-print-area"
           className="audit-report-print min-h-0 flex-1 overflow-y-auto p-4 print:overflow-visible print:p-0"
         >
-          <header className="report-header border-b border-slate-700 pb-3 print:border-black print:pb-2">
+          <header className="report-header border-b border-zinc-700 pb-3 print:border-black print:pb-2">
             <p className="text-xs font-semibold uppercase tracking-wide text-emerald-400 print:text-black">
               DeptSync Hub · Lowe&apos;s Store #{ctx.storeNumber}
             </p>
-            <h3 className="mt-1 text-base font-bold text-slate-50 print:text-lg print:text-black">
+            <h3 className="mt-1 text-base font-bold text-white print:text-lg print:text-black">
               {reportTitle(ctx)}
             </h3>
-            <dl className="mt-2 grid gap-1 text-xs text-slate-300 print:text-black sm:grid-cols-2">
+            <dl className="mt-2 grid gap-1 text-xs text-zinc-300 print:text-black sm:grid-cols-2">
               <div>
-                <dt className="inline text-slate-500 print:text-black">
+                <dt className="inline text-zinc-500 print:text-black">
                   Audit Date:{" "}
                 </dt>
                 <dd className="inline font-mono">
@@ -229,7 +229,7 @@ export function AuditReportModal({
                 </dd>
               </div>
               <div>
-                <dt className="inline text-slate-500 print:text-black">
+                <dt className="inline text-zinc-500 print:text-black">
                   Audited By:{" "}
                 </dt>
                 <dd className="inline font-semibold">
@@ -237,7 +237,7 @@ export function AuditReportModal({
                 </dd>
               </div>
               <div className="sm:col-span-2">
-                <dt className="inline text-slate-500 print:text-black">
+                <dt className="inline text-zinc-500 print:text-black">
                   Network / Store Sync:{" "}
                 </dt>
                 <dd className="inline">{ctx.networkLabel}</dd>
@@ -276,9 +276,9 @@ export function AuditReportModal({
           {hasVarianceRows ? (
             <section
               aria-label="Discrepancy summary"
-              className="mt-3 rounded-xl border border-slate-700 bg-slate-950/60 p-3 text-xs text-slate-200 print:rounded-none print:border print:border-black print:bg-white print:text-black"
+              className="mt-3 rounded-xl border border-zinc-700 bg-zinc-950/60 p-3 text-xs text-zinc-200 print:rounded-none print:border print:border-black print:bg-white print:text-black"
             >
-              <p className="font-bold uppercase tracking-wide text-slate-400 print:text-black">
+              <p className="font-bold uppercase tracking-wide text-zinc-400 print:text-black">
                 Shortage / Overage Summary
               </p>
               <p className="mt-1 font-mono">
@@ -294,19 +294,19 @@ export function AuditReportModal({
               </p>
             </section>
           ) : (
-            <p className="mt-3 text-xs text-slate-500 print:text-black">
+            <p className="mt-3 text-xs text-zinc-500 print:text-black">
               Discrepancy summary unavailable — no system on-hand values entered.
             </p>
           )}
 
           <section aria-label="Itemized audit breakdown" className="mt-4 print:mt-3">
-            <h4 className="mb-2 text-xs font-bold uppercase tracking-wide text-slate-400 print:text-black">
+            <h4 className="mb-2 text-xs font-bold uppercase tracking-wide text-zinc-400 print:text-black">
               Itemized Audit Breakdown
             </h4>
-            <div className="overflow-x-auto rounded-xl border border-slate-700 print:overflow-visible print:rounded-none print:border print:border-black">
+            <div className="overflow-x-auto rounded-xl border border-zinc-700 print:overflow-visible print:rounded-none print:border print:border-black">
               <table className="audit-report-table w-full min-w-[640px] border-collapse text-left text-[11px] print:min-w-0 print:text-[9pt]">
                 <thead>
-                  <tr className="border-b border-slate-700 bg-slate-950 text-slate-400 print:border-black print:bg-white print:text-black">
+                  <tr className="border-b border-zinc-700 bg-zinc-950 text-zinc-400 print:border-black print:bg-white print:text-black">
                     <th className="px-2 py-2 font-bold">SIMS Bay</th>
                     <th className="px-2 py-2 font-bold">Item # / SKU</th>
                     <th className="px-2 py-2 font-bold">Description</th>
@@ -322,7 +322,7 @@ export function AuditReportModal({
                     <tr>
                       <td
                         colSpan={8}
-                        className="px-2 py-6 text-center text-slate-500 print:text-black"
+                        className="px-2 py-6 text-center text-zinc-500 print:text-black"
                       >
                         No audit entries to report.
                       </td>
@@ -333,7 +333,7 @@ export function AuditReportModal({
                       return (
                         <tr
                           key={a.id}
-                          className="border-b border-slate-800 text-slate-200 print:border-black print:text-black"
+                          className="border-b border-zinc-800 text-zinc-200 print:border-black print:text-black"
                         >
                           <td className="px-2 py-1.5 font-mono">
                             {a.sims_location || "—"}
@@ -354,7 +354,7 @@ export function AuditReportModal({
                           <td className="px-2 py-1.5 font-mono">
                             {qtyCell(a)}
                             {a.variance_clf != null && kindVar !== "none" ? (
-                              <span className="mt-0.5 block text-[10px] text-slate-500 print:text-black">
+                              <span className="mt-0.5 block text-[10px] text-zinc-500 print:text-black">
                                 {formatVariance(a.variance_clf)}
                               </span>
                             ) : null}
@@ -369,7 +369,7 @@ export function AuditReportModal({
             </div>
           </section>
 
-          <footer className="mt-4 text-[10px] text-slate-500 print:mt-3 print:text-black">
+          <footer className="mt-4 text-[10px] text-zinc-500 print:mt-3 print:text-black">
             Generated by DeptSync Hub · {audits.length} row
             {audits.length === 1 ? "" : "s"} · Store #{ctx.storeNumber}
           </footer>
@@ -381,11 +381,11 @@ export function AuditReportModal({
 
 function MetricCard({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-xl border border-slate-700 bg-slate-950/70 p-2.5 print:rounded-none print:border print:border-black print:bg-white">
-      <p className="text-[9px] font-bold uppercase tracking-wide text-slate-500 print:text-black">
+    <div className="rounded-xl border border-zinc-700 bg-zinc-950/70 p-2.5 print:rounded-none print:border print:border-black print:bg-white">
+      <p className="text-[9px] font-bold uppercase tracking-wide text-zinc-500 print:text-black">
         {label}
       </p>
-      <p className="mt-0.5 font-mono text-lg font-bold tabular-nums text-slate-50 print:text-black">
+      <p className="mt-0.5 font-mono text-lg font-bold tabular-nums text-white print:text-black">
         {value}
       </p>
     </div>

@@ -1,5 +1,46 @@
 # DeptSync Hub — Development Journal
 
+## 2026-08-11 — AI Visual Bay Scan (Gemini multimodal)
+
+### Shipped
+- Domain module `lib/store-ops/ai-bay-scan.ts` — prompt, normalize, local fallback for carton/pallet estimates + cleanliness score + severity-ranked issues.
+- `POST /api/store-ops/ai-bay-scan` — Store Ops actor auth; accepts base64 / data-URL bay photo + optional aisle/bay/department_code; Gemini Flash multimodal; graceful local fallback when `GEMINI_API_KEY` missing.
+- Client `scanBayVisual` + `VisualBayScannerModal` (live camera / Zebra upload, scan beam animation, obsidian results drawer with severity pills + quick actions).
+- Mounted **📷 Snap Bay AI Audit** on Store Map header, bay actions sheet (`StoreLocationGrid`), and Flooring Cycle Audit.
+
+## 2026-08-11 — Sunday Flooring Cycle Audit staging + Master Admin dept context
+
+### Shipped
+- Master Admin **My Department Context** pin (`lib/admin-department-context.ts` + `AdminDepartmentSwitcher` in NavigationHub) — Full Store / D23 Flooring / D35 Appliances / Plumbing; privileges unchanged.
+- `SundayAuditAssignmentModal` + glowing `SundayAuditStagingCard` — pending Flooring weekly bays, specialist assignment dropdowns, **Auto-Assign All to Me (Flooring DS)**, Stage/Draw 12 bays (composes existing generate API).
+- Surfaced on `/dashboard` (Pending Cycle Audits), Cycle Audit tab header, Admin Tools → **Sunday Rotation Engine**, and `/flooring` deep link → `/?section=audit` with D23 pin.
+- Person assignments persist locally per store/week (`lib/store-ops/sunday-audit.ts`); bay engine ownership stays in rotations/cron.
+
+## 2026-08-11 — Store Audit Velocity & Health Telemetry Chart
+
+### Shipped
+- `lib/store-ops/telemetry.ts` — hourly shift velocity (06:00–22:00), linear target baseline to 100%, exception-spike flags; Overall / D23 Flooring / D35 Appliances series.
+- `GET /api/store-health` snapshot now includes `telemetry` (composed from `weekly_rotations.completed_at` + `rotation_exceptions`).
+- `StoreHealthChart` glass SVG (Dexcom-style neon curve + dashed target + amber/rose spikes) mounted on `/dashboard` under Shift Briefing.
+- `POST /api/store-health/ai-summary` + shift-briefing prompt fold `audit_velocity` into Gemini / local 3-bullet briefing; client passes telemetry from health fetch.
+
+## 2026-08-11 — Obsidian-glass pass: AuthWall, Store Map, modals
+
+### Shipped
+- Extended glass tokens in `app/globals.css`: stronger `glass-input` emerald rings, `.glass-backdrop`, `.glass-void`, `.glass-label`, bay status helpers (`.glass-bay-complete` / pending / cyan).
+- `AuthWall` floats a `.glass-card` over `.glass-void` with emerald glow; PIN pads / WebAuthn / emergency + phone-reset CTAs use `min-h-[44px]` + emerald focus / `btn-primary-glow`.
+- Store Map header + department overview + `StoreLocationGrid` / bay action sheet glassified; S/T cells use high-contrast emerald / amber / cyan status glows.
+- Remaining overlay modals (PIN, credentials, Quick-Add, Marry, Confirm, Audit Report, Sims finder, Force Rotation, etc.) use `bg-black/60 backdrop-blur-md` backdrops + `.glass-card` bodies; shared `NumberField`/`TextField` focus rings match glass tokens.
+- Auth session mechanics and Supabase calls unchanged (presentation-only).
+
+## 2026-08-11 — Department Catalog Taxonomies + AI Taxonomy Generator
+
+### Shipped
+- Central registry `lib/catalog/taxonomies.ts` maps Lowe's catalog codes (D21 Lumber → D52 Tools) to default category / sub-category trees; hub departments resolve via `taxonomyCodeForHubDepartment`; AI overrides persist in `localStorage` (`deptsync_catalog_taxonomies`).
+- Domain AI module `lib/catalog/ai-taxonomy.ts` + `POST /api/catalog/ai-taxonomy` — Gemini Flash generates department taxonomies; graceful registry fallback when `GEMINI_API_KEY` missing.
+- `TaxonomyManagerModal` (glass-card) in Admin Tools → **Catalog Taxonomies** with ✨ Generate / Refresh AI Taxonomy.
+- `TaxonomyDrillDown` accordion on `DepartmentAuditSection` + `/department` overview; selected sub-category stamps audit `sub_category` and filters today's logs.
+
 ## 2026-08-11 — Appliance Scan Anomaly Detection
 
 ### Shipped
@@ -45,6 +86,7 @@
 - Applied to `NavigationHub` / `HubChrome` headers + drawers + bottom nav (backdrop-blur glass panels).
 - `BulkLocationGenerator` form + CSV dropzone glassified with emerald focus rings and cyan batch CTA.
 - Flooring / Appliances / Dept Audit section cards use `.glass-card` + emerald/cyan mode pills; variance accents updated in `lib/variance.ts`.
+- AuthWall / PIN / credentials, Store Map + location grid, and remaining overlay modals use `.glass-void` / `.glass-backdrop` / `.glass-card` with Zebra `min-h-[44px]` targets (2026-08-11 pass).
 - No changes to sync queue, Supabase clients, or audit state logic.
 
 ## 2026-08-11 — Emergency unlock: update-only (no username insert clash)

@@ -89,7 +89,7 @@ export function QuickAddApplianceModal({
     <div className="fixed inset-0 z-[60] flex items-end justify-center sm:items-center">
       <button
         type="button"
-        className="absolute inset-0 bg-slate-950/75 backdrop-blur-sm"
+        className="absolute inset-0 bg-black/60 backdrop-blur-md"
         aria-label="Close quick-add dialog"
         onClick={onClose}
       />
@@ -97,15 +97,15 @@ export function QuickAddApplianceModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby="quick-add-appliance-title"
-        className="relative z-[61] max-h-[92dvh] w-full max-w-md overflow-y-auto rounded-t-2xl border border-slate-700 bg-slate-900 p-4 shadow-2xl sm:rounded-2xl"
+        className="relative z-[61] max-h-[92dvh] w-full max-w-md overflow-y-auto glass-card rounded-t-2xl !rounded-b-none border-emerald-500/20 p-4 sm:!rounded-2xl"
       >
         <h2
           id="quick-add-appliance-title"
-          className="text-lg font-bold text-slate-50"
+          className="text-lg font-bold text-white"
         >
           {isUpcScan ? "Link UPC to Item #" : "New Appliance — Sub-Category"}
         </h2>
-        <p className="mt-1 text-sm text-slate-400">
+        <p className="mt-1 text-sm text-zinc-400">
           {isUpcScan
             ? "Unrecognized barcode — choose category & sub-category, then scan continues."
             : "Unrecognized item — choose category & sub-category to log and continue."}
@@ -147,14 +147,14 @@ export function QuickAddApplianceModal({
           type="button"
           disabled={saving || !canSave}
           onClick={() => void handleSaveAndContinue()}
-          className="mt-4 flex min-h-12 w-full items-center justify-center rounded-xl bg-emerald-500 text-sm font-bold text-slate-950 disabled:opacity-40"
+          className="mt-4 flex min-h-12 w-full items-center justify-center btn-primary-glow rounded-xl text-sm disabled:opacity-40"
         >
           {saving ? "Saving…" : "Save, Log Scan & Continue"}
         </button>
         <button
           type="button"
           onClick={onClose}
-          className="mt-2 flex min-h-12 w-full items-center justify-center rounded-xl border border-slate-700 text-sm font-semibold text-slate-300"
+          className="mt-2 flex min-h-12 w-full items-center justify-center rounded-xl border border-zinc-700 text-sm font-semibold text-zinc-300"
         >
           Cancel
         </button>

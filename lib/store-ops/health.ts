@@ -1,10 +1,16 @@
 /**
  * Store Health Scorecard — weekly pace + bottleneck aggregation.
  * Composes weekly_rotations + rotation_exceptions for the current ISO week.
+ * Shift velocity telemetry is composed via lib/store-ops/telemetry (does not own chart UI).
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { resolveDepartmentIdByCode } from "./rotations";
+import {
+  buildStoreAuditTelemetry,
+  type StoreAuditTelemetry,
+  type TelemetryCompletionEvent,
+} from "./telemetry";
 import { isoWeekLabel } from "./week";
 
 export type DepartmentHealthRow = {
@@ -47,6 +53,8 @@ export type StoreHealthSnapshot = {
     exceptions: number;
     completion_pct: number;
   };
+  /** Active-shift hourly velocity (06:00–22:00). */
+  telemetry: StoreAuditTelemetry | null;
 };
 
 function completionPct(completed: number, assigned: number): number {
@@ -124,13 +132,14 @@ export async function buildStoreHealthSnapshot(
       exceptions: 0,
       completion_pct: 0,
     },
+    telemetry: null,
   };
 
   if (deptIds.length === 0) return empty;
 
   let rotQuery = supabase
     .from("weekly_rotations")
-    .select("id, department_id, is_completed, assigned_week")
+    .select("id, department_id, is_completed, completed_at, assigned_week")
     .eq("store_id", opts.storeId)
     .eq("assigned_week", week)
     .in("department_id", deptIds);
@@ -140,7 +149,7 @@ export async function buildStoreHealthSnapshot(
     // Missing store_id column / empty — try without store filter
     const fallback = await supabase
       .from("weekly_rotations")
-      .select("id, department_id, is_completed, assigned_week")
+      .select("id, department_id, is_completed, completed_at, assigned_week")
       .eq("assigned_week", week)
       .in("department_id", deptIds);
     if (fallback.error) throw new Error(fallback.error.message);
@@ -204,6 +213,7 @@ function composeSnapshot(
   rotations: Array<{
     department_id: string;
     is_completed: boolean;
+    completed_at?: string | null;
   }>,
   barriers: BarrierRow[]
 ): StoreHealthSnapshot {
@@ -244,6 +254,34 @@ function composeSnapshot(
   const open = assigned - completed;
   const exceptions = barriers.length;
 
+  const codeById = new Map(rows.map((r) => [r.department_id, r] as const));
+  const completionEvents: TelemetryCompletionEvent[] = rotations.map((r) => {
+    const meta = codeById.get(r.department_id);
+    return {
+      completed_at: r.completed_at ?? null,
+      department_id: r.department_id,
+      department_code: meta?.department_code,
+      department_name: meta?.department_name,
+      is_completed: Boolean(r.is_completed),
+    };
+  });
+
+  const telemetry = buildStoreAuditTelemetry({
+    completions: completionEvents,
+    exceptions: barriers.map((b) => ({
+      created_at: b.created_at,
+      department_id: b.department_id,
+      department_code: codeById.get(b.department_id)?.department_code,
+    })),
+    departments: rows.map((r) => ({
+      department_id: r.department_id,
+      department_code: r.department_code,
+      department_name: r.department_name,
+      weekly_bay_target: r.weekly_bay_target,
+      assigned: r.assigned,
+    })),
+  });
+
   return {
     assigned_week: week,
     store_id: storeId,
@@ -259,5 +297,6 @@ function composeSnapshot(
       exceptions,
       completion_pct: completionPct(completed, assigned),
     },
+    telemetry,
   };
 }

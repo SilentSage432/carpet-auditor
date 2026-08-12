@@ -10,6 +10,8 @@ import {
   type BayRotationHistoryRow,
   patchStoreLocation,
 } from "@/lib/store-ops/client";
+import { VisualBayScannerModal } from "@/components/store-ops/VisualBayScannerModal";
+import type { BayScanMeta } from "@/lib/store-ops/ai-bay-scan";
 
 type Props = {
   specialist: StoreSpecialist;
@@ -172,8 +174,8 @@ export function StoreLocationGrid({
 
   if (locations.length === 0) {
     return (
-      <section className="rounded-2xl border border-dashed border-slate-700 bg-slate-950/50 p-6 text-center">
-        <p className="text-sm text-slate-400">
+      <section className="glass-card border-dashed p-6 text-center">
+        <p className="text-sm text-zinc-400">
           No store locations mapped yet. Expand Map Management &amp; Bulk Add
           to generate aisle tags.
         </p>
@@ -187,7 +189,7 @@ export function StoreLocationGrid({
         <h2 className="font-mono text-xs font-semibold uppercase tracking-[0.16em] text-emerald-400">
           Store Location Grid
         </h2>
-        <p className="mt-1 text-sm text-slate-400">
+        <p className="mt-1 text-sm text-zinc-400">
           Expand a department, then an aisle. Tap a bay label for pin, history,
           and zone edits. Use S / T switches to activate tags.
         </p>
@@ -204,33 +206,33 @@ export function StoreLocationGrid({
         return (
           <div
             key={dept.departmentId}
-            className="overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/70"
+            className="glass-card overflow-hidden !p-0"
           >
             <button
               type="button"
               aria-expanded={deptOpen}
               onClick={() => toggleDept(dept.departmentId)}
-              className="flex min-h-14 w-full items-center justify-between gap-3 bg-slate-950/60 px-4 py-3 text-left"
+              className="flex min-h-[44px] w-full items-center justify-between gap-3 bg-zinc-950/50 px-4 py-3 text-left"
             >
               <div className="min-w-0">
-                <p className="text-sm font-bold text-slate-50">
+                <p className="text-sm font-bold text-white">
                   {dept.departmentName}
                   <span className="ml-2 font-mono text-xs font-semibold text-emerald-400/90">
                     · {dept.tagCount} tag{dept.tagCount === 1 ? "" : "s"}
                   </span>
                 </p>
-                <p className="font-mono text-[11px] text-slate-500">
+                <p className="font-mono text-[11px] text-zinc-500">
                   {dept.aisles.length} aisle
                   {dept.aisles.length === 1 ? "" : "s"}
                 </p>
               </div>
-              <span aria-hidden className="font-mono text-base text-slate-300">
+              <span aria-hidden className="font-mono text-base text-zinc-300">
                 {deptOpen ? "▲" : "▼"}
               </span>
             </button>
 
             {deptOpen ? (
-              <div className="space-y-2 border-t border-slate-800 p-2">
+              <div className="space-y-2 border-t border-zinc-800/80 p-2">
                 {dept.aisles.map((aisle) => {
                   const aisleKey = `${dept.departmentId}:${aisle.aisle}`;
                   const aisleOpen = Boolean(openAisles[aisleKey]);
@@ -238,30 +240,30 @@ export function StoreLocationGrid({
                   return (
                     <div
                       key={aisleKey}
-                      className="overflow-hidden rounded-xl border border-slate-800 bg-slate-950/40"
+                      className="overflow-hidden rounded-xl border border-zinc-800/80 bg-zinc-950/50"
                     >
                       <button
                         type="button"
                         aria-expanded={aisleOpen}
                         onClick={() => toggleAisle(aisleKey)}
-                        className="flex min-h-12 w-full items-center justify-between gap-3 px-3 py-2 text-left"
+                        className="flex min-h-[44px] w-full items-center justify-between gap-3 px-3 py-2 text-left"
                       >
-                        <p className="font-mono text-sm font-semibold text-slate-100">
+                        <p className="font-mono text-sm font-semibold text-zinc-100">
                           Aisle {aisle.aisle}
-                          <span className="ml-2 text-xs font-medium text-slate-400">
+                          <span className="ml-2 text-xs font-medium text-zinc-400">
                             · {bayCount} bay{bayCount === 1 ? "" : "s"}
                           </span>
                         </p>
                         <span
                           aria-hidden
-                          className="font-mono text-sm text-slate-400"
+                          className="font-mono text-sm text-zinc-400"
                         >
                           {aisleOpen ? "▲" : "▼"}
                         </span>
                       </button>
 
                       {aisleOpen ? (
-                        <ul className="divide-y divide-slate-800 border-t border-slate-800">
+                        <ul className="divide-y divide-zinc-800/80 border-t border-zinc-800/80">
                           {aisle.bays.map((pair) => {
                             const inRotation =
                               isInActiveRotation(pair.selling) ||
@@ -269,7 +271,7 @@ export function StoreLocationGrid({
                             return (
                               <li
                                 key={`${aisleKey}-bay-${pair.bay}`}
-                                className="flex min-h-14 items-center gap-2 px-2 py-1.5"
+                                className="flex min-h-[44px] items-center gap-2 px-2 py-1.5"
                               >
                                 <button
                                   type="button"
@@ -281,7 +283,7 @@ export function StoreLocationGrid({
                                       pair,
                                     })
                                   }
-                                  className="flex min-h-11 min-w-[4.5rem] shrink-0 items-center gap-1.5 rounded-xl px-1.5 text-left active:bg-slate-800/80"
+                                  className="flex min-h-[44px] min-w-[4.5rem] shrink-0 items-center gap-1.5 rounded-xl px-1.5 text-left active:bg-zinc-800/80"
                                   aria-label={`Bay ${pair.bay} actions`}
                                 >
                                   {inRotation ? (
@@ -292,11 +294,11 @@ export function StoreLocationGrid({
                                     />
                                   ) : (
                                     <span
-                                      className="inline-block h-2.5 w-2.5 shrink-0 rounded-full bg-slate-700"
+                                      className="inline-block h-2.5 w-2.5 shrink-0 rounded-full bg-zinc-700"
                                       aria-hidden
                                     />
                                   )}
-                                  <span className="font-mono text-xs font-bold text-slate-200">
+                                  <span className="font-mono text-xs font-bold text-zinc-200">
                                     Bay {pair.bay}
                                   </span>
                                 </button>
@@ -333,6 +335,7 @@ export function StoreLocationGrid({
       {liveSheetBay ? (
         <BayActionsSheet
           specialist={specialist}
+          departments={departments}
           bay={liveSheetBay}
           onClose={() => setSheetBay(null)}
           onChanged={onChanged}
@@ -358,11 +361,11 @@ function TypeToggle({
 }) {
   if (!loc) {
     return (
-      <div className="flex min-h-11 items-center justify-center gap-1.5 rounded-xl border border-dashed border-slate-800 px-2 opacity-40">
-        <span className="font-mono text-xs font-bold text-slate-500">
+      <div className="flex min-h-[44px] items-center justify-center gap-1.5 rounded-xl border border-dashed border-zinc-800 px-2 opacity-40">
+        <span className="font-mono text-xs font-bold text-zinc-500">
           {label}
         </span>
-        <span className="text-[10px] text-slate-600">—</span>
+        <span className="text-[10px] text-zinc-600">—</span>
       </div>
     );
   }
@@ -372,16 +375,22 @@ function TypeToggle({
 
   return (
     <div
-      className={`flex min-h-11 items-center justify-between gap-1 rounded-xl border px-1 ${
+      className={`flex min-h-[44px] items-center justify-between gap-1 rounded-xl border px-1 ${
         showroom
-          ? "border-amber-500/40 bg-amber-950/25"
-          : "border-slate-800 bg-slate-900/80"
+          ? "glass-bay-pending"
+          : loc.is_active
+            ? inRotation
+              ? "glass-bay-complete"
+              : loc.type === "TOPSTOCK"
+                ? "glass-bay-cyan"
+                : "border-emerald-500/35 bg-emerald-950/25"
+            : "border-zinc-800 bg-zinc-900/70"
       } ${loc.is_active ? "" : "opacity-50"}`}
     >
       <div className="min-w-0 pl-1.5">
         <p className="font-mono text-xs font-bold text-emerald-400/90">
           {label}
-          <span className="ml-1 font-sans text-[10px] font-medium text-slate-500">
+          <span className="ml-1 font-sans text-[10px] font-medium text-zinc-500">
             {inRotation ? "week" : loc.status === "PENDING" ? "ready" : loc.status.slice(0, 3).toLowerCase()}
             {showroom ? " · show" : ""}
           </span>
@@ -398,7 +407,7 @@ function TypeToggle({
       >
         <span
           className={`relative block h-6 w-10 rounded-full transition ${
-            loc.is_active ? "bg-emerald-500" : "bg-slate-600"
+            loc.is_active ? "bg-emerald-500" : "bg-zinc-600"
           }`}
         >
           <span
@@ -414,12 +423,14 @@ function TypeToggle({
 
 function BayActionsSheet({
   specialist,
+  departments,
   bay,
   onClose,
   onChanged,
   onError,
 }: {
   specialist: StoreSpecialist;
+  departments: Department[];
   bay: SheetBay;
   onClose: () => void;
   onChanged: () => void;
@@ -428,6 +439,7 @@ function BayActionsSheet({
   const [mode, setMode] = useState<SheetMode>("actions");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [bayScanOpen, setBayScanOpen] = useState(false);
   const [historyLoc, setHistoryLoc] = useState<StoreLocation | null>(
     bay.pair.selling ?? bay.pair.topstock
   );
@@ -547,8 +559,14 @@ function BayActionsSheet({
       (loc!.location_type ?? "STANDARD") !== "SHOWROOM_STACKOUT"
   );
 
+  const bayScanMeta: BayScanMeta = {
+    aisle: bay.aisle,
+    bay: bay.pair.bay,
+    department_code: departments.find((d) => d.id === bay.departmentId)?.code,
+  };
+
   return (
-    <div className="fixed inset-0 z-[80] flex flex-col justify-end bg-slate-950/75">
+    <div className="glass-backdrop fixed inset-0 z-[80] flex flex-col justify-end">
       <button
         type="button"
         aria-label="Close bay actions"
@@ -559,9 +577,9 @@ function BayActionsSheet({
         role="dialog"
         aria-modal="true"
         aria-labelledby="bay-actions-title"
-        className="relative z-10 max-h-[88dvh] w-full overflow-y-auto rounded-t-2xl border-t-2 border-emerald-500/40 bg-slate-950 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3 shadow-2xl"
+        className="glass-card relative z-10 max-h-[88dvh] w-full overflow-y-auto !rounded-t-2xl !rounded-b-none border-t-2 border-emerald-500/40 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3"
       >
-        <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-slate-600" />
+        <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-zinc-600" />
 
         <div className="mb-4 flex items-start justify-between gap-3">
           <div>
@@ -570,11 +588,11 @@ function BayActionsSheet({
             </p>
             <h2
               id="bay-actions-title"
-              className="mt-1 text-lg font-bold text-slate-50"
+              className="glass-title mt-1 text-lg"
             >
               Aisle {bay.aisle} · Bay {bay.pair.bay}
             </h2>
-            <p className="mt-0.5 text-sm text-slate-400">
+            <p className="mt-0.5 text-sm text-zinc-400">
               {mode === "actions"
                 ? "Advanced bay actions"
                 : mode === "history"
@@ -585,7 +603,7 @@ function BayActionsSheet({
           <button
             type="button"
             onClick={onClose}
-            className="flex h-11 w-11 items-center justify-center rounded-xl border border-slate-700 text-slate-200"
+            className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl border border-zinc-700 text-zinc-200"
             aria-label="Close"
           >
             ✕
@@ -600,8 +618,18 @@ function BayActionsSheet({
 
         {mode === "actions" ? (
           <div className="space-y-2">
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => setBayScanOpen(true)}
+              className="btn-primary-glow flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl px-4 text-sm disabled:opacity-50"
+            >
+              <span aria-hidden>📷</span>
+              Snap Bay AI Audit
+            </button>
+
             {pinTargets.length === 0 ? (
-              <p className="rounded-xl border border-dashed border-slate-700 px-3 py-4 text-sm text-slate-400">
+              <p className="rounded-xl border border-dashed border-zinc-700 px-3 py-4 text-sm text-zinc-400">
                 No standard aisle tags to pin (showroom zones use Quick Touch).
               </p>
             ) : (
@@ -611,7 +639,7 @@ function BayActionsSheet({
                   type="button"
                   disabled={busy}
                   onClick={() => void pinToWeek(loc)}
-                  className="flex min-h-14 w-full items-center justify-center rounded-xl bg-emerald-500 px-4 text-sm font-bold text-slate-950 disabled:opacity-50"
+                  className="flex min-h-[44px] w-full items-center justify-center rounded-xl border border-zinc-700/80 bg-zinc-950/60 px-4 text-sm font-bold text-zinc-100 disabled:opacity-50"
                 >
                   Pin {loc.type === "SELLING" ? "Selling" : "Topstock"} to
                   Current Week
@@ -627,7 +655,7 @@ function BayActionsSheet({
                   type="button"
                   disabled={busy}
                   onClick={() => void openHistory(loc)}
-                  className="flex min-h-14 w-full items-center justify-center rounded-xl border-2 border-slate-600 bg-slate-900 px-4 text-sm font-bold text-slate-100 disabled:opacity-50"
+                  className="flex min-h-[44px] w-full items-center justify-center rounded-xl border border-zinc-700/80 bg-zinc-950/60 px-4 text-sm font-bold text-zinc-100 disabled:opacity-50"
                 >
                   View {loc.type === "SELLING" ? "Selling" : "Topstock"} Audit
                   Log / History
@@ -655,24 +683,24 @@ function BayActionsSheet({
               ← Back
             </button>
             {historyLoc ? (
-              <div className="rounded-xl border border-slate-800 bg-slate-900/80 px-3 py-3 text-sm text-slate-300">
-                <p className="font-semibold text-slate-100">
+              <div className="rounded-xl border border-zinc-800 bg-zinc-900/80 px-3 py-3 text-sm text-zinc-300">
+                <p className="font-semibold text-zinc-100">
                   {historyLoc.type} · cycle {historyLoc.cycle_number}
                 </p>
-                <p className="mt-1 font-mono text-xs text-slate-500">
+                <p className="mt-1 font-mono text-xs text-zinc-500">
                   Status {historyLoc.status} · last completed{" "}
                   {formatWhen(historyLoc.last_completed_at)}
                 </p>
-                <p className="mt-1 font-mono text-xs text-slate-500">
+                <p className="mt-1 font-mono text-xs text-zinc-500">
                   Priority {historyLoc.manual_priority_count ?? 0} · zone{" "}
                   {historyLoc.location_type ?? "STANDARD"}
                 </p>
               </div>
             ) : null}
             {historyLoading ? (
-              <p className="text-sm text-slate-400">Loading history…</p>
+              <p className="text-sm text-zinc-400">Loading history…</p>
             ) : historyRows.length === 0 ? (
-              <p className="rounded-xl border border-dashed border-slate-700 px-3 py-6 text-center text-sm text-slate-400">
+              <p className="rounded-xl border border-dashed border-zinc-700 px-3 py-6 text-center text-sm text-zinc-400">
                 No weekly rotation history yet for this bay.
               </p>
             ) : (
@@ -680,12 +708,12 @@ function BayActionsSheet({
                 {historyRows.map((row) => (
                   <li
                     key={row.id}
-                    className="rounded-xl border border-slate-800 bg-slate-900/70 px-3 py-3"
+                    className="rounded-xl border border-zinc-800 bg-zinc-900/70 px-3 py-3"
                   >
-                    <p className="font-mono text-sm font-bold text-slate-100">
+                    <p className="font-mono text-sm font-bold text-zinc-100">
                       {row.assigned_week}
                     </p>
-                    <p className="mt-0.5 text-xs text-slate-400">
+                    <p className="mt-0.5 text-xs text-zinc-400">
                       {row.is_completed
                         ? `Completed ${formatWhen(row.completed_at)}`
                         : "Open / incomplete"}
@@ -721,7 +749,7 @@ function BayActionsSheet({
                       className={`min-h-12 rounded-xl border text-sm font-bold ${
                         editTargetId === loc.id
                           ? "border-emerald-400 bg-emerald-500/15 text-emerald-100"
-                          : "border-slate-700 text-slate-300"
+                          : "border-zinc-700 text-zinc-300"
                       }`}
                     >
                       {loc.type === "SELLING" ? "Selling" : "Topstock"}
@@ -731,7 +759,7 @@ function BayActionsSheet({
             ) : null}
 
             <fieldset>
-              <legend className="mb-1.5 text-sm font-medium text-slate-200">
+              <legend className="mb-1.5 text-sm font-medium text-zinc-200">
                 Zone
               </legend>
               <div className="grid grid-cols-2 gap-2">
@@ -748,7 +776,7 @@ function BayActionsSheet({
                     className={`min-h-12 rounded-xl border px-2 text-xs font-bold ${
                       zoneDraft === value
                         ? "border-amber-400 bg-amber-500/15 text-amber-100"
-                        : "border-slate-700 text-slate-300"
+                        : "border-zinc-700 text-zinc-300"
                     }`}
                   >
                     {label}
@@ -758,7 +786,7 @@ function BayActionsSheet({
             </fieldset>
 
             <label className="block space-y-1.5">
-              <span className="text-sm font-medium text-slate-200">
+              <span className="text-sm font-medium text-zinc-200">
                 Audit frequency (days)
               </span>
               <input
@@ -767,7 +795,7 @@ function BayActionsSheet({
                 max={90}
                 value={freqDraft}
                 onChange={(e) => setFreqDraft(e.target.value)}
-                className="min-h-12 w-full rounded-xl border border-slate-700 bg-slate-900 px-3 font-mono text-slate-100"
+                className="min-h-12 w-full rounded-xl border border-zinc-700 bg-zinc-900 px-3 font-mono text-zinc-100"
               />
             </label>
 
@@ -775,13 +803,20 @@ function BayActionsSheet({
               type="button"
               disabled={busy}
               onClick={() => void saveEdit()}
-              className="flex min-h-14 w-full items-center justify-center rounded-xl bg-emerald-500 text-sm font-bold text-slate-950 disabled:opacity-50"
+              className="btn-primary-glow flex min-h-[44px] w-full items-center justify-center rounded-xl text-sm disabled:opacity-50"
             >
               {busy ? "Saving…" : "Save location details"}
             </button>
           </div>
         ) : null}
       </div>
+
+      <VisualBayScannerModal
+        open={bayScanOpen}
+        onClose={() => setBayScanOpen(false)}
+        specialist={specialist}
+        meta={bayScanMeta}
+      />
     </div>
   );
 }

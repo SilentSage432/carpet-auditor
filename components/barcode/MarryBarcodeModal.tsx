@@ -114,7 +114,7 @@ export function MarryBarcodeModal({
     <div className="fixed inset-0 z-[60] flex items-end justify-center sm:items-center">
       <button
         type="button"
-        className="absolute inset-0 bg-slate-950/75 backdrop-blur-sm"
+        className="absolute inset-0 bg-black/60 backdrop-blur-md"
         aria-label="Close marry barcode dialog"
         onClick={onClose}
       />
@@ -122,15 +122,15 @@ export function MarryBarcodeModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby="marry-barcode-title"
-        className="relative z-[61] max-h-[90dvh] w-full max-w-md overflow-y-auto rounded-t-2xl border border-slate-700 bg-slate-900 p-4 shadow-2xl sm:rounded-2xl"
+        className="relative z-[61] max-h-[90dvh] w-full max-w-md overflow-y-auto glass-card rounded-t-2xl !rounded-b-none border-emerald-500/20 p-4 sm:!rounded-2xl"
       >
         <h2
           id="marry-barcode-title"
-          className="text-lg font-bold text-slate-50"
+          className="text-lg font-bold text-white"
         >
           Unlinked Barcode Detected
         </h2>
-        <p className="mt-1 text-sm text-slate-400">
+        <p className="mt-1 text-sm text-zinc-400">
           Link this vendor barcode to a Lowe&apos;s Item # so future scans
           auto-fill.
         </p>
@@ -138,14 +138,14 @@ export function MarryBarcodeModal({
           {cleaned}
         </p>
 
-        <div className="mt-4 grid grid-cols-2 gap-1 rounded-xl border border-slate-800 bg-slate-950 p-1">
+        <div className="mt-4 grid grid-cols-2 gap-1 rounded-xl border border-zinc-800 bg-zinc-950 p-1">
           <button
             type="button"
             onClick={() => setMode("select")}
             className={`flex min-h-12 items-center justify-center rounded-lg text-sm font-semibold ${
               mode === "select"
-                ? "bg-emerald-500 text-slate-950"
-                : "text-slate-400"
+                ? "bg-emerald-500 text-zinc-950"
+                : "text-zinc-400"
             }`}
           >
             Select Existing
@@ -155,8 +155,8 @@ export function MarryBarcodeModal({
             onClick={() => setMode("create")}
             className={`flex min-h-12 items-center justify-center rounded-lg text-sm font-semibold ${
               mode === "create"
-                ? "bg-emerald-500 text-slate-950"
-                : "text-slate-400"
+                ? "bg-emerald-500 text-zinc-950"
+                : "text-zinc-400"
             }`}
           >
             Create New Item #
@@ -171,9 +171,9 @@ export function MarryBarcodeModal({
               placeholder="Search catalog…"
               aria-label="Search catalog to marry"
             />
-            <ul className="max-h-52 space-y-1 overflow-y-auto rounded-xl border border-slate-800 bg-slate-950/60 p-1">
+            <ul className="max-h-52 space-y-1 overflow-y-auto rounded-xl border border-zinc-800 bg-zinc-950/60 p-1">
               {filtered.length === 0 ? (
-                <li className="px-3 py-6 text-center text-sm text-slate-500">
+                <li className="px-3 py-6 text-center text-sm text-zinc-500">
                   No catalog items found
                 </li>
               ) : (
@@ -187,13 +187,13 @@ export function MarryBarcodeModal({
                         className={`flex min-h-12 w-full flex-col items-start rounded-lg px-3 py-2 text-left ${
                           active
                             ? "bg-emerald-500/20 ring-1 ring-emerald-500/50"
-                            : "hover:bg-slate-800"
+                            : "hover:bg-zinc-800"
                         }`}
                       >
-                        <span className="font-mono text-sm font-bold text-slate-50">
+                        <span className="font-mono text-sm font-bold text-white">
                           {item.sku}
                         </span>
-                        <span className="truncate text-xs text-slate-400">
+                        <span className="truncate text-xs text-zinc-400">
                           {item.carpet_name} · {item.roll_width_ft}ft
                         </span>
                       </button>
@@ -206,7 +206,7 @@ export function MarryBarcodeModal({
               type="button"
               disabled={saving || !selectedId}
               onClick={() => void marryExisting()}
-              className="flex min-h-12 w-full items-center justify-center rounded-xl bg-emerald-500 text-sm font-bold text-slate-950 disabled:opacity-40"
+              className="flex min-h-12 w-full items-center justify-center btn-primary-glow rounded-xl text-sm disabled:opacity-40"
             >
               {saving ? "Linking…" : "Marry Barcode"}
             </button>
@@ -230,7 +230,7 @@ export function MarryBarcodeModal({
               type="button"
               disabled={saving || !newSku.trim() || !newName.trim()}
               onClick={() => void createAndLink()}
-              className="flex min-h-12 w-full items-center justify-center rounded-xl bg-emerald-500 text-sm font-bold text-slate-950 disabled:opacity-40"
+              className="flex min-h-12 w-full items-center justify-center btn-primary-glow rounded-xl text-sm disabled:opacity-40"
             >
               {saving ? "Saving…" : "Save & Link Barcode"}
             </button>
@@ -244,7 +244,7 @@ export function MarryBarcodeModal({
         <button
           type="button"
           onClick={onClose}
-          className="mt-3 flex min-h-12 w-full items-center justify-center rounded-xl border border-slate-700 text-sm font-semibold text-slate-300"
+          className="mt-3 flex min-h-12 w-full items-center justify-center rounded-xl border border-zinc-700 text-sm font-semibold text-zinc-300"
         >
           Cancel
         </button>

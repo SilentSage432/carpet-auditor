@@ -459,6 +459,7 @@ export type StoreHealthSnapshotClient = {
     exceptions: number;
     completion_pct: number;
   };
+  telemetry?: import("@/lib/store-ops/telemetry").StoreAuditTelemetry | null;
 };
 
 export async function fetchStoreHealth(
@@ -487,6 +488,7 @@ export async function fetchStoreHealth(
         exceptions: 0,
         completion_pct: 0,
       },
+      telemetry: null,
     };
   }
 }
@@ -499,10 +501,14 @@ export type ShiftBriefingClient = {
   source?: "gemini" | "local";
 };
 
-/** Zebra Shift Intelligence Briefing from store health metrics. */
+/** Zebra Shift Intelligence Briefing from store health metrics + velocity. */
 export async function fetchShiftBriefing(
   specialist: StoreSpecialist,
-  week?: string
+  options?: {
+    week?: string;
+    snapshot?: StoreHealthSnapshotClient;
+    telemetry?: import("@/lib/store-ops/telemetry").StoreAuditTelemetry | null;
+  }
 ): Promise<ShiftBriefingClient> {
   return storeOpsFetch<ShiftBriefingClient>(
     "/api/store-health/ai-summary",
@@ -510,7 +516,13 @@ export async function fetchShiftBriefing(
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(week ? { week } : {}),
+      body: JSON.stringify({
+        ...(options?.week ? { week: options.week } : {}),
+        ...(options?.snapshot ? { snapshot: options.snapshot } : {}),
+        ...(options?.telemetry !== undefined
+          ? { telemetry: options.telemetry }
+          : {}),
+      }),
     }
   );
 }
@@ -548,6 +560,33 @@ export async function inviteSupervisor(
 ): Promise<InviteSupervisorResult> {
   return storeOpsFetch<InviteSupervisorResult>(
     "/api/admin/invite-supervisor",
+    specialist,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    }
+  );
+}
+
+export type BayScanClientResult = import("./ai-bay-scan").BayScanResult & {
+  source?: "gemini" | "local";
+};
+
+/** Gemini multimodal bay photo → inventory / safety compliance JSON. */
+export async function scanBayVisual(
+  specialist: StoreSpecialist,
+  input: {
+    image: string;
+    mime_type?: string;
+    aisle?: string;
+    bay?: number;
+    department_code?: string;
+    allow_local_fallback?: boolean;
+  }
+): Promise<BayScanClientResult> {
+  return storeOpsFetch<BayScanClientResult>(
+    "/api/store-ops/ai-bay-scan",
     specialist,
     {
       method: "POST",

@@ -58,6 +58,7 @@ export async function GET(request: Request) {
         exceptions: 0,
         completion_pct: 0,
       },
+      telemetry: null,
       error: err instanceof Error ? err.message : "Failed to load store health",
     });
   }

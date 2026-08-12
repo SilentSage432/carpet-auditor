@@ -27,8 +27,12 @@ components/hub/AuditReportModal.tsx → Printable / emailable / clipboard audit 
 components/hub/*Modal.tsx         → Specialist / PIN / Markdown modals
 components/barcode/QuickAddCatalogModal.tsx → Scan-to-catalog Quick-Add
 components/catalog/SimsLocationFinder.tsx   → SIMS location stock drawer
-components/sections/*             → Presentation per workspace section
-components/sections/DepartmentAuditSection.tsx → Generic unit-count audit for non-flooring/appliance depts
+components/hub/AdminDepartmentSwitcher.tsx → Master Admin working-dept pin
+components/admin/SundayAuditStagingCard.tsx → Glowing pending Sunday Flooring audit CTA
+components/admin/SundayAuditAssignmentModal.tsx → Assign Flooring specialists to staged bays
+lib/admin-department-context.ts       → Master Admin working department pin (local)
+lib/store-ops/sunday-audit.ts         → Sunday Flooring staging + assignment overlay
+app/flooring/page.tsx                 → Deep link → Cycle Audit + D23 pin
 lib/auth-session.ts               → Auth session token + inactivity lock
 lib/biometric-auth.ts             → WebAuthn fingerprint / Face ID register + assert
 lib/audit-report.ts               → Audit report metrics + email/clipboard composition
@@ -69,6 +73,9 @@ supabase/migrations/20260811_alphanumeric_aisle.sql → store_locations.aisle IN
 | CLF / carton math | `lib/calc.ts` |
 | Number typing UX | `lib/number-input.ts` + `NumberField` |
 | Catalog knowledge | `lib/catalog.ts` |
+| Store health scorecard | `lib/store-ops/health.ts`, `StoreHealthCard` |
+| Shift audit velocity telemetry | `lib/store-ops/telemetry.ts`, `StoreHealthChart` |
+| Zebra shift briefing | `lib/store-ops/shift-briefing.ts`, `ShiftBriefingCard` |
 | Barcode resolve / Quick-Add | `lib/barcode.ts`, `NumberField` scan hooks, `QuickAddCatalogModal` |
 | Hardware wedge (no soft keyboard) | `lib/hardware-scanner.ts` |
 | Focus / keyboard dismiss | `lib/focus-input.ts` (`blurActiveInput` — never auto-focus on tab switch) |

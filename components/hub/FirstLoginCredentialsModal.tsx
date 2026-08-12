@@ -69,23 +69,23 @@ export function FirstLoginCredentialsModal({
 
   return (
     <div className="fixed inset-0 z-[80] flex items-end justify-center sm:items-center">
-      <div className="absolute inset-0 bg-slate-950/90 backdrop-blur-md" />
+      <div className="absolute inset-0 bg-black/60 backdrop-blur-md" />
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="first-login-title"
-        className="relative z-[81] w-full max-w-md rounded-t-2xl border border-emerald-500/30 bg-slate-900 p-5 shadow-2xl sm:rounded-2xl"
+        className="relative z-[81] w-full max-w-md glass-card rounded-t-2xl !rounded-b-none border-emerald-500/30 p-5 sm:!rounded-2xl"
       >
         <div className="flex items-start gap-3">
           <DeptSyncBadge size="md" />
           <div className="min-w-0">
             <h2
               id="first-login-title"
-              className="text-lg font-bold text-slate-50"
+              className="text-lg font-bold text-white"
             >
               Welcome to DeptSync!
             </h2>
-            <p className="mt-1 text-sm leading-relaxed text-slate-400">
+            <p className="mt-1 text-sm leading-relaxed text-zinc-400">
               Please set your custom Username &amp; Password before continuing.
             </p>
           </div>
@@ -129,11 +129,11 @@ export function FirstLoginCredentialsModal({
           type="button"
           disabled={saving}
           onClick={() => void handleSave()}
-          className="mt-5 flex min-h-12 w-full items-center justify-center rounded-xl bg-emerald-500 text-sm font-bold text-slate-950 disabled:opacity-40"
+          className="mt-5 flex min-h-12 w-full items-center justify-center btn-primary-glow rounded-xl text-sm disabled:opacity-40"
         >
           {saving ? "Saving…" : "Save & Continue"}
         </button>
-        <p className="mt-2 text-center text-[11px] text-slate-500">
+        <p className="mt-2 text-center text-[11px] text-zinc-500">
           Required for {member.name} · department access unlocks after setup
         </p>
       </div>

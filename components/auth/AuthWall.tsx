@@ -57,12 +57,16 @@ export function AuthWall({
   const storeLabel = formatStoreLabel(getStoreNumber());
 
   return (
-    <div className="fixed inset-0 z-[90] flex items-end justify-center bg-slate-950/90 backdrop-blur-2xl sm:items-center">
+    <div className="glass-void fixed inset-0 z-[90] flex items-end justify-center sm:items-center">
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 bg-black/40 backdrop-blur-md"
+      />
       <div
         role="dialog"
         aria-modal="true"
         aria-labelledby="auth-wall-title"
-        className="relative z-[91] w-full max-w-md rounded-t-2xl border border-emerald-500/30 bg-slate-900 p-5 shadow-2xl sm:rounded-2xl"
+        className="glass-card relative z-[91] w-full max-w-md rounded-t-2xl !rounded-b-none border-emerald-500/35 p-5 shadow-[0_0_60px_-12px_rgba(16,185,129,0.45)] sm:!rounded-2xl"
       >
         <div className="flex items-start gap-3">
           <DeptSyncBadge size="md" />
@@ -72,7 +76,7 @@ export function AuthWall({
             </p>
             <h1
               id="auth-wall-title"
-              className="mt-1 text-lg font-bold text-slate-50"
+              className="glass-title mt-1 text-lg"
             >
               {mode === "setup"
                 ? "Set Your Permanent Credentials"
@@ -80,7 +84,7 @@ export function AuthWall({
                   ? "Unlock DeptSync"
                   : "DeptSync — Login to Your Department"}
             </h1>
-            <p className="mt-1 text-sm leading-relaxed text-slate-400">
+            <p className="mt-1 text-sm leading-relaxed text-zinc-400">
               {mode === "setup"
                 ? "Choose a custom username and password before department access unlocks."
                 : mode === "unlock"
@@ -281,7 +285,7 @@ function LoginForm({
           type="button"
           disabled={busy}
           onClick={() => void handleBiometricLogin()}
-          className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-emerald-500/40 bg-emerald-950/50 text-sm font-bold text-emerald-200 active:scale-[0.98] disabled:opacity-40"
+          className="flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl border border-emerald-500/40 bg-emerald-950/50 text-sm font-bold text-emerald-200 shadow-[0_0_20px_-8px_rgba(16,185,129,0.55)] active:scale-[0.98] disabled:opacity-40"
         >
           👆 Login with Fingerprint / Touch ID
         </button>
@@ -306,7 +310,7 @@ function LoginForm({
         passwordToggle
       />
       {error ? (
-        <p className="text-center text-sm font-semibold text-red-400" role="alert">
+        <p className="text-center text-sm font-semibold text-rose-400" role="alert">
           {error}
         </p>
       ) : null}
@@ -318,7 +322,7 @@ function LoginForm({
           (!isEmergencyMasterCode(password.trim() || username.trim()) &&
             (!username.trim() || !password.trim()))
         }
-        className="flex min-h-12 w-full items-center justify-center rounded-xl bg-emerald-500 text-sm font-bold text-slate-950 disabled:opacity-40"
+        className="btn-primary-glow flex min-h-[44px] w-full items-center justify-center rounded-xl text-sm disabled:opacity-40"
       >
         {busy ? "Signing in…" : "Log In"}
       </button>
@@ -329,11 +333,11 @@ function LoginForm({
           setError(null);
           setPhoneResetOpen(true);
         }}
-        className="flex min-h-11 w-full items-center justify-center rounded-xl border border-slate-600/80 bg-slate-950/40 text-sm font-semibold text-emerald-300/90 active:scale-[0.98] disabled:opacity-40"
+        className="flex min-h-[44px] w-full items-center justify-center rounded-xl border border-zinc-700/80 bg-zinc-950/50 text-sm font-semibold text-emerald-300 active:scale-[0.98] disabled:opacity-40"
       >
         Forgot Access Code? Reset via Phone
       </button>
-      <p className="text-center text-[11px] text-slate-500">
+      <p className="text-center text-[11px] text-zinc-400">
         Access is locked until you authenticate. Session stays signed in on this
         browser until logout or 8h idle.
       </p>
@@ -418,7 +422,7 @@ function PhoneResetPanel({
 
   return (
     <div className="mt-5 space-y-3">
-      <p className="rounded-xl border border-emerald-500/25 bg-emerald-950/30 px-3 py-2 text-xs leading-relaxed text-emerald-100/90">
+      <p className="rounded-xl border border-emerald-500/30 bg-emerald-950/40 px-3 py-2 text-xs leading-relaxed text-emerald-100">
         Reset via encrypted SMS OTP. A 6-digit code is sent to the mobile number
         on your DeptSync profile.
       </p>
@@ -437,7 +441,7 @@ function PhoneResetPanel({
             type="button"
             disabled={busy || !phone.trim()}
             onClick={() => void handleSendOtp()}
-            className="flex min-h-12 w-full items-center justify-center rounded-xl bg-emerald-500 text-sm font-bold text-slate-950 disabled:opacity-40"
+            className="btn-primary-glow flex min-h-[44px] w-full items-center justify-center rounded-xl text-sm disabled:opacity-40"
           >
             {busy ? "Sending code…" : "Send 6-Digit SMS Code"}
           </button>
@@ -458,7 +462,7 @@ function PhoneResetPanel({
             type="button"
             disabled={busy || otp.replace(/\D/g, "").length !== 6}
             onClick={() => void handleVerifyOtp()}
-            className="flex min-h-12 w-full items-center justify-center rounded-xl bg-emerald-500 text-sm font-bold text-slate-950 disabled:opacity-40"
+            className="btn-primary-glow flex min-h-[44px] w-full items-center justify-center rounded-xl text-sm disabled:opacity-40"
           >
             {busy ? "Verifying…" : "Verify Code"}
           </button>
@@ -507,7 +511,7 @@ function PhoneResetPanel({
             type="button"
             disabled={busy || newPassword.trim().length < 6}
             onClick={() => void handleResetPassword()}
-            className="flex min-h-12 w-full items-center justify-center rounded-xl bg-emerald-500 text-sm font-bold text-slate-950 disabled:opacity-40"
+            className="btn-primary-glow flex min-h-[44px] w-full items-center justify-center rounded-xl text-sm disabled:opacity-40"
           >
             {busy ? "Saving…" : "Save New Access Code & Sign In"}
           </button>
@@ -515,7 +519,7 @@ function PhoneResetPanel({
       ) : null}
 
       {error ? (
-        <p className="text-center text-sm font-semibold text-red-400" role="alert">
+        <p className="text-center text-sm font-semibold text-rose-400" role="alert">
           {error}
         </p>
       ) : null}
@@ -524,7 +528,7 @@ function PhoneResetPanel({
         type="button"
         disabled={busy}
         onClick={onCancel}
-        className="flex min-h-11 w-full items-center justify-center text-sm font-semibold text-slate-400"
+        className="flex min-h-[44px] w-full items-center justify-center text-sm font-semibold text-zinc-400"
       >
         ← Back to login
       </button>
@@ -550,12 +554,12 @@ function BiometricEnrollBanner({
       <p className="text-sm font-semibold leading-relaxed text-emerald-100">
         ⚡ Enable Fingerprint / Touch ID Login for faster access on this phone?
       </p>
-      <p className="text-xs text-slate-400">
+      <p className="text-xs text-zinc-400">
         Signed in as {memberName}. Your device will prompt for Face ID,
         Touch ID, or fingerprint to register.
       </p>
       {error ? (
-        <p className="text-center text-sm font-semibold text-red-400" role="alert">
+        <p className="text-center text-sm font-semibold text-rose-400" role="alert">
           {error}
         </p>
       ) : null}
@@ -563,7 +567,7 @@ function BiometricEnrollBanner({
         type="button"
         disabled={busy}
         onClick={onEnable}
-        className="flex min-h-12 w-full items-center justify-center rounded-xl bg-emerald-500 text-sm font-bold text-slate-950 disabled:opacity-40"
+        className="btn-primary-glow flex min-h-[44px] w-full items-center justify-center rounded-xl text-sm disabled:opacity-40"
       >
         {busy ? "Waiting for sensor…" : "Enable Fingerprint Access"}
       </button>
@@ -571,7 +575,7 @@ function BiometricEnrollBanner({
         type="button"
         disabled={busy}
         onClick={onSkip}
-        className="flex min-h-12 w-full items-center justify-center rounded-xl border border-slate-600 text-sm font-semibold text-slate-300 disabled:opacity-40"
+        className="flex min-h-[44px] w-full items-center justify-center rounded-xl border border-zinc-700/80 text-sm font-semibold text-zinc-300 disabled:opacity-40"
       >
         Skip for Now
       </button>
@@ -739,19 +743,19 @@ function SetupForm({
         autoComplete="new-password"
         passwordToggle
       />
-      <p className="text-[11px] leading-relaxed text-slate-500">
+      <p className="text-[11px] leading-relaxed text-zinc-400">
         Mobile is stored on your Supabase profile and used for SMS OTP access
         recovery.
       </p>
       {error ? (
-        <p className="text-center text-sm font-semibold text-red-400" role="alert">
+        <p className="text-center text-sm font-semibold text-rose-400" role="alert">
           {error}
         </p>
       ) : null}
       <button
         type="submit"
         disabled={saving}
-        className="flex min-h-12 w-full items-center justify-center rounded-xl bg-emerald-500 text-sm font-bold text-slate-950 disabled:opacity-40"
+        className="btn-primary-glow flex min-h-[44px] w-full items-center justify-center rounded-xl text-sm disabled:opacity-40"
       >
         {saving ? "Saving…" : "Save & Unlock Department"}
       </button>
@@ -881,7 +885,7 @@ function UnlockForm({
 
   return (
     <div className={`mt-5 ${shake ? "animate-pin-shake" : ""}`}>
-      <p className="mb-3 text-center text-xs text-slate-400">
+      <p className="mb-3 text-center text-xs text-zinc-400">
         {roleBadge(member)}
       </p>
 
@@ -890,7 +894,7 @@ function UnlockForm({
           type="button"
           disabled={busy}
           onClick={() => void handleBiometricUnlock()}
-          className="mb-3 flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-emerald-500/40 bg-emerald-950/50 text-sm font-bold text-emerald-200 active:scale-[0.98] disabled:opacity-40"
+          className="mb-3 flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl border border-emerald-500/40 bg-emerald-950/50 text-sm font-bold text-emerald-200 shadow-[0_0_20px_-8px_rgba(16,185,129,0.55)] active:scale-[0.98] disabled:opacity-40"
         >
           👆 Unlock with Fingerprint / Touch ID
         </button>
@@ -905,14 +909,14 @@ function UnlockForm({
                 className={`h-3 w-3 rounded-full border ${
                   i < secret.length
                     ? "border-emerald-400 bg-emerald-400"
-                    : "border-slate-600 bg-transparent"
+                    : "border-zinc-600 bg-transparent"
                 }`}
               />
             ))}
           </div>
           {error ? (
             <p
-              className="mt-3 text-center text-sm font-semibold text-red-400"
+              className="mt-3 text-center text-sm font-semibold text-rose-400"
               role="alert"
             >
               {error}
@@ -930,7 +934,7 @@ function UnlockForm({
                       setError(null);
                       setSecret((prev) => prev.slice(0, -1));
                     }}
-                    className="flex h-14 items-center justify-center rounded-xl border border-slate-700 bg-slate-950 text-lg font-semibold text-slate-200 active:scale-95"
+                    className="flex min-h-[44px] h-14 items-center justify-center rounded-xl border border-zinc-700/80 bg-zinc-950/80 text-lg font-semibold text-zinc-200 transition focus:outline-none focus:ring-2 focus:ring-emerald-500/50 active:scale-95"
                   >
                     ⌫
                   </button>
@@ -941,7 +945,7 @@ function UnlockForm({
                   key={key}
                   type="button"
                   onClick={() => handleDigit(key)}
-                  className="flex h-14 items-center justify-center rounded-xl border border-slate-700 bg-slate-950 font-mono text-xl font-bold text-slate-50 active:scale-95"
+                  className="flex min-h-[44px] h-14 items-center justify-center rounded-xl border border-zinc-700/80 bg-zinc-950/80 font-mono text-xl font-bold text-white transition focus:outline-none focus:ring-2 focus:ring-emerald-500/50 active:scale-95"
                 >
                   {key}
                 </button>
@@ -975,7 +979,7 @@ function UnlockForm({
           />
           {error ? (
             <p
-              className="text-center text-sm font-semibold text-red-400"
+              className="text-center text-sm font-semibold text-rose-400"
               role="alert"
             >
               {error}
@@ -983,7 +987,7 @@ function UnlockForm({
           ) : null}
           <button
             type="submit"
-            className="flex min-h-12 w-full items-center justify-center rounded-xl bg-emerald-500 text-sm font-bold text-slate-950"
+            className="btn-primary-glow flex min-h-[44px] w-full items-center justify-center rounded-xl text-sm"
           >
             Unlock
           </button>
@@ -994,7 +998,7 @@ function UnlockForm({
         <button
           type="button"
           onClick={() => void submit()}
-          className="mt-3 flex min-h-12 w-full items-center justify-center rounded-xl bg-emerald-500 text-sm font-bold text-slate-950"
+          className="mt-3 btn-primary-glow flex min-h-[44px] w-full items-center justify-center rounded-xl text-sm"
         >
           Unlock
         </button>
@@ -1004,7 +1008,7 @@ function UnlockForm({
         <button
           type="button"
           onClick={onRequestFullLogin}
-          className="mt-2 flex min-h-12 w-full items-center justify-center rounded-xl border border-slate-700 text-sm font-semibold text-slate-300"
+          className="mt-2 flex min-h-[44px] w-full items-center justify-center rounded-xl border border-zinc-700/80 text-sm font-semibold text-zinc-300"
         >
           Sign in as a different user
         </button>

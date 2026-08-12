@@ -92,7 +92,7 @@ export function ChangePinModal({ open, member, onClose, onUpdated }: Props) {
     <div className="fixed inset-0 z-[75] flex items-end justify-center sm:items-center">
       <button
         type="button"
-        className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm"
+        className="absolute inset-0 bg-black/60 backdrop-blur-md"
         aria-label="Close change PIN modal"
         onClick={onClose}
       />
@@ -100,12 +100,12 @@ export function ChangePinModal({ open, member, onClose, onUpdated }: Props) {
         role="dialog"
         aria-modal="true"
         aria-labelledby="change-pin-title"
-        className="relative z-[76] w-full max-w-md rounded-t-2xl border border-slate-700 bg-slate-900 p-4 shadow-2xl sm:rounded-2xl"
+        className="relative z-[76] w-full max-w-md glass-card rounded-t-2xl !rounded-b-none border-emerald-500/20 p-4 sm:!rounded-2xl"
       >
-        <h2 id="change-pin-title" className="text-lg font-bold text-slate-50">
+        <h2 id="change-pin-title" className="text-lg font-bold text-white">
           Change My PIN
         </h2>
-        <p className="mt-1 text-sm text-slate-400">
+        <p className="mt-1 text-sm text-zinc-400">
           Update the access code for {member.name}.
         </p>
 
@@ -148,7 +148,7 @@ export function ChangePinModal({ open, member, onClose, onUpdated }: Props) {
           <button
             type="button"
             onClick={onClose}
-            className="flex min-h-12 items-center justify-center rounded-xl border border-slate-700 text-sm font-semibold text-slate-300"
+            className="flex min-h-12 items-center justify-center rounded-xl border border-zinc-700 text-sm font-semibold text-zinc-300"
           >
             Cancel
           </button>
@@ -156,7 +156,7 @@ export function ChangePinModal({ open, member, onClose, onUpdated }: Props) {
             type="button"
             disabled={saving}
             onClick={() => void handleSave()}
-            className="flex min-h-12 items-center justify-center rounded-xl bg-emerald-500 text-sm font-bold text-slate-950 disabled:opacity-40"
+            className="flex min-h-12 items-center justify-center btn-primary-glow rounded-xl text-sm disabled:opacity-40"
           >
             {saving ? "Saving…" : "Save PIN"}
           </button>

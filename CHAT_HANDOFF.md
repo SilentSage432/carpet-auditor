@@ -10,7 +10,7 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 - Header: brand `DeptSync Hub` · subtitle `DeptSync · Lowe's #{store}` · section title · network
 - Header badge: `DeptSyncBadge` (stacked boxes + barcode, emerald/amber on dark)
 - Icons: `public/icons/icon-192.png`, `icon-512.png`, `apple-touch-icon.png`
-- **Obsidian-glass UI:** void `#09090b`; utilities in `app/globals.css` (`.glass-card`, `.glass-panel`, `.glass-input`, `.btn-primary-glow`, status pills). Emerald primary / cyan secondary accents. NavigationHub + audit cards + Bulk Generator consume these tokens.
+- **Obsidian-glass UI:** void `#09090b`; utilities in `app/globals.css` (`.glass-card`, `.glass-panel`, `.glass-input`, `.glass-backdrop`, `.glass-void`, `.btn-primary-glow`, status pills / bay glows). Emerald primary / cyan secondary accents. AuthWall, Store Map, NavigationHub, audit cards, Bulk Generator, and overlay modals consume these tokens.
 
 ## AI (`lib/ai/gemini.ts`)
 - Server-only Gemini Flash client (`@google/generative-ai`)
@@ -21,8 +21,11 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 - Does not recommend or own institutional knowledge — callers compose prompts
 - **AI Pre-Flight (Bulk Generator):** `POST /api/store-locations/ai-parse` + `lib/store-ops/ai-parse.ts` normalize to `{ locations, corrections_made }`; UI tab confirms via existing bulk upsert
 - **Flooring AI Insights:** `POST /api/flooring/ai-insights` + `lib/flooring/ai-insights.ts` + `FlooringAIInsightBanner` on Cycle Audit / Remnants; applies markdown via `lib/markdown` + `saveRemnant`; age bands via `agingBand()` (30/60/90+)
-- **Zebra Shift Briefing:** `POST /api/store-health/ai-summary` + `ShiftBriefingCard` on `/dashboard` (composes `lib/store-ops/health` snapshot → 3-bullet briefing)
+- **Zebra Shift Briefing:** `POST /api/store-health/ai-summary` + `ShiftBriefingCard` on `/dashboard` (composes `lib/store-ops/health` snapshot + active-shift `telemetry` → 3-bullet briefing)
+- **Audit Velocity Chart:** `lib/store-ops/telemetry.ts` + `StoreHealthChart` on `/dashboard` (06:00–22:00 curve vs linear target; Overall / D23 / D35 pills)
 - **Appliance Anomaly Detection:** `POST /api/appliances/ai-anomaly` + `ApplianceAnomalyWidget` on Appliance Audit (duplicate serials, distant locations, category mismatch, missing high-value floor models)
+- **Catalog Taxonomies:** `lib/catalog/taxonomies.ts` (D21–D28 / D35 / D52 defaults) + `POST /api/catalog/ai-taxonomy` + Admin Tools `TaxonomyManagerModal`; folder accordions on Department Audit + `/department`
+- **AI Visual Bay Scan:** `POST /api/store-ops/ai-bay-scan` + `lib/store-ops/ai-bay-scan.ts` + `VisualBayScannerModal` — Gemini multimodal carton/pallet/hazard read on Store Map bay sheet + Cycle Audit
 
 ## RBAC (`lib/rbac.ts` + `lib/specialists.ts`)
 | Role | Scope | Tabs |
@@ -40,8 +43,13 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 
 ### Admin Tools (Super Admin only)
 - Slide-over drawer defaults **closed** — header **Admin** chip, hamburger entry, or `openAdminTools()`
-- Owns: Bulk Generate, Trigger Weekly Rotation, all-dept bay targets, store number, device diagnostics, links to Store Map / Supervisors / Exceptions
+- Owns: Bulk Generate, **Sunday Rotation Engine** (Flooring cycle assign), Trigger Weekly Rotation, Catalog Taxonomies (AI generate / refresh), all-dept bay targets, store number, device diagnostics, links to Store Map / Supervisors / Exceptions
 - Department Supervisors never see Admin Tools chrome
+- Master Admin header: **My Department Context** pin (Full Store / D23 Flooring / D35 Appliances / …) — filters dashboard Flooring focus without dropping Master privileges
+
+### Sunday Flooring Cycle Audit
+- Staging card + assignment modal: open weekly Flooring bays → assign from Flooring roster; Auto-Assign All to Me; Stage/Draw 12
+- Entry points: `/dashboard`, Cycle Audit tab, Admin Tools, `/flooring` deep link
 
 ### Departments
 `flooring` · `appliances` · `plumbing` · `electrical` · `lawn_garden` · `paint` · `millwork` · `building_materials` · `hardware` · `all`
@@ -72,6 +80,7 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 - Focused SKU fields still support Enter **or** rapid burst via NumberField
 - Quick-Add modal for unlinked barcodes
 - Catalog folders (`lib/catalog-folders.ts`); domain-filtered for department supervisors
+- Department taxonomies (`lib/catalog/taxonomies.ts`) for generic dept folder drill-down; AI seed via Admin Tools
 
 ## Dual audit engine
 - Mode A (Carpet / Sheet Vinyl): CLF; Mode B: cartons × sqft/box
@@ -109,9 +118,10 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
   - Super Admin: `/admin/store-map` · `/admin/supervisors` · `/dashboard` · `/settings`
   - Supervisor: `/dashboard` · `/department` · `/settings`
 - Quick Actions banner (Super Admin): Bulk Generate · Trigger Weekly Rotation · Manage Supervisors
-- `/admin/store-map` — department overview + location grid; Bulk Add accordion; Trigger Weekly Rotation modal (**Force Draw New Rotation**)
+- `/admin/store-map` — department overview + location grid; Bulk Add accordion; Trigger Weekly Rotation modal (**Force Draw New Rotation**); **📷 Snap Bay AI Audit** (Gemini visual scan) on page + bay actions sheet
 - `/dashboard` — Store Health Scorecard (top) + Zebra checklist for this ISO week; checkbox → complete rotation + location COMPLETED (cool-down)
 - `GET /api/store-health` — weekly pace + bottleneck aggregation for DS / Super Admin
+- `POST /api/store-ops/ai-bay-scan` — multimodal bay photo → carton/pallet estimates, cleanliness score, detected issues (Store Ops actor)
 - APIs under `/api/rotations/*`, `/api/store-locations*`, `/api/departments`, `/api/weekly-rotations`
 - Multi-store: apply `20260809_multi_store.sql`; requests send `x-store-ops-store-number`
 - Requires `SUPABASE_SERVICE_ROLE_KEY` for server routes (apply migration in Supabase SQL editor)

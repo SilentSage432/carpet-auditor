@@ -137,7 +137,7 @@ export function ApplyMarkdownModal({
     <div className="fixed inset-0 z-[75] flex items-end justify-center sm:items-center">
       <button
         type="button"
-        className="absolute inset-0 bg-slate-950/80 backdrop-blur-sm"
+        className="absolute inset-0 bg-black/60 backdrop-blur-md"
         aria-label="Close markdown modal"
         onClick={onClose}
       />
@@ -145,12 +145,12 @@ export function ApplyMarkdownModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby="markdown-title"
-        className="relative z-[76] max-h-[90dvh] w-full max-w-md overflow-y-auto rounded-t-2xl border border-slate-700 bg-slate-900 p-4 shadow-2xl sm:rounded-2xl"
+        className="relative z-[76] max-h-[90dvh] w-full max-w-md overflow-y-auto glass-card rounded-t-2xl !rounded-b-none border-emerald-500/20 p-4 sm:!rounded-2xl"
       >
-        <h2 id="markdown-title" className="text-lg font-bold text-slate-50">
+        <h2 id="markdown-title" className="text-lg font-bold text-white">
           🏷️ Apply Manager Markdown
         </h2>
-        <p className="mt-1 text-sm text-slate-400">
+        <p className="mt-1 text-sm text-zinc-400">
           {remnant.tag_number} · {remnant.carpet_name || remnant.sku}
         </p>
 
@@ -163,7 +163,7 @@ export function ApplyMarkdownModal({
             <button
               type="button"
               onClick={onClose}
-              className="flex min-h-12 w-full items-center justify-center rounded-xl border border-slate-700 text-sm font-semibold text-slate-300"
+              className="flex min-h-12 w-full items-center justify-center rounded-xl border border-zinc-700 text-sm font-semibold text-zinc-300"
             >
               Close
             </button>
@@ -176,8 +176,8 @@ export function ApplyMarkdownModal({
                 onClick={() => setMode("percent")}
                 className={`flex min-h-12 items-center justify-center rounded-xl text-sm font-semibold ${
                   mode === "percent"
-                    ? "bg-emerald-500 text-slate-950"
-                    : "border border-slate-700 text-slate-300"
+                    ? "bg-emerald-500 text-zinc-950"
+                    : "border border-zinc-700 text-zinc-300"
                 }`}
               >
                 % Off
@@ -187,8 +187,8 @@ export function ApplyMarkdownModal({
                 onClick={() => setMode("fixed")}
                 className={`flex min-h-12 items-center justify-center rounded-xl text-sm font-semibold ${
                   mode === "fixed"
-                    ? "bg-emerald-500 text-slate-950"
-                    : "border border-slate-700 text-slate-300"
+                    ? "bg-emerald-500 text-zinc-950"
+                    : "border border-zinc-700 text-zinc-300"
                 }`}
               >
                 Fixed $
@@ -211,7 +211,7 @@ export function ApplyMarkdownModal({
 
               {mode === "percent" ? (
                 <div className="space-y-2">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
                     Discount
                   </p>
                   <div className="flex flex-wrap gap-2">
@@ -223,7 +223,7 @@ export function ApplyMarkdownModal({
                         className={`flex min-h-12 min-w-[4.5rem] items-center justify-center rounded-xl px-3 text-sm font-bold ${
                           percent === p
                             ? "bg-red-500 text-white"
-                            : "border border-slate-700 text-slate-300"
+                            : "border border-zinc-700 text-zinc-300"
                         }`}
                       >
                         {p}%
@@ -276,7 +276,7 @@ export function ApplyMarkdownModal({
               <button
                 type="button"
                 onClick={onClose}
-                className="flex min-h-12 items-center justify-center rounded-xl border border-slate-700 text-sm font-semibold text-slate-300"
+                className="flex min-h-12 items-center justify-center rounded-xl border border-zinc-700 text-sm font-semibold text-zinc-300"
               >
                 Cancel
               </button>
