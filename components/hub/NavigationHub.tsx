@@ -69,6 +69,7 @@ export function NavigationHub({
     useState<AdminToolsSection>("menu");
   const [adminForce, setAdminForce] = useState(false);
   const [adminSunday, setAdminSunday] = useState(false);
+  const [adminNotes, setAdminNotes] = useState(false);
   const [workingLabel, setWorkingLabel] = useState("Full Store");
   const userMenuId = useId();
   const drawerId = useId();
@@ -101,6 +102,7 @@ export function NavigationHub({
       setAdminSection(detail.section ?? "menu");
       setAdminForce(Boolean(detail.openForceRotation));
       setAdminSunday(Boolean(detail.openSundayAudit));
+      setAdminNotes(Boolean(detail.openManagerNotes));
       setAdminOpen(true);
     }
     window.addEventListener(ADMIN_TOOLS_EVENT, onAdminEvent);
@@ -114,21 +116,31 @@ export function NavigationHub({
       setAdminSection("bulk");
       setAdminForce(false);
       setAdminSunday(false);
+      setAdminNotes(false);
       setAdminOpen(true);
     } else if (hash === "weekly-rotation") {
       setAdminSection("menu");
       setAdminForce(true);
       setAdminSunday(false);
+      setAdminNotes(false);
       setAdminOpen(true);
     } else if (hash === "sunday-audit" || hash === "sunday-rotation") {
       setAdminSection("menu");
       setAdminForce(false);
       setAdminSunday(true);
+      setAdminNotes(false);
+      setAdminOpen(true);
+    } else if (hash === "manager-notes" || hash === "s-pen-notes") {
+      setAdminSection("menu");
+      setAdminForce(false);
+      setAdminSunday(false);
+      setAdminNotes(true);
       setAdminOpen(true);
     } else if (hash === "admin-tools") {
       setAdminSection("menu");
       setAdminForce(false);
       setAdminSunday(false);
+      setAdminNotes(false);
       setAdminOpen(true);
     }
   }, [master, pathname]);
@@ -434,6 +446,7 @@ export function NavigationHub({
             setAdminOpen(false);
             setAdminForce(false);
             setAdminSunday(false);
+            setAdminNotes(false);
             if (typeof window !== "undefined" && window.location.hash) {
               history.replaceState(
                 null,
@@ -448,6 +461,7 @@ export function NavigationHub({
           initialSection={adminSection}
           openForceRotationOnMount={adminForce}
           openSundayAuditOnMount={adminSunday}
+          openManagerNotesOnMount={adminNotes}
         />
       ) : null}
     </>

@@ -308,6 +308,7 @@ Stacked cards (~1.5–2 handheld screens):
 | **ApplyMarkdownModal** | `ApplyMarkdownModal.tsx` | Remnant markdown CTA | % Off / Fixed $ + preview |
 | **MarryBarcodeModal** | `MarryBarcodeModal.tsx` | *Not currently wired* | Orphan — Select Existing / Create New (superseded by Quick-Add) |
 | **VisualBayScannerModal** | `store-ops/VisualBayScannerModal.tsx` | Store Map CTA / bay sheet / Cycle Audit **📷 Snap Bay AI Audit** | Camera or upload → Gemini scan beam → results drawer (z-90) |
+| **ManagerNotesWorkspace** | `store-ops/ManagerNotesWorkspace.tsx` | Admin Tools / `/manager-notes` / `#manager-notes` | S Pen canvas + note editor → Gemini action items (z-80) |
 | Pin / Sync toasts | `app/page.tsx` | PIN save / online flush | Fixed top status pills |
 
 ### Z-index stack

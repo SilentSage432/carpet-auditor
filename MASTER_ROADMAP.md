@@ -75,6 +75,7 @@
 - [x] Store Audit Velocity & Health Telemetry Chart (`StoreHealthChart` + `lib/store-ops/telemetry` on `/dashboard` / store-health)
 - [x] Sunday Flooring Cycle Audit staging + Master Admin department context switcher
 - [x] AI Visual Bay Scan (`/api/store-ops/ai-bay-scan` + `VisualBayScannerModal` on Store Map / Cycle Audit)
+- [x] Manager Notes & S Pen Canvas (`/api/store-ops/ai-note-summary` + `ManagerNotesWorkspace` + `20260811_manager_notes.sql`)
 
 ## Next
 - [ ] JWT / claim-based RLS enforcing `store_number` (+ department) server-side
@@ -85,6 +86,7 @@
 - [ ] Conflict resolution UI when offline edits collide
 - [ ] Retire or wire orphan `MarryBarcodeModal`
 - [ ] Persist Sunday specialist bay assignments server-side (today: local store/week overlay)
+- [ ] Persist Manager Notes to Supabase (`manager_notes`) beyond localStorage list
 - [ ] Additional Gemini product surfaces beyond current AI ops widgets
 ## Non-goals
 - Pricing / margin engines

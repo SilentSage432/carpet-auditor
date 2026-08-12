@@ -1,5 +1,14 @@
 # DeptSync Hub — Development Journal
 
+## 2026-08-11 — Manager Notes & S Pen Canvas (Gemini synthesis)
+
+### Shipped
+- Migration `supabase/migrations/20260811_manager_notes.sql` — `manager_notes` table (UUID `store_id` FK to `stores`, dept/aisle/bay context, canvas PNG data-URL, `ai_summary`, `action_items` jsonb).
+- Domain `lib/store-ops/ai-note-summary.ts` — prompt, normalize, local heuristic fallback; `lib/store-ops/manager-notes.ts` — offline localStorage note list aligned to schema.
+- `POST /api/store-ops/ai-note-summary` — Store Ops actor auth; accepts title/content + optional S Pen PNG; Gemini Flash multimodal → 2-sentence executive summary, action items (`task` / `priority` / `assignee_role`), referenced SKUs/aisles/bay exceptions; graceful local fallback without key.
+- Client `synthesizeManagerNote` + glass `ManagerNotesWorkspace` (stylus pressure strokes, undo/clear/colors, ✨ Synthesize Action Items → glowing checkbox cards).
+- Entry points: Admin Tools → **Manager Notes & S Pen**, `/manager-notes` hub route (Master + Supervisor nav), hash `#manager-notes`.
+
 ## 2026-08-11 — AI Visual Bay Scan (Gemini multimodal)
 
 ### Shipped

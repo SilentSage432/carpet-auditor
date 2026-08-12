@@ -17,6 +17,7 @@ export type NavHubHref =
   | "/dashboard"
   | "/verify-rotation"
   | "/department"
+  | "/manager-notes"
   | "/settings"
   | "/";
 
@@ -105,6 +106,13 @@ export function navRoleLinks(
         description: "This week’s assigned bay checklist",
       },
       {
+        href: "/manager-notes",
+        label: "Manager Notes & S Pen",
+        shortLabel: "Notes",
+        icon: "📝",
+        description: "Floor notes + stylus canvas + AI action items",
+      },
+      {
         href: "/settings",
         label: "Settings & Config",
         shortLabel: "Settings",
@@ -137,6 +145,13 @@ export function navRoleLinks(
         shortLabel: dept.shortLabel,
         icon: dept.icon,
         description: `${dept.label} ops overview + Hub link`,
+      },
+      {
+        href: "/manager-notes",
+        label: "Manager Notes & S Pen",
+        shortLabel: "Notes",
+        icon: "📝",
+        description: "Floor notes + stylus canvas + AI action items",
       },
       {
         href: "/settings",

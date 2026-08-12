@@ -32,6 +32,12 @@ components/admin/SundayAuditStagingCard.tsx → Glowing pending Sunday Flooring 
 components/admin/SundayAuditAssignmentModal.tsx → Assign Flooring specialists to staged bays
 lib/admin-department-context.ts       → Master Admin working department pin (local)
 lib/store-ops/sunday-audit.ts         → Sunday Flooring staging + assignment overlay
+lib/store-ops/ai-bay-scan.ts          → Visual bay scan prompt / normalize / local fallback
+lib/store-ops/ai-note-summary.ts      → Manager note + S Pen synthesis prompt / normalize / fallback
+lib/store-ops/manager-notes.ts        → Offline manager note list (aligned to manager_notes table)
+components/store-ops/ManagerNotesWorkspace.tsx → S Pen canvas + synthesize action items UI
+app/manager-notes/page.tsx            → Hub route for Manager Notes workspace
+app/api/store-ops/ai-note-summary     → Gemini Flash manager note synthesis
 app/flooring/page.tsx                 → Deep link → Cycle Audit + D23 pin
 lib/auth-session.ts               → Auth session token + inactivity lock
 lib/biometric-auth.ts             → WebAuthn fingerprint / Face ID register + assert
@@ -57,6 +63,7 @@ supabase/migrations/20260809_store_operations_rbac.sql → departments, profiles
 supabase/migrations/20260809_multi_store.sql → stores + store_id scoping
 supabase/migrations/20260810_store_locations_type_unique.sql → location unique (department_id,aisle,bay,type)
 supabase/migrations/20260811_alphanumeric_aisle.sql → store_locations.aisle INTEGER → TEXT (BW/RW/12/A1)
+supabase/migrations/20260811_manager_notes.sql → manager_notes (S Pen canvas + AI action items)
 
 ## Ownership
 
@@ -66,6 +73,7 @@ supabase/migrations/20260811_alphanumeric_aisle.sql → store_locations.aisle IN
 | Department RBAC / tab visibility | `lib/rbac.ts` |
 | Cross-app Navigation Hub | `lib/nav-hub.ts` + `NavigationHub` |
 | Store Operations map + rotations | `lib/store-ops/*` + `/admin/store-map` + `/dashboard` |
+| Manager notes + S Pen synthesis | `lib/store-ops/ai-note-summary.ts`, `manager-notes.ts`, `ManagerNotesWorkspace` |
 | Team roster (Master Admin) | `AdminRosterManager`, `lib/specialists.ts` (`is_active` soft-delete) |
 | Store context | `lib/store.ts` + `lib/store-ops/stores.ts` |
 | Offline sync queue | `lib/sync-queue.ts` |
@@ -76,6 +84,7 @@ supabase/migrations/20260811_alphanumeric_aisle.sql → store_locations.aisle IN
 | Store health scorecard | `lib/store-ops/health.ts`, `StoreHealthCard` |
 | Shift audit velocity telemetry | `lib/store-ops/telemetry.ts`, `StoreHealthChart` |
 | Zebra shift briefing | `lib/store-ops/shift-briefing.ts`, `ShiftBriefingCard` |
+| Visual bay scan | `lib/store-ops/ai-bay-scan.ts`, `VisualBayScannerModal` |
 | Barcode resolve / Quick-Add | `lib/barcode.ts`, `NumberField` scan hooks, `QuickAddCatalogModal` |
 | Hardware wedge (no soft keyboard) | `lib/hardware-scanner.ts` |
 | Focus / keyboard dismiss | `lib/focus-input.ts` (`blurActiveInput` — never auto-focus on tab switch) |

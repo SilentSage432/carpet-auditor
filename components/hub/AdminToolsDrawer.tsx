@@ -19,6 +19,7 @@ import { ForceRotationModal } from "@/components/admin/ForceRotationModal";
 import { SundayAuditAssignmentModal } from "@/components/admin/SundayAuditAssignmentModal";
 import { TaxonomyManagerModal } from "@/components/catalog/TaxonomyManagerModal";
 import { WeeklyBayTargetCard } from "@/components/hub/WeeklyBayTargetCard";
+import { ManagerNotesWorkspace } from "@/components/store-ops/ManagerNotesWorkspace";
 import { selectOnFocus } from "@/lib/number-input";
 import { isMasterAdmin } from "@/lib/rbac";
 import { fetchDepartments } from "@/lib/store-ops/client";
@@ -48,6 +49,7 @@ export type AdminToolsEventDetail = {
   section?: AdminToolsSection;
   openForceRotation?: boolean;
   openSundayAudit?: boolean;
+  openManagerNotes?: boolean;
 };
 
 type Props = {
@@ -59,6 +61,7 @@ type Props = {
   initialSection?: AdminToolsSection;
   openForceRotationOnMount?: boolean;
   openSundayAuditOnMount?: boolean;
+  openManagerNotesOnMount?: boolean;
 };
 
 export function AdminToolsDrawer({
@@ -70,6 +73,7 @@ export function AdminToolsDrawer({
   initialSection = "menu",
   openForceRotationOnMount = false,
   openSundayAuditOnMount = false,
+  openManagerNotesOnMount = false,
 }: Props) {
   const titleId = useId();
   const [section, setSection] = useState<AdminToolsSection>(initialSection);
@@ -77,6 +81,7 @@ export function AdminToolsDrawer({
   const [forceOpen, setForceOpen] = useState(false);
   const [taxonomyOpen, setTaxonomyOpen] = useState(false);
   const [sundayOpen, setSundayOpen] = useState(false);
+  const [notesOpen, setNotesOpen] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
 
   const reloadDepts = useCallback(async () => {
@@ -96,6 +101,7 @@ export function AdminToolsDrawer({
     setSection(initialSection);
     setForceOpen(openForceRotationOnMount);
     setSundayOpen(openSundayAuditOnMount);
+    setNotesOpen(openManagerNotesOnMount);
     setTaxonomyOpen(false);
     void reloadDepts();
   }, [
@@ -103,6 +109,7 @@ export function AdminToolsDrawer({
     initialSection,
     openForceRotationOnMount,
     openSundayAuditOnMount,
+    openManagerNotesOnMount,
     reloadDepts,
   ]);
 
@@ -110,7 +117,8 @@ export function AdminToolsDrawer({
     if (!open) return;
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") {
-        if (sundayOpen) setSundayOpen(false);
+        if (notesOpen) setNotesOpen(false);
+        else if (sundayOpen) setSundayOpen(false);
         else if (taxonomyOpen) setTaxonomyOpen(false);
         else if (forceOpen) setForceOpen(false);
         else onClose();
@@ -118,7 +126,7 @@ export function AdminToolsDrawer({
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [open, forceOpen, taxonomyOpen, sundayOpen, onClose]);
+  }, [open, forceOpen, taxonomyOpen, sundayOpen, notesOpen, onClose]);
 
   useEffect(() => {
     if (!open) return;
@@ -186,6 +194,7 @@ export function AdminToolsDrawer({
                 onForce={() => setForceOpen(true)}
                 onSunday={() => setSundayOpen(true)}
                 onTaxonomy={() => setTaxonomyOpen(true)}
+                onNotes={() => setNotesOpen(true)}
                 onTargets={() => setSection("targets")}
                 onStore={() => setSection("store")}
                 onDiagnostics={() => setSection("diagnostics")}
@@ -247,6 +256,12 @@ export function AdminToolsDrawer({
         onClose={() => setTaxonomyOpen(false)}
         departments={departments}
       />
+      <ManagerNotesWorkspace
+        open={notesOpen}
+        onClose={() => setNotesOpen(false)}
+        specialist={specialist}
+        storeNumber={storeNumber}
+      />
     </>
   );
 }
@@ -256,6 +271,7 @@ function Menu({
   onForce,
   onSunday,
   onTaxonomy,
+  onNotes,
   onTargets,
   onStore,
   onDiagnostics,
@@ -265,6 +281,7 @@ function Menu({
   onForce: () => void;
   onSunday: () => void;
   onTaxonomy: () => void;
+  onNotes: () => void;
   onTargets: () => void;
   onStore: () => void;
   onDiagnostics: () => void;
@@ -275,6 +292,7 @@ function Menu({
       <ToolButton onClick={onBulk}>Bulk Generate Aisles</ToolButton>
       <ToolButton onClick={onSunday}>Sunday Rotation Engine</ToolButton>
       <ToolButton onClick={onForce}>Trigger Weekly Rotation</ToolButton>
+      <ToolButton onClick={onNotes}>Manager Notes &amp; S Pen</ToolButton>
       <ToolButton onClick={onTaxonomy}>Catalog Taxonomies</ToolButton>
       <ToolButton onClick={onTargets}>All-Department Bay Targets</ToolButton>
       <ToolButton onClick={onStore}>Store Number / Location</ToolButton>

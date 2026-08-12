@@ -595,3 +595,32 @@ export async function scanBayVisual(
     }
   );
 }
+
+export type NoteSummaryClientResult =
+  import("./ai-note-summary").NoteSummaryResult & {
+    source?: "gemini" | "local";
+  };
+
+/** Gemini Flash manager note (+ optional S Pen PNG) → summary + action items. */
+export async function synthesizeManagerNote(
+  specialist: StoreSpecialist,
+  input: {
+    title: string;
+    content: string;
+    canvas_data_url?: string;
+    department_code?: string;
+    aisle?: string;
+    bay?: number;
+    allow_local_fallback?: boolean;
+  }
+): Promise<NoteSummaryClientResult> {
+  return storeOpsFetch<NoteSummaryClientResult>(
+    "/api/store-ops/ai-note-summary",
+    specialist,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    }
+  );
+}
