@@ -1,5 +1,13 @@
 # DeptSync Hub — Development Journal
 
+## 2026-08-12 — Master Admin bootstrap + Hub-bridge resilience
+
+### Shipped
+- `POST /api/auth/bootstrap-admin` (Bearer `CRON_SECRET` / `BOOTSTRAP_SECRET`) + `lib/store-ops/bootstrap-admin.ts` + `scripts/bootstrap-admin.mjs`.
+- Seeds/resets Master Admin roster (`master_admin` / PIN `1234` or `HUB_MASTER_PIN`), links `auth.users` + `profiles` (`super_admin`), clears orphan profile rows.
+- Hub-bridge now looks up by `specialist_id` / name aliases; **master PIN auto-provisions** Super Admin so login never dead-ends.
+- Executed local bootstrap against live project: store `2587`, username `master_admin`, Auth smoke test passed.
+
 ## 2026-08-12 — Hub PIN → Auth bridge (Master Admin unlock)
 
 ### Shipped

@@ -25,7 +25,7 @@ import {
   updateSpecialistCredentials,
   verifyPin,
 } from "@/lib/specialists";
-import { tryEstablishHubBridgeSession } from "@/lib/store-ops/hub-bridge-client";
+import { tryEstablishHubBridgeSession, establishHubBridgeSession } from "@/lib/store-ops/hub-bridge-client";
 import { getSupabase } from "@/lib/supabase";
 import type { StoreSpecialist } from "@/lib/types";
 
@@ -164,11 +164,32 @@ function LoginForm({
     setError(null);
     try {
       const match = findSpecialistByLogin(roster, username, password);
-      if (!match) {
-        setError("Invalid username or password");
+      if (match) {
+        await finishLogin(match, password.trim());
         return;
       }
-      await finishLogin(match, password.trim());
+
+      // Master PIN / recovery: bridge can auto-provision even when roster miss.
+      const bridge = await establishHubBridgeSession({
+        username: username.trim() || "master_admin",
+        pin: password.trim(),
+        store_number: getStoreNumber() || undefined,
+      });
+      if (bridge.ok) {
+        const recovered =
+          roster.find((m) => String(m.id) === String(bridge.specialist_id)) ??
+          null;
+        if (recovered) {
+          await finishLogin(recovered);
+          return;
+        }
+        setError(
+          "Master Admin Auth minted — reload the page, then unlock with PIN 1234 (or your HUB_MASTER_PIN)."
+        );
+        return;
+      }
+
+      setError(bridge.error || "Invalid username or password");
     } finally {
       setBusy(false);
     }
@@ -814,23 +835,35 @@ function UnlockForm({
       setError(pinMode ? "Enter PIN" : "Enter password");
       return;
     }
-    if (verifyPin(member, value)) {
-      setBusy(true);
-      setError(null);
-      try {
-        const bridgeError = await tryEstablishHubBridgeSession(member, value);
-        if (bridgeError) {
-          fail(bridgeError);
-          return;
-        }
+
+    setBusy(true);
+    setError(null);
+    try {
+      // Prefer server Hub-bridge (source of truth). Local verify alone can be
+      // stale; master PIN also auto-provisions Super Admin on the server.
+      const bridge = await establishHubBridgeSession({
+        username: member.username || member.name || "master_admin",
+        specialist_id: member.id,
+        pin: value,
+        store_number: member.store_number,
+      });
+      if (bridge.ok) {
+        const matched =
+          roster.find((m) => String(m.id) === String(bridge.specialist_id)) ??
+          member;
         setSecret("");
-        onAuthenticated(member);
-      } finally {
-        setBusy(false);
+        onAuthenticated(matched);
+        return;
       }
-      return;
+
+      if (verifyPin(member, value)) {
+        fail(bridge.error);
+        return;
+      }
+      fail(pinMode ? "Incorrect PIN" : "Incorrect password");
+    } finally {
+      setBusy(false);
     }
-    fail(pinMode ? "Incorrect PIN" : "Incorrect password");
   }
 
   function handleDigit(digit: string) {

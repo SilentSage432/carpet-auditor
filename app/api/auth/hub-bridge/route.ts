@@ -7,6 +7,7 @@ import { describeSupabaseEnv } from "@/lib/supabase/env";
  * POST /api/auth/hub-bridge
  * Verify Hub PIN against store_specialists (service role) and mint a Supabase
  * Auth session so Store Ops APIs work without phone OTP.
+ * Master PIN auto-provisions Super Admin when roster/profile is missing.
  */
 export async function POST(request: Request) {
   try {
@@ -23,22 +24,25 @@ export async function POST(request: Request) {
 
     const body = (await request.json().catch(() => ({}))) as {
       username?: string;
+      specialist_id?: string;
       pin?: string;
       password?: string;
       store_number?: string;
     };
 
     const username = String(body.username ?? "").trim();
+    const specialistId = String(body.specialist_id ?? "").trim();
     const pin = String(body.pin ?? body.password ?? "").trim();
-    if (!username || !pin) {
+    if ((!username && !specialistId) || !pin) {
       return NextResponse.json(
-        { error: "username and pin are required" },
+        { error: "username or specialist_id, and pin, are required" },
         { status: 400 }
       );
     }
 
     const result = await mintHubBridgeSession({
-      username,
+      username: username || undefined,
+      specialist_id: specialistId || undefined,
       pin,
       store_number: body.store_number,
     });

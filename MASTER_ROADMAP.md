@@ -83,6 +83,7 @@
 - [x] Phase 2 Data Durability — Manager Notes + Sunday bay assignments on Supabase; retire `MarryBarcodeModal`
 - [x] Hub PIN → Auth bridge — Master Admin / supervisors mint Store Ops JWT via PIN (`/api/auth/hub-bridge`); phone OTP optional recovery only
 - [x] Soft-fail Store Ops reads when JWT missing (briefing / map / departments) + Hub PIN unlock copy
+- [x] Master Admin bootstrap (`/api/auth/bootstrap-admin` + `scripts/bootstrap-admin.mjs`) + master-PIN auto-provision on hub-bridge
 
 ## Next
 - [x] Apply Phase 1 JWT/RLS migration in Supabase + enable Custom Access Token Hook

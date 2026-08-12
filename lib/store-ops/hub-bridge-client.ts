@@ -10,17 +10,28 @@ import { getStoreNumber } from "@/lib/store";
 import { getSupabase } from "@/lib/supabase";
 import type { StoreSpecialist } from "@/lib/types";
 
+export type HubBridgeClientResult =
+  | {
+      ok: true;
+      specialist_id: string;
+      role?: string;
+      store_number?: string | null;
+    }
+  | { ok: false; error: string };
+
 export async function establishHubBridgeSession(input: {
-  username: string;
+  username?: string;
+  specialist_id?: string;
   pin: string;
   store_number?: string | null;
-}): Promise<{ ok: true } | { ok: false; error: string }> {
+}): Promise<HubBridgeClientResult> {
   try {
     const res = await fetch("/api/auth/hub-bridge", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
         username: input.username,
+        specialist_id: input.specialist_id,
         pin: input.pin,
         store_number:
           String(input.store_number ?? "").trim() || getStoreNumber() || undefined,
@@ -29,6 +40,9 @@ export async function establishHubBridgeSession(input: {
 
     const body = (await res.json().catch(() => ({}))) as {
       error?: string;
+      specialist_id?: string;
+      role?: string;
+      store_number?: string | null;
       session?: {
         access_token: string;
         refresh_token: string;
@@ -56,7 +70,12 @@ export async function establishHubBridgeSession(input: {
       return { ok: false, error: error.message || "Could not persist Auth session" };
     }
 
-    return { ok: true };
+    return {
+      ok: true,
+      specialist_id: String(body.specialist_id ?? input.specialist_id ?? ""),
+      role: body.role,
+      store_number: body.store_number,
+    };
   } catch (err) {
     return {
       ok: false,
@@ -66,13 +85,14 @@ export async function establishHubBridgeSession(input: {
   }
 }
 
-/** After local PIN verify: mint Auth session (blocks Store Ops unlock on failure). */
+/** After PIN entry: mint Auth session (blocks Store Ops unlock on failure). */
 export async function tryEstablishHubBridgeSession(
   member: StoreSpecialist,
   pin: string
 ): Promise<string | null> {
   const result = await establishHubBridgeSession({
-    username: member.username || member.name || member.id,
+    username: member.username || member.name || "master_admin",
+    specialist_id: member.id,
     pin,
     store_number: member.store_number,
   });

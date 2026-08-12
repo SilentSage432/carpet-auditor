@@ -36,7 +36,9 @@ export async function linkAuthUserToSpecialistProfile(
   const storeNumber = normalizeStoreNumber(
     String(input.specialist.store_number ?? "")
   );
-  if (!storeNumber) return;
+  // Super Admin may bootstrap before a store is set — keep linking so Hub PIN works.
+  if (!storeNumber && role !== "super_admin") return;
+  const effectiveStore = storeNumber || "0001";
 
   let departmentId: string | null = null;
   let departmentCode: string | null = null;
@@ -50,7 +52,7 @@ export async function linkAuthUserToSpecialistProfile(
     const { data: store } = await admin
       .from("stores")
       .select("id")
-      .eq("store_number", storeNumber)
+      .eq("store_number", effectiveStore)
       .maybeSingle();
 
     if (store?.id) {
@@ -67,28 +69,54 @@ export async function linkAuthUserToSpecialistProfile(
   const jwtRole =
     role === "super_admin" ? "master_admin" : role === "associate" ? "associate" : "department_supervisor";
 
-  const { error: profileError } = await admin.from("profiles").upsert(
-    {
-      id: input.authUserId,
-      email: input.email ?? null,
-      role,
-      assigned_department_id: departmentId,
-      store_number: storeNumber,
-      specialist_id: String(input.specialist.id),
-      updated_at: new Date().toISOString(),
-    },
-    { onConflict: "id" }
-  );
+  const profilePayload: Record<string, unknown> = {
+    id: input.authUserId,
+    role,
+    assigned_department_id: departmentId,
+    store_number: effectiveStore,
+    specialist_id: String(input.specialist.id),
+    username: input.specialist.username ?? null,
+    full_name: input.specialist.name ?? null,
+    is_active: input.specialist.is_active !== false,
+    must_change_credentials: Boolean(input.specialist.must_change_credentials),
+    pin_code: input.specialist.pin_code ?? null,
+    pin: input.specialist.pin_code ?? null,
+    assigned_department:
+      input.specialist.assigned_department &&
+      input.specialist.assigned_department !== "all"
+        ? input.specialist.assigned_department
+        : null,
+  };
+
+  const { error: profileError } = await admin
+    .from("profiles")
+    .upsert(profilePayload, { onConflict: "id" });
 
   if (profileError) {
-    throw new Error(profileError.message || "Could not link Auth profile");
+    // Live schemas vary — retry with the minimal Store Ops identity columns.
+    const { error: minimalError } = await admin.from("profiles").upsert(
+      {
+        id: input.authUserId,
+        role,
+        store_number: effectiveStore,
+        specialist_id: String(input.specialist.id),
+      },
+      { onConflict: "id" }
+    );
+    if (minimalError) {
+      throw new Error(
+        profileError.message ||
+          minimalError.message ||
+          "Could not link Auth profile"
+      );
+    }
   }
 
   const { error: metaError } = await admin.auth.admin.updateUserById(
     input.authUserId,
     {
       app_metadata: {
-        store_number: storeNumber,
+        store_number: effectiveStore,
         department: departmentCode,
         role: jwtRole,
         specialist_id: String(input.specialist.id),

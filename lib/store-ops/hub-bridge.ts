@@ -12,6 +12,11 @@ import { mapRow, verifyPin } from "@/lib/specialists";
 import { normalizeStoreNumber } from "@/lib/store";
 import { getSupabaseAnonKey, getSupabaseUrl } from "@/lib/supabase/env";
 import { createAdminClient } from "@/lib/supabase/admin";
+import {
+  ensureMasterAdminBootstrap,
+  HUB_MASTER_USERNAME,
+  isHubMasterPin,
+} from "./bootstrap-admin";
 import { linkAuthUserToSpecialistProfile } from "./link-auth-profile";
 import type { StoreSpecialist } from "@/lib/types";
 
@@ -39,6 +44,43 @@ function hubBridgeEmail(specialistId: string): string {
   return `hub.${safe || "user"}@deptsync.hub`;
 }
 
+async function loadSpecialistById(
+  specialistId: string
+): Promise<StoreSpecialist | null> {
+  const id = String(specialistId ?? "").trim();
+  if (!id) return null;
+  const admin = createAdminClient();
+  const { data, error } = await admin
+    .from("store_specialists")
+    .select("*")
+    .eq("id", id)
+    .eq("is_active", true)
+    .maybeSingle();
+  if (error) {
+    throw new Error(error.message || "Could not load specialist by id");
+  }
+  if (!data) return null;
+  return mapRow(data as Record<string, unknown>);
+}
+
+function matchesLoginAlias(
+  member: StoreSpecialist,
+  login: string
+): boolean {
+  const aliases = new Set([login]);
+  if (login === "admin" || login === "master" || login === "masteradmin") {
+    aliases.add("master_admin");
+    aliases.add(HUB_MASTER_USERNAME);
+  }
+  const uname = member.username?.trim().toLowerCase() ?? "";
+  const name = member.name.trim().toLowerCase();
+  if (uname && aliases.has(uname)) return true;
+  if (aliases.has(name)) return true;
+  if (aliases.has(name.replace(/\s+/g, "_"))) return true;
+  if (aliases.has(String(member.id).toLowerCase())) return true;
+  return false;
+}
+
 async function loadSpecialistByLogin(
   username: string,
   storeNumber: string | null
@@ -47,6 +89,7 @@ async function loadSpecialistByLogin(
   const login = String(username ?? "").trim().toLowerCase();
   if (!login) return null;
 
+  // Direct username match first
   let query = admin
     .from("store_specialists")
     .select("*")
@@ -64,9 +107,8 @@ async function loadSpecialistByLogin(
     throw new Error(error.message || "Could not load specialist roster");
   }
 
-  const rows = (data ?? []) as Record<string, unknown>[];
+  let rows = (data ?? []) as Record<string, unknown>[];
   if (rows.length === 0) {
-    // Fall back without store filter (device store may be blank on first login)
     const { data: anyStore, error: anyErr } = await admin
       .from("store_specialists")
       .select("*")
@@ -76,13 +118,27 @@ async function loadSpecialistByLogin(
     if (anyErr) {
       throw new Error(anyErr.message || "Could not load specialist roster");
     }
-    const mapped = (anyStore ?? []).map((row) =>
-      mapRow(row as Record<string, unknown>)
-    );
-    return mapped[0] ?? null;
+    rows = (anyStore ?? []) as Record<string, unknown>[];
   }
 
-  return mapRow(rows[0]);
+  if (rows.length > 0) {
+    return mapRow(rows[0]);
+  }
+
+  // Fallback: scan active roster for name / master aliases (same as client login)
+  const { data: active, error: activeErr } = await admin
+    .from("store_specialists")
+    .select("*")
+    .eq("is_active", true)
+    .limit(200);
+  if (activeErr) {
+    throw new Error(activeErr.message || "Could not load specialist roster");
+  }
+
+  const mapped = (active ?? []).map((row) =>
+    mapRow(row as Record<string, unknown>)
+  );
+  return mapped.find((m) => matchesLoginAlias(m, login)) ?? null;
 }
 
 async function ensureAuthUserForSpecialist(
@@ -129,7 +185,6 @@ async function ensureAuthUserForSpecialist(
   });
 
   if (error || !data.user?.id) {
-    // Email collision — try locate via Auth admin list by email match (single page)
     const listed = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
     const existing = listed.data.users.find(
       (u) => String(u.email ?? "").toLowerCase() === email.toLowerCase()
@@ -154,32 +209,9 @@ async function ensureAuthUserForSpecialist(
   return { userId: data.user.id, email };
 }
 
-/**
- * Verify Hub PIN against store_specialists and mint a Supabase Auth session
- * (service-role path). Used so Master Admin / supervisors are not locked out
- * waiting for phone OTP.
- */
-export async function mintHubBridgeSession(input: {
-  username: string;
-  pin: string;
-  store_number?: string | null;
-}): Promise<HubBridgeResult> {
-  const pin = String(input.pin ?? "").trim();
-  if (!pin) {
-    throw new Error("PIN is required");
-  }
-
-  const specialist = await loadSpecialistByLogin(
-    input.username,
-    input.store_number ?? null
-  );
-  if (!specialist || specialist.is_active === false) {
-    throw new Error("Invalid username or PIN");
-  }
-  if (!verifyPin(specialist, pin)) {
-    throw new Error("Invalid username or PIN");
-  }
-
+async function mintSessionForSpecialist(
+  specialist: StoreSpecialist
+): Promise<HubBridgeResult> {
   const url = getSupabaseUrl();
   const anon = getSupabaseAnonKey();
   if (!url || !anon) {
@@ -235,4 +267,48 @@ export async function mintHubBridgeSession(input: {
       },
     },
   };
+}
+
+/**
+ * Verify Hub PIN against store_specialists and mint a Supabase Auth session
+ * (service-role path). Master PIN auto-provisions Super Admin when missing.
+ */
+export async function mintHubBridgeSession(input: {
+  username?: string;
+  specialist_id?: string | null;
+  pin: string;
+  store_number?: string | null;
+}): Promise<HubBridgeResult> {
+  const pin = String(input.pin ?? "").trim();
+  if (!pin) {
+    throw new Error("PIN is required");
+  }
+
+  let specialist: StoreSpecialist | null = null;
+
+  if (input.specialist_id) {
+    specialist = await loadSpecialistById(input.specialist_id);
+  }
+
+  if (!specialist && input.username) {
+    specialist = await loadSpecialistByLogin(
+      input.username,
+      input.store_number ?? null
+    );
+  }
+
+  if (specialist && specialist.is_active !== false && verifyPin(specialist, pin)) {
+    return mintSessionForSpecialist(specialist);
+  }
+
+  // Master PIN resilience: never lock out Super Admin — bootstrap + mint.
+  if (isHubMasterPin(pin)) {
+    const boot = await ensureMasterAdminBootstrap({
+      store_number: input.store_number ?? specialist?.store_number ?? null,
+      mint_session: false,
+    });
+    return mintSessionForSpecialist(boot.specialist);
+  }
+
+  throw new Error("Invalid username or PIN");
 }
