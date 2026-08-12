@@ -13,8 +13,8 @@
   "backgroundColor": "#09090B",
   "enableNotifications": true,
   "startUrl": "/",
-  "iconUrl": "public/icons/icon-512.png",
-  "maskableIconUrl": "public/icons/icon-512.png",
+  "iconUrl": "https://deptsync-hub.vercel.app/icons/icon-512.png",
+  "maskableIconUrl": "https://deptsync-hub.vercel.app/icons/icon-512.png",
   "splashScreenFadeOutDuration": 300,
   "signingKey": {
     "path": "/Users/silentsage/Desktop/carpet-auditor/android.keystore",
