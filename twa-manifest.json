@@ -24,7 +24,7 @@
   "appVersionCode": 1,
   "shortcuts": [],
   "generatorApp": "bubblewrap-cli",
-  "webManifestUrl": "./public/manifest.json",
+  "webManifestUrl": "http://localhost:3000/manifest.json",
   "fallbackType": "customtabs",
   "features": {
     "locationDelegation": {
