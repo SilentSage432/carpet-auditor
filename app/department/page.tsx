@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { TaxonomyDrillDown } from "@/components/catalog/TaxonomyDrillDown";
 import { NavigationHub } from "@/components/hub/NavigationHub";
 import { SessionGate } from "@/components/hub/SessionGate";
+import { SupervisorAuditSummaryModal } from "@/components/store-ops/SupervisorAuditSummaryModal";
 import {
   getTaxonomyForHubDepartment,
   type DepartmentTaxonomy,
@@ -48,6 +49,7 @@ function DepartmentBody({
   const dept = effectiveDepartment(specialist);
   const meta = departmentMeta(dept === "all" ? "flooring" : dept);
   const [taxonomy, setTaxonomy] = useState<DepartmentTaxonomy | null>(null);
+  const [rollupOpen, setRollupOpen] = useState(false);
 
   useEffect(() => {
     function reload() {
@@ -87,6 +89,13 @@ function DepartmentBody({
         {taxonomy ? <TaxonomyDrillDown taxonomy={taxonomy} /> : null}
 
         <div className="grid gap-2">
+          <button
+            type="button"
+            onClick={() => setRollupOpen(true)}
+            className="flex min-h-14 items-center justify-center rounded-xl border-2 border-cyan-500/40 bg-cyan-950/35 px-4 text-sm font-bold text-cyan-100"
+          >
+            Weekly audit rollup
+          </button>
           <Link
             href="/dashboard"
             className="flex min-h-14 items-center justify-center rounded-xl border-2 border-emerald-500/40 bg-emerald-950/40 px-4 text-sm font-bold text-emerald-200"
@@ -118,6 +127,11 @@ function DepartmentBody({
           ) : null}
         </div>
       </main>
+      <SupervisorAuditSummaryModal
+        open={rollupOpen}
+        specialist={specialist}
+        onClose={() => setRollupOpen(false)}
+      />
     </div>
   );
 }

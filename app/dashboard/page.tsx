@@ -6,6 +6,7 @@ import { SundayAuditStagingCard } from "@/components/admin/SundayAuditStagingCar
 import { StoreHealthCard } from "@/components/StoreHealthCard";
 import { ShowroomQuickTouchCard } from "@/components/dashboard/ShowroomQuickTouchCard";
 import { ZebraChecklist } from "@/components/store-ops/ZebraChecklist";
+import { SupervisorAuditSummaryModal } from "@/components/store-ops/SupervisorAuditSummaryModal";
 import { NavigationHub } from "@/components/hub/NavigationHub";
 import { SessionGate } from "@/components/hub/SessionGate";
 import { ShiftBriefingCard } from "@/components/store-ops/ShiftBriefingCard";
@@ -16,6 +17,7 @@ import {
   workingDepartment,
 } from "@/lib/admin-department-context";
 import { isMasterAdmin } from "@/lib/rbac";
+import { isSupervisor } from "@/lib/specialists";
 import { actorFromSpecialist } from "@/lib/store-ops/auth";
 import {
   fetchDepartments,
@@ -62,6 +64,7 @@ function DashboardBody({
   const [error, setError] = useState<string | null>(null);
   const [healthKey, setHealthKey] = useState(0);
   const [contextTick, setContextTick] = useState(0);
+  const [rollupOpen, setRollupOpen] = useState(false);
   const working = workingDepartment(specialist);
   const dept = departmentMeta(working === "all" ? "flooring" : working);
   const flooringFocus =
@@ -140,6 +143,15 @@ function DashboardBody({
         <ShiftBriefingCard specialist={specialist} refreshKey={healthKey} />
         <StoreHealthChart specialist={specialist} refreshKey={healthKey} />
         <StoreHealthCard specialist={specialist} refreshKey={healthKey} />
+        {isSupervisor(specialist) ? (
+          <button
+            type="button"
+            onClick={() => setRollupOpen(true)}
+            className="mb-3 flex min-h-11 w-full items-center justify-center rounded-xl border border-emerald-500/40 bg-emerald-950/30 px-3 text-sm font-bold text-emerald-100"
+          >
+            Weekly audit rollup
+          </button>
+        ) : null}
 
         <ShowroomQuickTouchCard
           specialist={specialist}
@@ -185,6 +197,13 @@ function DashboardBody({
           )}
         </section>
       </main>
+
+      <SupervisorAuditSummaryModal
+        open={rollupOpen}
+        specialist={specialist}
+        assignedWeek={week}
+        onClose={() => setRollupOpen(false)}
+      />
     </div>
   );
 }

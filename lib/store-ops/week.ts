@@ -9,6 +9,17 @@ export function resolveWeeklyBayTarget(raw: unknown): number {
   return Math.floor(n);
 }
 
+/** True when an ISO timestamp falls in the given ISO week label (e.g. 2026-W33). */
+export function isoTimestampInWeek(
+  iso: string | null | undefined,
+  weekLabel: string
+): boolean {
+  if (!iso || !weekLabel) return false;
+  const t = Date.parse(iso);
+  if (!Number.isFinite(t)) return false;
+  return isoWeekLabel(new Date(t)) === weekLabel;
+}
+
 /** Return ISO week label for a Date (UTC-based ISO week-date). */
 export function isoWeekLabel(date: Date = new Date()): string {
   const target = new Date(

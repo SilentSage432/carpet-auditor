@@ -18,15 +18,26 @@ import {
   reportRotationBarriers,
 } from "@/lib/store-ops/client";
 import {
+  clearDownstockFlag,
+  DOWNSTOCK_EVENT,
+  fetchDownstockQueue,
+  flagForDownstock,
+  type DownstockFlag,
+  type DownstockMap,
+} from "@/lib/store-ops/downstock";
+import { emitBayReadiness } from "@/lib/store-ops/map-readiness";
+import { effectiveDepartment } from "@/lib/rbac";
+import {
   fetchSundayAssignments,
   isSundayAssignmentForSpecialist,
   partitionRotationsBySundayAssignment,
+  setSundayBayAssignment,
   subscribeSundayBayAssignments,
   SUNDAY_AUDIT_EVENT,
   type SundayAssignmentMap,
   type SundayBayAssignment,
 } from "@/lib/store-ops/sunday-audit";
-import { hoursBySpecialistId, readShiftRoster } from "@/lib/store-ops/weekly-rotations";
+import { hoursBySpecialistId, readShiftRoster, type ShiftRosterMember } from "@/lib/store-ops/weekly-rotations";
 import { forecastWeeklyPace } from "@/lib/store-ops/week";
 import { getStoreNumber } from "@/lib/store";
 import { fetchAudits, getLocalAudits } from "@/lib/storage";
@@ -48,6 +59,7 @@ export type ZebraChecklistProps = {
 
 type TypeFilter = StoreLocationType | "all";
 type AssociateFilter = "all" | "mine" | string;
+type QueueFilter = "all" | "downstock";
 
 export function ZebraChecklist({
   specialist,
@@ -59,8 +71,14 @@ export function ZebraChecklist({
   const [doneOpen, setDoneOpen] = useState(false);
   const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
   const [associateFilter, setAssociateFilter] = useState<AssociateFilter>("all");
+  const [queueFilter, setQueueFilter] = useState<QueueFilter>("all");
   const [shiftHours, setShiftHours] = useState<Record<string, number>>({});
+  const [shiftRoster, setShiftRoster] = useState<ShiftRosterMember[]>([]);
   const [assignments, setAssignments] = useState<SundayAssignmentMap>({});
+  const [downstock, setDownstock] = useState<DownstockMap>({});
+  const [downstockNoteId, setDownstockNoteId] = useState<string | null>(null);
+  const [downstockNote, setDownstockNote] = useState("");
+  const [downstockBusy, setDownstockBusy] = useState(false);
   const [completedOverlay, setCompletedOverlay] = useState<Set<string>>(
     () => new Set()
   );
@@ -86,16 +104,40 @@ export function ZebraChecklist({
     }
   }, [assignedWeek]);
 
+  const downstockDept = useMemo(() => {
+    const dept = effectiveDepartment(specialist);
+    return dept === "all" ? "flooring" : dept;
+  }, [specialist]);
+
+  const loadDownstock = useCallback(async () => {
+    if (!assignedWeek) {
+      setDownstock({});
+      return;
+    }
+    try {
+      const map = await fetchDownstockQueue(
+        assignedWeek,
+        getStoreNumber(),
+        downstockDept
+      );
+      setDownstock(map);
+    } catch {
+      setDownstock({});
+    }
+  }, [assignedWeek, downstockDept]);
+
   useEffect(() => {
     void loadAssignments();
+    void loadDownstock();
     if (assignedWeek) {
-      setShiftHours(
-        hoursBySpecialistId(readShiftRoster(assignedWeek, getStoreNumber()))
-      );
+      const roster = readShiftRoster(assignedWeek, getStoreNumber());
+      setShiftRoster(roster.filter((row) => row.active));
+      setShiftHours(hoursBySpecialistId(roster));
     } else {
+      setShiftRoster([]);
       setShiftHours({});
     }
-  }, [loadAssignments, assignedWeek]);
+  }, [loadAssignments, loadDownstock, assignedWeek]);
 
   useEffect(() => {
     let cancelled = false;
@@ -117,14 +159,16 @@ export function ZebraChecklist({
   useEffect(() => {
     function onSunday() {
       void loadAssignments();
+      void loadDownstock();
       if (assignedWeek) {
-        setShiftHours(
-          hoursBySpecialistId(readShiftRoster(assignedWeek, getStoreNumber()))
-        );
+        const roster = readShiftRoster(assignedWeek, getStoreNumber());
+        setShiftRoster(roster.filter((row) => row.active));
+        setShiftHours(hoursBySpecialistId(roster));
       }
       onRefresh();
     }
     window.addEventListener(SUNDAY_AUDIT_EVENT, onSunday);
+    window.addEventListener(DOWNSTOCK_EVENT, onSunday);
     const store = getStoreNumber();
     const unsub = subscribeSundayBayAssignments(store, assignedWeek, () => {
       void loadAssignments();
@@ -132,9 +176,10 @@ export function ZebraChecklist({
     });
     return () => {
       window.removeEventListener(SUNDAY_AUDIT_EVENT, onSunday);
+      window.removeEventListener(DOWNSTOCK_EVENT, onSunday);
       unsub();
     };
-  }, [assignedWeek, loadAssignments, onRefresh]);
+  }, [assignedWeek, loadAssignments, loadDownstock, onRefresh]);
 
   useEffect(() => {
     setCompletedOverlay((prev) => {
@@ -210,6 +255,13 @@ export function ZebraChecklist({
     );
   }, [open, partition, associateFilter, assignments, specialist]);
 
+  const downstockOpen = useMemo(
+    () => orderedOpen.filter((r) => Boolean(downstock[r.id])),
+    [orderedOpen, downstock]
+  );
+
+  const queueOpen = queueFilter === "downstock" ? downstockOpen : orderedOpen;
+
   const bayHealth = useMemo(
     () => diagnoseBayHealth({ rotations: visible, audits }),
     [visible, audits]
@@ -231,8 +283,11 @@ export function ZebraChecklist({
 
   function handleCheck(rotationId: string) {
     setError(null);
-    const remaining = orderedOpen.filter((r) => r.id !== rotationId);
+    const remaining = queueOpen.filter((r) => r.id !== rotationId);
     const nextBay = remaining[0]?.id ?? null;
+    const rotation = rotations.find((r) => r.id === rotationId);
+    const locationId =
+      rotation?.location_id || rotation?.store_locations?.id || "";
     setCompletedOverlay((prev) => {
       const next = new Set(prev);
       next.add(rotationId);
@@ -240,6 +295,9 @@ export function ZebraChecklist({
     });
     setPulseId(nextBay);
     setBarrierId((id) => (id === rotationId ? null : id));
+    if (locationId) {
+      emitBayReadiness({ locationIds: [locationId], tone: "verified" });
+    }
     hapticPulse("success");
     startTransition(async () => {
       try {
@@ -298,6 +356,72 @@ export function ZebraChecklist({
     }
   }
 
+  async function submitDownstock(rotation: WeeklyRotationWithLocation) {
+    const locationId =
+      rotation.location_id || rotation.store_locations?.id || "";
+    setDownstockBusy(true);
+    setError(null);
+    try {
+      const flag = await flagForDownstock({
+        week: assignedWeek,
+        rotationId: rotation.id,
+        locationId,
+        note: downstockNoteId === rotation.id ? downstockNote : "",
+        flaggedBy: specialist.name,
+        department: downstockDept,
+      });
+      setDownstock((prev) => ({ ...prev, [rotation.id]: flag }));
+      setDownstockNoteId(null);
+      setDownstockNote("");
+      hapticPulse("medium");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not flag downstock");
+    } finally {
+      setDownstockBusy(false);
+    }
+  }
+
+  async function resolveDownstock(rotationId: string) {
+    setDownstockBusy(true);
+    setError(null);
+    try {
+      await clearDownstockFlag({
+        week: assignedWeek,
+        rotationId,
+        department: downstockDept,
+      });
+      setDownstock((prev) => {
+        const next = { ...prev };
+        delete next[rotationId];
+        return next;
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not clear downstock");
+    } finally {
+      setDownstockBusy(false);
+    }
+  }
+
+  async function assignDownstockPull(
+    rotationId: string,
+    specialistId: string
+  ) {
+    const member = shiftRoster.find((row) => row.specialist_id === specialistId);
+    if (!member || !assignedWeek) return;
+    setError(null);
+    try {
+      await setSundayBayAssignment(assignedWeek, rotationId, {
+        specialist_id: member.specialist_id,
+        specialist_name: member.specialist_name,
+        assigned_at: new Date().toISOString(),
+        status: "assigned",
+      });
+      await loadAssignments();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not assign pull");
+    }
+  }
+
   return (
     <div className="space-y-3">
       <div className="rounded-2xl border border-emerald-500/30 bg-emerald-950/30 px-4 py-3">
@@ -311,6 +435,9 @@ export function ZebraChecklist({
           {open.length} remaining · {done.length} complete
           {partition.hasPersonalQueue
             ? ` · ${partition.assignedToMe.length} assigned to you`
+            : ""}
+          {Object.keys(downstock).length > 0
+            ? ` · ${Object.keys(downstock).length} downstock`
             : ""}
         </p>
         <p
@@ -333,6 +460,40 @@ export function ZebraChecklist({
       </div>
 
       <BayHealthScorecard card={bayHealth} />
+
+      <div
+        role="tablist"
+        aria-label="Zebra queue"
+        className="grid grid-cols-2 gap-2"
+      >
+        <button
+          type="button"
+          role="tab"
+          aria-selected={queueFilter === "all"}
+          onClick={() => setQueueFilter("all")}
+          className={`flex min-h-11 items-center justify-center rounded-xl border px-3 text-xs font-bold uppercase tracking-wider ${
+            queueFilter === "all"
+              ? "border-emerald-500/50 bg-emerald-950/40 text-emerald-200"
+              : "border-zinc-800/80 bg-zinc-950/50 text-zinc-400"
+          }`}
+        >
+          Rotation
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={queueFilter === "downstock"}
+          onClick={() => setQueueFilter("downstock")}
+          className={`flex min-h-11 items-center justify-center rounded-xl border px-3 text-xs font-bold uppercase tracking-wider ${
+            queueFilter === "downstock"
+              ? "border-cyan-500/50 bg-cyan-950/40 text-cyan-200"
+              : "border-zinc-800/80 bg-zinc-950/50 text-zinc-400"
+          }`}
+        >
+          Downstock Queue
+          {downstockOpen.length > 0 ? ` (${downstockOpen.length})` : ""}
+        </button>
+      </div>
 
       <AuditLocationModeToggle
         value={typeFilter}
@@ -382,14 +543,26 @@ export function ZebraChecklist({
         </p>
       ) : null}
 
-      {partition.hasPersonalQueue ? (
+      {queueFilter === "downstock" && queueOpen.length === 0 ? (
+        <p className="rounded-2xl border border-dashed border-slate-700 px-4 py-8 text-center text-sm text-slate-400">
+          No overhead pulls flagged. Use Flag for Downstock on a bay card.
+        </p>
+      ) : null}
+
+      {partition.hasPersonalQueue && queueFilter !== "downstock" ? (
         <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-cyan-300">
           Your Sunday bays first · live handoff
         </p>
       ) : null}
 
+      {queueFilter === "downstock" ? (
+        <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-cyan-300">
+          Overhead pulls · assign to a CSA from the shift roster
+        </p>
+      ) : null}
+
       <ul className="divide-y divide-slate-800 overflow-hidden rounded-xl border border-slate-700 bg-slate-900/90">
-        {orderedOpen.map((rotation) => (
+        {queueOpen.map((rotation) => (
           <ZebraBayRow
             key={rotation.id}
             rotation={rotation}
@@ -404,10 +577,32 @@ export function ZebraChecklist({
             )}
             pulsing={pulseId === rotation.id}
             flagged={flaggedIds.has(rotation.id)}
+            downstock={downstock[rotation.id] ?? null}
+            downstockNoteOpen={downstockNoteId === rotation.id}
+            downstockNote={downstockNote}
+            downstockBusy={downstockBusy}
+            assignOptions={
+              queueFilter === "downstock" ? shiftRoster : []
+            }
             barrierOpen={barrierId === rotation.id}
             barrierBusy={barrierBusy}
             onToggleBarrier={() =>
               setBarrierId((id) => (id === rotation.id ? null : rotation.id))
+            }
+            onToggleDownstock={() => {
+              if (downstock[rotation.id]) {
+                void resolveDownstock(rotation.id);
+                return;
+              }
+              setDownstockNoteId((id) =>
+                id === rotation.id ? null : rotation.id
+              );
+              setDownstockNote("");
+            }}
+            onDownstockNoteChange={setDownstockNote}
+            onFlagDownstock={() => void submitDownstock(rotation)}
+            onAssign={(specialistId) =>
+              void assignDownstockPull(rotation.id, specialistId)
             }
             onComplete={() => handleCheck(rotation.id)}
             onBarrier={(reason) => void handleBarrier(rotation, reason)}
@@ -494,9 +689,18 @@ function ZebraBayRow({
   assignedToMe,
   pulsing,
   flagged,
+  downstock,
+  downstockNoteOpen,
+  downstockNote,
+  downstockBusy,
+  assignOptions,
   barrierOpen,
   barrierBusy,
   onToggleBarrier,
+  onToggleDownstock,
+  onDownstockNoteChange,
+  onFlagDownstock,
+  onAssign,
   onComplete,
   onBarrier,
 }: {
@@ -505,9 +709,18 @@ function ZebraBayRow({
   assignedToMe: boolean;
   pulsing: boolean;
   flagged: boolean;
+  downstock: DownstockFlag | null;
+  downstockNoteOpen: boolean;
+  downstockNote: string;
+  downstockBusy: boolean;
+  assignOptions: ShiftRosterMember[];
   barrierOpen: boolean;
   barrierBusy: boolean;
   onToggleBarrier: () => void;
+  onToggleDownstock: () => void;
+  onDownstockNoteChange: (value: string) => void;
+  onFlagDownstock: () => void;
+  onAssign: (specialistId: string) => void;
   onComplete: () => void;
   onBarrier: (reason: ExceptionReason) => void;
 }) {
@@ -523,7 +736,7 @@ function ZebraBayRow({
         assignedToMe ? "bg-cyan-950/20" : ""
       }`}
     >
-      <div className="flex min-h-12 items-center gap-3 px-3 py-2">
+      <div className="flex min-h-12 items-center gap-2 px-3 py-2">
         <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-3 active:bg-slate-800/60">
           <input
             type="checkbox"
@@ -554,6 +767,11 @@ function ZebraBayRow({
               {flagged ? (
                 <span className="glass-pill-rose">Health</span>
               ) : null}
+              {downstock ? (
+                <span className="glass-pill-cyan">
+                  Downstock{downstock.note ? ` · ${downstock.note}` : ""}
+                </span>
+              ) : null}
             </span>
           </span>
         </label>
@@ -571,12 +789,70 @@ function ZebraBayRow({
         </button>
         <button
           type="button"
+          disabled={downstockBusy}
+          onClick={onToggleDownstock}
+          className={`shrink-0 rounded-lg border px-2 py-1.5 text-[10px] font-bold uppercase tracking-wide ${
+            downstock
+              ? "border-cyan-400/55 bg-cyan-950/50 text-cyan-100"
+              : "border-cyan-500/35 bg-cyan-950/25 text-cyan-200"
+          }`}
+        >
+          {downstock ? "Clear pull" : "Flag for Downstock"}
+        </button>
+        <button
+          type="button"
           onClick={onToggleBarrier}
           className="shrink-0 rounded-lg border border-amber-500/40 bg-amber-950/30 px-2 py-1.5 text-[10px] font-bold uppercase tracking-wide text-amber-200"
         >
           Barrier
         </button>
       </div>
+      {downstockNoteOpen && !downstock ? (
+        <div className="border-t border-slate-800 px-3 py-2">
+          <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-cyan-200/90">
+            Optional pallet / SKU note
+          </p>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              value={downstockNote}
+              onChange={(e) => onDownstockNoteChange(e.target.value)}
+              placeholder="e.g. pallet 4 · SKU 12345"
+              className="glass-input min-h-11 flex-1 py-2 text-sm"
+            />
+            <button
+              type="button"
+              disabled={downstockBusy}
+              onClick={onFlagDownstock}
+              className="flex min-h-11 shrink-0 items-center rounded-xl border border-cyan-500/45 bg-cyan-950/40 px-3 text-xs font-bold uppercase tracking-wide text-cyan-100"
+            >
+              Flag
+            </button>
+          </div>
+        </div>
+      ) : null}
+      {assignOptions.length > 0 && downstock ? (
+        <div className="border-t border-slate-800 px-3 py-2">
+          <label className="block text-[11px] font-semibold uppercase tracking-wide text-cyan-200/90">
+            Assign overhead pull
+            <select
+              value=""
+              onChange={(e) => {
+                const id = e.target.value;
+                if (id) onAssign(id);
+              }}
+              className="glass-input mt-1 min-h-11 py-2 text-sm"
+            >
+              <option value="">Choose CSA…</option>
+              {assignOptions.map((row) => (
+                <option key={row.specialist_id} value={row.specialist_id}>
+                  {row.specialist_name} · {row.hours}h
+                </option>
+              ))}
+            </select>
+          </label>
+        </div>
+      ) : null}
       {barrierOpen ? (
         <div className="border-t border-slate-800 px-3 py-2">
           <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wide text-amber-200/90">

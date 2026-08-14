@@ -149,9 +149,9 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
   - Associate primary: Zebra · Barriers · Tools · Profile
 - Quick Actions banner (Super Admin): Bulk Generate · Trigger Weekly Rotation · Manage Supervisors
 - `/manager-notes` — Executive Floor Pad (TipTap rich notes + Gemini Copilot Extract Tasks & Tag + archive); also Admin Tools entry + `#manager-notes`
-- `/dashboard` — Store Health Scorecard (top) + **ZebraChecklist** (optimistic complete, **Quick Touch**, assignment badges + associate filter, weekly Ahead/On Track/Behind pace, next-bay pulse, SELLING/TOPSTOCK filter, Sunday assignment queue, one-tap barriers). Completions refresh silently (no loading flash).
+- `/dashboard` — Store Health Scorecard (top) + **ZebraChecklist** (optimistic complete, **Quick Touch**, **Flag for Downstock** + Downstock Queue tab, assignment badges + associate filter, weekly Ahead/On Track/Behind pace, next-bay pulse, SELLING/TOPSTOCK filter, Sunday assignment queue, one-tap barriers). Completions refresh silently (no loading flash). Supervisor **Weekly audit rollup** modal.
 - Sunday staging card opens the assignment modal with **Shift balancer** (hours → proportional clustered zones). Plan owner: `lib/store-ops/weekly-rotations.ts`; persist: `sunday-audit.ts`.
-- `/admin/store-map` — department overview + location grid; **duplicate bay prune** (deactivate extras); Bulk Add accordion; Trigger Weekly Rotation modal (**Force Draw New Rotation**); **📷 Snap Bay AI Audit** (Gemini visual scan) on page + bay actions sheet
+- `/admin/store-map` — department overview + location grid **readiness heatmap** (green this-week verified / yellow scheduled / red stale or barrier); **duplicate bay prune** (hard-delete extras); Bulk Add accordion; Trigger Weekly Rotation modal (**Force Draw New Rotation**); **📷 Snap Bay AI Audit** (Gemini visual scan) on page + bay actions sheet
 - `GET /api/store-health` — weekly pace + bottleneck aggregation + compact `bay_health` for DS / Super Admin
 - `POST /api/store-ops/ai-bay-scan` — multimodal bay photo → carton/pallet estimates, cleanliness score, detected issues (Store Ops actor)
 - `POST /api/store-ops/ai-note-summary` — manager note + optional S Pen PNG → executive summary + action items (Store Ops actor)
@@ -159,6 +159,7 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 - Multi-store: apply `20260809_multi_store.sql`; store scope comes from JWT `app_metadata.store_number` / `profiles.store_number`
 - Manager notes: apply `20260811_manager_notes.sql` + `20260812_manager_notes.sql` + `20260812_manager_notes_archive.sql` + `20260812_fix_manager_notes_rls.sql` + **`20260812_manager_notes_metadata.sql`** (`metadata` JSONB from Gemini Copilot)
 - Sunday bay assignments: apply `20260812_sunday_bay_assignments.sql`
+- Downstock queue: apply `20260814_downstock_queue.sql` (localStorage fallback until applied)
 - JWT claims / RLS helpers: apply `20260812_jwt_rls_policies.sql` + enable Custom Access Token Hook
 - Requires `SUPABASE_SERVICE_ROLE_KEY` for server routes (apply migration in Supabase SQL editor)
 

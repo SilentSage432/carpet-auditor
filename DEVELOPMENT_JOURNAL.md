@@ -1,5 +1,12 @@
 # DeptSync Hub — Development Journal
 
+## 2026-08-14 — Downstock queue, Store Map heatmap, supervisor weekly rollup
+
+### Shipped
+- **Downstock queue** (`lib/store-ops/downstock.ts`) — Zebra bay chip **Flag for Downstock** (optional pallet/SKU note). **Downstock Queue** tab isolates overhead pulls; assign to a CSA via existing Sunday assignment. Persists to `downstock_queue` (migration `20260814_downstock_queue.sql`) with localStorage fallback.
+- **Store Map heatmap** (`lib/store-ops/map-readiness.ts` + `StoreLocationGrid`) — green verified this ISO week, yellow scheduled rotation, red stale >7d or barrier. Quick Touch / complete emits `BAY_READINESS_EVENT` so the map turns green immediately.
+- **Supervisor weekly rollup** (`lib/store-ops/audit-summary.ts` + `SupervisorAuditSummaryModal`) — quota vs completed, associate/shift breakdown (Sunday assignees, not guessed tappers), resolved vs open barriers. One-tap copy. Dashboard + Department Overview.
+
 ## 2026-08-14 — Store Map bay edit, delete, and odd/even-only generate
 
 ### Shipped

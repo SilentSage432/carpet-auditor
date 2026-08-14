@@ -97,10 +97,11 @@
 - [x] Smart Floor Insights — Quick Touch on Zebra; shift briefing Focus/Barriers/Quick-win from bay-health; remnant rack Fresh/Watch/Critical + markdown chip; isolated header sync-queue chip
 - [x] Shift workload balancer — hours/start-end → proportional clustered Sunday assignment; Zebra associate filter + weekly pace badge; Store Map duplicate-bay prune
 - [x] Store Map bay edit/delete — per-bay Edit (aisle/bay/type/status) + Delete; multi-select batch delete; Bulk Generator Clean-Up tab; hard DELETE by id or ids[]
+- [x] Downstock queue + Store Map heatmap + supervisor weekly rollup
 
 ## Next
 - [x] Apply Phase 1 JWT/RLS migration in Supabase + enable Custom Access Token Hook
-- [ ] Apply Phase 2 migrations (`20260812_manager_notes.sql`, `20260812_sunday_bay_assignments.sql`, `20260812_manager_notes_archive.sql`, `20260812_fix_manager_notes_rls.sql`, **`20260812_manager_notes_metadata.sql`**, **`enable_rls_flagged_tables.sql`**, **`20260813_p0_query_indexes.sql`**) + Realtime on notes/assignments tables
+- [ ] Apply Phase 2 migrations (`20260812_manager_notes.sql`, `20260812_sunday_bay_assignments.sql`, `20260812_manager_notes_archive.sql`, `20260812_fix_manager_notes_rls.sql`, **`20260812_manager_notes_metadata.sql`**, **`enable_rls_flagged_tables.sql`**, **`20260813_p0_query_indexes.sql`**, **`20260814_downstock_queue.sql`**) + Realtime on notes/assignments tables
 - [ ] Confirm every Master Admin has `store_number` set so Hub bridge can link `profiles`
 - [ ] Additional Gemini product surfaces beyond current AI ops widgets
 ## Non-goals

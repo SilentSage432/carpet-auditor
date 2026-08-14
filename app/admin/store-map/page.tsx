@@ -9,7 +9,9 @@ import { VisualBayScannerModal } from "@/components/store-ops/VisualBayScannerMo
 import { isMasterAdmin } from "@/lib/rbac";
 import {
   fetchDepartmentsDetailed,
+  fetchExceptionSummary,
   fetchStoreLocationsDetailed,
+  fetchThisWeekRotations,
   updateDepartmentActive,
 } from "@/lib/store-ops/client";
 import {
@@ -57,6 +59,10 @@ function StoreMapBody({
   const [isOverviewOpen, setIsOverviewOpen] = useState(false);
   const [toggleBusyId, setToggleBusyId] = useState<string | null>(null);
   const [bayScanOpen, setBayScanOpen] = useState(false);
+  const [weekRotationLocations, setWeekRotationLocations] = useState<
+    Array<{ locationId: string; completed: boolean }>
+  >([]);
+  const [barrierLocationIds, setBarrierLocationIds] = useState<string[]>([]);
   const currentWeek = isoWeekLabel();
 
   const reload = useCallback(async (member: StoreSpecialist) => {
@@ -64,12 +70,34 @@ function StoreMapBody({
     setError(null);
     setAuthRequired(false);
     try {
-      const [depts, locs] = await Promise.all([
+      const [depts, locs, weekData, exceptions] = await Promise.all([
         fetchDepartmentsDetailed(member),
         fetchStoreLocationsDetailed(member),
+        fetchThisWeekRotations(member).catch(() => ({
+          assigned_week: "",
+          rotations: [] as Array<{
+            location_id?: string;
+            is_completed?: boolean;
+            store_locations?: { id?: string } | null;
+          }>,
+        })),
+        fetchExceptionSummary(member).catch(() => ({
+          exceptions: [] as Array<{ bay_id: string }>,
+        })),
       ]);
       setDepartments(depts.items);
       setLocations(locs.items);
+      setWeekRotationLocations(
+        (weekData.rotations ?? []).map((row) => ({
+          locationId: String(row.location_id || row.store_locations?.id || ""),
+          completed: Boolean(row.is_completed),
+        })).filter((row) => row.locationId)
+      );
+      setBarrierLocationIds(
+        (exceptions.exceptions ?? [])
+          .map((row) => String(row.bay_id ?? ""))
+          .filter(Boolean)
+      );
       if (depts.authRequired || locs.authRequired) {
         setAuthRequired(true);
       }
@@ -301,6 +329,9 @@ function StoreMapBody({
               specialist={specialist}
               departments={departments}
               locations={locations}
+              assignedWeek={currentWeek}
+              weekRotationLocations={weekRotationLocations}
+              barrierLocationIds={barrierLocationIds}
               onChanged={() => void reload(specialist)}
             />
           )}

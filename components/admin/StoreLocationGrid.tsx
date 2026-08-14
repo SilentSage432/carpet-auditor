@@ -22,12 +22,24 @@ import {
 } from "@/lib/store-ops/locations";
 import { VisualBayScannerModal } from "@/components/store-ops/VisualBayScannerModal";
 import type { BayScanMeta } from "@/lib/store-ops/ai-bay-scan";
+import {
+  BAY_READINESS_EVENT,
+  classifyMapReadiness,
+  mapReadinessDotClass,
+  mapReadinessLabel,
+  worstMapReadiness,
+  type BayReadinessEventDetail,
+  type MapReadinessTone,
+} from "@/lib/store-ops/map-readiness";
 
 type Props = {
   specialist: StoreSpecialist;
   departments: Department[];
   locations: StoreLocation[];
   onChanged: () => void;
+  assignedWeek?: string;
+  weekRotationLocations?: Array<{ locationId: string; completed: boolean }>;
+  barrierLocationIds?: string[];
 };
 
 type BayPair = {
@@ -111,6 +123,9 @@ export function StoreLocationGrid({
   departments,
   locations,
   onChanged,
+  assignedWeek,
+  weekRotationLocations = [],
+  barrierLocationIds = [],
 }: Props) {
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -122,6 +137,54 @@ export function StoreLocationGrid({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [confirmDeleteKey, setConfirmDeleteKey] = useState<string | null>(null);
   const [batchConfirm, setBatchConfirm] = useState(false);
+  const [verifiedOverlay, setVerifiedOverlay] = useState<Set<string>>(
+    () => new Set()
+  );
+
+  const weekByLocation = useMemo(() => {
+    const map = new Map<string, { assigned: boolean; completed: boolean }>();
+    for (const row of weekRotationLocations) {
+      map.set(row.locationId, {
+        assigned: true,
+        completed: row.completed,
+      });
+    }
+    return map;
+  }, [weekRotationLocations]);
+
+  const barrierSet = useMemo(
+    () => new Set(barrierLocationIds),
+    [barrierLocationIds]
+  );
+
+  useEffect(() => {
+    function onReady(ev: Event) {
+      const detail = (ev as CustomEvent<BayReadinessEventDetail>).detail;
+      if (!detail?.locationIds?.length) return;
+      if (detail.tone !== "verified") return;
+      setVerifiedOverlay((prev) => {
+        const next = new Set(prev);
+        for (const id of detail.locationIds) next.add(id);
+        return next;
+      });
+    }
+    window.addEventListener(BAY_READINESS_EVENT, onReady);
+    return () => window.removeEventListener(BAY_READINESS_EVENT, onReady);
+  }, []);
+
+  function readinessFor(loc: StoreLocation | null | undefined): MapReadinessTone {
+    if (!loc) return "idle";
+    const weekRow = weekByLocation.get(loc.id);
+    return classifyMapReadiness({
+      lastCompletedAt: loc.last_completed_at,
+      status: loc.status,
+      inCurrentWeekRotation: Boolean(weekRow),
+      currentWeekCompleted:
+        verifiedOverlay.has(loc.id) || Boolean(weekRow?.completed),
+      hasBarrier: barrierSet.has(loc.id),
+      weekLabel: assignedWeek,
+    });
+  }
 
   const duplicateGroups = useMemo(
     () => findDuplicateLegacyBays(locations),
@@ -329,10 +392,29 @@ export function StoreLocationGrid({
           Store Location Grid
         </h2>
         <p className="mt-1 text-sm text-zinc-400">
-          Expand a department, then an aisle. Tap a bay label for pin, history,
-          and edits. Use Edit / Delete on each row, or select bays for batch
-          clean-up. S / T switches activate tags.
+          Expand a department, then an aisle. Heatmap: green verified this week,
+          yellow scheduled, red stale (&gt;7d) or barrier. Tap a bay for pin,
+          history, and edits.
         </p>
+        <div className="mt-2 flex flex-wrap gap-2">
+          {(
+            [
+              ["verified", "Verified"],
+              ["scheduled", "Scheduled"],
+              ["attention", "Stale / barrier"],
+            ] as const
+          ).map(([tone, label]) => (
+            <span
+              key={tone}
+              className="inline-flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wide text-zinc-400"
+            >
+              <span
+                className={`inline-block h-2.5 w-2.5 rounded-full ${mapReadinessDotClass(tone)}`}
+              />
+              {label}
+            </span>
+          ))}
+        </div>
       </div>
 
       {duplicateGroups.length > 0 ? (
@@ -448,6 +530,9 @@ export function StoreLocationGrid({
                   const aisleKey = `${dept.departmentId}:${aisle.aisle}`;
                   const aisleOpen = Boolean(openAisles[aisleKey]);
                   const bayCount = aisle.bays.length;
+                  const aisleTone = worstMapReadiness(
+                    aisle.locations.map((loc) => readinessFor(loc))
+                  );
                   return (
                       <div
                         key={aisleKey}
@@ -479,9 +564,13 @@ export function StoreLocationGrid({
                             onClick={() => toggleAisle(aisleKey)}
                             className="flex min-h-[44px] min-w-0 flex-1 items-center justify-between gap-3 py-2 text-left"
                           >
-                            <p className="font-mono text-sm font-semibold text-zinc-100">
+                            <p className="flex items-center gap-2 font-mono text-sm font-semibold text-zinc-100">
+                              <span
+                                className={`inline-block h-2.5 w-2.5 shrink-0 rounded-full ${mapReadinessDotClass(aisleTone)}`}
+                                title={mapReadinessLabel(aisleTone)}
+                              />
                               Aisle {aisle.aisle}
-                              <span className="ml-2 text-xs font-medium text-zinc-400">
+                              <span className="ml-1 text-xs font-medium text-zinc-400">
                                 · {bayCount} bay{bayCount === 1 ? "" : "s"}
                               </span>
                             </p>
@@ -497,9 +586,6 @@ export function StoreLocationGrid({
                       {aisleOpen ? (
                         <ul className="divide-y divide-zinc-800/80 border-t border-zinc-800/80">
                           {aisle.bays.map((pair) => {
-                            const inRotation =
-                              isInActiveRotation(pair.selling) ||
-                              isInActiveRotation(pair.topstock);
                             const ids = pairLocationIds(pair);
                             const rowKey = bayRowKey(
                               dept.departmentId,
@@ -510,6 +596,11 @@ export function StoreLocationGrid({
                               ids.length > 0 &&
                               ids.every((id) => selectedIds.has(id));
                             const confirming = confirmDeleteKey === rowKey;
+                            const pairTone = worstMapReadiness(
+                              [pair.selling, pair.topstock].map((loc) =>
+                                readinessFor(loc)
+                              )
+                            );
                             const sheetPayload: SheetBay = {
                               departmentId: dept.departmentId,
                               departmentName: dept.departmentName,
@@ -537,18 +628,11 @@ export function StoreLocationGrid({
                                   className="flex min-h-[44px] min-w-[4.5rem] shrink-0 items-center gap-1.5 rounded-xl px-1.5 text-left active:bg-zinc-800/80"
                                   aria-label={`Bay ${pair.bay} actions`}
                                 >
-                                  {inRotation ? (
-                                    <span
-                                      className="inline-block h-2.5 w-2.5 shrink-0 rounded-full bg-amber-400 shadow-[0_0_8px_rgba(251,191,36,0.7)]"
-                                      title="In this week's rotation"
-                                      aria-label="In this week's rotation"
-                                    />
-                                  ) : (
-                                    <span
-                                      className="inline-block h-2.5 w-2.5 shrink-0 rounded-full bg-zinc-700"
-                                      aria-hidden
-                                    />
-                                  )}
+                                  <span
+                                    className={`inline-block h-2.5 w-2.5 shrink-0 rounded-full ${mapReadinessDotClass(pairTone)}`}
+                                    title={mapReadinessLabel(pairTone)}
+                                    aria-label={mapReadinessLabel(pairTone)}
+                                  />
                                   <span className="font-mono text-xs font-bold text-zinc-200">
                                     Bay {pair.bay}
                                   </span>
@@ -559,6 +643,7 @@ export function StoreLocationGrid({
                                     fullLabel="Selling"
                                     loc={pair.selling}
                                     pendingId={pendingId}
+                                    readiness={readinessFor(pair.selling)}
                                     onToggle={toggleActive}
                                   />
                                   <TypeToggle
@@ -566,6 +651,7 @@ export function StoreLocationGrid({
                                     fullLabel="Topstock"
                                     loc={pair.topstock}
                                     pendingId={pendingId}
+                                    readiness={readinessFor(pair.topstock)}
                                     onToggle={toggleActive}
                                   />
                                 </div>
@@ -635,12 +721,14 @@ function TypeToggle({
   fullLabel,
   loc,
   pendingId,
+  readiness = "idle",
   onToggle,
 }: {
   label: string;
   fullLabel: string;
   loc: StoreLocation | null;
   pendingId: string | null;
+  readiness?: MapReadinessTone;
   onToggle: (loc: StoreLocation) => void;
 }) {
   if (!loc) {
@@ -656,20 +744,24 @@ function TypeToggle({
 
   const showroom = (loc.location_type ?? "STANDARD") === "SHOWROOM_STACKOUT";
   const inRotation = isInActiveRotation(loc);
+  const heatClass =
+    readiness === "verified"
+      ? "glass-bay-complete"
+      : readiness === "scheduled"
+        ? "glass-bay-pending"
+        : readiness === "attention"
+          ? "border-rose-500/45 bg-rose-950/35"
+          : showroom
+            ? "glass-bay-pending"
+            : loc.type === "TOPSTOCK"
+              ? "glass-bay-cyan"
+              : "border-emerald-500/35 bg-emerald-950/25";
 
   return (
     <div
-      className={`flex min-h-[44px] items-center justify-between gap-1 rounded-xl border px-1 ${
-        showroom
-          ? "glass-bay-pending"
-          : loc.is_active
-            ? inRotation
-              ? "glass-bay-complete"
-              : loc.type === "TOPSTOCK"
-                ? "glass-bay-cyan"
-                : "border-emerald-500/35 bg-emerald-950/25"
-            : "border-zinc-800 bg-zinc-900/70"
-      } ${loc.is_active ? "" : "opacity-50"}`}
+      className={`flex min-h-[44px] items-center justify-between gap-1 rounded-xl border px-1 ${heatClass} ${
+        loc.is_active ? "" : "opacity-50"
+      }`}
     >
       <div className="min-w-0 pl-1.5">
         <p className="font-mono text-xs font-bold text-emerald-400/90">
