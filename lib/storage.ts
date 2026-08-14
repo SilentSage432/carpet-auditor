@@ -1,3 +1,4 @@
+import { createDebouncedPersist } from "./debounced-persist";
 import { uid } from "./uid";
 import type { CarpetAudit, CarpetAuditInsert, LocationType } from "./types";
 import {
@@ -96,7 +97,19 @@ export function saveAuditDraft(draft: AuditFormDraft): void {
   localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
 }
 
+const auditDraftPersist = createDebouncedPersist(saveAuditDraft, 300);
+
+/** Debounced mid-scan draft write (300ms). Flush on submit / navigate away. */
+export function scheduleAuditDraftSave(draft: AuditFormDraft): void {
+  auditDraftPersist.schedule(draft);
+}
+
+export function flushAuditDraftSave(): void {
+  auditDraftPersist.flush();
+}
+
 export function clearAuditDraft(): void {
+  auditDraftPersist.cancel();
   if (typeof window === "undefined") return;
   localStorage.removeItem(DRAFT_KEY);
 }

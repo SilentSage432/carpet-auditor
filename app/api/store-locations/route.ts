@@ -47,7 +47,24 @@ export async function GET(request: Request) {
 
     let query = supabase
       .from("store_locations")
-      .select("*")
+      .select(
+        [
+          "id",
+          "store_id",
+          "department_id",
+          "aisle",
+          "bay",
+          "type",
+          "location_type",
+          "status",
+          "manual_priority_count",
+          "last_completed_at",
+          "updated_at",
+          "is_active",
+          "cycle_number",
+          "audit_frequency_days",
+        ].join(", ")
+      )
       .eq("store_id", storeId)
       .order("aisle")
       .order("bay");

@@ -17,9 +17,10 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 ## AI (`lib/ai/gemini.ts`)
 - Server-only Gemini Flash client (`@google/generative-ai`)
 - Env: `GEMINI_API_KEY`, `GEMINI_MODEL` (default `gemini-3.5-flash`) — never `NEXT_PUBLIC_`
-- Exports: `callGeminiFlash(prompt, inlineImage?)`, `callGeminiFlashJson`, `extractGeminiJsonText` / `parseGeminiJson`, `isGeminiConfigured`
+- Exports: `callGeminiFlash(prompt, inlineImage?)`, `callGeminiFlashJson`, `extractGeminiJsonText` / `parseGeminiJson`, `isGeminiConfigured`, `GEMINI_JSON_GENERATION_CONFIG`
+- Generation config: `responseMimeType: application/json`, `maxOutputTokens: 1024` (keeps JSON parseable; bounds output)
 - Inline images accept raw base64 or `data:image/...;base64,...` (prefix stripped)
-- JSON regex extraction for object/array payloads from fenced or chatty model replies
+- JSON regex extraction remains as a safety net for fenced/chatty replies
 - Does not recommend or own institutional knowledge — callers compose prompts
 - **AI Pre-Flight (Bulk Generator):** `POST /api/store-locations/ai-parse` + `lib/store-ops/ai-parse.ts` normalize to `{ locations, corrections_made }`; UI tab confirms via existing bulk upsert
 - **Flooring AI Insights:** `POST /api/flooring/ai-insights` + `lib/flooring/ai-insights.ts` + `FlooringAIInsightBanner` on Cycle Audit / Remnants; applies markdown via `lib/markdown` + `saveRemnant`; age bands via `agingBand()` (30/60/90+)
@@ -27,8 +28,8 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 - **Audit Velocity Chart:** `lib/store-ops/telemetry.ts` + `StoreHealthChart` on `/dashboard` (06:00–22:00 curve vs linear target; Overall / D23 / D35 pills)
 - **Appliance Anomaly Detection:** `POST /api/appliances/ai-anomaly` + `ApplianceAnomalyWidget` on Appliance Audit (duplicate serials, distant locations, category mismatch, missing high-value floor models)
 - **Catalog Taxonomies:** `lib/catalog/taxonomies.ts` (D21–D28 / D35 / D52 defaults) + `POST /api/catalog/ai-taxonomy` + Admin Tools `TaxonomyManagerModal`; folder accordions on Department Audit + `/department`
-- **AI Visual Bay Scan:** `POST /api/store-ops/ai-bay-scan` + `lib/store-ops/ai-bay-scan.ts` + `VisualBayScannerModal` — immersive full-screen camera (`object-cover`, rear-cam WebRTC cascade) + Gemini multimodal carton/pallet/hazard read on Store Map bay sheet + Cycle Audit
-- **Manager Notes / Executive Floor Pad:** `POST /api/store-ops/ai-note-summary` (legacy synthesize) + Server Action `extractTasksAndTag` (`app/actions/manager-notes.ts`) + `lib/store-ops/ai-note-extract.ts` + `lib/store-ops/manager-notes.ts` (Supabase CRUD + realtime + archive) + `components/manager-notes/ExecutiveFloorPad` — dense TipTap pad (sticky title/toolbar, ≥80dvh canvas, 15 Google Fonts, **voice dictation → Gemini parse**, metadata incl. `follow_up_date`), Gemini Copilot tasks/tags, debounced autosave; Admin Tools + `/manager-notes`
+- **AI Visual Bay Scan:** `POST /api/store-ops/ai-bay-scan` + `lib/store-ops/ai-bay-scan.ts` + `VisualBayScannerModal` — immersive full-screen camera (`object-cover`, rear-cam WebRTC cascade targeting **720p**); single-pass JPEG snapshot (q=0.70, max edge 960px); raw base64 payload; route cap ~1.5MB; Gemini JSON mime + 1024 output tokens
+- **Manager Notes / Executive Floor Pad:** `POST /api/store-ops/ai-note-summary` (legacy synthesize) + Server Action `extractTasksAndTag` (`app/actions/manager-notes.ts`) + `lib/store-ops/ai-note-extract.ts` + `lib/store-ops/manager-notes.ts` (Supabase CRUD + realtime + archive) + `components/manager-notes/ExecutiveFloorPad` — dense TipTap pad (sticky title/toolbar, ≥80dvh canvas, 15 Google Fonts, **voice dictation → Gemini parse**, metadata incl. `follow_up_date`), Gemini Copilot on **plain text ≤ 8k chars** (HTML kept for editor/save), schema-only prompt, debounced autosave; Admin Tools + `/manager-notes`
 
 ## RBAC (`lib/rbac.ts` + `lib/specialists.ts`)
 | Role | Scope | Tabs |
@@ -76,6 +77,9 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 - `must_change_credentials` → non-dismissible permanent credential setup
 - Session: `deptsync_auth_session` (hub UI) + Supabase Auth localStorage (API Bearer); 8h idle lock on hub session
 - **P0 boot:** `/` fetches roster only before AuthWall; catalog/remnants/appliance catalog after unlock per section; hub sections + Admin Tools + Snap Bay / SIMS / Audit Report are `next/dynamic`
+- **P0 indexes:** re-run `supabase/migrations/20260813_p0_query_indexes.sql` — hub tables use `store_number`; Store Ops locations/rotations use `store_id`; manager_notes Phase 2 uses `store_number`+`department` (legacy `store_id`+`department_code`). Script skips absent columns.
+- **P1 Gemini/map:** Snap Bay 720p + compressed JPEG; Floor Pad Copilot strips HTML / 8k cap; `GET /api/store-locations` explicit Store Map columns (no `SELECT *`)
+- **P2 hub UI:** `startTransition` + keep-alive hub panes (`hidden`); Cycle/Appliance scan forms isolated from logs; 300ms debounced draft saves with flush on submit/leave; weekly rotations + Sunday assignments TTL-cached 45s
 - Seeds: no hardcoded roster injection — use Invite / Add Supervisor; temp PIN sets `must_change_credentials`
 - Primary: fixed bottom tabs — **filtered by role/department**
 - Header: DeptSync Hub brand + `DeptSync · Lowe's #…` subtitle · section title · network; specialist chip + PIN gear
@@ -90,7 +94,8 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 ## Scan-to-Catalog
 - SKU / UPC resolve via `lib/barcode.ts` → `carpet_catalog`
 - Soft keyboard: **tap-to-type only** (no auto-focus on tab switch)
-- Hardware wedges: `useGlobalBarcodeScanner` (window keydown, 6+ chars ≤150ms) → active section lookup
+- Hardware wedges: `useGlobalBarcodeScanner` (window keydown, 6+ chars ≤150ms) → **active visible** section lookup (`scannerEnabled=false` while hub pane is hidden)
+- Mid-scan drafts: `lib/debounced-persist.ts` (300ms) + `useFlushOnLeave`; flooring `lib/storage.ts`, appliances `lib/appliance-scans.ts`
 - Focused SKU fields still support Enter **or** rapid burst via NumberField
 - Quick-Add modal for unlinked barcodes
 - Catalog folders (`lib/catalog-folders.ts`); domain-filtered for department supervisors

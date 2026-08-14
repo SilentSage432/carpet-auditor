@@ -1,7 +1,7 @@
 # DeptSync Hub — Architecture
 
 ```
-app/page.tsx                      → Hub shell (section state + RBAC gate + data load + online flush)
+app/page.tsx                      → Hub shell (section state + RBAC gate + data load + online flush; keep-alive panes + startTransition)
 app/layout.tsx                    → Fonts, PWA meta (DeptSync), ServiceWorkerRegister
 app/manifest.ts                   → short_name DeptSync · Department & SIMS Audit Hub
 public/sw.js                      → Offline shell cache strategies
@@ -34,6 +34,8 @@ components/hub/*Modal.tsx         → Specialist / PIN / Markdown modals
 components/barcode/QuickAddCatalogModal.tsx → Scan-to-catalog Quick-Add
 components/catalog/SimsLocationFinder.tsx   → SIMS location stock drawer
 components/hub/AdminDepartmentSwitcher.tsx → Master Admin working-dept pin
+components/sections/CycleAuditScanForm.tsx → Flooring scan/input island (drafts + scanner; log stays in parent)
+components/sections/ApplianceScanForm.tsx → Appliance scan/input island (drafts + scanner; log stays in parent)
 components/admin/SundayAuditStagingCard.tsx → Glowing pending Sunday Flooring audit CTA
 components/admin/SundayAuditAssignmentModal.tsx → Assign Flooring specialists to staged bays
 lib/admin-department-context.ts       → Master Admin working department pin (local)
@@ -68,7 +70,7 @@ lib/store-ops/*                   → Store Operations domain (rotations, bulk m
 app/admin/store-map/page.tsx      → Super Admin aisle/bay bulk mapper + weekly generate
 app/dashboard/page.tsx            → Zebra supervisor weekly rotation checklist
 app/api/rotations/*               → Generate + complete rotation route handlers
-app/api/store-locations*          → List / patch / bulk location APIs
+app/api/store-locations*          → List / patch / bulk location APIs (GET list is column-pruned for Store Map)
 supabase/schema.sql               → Tables + multi-category + SIMS + store_number + RBAC columns + RLS
 supabase/migrations/20260809_store_operations_rbac.sql → departments, profiles, locations, weekly rotations + RLS
 supabase/migrations/20260809_multi_store.sql → stores + store_id scoping
@@ -83,11 +85,11 @@ supabase/migrations/20260812_sunday_bay_assignments.sql → sunday specialist↔
 
 | Concern | Owner |
 |---|---|
-| Navigation / section routing | `app/page.tsx` + `HubChrome` (roster-only boot; hub sections via `next/dynamic`) |
+| Navigation / section routing | `app/page.tsx` + `HubChrome` (roster-only boot; `next/dynamic` sections; keep-alive `HubPane` + `startTransition`) |
 | Department RBAC / tab visibility | `lib/rbac.ts` |
 | Cross-app Navigation Hub | `lib/nav-hub.ts` + `NavigationHub` + `admin-tools-events.ts` (`AdminToolsDrawer` when `adminOpen`) |
 | Store Operations map + rotations | `lib/store-ops/*` + `/admin/store-map` + `/dashboard` |
-| Manager notes / Executive Floor Pad | `lib/store-ops/ai-note-extract.ts`, `manager-notes.ts`, `app/actions/manager-notes.ts`, `components/manager-notes/*` |
+| Manager notes / Executive Floor Pad | `lib/store-ops/ai-note-extract.ts`, `manager-notes.ts`, `app/actions/manager-notes.ts`, `components/manager-notes/*` (Copilot: plain text ≤ 8k) |
 | Team roster (Master Admin) | `AdminRosterManager`, `lib/specialists.ts` (`is_active` soft-delete) |
 | Store context | `lib/store.ts` + `lib/store-ops/stores.ts` |
 | Offline sync queue | `lib/sync-queue.ts`, `lib/sync-conflict.ts`, `ConflictResolutionModal` |
@@ -98,7 +100,8 @@ supabase/migrations/20260812_sunday_bay_assignments.sql → sunday specialist↔
 | Store health scorecard | `lib/store-ops/health.ts`, `StoreHealthCard` |
 | Shift audit velocity telemetry | `lib/store-ops/telemetry.ts`, `StoreHealthChart` |
 | Zebra shift briefing | `lib/store-ops/shift-briefing.ts`, `ShiftBriefingCard` |
-| Visual bay scan | `lib/store-ops/ai-bay-scan.ts`, `VisualBayScannerModal` |
+| Visual bay scan | `lib/store-ops/ai-bay-scan.ts`, `VisualBayScannerModal` (720p stream; JPEG q=0.70 / 960px) |
+| Gemini transport | `lib/ai/gemini.ts` (`GEMINI_JSON_GENERATION_CONFIG`: JSON mime, 1024 output tokens) |
 | Barcode resolve / Quick-Add | `lib/barcode.ts`, `NumberField` scan hooks, `QuickAddCatalogModal` |
 | Hardware wedge (no soft keyboard) | `lib/hardware-scanner.ts` |
 | Focus / keyboard dismiss | `lib/focus-input.ts` (`blurActiveInput` — never auto-focus on tab switch) |
@@ -114,18 +117,19 @@ supabase/migrations/20260812_sunday_bay_assignments.sql → sunday specialist↔
 | Variance | `lib/variance.ts` |
 | Remnant aging | `lib/aging.ts` |
 | Remnant inventory | `lib/remnants.ts` |
-| Audit log + draft | `lib/storage.ts` |
+| Audit log + draft | `lib/storage.ts` + `lib/debounced-persist.ts` (300ms) + `CycleAuditScanForm` |
 | Audit report export / print / email | `lib/audit-report.ts`, `AuditReportModal` |
 
 ## Sections (role-filtered)
 
-1. **Flooring Audit** — dual engine (roll CLF vs carton sq ft), scan-to-catalog, SIMS tags
+1. **Flooring Audit** — dual engine (roll CLF vs carton sq ft), scan-to-catalog, SIMS tags. Scan form is `CycleAuditScanForm` (isolated from the shift log).
 2. **Appliances Audit** — continuous floor scans on `appliance_scans` + UPC links on `appliance_catalog`
    - Suites: Laundry · Refrigeration · Cooking / Ranges · Dishwashers · Microwaves / Venting
    - Required `sub_category` on UPC Quick-Add and scan log
    - Scan log aggregated by SKU (Qty + expandable unit detail); sticky category filter + SKU/location search; Edit modal for qty/serials/bay
    - CSV: SUMMARY (counts/locations) + RAW DETAIL audit trail
    - Continuous mode: barcode detect → immediate `POST /api/appliances/scans`; session total counter; new items pause on Quick-Add then auto-log
+   - Scan form is `ApplianceScanForm` (isolated from the accordion log)
    - APIs: `/api/appliances/catalog`, `/api/appliances/scans` (`GET|POST|PATCH|DELETE`)
 3. **Universal / Appliance Catalog** — removed from bottom nav; SKU linking remains via Quick-Add / scan flows (`carpet_catalog` / `appliance_catalog`). `/catalog` redirects to `/appliances`.
 4. **Remnant Rack** — back-room remnant status + manager markdown
@@ -140,7 +144,7 @@ supabase/migrations/20260812_sunday_bay_assignments.sql → sunday specialist↔
 
 Writes fall back to localStorage and enqueue into `carpet_hub_sync_queue`
 (with `transaction_id`, `optimistic_at`, exponential backoff).
-Mid-scan form drafts persist via `carpet_hub_audit_draft`.
+Mid-scan form drafts persist via `carpet_hub_audit_draft` / `carpet_hub_appliance_scan_draft` with a 300ms debounce and flush on submit / leave.
 `installSyncAutoFlush` replays on `online`, tab focus, and `visibilitychange`.
 Version mismatches / HTTP 409 pause for `ConflictResolutionModal` (keep local vs accept server).
 The service worker caches the app shell for instant cold starts without connectivity.

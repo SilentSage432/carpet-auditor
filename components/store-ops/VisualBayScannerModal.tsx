@@ -73,30 +73,66 @@ function fileToDataUrl(file: File): Promise<string> {
   });
 }
 
-/** Downscale large handheld photos before POST (keeps payload under route limit). */
+const BAY_SNAP_MAX_EDGE = 960;
+const BAY_SNAP_JPEG_QUALITY = 0.7;
+
+function stripToRawBase64(data: string): string {
+  return data.replace(/^data:image\/[\w+.-]+;base64,/i, "");
+}
+
+function scaleToMaxEdge(
+  width: number,
+  height: number,
+  maxEdge: number
+): { w: number; h: number } {
+  const longest = Math.max(width, height) || 1;
+  const scale = longest > maxEdge ? maxEdge / longest : 1;
+  return {
+    w: Math.max(1, Math.round(width * scale)),
+    h: Math.max(1, Math.round(height * scale)),
+  };
+}
+
+/** Single-pass JPEG: scale to max edge 960, quality 0.70. */
+function canvasToBayJpeg(
+  draw: (ctx: CanvasRenderingContext2D, w: number, h: number) => void,
+  srcW: number,
+  srcH: number
+): { previewUrl: string; base64: string; mimeType: "image/jpeg" } {
+  const { w, h } = scaleToMaxEdge(srcW, srcH, BAY_SNAP_MAX_EDGE);
+  const canvas = document.createElement("canvas");
+  canvas.width = w;
+  canvas.height = h;
+  const ctx = canvas.getContext("2d");
+  if (!ctx) {
+    throw new Error("Canvas unavailable");
+  }
+  draw(ctx, w, h);
+  const previewUrl = canvas.toDataURL("image/jpeg", BAY_SNAP_JPEG_QUALITY);
+  return {
+    previewUrl,
+    base64: stripToRawBase64(previewUrl),
+    mimeType: "image/jpeg",
+  };
+}
+
 async function compressDataUrl(
-  dataUrl: string,
-  maxEdge = 1280,
-  quality = 0.82
-): Promise<{ dataUrl: string; mimeType: string }> {
+  dataUrl: string
+): Promise<{ previewUrl: string; base64: string; mimeType: "image/jpeg" }> {
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.onload = () => {
-      const longest = Math.max(img.width, img.height);
-      const scale = longest > maxEdge ? maxEdge / longest : 1;
-      const w = Math.max(1, Math.round(img.width * scale));
-      const h = Math.max(1, Math.round(img.height * scale));
-      const canvas = document.createElement("canvas");
-      canvas.width = w;
-      canvas.height = h;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) {
-        reject(new Error("Canvas unavailable"));
-        return;
+      try {
+        resolve(
+          canvasToBayJpeg(
+            (ctx, w, h) => ctx.drawImage(img, 0, 0, w, h),
+            img.naturalWidth || img.width,
+            img.naturalHeight || img.height
+          )
+        );
+      } catch (err) {
+        reject(err);
       }
-      ctx.drawImage(img, 0, 0, w, h);
-      const mimeType = "image/jpeg";
-      resolve({ dataUrl: canvas.toDataURL(mimeType, quality), mimeType });
     };
     img.onerror = () => reject(new Error("Could not decode image"));
     img.src = dataUrl;
@@ -106,6 +142,7 @@ async function compressDataUrl(
 /**
  * Mobile Chrome / Android / iOS getUserMedia cascade:
  * exact environment → ideal environment → any camera.
+ * Target 720p so Snap Bay JPEG stays small.
  */
 async function getCameraStream(): Promise<MediaStream> {
   if (!navigator.mediaDevices?.getUserMedia) {
@@ -117,14 +154,21 @@ async function getCameraStream(): Promise<MediaStream> {
       audio: false,
       video: {
         facingMode: { exact: "environment" },
-        width: { ideal: 1920 },
-        height: { ideal: 1080 },
+        width: { ideal: 1280 },
+        height: { ideal: 720 },
       },
     },
     {
       audio: false,
       video: {
         facingMode: "environment",
+        width: { ideal: 1280 },
+        height: { ideal: 720 },
+      },
+    },
+    {
+      audio: false,
+      video: {
         width: { ideal: 1280 },
         height: { ideal: 720 },
       },
@@ -254,15 +298,14 @@ export function VisualBayScannerModal({
   }, [stopCamera]);
 
   const runScan = useCallback(
-    async (rawDataUrl: string) => {
+    async (base64: string, mimeType: string, previewUrl: string) => {
       setError(null);
       setPhase("analyzing");
       setResult(null);
+      setPreviewUrl(previewUrl);
       try {
-        const { dataUrl, mimeType } = await compressDataUrl(rawDataUrl);
-        setPreviewUrl(dataUrl);
         const scanned = await scanBayVisual(specialist, {
-          image: dataUrl,
+          image: base64,
           mime_type: mimeType,
           ...resolvedMeta(),
         });
@@ -279,21 +322,19 @@ export function VisualBayScannerModal({
   const onSnapLive = useCallback(async () => {
     const video = videoRef.current;
     if (!video || !cameraLive) return;
-    const w = video.videoWidth || 1280;
-    const h = video.videoHeight || 720;
-    const canvas = document.createElement("canvas");
-    canvas.width = w;
-    canvas.height = h;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) {
-      setError("Could not capture frame");
-      return;
+    const srcW = video.videoWidth || 1280;
+    const srcH = video.videoHeight || 720;
+    try {
+      const shot = canvasToBayJpeg(
+        (ctx, w, h) => ctx.drawImage(video, 0, 0, w, h),
+        srcW,
+        srcH
+      );
+      stopCamera();
+      await runScan(shot.base64, shot.mimeType, shot.previewUrl);
+    } catch (err) {
+      setError(readableError(err, "Could not capture frame"));
     }
-    ctx.drawImage(video, 0, 0, w, h);
-    const dataUrl = canvas.toDataURL("image/jpeg", 0.88);
-    stopCamera();
-    setPreviewUrl(dataUrl);
-    await runScan(dataUrl);
   }, [cameraLive, stopCamera, runScan]);
 
   const onFilePicked = useCallback(
@@ -306,8 +347,8 @@ export function VisualBayScannerModal({
       stopCamera();
       try {
         const dataUrl = await fileToDataUrl(file);
-        setPreviewUrl(dataUrl);
-        await runScan(dataUrl);
+        const shot = await compressDataUrl(dataUrl);
+        await runScan(shot.base64, shot.mimeType, shot.previewUrl);
       } catch (err) {
         setError(readableError(err, "Could not read photo"));
       }

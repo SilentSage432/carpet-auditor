@@ -5,6 +5,7 @@
 
 import { getSupabase } from "@/lib/supabase";
 import { getStoreNumber } from "@/lib/store";
+import { createTtlCache } from "@/lib/store-ops/ttl-cache";
 import {
   formatLocationLabel,
   type Department,
@@ -15,6 +16,11 @@ import type { StoreSpecialist } from "@/lib/types";
 
 export const SUNDAY_AUDIT_EVENT = "deptsync:sunday-audit-assignments";
 export const SUNDAY_DEPARTMENT = "flooring";
+
+const SUNDAY_ASSIGNMENTS_TTL_MS = 45_000;
+const sundayAssignmentsCache = createTtlCache<SundayAssignmentMap>(
+  SUNDAY_ASSIGNMENTS_TTL_MS
+);
 
 export type SundayBayAssignment = {
   specialist_id: string;
@@ -57,6 +63,7 @@ function requireClient() {
 }
 
 function emitSundayEvent() {
+  sundayAssignmentsCache.invalidate();
   if (typeof window === "undefined") return;
   window.dispatchEvent(new CustomEvent(SUNDAY_AUDIT_EVENT));
 }
@@ -115,29 +122,34 @@ export async function fetchSundayAssignments(
   storeNumber = getStoreNumber(),
   department = SUNDAY_DEPARTMENT
 ): Promise<SundayAssignmentMap> {
-  const supabase = requireClient();
   const store = String(storeNumber ?? "").trim();
   if (!store || !week) return {};
 
-  const weekStarting = isoWeekToMondayDate(week);
-  const { data, error } = await supabase
-    .from("sunday_bay_assignments")
-    .select("*")
-    .eq("store_number", store)
-    .eq("department", department)
-    .eq("week_starting", weekStarting)
-    .neq("status", "cleared");
+  return sundayAssignmentsCache.get(
+    `${store}:${department}:${week}`,
+    async () => {
+      const supabase = requireClient();
+      const weekStarting = isoWeekToMondayDate(week);
+      const { data, error } = await supabase
+        .from("sunday_bay_assignments")
+        .select("*")
+        .eq("store_number", store)
+        .eq("department", department)
+        .eq("week_starting", weekStarting)
+        .neq("status", "cleared");
 
-  if (error) {
-    throw new Error(error.message || "Could not load Sunday bay assignments");
-  }
+      if (error) {
+        throw new Error(error.message || "Could not load Sunday bay assignments");
+      }
 
-  const map: SundayAssignmentMap = {};
-  for (const row of (data as SundayBayAssignmentRow[] | null) ?? []) {
-    const assignment = mapRow(row);
-    if (assignment) map[String(row.bay_id)] = assignment;
-  }
-  return map;
+      const map: SundayAssignmentMap = {};
+      for (const row of (data as SundayBayAssignmentRow[] | null) ?? []) {
+        const assignment = mapRow(row);
+        if (assignment) map[String(row.bay_id)] = assignment;
+      }
+      return map;
+    }
+  );
 }
 
 /** @deprecated Prefer fetchSundayAssignments — sync local overlay removed. */

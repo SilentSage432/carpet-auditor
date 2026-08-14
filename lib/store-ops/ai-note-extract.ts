@@ -39,62 +39,77 @@ export function emptyNoteExtractMetadata(): NoteExtractMetadata {
   };
 }
 
+/** Max plain-text chars sent to Gemini Copilot. */
+export const NOTE_EXTRACT_MAX_CHARS = 8_000;
+
+/** TipTap HTML → plain text for Copilot (server-safe; no DOM). */
+export function stripHtmlToPlainText(raw: string): string {
+  return String(raw ?? "")
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/(p|div|li|h[1-6]|tr)>/gi, "\n")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/[ \t]+\n/g, "\n")
+    .replace(/\n{3,}/g, "\n\n")
+    .replace(/[ \t]{2,}/g, " ")
+    .trim();
+}
+
+export function capNoteExtractContent(text: string): string {
+  const trimmed = String(text ?? "").trim();
+  if (trimmed.length <= NOTE_EXTRACT_MAX_CHARS) return trimmed;
+  return trimmed.slice(0, NOTE_EXTRACT_MAX_CHARS);
+}
+
+export function prepareNoteExtractContent(raw: string): string {
+  return capNoteExtractContent(stripHtmlToPlainText(raw));
+}
+
 export function buildNoteExtractPrompt(input: NoteExtractInput): string {
   const title = String(input.title ?? "").trim() || "(untitled)";
-  const content = String(input.content ?? "").trim() || "(empty)";
+  const content = prepareNoteExtractContent(input.content) || "(empty)";
   const dept = String(input.department_code ?? "").trim() || "unknown";
   const aisle = String(input.aisle ?? "").trim() || "";
   const bay =
     input.bay != null && Number.isFinite(Number(input.bay))
       ? String(Math.floor(Number(input.bay)))
       : "";
+  const today = new Date().toISOString().slice(0, 10);
 
   return `You are DeptSync Hub's Executive Floor Pad copilot for a Lowe's retail store.
 
-Analyze the manager note and extract actionable floor tasks, location tags, and structured floor metadata.
+Extract actionable floor tasks, location tags, and structured metadata from the note.
+Do not invent SKUs, aisles, bays, serials, brands, or hazards that are not evidenced.
+Prefer short imperative tasks. Keep provided aisle/bay unless the note clearly corrects them.
+follow_up_date: ISO YYYY-MM-DD relative to today=${today} when timing is stated, else null.
 
-Context already known:
-- department_code=${dept}
-- aisle=${aisle || "missing"}
-- bay=${bay || "missing"}
-
+Context: department_code=${dept}; aisle=${aisle || "missing"}; bay=${bay || "missing"}
 Title: ${title}
-Note (HTML or plain text):
+Note (plain text):
 ${content}
 
-Rules:
-1. Extract concrete action items the floor team should complete. Prefer short imperative tasks.
-2. Do not invent SKUs, aisles, bays, serials, brands, or hazards that are not evidenced in the note.
-3. If aisle/bay tags are missing in context but clearly stated in the note, return them.
-4. If aisle/bay are already provided, keep them unless the note clearly corrects them.
-5. Strip HTML to meaning; ignore formatting chrome.
-6. Populate metadata only from evidenced text:
-   - appliance_serials: serials and/or model numbers with dwell/location details when mentioned
-   - carpet_remnants: remnant / roll lengths, brands, and missing-tag alerts
-   - operational_hotspots: bay physical issues (top-stock clutter, pricing errors, safety hazards, etc.)
-   - vendor_mentions: brand / vendor names mentioned
-   - follow_up_date: any re-audit / follow-up timing (e.g. "re-check on Friday", "follow up in 2 days") as ISO YYYY-MM-DD relative to today when possible, else null
-
-Return ONLY valid JSON (no markdown fences):
+Return ONLY JSON with this schema (no markdown, no examples):
 {
-  "executive_summary": "One or two observational sentences.",
-  "tasks": ["Concrete next step", "Another next step"],
-  "aisle": "BW" | null,
-  "bay": 4 | null,
+  "executive_summary": string,
+  "tasks": string[],
+  "aisle": string | null,
+  "bay": number | null,
   "metadata": {
-    "appliance_serials": [
-      { "serial": "ABC123", "model": "WRF535SWHZ", "location": "Aisle 12 Bay 4", "details": "floor model dwell" }
-    ],
-    "carpet_remnants": [
-      { "length_clf": 12.5, "brand": "Stainmaster", "missing_tag": true, "details": "end-cap remnant" }
-    ],
-    "operational_hotspots": [
-      { "issue": "Top-stock clutter", "bay": "Bay 7", "severity": "medium", "details": "leaning cartons" }
-    ],
-    "vendor_mentions": ["Mohawk", "Whirlpool"],
-    "follow_up_date": "2026-08-15"
+    "appliance_serials": object[],
+    "carpet_remnants": object[],
+    "operational_hotspots": object[],
+    "vendor_mentions": string[],
+    "follow_up_date": string | null
   }
-}`;
+}
+metadata object fields when evidenced: serial, model, location, details; length_clf, brand, missing_tag; issue, bay, severity.`;
 }
 
 function asRecord(value: unknown): Record<string, any> | null {

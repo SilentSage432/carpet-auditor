@@ -27,8 +27,8 @@ type Props = {
   content: string;
   onChange: (html: string) => void;
   busy: boolean;
-  /** Manual Gemini Copilot on current document. */
-  onGemini: () => void;
+  /** Manual Gemini Copilot on current document (plain text from editor.getText()). */
+  onGemini: (plainText?: string) => void;
   /**
    * Voice Stop & Parse — parent runs Gemini on the HTML that already
    * includes the appended transcript.
@@ -214,7 +214,7 @@ export function FloorPadEditor({
       <FloorPadToolbar
         editor={editor}
         busy={busy}
-        onGemini={onGemini}
+        onGemini={() => onGemini(editor?.getText() ?? "")}
         saveStatus={saveStatus}
         title={title}
         onTitleChange={onTitleChange}

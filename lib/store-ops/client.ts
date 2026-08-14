@@ -10,12 +10,36 @@ import {
   STORE_OPS_AUTH_HINT,
 } from "./auth-soft";
 import { readableError } from "./errors";
+import { createTtlCache } from "./ttl-cache";
 import type {
   BulkGenerateInput,
   Department,
   StoreLocation,
   WeeklyRotationWithLocation,
 } from "./types";
+
+const STORE_OPS_LIST_TTL_MS = 45_000;
+
+const departmentsCache = createTtlCache<StoreOpsListResult<Department>>(
+  STORE_OPS_LIST_TTL_MS
+);
+const rotationsCache = createTtlCache<{
+  assigned_week: string;
+  rotations: WeeklyRotationWithLocation[];
+}>(STORE_OPS_LIST_TTL_MS);
+
+function storeOpsListCacheKey(
+  specialist: StoreSpecialist,
+  extra = ""
+): string {
+  return `${specialist.id}:${getStoreNumber()}:${extra}`;
+}
+
+/** Drop cached Store Map / Zebra list GETs after writes. */
+export function invalidateStoreOpsListCaches(): void {
+  departmentsCache.invalidate();
+  rotationsCache.invalidate();
+}
 
 async function storeOpsFetch<T>(
   path: string,
@@ -79,28 +103,33 @@ export async function fetchDepartments(
 export async function fetchDepartmentsDetailed(
   specialist: StoreSpecialist
 ): Promise<StoreOpsListResult<Department>> {
-  try {
-    const data = await storeOpsFetch<{
-      departments: Department[];
-      auth_required?: boolean;
-      hint?: string;
-    }>("/api/departments", specialist);
-    return {
-      items: data.departments ?? [],
-      authRequired: Boolean(data.auth_required),
-      hint: data.hint,
-    };
-  } catch (err) {
-    const message = String((err as { message?: string } | null)?.message ?? "");
-    if (isStoreOpsAuthFailureMessage(message)) {
-      return {
-        items: [],
-        authRequired: true,
-        hint: STORE_OPS_AUTH_HINT,
-      };
+  return departmentsCache.get(
+    storeOpsListCacheKey(specialist, "departments"),
+    async () => {
+      try {
+        const data = await storeOpsFetch<{
+          departments: Department[];
+          auth_required?: boolean;
+          hint?: string;
+        }>("/api/departments", specialist);
+        return {
+          items: data.departments ?? [],
+          authRequired: Boolean(data.auth_required),
+          hint: data.hint,
+        };
+      } catch (err) {
+        const message = String((err as { message?: string } | null)?.message ?? "");
+        if (isStoreOpsAuthFailureMessage(message)) {
+          return {
+            items: [],
+            authRequired: true,
+            hint: STORE_OPS_AUTH_HINT,
+          };
+        }
+        throw err;
+      }
     }
-    throw err;
-  }
+  );
 }
 
 export async function fetchStoreLocations(
@@ -234,28 +263,32 @@ export async function fetchThisWeekRotations(
   assigned_week: string;
   rotations: WeeklyRotationWithLocation[];
 }> {
-  try {
-    const data = await storeOpsFetch<{
-      assigned_week?: string | null;
-      rotations?: WeeklyRotationWithLocation[] | null;
-    }>("/api/weekly-rotations", specialist);
+  return rotationsCache.get(
+    storeOpsListCacheKey(specialist, "weekly-rotations"),
+    async () => {
+      try {
+        const data = await storeOpsFetch<{
+          assigned_week?: string | null;
+          rotations?: WeeklyRotationWithLocation[] | null;
+        }>("/api/weekly-rotations", specialist);
 
-    const week = String(data.assigned_week ?? "").trim();
-    const rotations = Array.isArray(data.rotations)
-      ? data.rotations.filter((r) => Boolean(r?.assigned_week))
-      : [];
+        const week = String(data.assigned_week ?? "").trim();
+        const rotations = Array.isArray(data.rotations)
+          ? data.rotations.filter((r) => Boolean(r?.assigned_week))
+          : [];
 
-    return {
-      assigned_week: week,
-      rotations,
-    };
-  } catch {
-    // Zero assignments / schema soft-fail — empty Zebra list, no red toast
-    return {
-      assigned_week: "",
-      rotations: [],
-    };
-  }
+        return {
+          assigned_week: week,
+          rotations,
+        };
+      } catch {
+        return {
+          assigned_week: "",
+          rotations: [],
+        };
+      }
+    }
+  );
 }
 
 export async function completeRotation(
@@ -266,6 +299,7 @@ export async function completeRotation(
     method: "POST",
     body: JSON.stringify({ rotation_id: rotationId }),
   });
+  invalidateStoreOpsListCaches();
 }
 
 export async function generateRotations(
@@ -278,10 +312,17 @@ export async function generateRotations(
   cycle_reset: boolean;
   created: number;
 }> {
-  return storeOpsFetch("/api/rotations/generate", specialist, {
+  const result = await storeOpsFetch<{
+    assigned_week: string;
+    cycle_number: number;
+    cycle_reset: boolean;
+    created: number;
+  }>("/api/rotations/generate", specialist, {
     method: "POST",
     body: JSON.stringify({ department_id: departmentId, count }),
   });
+  invalidateStoreOpsListCaches();
+  return result;
 }
 
 export async function updateDepartmentWeeklyTarget(
@@ -667,13 +708,20 @@ export async function scanBayVisual(
     allow_local_fallback?: boolean;
   }
 ): Promise<BayScanClientResult> {
+  const rawBase64 = String(input.image ?? "")
+    .trim()
+    .replace(/^data:image\/[\w+.-]+;base64,/i, "");
   return storeOpsFetch<BayScanClientResult>(
     "/api/store-ops/ai-bay-scan",
     specialist,
     {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(input),
+      body: JSON.stringify({
+        ...input,
+        image: rawBase64,
+        mime_type: input.mime_type || "image/jpeg",
+      }),
     }
   );
 }

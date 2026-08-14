@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { useCallback, useEffect, useState } from "react";
+import { startTransition, useCallback, useEffect, useState, type ReactNode } from "react";
 import { ChangePinModal } from "@/components/hub/ChangePinModal";
 import { BottomNavBar, AssociateSpecialtySwitcher } from "@/components/hub/HubChrome";
 import { SpecialistModal } from "@/components/hub/SpecialistModal";
@@ -129,6 +129,14 @@ function sectionNeedsApplianceCatalog(section: HubSection): boolean {
   return section === "appliances";
 }
 
+function HubPane({ show, children }: { show: boolean; children: ReactNode }) {
+  return (
+    <div hidden={!show} aria-hidden={!show}>
+      {children}
+    </div>
+  );
+}
+
 type Gate = "booting" | AuthWallMode | "ready";
 
 export default function DeptSyncHubPage() {
@@ -149,6 +157,9 @@ export default function DeptSyncHubPage() {
   );
   const [gate, setGate] = useState<Gate>("booting");
   const [rosterReady, setRosterReady] = useState(false);
+  const [visitedSections, setVisitedSections] = useState<Set<HubSection>>(
+    () => new Set()
+  );
 
   const unlockWorkspace = useCallback((member: StoreSpecialist) => {
     setSpecialist(member);
@@ -371,12 +382,20 @@ export default function DeptSyncHubPage() {
     if (!canAccessSection(specialist, next)) return;
     blurActiveInput();
     touchAuthSession();
-    setSection(next);
     if (typeof window !== "undefined") {
       const url = new URL(window.location.href);
       url.searchParams.set("section", next);
       window.history.replaceState({}, "", url.pathname + url.search);
     }
+    startTransition(() => {
+      setSection(next);
+      setVisitedSections((prev) => {
+        if (prev.has(next)) return prev;
+        const copy = new Set(prev);
+        copy.add(next);
+        return copy;
+      });
+    });
   }
 
   const dept = effectiveDepartment(specialist);
@@ -393,6 +412,16 @@ export default function DeptSyncHubPage() {
     if (gate !== "ready") return;
     void loadInventoryForSection(activeSection);
   }, [gate, activeSection, storeNumber, loadInventoryForSection]);
+
+  useEffect(() => {
+    if (gate !== "ready") return;
+    setVisitedSections((prev) => {
+      if (prev.has(activeSection)) return prev;
+      const next = new Set(prev);
+      next.add(activeSection);
+      return next;
+    });
+  }, [gate, activeSection]);
 
   useEffect(() => {
     async function onOnline() {
@@ -485,13 +514,7 @@ export default function DeptSyncHubPage() {
         <>
           <div
             className={`mx-auto w-full max-w-md flex-1 overflow-x-hidden px-4 py-4 ${
-              associateSession
-                ? "pb-28"
-                : activeSection === "audit" ||
-                    activeSection === "appliances" ||
-                    activeSection === "department"
-                  ? "pb-44"
-                  : "pb-32"
+              associateSession ? "pb-28" : "pb-44"
             }`}
           >
             {associateSession ? (
@@ -501,62 +524,76 @@ export default function DeptSyncHubPage() {
                 specialist={specialist}
               />
             ) : null}
-            {activeSection === "audit" && canAccessSection(specialist, "audit") && (
-              <CycleAuditSection
-                catalog={catalog}
-                onCatalogChange={setCatalog}
-                auditedBy={specialist?.name ?? ""}
-                specialists={specialists}
-                activeSpecialist={specialist}
-                remnants={remnants}
-                onRemnantsChange={setRemnants}
-              />
-            )}
-            {activeSection === "remnants" &&
+            {visitedSections.has("audit") &&
+              canAccessSection(specialist, "audit") && (
+                <HubPane show={activeSection === "audit"}>
+                  <CycleAuditSection
+                    catalog={catalog}
+                    onCatalogChange={setCatalog}
+                    auditedBy={specialist?.name ?? ""}
+                    specialists={specialists}
+                    activeSpecialist={specialist}
+                    remnants={remnants}
+                    onRemnantsChange={setRemnants}
+                    scannerEnabled={activeSection === "audit"}
+                  />
+                </HubPane>
+              )}
+            {visitedSections.has("remnants") &&
               canAccessSection(specialist, "remnants") && (
-                <RemnantSection
-                  catalog={catalog}
-                  remnants={remnants}
-                  onRemnantsChange={setRemnants}
-                  loggedBy={specialist?.name ?? ""}
-                  specialists={specialists}
-                  activeSpecialist={specialist}
-                />
+                <HubPane show={activeSection === "remnants"}>
+                  <RemnantSection
+                    catalog={catalog}
+                    remnants={remnants}
+                    onRemnantsChange={setRemnants}
+                    loggedBy={specialist?.name ?? ""}
+                    specialists={specialists}
+                    activeSpecialist={specialist}
+                  />
+                </HubPane>
               )}
-            {activeSection === "appliances" &&
+            {visitedSections.has("appliances") &&
               canAccessSection(specialist, "appliances") && (
-                <ApplianceAuditSection
-                  catalog={applianceCatalog}
-                  onCatalogChange={setApplianceCatalog}
-                  scannedBy={specialist?.name ?? ""}
-                  activeSpecialist={specialist}
-                />
+                <HubPane show={activeSection === "appliances"}>
+                  <ApplianceAuditSection
+                    catalog={applianceCatalog}
+                    onCatalogChange={setApplianceCatalog}
+                    scannedBy={specialist?.name ?? ""}
+                    activeSpecialist={specialist}
+                    scannerEnabled={activeSection === "appliances"}
+                  />
+                </HubPane>
               )}
-            {activeSection === "department" &&
+            {visitedSections.has("department") &&
               canAccessSection(specialist, "department") &&
               isGenericDepartment(dept) && (
-                <DepartmentAuditSection
-                  department={dept}
-                  catalog={catalog}
-                  onCatalogChange={setCatalog}
-                  auditedBy={specialist?.name ?? ""}
-                  activeSpecialist={specialist}
-                />
+                <HubPane show={activeSection === "department"}>
+                  <DepartmentAuditSection
+                    department={dept}
+                    catalog={catalog}
+                    onCatalogChange={setCatalog}
+                    auditedBy={specialist?.name ?? ""}
+                    activeSpecialist={specialist}
+                    scannerEnabled={activeSection === "department"}
+                  />
+                </HubPane>
               )}
             {!associateSession &&
-              activeSection === "settings" &&
+              visitedSections.has("settings") &&
               canAccessSection(specialist, "settings") && (
-                <SettingsSection
-                  catalogCount={catalog.length}
-                  remnantCount={remnants.length}
-                  activeSpecialist={specialist}
-                  specialists={specialists}
-                  onSpecialistUpdated={handleSpecialistUpdated}
-                  onRosterChange={(roster) => setSpecialists(dedupeRoster(roster))}
-                  onOpenChangePin={() => setChangePinOpen(true)}
-                  storeNumber={storeNumber}
-                  onStoreNumberChange={setStoreNumberState}
-                />
+                <HubPane show={activeSection === "settings"}>
+                  <SettingsSection
+                    catalogCount={catalog.length}
+                    remnantCount={remnants.length}
+                    activeSpecialist={specialist}
+                    specialists={specialists}
+                    onSpecialistUpdated={handleSpecialistUpdated}
+                    onRosterChange={(roster) => setSpecialists(dedupeRoster(roster))}
+                    onOpenChangePin={() => setChangePinOpen(true)}
+                    storeNumber={storeNumber}
+                    onStoreNumberChange={setStoreNumberState}
+                  />
+                </HubPane>
               )}
           </div>
 

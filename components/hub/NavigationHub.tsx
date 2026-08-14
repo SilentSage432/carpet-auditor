@@ -8,7 +8,7 @@
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useId, useRef, useState } from "react";
+import { startTransition, useEffect, useId, useRef, useState } from "react";
 import {
   ADMIN_TOOLS_EVENT,
   type AdminToolsEventDetail,
@@ -347,13 +347,15 @@ export function NavigationHub({
               specialist={specialist}
               compact
               onPinnedNavigate={(section) => {
-                if (pathname === "/" || pathname === "") {
-                  router.push(`/?section=${section}`);
-                } else if (section === "audit") {
-                  router.push("/flooring");
-                } else {
-                  router.push(`/?section=${section}`);
-                }
+                startTransition(() => {
+                  if (pathname === "/" || pathname === "") {
+                    router.push(`/?section=${section}`);
+                  } else if (section === "audit") {
+                    router.push("/flooring");
+                  } else {
+                    router.push(`/?section=${section}`);
+                  }
+                });
               }}
             />
           </div>

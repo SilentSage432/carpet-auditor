@@ -10,7 +10,10 @@ import { useCallback, useEffect, useId, useRef, useState } from "react";
 import { Archive, Plus, Trash2, X } from "lucide-react";
 import { extractTasksAndTag } from "@/app/actions/manager-notes";
 import { workingDepartment } from "@/lib/admin-department-context";
-import { appendTaskCheckboxesHtml } from "@/lib/store-ops/ai-note-extract";
+import {
+  appendTaskCheckboxesHtml,
+  prepareNoteExtractContent,
+} from "@/lib/store-ops/ai-note-extract";
 import { readableError } from "@/lib/store-ops/errors";
 import {
   archiveManagerNote,
@@ -269,7 +272,7 @@ export function ExecutiveFloorPad({
     }, 50);
   }
 
-  async function runGeminiCopilot(contentOverride?: string) {
+  async function runGeminiCopilot(htmlOverride?: string, plainOverride?: string) {
     setBusy(true);
     setError(null);
     setStatus(null);
@@ -281,20 +284,23 @@ export function ExecutiveFloorPad({
         );
       }
 
-      const contentForExtract = contentOverride ?? draftRef.current.content;
+      const htmlForEditor = htmlOverride ?? draftRef.current.content;
       const draftSnap = draftRef.current;
+      const plainForGemini = prepareNoteExtractContent(
+        plainOverride?.trim() || htmlForEditor
+      );
 
       const result = await extractTasksAndTag({
         accessToken: token,
         title: draftSnap.title,
-        content: contentForExtract,
+        content: plainForGemini,
         department_code: draftSnap.department_code,
         aisle: draftSnap.aisle?.trim() || undefined,
         bay: draftSnap.bay,
       });
 
       const nextHtml = appendTaskCheckboxesHtml(
-        contentForExtract,
+        htmlForEditor,
         result.tasks
       );
       skipAutosaveRef.current = true;
@@ -331,8 +337,8 @@ export function ExecutiveFloorPad({
     }
   }
 
-  async function onGeminiCopilot() {
-    await runGeminiCopilot();
+  async function onGeminiCopilot(plainFromEditor?: string) {
+    await runGeminiCopilot(undefined, plainFromEditor);
   }
 
   async function onVoiceParse(htmlWithTranscript: string) {
@@ -464,7 +470,7 @@ export function ExecutiveFloorPad({
           contentKey={contentKey}
           onChange={(html) => setDraft((d) => ({ ...d, content: html }))}
           busy={busy}
-          onGemini={() => void onGeminiCopilot()}
+          onGemini={(plain) => void onGeminiCopilot(plain)}
           onVoiceParse={(html) => void onVoiceParse(html)}
           onSpeechError={(message) => setError(message)}
           saveStatus={saveStatus}

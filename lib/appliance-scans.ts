@@ -6,6 +6,7 @@
  * on failure — never silently report success via the offline queue.
  */
 
+import { createDebouncedPersist } from "./debounced-persist";
 import { getStoreNumber } from "./store";
 import { getSupabase } from "./supabase";
 import { enqueueSyncAction, isBrowserOnline } from "./sync-queue";
@@ -20,7 +21,53 @@ import {
 } from "./types";
 
 const STORAGE_KEY = "appliance_scans_offline";
+const DRAFT_KEY = "carpet_hub_appliance_scan_draft";
 const TABLE = "appliance_scans";
+
+/** Mid-scan appliance form — survives refresh / tab switches. */
+export type ApplianceScanDraft = {
+  store_number: string;
+  itemNumber: string;
+  serialNumber: string;
+  location: string;
+  description: string;
+};
+
+export function loadApplianceScanDraft(
+  store = getStoreNumber()
+): ApplianceScanDraft | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(DRAFT_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as ApplianceScanDraft;
+    if (parsed.store_number !== store) return null;
+    return parsed;
+  } catch {
+    return null;
+  }
+}
+
+export function saveApplianceScanDraft(draft: ApplianceScanDraft): void {
+  if (typeof window === "undefined") return;
+  localStorage.setItem(DRAFT_KEY, JSON.stringify(draft));
+}
+
+const applianceDraftPersist = createDebouncedPersist(saveApplianceScanDraft, 300);
+
+export function scheduleApplianceScanDraftSave(draft: ApplianceScanDraft): void {
+  applianceDraftPersist.schedule(draft);
+}
+
+export function flushApplianceScanDraftSave(): void {
+  applianceDraftPersist.flush();
+}
+
+export function clearApplianceScanDraft(): void {
+  applianceDraftPersist.cancel();
+  if (typeof window === "undefined") return;
+  localStorage.removeItem(DRAFT_KEY);
+}
 
 function readAllLocal(): ApplianceScan[] {
   if (typeof window === "undefined") return [];

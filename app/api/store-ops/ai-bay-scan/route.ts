@@ -1,8 +1,7 @@
 import { NextResponse } from "next/server";
 import {
-  callGeminiFlash,
+  callGeminiFlashJson,
   isGeminiConfigured,
-  parseGeminiJson,
 } from "@/lib/ai/gemini";
 import {
   buildBayScanPrompt,
@@ -43,8 +42,8 @@ export async function POST(request: Request) {
       );
     }
 
-    // Guard extreme payloads (roughly > ~6MB base64)
-    if (image.length > 8_000_000) {
+    // ~1.5MB JSON field — client sends single-pass JPEG base64 (max edge 960).
+    if (image.length > 1_500_000) {
       return NextResponse.json(
         { error: "Image too large — capture a smaller bay photo and retry" },
         { status: 413 }
@@ -81,11 +80,11 @@ export async function POST(request: Request) {
 
     const mimeType = resolveImageMimeType(image, body.mime_type);
     const prompt = buildBayScanPrompt(meta);
-    const rawText = await callGeminiFlash(prompt, {
-      mimeType,
-      data: image,
+    // JSON mime + maxOutputTokens 1024 applied in lib/ai/gemini.ts
+    const parsed = await callGeminiFlashJson<unknown>(prompt, {
+      inlineImageData: { mimeType, data: image },
+      prefer: "object",
     });
-    const parsed = parseGeminiJson<unknown>(rawText, "object");
     const result: BayScanResult = normalizeBayScanResult(parsed);
 
     return NextResponse.json({

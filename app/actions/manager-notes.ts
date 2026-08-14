@@ -13,6 +13,7 @@ import {
   buildLocalNoteExtract,
   buildNoteExtractPrompt,
   normalizeNoteExtractResult,
+  prepareNoteExtractContent,
   type NoteExtractInput,
   type NoteExtractResult,
 } from "@/lib/store-ops/ai-note-extract";
@@ -41,7 +42,7 @@ export async function extractTasksAndTag(
 
     const payload: NoteExtractInput = {
       title: String(input.title ?? "").trim(),
-      content: String(input.content ?? "").trim(),
+      content: prepareNoteExtractContent(input.content),
       department_code: String(input.department_code ?? "").trim() || undefined,
       aisle: String(input.aisle ?? "").trim() || undefined,
       bay:

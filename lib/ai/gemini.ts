@@ -12,6 +12,7 @@
 
 import {
   GoogleGenerativeAI,
+  type GenerationConfig,
   type Part,
 } from "@google/generative-ai";
 
@@ -22,6 +23,12 @@ export type GeminiInlineImage = {
 };
 
 const DEFAULT_MODEL = "gemini-3.5-flash";
+
+/** Shared JSON-mode config — keeps replies parseable and bounds output length. */
+export const GEMINI_JSON_GENERATION_CONFIG: GenerationConfig = {
+  responseMimeType: "application/json",
+  maxOutputTokens: 1024,
+};
 
 function resolveApiKey(): string {
   return (process.env.GEMINI_API_KEY ?? "").trim();
@@ -63,7 +70,10 @@ export async function callGeminiFlash(
   inlineImageData?: GeminiInlineImage
 ): Promise<string> {
   const genAI = getClient();
-  const model = genAI.getGenerativeModel({ model: resolveModelName() });
+  const model = genAI.getGenerativeModel({
+    model: resolveModelName(),
+    generationConfig: GEMINI_JSON_GENERATION_CONFIG,
+  });
 
   const content: Part[] = [{ text: prompt }];
   if (inlineImageData) {

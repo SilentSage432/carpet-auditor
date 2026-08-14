@@ -79,7 +79,6 @@ export function SundayAuditStagingCard({
   useEffect(() => {
     function onEvt() {
       setWorkingTick((n) => n + 1);
-      void reload();
     }
     window.addEventListener(SUNDAY_AUDIT_EVENT, onEvt);
     window.addEventListener("deptsync:admin-dept-context", onEvt);
@@ -87,7 +86,7 @@ export function SundayAuditStagingCard({
       window.removeEventListener(SUNDAY_AUDIT_EVENT, onEvt);
       window.removeEventListener("deptsync:admin-dept-context", onEvt);
     };
-  }, [reload]);
+  }, []);
 
   const flooringContext =
     forceShow ||

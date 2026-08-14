@@ -87,6 +87,8 @@
 - [x] Master Admin bootstrap (`/api/auth/bootstrap-admin` + `scripts/bootstrap-admin.mjs`) + master-PIN auto-provision on hub-bridge
 - [x] Master Admin PIN reset API (`/api/auth/reset-pin`) — upserts `store_profiles` when missing; Change PIN uses service role
 - [x] P0 mobile boot — roster-only AuthWall fetch; `next/dynamic` hub sections + Admin Tools + Cycle Audit modals; bounded audits/scans; composite list indexes (`20260813_p0_query_indexes.sql`)
+- [x] P1 Gemini latency — Snap Bay 720p + JPEG 0.70/960px + JSON mime/`maxOutputTokens` 1024; Floor Pad plain-text 8k Copilot; Store Map `GET /api/store-locations` column prune
+- [x] P2 hub UI streamlining — debounced audit drafts; Cycle/Appliance scan-form isolation; Sunday rotations/assignments TTL cache; `startTransition` + keep-alive hub panes
 
 ## Next
 - [x] Apply Phase 1 JWT/RLS migration in Supabase + enable Custom Access Token Hook

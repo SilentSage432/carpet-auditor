@@ -47,6 +47,8 @@ type Props = {
   onCatalogChange: (items: CatalogItem[]) => void;
   auditedBy: string;
   activeSpecialist: StoreSpecialist | null;
+  /** Disable wedge scanner while this hub section is hidden. */
+  scannerEnabled?: boolean;
 };
 
 const cardClass = "glass-card p-4";
@@ -70,6 +72,7 @@ export function DepartmentAuditSection({
   onCatalogChange,
   auditedBy,
   activeSpecialist,
+  scannerEnabled = true,
 }: Props) {
   const meta = departmentMeta(department);
   const skuInputRef = useRef<HTMLInputElement>(null);
@@ -211,7 +214,7 @@ export function DepartmentAuditSection({
     setQuickAddBarcode(resolution.scanned);
   }
 
-  useGlobalBarcodeScanner(handleSkuLookup);
+  useGlobalBarcodeScanner(handleSkuLookup, scannerEnabled);
 
   function handleSkuChange(value: string) {
     setSku(value);

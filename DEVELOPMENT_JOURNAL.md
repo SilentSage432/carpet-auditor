@@ -1,5 +1,29 @@
 # DeptSync Hub — Development Journal
 
+## 2026-08-14 — Phase 2 UI streamlining (tab latency, draft debounce, form isolation)
+
+### Shipped
+- Cycle / Appliance audit drafts write to localStorage on a **300ms debounce** (`scheduleAuditDraftSave` / `scheduleApplianceScanDraftSave`). Immediate flush on submit, tab hide, unmount, and when the hub section is hidden (keep-alive).
+- Scan/input state lives in `CycleAuditScanForm` and `ApplianceScanForm`. Historical logs stay in the parent sections so keystrokes do not reconcile the shift tables.
+- `GET /api/weekly-rotations` and departments remain 45s TTL + in-flight dedupe (`lib/store-ops/client.ts`). Sunday assignments use the same TTL cache (`lib/store-ops/sunday-audit.ts`); writes invalidate. Staging card no longer double-fetches on assignment events.
+- Hub `/?section=` switches use `React.startTransition` and keep visited sections mounted (`hidden` + `aria-hidden`) so Cycle Audit / Sunday staging do not remount. Wedge scanners disable when a pane is hidden. Bottom padding is stable (`pb-44`) to avoid layout shift.
+
+## 2026-08-14 — P0 index SQL: `store_number` vs `store_id`
+
+### Shipped
+- `20260813_p0_query_indexes.sql` no longer assumes `store_number` on every table (live 42703).
+- Hub `carpet_audits` / `carpet_remnants`: `ADD COLUMN IF NOT EXISTS store_number` then composite index (these tables have no `store_id`).
+- Store Map / rotations: index `store_id` (and `store_number` only if JWT RLS added it).
+- Floor Pad: Phase 2 index on `(store_number, is_archived, department, created_at)`; legacy fallback `(store_id, is_archived, department_code, created_at)`. Missing columns skip with NOTICE.
+
+## 2026-08-14 — P1 Gemini latency, Snap Bay payload, Store Map columns
+
+### Shipped
+- Snap Bay camera targets **1280×720**; live/upload snapshots are a single-pass JPEG (quality 0.70, max edge 960px). `scanBayVisual` strips data-URL prefixes so Gemini receives raw base64. Route rejects images over ~1.5MB chars.
+- Gemini Flash uses `responseMimeType: application/json` and `maxOutputTokens: 1024` (`GEMINI_JSON_GENERATION_CONFIG` in `lib/ai/gemini.ts`) so bay-scan JSON is not truncated.
+- Floor Pad Copilot sends `editor.getText()` / stripped HTML, capped at 8,000 characters. Prompt is schema-only (no example JSON blobs). TipTap HTML is unchanged for persist/checkboxes.
+- `GET /api/store-locations` selects Store Map columns only (no `SELECT *`).
+
 ## 2026-08-13 — P0 mobile boot path (roster-only + code-split + bounded queries)
 
 ### Shipped
@@ -9,7 +33,7 @@
 - Cycle Audit mounts Visual Bay Scan, Audit Report, and SIMS Finder on demand.
 - `fetchAudits` bounded to today + `.limit(200)`. Appliance scans GET `.limit(200)`.
 - `fetchSpecialists` column list — no `pin_code` / `temp_pin_hash`; Hub-bridge remains PIN source of truth.
-- Migration `20260813_p0_query_indexes.sql` — composite indexes for audits, remnants, locations, rotations, manager notes.
+- Migration `20260813_p0_query_indexes.sql` — composite indexes for audits, remnants, locations, rotations, manager notes. Hub tables (`carpet_audits` / `carpet_remnants`) key on **`store_number`** (added if missing — original CREATE omitted it). Store Ops (`store_locations` / `weekly_rotations`) key on **`store_id`**. Floor Pad uses **`store_number` + `department`** (Phase 2) or **`store_id` + `department_code`** (legacy). Script skips any index whose columns are absent.
 
 ## 2026-08-12 — Master Admin PIN reset via service-role API
 
