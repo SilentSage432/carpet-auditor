@@ -37,24 +37,14 @@ import {
 } from "@/lib/store";
 import { flushSyncQueue } from "@/lib/sync-queue";
 import { getSupabase, isSupabaseConfigured } from "@/lib/supabase";
+import type {
+  AdminToolsSection,
+} from "@/components/hub/admin-tools-events";
 import type { Department } from "@/lib/store-ops/types";
 import type { StoreSpecialist } from "@/lib/types";
 
-export type AdminToolsSection =
-  | "menu"
-  | "bulk"
-  | "targets"
-  | "store"
-  | "diagnostics";
-
-export const ADMIN_TOOLS_EVENT = "deptsync:admin-tools";
-
-export type AdminToolsEventDetail = {
-  section?: AdminToolsSection;
-  openForceRotation?: boolean;
-  openSundayAudit?: boolean;
-  openManagerNotes?: boolean;
-};
+export type { AdminToolsSection, AdminToolsEventDetail } from "@/components/hub/admin-tools-events";
+export { ADMIN_TOOLS_EVENT, openAdminTools } from "@/components/hub/admin-tools-events";
 
 type Props = {
   open: boolean;
@@ -540,13 +530,5 @@ function DiagnosticsPanel({ storeNumber }: { storeNumber: string }) {
         </button>
       </div>
     </section>
-  );
-}
-
-/** Dispatch from any page (e.g. hash deep-links) to open Admin Tools. */
-export function openAdminTools(detail?: AdminToolsEventDetail) {
-  if (typeof window === "undefined") return;
-  window.dispatchEvent(
-    new CustomEvent(ADMIN_TOOLS_EVENT, { detail: detail ?? {} })
   );
 }

@@ -63,7 +63,7 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 
 ## Authentication (Zero-Access Wall)
 - Unauthenticated visitors never see workspace tabs/data — `AuthWall` only
-- Login / unlock: username + password/PIN → roster match (`findSpecialistByLogin` / `verifyPin`)
+- Login / unlock: username + password/PIN → roster match (`findSpecialistByLogin`); Hub-bridge verifies PIN (roster **list** no longer selects `pin_code` / `temp_pin_hash`)
 - **Hub PIN → Auth bridge (primary Store Ops unlock):** after PIN verify, client calls `POST /api/auth/hub-bridge` (`lib/store-ops/hub-bridge.ts` + `hub-bridge-client.ts`) which service-role verifies the roster PIN (by `specialist_id` / username / name), ensures `auth.users` + `profiles` link, and mints a real Supabase Auth session (`setSession`). **Master PIN** (`1234` or `HUB_MASTER_PIN`) auto-provisions Super Admin when missing so Master Admin never lock out.
 - **Bootstrap recovery:** `POST /api/auth/bootstrap-admin` (Bearer `CRON_SECRET`) or `node --env-file=.env.local scripts/bootstrap-admin.mjs` — resets `master_admin` roster + Auth + profiles
 - **PIN reset:** `POST /api/auth/reset-pin` — Super Admin Bearer or `current_pin`; service-role updates `store_specialists` and upserts `store_profiles` (creates Master Admin profile when missing). Change PIN modal uses this path.
@@ -75,6 +75,7 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 - Biometric: WebAuthn; requires an existing Store Ops Auth session (otherwise PIN once after fingerprint)
 - `must_change_credentials` → non-dismissible permanent credential setup
 - Session: `deptsync_auth_session` (hub UI) + Supabase Auth localStorage (API Bearer); 8h idle lock on hub session
+- **P0 boot:** `/` fetches roster only before AuthWall; catalog/remnants/appliance catalog after unlock per section; hub sections + Admin Tools + Snap Bay / SIMS / Audit Report are `next/dynamic`
 - Seeds: no hardcoded roster injection — use Invite / Add Supervisor; temp PIN sets `must_change_credentials`
 - Primary: fixed bottom tabs — **filtered by role/department**
 - Header: DeptSync Hub brand + `DeptSync · Lowe's #…` subtitle · section title · network; specialist chip + PIN gear

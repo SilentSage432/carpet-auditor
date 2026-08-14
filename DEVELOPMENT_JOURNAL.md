@@ -1,5 +1,16 @@
 # DeptSync Hub — Development Journal
 
+## 2026-08-13 — P0 mobile boot path (roster-only + code-split + bounded queries)
+
+### Shipped
+- Hub boot (`app/page.tsx`) fetches **roster only** before AuthWall. Catalog / remnants / appliance catalog load after unlock when the relevant section mounts.
+- `next/dynamic` for AuthWall, NavigationHub, and the five hub sections.
+- `AdminToolsDrawer` loads only when `adminOpen` (event bus extracted to `admin-tools-events.ts` so TipTap is not on the chrome chunk).
+- Cycle Audit mounts Visual Bay Scan, Audit Report, and SIMS Finder on demand.
+- `fetchAudits` bounded to today + `.limit(200)`. Appliance scans GET `.limit(200)`.
+- `fetchSpecialists` column list — no `pin_code` / `temp_pin_hash`; Hub-bridge remains PIN source of truth.
+- Migration `20260813_p0_query_indexes.sql` — composite indexes for audits, remnants, locations, rotations, manager notes.
+
 ## 2026-08-12 — Master Admin PIN reset via service-role API
 
 ### Shipped

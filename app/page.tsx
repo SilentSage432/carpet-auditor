@@ -1,16 +1,10 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { useCallback, useEffect, useState } from "react";
-import { AuthWall, type AuthWallMode } from "@/components/auth/AuthWall";
 import { ChangePinModal } from "@/components/hub/ChangePinModal";
 import { BottomNavBar, AssociateSpecialtySwitcher } from "@/components/hub/HubChrome";
-import { NavigationHub } from "@/components/hub/NavigationHub";
 import { SpecialistModal } from "@/components/hub/SpecialistModal";
-import { CycleAuditSection } from "@/components/sections/CycleAuditSection";
-import { ApplianceAuditSection } from "@/components/sections/ApplianceAuditSection";
-import { RemnantSection } from "@/components/sections/RemnantSection";
-import { SettingsSection } from "@/components/sections/SettingsSection";
-import { DepartmentAuditSection } from "@/components/sections/DepartmentAuditSection";
 import {
   clearAuthSession,
   isAuthSessionExpired,
@@ -48,6 +42,58 @@ import type {
   Remnant,
   StoreSpecialist,
 } from "@/lib/types";
+import type { AuthWallMode } from "@/components/auth/AuthWall";
+
+function HubBootFallback() {
+  return (
+    <div className="flex min-h-dvh items-center justify-center bg-slate-950 px-4">
+      <p className="text-sm font-semibold text-slate-400">
+        Loading DeptSync secure session…
+      </p>
+    </div>
+  );
+}
+
+const AuthWall = dynamic(
+  () => import("@/components/auth/AuthWall").then((m) => m.AuthWall),
+  { loading: HubBootFallback }
+);
+const NavigationHub = dynamic(
+  () => import("@/components/hub/NavigationHub").then((m) => m.NavigationHub)
+);
+const CycleAuditSection = dynamic(
+  () =>
+    import("@/components/sections/CycleAuditSection").then(
+      (m) => m.CycleAuditSection
+    ),
+  { ssr: false }
+);
+const ApplianceAuditSection = dynamic(
+  () =>
+    import("@/components/sections/ApplianceAuditSection").then(
+      (m) => m.ApplianceAuditSection
+    ),
+  { ssr: false }
+);
+const RemnantSection = dynamic(
+  () =>
+    import("@/components/sections/RemnantSection").then((m) => m.RemnantSection),
+  { ssr: false }
+);
+const SettingsSection = dynamic(
+  () =>
+    import("@/components/sections/SettingsSection").then(
+      (m) => m.SettingsSection
+    ),
+  { ssr: false }
+);
+const DepartmentAuditSection = dynamic(
+  () =>
+    import("@/components/sections/DepartmentAuditSection").then(
+      (m) => m.DepartmentAuditSection
+    ),
+  { ssr: false }
+);
 
 const HUB_SECTION_IDS: HubSection[] = [
   "audit",
@@ -65,6 +111,24 @@ function parseHubSectionParam(raw: string | null): HubSection | null {
   }
   return null;
 }
+
+function sectionNeedsCatalog(section: HubSection): boolean {
+  return (
+    section === "audit" ||
+    section === "remnants" ||
+    section === "department" ||
+    section === "settings"
+  );
+}
+
+function sectionNeedsRemnants(section: HubSection): boolean {
+  return section === "audit" || section === "remnants" || section === "settings";
+}
+
+function sectionNeedsApplianceCatalog(section: HubSection): boolean {
+  return section === "appliances";
+}
+
 type Gate = "booting" | AuthWallMode | "ready";
 
 export default function DeptSyncHubPage() {
@@ -153,19 +217,28 @@ export default function DeptSyncHubPage() {
   }, []);
 
   const loadStoreData = useCallback(async () => {
-    const [cat, applianceCat, rem, team] = await Promise.all([
-      fetchCatalog(),
-      fetchApplianceCatalog(),
-      fetchRemnants(),
-      fetchSpecialists(),
-    ]);
+    const team = await fetchSpecialists();
     const roster = dedupeRoster(team);
-    setCatalog(cat);
-    setApplianceCatalog(applianceCat);
-    setRemnants(rem);
     setSpecialists(roster);
     setRosterReady(true);
     return roster;
+  }, []);
+
+  const loadInventoryForSection = useCallback(async (next: HubSection) => {
+    const tasks: Promise<void>[] = [];
+    if (sectionNeedsCatalog(next)) {
+      tasks.push(fetchCatalog().then((cat) => setCatalog(cat)));
+    }
+    if (sectionNeedsRemnants(next)) {
+      tasks.push(fetchRemnants().then((rem) => setRemnants(rem)));
+    }
+    if (sectionNeedsApplianceCatalog(next)) {
+      tasks.push(
+        fetchApplianceCatalog().then((items) => setApplianceCatalog(items))
+      );
+    }
+    if (tasks.length === 0) return;
+    await Promise.all(tasks);
   }, []);
 
   useEffect(() => {
@@ -201,24 +274,6 @@ export default function DeptSyncHubPage() {
     }
     window.addEventListener(STORE_CHANGED_EVENT, onStoreChanged);
     return () => window.removeEventListener(STORE_CHANGED_EVENT, onStoreChanged);
-  }, [loadStoreData]);
-
-  useEffect(() => {
-    async function onOnline() {
-      const synced = await flushSyncQueue();
-      if (synced > 0) {
-        setSyncToast(
-          `🟢 Connected! Synced ${synced} offline action${synced === 1 ? "" : "s"} to store database.`
-        );
-        window.setTimeout(() => setSyncToast(null), 4000);
-        await loadStoreData();
-      }
-    }
-    window.addEventListener("online", onOnline);
-    if (navigator.onLine) {
-      void onOnline();
-    }
-    return () => window.removeEventListener("online", onOnline);
   }, [loadStoreData]);
 
   // Inactivity watchdog — after 8h idle, require full login (app-level only).
@@ -334,15 +389,35 @@ export default function DeptSyncHubPage() {
         ? defaultSectionForMember(specialist)
         : section;
 
+  useEffect(() => {
+    if (gate !== "ready") return;
+    void loadInventoryForSection(activeSection);
+  }, [gate, activeSection, storeNumber, loadInventoryForSection]);
+
+  useEffect(() => {
+    async function onOnline() {
+      const synced = await flushSyncQueue();
+      if (synced > 0) {
+        setSyncToast(
+          `🟢 Connected! Synced ${synced} offline action${synced === 1 ? "" : "s"} to store database.`
+        );
+        window.setTimeout(() => setSyncToast(null), 4000);
+        await loadStoreData();
+        if (gate === "ready") {
+          await loadInventoryForSection(activeSection);
+        }
+      }
+    }
+    window.addEventListener("online", onOnline);
+    if (navigator.onLine) {
+      void onOnline();
+    }
+    return () => window.removeEventListener("online", onOnline);
+  }, [loadStoreData, loadInventoryForSection, gate, activeSection]);
+
   // Zero-access wall — hide all workspace chrome until auth succeeds.
   if (gate === "booting" || !rosterReady) {
-    return (
-      <div className="flex min-h-dvh items-center justify-center bg-slate-950 px-4">
-        <p className="text-sm font-semibold text-slate-400">
-          Loading DeptSync secure session…
-        </p>
-      </div>
-    );
+    return <HubBootFallback />;
   }
 
   if (gate === "login" || gate === "setup" || gate === "unlock") {

@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useState } from "react";
-import { openAdminTools } from "@/components/hub/AdminToolsDrawer";
+import { openAdminTools } from "@/components/hub/admin-tools-events";
 import { PushNotificationsCard } from "@/components/hub/PushNotificationsCard";
 import { WeeklyBayTargetCard } from "@/components/hub/WeeklyBayTargetCard";
 import {

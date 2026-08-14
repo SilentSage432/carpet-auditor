@@ -40,7 +40,8 @@ export async function GET(request: Request) {
       .from("appliance_scans")
       .select("*")
       .eq("store_number", store)
-      .order("scanned_at", { ascending: false });
+      .order("scanned_at", { ascending: false })
+      .limit(200);
 
     if (error) {
       console.error("[GET /api/appliances/scans] select failed", error);

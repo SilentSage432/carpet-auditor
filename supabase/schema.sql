@@ -410,3 +410,9 @@ create policy "anon_all_appliance_catalog"
 drop policy if exists "anon_all_appliance_scans" on public.appliance_scans;
 create policy "anon_all_appliance_scans"
   on public.appliance_scans for all to anon using (true) with check (true);
+
+-- P0 list-path composite indexes (see supabase/migrations/20260813_p0_query_indexes.sql)
+create index if not exists carpet_audits_store_created_at_idx
+  on public.carpet_audits (store_number, created_at desc);
+create index if not exists carpet_remnants_store_updated_at_idx
+  on public.carpet_remnants (store_number, updated_at desc);

@@ -17,6 +17,21 @@ const STORAGE_KEY = "carpet_specialists_offline";
 const ACTIVE_KEY = "carpet_active_specialist";
 const TABLE = "store_specialists";
 
+/** Roster list columns — never pin_code or temp_pin_hash. */
+const SPECIALIST_LIST_SELECT = [
+  "id",
+  "store_number",
+  "name",
+  "role",
+  "username",
+  "assigned_department",
+  "must_change_credentials",
+  "must_change_pin",
+  "phone_number",
+  "is_active",
+  "created_at",
+].join(", ");
+
 export const DEFAULT_SUPERVISOR_PIN = "1234";
 export const DEFAULT_APPLIANCE_USERNAME = "amber_appliance";
 /** Legacy Amber password — blocked on credential customize, not used for seeding. */
@@ -370,9 +385,10 @@ export function requiresPin(member: StoreSpecialist): boolean {
 
 /** True when unlock should use a text password field (non-digit secrets). */
 export function usesPasswordUnlock(member: StoreSpecialist): boolean {
+  if (member.username?.trim()) return true;
   const secret = member.pin_code?.trim() ?? "";
   if (!secret) return false;
-  return !/^\d+$/.test(secret) || Boolean(member.username);
+  return !/^\d+$/.test(secret);
 }
 
 export function verifyPin(member: StoreSpecialist, pin: string): boolean {
@@ -385,16 +401,18 @@ export function verifyPin(member: StoreSpecialist, pin: string): boolean {
 
 /** True when the member can unlock via a 4-digit PIN keypad. */
 export function hasQuickPin(member: StoreSpecialist): boolean {
-  const secret =
-    member.pin_code && member.pin_code.trim().length > 0
-      ? member.pin_code.trim()
-      : DEFAULT_SUPERVISOR_PIN;
+  const secret = member.pin_code?.trim() ?? "";
+  if (!secret) {
+    // Roster list no longer includes pin_code — username logins use the password field.
+    return !Boolean(member.username?.trim());
+  }
   return /^\d{4}$/.test(secret);
 }
 
 /**
  * Username + password/PIN login against the store roster (local + Supabase-backed).
  * Matches username (case-insensitive), Master Admin aliases, or display name.
+ * PIN secrets are not on the list payload — Hub-bridge verifies the PIN.
  */
 export function findSpecialistByLogin(
   roster: StoreSpecialist[],
@@ -421,6 +439,7 @@ export function findSpecialistByLogin(
   });
 
   for (const member of candidates) {
+    if (!member.pin_code) return member;
     if (verifyPin(member, password)) return member;
   }
   return null;
@@ -578,14 +597,28 @@ export async function fetchSpecialists(): Promise<StoreSpecialist[]> {
   try {
     const { data, error } = await supabase
       .from(TABLE)
-      .select("*")
+      .select(SPECIALIST_LIST_SELECT)
       .eq("store_number", store)
       .order("name", { ascending: true });
 
     if (error) throw error;
 
     const remote = (data ?? [])
-      .map((row) => mapRow({ ...(row as Record<string, unknown>), offline: false }))
+      .map((row) => {
+        const mapped = mapRow({
+          ...(row as unknown as Record<string, unknown>),
+          offline: false,
+        });
+        const prev = local.find(
+          (r) =>
+            String(r.id) === String(mapped.id) ||
+            r.name.toLowerCase() === mapped.name.toLowerCase()
+        );
+        if (!mapped.pin_code && prev?.pin_code) {
+          mapped.pin_code = prev.pin_code;
+        }
+        return mapped;
+      })
       .filter((m) => !isPlaceholder(m) && !isHardcodedSeedProfile(m));
 
     const remoteIds = new Set(remote.map((r) => String(r.id)));

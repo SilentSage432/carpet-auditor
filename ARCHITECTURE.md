@@ -7,6 +7,7 @@ app/manifest.ts                   → short_name DeptSync · Department & SIMS A
 public/sw.js                      → Offline shell cache strategies
 components/hub/HubChrome.tsx      → Sticky header (legacy) + role-filtered inventory bottom nav
 components/hub/NavigationHub.tsx  → Cross-app Navigation Hub (hamburger, role badge, ops bottom nav)
+components/hub/admin-tools-events.ts → Admin Tools open event + types (light; drawer is dynamic)
 components/hub/NavIcons.tsx       → Shared Lucide icons for ops + inventory bottom bars
 components/hub/HapticsListener.tsx → Delegated vibrate pulses for taps / toggles / tabs
 components/hub/OfflineNetworkBanner.tsx → Offline toast + installSyncAutoFlush callbacks
@@ -82,9 +83,9 @@ supabase/migrations/20260812_sunday_bay_assignments.sql → sunday specialist↔
 
 | Concern | Owner |
 |---|---|
-| Navigation / section routing | `app/page.tsx` + `HubChrome` |
+| Navigation / section routing | `app/page.tsx` + `HubChrome` (roster-only boot; hub sections via `next/dynamic`) |
 | Department RBAC / tab visibility | `lib/rbac.ts` |
-| Cross-app Navigation Hub | `lib/nav-hub.ts` + `NavigationHub` |
+| Cross-app Navigation Hub | `lib/nav-hub.ts` + `NavigationHub` + `admin-tools-events.ts` (`AdminToolsDrawer` when `adminOpen`) |
 | Store Operations map + rotations | `lib/store-ops/*` + `/admin/store-map` + `/dashboard` |
 | Manager notes / Executive Floor Pad | `lib/store-ops/ai-note-extract.ts`, `manager-notes.ts`, `app/actions/manager-notes.ts`, `components/manager-notes/*` |
 | Team roster (Master Admin) | `AdminRosterManager`, `lib/specialists.ts` (`is_active` soft-delete) |

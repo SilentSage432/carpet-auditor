@@ -86,10 +86,11 @@
 - [x] Soft-fail Store Ops reads when JWT missing (briefing / map / departments) + Hub PIN unlock copy
 - [x] Master Admin bootstrap (`/api/auth/bootstrap-admin` + `scripts/bootstrap-admin.mjs`) + master-PIN auto-provision on hub-bridge
 - [x] Master Admin PIN reset API (`/api/auth/reset-pin`) — upserts `store_profiles` when missing; Change PIN uses service role
+- [x] P0 mobile boot — roster-only AuthWall fetch; `next/dynamic` hub sections + Admin Tools + Cycle Audit modals; bounded audits/scans; composite list indexes (`20260813_p0_query_indexes.sql`)
 
 ## Next
 - [x] Apply Phase 1 JWT/RLS migration in Supabase + enable Custom Access Token Hook
-- [ ] Apply Phase 2 migrations (`20260812_manager_notes.sql`, `20260812_sunday_bay_assignments.sql`, `20260812_manager_notes_archive.sql`, `20260812_fix_manager_notes_rls.sql`, **`20260812_manager_notes_metadata.sql`**, **`enable_rls_flagged_tables.sql`**) + Realtime on notes/assignments tables
+- [ ] Apply Phase 2 migrations (`20260812_manager_notes.sql`, `20260812_sunday_bay_assignments.sql`, `20260812_manager_notes_archive.sql`, `20260812_fix_manager_notes_rls.sql`, **`20260812_manager_notes_metadata.sql`**, **`enable_rls_flagged_tables.sql`**, **`20260813_p0_query_indexes.sql`**) + Realtime on notes/assignments tables
 - [ ] Confirm every Master Admin has `store_number` set so Hub bridge can link `profiles`
 - [ ] Additional Gemini product surfaces beyond current AI ops widgets
 ## Non-goals

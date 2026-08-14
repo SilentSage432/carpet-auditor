@@ -190,11 +190,16 @@ export async function fetchAudits(): Promise<CarpetAudit[]> {
   if (!supabase || shouldSaveOffline()) return local;
 
   try {
+    const startOfDay = new Date();
+    startOfDay.setHours(0, 0, 0, 0);
+
     const { data, error } = await supabase
       .from(TABLE)
       .select("*")
       .eq("store_number", store)
-      .order("created_at", { ascending: false });
+      .gte("created_at", startOfDay.toISOString())
+      .order("created_at", { ascending: false })
+      .limit(200);
 
     if (error) throw error;
 

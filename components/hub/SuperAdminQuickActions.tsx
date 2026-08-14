@@ -6,7 +6,7 @@
  * Kept so old imports fail loudly at type-check if reintroduced incorrectly.
  */
 
-import { openAdminTools } from "@/components/hub/AdminToolsDrawer";
+import { openAdminTools } from "@/components/hub/admin-tools-events";
 import { isMasterAdmin } from "@/lib/rbac";
 import type { StoreSpecialist } from "@/lib/types";
 

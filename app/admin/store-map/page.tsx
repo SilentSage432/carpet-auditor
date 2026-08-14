@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { StoreLocationGrid } from "@/components/admin/StoreLocationGrid";
-import { openAdminTools } from "@/components/hub/AdminToolsDrawer";
+import { openAdminTools } from "@/components/hub/admin-tools-events";
 import { NavigationHub } from "@/components/hub/NavigationHub";
 import { SessionGate } from "@/components/hub/SessionGate";
 import { VisualBayScannerModal } from "@/components/store-ops/VisualBayScannerModal";

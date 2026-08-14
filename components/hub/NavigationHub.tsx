@@ -5,15 +5,21 @@
  * Master Admin: Admin Tools slide-over (defaults closed).
  */
 
+import dynamic from "next/dynamic";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useId, useRef, useState } from "react";
 import {
   ADMIN_TOOLS_EVENT,
-  AdminToolsDrawer,
   type AdminToolsEventDetail,
   type AdminToolsSection,
-} from "@/components/hub/AdminToolsDrawer";
+} from "@/components/hub/admin-tools-events";
+
+const AdminToolsDrawer = dynamic(
+  () =>
+    import("@/components/hub/AdminToolsDrawer").then((m) => m.AdminToolsDrawer),
+  { ssr: false }
+);
 import { AdminDepartmentSwitcher } from "@/components/hub/AdminDepartmentSwitcher";
 import { DeptSyncBadge } from "@/components/hub/DeptSyncBadge";
 import { NavIcon } from "@/components/hub/NavIcons";
@@ -547,7 +553,7 @@ export function NavigationHub({
         />
       ) : null}
 
-      {master && specialist ? (
+      {master && specialist && adminOpen ? (
         <AdminToolsDrawer
           open={adminOpen}
           onClose={() => {

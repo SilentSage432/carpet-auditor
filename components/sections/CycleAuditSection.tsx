@@ -1,14 +1,32 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import dynamic from "next/dynamic";
 import { QuickAddCatalogModal } from "@/components/barcode/QuickAddCatalogModal";
-import { SimsLocationFinder } from "@/components/catalog/SimsLocationFinder";
 import { FlooringAIInsightBanner } from "@/components/flooring/FlooringAIInsightBanner";
 import { SundayAuditStagingCard } from "@/components/admin/SundayAuditStagingCard";
-import { VisualBayScannerModal } from "@/components/store-ops/VisualBayScannerModal";
 import { NumberField, TextField } from "@/components/ui/NumberField";
 import { ApplyMarkdownModal } from "@/components/hub/ApplyMarkdownModal";
-import { AuditReportModal } from "@/components/hub/AuditReportModal";
+
+const SimsLocationFinder = dynamic(
+  () =>
+    import("@/components/catalog/SimsLocationFinder").then(
+      (m) => m.SimsLocationFinder
+    ),
+  { ssr: false }
+);
+const AuditReportModal = dynamic(
+  () =>
+    import("@/components/hub/AuditReportModal").then((m) => m.AuditReportModal),
+  { ssr: false }
+);
+const VisualBayScannerModal = dynamic(
+  () =>
+    import("@/components/store-ops/VisualBayScannerModal").then(
+      (m) => m.VisualBayScannerModal
+    ),
+  { ssr: false }
+);
 import {
   resolveScan,
   sanitizeBarcodeScan,
@@ -621,27 +639,31 @@ export function CycleAuditSection({
         onClose={closeQuickAdd}
         onSaved={handleQuickAdded}
       />
-      <SimsLocationFinder
-        open={simsFinderOpen}
-        onClose={() => {
-          setSimsFinderOpen(false);
-          dismissKeyboard();
-        }}
-        catalog={catalog}
-        audits={audits}
-      />
-      <AuditReportModal
-        open={reportOpen}
-        onClose={() => {
-          setReportOpen(false);
-          dismissKeyboard();
-        }}
-        kind="flooring"
-        departmentLabel="Flooring"
-        audits={shiftAudits.length > 0 ? shiftAudits : audits}
-        specialist={activeSpecialist}
-        auditedBy={auditedBy}
-      />
+      {simsFinderOpen ? (
+        <SimsLocationFinder
+          open={simsFinderOpen}
+          onClose={() => {
+            setSimsFinderOpen(false);
+            dismissKeyboard();
+          }}
+          catalog={catalog}
+          audits={audits}
+        />
+      ) : null}
+      {reportOpen ? (
+        <AuditReportModal
+          open={reportOpen}
+          onClose={() => {
+            setReportOpen(false);
+            dismissKeyboard();
+          }}
+          kind="flooring"
+          departmentLabel="Flooring"
+          audits={shiftAudits.length > 0 ? shiftAudits : audits}
+          specialist={activeSpecialist}
+          auditedBy={auditedBy}
+        />
+      ) : null}
       <ApplyMarkdownModal
         key={markdownTarget?.id ?? "cycle-markdown-closed"}
         open={markdownTarget != null}
@@ -685,7 +707,7 @@ export function CycleAuditSection({
         </button>
       ) : null}
 
-      {activeSpecialist ? (
+      {activeSpecialist && bayScanOpen ? (
         <VisualBayScannerModal
           open={bayScanOpen}
           onClose={() => setBayScanOpen(false)}
