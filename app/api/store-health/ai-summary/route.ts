@@ -12,6 +12,7 @@ import {
 import { readableError } from "@/lib/store-ops/errors";
 import {
   buildStoreHealthSnapshot,
+  enrichSnapshotBayHealth,
   type StoreHealthSnapshot,
 } from "@/lib/store-ops/health";
 import {
@@ -73,7 +74,12 @@ export async function POST(request: Request) {
       body.snapshot &&
       typeof body.snapshot === "object" &&
       Array.isArray(body.snapshot.departments)
-        ? body.snapshot
+        ? await enrichSnapshotBayHealth(supabase, {
+            ...body.snapshot,
+            store_id: body.snapshot.store_id || store.id,
+            bay_health: body.snapshot.bay_health ?? null,
+            telemetry: body.snapshot.telemetry ?? null,
+          })
         : await buildStoreHealthSnapshot(supabase, {
             storeId: store.id,
             weekLabel: week,

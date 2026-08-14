@@ -4,6 +4,7 @@
  * Zebra floor checklist — optimistic bay complete, next-bay pulse,
  * Selling/Topstock filter, Sunday assignment handoff, one-tap barriers.
  * Completions owned by /api/rotations/complete; assignments by sunday-audit.
+ * Quick Touch is a one-tap facing/readiness complete (same completeRotation path).
  */
 
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
@@ -349,8 +350,11 @@ export function ZebraChecklist({
                       readOnly
                       className="h-4 w-4 accent-emerald-600"
                     />
-                    <span className="truncate font-mono text-sm text-slate-400 line-through">
+                    <span className="min-w-0 flex-1 truncate font-mono text-sm text-slate-400 line-through">
                       {label}
+                    </span>
+                    <span className="shrink-0 font-mono text-[10px] text-slate-500">
+                      {formatTouchTime(rotation.completed_at)}
                     </span>
                   </li>
                 );
@@ -361,6 +365,13 @@ export function ZebraChecklist({
       ) : null}
     </div>
   );
+}
+
+function formatTouchTime(iso: string | null | undefined): string {
+  if (!iso) return "Touched";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "Touched";
+  return `Touched ${d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}`;
 }
 
 function assignmentCaption(
@@ -443,6 +454,18 @@ function ZebraBayRow({
             </span>
           </span>
         </label>
+        <button
+          type="button"
+          onClick={onComplete}
+          className={`shrink-0 rounded-lg border px-2 py-1.5 text-[10px] font-bold uppercase tracking-wide ${
+            assignedToMe
+              ? "border-cyan-400/50 bg-cyan-950/40 text-cyan-100"
+              : "border-emerald-500/45 bg-emerald-950/40 text-emerald-200"
+          }`}
+          aria-label={`Quick Touch facing check: ${label}`}
+        >
+          Quick Touch
+        </button>
         <button
           type="button"
           onClick={onToggleBarrier}

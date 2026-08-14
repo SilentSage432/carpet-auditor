@@ -1,7 +1,7 @@
 /**
  * Zebra Shift Intelligence Briefing — owns briefing shape + prompt/normalize.
  * Composes StoreHealthSnapshot from lib/store-ops/health (does not recompute pace).
- * Optionally folds active-shift velocity telemetry into the Gemini prompt.
+ * Optionally folds active-shift velocity telemetry + bay-health flags into Gemini.
  * Gemini owns transport; presentation renders bullets only.
  */
 
@@ -69,15 +69,21 @@ export function buildShiftBriefingPrompt(
       reason: b.reason,
     })),
     audit_velocity: velocity,
+    bay_health: snapshot.bay_health,
   };
 
   return `You are DeptSync Hub's Zebra Shift Intelligence analyst for Lowe's Store Operations.
 
-Write a 3-bullet executive operational briefing for a handheld/Zebra screen at shift start.
-Be concrete and observational — pace, open bays, bottlenecks, exceptions, and today's audit velocity trajectory (06:00–22:00) when audit_velocity is present.
-Do not invent departments or counts not in the data. Keep each bullet ≤110 characters. No markdown fences.
+Write a sharp 3-bullet operational briefing for a handheld/Zebra screen at shift start.
+Be concrete and observational. Do not invent departments, aisles, bays, or counts not in the data.
+Keep each bullet ≤110 characters. No markdown fences.
 
-When audit_velocity is present, synthesize the trajectory curve into at least one bullet (ahead/behind target pace, exception-hour spikes, or flooring/appliances divergence).
+Return bullets in this exact order:
+1. Focus Bay / hotspot of the day — prefer bay_health.hotspot (aisle, bay, type, stale >7d / never audited / unworked top-stock). If no hotspot, use the lagging department.
+2. Pending Barriers needing resolution — exception tickets (bottleneck_summary / barriers) plus bay_health barrier flags (stale_over_7d, unworked_topstock, sims_mismatch). Say none if empty.
+3. Quick-win maintenance recommendation — one concrete facing/Quick Touch or top-stock walk the floor can finish this shift.
+
+When audit_velocity is present, fold pace into the headline (not a fourth bullet).
 
 Return ONLY valid JSON:
 {
@@ -124,16 +130,17 @@ export function normalizeShiftBriefing(
   };
 }
 
-/** Institutional fallback when Gemini is unavailable — composes health snapshot only. */
+/** Institutional fallback when Gemini is unavailable — composes health + bay-health. */
 export function buildLocalShiftBriefing(
   snapshot: StoreHealthSnapshot,
   telemetry?: StoreAuditTelemetry | null
 ): ShiftBriefing {
   const { totals, departments, bottleneck_summary, department, assigned_week } =
     snapshot;
-  const velocity =
-    telemetry ?? snapshot.telemetry ?? null;
+  const velocity = telemetry ?? snapshot.telemetry ?? null;
   const overall = velocity?.series.find((s) => s.key === "overall");
+  const health = snapshot.bay_health;
+  const hotspot = health?.hotspot ?? null;
 
   const lagging = [...departments].sort((a, b) => {
     if (a.completion_pct !== b.completion_pct) {
@@ -148,33 +155,56 @@ export function buildLocalShiftBriefing(
     "Storewide";
 
   const topBottleneck = bottleneck_summary[0];
-  const paceLabel =
-    totals.assigned > 0
-      ? `${totals.completed}/${totals.assigned} bays done (${totals.completion_pct}%)`
-      : "No rotations assigned this week yet";
 
   const headline =
-    totals.open > 0
-      ? `${totals.open} open bay${totals.open === 1 ? "" : "s"} · Week ${assigned_week}`
-      : `Week ${assigned_week} · Rotation clear`;
+    hotspot
+      ? `Hotspot Aisle ${hotspot.aisle} Bay ${hotspot.bay} · Week ${assigned_week}`
+      : totals.open > 0
+        ? `${totals.open} open bay${totals.open === 1 ? "" : "s"} · Week ${assigned_week}`
+        : `Week ${assigned_week} · Rotation clear`;
 
-  const velocityBullet = overall
-    ? overall.ahead_behind_pct >= 0
-      ? `Shift velocity ${overall.current_velocity_pct}% vs ${overall.current_target_pct}% target (+${overall.ahead_behind_pct} pts).`
-      : `Shift velocity ${overall.current_velocity_pct}% — ${Math.abs(overall.ahead_behind_pct)} pts behind ${overall.current_target_pct}% target.`
-    : topBottleneck
-      ? `Bottleneck: ${topBottleneck.label} ×${topBottleneck.count} exception${topBottleneck.count === 1 ? "" : "s"}.`
-      : "No exception bottlenecks logged this week.";
+  const focus = hotspot
+    ? `Focus: Aisle ${hotspot.aisle} Bay ${hotspot.bay} [${hotspot.type}]${
+        hotspot.age_days == null
+          ? " — never completed"
+          : ` — ${hotspot.age_days}d stale`
+      }.`
+    : lagging && lagging.open > 0
+      ? `Focus: ${lagging.department_name} — ${lagging.open} open of ${lagging.assigned}.`
+      : "Focus: No hotspot bays — assigned aisles are current.";
 
-  const bullets = padBullets([
-    `Pace: ${paceLabel}.`,
-    velocityBullet,
-    lagging && lagging.open > 0
-      ? `Priority: ${lagging.department_name} — ${lagging.open} open of ${lagging.assigned} (target ${lagging.weekly_bay_target}).`
-      : department
-        ? `${department.department_name}: ${department.completed}/${department.assigned} complete.`
-        : "All scoped departments are on pace or idle.",
-  ]);
+  const flagBits: string[] = [];
+  if (health?.stale_over_7d) flagBits.push(`${health.stale_over_7d} stale>7d`);
+  if (health?.unworked_topstock) {
+    flagBits.push(`${health.unworked_topstock} unworked top-stock`);
+  }
+  if (health?.sims_mismatch) flagBits.push(`${health.sims_mismatch} SIMS`);
+  const barriers =
+    totals.exceptions > 0
+      ? `Barriers: ${topBottleneck?.label ?? "exceptions"} ×${totals.exceptions}${
+          flagBits.length ? `; ${flagBits.join(", ")}` : ""
+        }.`
+      : flagBits.length > 0
+        ? `Barriers: ${flagBits.join(", ")}; no exception tickets.`
+        : "Barriers: none logged this week.";
 
-  return { headline, bullets, priority_department };
+  const aisleHint =
+    hotspot?.aisle || health?.trouble_aisles[0] || lagging?.department_code || "map";
+  const quickWin = health?.unworked_topstock
+    ? `Quick-win: inventory TOPSTOCK on aisle ${aisleHint}.`
+    : health?.stale_over_7d
+      ? `Quick-win: Quick-Touch stale bays on aisle ${aisleHint}.`
+      : totals.open > 0
+        ? `Quick-win: clear ${Math.min(3, totals.open)} remaining open bay${
+            Math.min(3, totals.open) === 1 ? "" : "s"
+          } with Quick Touch.`
+        : overall && overall.ahead_behind_pct < 0
+          ? `Quick-win: recover ${Math.abs(overall.ahead_behind_pct)} pts vs target pace.`
+          : "Quick-win: facing check on showroom/stack-out if due.";
+
+  return {
+    headline: headline.slice(0, 60),
+    bullets: padBullets([focus, barriers, quickWin]),
+    priority_department,
+  };
 }

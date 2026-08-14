@@ -15,7 +15,7 @@ import {
 import { sanitizeBarcodeScan } from "@/lib/barcode";
 import { clearanceBadgeLabel } from "@/lib/markdown";
 import { toNumber } from "@/lib/number-input";
-import { deleteRemnant, saveRemnant } from "@/lib/remnants";
+import { deleteRemnant, remnantRackAlert, saveRemnant } from "@/lib/remnants";
 import { isSupervisor } from "@/lib/specialists";
 import type {
   CatalogCategory,
@@ -504,6 +504,7 @@ export function RemnantSection({
           {filtered.map((item) => {
             const age = daysOld(item.created_at);
             const ageBadge = agingBadge(age);
+            const rackAlert = remnantRackAlert(item);
             const canMarkdown =
               ageBadge.tier === "clearance" || supervisorSession;
             const clearance = clearanceBadgeLabel({
@@ -517,6 +518,7 @@ export function RemnantSection({
                 key={item.id}
                 item={item}
                 ageBadge={ageBadge}
+                rackAlert={rackAlert}
                 clearance={clearance}
                 canMarkdown={canMarkdown}
                 onMarkdown={() => setMarkdownTarget(item)}
@@ -536,6 +538,7 @@ export function RemnantSection({
 function RemnantRow({
   item,
   ageBadge,
+  rackAlert,
   clearance,
   canMarkdown,
   onMarkdown,
@@ -546,6 +549,7 @@ function RemnantRow({
 }: {
   item: Remnant;
   ageBadge: ReturnType<typeof agingBadge>;
+  rackAlert: ReturnType<typeof remnantRackAlert>;
   clearance: string | null;
   canMarkdown: boolean;
   onMarkdown: () => void;
@@ -578,6 +582,28 @@ function RemnantRow({
             sq yd
             {item.location ? ` · ${item.location}` : ""}
           </p>
+          <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+            <span
+              className={`rounded border px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide ${rackAlert.className}`}
+            >
+              {rackAlert.label}
+            </span>
+            {rackAlert.suggestMarkdown ? (
+              canMarkdown ? (
+                <button
+                  type="button"
+                  onClick={onMarkdown}
+                  className="rounded-full border border-rose-400/50 bg-rose-950/50 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-rose-100"
+                >
+                  {rackAlert.markdownChipLabel}
+                </button>
+              ) : (
+                <span className="rounded-full border border-rose-500/35 bg-rose-950/30 px-2 py-0.5 text-[9px] font-bold uppercase tracking-wide text-rose-200/80">
+                  Needs markdown
+                </span>
+              )
+            ) : null}
+          </div>
           <p
             className={`mt-1 text-[10px] font-semibold ${ageBadge.className.includes("text-") ? "" : "text-slate-400"}`}
           >

@@ -5,12 +5,21 @@
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import {
+  compactBayHealthForPrompt,
+  diagnoseBayHealth,
+  type BayHealthBriefingContext,
+} from "./bay-health";
 import { resolveDepartmentIdByCode } from "./rotations";
 import {
   buildStoreAuditTelemetry,
   type StoreAuditTelemetry,
   type TelemetryCompletionEvent,
 } from "./telemetry";
+import type {
+  StoreLocation,
+  WeeklyRotationWithLocation,
+} from "./types";
 import { isoWeekLabel } from "./week";
 
 export type DepartmentHealthRow = {
@@ -55,6 +64,8 @@ export type StoreHealthSnapshot = {
   };
   /** Active-shift hourly velocity (06:00–22:00). */
   telemetry: StoreAuditTelemetry | null;
+  /** Compact bay-health flags for shift briefing (diagnostics owned by bay-health.ts). */
+  bay_health: BayHealthBriefingContext | null;
 };
 
 function completionPct(completed: number, assigned: number): number {
@@ -133,6 +144,9 @@ export async function buildStoreHealthSnapshot(
       completion_pct: 0,
     },
     telemetry: null,
+    bay_health: compactBayHealthForPrompt(
+      diagnoseBayHealth({ rotations: [] })
+    ),
   };
 
   if (deptIds.length === 0) return empty;
@@ -153,7 +167,7 @@ export async function buildStoreHealthSnapshot(
       .eq("assigned_week", week)
       .in("department_id", deptIds);
     if (fallback.error) throw new Error(fallback.error.message);
-    return composeSnapshot(
+    const snapshot = composeSnapshot(
       week,
       opts.storeId,
       scope,
@@ -161,10 +175,11 @@ export async function buildStoreHealthSnapshot(
       fallback.data ?? [],
       await loadExceptions(supabase, week, deptIds, deptList)
     );
+    return enrichSnapshotBayHealth(supabase, snapshot, deptIds);
   }
 
   const exceptions = await loadExceptions(supabase, week, deptIds, deptList);
-  return composeSnapshot(
+  const snapshot = composeSnapshot(
     week,
     opts.storeId,
     scope,
@@ -172,6 +187,115 @@ export async function buildStoreHealthSnapshot(
     rotations ?? [],
     exceptions
   );
+  return enrichSnapshotBayHealth(supabase, snapshot, deptIds);
+}
+
+const BAY_HEALTH_SELECT =
+  "id, department_id, location_id, is_completed, completed_at, assigned_week, store_locations(id, aisle, bay, type, last_completed_at, status, cycle_number)";
+const BAY_HEALTH_SELECT_NO_LAST =
+  "id, department_id, location_id, is_completed, completed_at, assigned_week, store_locations(id, aisle, bay, type, status, cycle_number)";
+
+/**
+ * Attach compact bay-health context when the client snapshot omitted it.
+ * Diagnostics stay in bay-health.ts; this only loads weekly rows and composes.
+ */
+export async function enrichSnapshotBayHealth(
+  supabase: SupabaseClient,
+  snapshot: StoreHealthSnapshot,
+  departmentIds?: string[]
+): Promise<StoreHealthSnapshot> {
+  if (snapshot.bay_health != null) {
+    return snapshot;
+  }
+  const deptIds =
+    departmentIds && departmentIds.length > 0
+      ? departmentIds
+      : snapshot.departments.map((d) => d.department_id);
+  const bay_health = await loadBayHealthBriefingContext(supabase, {
+    storeId: snapshot.store_id,
+    week: snapshot.assigned_week,
+    departmentIds: deptIds,
+  });
+  return { ...snapshot, bay_health };
+}
+
+async function loadBayHealthBriefingContext(
+  supabase: SupabaseClient,
+  opts: { storeId: string; week: string; departmentIds: string[] }
+): Promise<BayHealthBriefingContext | null> {
+  if (!opts.week || opts.departmentIds.length === 0) {
+    return compactBayHealthForPrompt(diagnoseBayHealth({ rotations: [] }));
+  }
+
+  const rows = await loadBayHealthRotations(supabase, opts);
+  const rotations: WeeklyRotationWithLocation[] = rows.map((row) => ({
+    id: String(row.id ?? ""),
+    store_id: opts.storeId,
+    department_id: String(row.department_id ?? ""),
+    location_id: String(row.location_id ?? ""),
+    assigned_week: String(row.assigned_week ?? opts.week),
+    is_completed: Boolean(row.is_completed),
+    completed_at: row.completed_at ? String(row.completed_at) : null,
+    store_locations: nestLocation(row.store_locations, row.department_id, opts.storeId),
+  }));
+
+  return compactBayHealthForPrompt(diagnoseBayHealth({ rotations }));
+}
+
+async function loadBayHealthRotations(
+  supabase: SupabaseClient,
+  opts: { storeId: string; week: string; departmentIds: string[] }
+): Promise<Array<Record<string, unknown>>> {
+  const attempts: Array<{ select: string; withStore: boolean }> = [
+    { select: BAY_HEALTH_SELECT, withStore: true },
+    { select: BAY_HEALTH_SELECT_NO_LAST, withStore: true },
+    { select: BAY_HEALTH_SELECT, withStore: false },
+    { select: BAY_HEALTH_SELECT_NO_LAST, withStore: false },
+  ];
+
+  for (const attempt of attempts) {
+    let query = supabase
+      .from("weekly_rotations")
+      .select(attempt.select)
+      .eq("assigned_week", opts.week)
+      .in("department_id", opts.departmentIds);
+    if (attempt.withStore && opts.storeId) {
+      query = query.eq("store_id", opts.storeId);
+    }
+    const { data, error } = await query;
+    if (!error) return ((data ?? []) as unknown) as Array<Record<string, unknown>>;
+  }
+  return [];
+}
+
+function nestLocation(
+  raw: unknown,
+  departmentId: unknown,
+  storeId: string
+): StoreLocation | null {
+  const loc = Array.isArray(raw) ? raw[0] : raw;
+  if (!loc || typeof loc !== "object") return null;
+  const row = loc as Record<string, unknown>;
+  return {
+    id: String(row.id ?? ""),
+    store_id: storeId,
+    department_id: String(departmentId ?? ""),
+    aisle: String(row.aisle ?? ""),
+    bay: Number(row.bay) || 0,
+    type: row.type === "TOPSTOCK" ? "TOPSTOCK" : "SELLING",
+    status:
+      row.status === "ASSIGNED" ||
+      row.status === "COMPLETED" ||
+      row.status === "CARRIED_OVER"
+        ? row.status
+        : "PENDING",
+    last_completed_at:
+      row.last_completed_at == null || row.last_completed_at === ""
+        ? null
+        : String(row.last_completed_at),
+    cycle_number: Number(row.cycle_number) || 1,
+    is_active: true,
+  };
 }
 
 async function loadExceptions(
@@ -298,5 +422,6 @@ function composeSnapshot(
       completion_pct: completionPct(completed, assigned),
     },
     telemetry,
+    bay_health: null,
   };
 }

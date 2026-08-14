@@ -19,13 +19,13 @@ import {
 import { AdminDepartmentSwitcher } from "@/components/hub/AdminDepartmentSwitcher";
 import { ChunkErrorBoundary } from "@/components/hub/ChunkErrorBoundary";
 import { DeptSyncBadge } from "@/components/hub/DeptSyncBadge";
+import { HeaderNetworkStatus } from "@/components/hub/HeaderNetworkStatus";
 import { NavIcon } from "@/components/hub/NavIcons";
 import {
   adminWorkingDepartmentLabel,
   readAdminWorkingDepartment,
   ADMIN_DEPT_CONTEXT_EVENT,
 } from "@/lib/admin-department-context";
-import { useNetworkBadge } from "@/lib/network";
 import {
   isNavHubPathActive,
   isNavOverflowActive,
@@ -120,7 +120,6 @@ export function NavigationHub({
 }: NavigationHubProps) {
   const pathname = usePathname() || "/";
   const router = useRouter();
-  const network = useNetworkBadge(storeNumber);
   const links = navRoleLinks(specialist);
   const primaryLinks = navPrimaryLinks(links);
   const overflowLinks = navOverflowLinks(links);
@@ -219,14 +218,6 @@ export function NavigationHub({
 
   const roleBadge = navRoleBadge(specialist);
   const loginId = navLoginIdentity(specialist);
-  const statusLabel =
-    network.tone === "online"
-      ? network.pending > 0
-        ? `Online · ${network.pending}q`
-        : "Online"
-      : network.pending > 0
-        ? `Offline · ${network.pending}q`
-        : "Offline";
 
   return (
     <>
@@ -274,20 +265,11 @@ export function NavigationHub({
               aria-label="Account and status"
               className="flex h-12 max-w-[10.5rem] items-center gap-2 rounded-xl border border-emerald-500/35 bg-emerald-950/35 px-2.5 text-left backdrop-blur-sm transition active:scale-[0.98] focus-visible:border-emerald-500/50 focus-visible:ring-1 focus-visible:ring-emerald-500/30"
             >
-              <span
-                className={`inline-block h-2 w-2 shrink-0 rounded-full ${
-                  network.tone === "online" ? "bg-emerald-400" : "bg-amber-400"
-                }`}
-                aria-hidden
-              />
-              <span className="min-w-0">
+              <HeaderNetworkStatus storeNumber={storeNumber} variant="compact">
                 <span className="block truncate font-mono text-[9px] font-bold leading-none tracking-wide text-amber-300">
                   {roleBadge.replace(/^\[|\]$/g, "")}
                 </span>
-                <span className="mt-0.5 block truncate text-[10px] font-semibold text-zinc-300">
-                  {statusLabel}
-                </span>
-              </span>
+              </HeaderNetworkStatus>
             </button>
 
             {userOpen ? (
@@ -306,18 +288,10 @@ export function NavigationHub({
                   <p className="glass-muted mt-0.5 break-all font-mono text-xs">
                     {loginId}
                   </p>
-                  <p
-                    className={`mt-2 text-[11px] font-semibold ${
-                      network.tone === "online"
-                        ? "text-emerald-400"
-                        : "text-amber-300"
-                    }`}
-                  >
-                    {network.tone === "online" ? "Online" : "Offline Mode"}
-                    {network.pending > 0
-                      ? ` · ${network.pending} queued`
-                      : ""}
-                  </p>
+                  <HeaderNetworkStatus
+                    storeNumber={storeNumber}
+                    variant="detail"
+                  />
                 </div>
                 <div className="p-2">
                   {master ? (

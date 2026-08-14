@@ -6,7 +6,6 @@
 
 "use client";
 
-import { useNetworkBadge } from "@/lib/network";
 import {
   sectionTitle,
   visibleNavTabs,
@@ -14,6 +13,7 @@ import {
 import { formatStoreLabel } from "@/lib/store";
 import type { HubSection, StoreSpecialist } from "@/lib/types";
 import { DeptSyncBadge } from "@/components/hub/DeptSyncBadge";
+import { HeaderNetworkStatus } from "@/components/hub/HeaderNetworkStatus";
 import { NavIcon } from "@/components/hub/NavIcons";
 
 type HubHeaderProps = {
@@ -34,7 +34,6 @@ export function HubHeader({
   onLogout,
   storeNumber,
 }: HubHeaderProps) {
-  const network = useNetworkBadge(storeNumber);
   const title = sectionTitle(section, specialist);
 
   return (
@@ -52,23 +51,7 @@ export function HubHeader({
           <h1 className="glass-title truncate text-base">
             {title}
           </h1>
-          <p
-            className={`mt-0.5 flex items-center gap-1.5 truncate text-[10px] font-semibold ${
-              network.tone === "online" ? "text-emerald-400/90" : "text-amber-300/90"
-            }`}
-            title={network.label}
-          >
-            <span
-              className={`inline-block h-1.5 w-1.5 shrink-0 rounded-full ${
-                network.tone === "online" ? "bg-emerald-400" : "bg-amber-400"
-              }`}
-              aria-hidden
-            />
-            <span className="truncate">
-              {network.tone === "online" ? "🟢 Online" : "🟠 Offline Mode"}
-              {network.pending > 0 ? ` · ${network.pending} queued` : ""}
-            </span>
-          </p>
+          <HeaderNetworkStatus storeNumber={storeNumber} variant="banner" />
         </div>
         <div className="flex shrink-0 items-center gap-1.5">
           <button

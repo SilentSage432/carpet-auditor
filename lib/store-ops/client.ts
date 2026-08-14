@@ -603,6 +603,7 @@ export type StoreHealthSnapshotClient = {
     completion_pct: number;
   };
   telemetry?: import("@/lib/store-ops/telemetry").StoreAuditTelemetry | null;
+  bay_health?: import("@/lib/store-ops/bay-health").BayHealthBriefingContext | null;
 };
 
 export async function fetchStoreHealth(
@@ -632,6 +633,7 @@ export async function fetchStoreHealth(
         completion_pct: 0,
       },
       telemetry: null,
+      bay_health: null,
     };
   }
 }

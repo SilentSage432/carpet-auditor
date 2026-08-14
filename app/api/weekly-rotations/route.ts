@@ -12,7 +12,9 @@ import { isoWeekLabel } from "@/lib/store-ops/week";
 import { supabaseAdminMissingMessage } from "@/lib/supabase/env";
 
 const ROTATION_SELECT =
-  "id, department_id, location_id, assigned_week, is_completed, completed_at, created_at, store_locations(id, aisle, bay, status, cycle_number)";
+  "id, department_id, location_id, assigned_week, is_completed, completed_at, created_at, store_locations(id, aisle, bay, type, last_completed_at, status, cycle_number)";
+const ROTATION_SELECT_NO_LAST =
+  "id, department_id, location_id, assigned_week, is_completed, completed_at, created_at, store_locations(id, aisle, bay, type, status, cycle_number)";
 
 /**
  * GET /api/weekly-rotations — this week's assignments for the actor's department.
@@ -113,13 +115,15 @@ async function fetchWeekRotations(
   }
 ): Promise<unknown[]> {
   // Prefer store-scoped query; fall back if store_id column is missing.
-  const attempts: Array<() => ReturnType<typeof buildQuery>> = [
-    () => buildQuery(supabase, opts, true),
-    () => buildQuery(supabase, opts, false),
+  const attempts: Array<{ withStoreId: boolean; select: string }> = [
+    { withStoreId: true, select: ROTATION_SELECT },
+    { withStoreId: true, select: ROTATION_SELECT_NO_LAST },
+    { withStoreId: false, select: ROTATION_SELECT },
+    { withStoreId: false, select: ROTATION_SELECT_NO_LAST },
   ];
 
   for (const attempt of attempts) {
-    const { data, error } = await attempt();
+    const { data, error } = await buildQuery(supabase, opts, attempt);
     if (!error) {
       return (data ?? []).filter(
         (row) =>
@@ -141,15 +145,15 @@ function buildQuery(
     storeId: string | null;
     departmentId: string | null;
   },
-  withStoreId: boolean
+  attempt: { withStoreId: boolean; select: string }
 ) {
   let query = supabase
     .from("weekly_rotations")
-    .select(ROTATION_SELECT)
+    .select(attempt.select)
     .eq("assigned_week", opts.week)
     .order("created_at", { ascending: true });
 
-  if (withStoreId && opts.storeId) {
+  if (attempt.withStoreId && opts.storeId) {
     query = query.eq("store_id", opts.storeId);
   }
   if (opts.departmentId) {

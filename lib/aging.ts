@@ -23,6 +23,48 @@ export function agingBand(days: number): AgingBand {
   return "0-29";
 }
 
+/**
+ * Floor-ops remnant rack velocity (orthogonal to markdown 30/60/90 bands).
+ * Fresh <14d · Watch 14–30d · Critical >30d.
+ */
+export type RackAgingAlert = "fresh" | "watch" | "critical";
+
+export const RACK_WATCH_DAYS = 14;
+export const RACK_CRITICAL_DAYS = 30;
+
+export function classifyRackAging(days: number): RackAgingAlert {
+  if (days > RACK_CRITICAL_DAYS) return "critical";
+  if (days >= RACK_WATCH_DAYS) return "watch";
+  return "fresh";
+}
+
+export function rackAgingBadge(days: number): {
+  alert: RackAgingAlert;
+  label: string;
+  className: string;
+} {
+  const alert = classifyRackAging(days);
+  if (alert === "critical") {
+    return {
+      alert,
+      label: `Critical ${days}d`,
+      className: "border-rose-500/45 bg-rose-950/40 text-rose-200",
+    };
+  }
+  if (alert === "watch") {
+    return {
+      alert,
+      label: `Watch ${days}d`,
+      className: "border-amber-500/40 bg-amber-950/35 text-amber-200",
+    };
+  }
+  return {
+    alert,
+    label: `Fresh ${days}d`,
+    className: "border-emerald-500/35 bg-emerald-950/30 text-emerald-200",
+  };
+}
+
 export function agingBadge(days: number): {
   tier: AgingTier;
   label: string;

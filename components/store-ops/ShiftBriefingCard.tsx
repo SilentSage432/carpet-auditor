@@ -13,6 +13,12 @@ import {
 } from "@/lib/store-ops/client";
 import type { StoreSpecialist } from "@/lib/types";
 
+const BRIEFING_CAPTIONS = [
+  "Focus Bay",
+  "Pending Barriers",
+  "Quick-win",
+] as const;
+
 type Props = {
   specialist: StoreSpecialist;
   /** Bump after checklist / rotation completes to refresh briefing. */
@@ -162,7 +168,14 @@ export function ShiftBriefingCard({ specialist, refreshKey }: Props) {
                     className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-400 shadow-[0_0_8px_rgba(52,211,153,0.85)]"
                     aria-hidden
                   />
-                  <span>{bullet}</span>
+                  <span>
+                    {BRIEFING_CAPTIONS[idx] ? (
+                      <span className="mr-1 font-mono text-[10px] font-bold uppercase tracking-wider text-emerald-400/80">
+                        {BRIEFING_CAPTIONS[idx]}
+                      </span>
+                    ) : null}
+                    {bullet}
+                  </span>
                 </li>
               ))}
             </ul>

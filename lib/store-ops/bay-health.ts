@@ -42,6 +42,63 @@ export type BayHealthScorecard = {
   tone: "ok" | "watch" | "alert";
 };
 
+/** Compact scorecard for Gemini / local shift briefing — not a second diagnostic owner. */
+export type BayHealthBriefingContext = {
+  score: number;
+  tone: BayHealthScorecard["tone"];
+  stale_over_7d: number;
+  never_audited: number;
+  unworked_topstock: number;
+  sims_mismatch: number;
+  barrier_flag_count: number;
+  trouble_aisles: string[];
+  hotspot: {
+    aisle: string;
+    bay: number;
+    type: StoreLocationType;
+    flags: BayHealthFlag[];
+    age_days: number | null;
+    score: number;
+  } | null;
+};
+
+export function compactBayHealthForPrompt(
+  card: BayHealthScorecard
+): BayHealthBriefingContext {
+  const hotspot =
+    [...card.findings].sort((a, b) => {
+      if (a.score !== b.score) return a.score - b.score;
+      const ageA = a.ageDays ?? 999;
+      const ageB = b.ageDays ?? 999;
+      return ageB - ageA;
+    })[0] ?? null;
+
+  return {
+    score: card.score,
+    tone: card.tone,
+    stale_over_7d: card.staleCount,
+    never_audited: card.neverAuditedCount,
+    unworked_topstock: card.topstockGapCount,
+    sims_mismatch: card.simsMismatchCount,
+    barrier_flag_count:
+      card.staleCount +
+      card.neverAuditedCount +
+      card.topstockGapCount +
+      card.simsMismatchCount,
+    trouble_aisles: card.troubleAisles.slice(0, 8),
+    hotspot: hotspot
+      ? {
+          aisle: hotspot.aisle,
+          bay: hotspot.bay,
+          type: hotspot.type,
+          flags: hotspot.flags,
+          age_days: hotspot.ageDays,
+          score: hotspot.score,
+        }
+      : null,
+  };
+}
+
 type SimsMatch = {
   aisle: string;
   bay: number;

@@ -94,6 +94,7 @@
 - [x] Phase 3 Bay-Readiness Velocity — ZebraChecklist optimistic complete + next-bay pulse; SELLING/TOPSTOCK audit mode; Verify All Completed Bays; Sunday assignment live handoff
 - [x] Admin Tools chunk isolation — named dynamic import, adminHosted keep-alive, ChunkErrorBoundary, TipTap nested lazy
 - [x] Floor discrepancy & bay health diagnostics — stale/never/topstock/SIMS flags + Zebra scorecard badge
+- [x] Smart Floor Insights — Quick Touch on Zebra; shift briefing Focus/Barriers/Quick-win from bay-health; remnant rack Fresh/Watch/Critical + markdown chip; isolated header sync-queue chip
 
 ## Next
 - [x] Apply Phase 1 JWT/RLS migration in Supabase + enable Custom Access Token Hook

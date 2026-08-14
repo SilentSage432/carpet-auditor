@@ -1,5 +1,13 @@
 # DeptSync Hub — Development Journal
 
+## 2026-08-14 — Smart Floor Insights & Operational Velocity
+
+### Shipped
+- **Quick Touch** on Zebra assigned bays (`ZebraChecklist`) — one-tap facing/readiness complete via existing `completeRotation`; optimistic overlay + timestamp on the completed list. Does not open an itemized count.
+- **Shift briefing** composes `bay-health.ts` into Gemini/local context (`stale >7d`, unworked top-stock, barrier flags, hotspot aisle/bay). Prompt + local fallback are 3 bullets: Focus Bay, Pending Barriers, Quick-win. `GET /api/store-health` attaches compact `bay_health`; `POST /api/store-health/ai-summary` enriches if the client snapshot omitted it.
+- **Remnant rack aging** — floor-ops bands Fresh <14d / Watch 14–30d / Critical >30d (`classifyRackAging` in `lib/aging.ts`, composed by `remnantRackAlert` in `lib/remnants.ts`). Critical available rolls without a markdown get a Suggest markdown chip. Institutional 30/60/90 markdown aging is unchanged.
+- **Header network chip** — `HeaderNetworkStatus` owns `useNetworkBadge` so pending-queue ticks do not re-render NavigationHub / Admin Tools / child forms. Badge `setState` skips identical online/pending values.
+
 ## 2026-08-14 — Admin Tools React #306 (undefined lazy component)
 
 ### Root cause

@@ -1,3 +1,4 @@
+import { daysOld, rackAgingBadge, type RackAgingAlert } from "./aging";
 import { calculateSquareFeet, calculateSquareYards } from "./calc";
 import { uid } from "./uid";
 import type { Remnant, RemnantInsert, RemnantStatus } from "./types";
@@ -247,6 +248,35 @@ export async function saveRemnant(
     enqueueSyncAction("upsert_remnant", remnantPayload(offlineRecord), store);
     return { record: offlineRecord, offline: true };
   }
+}
+
+/** Floor-ops rack alert for a remnant roll — aging math stays in lib/aging. */
+export type RemnantRackAlert = {
+  days: number;
+  alert: RackAgingAlert;
+  label: string;
+  className: string;
+  suggestMarkdown: boolean;
+  markdownChipLabel: string | null;
+};
+
+export function remnantRackAlert(
+  remnant: Pick<Remnant, "created_at" | "markdown_price" | "status">
+): RemnantRackAlert {
+  const days = daysOld(remnant.created_at);
+  const badge = rackAgingBadge(days);
+  const suggestMarkdown =
+    badge.alert === "critical" &&
+    remnant.markdown_price == null &&
+    remnant.status === "available";
+  return {
+    days,
+    alert: badge.alert,
+    label: badge.label,
+    className: badge.className,
+    suggestMarkdown,
+    markdownChipLabel: suggestMarkdown ? "Suggest markdown" : null,
+  };
 }
 
 export async function deleteRemnant(id: string): Promise<void> {

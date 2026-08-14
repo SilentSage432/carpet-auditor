@@ -64,7 +64,7 @@
 | Brand badge | `DeptSyncBadge` (boxes + barcode) | Display only |
 | Brand eyebrow | `DeptSync · Lowe's #{store} · Inventory & SIMS Audit` | Display only (store set in Settings) |
 | Section title | Role-aware title via `sectionTitle()` | Updates when bottom tab selects a section |
-| Network badge | 🟢 Online / 🟠 Offline Mode · `N queued` | Live via `useNetworkBadge` |
+| Network badge | 🟢 Online / 🟠 Offline Mode · `N queued` | Live via `HeaderNetworkStatus` (`useNetworkBadge` isolated from hub forms) |
 | Specialist chip | 👑/🛡️/👤 + name or “Select” | Opens **SpecialistModal** |
 | ⚙️ (conditional) | Shown when a specialist is active | Opens **ChangePinModal** |
 

@@ -52,7 +52,10 @@ export function usePendingSyncCount(
 
   useEffect(() => {
     function refresh() {
-      setPending(countPendingSync(storeNumber));
+      setPending((prev) => {
+        const next = countPendingSync(storeNumber);
+        return prev === next ? prev : next;
+      });
     }
     refresh();
     window.addEventListener("online", refresh);
@@ -83,7 +86,18 @@ export function useNetworkBadge(
 
   useEffect(() => {
     function refresh() {
-      setBadge(getNetworkBadge(resolvedStore));
+      setBadge((prev) => {
+        const next = getNetworkBadge(resolvedStore);
+        if (
+          prev.online === next.online &&
+          prev.pending === next.pending &&
+          prev.tone === next.tone &&
+          prev.label === next.label
+        ) {
+          return prev;
+        }
+        return next;
+      });
     }
     refresh();
     window.addEventListener("online", refresh);

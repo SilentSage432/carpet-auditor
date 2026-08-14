@@ -24,7 +24,7 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 - Does not recommend or own institutional knowledge — callers compose prompts
 - **AI Pre-Flight (Bulk Generator):** `POST /api/store-locations/ai-parse` + `lib/store-ops/ai-parse.ts` normalize to `{ locations, corrections_made }`; UI tab confirms via existing bulk upsert
 - **Flooring AI Insights:** `POST /api/flooring/ai-insights` + `lib/flooring/ai-insights.ts` + `FlooringAIInsightBanner` on Cycle Audit / Remnants; applies markdown via `lib/markdown` + `saveRemnant`; age bands via `agingBand()` (30/60/90+)
-- **Zebra Shift Briefing:** `POST /api/store-health/ai-summary` + `ShiftBriefingCard` on `/dashboard` (composes `lib/store-ops/health` snapshot + active-shift `telemetry` → 3-bullet briefing)
+- **Zebra Shift Briefing:** `POST /api/store-health/ai-summary` + `ShiftBriefingCard` on `/dashboard` (composes `lib/store-ops/health` snapshot + `bay_health` from `bay-health.ts` + active-shift `telemetry` → 3-bullet Focus Bay / Pending Barriers / Quick-win)
 - **Audit Velocity Chart:** `lib/store-ops/telemetry.ts` + `StoreHealthChart` on `/dashboard` (06:00–22:00 curve vs linear target; Overall / D23 / D35 pills)
 - **Appliance Anomaly Detection:** `POST /api/appliances/ai-anomaly` + `ApplianceAnomalyWidget` on Appliance Audit (duplicate serials, distant locations, category mismatch, missing high-value floor models)
 - **Catalog Taxonomies:** `lib/catalog/taxonomies.ts` (D21–D28 / D35 / D52 defaults) + `POST /api/catalog/ai-taxonomy` + Admin Tools `TaxonomyManagerModal`; folder accordions on Department Audit + `/department`
@@ -115,7 +115,7 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 - Queue actions carry `transaction_id`, `optimistic_at`, retry backoff (`next_retry_at`), optional `base_updated_at`
 - `installSyncAutoFlush` — flush on `online`, `visibilitychange` (visible), and `focus`
 - Version/409 conflicts → `ConflictResolutionModal` (Keep Local force-overwrite vs Accept Server)
-- Header: Online / Offline Mode + pending count
+- Header: Online / Offline Mode + pending count (`HeaderNetworkStatus` owns the live queue hook so hub forms do not re-render)
 
 ## Multi-store
 - `lib/store.ts` (default `1234`); **store switch = Master Admin only** (Settings)
@@ -130,6 +130,7 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 
 ## Remnants / markdown
 - Aging badges; 60+ or elevated role → Apply Manager Markdown
+- Floor-ops rack bands (Fresh <14d / Watch 14–30d / Critical >30d) via `lib/aging.ts` `classifyRackAging` + `lib/remnants.ts` `remnantRackAlert`; critical rolls show a Suggest markdown chip (markdown math stays in `lib/markdown.ts`)
 
 ## Audit Report Export
 - Shift summary → **📊 Export / Print Report** (Flooring, Appliances, Department)
@@ -148,8 +149,8 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 - Quick Actions banner (Super Admin): Bulk Generate · Trigger Weekly Rotation · Manage Supervisors
 - `/admin/store-map` — department overview + location grid; Bulk Add accordion; Trigger Weekly Rotation modal (**Force Draw New Rotation**); **📷 Snap Bay AI Audit** (Gemini visual scan) on page + bay actions sheet
 - `/manager-notes` — Executive Floor Pad (TipTap rich notes + Gemini Copilot Extract Tasks & Tag + archive); also Admin Tools entry + `#manager-notes`
-- `/dashboard` — Store Health Scorecard (top) + **ZebraChecklist** (optimistic complete, next-bay pulse, SELLING/TOPSTOCK filter, Sunday assignment queue, one-tap barriers). Completions refresh silently (no loading flash).
-- `GET /api/store-health` — weekly pace + bottleneck aggregation for DS / Super Admin
+- `/dashboard` — Store Health Scorecard (top) + **ZebraChecklist** (optimistic complete, **Quick Touch** facing check, next-bay pulse, SELLING/TOPSTOCK filter, Sunday assignment queue, one-tap barriers). Completions refresh silently (no loading flash).
+- `GET /api/store-health` — weekly pace + bottleneck aggregation + compact `bay_health` for DS / Super Admin
 - `POST /api/store-ops/ai-bay-scan` — multimodal bay photo → carton/pallet estimates, cleanliness score, detected issues (Store Ops actor)
 - `POST /api/store-ops/ai-note-summary` — manager note + optional S Pen PNG → executive summary + action items (Store Ops actor)
 - APIs under `/api/rotations/*`, `/api/store-locations*`, `/api/departments`, `/api/weekly-rotations`

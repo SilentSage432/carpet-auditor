@@ -7,6 +7,7 @@ app/manifest.ts                   → short_name DeptSync · Department & SIMS A
 public/sw.js                      → Offline shell cache strategies
 components/hub/HubChrome.tsx      → Sticky header (legacy) + role-filtered inventory bottom nav
 components/hub/NavigationHub.tsx  → Cross-app Navigation Hub (hamburger, role badge, ops bottom nav)
+components/hub/HeaderNetworkStatus.tsx → Isolated online / pending-queue chip (owns useNetworkBadge)
 components/hub/admin-tools-events.ts → Admin Tools open event + payload types (light; drawer is dynamic)
 components/hub/ChunkErrorBoundary.tsx → Catch failed next/dynamic chunks + child render throws
 components/hub/NavIcons.tsx       → Shared Lucide icons for ops + inventory bottom bars
@@ -21,7 +22,7 @@ lib/push/*                        → Web Push subscribe + VAPID dispatch for ro
 app/admin/store-map/page.tsx      → Super Admin aisle/bay bulk mapper + weekly generate
 app/admin/supervisors/page.tsx    → Supervisor & role management console
 app/dashboard/page.tsx            → Zebra weekly rotation checklist (silent refresh + Sunday handoff)
-components/store-ops/ZebraChecklist.tsx → Optimistic complete, next-bay pulse, S/T filter, Sunday queue, bay-health badge
+components/store-ops/ZebraChecklist.tsx → Optimistic complete, Quick Touch, next-bay pulse, S/T filter, Sunday queue, bay-health badge
 components/store-ops/BayHealthScorecard.tsx → Compact Zebra health badge (presentation)
 lib/store-ops/bay-health.ts       → Aging / SIMS / topstock discrepancy diagnostics (compose only)
 components/store-ops/AuditLocationModeToggle.tsx → SELLING vs TOPSTOCK audit-mode control
@@ -104,13 +105,14 @@ supabase/migrations/20260812_sunday_bay_assignments.sql → sunday specialist↔
 | Team roster (Master Admin) | `AdminRosterManager`, `lib/specialists.ts` (`is_active` soft-delete) |
 | Store context | `lib/store.ts` + `lib/store-ops/stores.ts` |
 | Offline sync queue | `lib/sync-queue.ts`, `lib/sync-conflict.ts`, `ConflictResolutionModal` |
+| Header network / pending queue | `lib/network.ts` + `HeaderNetworkStatus` (hook isolated from hub forms) |
 | Shell caching | `public/sw.js` + `ServiceWorkerRegister` |
 | CLF / carton math | `lib/calc.ts` |
 | Number typing UX | `lib/number-input.ts` + `NumberField` |
 | Catalog knowledge | `lib/catalog.ts` |
 | Store health scorecard | `lib/store-ops/health.ts`, `StoreHealthCard` |
 | Shift audit velocity telemetry | `lib/store-ops/telemetry.ts`, `StoreHealthChart` |
-| Zebra shift briefing | `lib/store-ops/shift-briefing.ts`, `ShiftBriefingCard` |
+| Zebra shift briefing | `lib/store-ops/shift-briefing.ts`, `ShiftBriefingCard` (composes health snapshot + `bay_health`) |
 | Visual bay scan | `lib/store-ops/ai-bay-scan.ts`, `VisualBayScannerModal` (720p stream; JPEG q=0.70 / 960px) |
 | Gemini transport | `lib/ai/gemini.ts` (`GEMINI_JSON_GENERATION_CONFIG`: JSON mime, 1024 output tokens) |
 | Barcode resolve / Quick-Add | `lib/barcode.ts`, `NumberField` scan hooks, `QuickAddCatalogModal` |
@@ -126,8 +128,8 @@ supabase/migrations/20260812_sunday_bay_assignments.sql → sunday specialist↔
 | PIN change / default notice | `ChangePinModal` |
 | Manager markdown | `lib/markdown.ts`, `ApplyMarkdownModal` |
 | Variance | `lib/variance.ts` |
-| Remnant aging | `lib/aging.ts` |
-| Remnant inventory | `lib/remnants.ts` |
+| Remnant aging | `lib/aging.ts` (markdown 30/60/90 + floor-ops Fresh/Watch/Critical rack bands) |
+| Remnant inventory | `lib/remnants.ts` (`remnantRackAlert` composes rack badges / markdown chip) |
 | Audit log + draft | `lib/storage.ts` + `lib/debounced-persist.ts` (300ms) + `CycleAuditScanForm` |
 | Audit report export / print / email | `lib/audit-report.ts`, `AuditReportModal` |
 
