@@ -55,6 +55,7 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 - Staging card + assignment modal: open weekly Flooring bays → assign from Flooring roster; Auto-Assign All to Me; Stage/Draw 12
 - Assignments persist in `sunday_bay_assignments` (JWT store/dept RLS); `bay_id` = `weekly_rotations.id`; ISO week → `week_starting` Monday
 - Entry points: `/dashboard`, Cycle Audit tab, Admin Tools, `/flooring` deep link
+- ZebraChecklist live-handoff: `SUNDAY_AUDIT_EVENT` + Realtime; assigned specialist sees **Your Sunday bays first** without refresh
 
 ### Departments
 `flooring` · `appliances` · `plumbing` · `electrical` · `lawn_garden` · `paint` · `millwork` · `building_materials` · `hardware` · `all`
@@ -145,7 +146,7 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 - Quick Actions banner (Super Admin): Bulk Generate · Trigger Weekly Rotation · Manage Supervisors
 - `/admin/store-map` — department overview + location grid; Bulk Add accordion; Trigger Weekly Rotation modal (**Force Draw New Rotation**); **📷 Snap Bay AI Audit** (Gemini visual scan) on page + bay actions sheet
 - `/manager-notes` — Executive Floor Pad (TipTap rich notes + Gemini Copilot Extract Tasks & Tag + archive); also Admin Tools entry + `#manager-notes`
-- `/dashboard` — Store Health Scorecard (top) + Zebra checklist for this ISO week; checkbox → complete rotation + location COMPLETED (cool-down)
+- `/dashboard` — Store Health Scorecard (top) + **ZebraChecklist** (optimistic complete, next-bay pulse, SELLING/TOPSTOCK filter, Sunday assignment queue, one-tap barriers). Completions refresh silently (no loading flash).
 - `GET /api/store-health` — weekly pace + bottleneck aggregation for DS / Super Admin
 - `POST /api/store-ops/ai-bay-scan` — multimodal bay photo → carton/pallet estimates, cleanliness score, detected issues (Store Ops actor)
 - `POST /api/store-ops/ai-note-summary` — manager note + optional S Pen PNG → executive summary + action items (Store Ops actor)
@@ -172,9 +173,15 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 
 ## End-of-week verification
 - Migration: `supabase/migrations/20260809_rotation_verification.sql`
-- `/verify-rotation` — supervisors confirm or report incomplete bays (CARRIED_OVER + exception reasons)
-- `/admin/exceptions` — Master Admin tabs: Pending / Verified / Barriers / All
-- APIs: `POST /api/rotations/verify`, `GET /api/rotations/exceptions`
+- `/verify-rotation` — **Verify All Completed Bays** (sign off without completing remaining open) + Report Incomplete with one-tap chips (Blocked Bay / Unpalletized Top-Stock / Missing SIMS Tags)
+- `/admin/exceptions` — Master Admin tabs: Pending / Verified / Barriers / All; batch **Verify All Completed Bays** for depts with 0 open; barrier rows show SELLING/TOPSTOCK
+- Mid-week floor barriers: `POST /api/rotations/exceptions` (does **not** stamp `last_verified_week`) — Zebra row **Barrier** → tap reason
+- APIs: `POST /api/rotations/verify`, `GET|POST /api/rotations/exceptions`
+
+## Selling vs Topstock audit mode
+- Canonical Store Ops type `SELLING` | `TOPSTOCK` (`lib/store-ops/audit-location-mode.ts`); hub audits still persist `sales_floor` / `top_stock`
+- Cycle Audit / Department Audit / Zebra filter share `AuditLocationModeToggle` — SELLING = lower floor, TOPSTOCK = overheads/racking
+- Discrepancy flags, log rows, and audit reports include the mode; Cycle/Department forms keep the mode across logs (not reset)
 
 ## Store number (dynamic)
 - Owner: `lib/store.ts` — localStorage `carpet_hub_store_number`; **no hardcoded `1234`/`1852`**

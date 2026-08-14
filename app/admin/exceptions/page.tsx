@@ -4,7 +4,11 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { NavigationHub } from "@/components/hub/NavigationHub";
 import { SessionGate } from "@/components/hub/SessionGate";
 import { isMasterAdmin } from "@/lib/rbac";
-import { fetchExceptionSummary } from "@/lib/store-ops/client";
+import { formatAuditLocationBadge } from "@/lib/store-ops/audit-location-mode";
+import {
+  fetchExceptionSummary,
+  verifyAllCompletedBays,
+} from "@/lib/store-ops/client";
 import type { StoreSpecialist } from "@/lib/types";
 
 type SummaryRow = Awaited<
@@ -51,6 +55,8 @@ function ExceptionsBody({
   const [error, setError] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>("pending");
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -87,6 +93,36 @@ function ExceptionsBody({
     () => summary.filter((s) => s.verified_this_week),
     [summary]
   );
+  const completable = useMemo(
+    () =>
+      pendingRows.filter(
+        (s) => s.incomplete_rotations === 0 && s.total_rotations > 0
+      ),
+    [pendingRows]
+  );
+
+  async function handleVerifyCompleted() {
+    if (completable.length === 0) return;
+    setBusy(true);
+    setError(null);
+    setMessage(null);
+    try {
+      let ok = 0;
+      for (const row of completable) {
+        await verifyAllCompletedBays(specialist, {
+          department_id: row.department_id,
+          assigned_week: week,
+        });
+        ok += 1;
+      }
+      setMessage(`Verified ${ok} department${ok === 1 ? "" : "s"} with all bays complete.`);
+      await reload();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Batch verify failed");
+    } finally {
+      setBusy(false);
+    }
+  }
 
   const statusRows =
     tab === "pending"
@@ -122,6 +158,24 @@ function ExceptionsBody({
           <p className="mb-3 rounded-xl border border-red-500/40 bg-red-950/40 px-3 py-2 text-sm text-red-200">
             {error}
           </p>
+        ) : null}
+        {message ? (
+          <p className="mb-3 rounded-xl border border-emerald-500/40 bg-emerald-950/40 px-3 py-2 text-sm text-emerald-200">
+            {message}
+          </p>
+        ) : null}
+
+        {completable.length > 0 ? (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void handleVerifyCompleted()}
+            className="mb-3 flex min-h-12 w-full items-center justify-center rounded-xl bg-emerald-500 px-4 text-sm font-bold text-slate-950 disabled:opacity-50"
+          >
+            {busy
+              ? "Signing off…"
+              : `Verify All Completed Bays (${completable.length} dept)`}
+          </button>
         ) : null}
 
         {loading ? (
@@ -174,6 +228,9 @@ function ExceptionsBody({
                         {ex.departments?.name ?? "Department"}
                         {ex.store_locations
                           ? ` · A${ex.store_locations.aisle} B${ex.store_locations.bay}`
+                          : ""}
+                        {ex.store_locations?.type
+                          ? ` · ${formatAuditLocationBadge(ex.store_locations.type)}`
                           : ""}
                       </p>
                       <p className="mt-1 text-sm text-amber-200">{ex.reason}</p>

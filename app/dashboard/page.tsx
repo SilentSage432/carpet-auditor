@@ -5,7 +5,7 @@ import Link from "next/link";
 import { SundayAuditStagingCard } from "@/components/admin/SundayAuditStagingCard";
 import { StoreHealthCard } from "@/components/StoreHealthCard";
 import { ShowroomQuickTouchCard } from "@/components/dashboard/ShowroomQuickTouchCard";
-import { WeeklyRotationList } from "@/components/dashboard/WeeklyRotationList";
+import { ZebraChecklist } from "@/components/store-ops/ZebraChecklist";
 import { NavigationHub } from "@/components/hub/NavigationHub";
 import { SessionGate } from "@/components/hub/SessionGate";
 import { ShiftBriefingCard } from "@/components/store-ops/ShiftBriefingCard";
@@ -24,6 +24,7 @@ import {
 import {
   filterFlooringRotations,
   findFlooringDepartment,
+  SUNDAY_AUDIT_EVENT,
 } from "@/lib/store-ops/sunday-audit";
 import type { WeeklyRotationWithLocation } from "@/lib/store-ops/types";
 import { departmentMeta, type StoreSpecialist } from "@/lib/types";
@@ -69,26 +70,33 @@ function DashboardBody({
       (specialist.assigned_department === "flooring" ||
         specialist.assigned_department == null));
 
-  const reload = useCallback(async (member: StoreSpecialist) => {
-    setLoading(true);
-    setError(null);
-    try {
-      const [data, depts] = await Promise.all([
-        fetchThisWeekRotations(member),
-        fetchDepartments(member).catch(() => []),
-      ]);
-      setWeek(data.assigned_week || "");
-      setRotations(data.rotations ?? []);
-      setFlooringDeptId(findFlooringDepartment(depts)?.id ?? null);
-      setHealthKey((k) => k + 1);
-    } catch {
-      setWeek("");
-      setRotations([]);
+  const reload = useCallback(
+    async (member: StoreSpecialist, opts?: { silent?: boolean }) => {
+      if (!opts?.silent) setLoading(true);
       setError(null);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+      try {
+        const [data, depts] = await Promise.all([
+          fetchThisWeekRotations(member),
+          fetchDepartments(member).catch(() => []),
+        ]);
+        setWeek(data.assigned_week || "");
+        setRotations(data.rotations ?? []);
+        setFlooringDeptId(findFlooringDepartment(depts)?.id ?? null);
+        setHealthKey((k) => k + 1);
+      } catch {
+        setWeek("");
+        setRotations([]);
+        setError(null);
+      } finally {
+        if (!opts?.silent) setLoading(false);
+      }
+    },
+    []
+  );
+
+  const silentRefresh = useCallback(() => {
+    void reload(specialist, { silent: true });
+  }, [reload, specialist]);
 
   useEffect(() => {
     void reload(specialist);
@@ -98,9 +106,16 @@ function DashboardBody({
     function onCtx() {
       setContextTick((n) => n + 1);
     }
+    function onSunday() {
+      void reload(specialist, { silent: true });
+    }
     window.addEventListener(ADMIN_DEPT_CONTEXT_EVENT, onCtx);
-    return () => window.removeEventListener(ADMIN_DEPT_CONTEXT_EVENT, onCtx);
-  }, []);
+    window.addEventListener(SUNDAY_AUDIT_EVENT, onSunday);
+    return () => {
+      window.removeEventListener(ADMIN_DEPT_CONTEXT_EVENT, onCtx);
+      window.removeEventListener(SUNDAY_AUDIT_EVENT, onSunday);
+    };
+  }, [reload, specialist]);
 
   const displayRotations = useMemo(() => {
     if (!flooringFocus || !flooringDeptId) return rotations;
@@ -161,11 +176,11 @@ function DashboardBody({
           {loading ? (
             <p className="text-sm text-zinc-400">Loading this week&apos;s bays…</p>
           ) : (
-            <WeeklyRotationList
+            <ZebraChecklist
               specialist={specialist}
               assignedWeek={week}
               rotations={displayRotations}
-              onRefresh={() => void reload(specialist)}
+              onRefresh={silentRefresh}
             />
           )}
         </section>

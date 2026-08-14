@@ -438,6 +438,44 @@ export async function verifyWeeklyRotationBatch(
   });
 }
 
+/** Stamp the week verified without completing remaining open bays. */
+export async function verifyAllCompletedBays(
+  specialist: StoreSpecialist,
+  input: { department_id: string; assigned_week: string }
+): Promise<{ completed_count: number; exception_count: number }> {
+  return verifyWeeklyRotationBatch(specialist, {
+    department_id: input.department_id,
+    assigned_week: input.assigned_week,
+    completed_rotation_ids: [],
+    incomplete: [],
+  });
+}
+
+export async function reportRotationBarriers(
+  specialist: StoreSpecialist,
+  input: {
+    department_id: string;
+    assigned_week: string;
+    incomplete: Array<{
+      rotation_id: string;
+      location_id: string;
+      reason: string;
+      cycle_number: number;
+    }>;
+  }
+): Promise<{ exception_count: number }> {
+  const result = await storeOpsFetch<{ exception_count?: number }>(
+    "/api/rotations/exceptions",
+    specialist,
+    {
+      method: "POST",
+      body: JSON.stringify(input),
+    }
+  );
+  invalidateStoreOpsListCaches();
+  return { exception_count: result.exception_count ?? input.incomplete.length };
+}
+
 export async function fetchExceptionSummary(
   specialist: StoreSpecialist,
   week?: string
@@ -468,6 +506,7 @@ export async function fetchExceptionSummary(
       id: string;
       aisle: string;
       bay: number;
+      type?: string | null;
     } | null;
     departments: { id: string; name: string; code: string } | null;
   }>;
@@ -501,6 +540,7 @@ export async function fetchExceptionSummary(
           id: string;
           aisle: string;
           bay: number;
+          type?: string | null;
         } | null;
         departments: { id: string; name: string; code: string } | null;
       }>;

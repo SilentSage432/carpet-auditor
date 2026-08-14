@@ -45,6 +45,12 @@ import {
   saveAudit,
   scheduleAuditDraftSave,
 } from "@/lib/storage";
+import { AuditLocationModeToggle } from "@/components/store-ops/AuditLocationModeToggle";
+import {
+  hubLocationFromStoreType,
+  storeTypeFromHubLocation,
+  formatAuditLocationBadge,
+} from "@/lib/store-ops/audit-location-mode";
 import {
   DEFAULT_ROLL_WIDTH_FT,
   FLOORING_CATEGORIES,
@@ -342,7 +348,6 @@ export function CycleAuditScanForm({
     setSimsLocation("");
     setRollWidth(null);
     setSqftPerBox("");
-    setLocation("sales_floor");
     setWholeInches("");
     setFraction(0);
     setRounds("");
@@ -383,14 +388,15 @@ export function CycleAuditScanForm({
         audited_by: auditedBy,
       });
       playSuccessChime();
+      const modeLabel = formatAuditLocationBadge(location);
       resetForm();
       onLogged(record, offline);
       flashStatus(
         offline
-          ? "Saved offline — form reset"
+          ? `${modeLabel} saved offline — form reset`
           : auditMode === "roll"
-            ? "Roll logged — form reset"
-            : "Units logged — form reset"
+            ? `${modeLabel} roll logged`
+            : `${modeLabel} units logged`
       );
     } catch {
       flashStatus("Could not save audit");
@@ -581,38 +587,14 @@ export function CycleAuditScanForm({
           ) : null}
         </div>
 
-        <fieldset>
-          <legend className="mb-1.5 text-sm font-medium text-slate-200">
-            Location Type
-          </legend>
-          <div
-            role="group"
-            className="grid grid-cols-2 gap-1 rounded-xl border border-slate-800 bg-slate-950 p-1"
-          >
-            {(
-              [
-                ["sales_floor", "Sales Floor"],
-                ["top_stock", "Top Stock"],
-              ] as const
-            ).map(([value, label]) => {
-              const active = location === value;
-              return (
-                <button
-                  key={value}
-                  type="button"
-                  onClick={() => setLocation(value)}
-                  className={`flex min-h-12 items-center justify-center rounded-lg text-sm font-semibold transition ${
-                    active
-                      ? "bg-emerald-500 text-slate-950 shadow"
-                      : "text-slate-400 hover:text-slate-100"
-                  }`}
-                >
-                  {label}
-                </button>
-              );
-            })}
-          </div>
-        </fieldset>
+        <AuditLocationModeToggle
+          value={storeTypeFromHubLocation(location)}
+          onChange={(mode) => {
+            if (mode === "all") return;
+            setLocation(hubLocationFromStoreType(mode));
+          }}
+          legend="Selling vs Topstock"
+        />
 
         {auditMode === "roll" ? (
           <>

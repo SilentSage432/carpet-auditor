@@ -7,14 +7,17 @@ import { actorFromSpecialist } from "@/lib/store-ops/auth";
 import {
   fetchDepartments,
   fetchThisWeekRotations,
+  verifyAllCompletedBays,
   verifyWeeklyRotationBatch,
 } from "@/lib/store-ops/client";
+import { formatAuditLocationBadge } from "@/lib/store-ops/audit-location-mode";
+import { BarrierReasonChips } from "@/components/store-ops/BarrierReasonChips";
 import {
   formatLocationLabel,
   type Department,
+  type ExceptionReason,
   type WeeklyRotationWithLocation,
 } from "@/lib/store-ops/types";
-import { EXCEPTION_REASONS } from "@/lib/store-ops/verification";
 import type { StoreSpecialist } from "@/lib/types";
 
 export default function VerifyRotationPage() {
@@ -94,6 +97,39 @@ function VerifyBody({
       else next.add(id);
       return next;
     });
+  }
+
+  function selectBarrier(id: string, reason: ExceptionReason) {
+    setIncompleteIds((prev) => {
+      const next = new Set(prev);
+      next.add(id);
+      return next;
+    });
+    setReasons((prev) => ({ ...prev, [id]: reason }));
+  }
+
+  async function submitVerifyCompleted() {
+    if (!department) {
+      setError("Department not found");
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const result = await verifyAllCompletedBays(specialist, {
+        department_id: department.id,
+        assigned_week: week,
+      });
+      setMessage(
+        `Week signed off — ${doneRotations.length} floor-completed bays verified (${result.completed_count} writes). Remaining open bays stay on the checklist.`
+      );
+      await reload();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Verification failed");
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function submit(confirmAll: boolean) {
@@ -230,8 +266,8 @@ function VerifyBody({
 
             {reportMode ? (
               <p className="mb-3 text-sm text-amber-200/90">
-                Uncheck unfinished bays and pick a reason. Those bays carry over
-                next week.
+                Tap a reason on each blocked bay. One tap flags the barrier;
+                Submit carries those bays over.
               </p>
             ) : null}
 
@@ -242,46 +278,47 @@ function VerifyBody({
                   ? formatLocationLabel(loc)
                   : rotation.location_id.slice(0, 8);
                 const markedIncomplete = incompleteIds.has(rotation.id);
+                const typeBadge = loc?.type
+                  ? formatAuditLocationBadge(loc.type)
+                  : null;
                 return (
                   <li key={rotation.id} className="px-3 py-2">
-                    {reportMode ? (
-                      <>
-                        <label className="flex min-h-10 items-center gap-3">
-                          <input
-                            type="checkbox"
-                            checked={!markedIncomplete}
-                            onChange={() => toggleIncomplete(rotation.id)}
-                            className="h-5 w-5 accent-emerald-500"
-                          />
-                          <span className="truncate font-mono text-sm font-bold text-slate-50">
-                            {label}
-                          </span>
-                        </label>
-                        {markedIncomplete ? (
-                          <select
-                            value={reasons[rotation.id] ?? ""}
-                            onChange={(e) =>
-                              setReasons((prev) => ({
-                                ...prev,
-                                [rotation.id]: e.target.value,
-                              }))
-                            }
-                            className="mt-2 w-full rounded-xl border border-amber-500/40 bg-slate-950 px-3 py-2.5 text-sm text-slate-100"
-                          >
-                            <option value="">Select reason…</option>
-                            {EXCEPTION_REASONS.map((r) => (
-                              <option key={r} value={r}>
-                                {r}
-                              </option>
-                            ))}
-                          </select>
-                        ) : null}
-                      </>
-                    ) : (
-                      <p className="min-h-10 font-mono text-sm font-bold leading-10 text-slate-50">
+                    <div className="flex min-h-10 items-center gap-2">
+                      <p className="min-w-0 flex-1 font-mono text-sm font-bold text-slate-50">
                         {label}
                       </p>
-                    )}
+                      {typeBadge ? (
+                        <span
+                          className={
+                            loc?.type === "TOPSTOCK"
+                              ? "glass-pill-cyan"
+                              : "glass-pill-emerald"
+                          }
+                        >
+                          {typeBadge}
+                        </span>
+                      ) : null}
+                    </div>
+                    {reportMode ? (
+                      <div className="mt-2">
+                        <BarrierReasonChips
+                          value={reasons[rotation.id]}
+                          showAll
+                          onSelect={(reason) =>
+                            selectBarrier(rotation.id, reason)
+                          }
+                        />
+                        {markedIncomplete ? (
+                          <button
+                            type="button"
+                            onClick={() => toggleIncomplete(rotation.id)}
+                            className="mt-1.5 text-[11px] font-semibold text-slate-400 underline-offset-2 hover:underline"
+                          >
+                            Clear barrier
+                          </button>
+                        ) : null}
+                      </div>
+                    ) : null}
                   </li>
                 );
               })}
@@ -316,33 +353,40 @@ function VerifyBody({
             ) : null}
 
             <div className="fixed bottom-0 left-0 right-0 z-20 border-t border-slate-800 bg-slate-950/95 px-3 pb-[calc(env(safe-area-inset-bottom)+4.75rem)] pt-2">
-              <div className="mx-auto max-w-lg">
+              <div className="mx-auto max-w-lg space-y-2">
                 {!reportMode ? (
-                  <button
-                    type="button"
-                    disabled={
-                      busy ||
-                      (openRotations.length === 0 && doneRotations.length === 0)
-                    }
-                    onClick={() => void submit(true)}
-                    className="flex min-h-14 w-full items-center justify-center rounded-xl bg-emerald-500 px-4 text-base font-bold text-slate-950 disabled:opacity-50"
-                  >
-                    {busy
-                      ? "Saving…"
-                      : openRotations.length === 0
-                        ? "Confirm Week Verified"
-                        : "Confirm All Completed"}
-                  </button>
+                  <>
+                    <button
+                      type="button"
+                      disabled={busy || !department || rotations.length === 0}
+                      onClick={() => void submitVerifyCompleted()}
+                      className="flex min-h-14 w-full items-center justify-center rounded-xl bg-emerald-500 px-4 text-base font-bold text-slate-950 disabled:opacity-50"
+                    >
+                      {busy
+                        ? "Saving…"
+                        : `Verify All Completed Bays (${doneRotations.length})`}
+                    </button>
+                    {openRotations.length > 0 ? (
+                      <button
+                        type="button"
+                        disabled={busy}
+                        onClick={() => void submit(true)}
+                        className="flex min-h-11 w-full items-center justify-center rounded-xl border border-slate-600 bg-slate-900 px-4 text-sm font-semibold text-slate-200 disabled:opacity-50"
+                      >
+                        Mark remaining open as complete
+                      </button>
+                    ) : null}
+                  </>
                 ) : (
                   <button
                     type="button"
-                    disabled={busy}
+                    disabled={busy || incompleteIds.size === 0}
                     onClick={() => void submit(false)}
                     className="flex min-h-14 w-full items-center justify-center rounded-xl bg-amber-500 px-4 text-base font-bold text-slate-950 disabled:opacity-50"
                   >
                     {busy
                       ? "Saving…"
-                      : `Submit Verification (${incompleteIds.size} incomplete)`}
+                      : `Submit Barriers (${incompleteIds.size})`}
                   </button>
                 )}
               </div>

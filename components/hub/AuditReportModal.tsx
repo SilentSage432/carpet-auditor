@@ -16,6 +16,7 @@ import {
 import { formatClf, formatSqFt } from "@/lib/calc";
 import { getStoreNumber } from "@/lib/store";
 import { useNetworkBadge } from "@/lib/network";
+import { formatAuditLocationBadge } from "@/lib/store-ops/audit-location-mode";
 import type { CarpetAudit, StoreSpecialist } from "@/lib/types";
 import { classifyVariance, formatVariance } from "@/lib/variance";
 
@@ -30,7 +31,7 @@ type Props = {
 };
 
 function locationLabel(location: CarpetAudit["location_type"]): string {
-  return location === "sales_floor" ? "Floor" : "Top";
+  return formatAuditLocationBadge(location);
 }
 
 function qtyCell(audit: CarpetAudit): string {

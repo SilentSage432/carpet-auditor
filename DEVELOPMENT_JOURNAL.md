@@ -1,5 +1,14 @@
 # DeptSync Hub — Development Journal
 
+## 2026-08-14 — Phase 3: Bay-Readiness Velocity & Floor Workflow
+
+### Shipped
+- **ZebraChecklist** (`components/store-ops/ZebraChecklist.tsx`) owns the floor checklist: optimistic complete (no loading flash), haptic + next-bay `bay-advance-pulse`, SELLING/TOPSTOCK filter, Sunday assignment queue, one-tap Barrier chips.
+- Dashboard silent-refreshes rotations on complete and on `SUNDAY_AUDIT_EVENT`; Zebra subscribes to Sunday Realtime (cache invalidate on change) so specialist assignments appear without a page refresh.
+- **Audit mode:** `lib/store-ops/audit-location-mode.ts` + `AuditLocationModeToggle` — Cycle / Department forms label SELLING (lower floor) vs TOPSTOCK (overheads). Logs, discrepancy filters, and audit reports carry the mode; the toggle is not reset after each log.
+- **Verify All Completed Bays** on `/verify-rotation` stamps the week without completing remaining open bays. `/admin/exceptions` batch-verifies pending depts with 0 open. Barrier chips: Blocked Bay, Unpalletized Top-Stock, Missing SIMS Tags.
+- Mid-week barriers: `POST /api/rotations/exceptions` + `reportRotationBarriers` (CARRIED_OVER, does **not** stamp `last_verified_week`). End-of-week verify composes the same insert then stamps.
+
 ## 2026-08-14 — Admin Tools open + odd/even bulk bays
 
 ### Shipped

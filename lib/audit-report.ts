@@ -5,6 +5,7 @@
  */
 
 import { formatClf, formatSqFt } from "./calc";
+import { formatAuditLocationBadge } from "./store-ops/audit-location-mode";
 import type { CarpetAudit, StoreSpecialist } from "./types";
 import { classifyVariance, formatVariance, isDiscrepancy } from "./variance";
 import { roleBadge } from "./specialists";
@@ -36,7 +37,7 @@ export type AuditReportContext = {
 };
 
 function locationLabel(location: CarpetAudit["location_type"]): string {
-  return location === "sales_floor" ? "Sales Floor" : "Top Stock";
+  return formatAuditLocationBadge(location);
 }
 
 function qtyDisplay(audit: CarpetAudit): string {

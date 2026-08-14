@@ -19,7 +19,12 @@ lib/nav-hub.ts                    → Role-aware Store Ops route menus + compact
 lib/push/*                        → Web Push subscribe + VAPID dispatch for rotation alerts
 app/admin/store-map/page.tsx      → Super Admin aisle/bay bulk mapper + weekly generate
 app/admin/supervisors/page.tsx    → Supervisor & role management console
-app/dashboard/page.tsx            → Zebra supervisor weekly rotation checklist
+app/dashboard/page.tsx            → Zebra weekly rotation checklist (silent refresh + Sunday handoff)
+components/store-ops/ZebraChecklist.tsx → Optimistic complete, next-bay pulse, S/T filter, Sunday queue, one-tap barriers
+components/store-ops/AuditLocationModeToggle.tsx → SELLING vs TOPSTOCK audit-mode control
+components/store-ops/BarrierReasonChips.tsx → One-tap barrier reasons
+lib/store-ops/audit-location-mode.ts → Canonical SELLING/TOPSTOCK ↔ hub sales_floor/top_stock
+components/dashboard/WeeklyRotationList.tsx → Compatibility re-export of ZebraChecklist
 app/department/page.tsx           → Department Overview (supervisor audit workspace)
 app/settings/page.tsx             → Standalone Settings & Config
 app/api/push/*                    → VAPID public key, subscribe, manual dispatch
@@ -68,8 +73,8 @@ lib/catalog.ts / remnants.ts / storage.ts / specialists.ts → Domain persistenc
 lib/supabase.ts                   → Client factory
 lib/store-ops/*                   → Store Operations domain (rotations, bulk map, auth bridge)
 app/admin/store-map/page.tsx      → Super Admin aisle/bay bulk mapper + weekly generate
-app/dashboard/page.tsx            → Zebra supervisor weekly rotation checklist
-app/api/rotations/*               → Generate + complete rotation route handlers
+app/dashboard/page.tsx            → Zebra weekly rotation checklist (silent refresh + Sunday handoff)
+app/api/rotations/*               → Generate + complete + verify; POST /api/rotations/exceptions mid-week barriers
 app/api/store-locations*          → List / patch / bulk location APIs (GET list is column-pruned for Store Map)
 supabase/schema.sql               → Tables + multi-category + SIMS + store_number + RBAC columns + RLS
 supabase/migrations/20260809_store_operations_rbac.sql → departments, profiles, locations, weekly rotations + RLS
@@ -88,7 +93,9 @@ supabase/migrations/20260812_sunday_bay_assignments.sql → sunday specialist↔
 | Navigation / section routing | `app/page.tsx` + `HubChrome` (roster-only boot; `next/dynamic` sections; keep-alive `HubPane` + `startTransition`) |
 | Department RBAC / tab visibility | `lib/rbac.ts` |
 | Cross-app Navigation Hub | `lib/nav-hub.ts` + `NavigationHub` + `admin-tools-events.ts` (`subscribeAdminTools` → host `AdminToolsDrawer`; TipTap stays in the dynamic chunk) |
-| Store Operations map + rotations | `lib/store-ops/*` + `/admin/store-map` + `/dashboard` (bulk bays: `bay-pattern.ts`) |
+| Store Operations map + rotations | `lib/store-ops/*` + `/admin/store-map` + `/dashboard` (bulk bays: `bay-pattern.ts`; floor checklist: `ZebraChecklist`) |
+| Selling vs Topstock audit mode | `lib/store-ops/audit-location-mode.ts` + `AuditLocationModeToggle` (Cycle/Department forms + Zebra filter) |
+| Rotation verification / barriers | `lib/store-ops/verification.ts` + `/verify-rotation` + `/admin/exceptions` + `POST /api/rotations/exceptions` |
 | Manager notes / Executive Floor Pad | `lib/store-ops/ai-note-extract.ts`, `manager-notes.ts`, `app/actions/manager-notes.ts`, `components/manager-notes/*` (Copilot: plain text ≤ 8k) |
 | Team roster (Master Admin) | `AdminRosterManager`, `lib/specialists.ts` (`is_active` soft-delete) |
 | Store context | `lib/store.ts` + `lib/store-ops/stores.ts` |

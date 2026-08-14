@@ -26,6 +26,12 @@ import { useGlobalBarcodeScanner } from "@/lib/hardware-scanner";
 import { toNumber } from "@/lib/number-input";
 import { playSuccessChime } from "@/lib/scan-feedback";
 import { deleteAudit, fetchAudits, isToday, saveAudit } from "@/lib/storage";
+import { AuditLocationModeToggle } from "@/components/store-ops/AuditLocationModeToggle";
+import {
+  formatAuditLocationBadge,
+  hubLocationFromStoreType,
+  storeTypeFromHubLocation,
+} from "@/lib/store-ops/audit-location-mode";
 import {
   departmentMeta,
   type CarpetAudit,
@@ -52,10 +58,6 @@ type Props = {
 };
 
 const cardClass = "glass-card p-4";
-
-function locationLabel(location: LocationType): string {
-  return location === "sales_floor" ? "Sales Floor" : "Top Stock";
-}
 
 function formatTime(iso: string): string {
   return new Date(iso).toLocaleString(undefined, {
@@ -240,7 +242,6 @@ export function DepartmentAuditSection({
     setSku("");
     setName("");
     setSimsLocation("");
-    setLocation("sales_floor");
     setUnitCount("1");
     dismissKeyboard();
   }
@@ -494,32 +495,14 @@ export function DepartmentAuditSection({
           </div>
         </div>
 
-        <fieldset>
-          <legend className="mb-1.5 text-sm font-medium text-slate-200">
-            Location Type
-          </legend>
-          <div className="grid grid-cols-2 gap-1 rounded-xl border border-slate-800 bg-slate-950 p-1">
-            {(
-              [
-                ["sales_floor", "Sales Floor"],
-                ["top_stock", "Top Stock"],
-              ] as const
-            ).map(([value, label]) => (
-              <button
-                key={value}
-                type="button"
-                onClick={() => setLocation(value)}
-                className={`flex min-h-11 items-center justify-center rounded-lg text-sm font-semibold ${
-                  location === value
-                    ? "bg-emerald-500 text-slate-950"
-                    : "text-slate-400"
-                }`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-        </fieldset>
+        <AuditLocationModeToggle
+          value={storeTypeFromHubLocation(location)}
+          onChange={(mode) => {
+            if (mode === "all") return;
+            setLocation(hubLocationFromStoreType(mode));
+          }}
+          legend="Selling vs Topstock"
+        />
 
         <div>
           <span className="mb-1.5 block text-sm font-medium text-slate-200">
@@ -596,7 +579,7 @@ export function DepartmentAuditSection({
                     <p className="text-xs text-slate-400">
                       {a.box_count ?? 0} units
                       {a.sub_category ? ` · ${a.sub_category}` : ""} ·{" "}
-                      {locationLabel(a.location_type)} ·{" "}
+                      {formatAuditLocationBadge(a.location_type)} ·{" "}
                       {a.sims_location || "—"} · {formatTime(a.created_at)}
                     </p>
                   </div>

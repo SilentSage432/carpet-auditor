@@ -12,10 +12,20 @@ import type {
 import { isoWeekLabel } from "./week";
 
 export const EXCEPTION_REASONS: ExceptionReason[] = [
+  "Blocked Bay",
+  "Unpalletized Top-Stock",
+  "Missing SIMS Tags",
   "Freight/Pallets In Aisle",
   "Short Staffed",
   "High Customer Volume",
   "Other",
+];
+
+/** One-tap floor barriers — first-class reasons for Zebra / verify chips. */
+export const QUICK_BARRIER_REASONS: ExceptionReason[] = [
+  "Blocked Bay",
+  "Unpalletized Top-Stock",
+  "Missing SIMS Tags",
 ];
 
 export type VerifySubmitInput = {
@@ -79,37 +89,13 @@ export async function verifyWeeklyRotations(
     completedCount += 1;
   }
 
-  const exceptionRows = input.incomplete.map((item) => ({
-    department_id: input.departmentId,
-    bay_id: item.locationId,
-    reason: item.reason.trim() || "Other",
-    cycle_number: item.cycleNumber || 1,
-    assigned_week: week,
-    reported_by: input.reportedBy ?? null,
-  }));
-
-  let exceptions: RotationException[] = [];
-  if (exceptionRows.length > 0) {
-    const { data, error } = await supabase
-      .from("rotation_exceptions")
-      .insert(exceptionRows)
-      .select("*");
-    if (error) throw new Error(error.message);
-    exceptions = (data ?? []) as RotationException[];
-
-    for (const item of input.incomplete) {
-      const { error: locError } = await supabase
-        .from("store_locations")
-        .update({
-          status: "CARRIED_OVER",
-          updated_at: now,
-        })
-        .eq("id", item.locationId);
-      if (locError) throw new Error(locError.message);
-
-      // Leave weekly_rotations.is_completed = false for incomplete reports
-    }
-  }
+  const barriers = await insertRotationBarriers(supabase, {
+    departmentId: input.departmentId,
+    assignedWeek: week,
+    incomplete: input.incomplete,
+    reportedBy: input.reportedBy,
+    markCarriedOver: true,
+  });
 
   const { error: deptError } = await supabase
     .from("departments")
@@ -123,9 +109,95 @@ export async function verifyWeeklyRotations(
   return {
     assigned_week: week,
     completed_count: completedCount,
-    exception_count: exceptions.length,
-    exceptions,
+    exception_count: barriers.exceptions.length,
+    exceptions: barriers.exceptions,
   };
+}
+
+export type ReportBarrierInput = {
+  departmentId: string;
+  assignedWeek: string;
+  incomplete: Array<{
+    rotationId: string;
+    locationId: string;
+    reason: ExceptionReason | string;
+    cycleNumber: number;
+  }>;
+  reportedBy?: string | null;
+  /** Mid-week floor reports default to carrying the bay over. */
+  markCarriedOver?: boolean;
+};
+
+export type ReportBarrierResult = {
+  assigned_week: string;
+  exception_count: number;
+  exceptions: RotationException[];
+};
+
+/**
+ * Mid-week barrier log — does not stamp department last_verified_week.
+ * End-of-week verify composes this, then stamps verification.
+ */
+export async function reportRotationBarriers(
+  supabase: SupabaseClient,
+  input: ReportBarrierInput
+): Promise<ReportBarrierResult> {
+  const week = input.assignedWeek || isoWeekLabel();
+  const barriers = await insertRotationBarriers(supabase, {
+    ...input,
+    assignedWeek: week,
+    markCarriedOver: input.markCarriedOver !== false,
+  });
+  return {
+    assigned_week: week,
+    exception_count: barriers.exceptions.length,
+    exceptions: barriers.exceptions,
+  };
+}
+
+async function insertRotationBarriers(
+  supabase: SupabaseClient,
+  input: ReportBarrierInput
+): Promise<{ exceptions: RotationException[] }> {
+  const now = new Date().toISOString();
+  const exceptionRows = input.incomplete
+    .filter((item) => item.locationId)
+    .map((item) => ({
+      department_id: input.departmentId,
+      bay_id: item.locationId,
+      reason: item.reason.trim() || "Other",
+      cycle_number: item.cycleNumber || 1,
+      assigned_week: input.assignedWeek,
+      reported_by: input.reportedBy ?? null,
+    }));
+
+  let exceptions: RotationException[] = [];
+  if (exceptionRows.length === 0) {
+    return { exceptions };
+  }
+
+  const { data, error } = await supabase
+    .from("rotation_exceptions")
+    .insert(exceptionRows)
+    .select("*");
+  if (error) throw new Error(error.message);
+  exceptions = (data ?? []) as RotationException[];
+
+  if (input.markCarriedOver !== false) {
+    for (const item of input.incomplete) {
+      if (!item.locationId) continue;
+      const { error: locError } = await supabase
+        .from("store_locations")
+        .update({
+          status: "CARRIED_OVER",
+          updated_at: now,
+        })
+        .eq("id", item.locationId);
+      if (locError) throw new Error(locError.message);
+    }
+  }
+
+  return { exceptions };
 }
 
 export type ExceptionWithLocation = RotationException & {
@@ -133,6 +205,7 @@ export type ExceptionWithLocation = RotationException & {
     id: string;
     aisle: string;
     bay: number;
+    type?: string | null;
   } | null;
   departments: {
     id: string;
@@ -147,7 +220,9 @@ export async function listRotationExceptions(
 ): Promise<ExceptionWithLocation[]> {
   let query = supabase
     .from("rotation_exceptions")
-    .select("*, store_locations(id, aisle, bay), departments(id, name, code)")
+    .select(
+      "*, store_locations(id, aisle, bay, type), departments(id, name, code)"
+    )
     .order("created_at", { ascending: false })
     .limit(opts?.limit ?? 200);
 

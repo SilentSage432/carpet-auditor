@@ -71,6 +71,9 @@ export type WeeklyRotationWithLocation = WeeklyRotation & {
 };
 
 export type ExceptionReason =
+  | "Blocked Bay"
+  | "Unpalletized Top-Stock"
+  | "Missing SIMS Tags"
   | "Freight/Pallets In Aisle"
   | "Short Staffed"
   | "High Customer Volume"

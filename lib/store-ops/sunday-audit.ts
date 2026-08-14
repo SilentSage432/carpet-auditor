@@ -278,7 +278,10 @@ export function subscribeSundayBayAssignments(
         table: "sunday_bay_assignments",
         filter: `store_number=eq.${storeNumber}`,
       },
-      () => onChange()
+      () => {
+        sundayAssignmentsCache.invalidate();
+        onChange();
+      }
     )
     .subscribe();
 
@@ -366,6 +369,52 @@ export function isSundayLocal(now = new Date()): boolean {
  */
 export function shouldShowSundayStaging(openBayCount: number): boolean {
   return openBayCount > 0;
+}
+
+export function isSundayAssignmentForSpecialist(
+  assignment: SundayBayAssignment | null | undefined,
+  specialist: StoreSpecialist
+): boolean {
+  if (!assignment) return false;
+  const rosterId = String(specialist.id);
+  const profileId = String(assignment.assigned_specialist_id ?? "").trim();
+  return (
+    String(assignment.specialist_id) === rosterId ||
+    (profileId.length > 0 && profileId === rosterId)
+  );
+}
+
+export function partitionRotationsBySundayAssignment(
+  rotations: WeeklyRotationWithLocation[],
+  assignments: SundayAssignmentMap,
+  specialist: StoreSpecialist
+): {
+  assignedToMe: WeeklyRotationWithLocation[];
+  assignedToOthers: WeeklyRotationWithLocation[];
+  unassigned: WeeklyRotationWithLocation[];
+  hasPersonalQueue: boolean;
+} {
+  const assignedToMe: WeeklyRotationWithLocation[] = [];
+  const assignedToOthers: WeeklyRotationWithLocation[] = [];
+  const unassigned: WeeklyRotationWithLocation[] = [];
+
+  for (const rotation of rotations) {
+    const assignment = assignments[rotation.id] ?? null;
+    if (isSundayAssignmentForSpecialist(assignment, specialist)) {
+      assignedToMe.push(rotation);
+    } else if (assignment) {
+      assignedToOthers.push(rotation);
+    } else {
+      unassigned.push(rotation);
+    }
+  }
+
+  return {
+    assignedToMe,
+    assignedToOthers,
+    unassigned,
+    hasPersonalQueue: assignedToMe.length > 0,
+  };
 }
 
 export function sundayStagingHeadline(input: {

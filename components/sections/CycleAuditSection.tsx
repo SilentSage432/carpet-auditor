@@ -56,9 +56,7 @@ import {
   varianceLabel,
 } from "@/lib/variance";
 
-function locationLabel(location: LocationType): string {
-  return location === "sales_floor" ? "Sales Floor" : "Top Stock";
-}
+import { formatAuditLocationBadge } from "@/lib/store-ops/audit-location-mode";
 
 function formatTime(iso: string): string {
   return new Date(iso).toLocaleString(undefined, {
@@ -239,7 +237,7 @@ export function CycleAuditSection({
       "Flooring Cycle Count — Shift Summary",
       `Store: Lowe's #${getStoreNumber()}`,
       `Date: ${new Date().toLocaleDateString()}`,
-      `Total entries: ${totalRolls} (Floor ${floorCount} / Top Stock ${topStockCount})`,
+      `Total entries: ${totalRolls} (SELLING ${floorCount} / TOPSTOCK ${topStockCount})`,
       `Shift CLF: ${formatClf(shiftClf)}`,
       `Shift SqFt: ${formatSqFt(shiftSqFt)}`,
       `Cumulative CLF: ${formatClf(cumulativeClf)}`,
@@ -249,7 +247,7 @@ export function CycleAuditSection({
           a.box_count != null && a.box_count > 0
             ? `${a.box_count} units / ${formatSqFt(a.calculated_sqft ?? 0)} sq ft`
             : `${formatMeasurementDisplay(a.measurement_inches, a.measurement_fraction)} × ${a.rounds} = ${formatClf(a.calculated_clf)} CLF`;
-        return `${formatTime(a.created_at)} | SKU ${a.sku} | ${a.carpet_name || "—"} | ${a.category} | ${a.sims_location || "—"} | ${locationLabel(a.location_type)} | ${qty}`;
+        return `${formatTime(a.created_at)} | SKU ${a.sku} | ${a.carpet_name || "—"} | ${a.category} | ${a.sims_location || "—"} | ${formatAuditLocationBadge(a.location_type)} | ${qty}`;
       }),
     ];
     try {
@@ -404,15 +402,15 @@ export function CycleAuditSection({
               </div>
               <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-3">
                 <p className="text-[10px] font-medium uppercase tracking-wide text-emerald-400/80">
-                  Floor
+                  SELLING
                 </p>
                 <p className="mt-1 font-mono text-2xl font-semibold tabular-nums text-emerald-400">
                   {loaded ? floorCount : "—"}
                 </p>
               </div>
               <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-3">
-                <p className="text-[10px] font-medium uppercase tracking-wide text-amber-400/80">
-                  Top stock
+                <p className="text-[10px] font-medium uppercase tracking-wide text-cyan-400/80">
+                  TOPSTOCK
                 </p>
                 <p className="mt-1 font-mono text-2xl font-semibold tabular-nums text-amber-300">
                   {loaded ? topStockCount : "—"}
@@ -531,8 +529,8 @@ export function CycleAuditSection({
               className="min-h-12 w-full rounded-xl border border-slate-800 bg-slate-950 px-3 text-base text-slate-100"
             >
               <option value="all">All</option>
-              <option value="sales_floor">Sales Floor</option>
-              <option value="top_stock">Top Stock</option>
+              <option value="sales_floor">SELLING · lower floor</option>
+              <option value="top_stock">TOPSTOCK · overheads</option>
             </select>
           </label>
           <label className="flex min-h-12 items-center gap-3 rounded-xl border border-slate-800 bg-slate-950 px-3">
@@ -587,7 +585,7 @@ export function CycleAuditSection({
                   <p className="truncate font-mono text-sm font-semibold text-white">
                     {audit.sku}
                     <span className="ml-2 font-sans text-[10px] font-bold uppercase text-zinc-500">
-                      {locationLabel(audit.location_type)}
+                      {formatAuditLocationBadge(audit.location_type)}
                     </span>
                     {kind !== "none" ? (
                       <span

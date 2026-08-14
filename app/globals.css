@@ -175,12 +175,31 @@ body {
   @apply border-cyan-500/40 bg-cyan-950/30 shadow-[0_0_14px_-6px_rgba(34,211,238,0.4)];
 }
 
+.bay-advance-pulse {
+  animation: bay-advance-pulse 1.15s ease-out 2;
+}
+
 .visual-bay-scan-beam {
   animation: visual-bay-scan-sweep 1.6s ease-in-out infinite;
 }
 
 .visual-bay-cam-pulse {
   animation: visual-bay-cam-pulse 1.1s ease-in-out infinite;
+}
+
+@keyframes bay-advance-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgb(16 185 129 / 0.55);
+    background-color: rgb(6 78 59 / 0.55);
+  }
+  55% {
+    box-shadow: 0 0 0 10px rgb(16 185 129 / 0);
+    background-color: rgb(6 78 59 / 0.22);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgb(16 185 129 / 0);
+    background-color: transparent;
+  }
 }
 
 @keyframes visual-bay-cam-pulse {

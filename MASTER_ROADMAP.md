@@ -91,6 +91,7 @@
 - [x] P2 hub UI streamlining — debounced audit drafts; Cycle/Appliance scan-form isolation; Sunday rotations/assignments TTL cache; `startTransition` + keep-alive hub panes
 - [x] Admin Tools open path — chrome sets `adminOpen` immediately; `next/dynamic` `{ ssr: false }` default export + loading shell
 - [x] Bulk Generator bay pattern — Sequential / Odd Only / Even Only (step 2); Store Map GET `last_completed_at` null/missing-column fallback
+- [x] Phase 3 Bay-Readiness Velocity — ZebraChecklist optimistic complete + next-bay pulse; SELLING/TOPSTOCK audit mode; Verify All Completed Bays; Sunday assignment live handoff
 
 ## Next
 - [x] Apply Phase 1 JWT/RLS migration in Supabase + enable Custom Access Token Hook
