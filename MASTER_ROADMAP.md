@@ -89,6 +89,8 @@
 - [x] P0 mobile boot — roster-only AuthWall fetch; `next/dynamic` hub sections + Admin Tools + Cycle Audit modals; bounded audits/scans; composite list indexes (`20260813_p0_query_indexes.sql`)
 - [x] P1 Gemini latency — Snap Bay 720p + JPEG 0.70/960px + JSON mime/`maxOutputTokens` 1024; Floor Pad plain-text 8k Copilot; Store Map `GET /api/store-locations` column prune
 - [x] P2 hub UI streamlining — debounced audit drafts; Cycle/Appliance scan-form isolation; Sunday rotations/assignments TTL cache; `startTransition` + keep-alive hub panes
+- [x] Admin Tools open path — chrome sets `adminOpen` immediately; `next/dynamic` `{ ssr: false }` default export + loading shell
+- [x] Bulk Generator bay pattern — Sequential / Odd Only / Even Only (step 2); Store Map GET `last_completed_at` null/missing-column fallback
 
 ## Next
 - [x] Apply Phase 1 JWT/RLS migration in Supabase + enable Custom Access Token Hook

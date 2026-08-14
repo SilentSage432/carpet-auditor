@@ -532,3 +532,5 @@ function DiagnosticsPanel({ storeNumber }: { storeNumber: string }) {
     </section>
   );
 }
+
+export default AdminToolsDrawer;

@@ -11,6 +11,9 @@ export type StoreOpsUserRole =
 
 export type StoreLocationType = "SELLING" | "TOPSTOCK";
 
+/** Retail aisle facing: sequential, odd face, or even face. */
+export type BayNumberingPattern = "sequential" | "odd" | "even";
+
 /** Zone kind — orthogonal to Selling/Topstock `type`. */
 export type StoreLocationKind = "STANDARD" | "SHOWROOM_STACKOUT";
 
@@ -91,6 +94,11 @@ export type BulkGenerateInput = {
   start_bay: number;
   end_bay: number;
   types: StoreLocationType[];
+  /**
+   * Retail bay numbering: sequential 1,2,3…; odd face 1,3,5…; even face 2,4,6….
+   * Default sequential. Step is 2 for odd/even so facing sides do not duplicate.
+   */
+  bay_pattern?: BayNumberingPattern;
 };
 
 export function formatLocationLabel(

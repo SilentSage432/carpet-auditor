@@ -3,6 +3,10 @@
  */
 
 import { isValidAisle, normalizeAisle } from "./aisle";
+import {
+  expandBayNumbers,
+  parseBayNumberingPattern,
+} from "./bay-pattern";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { readableError } from "./errors";
 import type {
@@ -34,12 +38,6 @@ export function buildBulkLocationRows(
   if (!isValidAisle(aisle)) {
     throw new Error("aisle is required (alphanumeric code, e.g. BW, 12, A1)");
   }
-  if (!Number.isFinite(start_bay) || !Number.isFinite(end_bay)) {
-    throw new Error("start_bay and end_bay are required");
-  }
-  if (start_bay > end_bay) {
-    throw new Error("start_bay must be ≤ end_bay");
-  }
 
   const uniqueTypes = Array.from(
     new Set(
@@ -52,6 +50,12 @@ export function buildBulkLocationRows(
     throw new Error("Select at least one location type");
   }
 
+  const bays = expandBayNumbers(
+    start_bay,
+    end_bay,
+    parseBayNumberingPattern(input.bay_pattern)
+  );
+
   const rows: Array<{
     store_id: string;
     department_id: string;
@@ -63,7 +67,7 @@ export function buildBulkLocationRows(
     is_active: true;
   }> = [];
 
-  for (let bay = start_bay; bay <= end_bay; bay += 1) {
+  for (const bay of bays) {
     for (const type of uniqueTypes) {
       rows.push({
         store_id,

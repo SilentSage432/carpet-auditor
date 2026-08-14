@@ -2,6 +2,32 @@
  * Readable Supabase / Store Ops error messages for UI toasts and API logs.
  */
 
+export function isMissingColumnError(
+  error: unknown,
+  column: string
+): boolean {
+  const col = column.toLowerCase();
+  const record = error as {
+    message?: unknown;
+    details?: unknown;
+    hint?: unknown;
+    code?: unknown;
+  } | null;
+  const code = String(record?.code ?? "");
+  const msg = [record?.message, record?.details, record?.hint]
+    .map((part) => (typeof part === "string" ? part.toLowerCase() : ""))
+    .join(" ");
+  if (code === "42703" || code === "PGRST204") {
+    return msg.includes(col) || msg.length === 0;
+  }
+  return (
+    msg.includes(col) &&
+    (msg.includes("does not exist") ||
+      msg.includes("schema cache") ||
+      msg.includes("could not find"))
+  );
+}
+
 export function readableError(
   error: unknown,
   fallback = "Something went wrong"

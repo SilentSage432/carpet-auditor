@@ -39,7 +39,7 @@ components/sections/ApplianceScanForm.tsx → Appliance scan/input island (draft
 components/admin/SundayAuditStagingCard.tsx → Glowing pending Sunday Flooring audit CTA
 components/admin/SundayAuditAssignmentModal.tsx → Assign Flooring specialists to staged bays
 lib/admin-department-context.ts       → Master Admin working department pin (local)
-lib/store-ops/sunday-audit.ts         → Sunday Flooring staging + Supabase sunday_bay_assignments
+lib/store-ops/bay-pattern.ts          → Sequential / odd / even bay range expansion (Bulk Generator)
 lib/store-ops/manager-notes.ts        → Manager notes Supabase CRUD + realtime + archive (JWT-scoped)
 lib/store-ops/ai-bay-scan.ts          → Visual bay scan prompt / normalize / local fallback
 lib/store-ops/ai-note-summary.ts      → Legacy manager note synthesis prompt / normalize / fallback
@@ -87,8 +87,8 @@ supabase/migrations/20260812_sunday_bay_assignments.sql → sunday specialist↔
 |---|---|
 | Navigation / section routing | `app/page.tsx` + `HubChrome` (roster-only boot; `next/dynamic` sections; keep-alive `HubPane` + `startTransition`) |
 | Department RBAC / tab visibility | `lib/rbac.ts` |
-| Cross-app Navigation Hub | `lib/nav-hub.ts` + `NavigationHub` + `admin-tools-events.ts` (`AdminToolsDrawer` when `adminOpen`) |
-| Store Operations map + rotations | `lib/store-ops/*` + `/admin/store-map` + `/dashboard` |
+| Cross-app Navigation Hub | `lib/nav-hub.ts` + `NavigationHub` + `admin-tools-events.ts` (`subscribeAdminTools` → host `AdminToolsDrawer`; TipTap stays in the dynamic chunk) |
+| Store Operations map + rotations | `lib/store-ops/*` + `/admin/store-map` + `/dashboard` (bulk bays: `bay-pattern.ts`) |
 | Manager notes / Executive Floor Pad | `lib/store-ops/ai-note-extract.ts`, `manager-notes.ts`, `app/actions/manager-notes.ts`, `components/manager-notes/*` (Copilot: plain text ≤ 8k) |
 | Team roster (Master Admin) | `AdminRosterManager`, `lib/specialists.ts` (`is_active` soft-delete) |
 | Store context | `lib/store.ts` + `lib/store-ops/stores.ts` |

@@ -8,7 +8,14 @@ import {
   parseLocationBatchCsv,
 } from "@/lib/store-ops/aisle";
 import { typesFromAiLocationMode } from "@/lib/store-ops/ai-parse";
-import type { Department, StoreLocationType } from "@/lib/store-ops/types";
+import {
+  expandBayNumbers,
+} from "@/lib/store-ops/bay-pattern";
+import type {
+  BayNumberingPattern,
+  Department,
+  StoreLocationType,
+} from "@/lib/store-ops/types";
 import type { StoreSpecialist } from "@/lib/types";
 import {
   aiParseLocations,
@@ -51,6 +58,8 @@ export function BulkLocationGenerator({
   const [startBay, setStartBay] = useState("1");
   const [endBay, setEndBay] = useState("15");
   const [locationMode, setLocationMode] = useState<LocationMode>("BOTH");
+  const [bayPattern, setBayPattern] =
+    useState<BayNumberingPattern>("sequential");
   const [csvText, setCsvText] = useState("");
   const [aiText, setAiText] = useState("");
   const [aiPreview, setAiPreview] = useState<AiParsedLocationClient[] | null>(
@@ -65,6 +74,18 @@ export function BulkLocationGenerator({
     () => departments.find((d) => d.id === departmentId) ?? null,
     [departments, departmentId]
   );
+
+  const bayPreview = useMemo(() => {
+    try {
+      return expandBayNumbers(
+        Number(startBay),
+        Number(endBay),
+        bayPattern
+      );
+    } catch {
+      return [];
+    }
+  }, [startBay, endBay, bayPattern]);
 
   const codeToId = useMemo(
     () =>
@@ -88,10 +109,10 @@ export function BulkLocationGenerator({
         start_bay: Number(startBay),
         end_bay: Number(endBay),
         types,
+        bay_pattern: bayPattern,
       });
 
-      const bayCount = Number(endBay) - Number(startBay) + 1;
-      const expected = bayCount * types.length;
+      const expected = bayPreview.length * types.length;
       setMessage(
         result.created > 0
           ? `Upserted ${result.created} location${
@@ -145,6 +166,7 @@ export function BulkLocationGenerator({
             start_bay: row.start_bay,
             end_bay: row.end_bay,
             types: row.types,
+            bay_pattern: row.bay_pattern ?? "sequential",
           });
           created += result.created;
         } catch (err) {
@@ -381,6 +403,55 @@ export function BulkLocationGenerator({
           </div>
 
           <fieldset className="mt-4">
+            <legend className="mb-2 text-sm text-zinc-300">Bay pattern</legend>
+            <p className="mb-2 text-xs text-zinc-500">
+              Retail aisles: odds on one face, evens on the facing side. Step is
+              2 so opposite faces are not duplicated.
+            </p>
+            <div className="flex flex-wrap gap-3">
+              {(
+                [
+                  {
+                    value: "sequential" as const,
+                    label: "Sequential (1, 2, 3, 4…)",
+                  },
+                  { value: "odd" as const, label: "Odd Only (1, 3, 5, 7…)" },
+                  { value: "even" as const, label: "Even Only (2, 4, 6, 8…)" },
+                ]
+              ).map((option) => {
+                const selected = bayPattern === option.value;
+                return (
+                  <label
+                    key={option.value}
+                    className={`flex min-h-12 cursor-pointer items-center gap-2 rounded-xl border px-3 text-sm transition ${
+                      selected
+                        ? "border-emerald-500/50 bg-emerald-950/40 text-emerald-100 ring-1 ring-emerald-500/30"
+                        : "border-zinc-800/80 bg-zinc-950/50 text-zinc-100"
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="bulk-bay-pattern"
+                      checked={selected}
+                      onChange={() => setBayPattern(option.value)}
+                      className="h-5 w-5 accent-emerald-500"
+                    />
+                    {option.label}
+                  </label>
+                );
+              })}
+            </div>
+            {bayPreview.length > 0 ? (
+              <p className="mt-2 font-mono text-xs text-zinc-400">
+                {bayPreview.length} bay{bayPreview.length === 1 ? "" : "s"}:{" "}
+                {bayPreview.length <= 12
+                  ? bayPreview.join(", ")
+                  : `${bayPreview.slice(0, 8).join(", ")}… ${bayPreview[bayPreview.length - 1]}`}
+              </p>
+            ) : null}
+          </fieldset>
+
+          <fieldset className="mt-4">
             <legend className="mb-2 text-sm text-zinc-300">Location type</legend>
             <div className="flex flex-wrap gap-3">
               {(
@@ -428,10 +499,10 @@ export function BulkLocationGenerator({
             <p className="text-xs text-zinc-500">
               Columns:{" "}
               <span className="font-mono text-zinc-400">
-                aisle, start_bay, end_bay[, types][, department_code]
+                aisle, start_bay, end_bay[, types][, department_code][, bay_pattern]
               </span>
               . Aisle values are text (never numeric-only). Example:{" "}
-              <span className="font-mono text-zinc-400">BW,1,15,BOTH</span>
+              <span className="font-mono text-zinc-400">BW,1,15,BOTH,flooring,odd</span>
             </p>
             <div className="rounded-2xl border border-dashed border-cyan-500/30 bg-zinc-950/60 p-3 ring-0 transition focus-within:border-cyan-500/50 focus-within:ring-1 focus-within:ring-cyan-500/30">
               <textarea

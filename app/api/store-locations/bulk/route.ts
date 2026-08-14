@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { normalizeAisle } from "@/lib/store-ops/aisle";
+import { parseBayNumberingPattern } from "@/lib/store-ops/bay-pattern";
 import {
   resolveStoreOpsActor,
   requireSuperAdmin,
@@ -49,6 +50,7 @@ export async function POST(request: Request) {
       end_bay?: number;
       types?: StoreLocationType[];
       store_id?: string;
+      bay_pattern?: string;
     };
 
     const departmentId = String(body.department_id ?? "");
@@ -86,6 +88,7 @@ export async function POST(request: Request) {
       start_bay: Number(body.start_bay),
       end_bay: Number(body.end_bay),
       types: Array.isArray(body.types) ? body.types : [],
+      bay_pattern: parseBayNumberingPattern(body.bay_pattern),
     });
 
     return NextResponse.json({

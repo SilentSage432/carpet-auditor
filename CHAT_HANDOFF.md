@@ -80,6 +80,8 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 - **P0 indexes:** re-run `supabase/migrations/20260813_p0_query_indexes.sql` — hub tables use `store_number`; Store Ops locations/rotations use `store_id`; manager_notes Phase 2 uses `store_number`+`department` (legacy `store_id`+`department_code`). Script skips absent columns.
 - **P1 Gemini/map:** Snap Bay 720p + compressed JPEG; Floor Pad Copilot strips HTML / 8k cap; `GET /api/store-locations` explicit Store Map columns (no `SELECT *`)
 - **P2 hub UI:** `startTransition` + keep-alive hub panes (`hidden`); Cycle/Appliance scan forms isolated from logs; 300ms debounced draft saves with flush on submit/leave; weekly rotations + Sunday assignments TTL-cached 45s
+- **Admin Tools:** chrome `requestAdminTools` sets `adminOpen` immediately; `subscribeAdminTools` pending replay; `next/dynamic` default export + `{ ssr: false }` loading shell
+- **Bulk bays:** Sequential / Odd Only / Even Only (`lib/store-ops/bay-pattern.ts`); Store Map GET falls back if `last_completed_at` is missing/null
 - Seeds: no hardcoded roster injection — use Invite / Add Supervisor; temp PIN sets `must_change_credentials`
 - Primary: fixed bottom tabs — **filtered by role/department**
 - Header: DeptSync Hub brand + `DeptSync · Lowe's #…` subtitle · section title · network; specialist chip + PIN gear
@@ -183,7 +185,7 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 
 ## Mobile floor UX (Waves A–C)
 - Floor job first: Dashboard = pace + checklist; no permanent Super Admin quick-action strip
-- Admin Tools drawer (Master only, defaults closed)
+- Admin Tools drawer (Master only, defaults closed; `openAdminTools` event + hosted dynamic chunk after first open)
 - Dense bay/rotation rows; completed lists collapsed by default
 - Catalog/Remnant forms = bottom sheets; `/department` does not embed auditors
 

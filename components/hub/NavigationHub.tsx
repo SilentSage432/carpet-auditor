@@ -8,18 +8,13 @@
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { startTransition, useEffect, useId, useRef, useState } from "react";
+import { startTransition, useCallback, useEffect, useId, useRef, useState } from "react";
 import {
-  ADMIN_TOOLS_EVENT,
+  openAdminTools,
+  subscribeAdminTools,
   type AdminToolsEventDetail,
   type AdminToolsSection,
 } from "@/components/hub/admin-tools-events";
-
-const AdminToolsDrawer = dynamic(
-  () =>
-    import("@/components/hub/AdminToolsDrawer").then((m) => m.AdminToolsDrawer),
-  { ssr: false }
-);
 import { AdminDepartmentSwitcher } from "@/components/hub/AdminDepartmentSwitcher";
 import { DeptSyncBadge } from "@/components/hub/DeptSyncBadge";
 import { NavIcon } from "@/components/hub/NavIcons";
@@ -42,6 +37,28 @@ import {
 import { isAssociate, isMasterAdmin } from "@/lib/rbac";
 import { formatStoreLabel } from "@/lib/store";
 import type { StoreSpecialist } from "@/lib/types";
+
+function AdminToolsLoadingShell() {
+  return (
+    <div className="fixed inset-0 z-[70]" role="status" aria-live="polite">
+      <div className="absolute inset-0 bg-slate-950/70" />
+      <aside className="absolute inset-y-0 right-0 flex w-full max-w-md flex-col border-l-2 border-amber-400/50 bg-slate-950">
+        <div className="border-b border-amber-500/30 bg-amber-950/40 px-4 py-3">
+          <p className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-amber-300">
+            Super Admin
+          </p>
+          <p className="mt-1 text-sm font-bold text-amber-100">Admin Tools</p>
+        </div>
+        <p className="px-4 py-6 text-sm text-zinc-400">Opening tools…</p>
+      </aside>
+    </div>
+  );
+}
+
+const AdminToolsDrawer = dynamic(
+  () => import("@/components/hub/AdminToolsDrawer"),
+  { ssr: false, loading: AdminToolsLoadingShell }
+);
 
 type NavigationHubProps = {
   title: string;
@@ -91,6 +108,22 @@ export function NavigationHub({
   const associate = isAssociate(specialist);
   const linksIncludeHub = links.some((link) => link.href === "/");
 
+  const applyAdminOpen = useCallback((detail: AdminToolsEventDetail = {}) => {
+    setAdminSection(detail.section ?? "menu");
+    setAdminForce(Boolean(detail.openForceRotation));
+    setAdminSunday(Boolean(detail.openSundayAudit));
+    setAdminNotes(Boolean(detail.openManagerNotes));
+    setAdminOpen(true);
+  }, []);
+
+  const requestAdminTools = useCallback(
+    (detail: AdminToolsEventDetail = {}) => {
+      applyAdminOpen(detail);
+      openAdminTools(detail);
+    },
+    [applyAdminOpen]
+  );
+
   useEffect(() => {
     setMenuOpen(false);
     setUserOpen(false);
@@ -111,53 +144,24 @@ export function NavigationHub({
   }, []);
 
   useEffect(() => {
-    function onAdminEvent(e: Event) {
-      const detail = (e as CustomEvent<AdminToolsEventDetail>).detail ?? {};
-      setAdminSection(detail.section ?? "menu");
-      setAdminForce(Boolean(detail.openForceRotation));
-      setAdminSunday(Boolean(detail.openSundayAudit));
-      setAdminNotes(Boolean(detail.openManagerNotes));
-      setAdminOpen(true);
-    }
-    window.addEventListener(ADMIN_TOOLS_EVENT, onAdminEvent);
-    return () => window.removeEventListener(ADMIN_TOOLS_EVENT, onAdminEvent);
-  }, []);
+    return subscribeAdminTools(applyAdminOpen);
+  }, [applyAdminOpen]);
 
   useEffect(() => {
     if (!master || typeof window === "undefined") return;
     const hash = window.location.hash.replace(/^#/, "");
     if (hash === "bulk-generate" || hash === "map-management") {
-      setAdminSection("bulk");
-      setAdminForce(false);
-      setAdminSunday(false);
-      setAdminNotes(false);
-      setAdminOpen(true);
+      requestAdminTools({ section: "bulk" });
     } else if (hash === "weekly-rotation") {
-      setAdminSection("menu");
-      setAdminForce(true);
-      setAdminSunday(false);
-      setAdminNotes(false);
-      setAdminOpen(true);
+      requestAdminTools({ section: "menu", openForceRotation: true });
     } else if (hash === "sunday-audit" || hash === "sunday-rotation") {
-      setAdminSection("menu");
-      setAdminForce(false);
-      setAdminSunday(true);
-      setAdminNotes(false);
-      setAdminOpen(true);
+      requestAdminTools({ section: "menu", openSundayAudit: true });
     } else if (hash === "manager-notes" || hash === "s-pen-notes") {
-      setAdminSection("menu");
-      setAdminForce(false);
-      setAdminSunday(false);
-      setAdminNotes(true);
-      setAdminOpen(true);
+      requestAdminTools({ section: "menu", openManagerNotes: true });
     } else if (hash === "admin-tools") {
-      setAdminSection("menu");
-      setAdminForce(false);
-      setAdminSunday(false);
-      setAdminNotes(false);
-      setAdminOpen(true);
+      requestAdminTools({ section: "menu" });
     }
-  }, [master, pathname]);
+  }, [master, pathname, requestAdminTools]);
 
   useEffect(() => {
     if (!userOpen) return;
@@ -285,9 +289,7 @@ export function NavigationHub({
                       label="Admin Tools"
                       onClick={() => {
                         setUserOpen(false);
-                        setAdminSection("menu");
-                        setAdminForce(false);
-                        setAdminOpen(true);
+                        requestAdminTools({ section: "menu" });
                       }}
                     />
                   ) : null}
@@ -399,10 +401,8 @@ export function NavigationHub({
                   <button
                     type="button"
                     onClick={() => {
+                      requestAdminTools({ section: "menu" });
                       setMenuOpen(false);
-                      setAdminSection("menu");
-                      setAdminForce(false);
-                      setAdminOpen(true);
                     }}
                     className="flex h-14 w-full items-center gap-3 rounded-2xl border border-amber-400/40 bg-amber-950/30 px-4 text-left backdrop-blur-sm"
                   >
@@ -504,10 +504,8 @@ export function NavigationHub({
                   <button
                     type="button"
                     onClick={() => {
+                      requestAdminTools({ section: "menu" });
                       setMoreOpen(false);
-                      setAdminSection("menu");
-                      setAdminForce(false);
-                      setAdminOpen(true);
                     }}
                     className="flex h-14 w-full items-center gap-3 rounded-xl border border-amber-400/40 bg-amber-950/30 px-3 text-left text-amber-100"
                   >

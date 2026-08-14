@@ -1,5 +1,19 @@
 # DeptSync Hub — Development Journal
 
+## 2026-08-14 — Admin Tools open + odd/even bulk bays
+
+### Shipped
+- Admin Tools chrome clicks set `adminOpen` immediately (`requestAdminTools`), then dispatch the event. Drawer uses `next/dynamic` default export + `{ ssr: false }` and a loading shell so the first open actually renders.
+- Bulk Generator **Bay pattern**: Sequential / Odd Only / Even Only. `expandBayNumbers` steps by 2 for odd/even faces (`lib/store-ops/bay-pattern.ts`). CSV optional `bay_pattern` column.
+- Store Map GET retries without `last_completed_at` on 42703/PGRST204 and always returns `last_completed_at: null` when the value or column is absent.
+
+## 2026-08-14 — Admin Tools drawer open path
+
+### Shipped
+- `openAdminTools()` keeps a pending payload and `subscribeAdminTools()` replays it so a click before NavigationHub's listener attaches still opens the drawer.
+- Hamburger / More / account / Settings / hash deep-links all dispatch `openAdminTools`.
+- `AdminToolsDrawer` stays dynamically imported (`ssr: false`, named export as `{ default }`) with an immediate loading shell. After the first open it stays hosted (`adminHosted`) so later opens do not remount the lazy chunk.
+
 ## 2026-08-14 — Phase 2 UI streamlining (tab latency, draft debounce, form isolation)
 
 ### Shipped

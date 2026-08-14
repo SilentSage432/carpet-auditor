@@ -7,11 +7,40 @@ import {
   StoreOpsAuthError,
 } from "@/lib/store-ops/auth-server";
 import { storeOpsAuthRequiredBody } from "@/lib/store-ops/auth-soft";
+import { isMissingColumnError } from "@/lib/store-ops/errors";
 import { getSupabaseAdmin } from "@/lib/store-ops/supabase-admin";
 import { resolveDepartmentIdByCode } from "@/lib/store-ops/rotations";
 import { resolveStoreByNumber } from "@/lib/store-ops/stores";
 import { supabaseAdminMissingMessage } from "@/lib/supabase/env";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+
+const STORE_LOCATION_LIST_COLUMNS = [
+  "id",
+  "store_id",
+  "department_id",
+  "aisle",
+  "bay",
+  "type",
+  "location_type",
+  "status",
+  "manual_priority_count",
+  "last_completed_at",
+  "updated_at",
+  "is_active",
+  "cycle_number",
+  "audit_frequency_days",
+] as const;
+
+const STORE_LOCATION_LIST_COLUMNS_WITHOUT_LAST_COMPLETED =
+  STORE_LOCATION_LIST_COLUMNS.filter((column) => column !== "last_completed_at");
+
+function normalizeStoreLocationRow(row: Record<string, unknown>) {
+  return {
+    ...row,
+    last_completed_at:
+      row.last_completed_at == null ? null : String(row.last_completed_at),
+  };
+}
 
 export async function GET(request: Request) {
   try {
@@ -45,30 +74,11 @@ export async function GET(request: Request) {
         ? storeIdParam
         : store.id;
 
-    let query = supabase
-      .from("store_locations")
-      .select(
-        [
-          "id",
-          "store_id",
-          "department_id",
-          "aisle",
-          "bay",
-          "type",
-          "location_type",
-          "status",
-          "manual_priority_count",
-          "last_completed_at",
-          "updated_at",
-          "is_active",
-          "cycle_number",
-          "audit_frequency_days",
-        ].join(", ")
-      )
-      .eq("store_id", storeId)
-      .order("aisle")
-      .order("bay");
+    const storeLocationSelect = STORE_LOCATION_LIST_COLUMNS.join(", ");
+    const storeLocationSelectFallback =
+      STORE_LOCATION_LIST_COLUMNS_WITHOUT_LAST_COMPLETED.join(", ");
 
+    let departmentFilter: string | null = null;
     if (isDeptFloorActor(actor)) {
       if (!actor.departmentCode) {
         return NextResponse.json({ error: "No department assigned" }, { status: 403 });
@@ -84,19 +94,46 @@ export async function GET(request: Request) {
           { status: 404 }
         );
       }
-      query = query.eq("department_id", deptId);
+      departmentFilter = deptId;
     } else if (departmentIdParam) {
-      query = query.eq("department_id", departmentIdParam);
+      departmentFilter = departmentIdParam;
     }
 
-    const { data, error } = await query;
+    let query = supabase
+      .from("store_locations")
+      .select(storeLocationSelect)
+      .eq("store_id", storeId)
+      .order("aisle")
+      .order("bay");
+    if (departmentFilter) {
+      query = query.eq("department_id", departmentFilter);
+    }
+
+    let { data, error } = await query;
+    if (error && isMissingColumnError(error, "last_completed_at")) {
+      let fallback = supabase
+        .from("store_locations")
+        .select(storeLocationSelectFallback)
+        .eq("store_id", storeId)
+        .order("aisle")
+        .order("bay");
+      if (departmentFilter) {
+        fallback = fallback.eq("department_id", departmentFilter);
+      }
+      const retry = await fallback;
+      data = retry.data;
+      error = retry.error;
+    }
+
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
     return NextResponse.json({
       store_id: storeId,
-      locations: data ?? [],
+      locations: (Array.isArray(data) ? data : []).map((row) =>
+        normalizeStoreLocationRow(row as unknown as Record<string, unknown>)
+      ),
     });
   } catch (err) {
     if (err instanceof StoreOpsAuthError) {

@@ -3,7 +3,8 @@
  * Owns normalize / compare / batch CSV parse — presentation only renders.
  */
 
-import type { StoreLocationType } from "./types";
+import type { BayNumberingPattern, StoreLocationType } from "./types";
+import { parseBayNumberingPattern } from "./bay-pattern";
 
 /** Persist / compare form: trim + uppercase (BW, RW, A1, 12). */
 export function normalizeAisle(raw: unknown): string {
@@ -40,6 +41,7 @@ export type LocationBatchCsvRow = {
   types: StoreLocationType[];
   /** Optional department.code when CSV spans multiple depts. */
   department_code?: string;
+  bay_pattern?: BayNumberingPattern;
 };
 
 function splitCsvLine(line: string): string[] {
@@ -150,6 +152,11 @@ export function parseLocationBatchCsv(text: string): {
     index.get("department") ??
     index.get("dept") ??
     index.get("code");
+  const patternIdx =
+    index.get("baypattern") ??
+    index.get("pattern") ??
+    index.get("facing") ??
+    index.get("oddeneven");
 
   const rows: LocationBatchCsvRow[] = [];
   const errors: string[] = [];
@@ -194,6 +201,10 @@ export function parseLocationBatchCsv(text: string): {
         deptIdx != null
           ? String(cells[deptIdx] ?? "").trim() || undefined
           : undefined;
+      const bay_pattern =
+        patternIdx != null
+          ? parseBayNumberingPattern(cells[patternIdx] ?? "")
+          : undefined;
 
       rows.push({
         aisle,
@@ -201,6 +212,7 @@ export function parseLocationBatchCsv(text: string): {
         end_bay,
         types,
         department_code,
+        bay_pattern,
       });
     } catch (err) {
       errors.push(err instanceof Error ? err.message : String(err));
