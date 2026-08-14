@@ -54,10 +54,11 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 - Master Admin header: **My Department Context** pin (Full Store / D23 Flooring / D35 Appliances / …) — filters dashboard Flooring focus without dropping Master privileges
 
 ### Sunday Flooring Cycle Audit
-- Staging card + assignment modal: open weekly Flooring bays → assign from Flooring roster; Auto-Assign All to Me; Stage/Draw 12
+- Staging card + assignment modal: open weekly Flooring bays → assign from Flooring roster; Auto-Assign All to Me; Stage/Draw 12; **Shift balancer** (hours / start–end → proportional clustered zones)
 - Assignments persist in `sunday_bay_assignments` (JWT store/dept RLS); `bay_id` = `weekly_rotations.id`; ISO week → `week_starting` Monday
+- Plan math: `lib/store-ops/weekly-rotations.ts` (does not generate rotations or persist)
 - Entry points: `/dashboard`, Cycle Audit tab, Admin Tools, `/flooring` deep link
-- ZebraChecklist live-handoff: `SUNDAY_AUDIT_EVENT` + Realtime; assigned specialist sees **Your Sunday bays first** without refresh
+- ZebraChecklist live-handoff: `SUNDAY_AUDIT_EVENT` + Realtime; assigned specialist sees **Your Sunday bays first** without refresh; badges show name + shift hours; filter All / Mine / associate
 
 ### Departments
 `flooring` · `appliances` · `plumbing` · `electrical` · `lawn_garden` · `paint` · `millwork` · `building_materials` · `hardware` · `all`
@@ -84,7 +85,7 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 - **P1 Gemini/map:** Snap Bay 720p + compressed JPEG; Floor Pad Copilot strips HTML / 8k cap; `GET /api/store-locations` explicit Store Map columns (no `SELECT *`)
 - **P2 hub UI:** `startTransition` + keep-alive hub panes (`hidden`); Cycle/Appliance scan forms isolated from logs; 300ms debounced draft saves with flush on submit/leave; weekly rotations + Sunday assignments TTL-cached 45s
 - **Admin Tools:** chrome `requestAdminTools` sets `adminOpen` + `adminHosted`; `dynamic(() => import(AdminToolsDrawer))` uses the **default** export (avoid `{ default: mod.Named }` — React #306); loading shell handles chunk errors; `ChunkErrorBoundary`; Floor Pad/TipTap nested `dynamic` via named `mod.ManagerNotesWorkspace`; SW cache `deptsync-shell-v4-admin-tools`
-- **Bulk bays:** Sequential / Odd Only / Even Only (`lib/store-ops/bay-pattern.ts`); Store Map GET falls back if `last_completed_at` is missing/null
+- **Bulk bays:** Odd Only / Even Only (`lib/store-ops/bay-pattern.ts`, default odd); Store Map GET falls back if `last_completed_at` is missing/null
 - Seeds: no hardcoded roster injection — use Invite / Add Supervisor; temp PIN sets `must_change_credentials`
 - Primary: fixed bottom tabs — **filtered by role/department**
 - Header: DeptSync Hub brand + `DeptSync · Lowe's #…` subtitle · section title · network; specialist chip + PIN gear
@@ -147,9 +148,10 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
   - Supervisor primary: Zebra · Verify · Dept · More
   - Associate primary: Zebra · Barriers · Tools · Profile
 - Quick Actions banner (Super Admin): Bulk Generate · Trigger Weekly Rotation · Manage Supervisors
-- `/admin/store-map` — department overview + location grid; Bulk Add accordion; Trigger Weekly Rotation modal (**Force Draw New Rotation**); **📷 Snap Bay AI Audit** (Gemini visual scan) on page + bay actions sheet
 - `/manager-notes` — Executive Floor Pad (TipTap rich notes + Gemini Copilot Extract Tasks & Tag + archive); also Admin Tools entry + `#manager-notes`
-- `/dashboard` — Store Health Scorecard (top) + **ZebraChecklist** (optimistic complete, **Quick Touch** facing check, next-bay pulse, SELLING/TOPSTOCK filter, Sunday assignment queue, one-tap barriers). Completions refresh silently (no loading flash).
+- `/dashboard` — Store Health Scorecard (top) + **ZebraChecklist** (optimistic complete, **Quick Touch**, assignment badges + associate filter, weekly Ahead/On Track/Behind pace, next-bay pulse, SELLING/TOPSTOCK filter, Sunday assignment queue, one-tap barriers). Completions refresh silently (no loading flash).
+- Sunday staging card opens the assignment modal with **Shift balancer** (hours → proportional clustered zones). Plan owner: `lib/store-ops/weekly-rotations.ts`; persist: `sunday-audit.ts`.
+- `/admin/store-map` — department overview + location grid; **duplicate bay prune** (deactivate extras); Bulk Add accordion; Trigger Weekly Rotation modal (**Force Draw New Rotation**); **📷 Snap Bay AI Audit** (Gemini visual scan) on page + bay actions sheet
 - `GET /api/store-health` — weekly pace + bottleneck aggregation + compact `bay_health` for DS / Super Admin
 - `POST /api/store-ops/ai-bay-scan` — multimodal bay photo → carton/pallet estimates, cleanliness score, detected issues (Store Ops actor)
 - `POST /api/store-ops/ai-note-summary` — manager note + optional S Pen PNG → executive summary + action items (Store Ops actor)
@@ -216,7 +218,7 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 - Master toggles: Store Map Overview + Settings Department Overview (`departments.is_active`; Flooring default on)
 - Adaptive draw: `manual_priority_count` + `last_completed_at` age; Store Map ★ Week assigns + bumps priority
 - Showroom: `location_type=SHOWROOM_STACKOUT` + `audit_frequency_days`; dashboard Quick Touch card (not in weekly aisle draw)
-- Store Map bay rows: large S/T toggles; tap Bay label → bottom sheet (pin / history / edit zone)
+- Store Map bay rows: large S/T toggles; tap Bay label → bottom sheet (pin / history / edit aisle·bay·type·status). Row Edit / Delete; multi-select batch delete. Duplicate prune hard-deletes. Bulk Generator Clean-Up tab prunes aisle or odd/even range.
 
 ## Appliance categories (suite + sub)
 - **Tables:** `appliance_catalog` + `appliance_scans` (not carpet_*). Apply `supabase/migrations/20260810_appliance_catalog_scans.sql` then `enable_rls_flagged_tables.sql` (RLS on appliances + `store_specialists` + verify all public tables)

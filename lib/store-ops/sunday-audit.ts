@@ -252,6 +252,46 @@ export async function autoAssignSundayBaysToSpecialist(
   return bayIds.length;
 }
 
+/** Persist a balancer plan — assignment owner stays this module. */
+export async function applySundayAssignmentPlan(
+  week: string,
+  items: Array<{
+    rotationId: string;
+    specialist_id: string;
+    specialist_name: string;
+    hours?: number;
+  }>,
+  storeNumber = getStoreNumber(),
+  department = SUNDAY_DEPARTMENT
+): Promise<number> {
+  const stamp = new Date().toISOString();
+  const uniqueIds = [...new Set(items.map((row) => row.specialist_id))];
+  const profileByRoster = new Map<string, string | null>();
+  await Promise.all(
+    uniqueIds.map(async (id) => {
+      profileByRoster.set(id, await resolveProfileIdForRoster(id));
+    })
+  );
+  await Promise.all(
+    items.map((row) =>
+      setSundayBayAssignment(
+        week,
+        row.rotationId,
+        {
+          specialist_id: row.specialist_id,
+          specialist_name: row.specialist_name,
+          assigned_at: stamp,
+          assigned_specialist_id: profileByRoster.get(row.specialist_id) ?? null,
+          status: "assigned",
+        },
+        storeNumber,
+        department
+      )
+    )
+  );
+  return items.length;
+}
+
 export function subscribeSundayBayAssignments(
   storeNumber: string,
   week: string,

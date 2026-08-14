@@ -6,6 +6,7 @@ import {
   requireSupervisorOrAdmin,
   StoreOpsAuthError,
 } from "@/lib/store-ops/auth-server";
+import { isValidAisle, normalizeAisle } from "@/lib/store-ops/aisle";
 import { storeOpsAuthRequiredBody } from "@/lib/store-ops/auth-soft";
 import { isMissingColumnError } from "@/lib/store-ops/errors";
 import { getSupabaseAdmin } from "@/lib/store-ops/supabase-admin";
@@ -170,6 +171,9 @@ export async function PATCH(request: Request) {
       id?: string;
       is_active?: boolean;
       status?: string;
+      aisle?: string;
+      bay?: number | string;
+      type?: "SELLING" | "TOPSTOCK";
       location_type?: "STANDARD" | "SHOWROOM_STACKOUT";
       audit_frequency_days?: number;
     };
@@ -207,10 +211,13 @@ export async function PATCH(request: Request) {
       if (
         body.location_type !== undefined ||
         body.audit_frequency_days !== undefined ||
-        body.status !== undefined
+        body.status !== undefined ||
+        body.aisle !== undefined ||
+        body.bay !== undefined ||
+        body.type !== undefined
       ) {
         return NextResponse.json(
-          { error: "Only Super Admin can edit zone / status fields" },
+          { error: "Only Super Admin can edit zone / map fields" },
           { status: 403 }
         );
       }
@@ -242,6 +249,63 @@ export async function PATCH(request: Request) {
         }
         patch.audit_frequency_days = days;
       }
+      if (body.aisle !== undefined) {
+        const aisle = normalizeAisle(body.aisle);
+        if (!isValidAisle(aisle)) {
+          return NextResponse.json(
+            { error: "aisle is required (alphanumeric code, e.g. BW, 12, A1)" },
+            { status: 400 }
+          );
+        }
+        patch.aisle = aisle;
+      }
+      if (body.bay !== undefined) {
+        const bay = Math.floor(Number(body.bay));
+        if (!Number.isFinite(bay) || bay < 0) {
+          return NextResponse.json(
+            { error: "bay must be an integer ≥ 0" },
+            { status: 400 }
+          );
+        }
+        patch.bay = bay;
+      }
+      if (body.type === "SELLING" || body.type === "TOPSTOCK") {
+        patch.type = body.type;
+      }
+      if (body.status === "CARRIED_OVER") {
+        patch.status = body.status;
+      }
+    }
+
+    const nextAisle = String(patch.aisle ?? existing.aisle);
+    const nextBay = Number(patch.bay ?? existing.bay);
+    const nextType = String(patch.type ?? existing.type);
+    if (
+      nextAisle !== String(existing.aisle) ||
+      nextBay !== Number(existing.bay) ||
+      nextType !== String(existing.type)
+    ) {
+      const { data: clash, error: clashError } = await supabase
+        .from("store_locations")
+        .select("id")
+        .eq("store_id", store.id)
+        .eq("department_id", existing.department_id)
+        .eq("aisle", nextAisle)
+        .eq("bay", nextBay)
+        .eq("type", nextType)
+        .neq("id", body.id)
+        .maybeSingle();
+      if (clashError) {
+        return NextResponse.json({ error: clashError.message }, { status: 500 });
+      }
+      if (clash) {
+        return NextResponse.json(
+          {
+            error: `A ${nextType} tag already exists for aisle ${nextAisle} bay ${nextBay}`,
+          },
+          { status: 409 }
+        );
+      }
     }
 
     const { data, error } = await supabase
@@ -257,6 +321,74 @@ export async function PATCH(request: Request) {
     }
 
     return NextResponse.json({ location: data });
+  } catch (err) {
+    if (err instanceof StoreOpsAuthError) {
+      return NextResponse.json({ error: err.message }, { status: err.status });
+    }
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : "Unknown error" },
+      { status: 500 }
+    );
+  }
+}
+
+/**
+ * DELETE /api/store-locations
+ * Super Admin — hard-delete one or more tags (cascades weekly_rotations).
+ * Query: ?id=uuid  Body: { id } or { ids: string[] }
+ */
+export async function DELETE(request: Request) {
+  try {
+    const actor = requireSuperAdmin(await resolveStoreOpsActor(request));
+    const supabase = getSupabaseAdmin();
+    if (!supabase) {
+      return NextResponse.json(
+        { error: supabaseAdminMissingMessage() },
+        { status: 503 }
+      );
+    }
+
+    const store = await resolveStoreByNumber(supabase, actor.storeNumber);
+    const url = new URL(request.url);
+    const queryId = url.searchParams.get("id")?.trim() || "";
+    const body = (await request.json().catch(() => ({}))) as {
+      id?: string;
+      ids?: string[];
+    };
+    const ids = [
+      ...new Set(
+        [
+          queryId,
+          String(body.id ?? "").trim(),
+          ...(Array.isArray(body.ids) ? body.ids.map(String) : []),
+        ].filter(Boolean)
+      ),
+    ];
+    if (ids.length === 0) {
+      return NextResponse.json(
+        { error: "id or ids are required" },
+        { status: 400 }
+      );
+    }
+
+    const { data, error } = await supabase
+      .from("store_locations")
+      .delete()
+      .eq("store_id", store.id)
+      .in("id", ids)
+      .select("id");
+
+    if (error) {
+      return NextResponse.json({ error: error.message }, { status: 500 });
+    }
+
+    const deletedIds = (data ?? []).map((row) => String(row.id));
+    return NextResponse.json({
+      ok: true,
+      deleted: deletedIds.length,
+      pruned: deletedIds.length,
+      ids: deletedIds,
+    });
   } catch (err) {
     if (err instanceof StoreOpsAuthError) {
       return NextResponse.json({ error: err.message }, { status: err.status });

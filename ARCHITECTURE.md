@@ -22,7 +22,7 @@ lib/push/*                        → Web Push subscribe + VAPID dispatch for ro
 app/admin/store-map/page.tsx      → Super Admin aisle/bay bulk mapper + weekly generate
 app/admin/supervisors/page.tsx    → Supervisor & role management console
 app/dashboard/page.tsx            → Zebra weekly rotation checklist (silent refresh + Sunday handoff)
-components/store-ops/ZebraChecklist.tsx → Optimistic complete, Quick Touch, next-bay pulse, S/T filter, Sunday queue, bay-health badge
+components/store-ops/ZebraChecklist.tsx → Optimistic complete, Quick Touch, assignment badges + associate filter, weekly pace, next-bay pulse, S/T filter, Sunday queue, bay-health badge
 components/store-ops/BayHealthScorecard.tsx → Compact Zebra health badge (presentation)
 lib/store-ops/bay-health.ts       → Aging / SIMS / topstock discrepancy diagnostics (compose only)
 components/store-ops/AuditLocationModeToggle.tsx → SELLING vs TOPSTOCK audit-mode control
@@ -46,9 +46,11 @@ components/hub/AdminDepartmentSwitcher.tsx → Master Admin working-dept pin
 components/sections/CycleAuditScanForm.tsx → Flooring scan/input island (drafts + scanner; log stays in parent)
 components/sections/ApplianceScanForm.tsx → Appliance scan/input island (drafts + scanner; log stays in parent)
 components/admin/SundayAuditStagingCard.tsx → Glowing pending Sunday Flooring audit CTA
-components/admin/SundayAuditAssignmentModal.tsx → Assign Flooring specialists to staged bays
+components/admin/SundayAuditAssignmentModal.tsx → Assign specialists + shift-hour balancer
+lib/store-ops/weekly-rotations.ts → Proportional clustered bay assignment plan (hours / aisle-face / health risk)
+lib/store-ops/sunday-audit.ts → Persist specialist↔bay; apply balancer plan
 lib/admin-department-context.ts       → Master Admin working department pin (local)
-lib/store-ops/bay-pattern.ts          → Sequential / odd / even bay range expansion (Bulk Generator)
+lib/store-ops/bay-pattern.ts          → Odd / even bay range expansion (Bulk Generator; default odd)
 lib/store-ops/manager-notes.ts        → Manager notes Supabase CRUD + realtime + archive (JWT-scoped)
 lib/store-ops/ai-bay-scan.ts          → Visual bay scan prompt / normalize / local fallback
 lib/store-ops/ai-note-summary.ts      → Legacy manager note synthesis prompt / normalize / fallback
@@ -97,7 +99,9 @@ supabase/migrations/20260812_sunday_bay_assignments.sql → sunday specialist↔
 | Navigation / section routing | `app/page.tsx` + `HubChrome` (roster-only boot; `next/dynamic` sections; keep-alive `HubPane` + `startTransition`) |
 | Department RBAC / tab visibility | `lib/rbac.ts` |
 | Cross-app Navigation Hub | `lib/nav-hub.ts` + `NavigationHub` + `admin-tools-events.ts` (`subscribeAdminTools` → host `AdminToolsDrawer`; Floor Pad/TipTap lazy inside drawer; `ChunkErrorBoundary`) |
-| Store Operations map + rotations | `lib/store-ops/*` + `/admin/store-map` + `/dashboard` (bulk bays: `bay-pattern.ts`; floor checklist: `ZebraChecklist`) |
+| Store Operations map + rotations | `lib/store-ops/*` + `/admin/store-map` + `/dashboard` (bulk bays: `bay-pattern.ts` odd/even; floor checklist: `ZebraChecklist`; bay edit/delete + duplicate prune: `StoreLocationGrid` + hard `DELETE /api/store-locations`) |
+| Sunday assignments | `lib/store-ops/sunday-audit.ts` (persist) + `SundayAuditAssignmentModal` |
+| Shift workload balancer | `lib/store-ops/weekly-rotations.ts` (pure plan: hours, clusters, health-risk priority) |
 | Bay health / floor discrepancies | `lib/store-ops/bay-health.ts` + `BayHealthScorecard` (composes location cycle age + hub audits / SIMS / variance) |
 | Selling vs Topstock audit mode | `lib/store-ops/audit-location-mode.ts` + `AuditLocationModeToggle` (Cycle/Department forms + Zebra filter) |
 | Rotation verification / barriers | `lib/store-ops/verification.ts` + `/verify-rotation` + `/admin/exceptions` + `POST /api/rotations/exceptions` |

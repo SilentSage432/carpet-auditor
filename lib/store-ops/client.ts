@@ -216,7 +216,13 @@ export async function patchStoreLocation(
   patch: Partial<
     Pick<
       StoreLocation,
-      "is_active" | "status" | "location_type" | "audit_frequency_days"
+      | "is_active"
+      | "status"
+      | "location_type"
+      | "audit_frequency_days"
+      | "aisle"
+      | "bay"
+      | "type"
     >
   >
 ): Promise<StoreLocation> {
@@ -225,10 +231,60 @@ export async function patchStoreLocation(
     specialist,
     {
       method: "PATCH",
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id, ...patch }),
     }
   );
+  invalidateStoreOpsListCaches();
   return data.location;
+}
+
+export async function deleteStoreLocations(
+  specialist: StoreSpecialist,
+  ids: string[]
+): Promise<{ deleted: number; pruned: number; ids: string[] }> {
+  const unique = [...new Set(ids.map(String).filter(Boolean))];
+  const data = await storeOpsFetch<{
+    deleted?: number;
+    pruned?: number;
+    ids?: string[];
+  }>("/api/store-locations", specialist, {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ ids: unique }),
+  });
+  const removed = data.ids ?? unique;
+  const count = data.deleted ?? data.pruned ?? removed.length;
+  invalidateStoreOpsListCaches();
+  return { deleted: count, pruned: count, ids: removed };
+}
+
+export async function deleteStoreLocation(
+  specialist: StoreSpecialist,
+  id: string
+): Promise<{ deleted: number; ids: string[] }> {
+  const data = await storeOpsFetch<{
+    deleted?: number;
+    ids?: string[];
+  }>(`/api/store-locations?id=${encodeURIComponent(id)}`, specialist, {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ id }),
+  });
+  invalidateStoreOpsListCaches();
+  return {
+    deleted: data.deleted ?? 1,
+    ids: data.ids ?? [id],
+  };
+}
+
+/** @deprecated Prefer deleteStoreLocations — DELETE now removes tags. */
+export async function pruneStoreLocations(
+  specialist: StoreSpecialist,
+  ids: string[]
+): Promise<{ pruned: number; ids: string[] }> {
+  const result = await deleteStoreLocations(specialist, ids);
+  return { pruned: result.deleted, ids: result.ids };
 }
 
 export type BayRotationHistoryRow = {

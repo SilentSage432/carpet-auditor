@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   formatAisleInput,
   isValidAisle,
@@ -9,22 +9,27 @@ import {
 } from "@/lib/store-ops/aisle";
 import { typesFromAiLocationMode } from "@/lib/store-ops/ai-parse";
 import {
+  DEFAULT_BAY_PATTERN,
   expandBayNumbers,
 } from "@/lib/store-ops/bay-pattern";
+import { locationIdsInBayRange } from "@/lib/store-ops/locations";
 import type {
   BayNumberingPattern,
   Department,
+  StoreLocation,
   StoreLocationType,
 } from "@/lib/store-ops/types";
 import type { StoreSpecialist } from "@/lib/types";
 import {
   aiParseLocations,
   bulkGenerateLocations,
+  deleteStoreLocations,
+  fetchStoreLocationsDetailed,
   type AiParsedLocationClient,
 } from "@/lib/store-ops/client";
 
 type LocationMode = "BOTH" | "SELLING" | "TOPSTOCK";
-type GeneratorTab = "manual" | "ai";
+type GeneratorTab = "manual" | "ai" | "cleanup";
 
 type Props = {
   specialist: StoreSpecialist;
@@ -59,7 +64,10 @@ export function BulkLocationGenerator({
   const [endBay, setEndBay] = useState("15");
   const [locationMode, setLocationMode] = useState<LocationMode>("BOTH");
   const [bayPattern, setBayPattern] =
-    useState<BayNumberingPattern>("sequential");
+    useState<BayNumberingPattern>(DEFAULT_BAY_PATTERN);
+  const [mapLocations, setMapLocations] = useState<StoreLocation[]>([]);
+  const [cleanupEntireAisle, setCleanupEntireAisle] = useState(false);
+  const [cleanupConfirm, setCleanupConfirm] = useState(false);
   const [csvText, setCsvText] = useState("");
   const [aiText, setAiText] = useState("");
   const [aiPreview, setAiPreview] = useState<AiParsedLocationClient[] | null>(
@@ -74,6 +82,60 @@ export function BulkLocationGenerator({
     () => departments.find((d) => d.id === departmentId) ?? null,
     [departments, departmentId]
   );
+
+  useEffect(() => {
+    if (tab !== "cleanup") return;
+    let cancelled = false;
+    void fetchStoreLocationsDetailed(specialist)
+      .then((result) => {
+        if (!cancelled) setMapLocations(result.items);
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setError(
+            bulkAuthFriendlyError(err, "Could not load mapped bays for clean-up")
+          );
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [tab, specialist]);
+
+  const cleanupIds = useMemo(() => {
+    if (!departmentId || !isValidAisle(aisle)) return [];
+    if (cleanupEntireAisle) {
+      const aisleCode = normalizeAisle(aisle);
+      const types = typesForMode(locationMode);
+      return mapLocations
+        .filter((loc) => {
+          if (loc.department_id !== departmentId) return false;
+          if (normalizeAisle(loc.aisle) !== aisleCode) return false;
+          if (!types.includes(loc.type === "TOPSTOCK" ? "TOPSTOCK" : "SELLING")) {
+            return false;
+          }
+          return true;
+        })
+        .map((loc) => loc.id);
+    }
+    return locationIdsInBayRange(mapLocations, {
+      departmentId,
+      aisle,
+      startBay: Number(startBay),
+      endBay: Number(endBay),
+      pattern: bayPattern,
+      types: typesForMode(locationMode),
+    });
+  }, [
+    mapLocations,
+    departmentId,
+    aisle,
+    startBay,
+    endBay,
+    bayPattern,
+    locationMode,
+    cleanupEntireAisle,
+  ]);
 
   const bayPreview = useMemo(() => {
     try {
@@ -166,7 +228,7 @@ export function BulkLocationGenerator({
             start_bay: row.start_bay,
             end_bay: row.end_bay,
             types: row.types,
-            bay_pattern: row.bay_pattern ?? "sequential",
+            bay_pattern: row.bay_pattern ?? DEFAULT_BAY_PATTERN,
           });
           created += result.created;
         } catch (err) {
@@ -301,6 +363,33 @@ export function BulkLocationGenerator({
     reader.readAsText(file);
   }
 
+  async function handleCleanup() {
+    if (cleanupIds.length === 0) return;
+    if (!cleanupConfirm) {
+      setCleanupConfirm(true);
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const result = await deleteStoreLocations(specialist, cleanupIds);
+      setMessage(
+        `Deleted ${result.deleted} bay tag${
+          result.deleted === 1 ? "" : "s"
+        }. Weekly rotations for those bays were also removed.`
+      );
+      setCleanupConfirm(false);
+      const refreshed = await fetchStoreLocationsDetailed(specialist);
+      setMapLocations(refreshed.items);
+      onGenerated();
+    } catch (err) {
+      setError(bulkAuthFriendlyError(err, "Could not delete bays"));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   return (
     <section className="glass-card space-y-1 p-4">
       <h2 className="glass-subtitle text-emerald-400">Bulk Generator</h2>
@@ -314,14 +403,17 @@ export function BulkLocationGenerator({
       <div
         role="tablist"
         aria-label="Bulk generator mode"
-        className="mt-4 grid grid-cols-2 gap-2"
+        className="mt-4 grid grid-cols-3 gap-2"
       >
         <button
           type="button"
           role="tab"
           aria-selected={tab === "manual"}
-          onClick={() => setTab("manual")}
-          className={`flex min-h-11 items-center justify-center rounded-xl border px-3 text-xs font-bold uppercase tracking-wider transition ${
+          onClick={() => {
+            setTab("manual");
+            setCleanupConfirm(false);
+          }}
+          className={`flex min-h-11 items-center justify-center rounded-xl border px-2 text-[10px] font-bold uppercase tracking-wider transition sm:text-xs ${
             tab === "manual"
               ? "border-emerald-500/50 bg-emerald-950/40 text-emerald-200 ring-1 ring-emerald-500/30"
               : "border-zinc-800/80 bg-zinc-950/50 text-zinc-400"
@@ -333,14 +425,30 @@ export function BulkLocationGenerator({
           type="button"
           role="tab"
           aria-selected={tab === "ai"}
-          onClick={() => setTab("ai")}
-          className={`flex min-h-11 items-center justify-center rounded-xl border px-3 text-xs font-bold uppercase tracking-wider transition ${
+          onClick={() => {
+            setTab("ai");
+            setCleanupConfirm(false);
+          }}
+          className={`flex min-h-11 items-center justify-center rounded-xl border px-2 text-[10px] font-bold uppercase tracking-wider transition sm:text-xs ${
             tab === "ai"
               ? "border-cyan-500/50 bg-cyan-950/40 text-cyan-200 ring-1 ring-cyan-500/30"
               : "border-zinc-800/80 bg-zinc-950/50 text-zinc-400"
           }`}
         >
           ✨ AI Pre-Flight
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={tab === "cleanup"}
+          onClick={() => setTab("cleanup")}
+          className={`flex min-h-11 items-center justify-center rounded-xl border px-2 text-[10px] font-bold uppercase tracking-wider transition sm:text-xs ${
+            tab === "cleanup"
+              ? "border-rose-500/50 bg-rose-950/40 text-rose-200 ring-1 ring-rose-500/30"
+              : "border-zinc-800/80 bg-zinc-950/50 text-zinc-400"
+          }`}
+        >
+          Clean-Up
         </button>
       </div>
 
@@ -406,17 +514,13 @@ export function BulkLocationGenerator({
             <legend className="mb-2 text-sm text-zinc-300">Bay pattern</legend>
             <p className="mb-2 text-xs text-zinc-500">
               Retail aisles: odds on one face, evens on the facing side. Step is
-              2 so opposite faces are not duplicated.
+              2 so opposite faces are not duplicated. Default is Odd Only.
             </p>
             <div className="flex flex-wrap gap-3">
               {(
                 [
-                  {
-                    value: "sequential" as const,
-                    label: "Sequential (1, 2, 3, 4…)",
-                  },
-                  { value: "odd" as const, label: "Odd Only (1, 3, 5, 7…)" },
-                  { value: "even" as const, label: "Even Only (2, 4, 6, 8…)" },
+                  { value: "odd" as const, label: "Odd Only (1, 3, 5…)" },
+                  { value: "even" as const, label: "Even Only (2, 4, 6…)" },
                 ]
               ).map((option) => {
                 const selected = bayPattern === option.value;
@@ -501,7 +605,8 @@ export function BulkLocationGenerator({
               <span className="font-mono text-zinc-400">
                 aisle, start_bay, end_bay[, types][, department_code][, bay_pattern]
               </span>
-              . Aisle values are text (never numeric-only). Example:{" "}
+              . Aisle values are text (never numeric-only). `bay_pattern` is
+              odd or even (default odd). Example:{" "}
               <span className="font-mono text-zinc-400">BW,1,15,BOTH,flooring,odd</span>
             </p>
             <div className="rounded-2xl border border-dashed border-cyan-500/30 bg-zinc-950/60 p-3 ring-0 transition focus-within:border-cyan-500/50 focus-within:ring-1 focus-within:ring-cyan-500/30">
@@ -546,7 +651,9 @@ export function BulkLocationGenerator({
             </div>
           </div>
         </>
-      ) : (
+      ) : null}
+
+      {tab === "ai" ? (
         <div className="mt-4 space-y-4">
           <label className="block text-sm">
             <span className="mb-1 block text-zinc-300">
@@ -679,7 +786,212 @@ export function BulkLocationGenerator({
             </div>
           ) : null}
         </div>
-      )}
+      ) : null}
+
+      {tab === "cleanup" ? (
+        <div className="mt-4 space-y-4">
+          <p className="text-sm text-zinc-400">
+            Prune mapped tags by aisle or odd/even bay range. Deletion is
+            permanent and also removes weekly rotations for those bays.
+          </p>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <label className="block text-sm">
+              <span className="mb-1 block text-zinc-300">Department</span>
+              <select
+                value={departmentId}
+                onChange={(e) => {
+                  setDepartmentId(e.target.value);
+                  setCleanupConfirm(false);
+                }}
+                className="glass-input"
+              >
+                {departments.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.name} ({d.code})
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="block text-sm">
+              <span className="mb-1 block text-zinc-300">Aisle</span>
+              <input
+                type="text"
+                inputMode="text"
+                autoCapitalize="characters"
+                spellCheck={false}
+                placeholder="BW, RW, 12, A1…"
+                value={aisle}
+                onChange={(e) => {
+                  setAisle(formatAisleInput(e.target.value));
+                  setCleanupConfirm(false);
+                }}
+                onBlur={() => setAisle(normalizeAisle(aisle))}
+                className="glass-input font-mono uppercase"
+              />
+            </label>
+          </div>
+
+          <label className="flex min-h-12 cursor-pointer items-center gap-2 rounded-xl border border-zinc-800/80 bg-zinc-950/50 px-3 text-sm text-zinc-100">
+            <input
+              type="checkbox"
+              checked={cleanupEntireAisle}
+              onChange={(e) => {
+                setCleanupEntireAisle(e.target.checked);
+                setCleanupConfirm(false);
+              }}
+              className="h-5 w-5 accent-rose-500"
+            />
+            Entire aisle (ignore bay range)
+          </label>
+
+          {cleanupEntireAisle ? null : (
+            <>
+              <div className="grid grid-cols-2 gap-3">
+                <label className="block text-sm">
+                  <span className="mb-1 block text-zinc-300">Start Bay</span>
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    min={0}
+                    value={startBay}
+                    onChange={(e) => {
+                      setStartBay(e.target.value);
+                      setCleanupConfirm(false);
+                    }}
+                    className="glass-input font-mono"
+                  />
+                </label>
+                <label className="block text-sm">
+                  <span className="mb-1 block text-zinc-300">End Bay</span>
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    min={0}
+                    value={endBay}
+                    onChange={(e) => {
+                      setEndBay(e.target.value);
+                      setCleanupConfirm(false);
+                    }}
+                    className="glass-input font-mono"
+                  />
+                </label>
+              </div>
+
+              <fieldset>
+                <legend className="mb-2 text-sm text-zinc-300">
+                  Bay pattern
+                </legend>
+                <div className="flex flex-wrap gap-3">
+                  {(
+                    [
+                      { value: "odd" as const, label: "Odd Only (1, 3, 5…)" },
+                      { value: "even" as const, label: "Even Only (2, 4, 6…)" },
+                    ] as const
+                  ).map((option) => {
+                    const selected = bayPattern === option.value;
+                    return (
+                      <label
+                        key={option.value}
+                        className={`flex min-h-12 cursor-pointer items-center gap-2 rounded-xl border px-3 text-sm transition ${
+                          selected
+                            ? "border-rose-500/50 bg-rose-950/40 text-rose-100 ring-1 ring-rose-500/30"
+                            : "border-zinc-800/80 bg-zinc-950/50 text-zinc-100"
+                        }`}
+                      >
+                        <input
+                          type="radio"
+                          name="cleanup-bay-pattern"
+                          checked={selected}
+                          onChange={() => {
+                            setBayPattern(option.value);
+                            setCleanupConfirm(false);
+                          }}
+                          className="h-5 w-5 accent-rose-500"
+                        />
+                        {option.label}
+                      </label>
+                    );
+                  })}
+                </div>
+              </fieldset>
+            </>
+          )}
+
+          <fieldset>
+            <legend className="mb-2 text-sm text-zinc-300">Location type</legend>
+            <div className="flex flex-wrap gap-3">
+              {(
+                [
+                  { value: "BOTH", label: "Both (Selling + Topstock)" },
+                  { value: "SELLING", label: "Selling" },
+                  { value: "TOPSTOCK", label: "Topstock" },
+                ] as const
+              ).map((option) => {
+                const selected = locationMode === option.value;
+                return (
+                  <label
+                    key={option.value}
+                    className={`flex min-h-12 cursor-pointer items-center gap-2 rounded-xl border px-3 text-sm transition ${
+                      selected
+                        ? "border-rose-500/50 bg-rose-950/40 text-rose-100 ring-1 ring-rose-500/30"
+                        : "border-zinc-800/80 bg-zinc-950/50 text-zinc-100"
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="cleanup-location-type"
+                      checked={selected}
+                      onChange={() => {
+                        setLocationMode(option.value);
+                        setCleanupConfirm(false);
+                      }}
+                      className="h-5 w-5 accent-rose-500"
+                    />
+                    {option.label}
+                  </label>
+                );
+              })}
+            </div>
+          </fieldset>
+
+          <p className="font-mono text-xs text-zinc-400">
+            {cleanupIds.length} tag{cleanupIds.length === 1 ? "" : "s"} match
+            this prune.
+          </p>
+
+          <button
+            type="button"
+            disabled={busy || cleanupIds.length === 0}
+            onClick={() => void handleCleanup()}
+            className={`flex min-h-14 w-full items-center justify-center rounded-xl border px-4 text-base font-bold disabled:opacity-50 ${
+              cleanupConfirm
+                ? "border-rose-400 bg-rose-600 text-white"
+                : "border-rose-500/45 bg-rose-950/40 text-rose-100"
+            }`}
+          >
+            {busy
+              ? "Deleting…"
+              : cleanupConfirm
+                ? `Confirm delete ${cleanupIds.length} tag${
+                    cleanupIds.length === 1 ? "" : "s"
+                  }`
+                : `Delete ${cleanupIds.length} matching tag${
+                    cleanupIds.length === 1 ? "" : "s"
+                  }`}
+          </button>
+          {cleanupConfirm ? (
+            <button
+              type="button"
+              onClick={() => setCleanupConfirm(false)}
+              className="flex min-h-11 w-full items-center justify-center text-sm font-semibold text-zinc-400"
+            >
+              Cancel
+            </button>
+          ) : null}
+        </div>
+      ) : null}
 
       {message ? (
         <p className="mt-3 text-sm font-medium text-emerald-300" role="status">

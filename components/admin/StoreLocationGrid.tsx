@@ -1,15 +1,25 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { compareAisles } from "@/lib/store-ops/aisle";
-import type { Department, StoreLocation } from "@/lib/store-ops/types";
+import { compareAisles, formatAisleInput, isValidAisle, normalizeAisle } from "@/lib/store-ops/aisle";
+import type {
+  Department,
+  RotationStatus,
+  StoreLocation,
+  StoreLocationType,
+} from "@/lib/store-ops/types";
 import type { StoreSpecialist } from "@/lib/types";
 import {
   assignLocationsToWeek,
+  deleteStoreLocations,
   fetchBayLocationHistory,
   type BayRotationHistoryRow,
   patchStoreLocation,
 } from "@/lib/store-ops/client";
+import {
+  findDuplicateLegacyBays,
+  pruneIdsFromDuplicateGroups,
+} from "@/lib/store-ops/locations";
 import { VisualBayScannerModal } from "@/components/store-ops/VisualBayScannerModal";
 import type { BayScanMeta } from "@/lib/store-ops/ai-bay-scan";
 
@@ -47,6 +57,23 @@ type SheetBay = {
 };
 
 type SheetMode = "actions" | "history" | "edit";
+
+const ROTATION_STATUSES: RotationStatus[] = [
+  "PENDING",
+  "ASSIGNED",
+  "COMPLETED",
+  "CARRIED_OVER",
+];
+
+function pairLocationIds(pair: BayPair): string[] {
+  return [pair.selling, pair.topstock]
+    .filter((loc): loc is StoreLocation => Boolean(loc))
+    .map((loc) => loc.id);
+}
+
+function bayRowKey(departmentId: string, aisle: string, bay: number): string {
+  return `${departmentId}:${aisle}:${bay}`;
+}
 
 function buildBayPairs(locs: StoreLocation[]): BayPair[] {
   const byBay = new Map<number, BayPair>();
@@ -90,6 +117,38 @@ export function StoreLocationGrid({
   const [openDepts, setOpenDepts] = useState<Record<string, boolean>>({});
   const [openAisles, setOpenAisles] = useState<Record<string, boolean>>({});
   const [sheetBay, setSheetBay] = useState<SheetBay | null>(null);
+  const [sheetInitialMode, setSheetInitialMode] = useState<SheetMode>("actions");
+  const [pruneBusy, setPruneBusy] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [confirmDeleteKey, setConfirmDeleteKey] = useState<string | null>(null);
+  const [batchConfirm, setBatchConfirm] = useState(false);
+
+  const duplicateGroups = useMemo(
+    () => findDuplicateLegacyBays(locations),
+    [locations]
+  );
+  const pruneIds = useMemo(
+    () => pruneIdsFromDuplicateGroups(duplicateGroups),
+    [duplicateGroups]
+  );
+
+  const selectedBayCount = useMemo(() => {
+    const keys = new Set<string>();
+    for (const loc of locations) {
+      if (selectedIds.has(loc.id)) {
+        keys.add(bayRowKey(loc.department_id, loc.aisle, loc.bay));
+      }
+    }
+    return keys.size;
+  }, [locations, selectedIds]);
+
+  useEffect(() => {
+    const live = new Set(locations.map((loc) => loc.id));
+    setSelectedIds((prev) => {
+      const next = new Set([...prev].filter((id) => live.has(id)));
+      return next.size === prev.size ? prev : next;
+    });
+  }, [locations]);
 
   const departmentGroups = useMemo((): DepartmentGroup[] => {
     const nameById = new Map(departments.map((d) => [d.id, d.name]));
@@ -172,6 +231,86 @@ export function StoreLocationGrid({
     }
   }
 
+  async function pruneDuplicates() {
+    if (pruneIds.length === 0) return;
+    setPruneBusy(true);
+    setError(null);
+    try {
+      await deleteStoreLocations(specialist, pruneIds);
+      onChanged();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not prune duplicates");
+    } finally {
+      setPruneBusy(false);
+    }
+  }
+
+  function togglePairSelected(ids: string[]) {
+    if (ids.length === 0) return;
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      const allOn = ids.every((id) => next.has(id));
+      if (allOn) ids.forEach((id) => next.delete(id));
+      else ids.forEach((id) => next.add(id));
+      return next;
+    });
+    setBatchConfirm(false);
+  }
+
+  function setAisleSelected(locs: StoreLocation[], selected: boolean) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      for (const loc of locs) {
+        if (selected) next.add(loc.id);
+        else next.delete(loc.id);
+      }
+      return next;
+    });
+    setBatchConfirm(false);
+  }
+
+  function openBaySheet(bay: SheetBay, mode: SheetMode = "actions") {
+    setSheetInitialMode(mode);
+    setSheetBay(bay);
+  }
+
+  async function deleteIds(ids: string[]) {
+    if (ids.length === 0) return;
+    setPendingId(ids[0] ?? null);
+    setError(null);
+    try {
+      await deleteStoreLocations(specialist, ids);
+      setConfirmDeleteKey(null);
+      setBatchConfirm(false);
+      setSelectedIds((prev) => {
+        const next = new Set(prev);
+        ids.forEach((id) => next.delete(id));
+        return next;
+      });
+      if (sheetBay) {
+        const openIds = pairLocationIds(sheetBay.pair);
+        if (openIds.some((id) => ids.includes(id))) {
+          setSheetBay(null);
+          setSheetInitialMode("actions");
+        }
+      }
+      onChanged();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Could not delete bays");
+    } finally {
+      setPendingId(null);
+    }
+  }
+
+  async function deleteSelected() {
+    if (selectedIds.size === 0) return;
+    if (!batchConfirm) {
+      setBatchConfirm(true);
+      return;
+    }
+    await deleteIds([...selectedIds]);
+  }
+
   if (locations.length === 0) {
     return (
       <section className="glass-card border-dashed p-6 text-center">
@@ -191,9 +330,81 @@ export function StoreLocationGrid({
         </h2>
         <p className="mt-1 text-sm text-zinc-400">
           Expand a department, then an aisle. Tap a bay label for pin, history,
-          and zone edits. Use S / T switches to activate tags.
+          and edits. Use Edit / Delete on each row, or select bays for batch
+          clean-up. S / T switches activate tags.
         </p>
       </div>
+
+      {duplicateGroups.length > 0 ? (
+        <div className="rounded-xl border border-amber-500/40 bg-amber-950/25 px-3 py-3">
+          <p className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-amber-300">
+            Map prune · duplicate legacy bays
+          </p>
+          <p className="mt-1 text-sm text-amber-100/90">
+            {duplicateGroups.length} duplicate group
+            {duplicateGroups.length === 1 ? "" : "s"} · {pruneIds.length} extra
+            tag{pruneIds.length === 1 ? "" : "s"} to delete. Canonical tags
+            stay on the map. Weekly rotations for pruned tags are removed.
+          </p>
+          <ul className="mt-2 max-h-32 space-y-1 overflow-y-auto text-[11px] text-amber-100/80">
+            {duplicateGroups.slice(0, 8).map((group) => (
+              <li key={group.key}>
+                Aisle {group.aisle} Bay {group.bay} [{group.type}] · keep 1,
+                prune {group.prune.length}
+              </li>
+            ))}
+          </ul>
+          <button
+            type="button"
+            disabled={pruneBusy}
+            onClick={() => void pruneDuplicates()}
+            className="mt-3 flex min-h-11 w-full items-center justify-center rounded-xl border border-amber-400/45 bg-amber-950/40 px-3 text-sm font-bold text-amber-50 disabled:opacity-40"
+          >
+            {pruneBusy ? "Deleting…" : "Delete duplicate tags"}
+          </button>
+        </div>
+      ) : null}
+
+      {selectedIds.size > 0 ? (
+        <div className="rounded-xl border border-rose-500/40 bg-rose-950/25 px-3 py-3">
+          <p className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-rose-300">
+            Batch clean-up
+          </p>
+          <p className="mt-1 text-sm text-rose-100/90">
+            {selectedBayCount} bay{selectedBayCount === 1 ? "" : "s"} ·{" "}
+            {selectedIds.size} tag{selectedIds.size === 1 ? "" : "s"} selected.
+            Deletion also removes weekly rotations for those bays.
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <button
+              type="button"
+              disabled={Boolean(pendingId)}
+              onClick={() => void deleteSelected()}
+              className={`flex min-h-11 flex-1 items-center justify-center rounded-xl border px-3 text-sm font-bold disabled:opacity-40 ${
+                batchConfirm
+                  ? "border-rose-400 bg-rose-600 text-white"
+                  : "border-rose-400/45 bg-rose-950/40 text-rose-50"
+              }`}
+            >
+              {pendingId
+                ? "Deleting…"
+                : batchConfirm
+                  ? `Confirm delete ${selectedIds.size} tags`
+                  : `Delete Selected (${selectedBayCount}) Bays`}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setSelectedIds(new Set());
+                setBatchConfirm(false);
+              }}
+              className="flex min-h-11 items-center justify-center rounded-xl border border-zinc-700 px-3 text-sm font-semibold text-zinc-200"
+            >
+              Clear
+            </button>
+          </div>
+        </div>
+      ) : null}
 
       {error ? (
         <p className="text-sm font-medium text-red-300" role="alert">
@@ -238,29 +449,50 @@ export function StoreLocationGrid({
                   const aisleOpen = Boolean(openAisles[aisleKey]);
                   const bayCount = aisle.bays.length;
                   return (
-                    <div
-                      key={aisleKey}
-                      className="overflow-hidden rounded-xl border border-zinc-800/80 bg-zinc-950/50"
-                    >
-                      <button
-                        type="button"
-                        aria-expanded={aisleOpen}
-                        onClick={() => toggleAisle(aisleKey)}
-                        className="flex min-h-[44px] w-full items-center justify-between gap-3 px-3 py-2 text-left"
+                      <div
+                        key={aisleKey}
+                        className="overflow-hidden rounded-xl border border-zinc-800/80 bg-zinc-950/50"
                       >
-                        <p className="font-mono text-sm font-semibold text-zinc-100">
-                          Aisle {aisle.aisle}
-                          <span className="ml-2 text-xs font-medium text-zinc-400">
-                            · {bayCount} bay{bayCount === 1 ? "" : "s"}
-                          </span>
-                        </p>
-                        <span
-                          aria-hidden
-                          className="font-mono text-sm text-zinc-400"
-                        >
-                          {aisleOpen ? "▲" : "▼"}
-                        </span>
-                      </button>
+                        <div className="flex items-center gap-1 pr-2">
+                          <label className="flex min-h-[44px] min-w-[44px] items-center justify-center">
+                            <input
+                              type="checkbox"
+                              checked={
+                                aisle.locations.length > 0 &&
+                                aisle.locations.every((loc) =>
+                                  selectedIds.has(loc.id)
+                                )
+                              }
+                              onChange={(e) =>
+                                setAisleSelected(
+                                  aisle.locations,
+                                  e.target.checked
+                                )
+                              }
+                              aria-label={`Select all bays in aisle ${aisle.aisle}`}
+                              className="h-5 w-5 accent-emerald-500"
+                            />
+                          </label>
+                          <button
+                            type="button"
+                            aria-expanded={aisleOpen}
+                            onClick={() => toggleAisle(aisleKey)}
+                            className="flex min-h-[44px] min-w-0 flex-1 items-center justify-between gap-3 py-2 text-left"
+                          >
+                            <p className="font-mono text-sm font-semibold text-zinc-100">
+                              Aisle {aisle.aisle}
+                              <span className="ml-2 text-xs font-medium text-zinc-400">
+                                · {bayCount} bay{bayCount === 1 ? "" : "s"}
+                              </span>
+                            </p>
+                            <span
+                              aria-hidden
+                              className="font-mono text-sm text-zinc-400"
+                            >
+                              {aisleOpen ? "▲" : "▼"}
+                            </span>
+                          </button>
+                        </div>
 
                       {aisleOpen ? (
                         <ul className="divide-y divide-zinc-800/80 border-t border-zinc-800/80">
@@ -268,21 +500,40 @@ export function StoreLocationGrid({
                             const inRotation =
                               isInActiveRotation(pair.selling) ||
                               isInActiveRotation(pair.topstock);
+                            const ids = pairLocationIds(pair);
+                            const rowKey = bayRowKey(
+                              dept.departmentId,
+                              aisle.aisle,
+                              pair.bay
+                            );
+                            const pairSelected =
+                              ids.length > 0 &&
+                              ids.every((id) => selectedIds.has(id));
+                            const confirming = confirmDeleteKey === rowKey;
+                            const sheetPayload: SheetBay = {
+                              departmentId: dept.departmentId,
+                              departmentName: dept.departmentName,
+                              aisle: aisle.aisle,
+                              pair,
+                            };
                             return (
                               <li
                                 key={`${aisleKey}-bay-${pair.bay}`}
-                                className="flex min-h-[44px] items-center gap-2 px-2 py-1.5"
+                                className="flex min-h-[44px] flex-wrap items-center gap-1.5 px-2 py-1.5"
                               >
+                                <label className="flex min-h-[44px] min-w-[44px] items-center justify-center">
+                                  <input
+                                    type="checkbox"
+                                    checked={pairSelected}
+                                    disabled={ids.length === 0}
+                                    onChange={() => togglePairSelected(ids)}
+                                    aria-label={`Select aisle ${aisle.aisle} bay ${pair.bay}`}
+                                    className="h-5 w-5 accent-emerald-500"
+                                  />
+                                </label>
                                 <button
                                   type="button"
-                                  onClick={() =>
-                                    setSheetBay({
-                                      departmentId: dept.departmentId,
-                                      departmentName: dept.departmentName,
-                                      aisle: aisle.aisle,
-                                      pair,
-                                    })
-                                  }
+                                  onClick={() => openBaySheet(sheetPayload)}
                                   className="flex min-h-[44px] min-w-[4.5rem] shrink-0 items-center gap-1.5 rounded-xl px-1.5 text-left active:bg-zinc-800/80"
                                   aria-label={`Bay ${pair.bay} actions`}
                                 >
@@ -318,6 +569,34 @@ export function StoreLocationGrid({
                                     onToggle={toggleActive}
                                   />
                                 </div>
+                                <button
+                                  type="button"
+                                  disabled={ids.length === 0}
+                                  onClick={() =>
+                                    openBaySheet(sheetPayload, "edit")
+                                  }
+                                  className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl border border-zinc-700 px-2 text-xs font-bold text-zinc-200 disabled:opacity-40"
+                                >
+                                  Edit
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={ids.length === 0 || Boolean(pendingId)}
+                                  onClick={() => {
+                                    if (!confirming) {
+                                      setConfirmDeleteKey(rowKey);
+                                      return;
+                                    }
+                                    void deleteIds(ids);
+                                  }}
+                                  className={`flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl border px-2 text-xs font-bold disabled:opacity-40 ${
+                                    confirming
+                                      ? "border-rose-400 bg-rose-600 text-white"
+                                      : "border-rose-500/40 text-rose-200"
+                                  }`}
+                                >
+                                  {confirming ? "Yes?" : "Delete"}
+                                </button>
                               </li>
                             );
                           })}
@@ -337,9 +616,14 @@ export function StoreLocationGrid({
           specialist={specialist}
           departments={departments}
           bay={liveSheetBay}
-          onClose={() => setSheetBay(null)}
+          initialMode={sheetInitialMode}
+          onClose={() => {
+            setSheetBay(null);
+            setSheetInitialMode("actions");
+          }}
           onChanged={onChanged}
           onError={setError}
+          onDeleteIds={(ids) => deleteIds(ids)}
         />
       ) : null}
     </section>
@@ -425,20 +709,25 @@ function BayActionsSheet({
   specialist,
   departments,
   bay,
+  initialMode = "actions",
   onClose,
   onChanged,
   onError,
+  onDeleteIds,
 }: {
   specialist: StoreSpecialist;
   departments: Department[];
   bay: SheetBay;
+  initialMode?: SheetMode;
   onClose: () => void;
   onChanged: () => void;
   onError: (msg: string | null) => void;
+  onDeleteIds: (ids: string[]) => void | Promise<void>;
 }) {
-  const [mode, setMode] = useState<SheetMode>("actions");
+  const [mode, setMode] = useState<SheetMode>(initialMode);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [bayScanOpen, setBayScanOpen] = useState(false);
   const [historyLoc, setHistoryLoc] = useState<StoreLocation | null>(
     bay.pair.selling ?? bay.pair.topstock
@@ -460,6 +749,14 @@ function BayActionsSheet({
   const [freqDraft, setFreqDraft] = useState(
     String(editTarget?.audit_frequency_days ?? 7)
   );
+  const [aisleDraft, setAisleDraft] = useState(bay.aisle);
+  const [bayDraft, setBayDraft] = useState(String(editTarget?.bay ?? bay.pair.bay));
+  const [typeDraft, setTypeDraft] = useState<StoreLocationType>(
+    editTarget?.type === "TOPSTOCK" ? "TOPSTOCK" : "SELLING"
+  );
+  const [statusDraft, setStatusDraft] = useState<RotationStatus>(
+    editTarget?.status ?? "PENDING"
+  );
 
   useEffect(() => {
     document.body.style.overflow = "hidden";
@@ -469,15 +766,27 @@ function BayActionsSheet({
   }, []);
 
   useEffect(() => {
-    setMode("actions");
+    setMode(initialMode);
     setMessage(null);
+    setConfirmDelete(false);
     const first = bay.pair.selling ?? bay.pair.topstock;
     setEditTargetId(first?.id ?? "");
     setZoneDraft(
       (first?.location_type as "STANDARD" | "SHOWROOM_STACKOUT") ?? "STANDARD"
     );
     setFreqDraft(String(first?.audit_frequency_days ?? 7));
-  }, [bay.departmentId, bay.aisle, bay.pair.bay, bay.pair.selling?.id, bay.pair.topstock?.id]);
+    setAisleDraft(bay.aisle);
+    setBayDraft(String(first?.bay ?? bay.pair.bay));
+    setTypeDraft(first?.type === "TOPSTOCK" ? "TOPSTOCK" : "SELLING");
+    setStatusDraft(first?.status ?? "PENDING");
+  }, [
+    bay.departmentId,
+    bay.aisle,
+    bay.pair.bay,
+    bay.pair.selling?.id,
+    bay.pair.topstock?.id,
+    initialMode,
+  ]);
 
   useEffect(() => {
     if (!editTarget) return;
@@ -486,6 +795,10 @@ function BayActionsSheet({
         "STANDARD"
     );
     setFreqDraft(String(editTarget.audit_frequency_days ?? 7));
+    setAisleDraft(editTarget.aisle);
+    setBayDraft(String(editTarget.bay));
+    setTypeDraft(editTarget.type === "TOPSTOCK" ? "TOPSTOCK" : "SELLING");
+    setStatusDraft(editTarget.status);
   }, [editTarget?.id]);
 
   async function pinToWeek(loc: StoreLocation) {
@@ -532,22 +845,60 @@ function BayActionsSheet({
 
   async function saveEdit() {
     if (!editTarget) return;
+    const aisleCode = normalizeAisle(aisleDraft);
+    if (!isValidAisle(aisleCode)) {
+      onError("Enter an aisle code (e.g. BW, RW, 12, A1)");
+      return;
+    }
+    const bayNumber = Math.floor(Number(bayDraft));
+    if (!Number.isFinite(bayNumber) || bayNumber < 0) {
+      onError("Bay must be an integer ≥ 0");
+      return;
+    }
     setBusy(true);
     setMessage(null);
     onError(null);
     try {
       const days = Math.max(1, Math.floor(Number(freqDraft)) || 7);
       await patchStoreLocation(specialist, editTarget.id, {
+        aisle: aisleCode,
+        bay: bayNumber,
+        type: typeDraft,
+        status: statusDraft,
         location_type: zoneDraft,
         audit_frequency_days: days,
       });
       setMessage("Location details saved.");
       onChanged();
-      setMode("actions");
+      if (
+        aisleCode !== bay.aisle ||
+        bayNumber !== bay.pair.bay ||
+        typeDraft !== editTarget.type
+      ) {
+        onClose();
+      } else {
+        setMode("actions");
+      }
     } catch (err) {
       onError(
         err instanceof Error ? err.message : "Could not save location details"
       );
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function deleteCurrent() {
+    const ids = pairLocationIds(bay.pair);
+    if (ids.length === 0) return;
+    if (!confirmDelete) {
+      setConfirmDelete(true);
+      return;
+    }
+    setBusy(true);
+    try {
+      await onDeleteIds(ids);
+      onClose();
     } finally {
       setBusy(false);
     }
@@ -670,6 +1021,20 @@ function BayActionsSheet({
             >
               Edit Location Details
             </button>
+            <button
+              type="button"
+              disabled={busy || pairLocationIds(bay.pair).length === 0}
+              onClick={() => void deleteCurrent()}
+              className={`flex min-h-14 w-full items-center justify-center rounded-xl border px-4 text-sm font-bold disabled:opacity-50 ${
+                confirmDelete
+                  ? "border-rose-400 bg-rose-600 text-white"
+                  : "border-rose-500/40 bg-rose-950/30 text-rose-100"
+              }`}
+            >
+              {confirmDelete
+                ? "Confirm delete this bay (rotations too)"
+                : "Delete this bay"}
+            </button>
           </div>
         ) : null}
 
@@ -757,6 +1122,85 @@ function BayActionsSheet({
                   ))}
               </div>
             ) : null}
+
+            <div className="grid grid-cols-2 gap-2">
+              <label className="block space-y-1.5">
+                <span className="text-sm font-medium text-zinc-200">Aisle</span>
+                <input
+                  type="text"
+                  inputMode="text"
+                  autoCapitalize="characters"
+                  spellCheck={false}
+                  value={aisleDraft}
+                  onChange={(e) =>
+                    setAisleDraft(formatAisleInput(e.target.value))
+                  }
+                  onBlur={() => setAisleDraft(normalizeAisle(aisleDraft))}
+                  className="min-h-12 w-full rounded-xl border border-zinc-700 bg-zinc-900 px-3 font-mono uppercase text-zinc-100"
+                />
+              </label>
+              <label className="block space-y-1.5">
+                <span className="text-sm font-medium text-zinc-200">
+                  Bay number
+                </span>
+                <input
+                  type="number"
+                  min={0}
+                  value={bayDraft}
+                  onChange={(e) => setBayDraft(e.target.value)}
+                  className="min-h-12 w-full rounded-xl border border-zinc-700 bg-zinc-900 px-3 font-mono text-zinc-100"
+                />
+              </label>
+            </div>
+
+            <fieldset>
+              <legend className="mb-1.5 text-sm font-medium text-zinc-200">
+                Location type
+              </legend>
+              <div className="grid grid-cols-2 gap-2">
+                {(
+                  [
+                    ["SELLING", "Selling"],
+                    ["TOPSTOCK", "Topstock"],
+                  ] as const
+                ).map(([value, label]) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => setTypeDraft(value)}
+                    className={`min-h-12 rounded-xl border text-sm font-bold ${
+                      typeDraft === value
+                        ? "border-emerald-400 bg-emerald-500/15 text-emerald-100"
+                        : "border-zinc-700 text-zinc-300"
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </fieldset>
+
+            <fieldset>
+              <legend className="mb-1.5 text-sm font-medium text-zinc-200">
+                Status
+              </legend>
+              <div className="grid grid-cols-2 gap-2">
+                {ROTATION_STATUSES.map((value) => (
+                  <button
+                    key={value}
+                    type="button"
+                    onClick={() => setStatusDraft(value)}
+                    className={`min-h-12 rounded-xl border px-2 text-xs font-bold ${
+                      statusDraft === value
+                        ? "border-amber-400 bg-amber-500/15 text-amber-100"
+                        : "border-zinc-700 text-zinc-300"
+                    }`}
+                  >
+                    {value.replace("_", " ")}
+                  </button>
+                ))}
+              </div>
+            </fieldset>
 
             <fieldset>
               <legend className="mb-1.5 text-sm font-medium text-zinc-200">

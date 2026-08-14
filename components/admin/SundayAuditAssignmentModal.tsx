@@ -12,8 +12,10 @@ import {
   generateRotations,
 } from "@/lib/store-ops/client";
 import { readableError } from "@/lib/store-ops/errors";
+import { diagnoseBayHealth } from "@/lib/store-ops/bay-health";
 import {
   autoAssignSundayBaysToSpecialist,
+  applySundayAssignmentPlan,
   buildSundayStagedBays,
   clearSundayBayAssignment,
   fetchSundayAssignments,
@@ -27,6 +29,18 @@ import {
   sundayStagingHeadline,
   type SundayStagedBay,
 } from "@/lib/store-ops/sunday-audit";
+import {
+  SHIFT_HOUR_PRESETS,
+  clampShiftHours,
+  formatSpecialistShiftLabel,
+  hoursBetween,
+  mergeShiftRoster,
+  planProportionalBayAssignments,
+  readShiftRoster,
+  riskScoreFromFinding,
+  writeShiftRoster,
+  type ShiftRosterMember,
+} from "@/lib/store-ops/weekly-rotations";
 import { getStoreNumber } from "@/lib/store";
 import { fetchSpecialists } from "@/lib/specialists";
 import type { Department } from "@/lib/store-ops/types";
@@ -54,6 +68,7 @@ export function SundayAuditAssignmentModal({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
+  const [shiftRoster, setShiftRoster] = useState<ShiftRosterMember[]>([]);
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -76,7 +91,14 @@ export function SundayAuditAssignmentModal({
       );
       setWeek(rotData.assigned_week);
       setBays(buildSundayStagedBays(flooringRots, assignments));
-      setRoster(flooringRoster(specialists));
+      const floorRoster = flooringRoster(specialists);
+      setRoster(floorRoster);
+      setShiftRoster(
+        mergeShiftRoster(
+          floorRoster,
+          readShiftRoster(rotData.assigned_week, getStoreNumber())
+        )
+      );
     } catch (err) {
       setError(
         readableError(err, "Could not load Sunday Flooring cycle audits")
@@ -133,6 +155,50 @@ export function SundayAuditAssignmentModal({
     week,
   });
 
+  const healthByRotation = useMemo(() => {
+    const card = diagnoseBayHealth({
+      rotations: bays.map((b) => b.rotation),
+    });
+    return new Map(card.findings.map((f) => [f.rotationId, f]));
+  }, [bays]);
+
+  const balancerPlan = useMemo(
+    () =>
+      planProportionalBayAssignments(
+        bays.map((bay) => ({
+          rotationId: bay.rotation.id,
+          aisle: bay.aisle,
+          bay: bay.bay,
+          type: bay.rotation.store_locations?.type,
+          riskScore: riskScoreFromFinding(healthByRotation.get(bay.rotation.id)),
+        })),
+        shiftRoster
+      ),
+    [bays, shiftRoster, healthByRotation]
+  );
+
+  function persistRoster(next: ShiftRosterMember[]) {
+    setShiftRoster(next);
+    if (week) writeShiftRoster(week, next, getStoreNumber());
+  }
+
+  function patchMember(
+    specialistId: string,
+    patch: Partial<ShiftRosterMember>
+  ) {
+    persistRoster(
+      shiftRoster.map((row) => {
+        if (row.specialist_id !== specialistId) return row;
+        const merged = { ...row, ...patch };
+        const fromRange = hoursBetween(merged.start, merged.end);
+        return {
+          ...merged,
+          hours: clampShiftHours(fromRange ?? merged.hours),
+        };
+      })
+    );
+  }
+
   async function handleAssign(rotationId: string, specialistId: string) {
     if (!week) return;
     const previous = bays;
@@ -155,7 +221,10 @@ export function SundayAuditAssignmentModal({
     if (!member) return;
     const assignment = {
       specialist_id: String(member.id),
-      specialist_name: member.name,
+      specialist_name: formatSpecialistShiftLabel(
+        member.name,
+        shiftRoster.find((r) => r.specialist_id === String(member.id))?.hours
+      ),
       assigned_at: new Date().toISOString(),
     };
     setBays((prev) =>
@@ -186,6 +255,37 @@ export function SundayAuditAssignmentModal({
       onChanged?.();
     } catch (err) {
       setError(readableError(err, "Could not auto-assign bays"));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function handleBalanceAssign() {
+    if (!week || balancerPlan.items.length === 0) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const n = await applySundayAssignmentPlan(
+        week,
+        balancerPlan.items.map((row) => ({
+          rotationId: row.rotationId,
+          specialist_id: row.specialist_id,
+          specialist_name: formatSpecialistShiftLabel(
+            row.specialist_name,
+            row.hours
+          ),
+          hours: row.hours,
+        }))
+      );
+      setStatus(
+        `Balanced ${n} bay${n === 1 ? "" : "s"} across ${balancerPlan.loads.length} shift${
+          balancerPlan.loads.length === 1 ? "" : "s"
+        } (${balancerPlan.total_hours}h).`
+      );
+      await reload();
+      onChanged?.();
+    } catch (err) {
+      setError(readableError(err, "Could not apply shift balance"));
     } finally {
       setBusy(false);
     }
@@ -275,6 +375,126 @@ export function SundayAuditAssignmentModal({
               {busy ? "Staging…" : "Stage / Draw 12 Flooring Bays"}
             </button>
           </div>
+
+          {shiftRoster.length > 0 ? (
+            <section className="rounded-xl border border-cyan-500/30 bg-cyan-950/20 p-3">
+              <p className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-cyan-300">
+                Shift balancer · hours → bay quota
+              </p>
+              <p className="mt-1 text-[11px] text-cyan-100/70">
+                Toggle who is on the floor, set 4/6/8h or start–end. High-risk
+                stale/top-stock clusters go to the longest shifts first.
+              </p>
+              <ul className="mt-2 space-y-2">
+                {shiftRoster.map((row) => (
+                  <li
+                    key={row.specialist_id}
+                    className="rounded-lg border border-zinc-800/80 bg-zinc-950/50 px-2.5 py-2"
+                  >
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        checked={row.active}
+                        onChange={(e) =>
+                          patchMember(row.specialist_id, {
+                            active: e.target.checked,
+                          })
+                        }
+                        className="h-5 w-5 accent-cyan-500"
+                      />
+                      <span className="min-w-0 flex-1 truncate text-sm font-semibold text-white">
+                        {row.specialist_name}
+                      </span>
+                      <span className="shrink-0 font-mono text-[10px] text-cyan-300">
+                        {row.active
+                          ? `${row.hours}h · ${
+                              balancerPlan.loads.find(
+                                (l) => l.specialist_id === row.specialist_id
+                              )?.quota ?? 0
+                            } bays`
+                          : "off"}
+                      </span>
+                    </label>
+                    {row.active ? (
+                      <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                        {SHIFT_HOUR_PRESETS.map((h) => (
+                          <button
+                            key={h}
+                            type="button"
+                            onClick={() =>
+                              patchMember(row.specialist_id, {
+                                hours: h,
+                                start: undefined,
+                                end: undefined,
+                              })
+                            }
+                            className={`rounded-lg border px-2 py-1 text-[10px] font-bold ${
+                              row.hours === h && !row.start
+                                ? "border-cyan-400/60 bg-cyan-950/50 text-cyan-100"
+                                : "border-zinc-700 text-zinc-300"
+                            }`}
+                          >
+                            {h}h
+                          </button>
+                        ))}
+                        <input
+                          type="time"
+                          aria-label={`${row.specialist_name} start`}
+                          value={row.start ?? ""}
+                          onChange={(e) =>
+                            patchMember(row.specialist_id, {
+                              start: e.target.value || undefined,
+                            })
+                          }
+                          className="glass-input h-9 w-[6.5rem] px-1.5 text-[11px]"
+                        />
+                        <span className="text-[10px] text-zinc-500">→</span>
+                        <input
+                          type="time"
+                          aria-label={`${row.specialist_name} end`}
+                          value={row.end ?? ""}
+                          onChange={(e) =>
+                            patchMember(row.specialist_id, {
+                              end: e.target.value || undefined,
+                            })
+                          }
+                          className="glass-input h-9 w-[6.5rem] px-1.5 text-[11px]"
+                        />
+                      </div>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+              {balancerPlan.loads.length > 0 ? (
+                <ul className="mt-2 space-y-1 text-[11px] text-cyan-100/80">
+                  {balancerPlan.loads.map((load) => (
+                    <li key={load.specialist_id}>
+                      {load.specialist_name}: {load.quota} bays ({load.weight_pct}
+                      %)
+                      {load.aisles.length
+                        ? ` · Aisle ${load.aisles.join(", ")}`
+                        : ""}
+                      {load.high_risk
+                        ? ` · ${load.high_risk} high-risk`
+                        : ""}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="mt-2 text-[11px] text-amber-200/80">
+                  Turn on at least one specialist with hours to preview quotas.
+                </p>
+              )}
+              <button
+                type="button"
+                disabled={busy || balancerPlan.items.length === 0}
+                onClick={() => void handleBalanceAssign()}
+                className="mt-3 flex min-h-[44px] w-full items-center justify-center rounded-xl border border-cyan-400/45 bg-cyan-950/40 px-3 text-sm font-bold text-cyan-50 disabled:opacity-40"
+              >
+                {busy ? "Assigning…" : "Balance & Assign clustered zones"}
+              </button>
+            </section>
+          ) : null}
 
           {status ? (
             <p

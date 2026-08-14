@@ -1,5 +1,21 @@
 # DeptSync Hub — Development Journal
 
+## 2026-08-14 — Store Map bay edit, delete, and odd/even-only generate
+
+### Shipped
+- **Bay pattern** is Odd Only / Even Only only (`lib/store-ops/bay-pattern.ts`). Default Odd Only. Legacy CSV `sequential` maps to odd.
+- **Store Map** (`StoreLocationGrid`): per-bay Edit (aisle, bay, SELLING/TOPSTOCK, status, zone, audit frequency) and Delete with inline confirm. Multi-select + **Delete Selected (N) Bays**. Duplicate prune now hard-deletes.
+- **Bulk Generator Clean-Up** tab: prune an entire aisle or an odd/even bay range (SELLING / TOPSTOCK / both).
+- **API:** `PATCH /api/store-locations` Super Admin can update aisle, bay, type, status. `DELETE` hard-deletes by `?id=`, `{ id }`, or `{ ids: string[] }` (cascades `weekly_rotations`).
+
+## 2026-08-14 — Shift workload balancer + clustered bay assignment
+
+### Shipped
+- **Shift balancer** in Sunday assignment (`SundayAuditAssignmentModal`): toggle CSAs, 4/6/8h or start–end times. Hours persist per store/week in localStorage.
+- **Proportional clustered plan** (`lib/store-ops/weekly-rotations.ts`) — largest-remainder quotas by hours; aisle/face clusters stay together; stale >7d / unworked top-stock clusters feed the longest shifts. Persistence stays in `sunday-audit.ts` (`applySundayAssignmentPlan`). Rotation draw stays in `rotations.ts`.
+- **Zebra** assignment badges show name + shift tag; filter All / Mine / associate. Checklist header shows **Ahead / On Track / Behind** weekly pace (`forecastWeeklyPace` in `week.ts`).
+- **Store Map prune** — `findDuplicateLegacyBays` groups same dept+aisle+bay+type (numeric aisle padding collapsed). Super Admin deletes extra tags via `DELETE /api/store-locations` (cascades weekly rotations). See later **bay edit/delete** entry for hard-delete + per-bay actions.
+
 ## 2026-08-14 — Smart Floor Insights & Operational Velocity
 
 ### Shipped
@@ -44,7 +60,7 @@
 
 ### Shipped
 - Admin Tools chrome clicks set `adminOpen` immediately (`requestAdminTools`), then dispatch the event. Drawer uses `next/dynamic` default export + `{ ssr: false }` and a loading shell so the first open actually renders.
-- Bulk Generator **Bay pattern**: Sequential / Odd Only / Even Only. `expandBayNumbers` steps by 2 for odd/even faces (`lib/store-ops/bay-pattern.ts`). CSV optional `bay_pattern` column.
+- Bulk Generator **Bay pattern**: Odd Only / Even Only (default odd). `expandBayNumbers` steps by 2 (`lib/store-ops/bay-pattern.ts`). CSV optional `bay_pattern` column; legacy sequential maps to odd.
 - Store Map GET retries without `last_completed_at` on 42703/PGRST204 and always returns `last_completed_at: null` when the value or column is absent.
 
 ## 2026-08-14 — Admin Tools drawer open path

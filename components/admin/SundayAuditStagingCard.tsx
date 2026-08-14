@@ -135,7 +135,7 @@ export function SundayAuditStagingCard({
               : "⚡ Sunday Cycle Audit Engine — tap to stage Flooring bays"}
           </p>
           <p className="mt-1 text-xs text-emerald-200/75">
-            Assign Flooring specialists · Auto-assign to me · Stage draw
+            Assign Flooring specialists · shift hours · clustered balance
           </p>
         </div>
         <span className="relative shrink-0 self-center text-emerald-300">→</span>

@@ -95,6 +95,55 @@ export function pickWeightedByPriorityAndAge<T extends WeightedPickable>(
   return picked;
 }
 
+export type WeeklyPaceTone = "ahead" | "on_track" | "behind";
+
+export type WeeklyPaceForecast = {
+  tone: WeeklyPaceTone;
+  label: string;
+  actual_pct: number;
+  expected_pct: number;
+  assigned: number;
+  completed: number;
+};
+
+/** ISO weekday 1=Monday … 7=Sunday. */
+export function isoWeekday(date = new Date()): number {
+  return date.getDay() === 0 ? 7 : date.getDay();
+}
+
+/**
+ * Linear week-to-date pace vs ISO weekday (Mon=1/7 … Sun=7/7).
+ * ±10 pts of expected % → On Track; above Ahead; below Behind.
+ */
+export function forecastWeeklyPace(input: {
+  assigned: number;
+  completed: number;
+  now?: Date;
+}): WeeklyPaceForecast {
+  const assigned = Math.max(0, Math.floor(input.assigned));
+  const completed = Math.max(0, Math.min(assigned, Math.floor(input.completed)));
+  const actual_pct = assigned <= 0 ? 0 : Math.round((completed / assigned) * 100);
+  const expected_pct = Math.round((isoWeekday(input.now ?? new Date()) / 7) * 100);
+  const delta = actual_pct - expected_pct;
+  let tone: WeeklyPaceTone = "on_track";
+  if (assigned <= 0) {
+    tone = "on_track";
+  } else if (delta >= 10) {
+    tone = "ahead";
+  } else if (delta <= -10) {
+    tone = "behind";
+  }
+  const label =
+    assigned <= 0
+      ? "On Track · no bays assigned"
+      : tone === "ahead"
+        ? `Ahead · ${actual_pct}% vs ${expected_pct}% expected`
+        : tone === "behind"
+          ? `Behind · ${actual_pct}% vs ${expected_pct}% expected`
+          : `On Track · ${actual_pct}% vs ${expected_pct}% expected`;
+  return { tone, label, actual_pct, expected_pct, assigned, completed };
+}
+
 export function adaptiveDrawWeight(loc: WeightedPickable): number {
   const priority = 1 + Math.max(0, Number(loc.manual_priority_count) || 0);
   const last = loc.last_completed_at
