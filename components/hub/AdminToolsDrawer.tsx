@@ -7,6 +7,7 @@
  */
 
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import {
   useCallback,
   useEffect,
@@ -19,7 +20,6 @@ import { ForceRotationModal } from "@/components/admin/ForceRotationModal";
 import { SundayAuditAssignmentModal } from "@/components/admin/SundayAuditAssignmentModal";
 import { TaxonomyManagerModal } from "@/components/catalog/TaxonomyManagerModal";
 import { WeeklyBayTargetCard } from "@/components/hub/WeeklyBayTargetCard";
-import { ManagerNotesWorkspace } from "@/components/store-ops/ManagerNotesWorkspace";
 import { selectOnFocus } from "@/lib/number-input";
 import { isMasterAdmin } from "@/lib/rbac";
 import { fetchDepartmentsDetailed } from "@/lib/store-ops/client";
@@ -43,8 +43,13 @@ import type {
 import type { Department } from "@/lib/store-ops/types";
 import type { StoreSpecialist } from "@/lib/types";
 
-export type { AdminToolsSection, AdminToolsEventDetail } from "@/components/hub/admin-tools-events";
-export { ADMIN_TOOLS_EVENT, openAdminTools } from "@/components/hub/admin-tools-events";
+const ManagerNotesWorkspace = dynamic(
+  () =>
+    import("@/components/store-ops/ManagerNotesWorkspace").then((mod) => ({
+      default: mod.ManagerNotesWorkspace,
+    })),
+  { ssr: false }
+);
 
 type Props = {
   open: boolean;
@@ -267,12 +272,14 @@ export function AdminToolsDrawer({
         onClose={() => setTaxonomyOpen(false)}
         departments={departments}
       />
-      <ManagerNotesWorkspace
-        open={notesOpen}
-        onClose={() => setNotesOpen(false)}
-        specialist={specialist}
-        storeNumber={storeNumber}
-      />
+      {notesOpen ? (
+        <ManagerNotesWorkspace
+          open={notesOpen}
+          onClose={() => setNotesOpen(false)}
+          specialist={specialist}
+          storeNumber={storeNumber}
+        />
+      ) : null}
     </>
   );
 }

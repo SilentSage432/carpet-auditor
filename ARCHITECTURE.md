@@ -7,7 +7,8 @@ app/manifest.ts                   → short_name DeptSync · Department & SIMS A
 public/sw.js                      → Offline shell cache strategies
 components/hub/HubChrome.tsx      → Sticky header (legacy) + role-filtered inventory bottom nav
 components/hub/NavigationHub.tsx  → Cross-app Navigation Hub (hamburger, role badge, ops bottom nav)
-components/hub/admin-tools-events.ts → Admin Tools open event + types (light; drawer is dynamic)
+components/hub/admin-tools-events.ts → Admin Tools open event + payload types (light; drawer is dynamic)
+components/hub/ChunkErrorBoundary.tsx → Catch failed next/dynamic chunks + child render throws
 components/hub/NavIcons.tsx       → Shared Lucide icons for ops + inventory bottom bars
 components/hub/HapticsListener.tsx → Delegated vibrate pulses for taps / toggles / tabs
 components/hub/OfflineNetworkBanner.tsx → Offline toast + installSyncAutoFlush callbacks
@@ -20,7 +21,9 @@ lib/push/*                        → Web Push subscribe + VAPID dispatch for ro
 app/admin/store-map/page.tsx      → Super Admin aisle/bay bulk mapper + weekly generate
 app/admin/supervisors/page.tsx    → Supervisor & role management console
 app/dashboard/page.tsx            → Zebra weekly rotation checklist (silent refresh + Sunday handoff)
-components/store-ops/ZebraChecklist.tsx → Optimistic complete, next-bay pulse, S/T filter, Sunday queue, one-tap barriers
+components/store-ops/ZebraChecklist.tsx → Optimistic complete, next-bay pulse, S/T filter, Sunday queue, bay-health badge
+components/store-ops/BayHealthScorecard.tsx → Compact Zebra health badge (presentation)
+lib/store-ops/bay-health.ts       → Aging / SIMS / topstock discrepancy diagnostics (compose only)
 components/store-ops/AuditLocationModeToggle.tsx → SELLING vs TOPSTOCK audit-mode control
 components/store-ops/BarrierReasonChips.tsx → One-tap barrier reasons
 lib/store-ops/audit-location-mode.ts → Canonical SELLING/TOPSTOCK ↔ hub sales_floor/top_stock
@@ -92,8 +95,9 @@ supabase/migrations/20260812_sunday_bay_assignments.sql → sunday specialist↔
 |---|---|
 | Navigation / section routing | `app/page.tsx` + `HubChrome` (roster-only boot; `next/dynamic` sections; keep-alive `HubPane` + `startTransition`) |
 | Department RBAC / tab visibility | `lib/rbac.ts` |
-| Cross-app Navigation Hub | `lib/nav-hub.ts` + `NavigationHub` + `admin-tools-events.ts` (`subscribeAdminTools` → host `AdminToolsDrawer`; TipTap stays in the dynamic chunk) |
+| Cross-app Navigation Hub | `lib/nav-hub.ts` + `NavigationHub` + `admin-tools-events.ts` (`subscribeAdminTools` → host `AdminToolsDrawer`; Floor Pad/TipTap lazy inside drawer; `ChunkErrorBoundary`) |
 | Store Operations map + rotations | `lib/store-ops/*` + `/admin/store-map` + `/dashboard` (bulk bays: `bay-pattern.ts`; floor checklist: `ZebraChecklist`) |
+| Bay health / floor discrepancies | `lib/store-ops/bay-health.ts` + `BayHealthScorecard` (composes location cycle age + hub audits / SIMS / variance) |
 | Selling vs Topstock audit mode | `lib/store-ops/audit-location-mode.ts` + `AuditLocationModeToggle` (Cycle/Department forms + Zebra filter) |
 | Rotation verification / barriers | `lib/store-ops/verification.ts` + `/verify-rotation` + `/admin/exceptions` + `POST /api/rotations/exceptions` |
 | Manager notes / Executive Floor Pad | `lib/store-ops/ai-note-extract.ts`, `manager-notes.ts`, `app/actions/manager-notes.ts`, `components/manager-notes/*` (Copilot: plain text ≤ 8k) |

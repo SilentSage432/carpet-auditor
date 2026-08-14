@@ -9,7 +9,9 @@
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import { AuditLocationModeToggle } from "@/components/store-ops/AuditLocationModeToggle";
 import { BarrierReasonChips } from "@/components/store-ops/BarrierReasonChips";
+import { BayHealthScorecard } from "@/components/store-ops/BayHealthScorecard";
 import { formatAuditLocationBadge } from "@/lib/store-ops/audit-location-mode";
+import { diagnoseBayHealth } from "@/lib/store-ops/bay-health";
 import {
   completeRotation,
   reportRotationBarriers,
@@ -23,13 +25,14 @@ import {
   type SundayAssignmentMap,
 } from "@/lib/store-ops/sunday-audit";
 import { getStoreNumber } from "@/lib/store";
+import { fetchAudits, getLocalAudits } from "@/lib/storage";
 import {
   formatLocationLabel,
   type ExceptionReason,
   type StoreLocationType,
   type WeeklyRotationWithLocation,
 } from "@/lib/store-ops/types";
-import type { StoreSpecialist } from "@/lib/types";
+import type { CarpetAudit, StoreSpecialist } from "@/lib/types";
 import { hapticPulse } from "@/utils/haptics";
 
 export type ZebraChecklistProps = {
@@ -60,6 +63,7 @@ export function ZebraChecklist({
   const [barrierOverlay, setBarrierOverlay] = useState<Set<string>>(
     () => new Set()
   );
+  const [audits, setAudits] = useState<CarpetAudit[]>(() => getLocalAudits());
   const [, startTransition] = useTransition();
 
   const loadAssignments = useCallback(async () => {
@@ -78,6 +82,23 @@ export function ZebraChecklist({
   useEffect(() => {
     void loadAssignments();
   }, [loadAssignments]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void fetchAudits()
+      .then((rows) => {
+        if (cancelled) return;
+        const local = getLocalAudits();
+        const ids = new Set(rows.map((r) => r.id));
+        setAudits([...rows, ...local.filter((r) => !ids.has(r.id))]);
+      })
+      .catch(() => {
+        if (!cancelled) setAudits(getLocalAudits());
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     function onSunday() {
@@ -148,6 +169,15 @@ export function ZebraChecklist({
       ...partition.assignedToOthers,
     ];
   }, [open, partition]);
+
+  const bayHealth = useMemo(
+    () => diagnoseBayHealth({ rotations: visible, audits }),
+    [visible, audits]
+  );
+  const flaggedIds = useMemo(
+    () => new Set(bayHealth.findings.map((f) => f.rotationId)),
+    [bayHealth]
+  );
 
   function handleCheck(rotationId: string) {
     setError(null);
@@ -235,6 +265,8 @@ export function ZebraChecklist({
         </p>
       </div>
 
+      <BayHealthScorecard card={bayHealth} />
+
       <AuditLocationModeToggle
         value={typeFilter}
         onChange={setTypeFilter}
@@ -275,6 +307,7 @@ export function ZebraChecklist({
               specialist
             )}
             pulsing={pulseId === rotation.id}
+            flagged={flaggedIds.has(rotation.id)}
             barrierOpen={barrierId === rotation.id}
             barrierBusy={barrierBusy}
             onToggleBarrier={() =>
@@ -346,6 +379,7 @@ function ZebraBayRow({
   assignmentLabel,
   assignedToMe,
   pulsing,
+  flagged,
   barrierOpen,
   barrierBusy,
   onToggleBarrier,
@@ -356,6 +390,7 @@ function ZebraBayRow({
   assignmentLabel: string | null;
   assignedToMe: boolean;
   pulsing: boolean;
+  flagged: boolean;
   barrierOpen: boolean;
   barrierBusy: boolean;
   onToggleBarrier: () => void;
@@ -401,6 +436,9 @@ function ZebraBayRow({
               ) : null}
               {assignmentLabel ? (
                 <span className="glass-pill-amber">{assignmentLabel}</span>
+              ) : null}
+              {flagged ? (
+                <span className="glass-pill-rose">Health</span>
               ) : null}
             </span>
           </span>

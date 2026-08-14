@@ -1,5 +1,18 @@
 # DeptSync Hub — Development Journal
 
+## 2026-08-14 — Admin Tools chunk isolation + Bay Health diagnostics
+
+### Root cause (Admin Tools "couldn't load")
+- `next/dynamic` imported the drawer as a whole module while `AdminToolsDrawer` **statically imported** Executive Floor Pad / TipTap. Evaluating that graph on first open could reject the lazy chunk; React.lazy then bubbled to the Next.js page error ("This page couldn't load") because nothing caught it.
+- Closing the drawer unmounted the dynamic component (`adminOpen` only), so the next open remounted and re-fetched the chunk.
+- The loading shell ignored `error` / `retry` from `next/dynamic`.
+
+### Shipped
+- Named-export loader `{ default: mod.AdminToolsDrawer }`, `adminHosted` keep-alive, `ChunkErrorBoundary` + loading-shell retry with `console.error`.
+- Floor Pad/TipTap is a nested `dynamic()` and mounts only when notes open.
+- Service worker cache bumped to `deptsync-shell-v4-admin-tools`.
+- **Bay health:** `lib/store-ops/bay-health.ts` flags >7d stale / never completed, un-inventoried TOPSTOCK, and SIMS/variance mismatches. Zebra shows a compact scorecard badge.
+
 ## 2026-08-14 — Phase 3: Bay-Readiness Velocity & Floor Workflow
 
 ### Shipped

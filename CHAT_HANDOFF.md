@@ -47,6 +47,8 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 
 ### Admin Tools (Super Admin only)
 - Slide-over drawer defaults **closed** — header **Admin** chip, hamburger entry, or `openAdminTools()`
+- Hosted after first open (`adminHosted`) so the lazy chunk does not remount; `ChunkErrorBoundary` + loading-shell retry if the chunk fails
+- Floor Pad / TipTap is a nested dynamic import — opening Admin Tools does not evaluate TipTap
 - Owns: Bulk Generate, **Sunday Rotation Engine** (Flooring cycle assign), Trigger Weekly Rotation, **Executive Floor Pad**, Catalog Taxonomies (AI generate / refresh), all-dept bay targets, store number, device diagnostics, links to Store Map / Supervisors / Exceptions
 - Department Supervisors never see Admin Tools chrome
 - Master Admin header: **My Department Context** pin (Full Store / D23 Flooring / D35 Appliances / …) — filters dashboard Flooring focus without dropping Master privileges
@@ -81,7 +83,7 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 - **P0 indexes:** re-run `supabase/migrations/20260813_p0_query_indexes.sql` — hub tables use `store_number`; Store Ops locations/rotations use `store_id`; manager_notes Phase 2 uses `store_number`+`department` (legacy `store_id`+`department_code`). Script skips absent columns.
 - **P1 Gemini/map:** Snap Bay 720p + compressed JPEG; Floor Pad Copilot strips HTML / 8k cap; `GET /api/store-locations` explicit Store Map columns (no `SELECT *`)
 - **P2 hub UI:** `startTransition` + keep-alive hub panes (`hidden`); Cycle/Appliance scan forms isolated from logs; 300ms debounced draft saves with flush on submit/leave; weekly rotations + Sunday assignments TTL-cached 45s
-- **Admin Tools:** chrome `requestAdminTools` sets `adminOpen` immediately; `subscribeAdminTools` pending replay; `next/dynamic` default export + `{ ssr: false }` loading shell
+- **Admin Tools:** chrome `requestAdminTools` sets `adminOpen` + `adminHosted` immediately; named-export `next/dynamic` + `{ ssr: false }` loading shell that handles chunk errors; `ChunkErrorBoundary`; Floor Pad/TipTap loads only when notes open; SW cache `deptsync-shell-v4-admin-tools`
 - **Bulk bays:** Sequential / Odd Only / Even Only (`lib/store-ops/bay-pattern.ts`); Store Map GET falls back if `last_completed_at` is missing/null
 - Seeds: no hardcoded roster injection — use Invite / Add Supervisor; temp PIN sets `must_change_credentials`
 - Primary: fixed bottom tabs — **filtered by role/department**

@@ -6,6 +6,7 @@
  */
 
 import dynamic from "next/dynamic";
+import type { DynamicOptionsLoadingProps } from "next/dynamic";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { startTransition, useCallback, useEffect, useId, useRef, useState } from "react";
@@ -16,6 +17,7 @@ import {
   type AdminToolsSection,
 } from "@/components/hub/admin-tools-events";
 import { AdminDepartmentSwitcher } from "@/components/hub/AdminDepartmentSwitcher";
+import { ChunkErrorBoundary } from "@/components/hub/ChunkErrorBoundary";
 import { DeptSyncBadge } from "@/components/hub/DeptSyncBadge";
 import { NavIcon } from "@/components/hub/NavIcons";
 import {
@@ -38,7 +40,39 @@ import { isAssociate, isMasterAdmin } from "@/lib/rbac";
 import { formatStoreLabel } from "@/lib/store";
 import type { StoreSpecialist } from "@/lib/types";
 
-function AdminToolsLoadingShell() {
+function AdminToolsLoadingShell({
+  error,
+  retry,
+}: DynamicOptionsLoadingProps) {
+  if (error) {
+    console.error("[AdminTools] chunk failed to load", error);
+    return (
+      <div className="fixed inset-0 z-[70]" role="alert">
+        <div className="absolute inset-0 bg-slate-950/70" />
+        <aside className="absolute inset-y-0 right-0 flex w-full max-w-md flex-col border-l-2 border-rose-400/50 bg-slate-950">
+          <div className="border-b border-rose-500/30 bg-rose-950/40 px-4 py-3">
+            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-rose-300">
+              Super Admin
+            </p>
+            <p className="mt-1 text-sm font-bold text-rose-100">Admin Tools</p>
+          </div>
+          <p className="px-4 pt-4 text-sm text-zinc-300">
+            {error.message || "Admin Tools could not load."}
+          </p>
+          {retry ? (
+            <button
+              type="button"
+              onClick={() => retry()}
+              className="mx-4 mt-4 min-h-12 rounded-xl bg-emerald-500 px-4 text-sm font-bold text-slate-950"
+            >
+              Retry
+            </button>
+          ) : null}
+        </aside>
+      </div>
+    );
+  }
+
   return (
     <div className="fixed inset-0 z-[70]" role="status" aria-live="polite">
       <div className="absolute inset-0 bg-slate-950/70" />
@@ -56,7 +90,10 @@ function AdminToolsLoadingShell() {
 }
 
 const AdminToolsDrawer = dynamic(
-  () => import("@/components/hub/AdminToolsDrawer"),
+  () =>
+    import("@/components/hub/AdminToolsDrawer").then((mod) => ({
+      default: mod.AdminToolsDrawer,
+    })),
   { ssr: false, loading: AdminToolsLoadingShell }
 );
 
@@ -94,6 +131,7 @@ export function NavigationHub({
   const [moreOpen, setMoreOpen] = useState(false);
   const [userOpen, setUserOpen] = useState(false);
   const [adminOpen, setAdminOpen] = useState(false);
+  const [adminHosted, setAdminHosted] = useState(false);
   const [adminSection, setAdminSection] =
     useState<AdminToolsSection>("menu");
   const [adminForce, setAdminForce] = useState(false);
@@ -113,6 +151,7 @@ export function NavigationHub({
     setAdminForce(Boolean(detail.openForceRotation));
     setAdminSunday(Boolean(detail.openSundayAudit));
     setAdminNotes(Boolean(detail.openManagerNotes));
+    setAdminHosted(true);
     setAdminOpen(true);
   }, []);
 
@@ -553,30 +592,41 @@ export function NavigationHub({
         />
       ) : null}
 
-      {master && specialist && adminOpen ? (
-        <AdminToolsDrawer
-          open={adminOpen}
-          onClose={() => {
-            setAdminOpen(false);
-            setAdminForce(false);
-            setAdminSunday(false);
-            setAdminNotes(false);
-            if (typeof window !== "undefined" && window.location.hash) {
-              history.replaceState(
-                null,
-                "",
-                `${window.location.pathname}${window.location.search}`
-              );
-            }
+      {master && specialist && adminHosted ? (
+        <ChunkErrorBoundary
+          label="Admin Tools"
+          onReset={() => {
+            setAdminHosted(false);
+            window.setTimeout(() => {
+              setAdminHosted(true);
+              setAdminOpen(true);
+            }, 0);
           }}
-          specialist={specialist}
-          storeNumber={storeNumber ?? ""}
-          onStoreNumberChange={onStoreNumberChange}
-          initialSection={adminSection}
-          openForceRotationOnMount={adminForce}
-          openSundayAuditOnMount={adminSunday}
-          openManagerNotesOnMount={adminNotes}
-        />
+        >
+          <AdminToolsDrawer
+            open={adminOpen}
+            onClose={() => {
+              setAdminOpen(false);
+              setAdminForce(false);
+              setAdminSunday(false);
+              setAdminNotes(false);
+              if (typeof window !== "undefined" && window.location.hash) {
+                history.replaceState(
+                  null,
+                  "",
+                  `${window.location.pathname}${window.location.search}`
+                );
+              }
+            }}
+            specialist={specialist}
+            storeNumber={storeNumber ?? ""}
+            onStoreNumberChange={onStoreNumberChange}
+            initialSection={adminSection}
+            openForceRotationOnMount={adminForce}
+            openSundayAuditOnMount={adminSunday}
+            openManagerNotesOnMount={adminNotes}
+          />
+        </ChunkErrorBoundary>
       ) : null}
     </>
   );
