@@ -1,5 +1,15 @@
 # DeptSync Hub — Development Journal
 
+## 2026-08-14 — Admin Tools React #306 (undefined lazy component)
+
+### Root cause
+- `dynamic(() => import(...).then((mod) => ({ default: mod.AdminToolsDrawer })))` passed `undefined` into React.lazy when the client chunk exposed the drawer on `mod.default` (interop), not `mod.AdminToolsDrawer`. Minified React error #306.
+
+### Shipped
+- Drawer keeps `export default` + named `export { AdminToolsDrawer }`.
+- NavigationHub loads with `dynamic(() => import("@/components/hub/AdminToolsDrawer"), { ssr: false })`.
+- Floor Pad nested lazy uses named `mod.ManagerNotesWorkspace`; shim also has a default export.
+
 ## 2026-08-14 — Admin Tools chunk isolation + Bay Health diagnostics
 
 ### Root cause (Admin Tools "couldn't load")

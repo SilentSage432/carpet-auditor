@@ -45,9 +45,9 @@ import type { StoreSpecialist } from "@/lib/types";
 
 const ManagerNotesWorkspace = dynamic(
   () =>
-    import("@/components/store-ops/ManagerNotesWorkspace").then((mod) => ({
-      default: mod.ManagerNotesWorkspace,
-    })),
+    import("@/components/store-ops/ManagerNotesWorkspace").then(
+      (mod) => mod.ManagerNotesWorkspace
+    ),
   { ssr: false }
 );
 

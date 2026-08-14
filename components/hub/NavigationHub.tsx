@@ -90,10 +90,7 @@ function AdminToolsLoadingShell({
 }
 
 const AdminToolsDrawer = dynamic(
-  () =>
-    import("@/components/hub/AdminToolsDrawer").then((mod) => ({
-      default: mod.AdminToolsDrawer,
-    })),
+  () => import("@/components/hub/AdminToolsDrawer"),
   { ssr: false, loading: AdminToolsLoadingShell }
 );
 
