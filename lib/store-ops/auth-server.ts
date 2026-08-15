@@ -23,6 +23,8 @@ export {
   requireSuperAdmin,
   requireSupervisorOrAdmin,
   StoreOpsAuthError,
+  actorAccessibleDepartmentCodes,
+  actorAllowsDepartmentCode,
 } from "./auth";
 
 type ProfileRow = {
@@ -31,6 +33,7 @@ type ProfileRow = {
   assigned_department_id: string | null;
   store_number: string | null;
   specialist_id: string | null;
+  accessible_departments?: string[] | null;
   departments?: { code?: string } | { code?: string }[] | null;
 };
 
@@ -48,14 +51,28 @@ async function actorFromAuthUser(user: User): Promise<StoreOpsActor | null> {
   const { data: profile, error } = await admin
     .from("profiles")
     .select(
-      "id, role, assigned_department_id, store_number, specialist_id, departments:assigned_department_id(code)"
+      "id, role, assigned_department_id, store_number, specialist_id, accessible_departments, departments:assigned_department_id(code)"
     )
     .eq("id", user.id)
     .maybeSingle();
 
-  if (error || !profile) return null;
+  let row: ProfileRow | null = profile as ProfileRow | null;
+  if (error && /accessible_departments/i.test(String(error.message ?? ""))) {
+    const retry = await admin
+      .from("profiles")
+      .select(
+        "id, role, assigned_department_id, store_number, specialist_id, departments:assigned_department_id(code)"
+      )
+      .eq("id", user.id)
+      .maybeSingle();
+    if (retry.error || !retry.data) return null;
+    row = retry.data as ProfileRow;
+  } else if (error || !profile) {
+    return null;
+  }
 
-  const row = profile as ProfileRow;
+  if (!row) return null;
+
   const role = mapProfileRole(String(row.role ?? ""));
   if (!role) return null;
 
@@ -76,11 +93,26 @@ async function actorFromAuthUser(user: User): Promise<StoreOpsActor | null> {
     if (!departmentCode) return null;
   }
 
+  const metaAccessible = Array.isArray(meta.accessible_departments)
+    ? meta.accessible_departments.map((code: unknown) => String(code).trim())
+    : [];
+  const rowAccessible = Array.isArray(row.accessible_departments)
+    ? row.accessible_departments.map((code) => String(code).trim())
+    : [];
+  const accessibleDepartmentCodes = [
+    ...new Set(
+      [...rowAccessible, ...metaAccessible, departmentCode]
+        .filter((code): code is string => Boolean(code))
+    ),
+  ];
+
   return {
     userId: row.id,
     specialistId: String(row.specialist_id ?? row.id),
     role,
     departmentCode: role === "super_admin" ? null : departmentCode,
+    accessibleDepartmentCodes:
+      role === "super_admin" ? [] : accessibleDepartmentCodes,
     storeNumber: claimStore,
   };
 }

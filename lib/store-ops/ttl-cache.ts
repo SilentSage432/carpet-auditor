@@ -14,6 +14,10 @@ export function createTtlCache<T>(ttlMs: number) {
       entry = null;
       inflight.clear();
     },
+    peek(key: string): T | undefined {
+      if (entry && entry.key === key) return entry.data;
+      return undefined;
+    },
     async get(key: string, loader: () => Promise<T>): Promise<T> {
       const now = Date.now();
       if (entry && entry.key === key && now - entry.at < ttlMs) {
@@ -31,6 +35,26 @@ export function createTtlCache<T>(ttlMs: number) {
         });
       inflight.set(key, next);
       return next;
+    },
+    /** Return cached data immediately; refresh in the background when stale. */
+    async getSWR(key: string, loader: () => Promise<T>): Promise<T> {
+      const now = Date.now();
+      if (entry && entry.key === key) {
+        if (now - entry.at < ttlMs) return entry.data;
+        if (!inflight.has(key)) {
+          const next = loader()
+            .then((data) => {
+              entry = { key, at: Date.now(), data };
+              return data;
+            })
+            .finally(() => {
+              inflight.delete(key);
+            });
+          inflight.set(key, next);
+        }
+        return entry.data;
+      }
+      return this.get(key, loader);
     },
   };
 }

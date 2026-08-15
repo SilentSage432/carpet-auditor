@@ -3,6 +3,9 @@
 ```
 app/page.tsx                      → Hub shell (AuthWall + specialty scan `?section=`; authenticated home redirects to /dashboard)
 app/dashboard/page.tsx            → Floor weekly bay checklist (associates: list first; supervisors: staging/health above)
+app/(workflow)/layout.tsx         → Keep-alive Floor/Map/Stock/Settings shell (SessionGate once)
+components/hub/WorkflowTabShell.tsx → Persistent tab panels (`hidden`, lazy Map/Stock/Settings)
+lib/store-ops/ttl-cache.ts        → TTL + in-flight + getSWR stale-while-revalidate
 app/layout.tsx                    → Fonts, PWA meta, ThemeProvider + FOUC boot script
 lib/theme.ts                      → Theme catalog, prefs persistence, document apply (owns personalization)
 lib/theme-context.tsx             → React mirror of theme prefs (presentation)
@@ -24,7 +27,7 @@ components/hub/admin-tools-events.ts → Admin Tools open event + payload types 
 components/hub/ChunkErrorBoundary.tsx → Catch failed next/dynamic chunks + child render throws
 components/hub/NavIcons.tsx       → Canonical Lucide HubIcon / NavIcon / DepartmentIcon (stroke 2, currentColor)
 components/hub/DepartmentPicker.tsx → Lucide department listbox (roster / admin selectors)
-lib/store-ops/realtime.ts         → postgres_changes bind-before-subscribe + unique channel instances
+lib/store-ops/realtime.ts         → Shared postgres_changes channel per logical name (bind-before-subscribe)
 app/globals.css                   → Theme tokens + glass / hub-main / chip-filter / btn-quick-touch
 components/hub/HapticsListener.tsx → Delegated vibrate pulses for taps / toggles / tabs
 components/hub/OfflineNetworkBanner.tsx → Offline toast + installSyncAutoFlush callbacks
@@ -65,6 +68,10 @@ lib/store-ops/weekly-rotations.ts → Proportional clustered bay assignment plan
 lib/store-ops/sunday-audit.ts → Persist specialist↔bay; apply balancer plan
 lib/store-ops/downstock.ts → Downstock/packdown flags (queue owner; assignment composes sunday-audit)
 lib/store-ops/map-readiness.ts → Store Map green/yellow/red readiness tones (composes bay-health stale + week)
+lib/store-ops/velocity.ts → IRP cadence tones + auto-tier rules (last_serviced_at / velocity_tier)
+lib/store-ops/bay-service.ts → Persist bay_service_logs + stamp last_serviced_at + promote velocity
+lib/store-ops/rotation.ts → Sunday draw velocity-priority pick (composed by rotations.ts)
+components/admin/WalkTheFloorSheet.tsx → 2-second IRP intensity log (presentation)
 lib/store-ops/audit-summary.ts → Supervisor weekly rollup composition (quota / associate / barriers)
 components/store-ops/SupervisorAuditSummaryModal.tsx → Personal weekly stats + copy
 lib/admin-department-context.ts       → Master Admin working department pin (local)
@@ -84,11 +91,18 @@ app/sunday-rotation/page.tsx          → Redirect → /dashboard + Sunday drawe
 components/admin/AssociateRosterPanel.tsx → Lightweight Specialist vs CSA roster (Settings / Admin Tools / Sunday)
 lib/types.ts                          → Cabinets D29 + SPECIALTY/CORE + associateFloorTitle
 supabase/migrations/20260814_cabinets_d29.sql → Seed Cabinets per store
+supabase/migrations/20260814_bay_velocity_heatmap.sql → store_locations IRP columns + bay_service_logs
+supabase/migrations/20260814_multi_department_access.sql → profiles + store_specialists accessible_departments + JWT match
+app/admin/roles/page.tsx          → Supervisor (and Master) cross-department grant console
+app/api/admin/department-access/route.ts → Instant accessible_departments upsert + JWT app_metadata
+components/hub/DepartmentAccessChips.tsx → Roster multi-select department grants
+components/hub/AdminDepartmentSwitcher.tsx → Header pill when accessible_departments.length > 1
 lib/auth-session.ts               → Auth session token + inactivity lock
 lib/biometric-auth.ts             → WebAuthn fingerprint / Face ID register + assert
 lib/audit-report.ts               → Audit report metrics + email/clipboard composition
 lib/hardware-scanner.ts           → Window-level Bluetooth/wedge barcode burst listener
 lib/rbac.ts                       → Department-scoped section / catalog visibility (compose only)
+lib/department-access.ts          → accessible_departments compose (primary + granted)
 lib/store.ts                      → Active store_number session
 lib/store-ops/stores.ts           → Resolve store_number → stores.id; upsert seed (code or store_id,code) + UUID-safe list
 lib/sync-queue.ts                 → Offline queue + backoff + conflict pause + auto-flush
@@ -103,7 +117,7 @@ lib/store-ops/*                   → Store Operations domain (rotations, bulk m
 app/admin/store-map/page.tsx      → Super Admin aisle/bay bulk mapper + Department Overview (Cabinets D29 target 6)
 app/dashboard/page.tsx            → Floor weekly bay checklist (associates: list first)
 app/api/rotations/*               → Generate + complete + verify; POST /api/rotations/exceptions mid-week barriers
-app/api/store-locations*          → List / patch / bulk location APIs (GET list is column-pruned for Store Map)
+app/api/store-locations*          → List / patch / bulk location APIs (GET list is column-pruned for Store Map); POST /api/store-locations/service walk-the-floor log
 supabase/schema.sql               → Tables + multi-category + SIMS + store_number + RBAC columns + RLS
 supabase/migrations/20260809_store_operations_rbac.sql → departments, profiles, locations, weekly rotations + RLS
 supabase/migrations/20260809_multi_store.sql → stores + store_id scoping
@@ -119,10 +133,10 @@ supabase/migrations/20260812_sunday_bay_assignments.sql → sunday specialist↔
 | Concern | Owner |
 |---|---|
 | Navigation / section routing | `app/page.tsx` (specialty `?section=` or replace `/dashboard`) + `lib/nav-hub.ts` + `HubHeader` / `BottomNav` |
-| Department RBAC / tab visibility | `lib/rbac.ts` (`visibleFloorAuditTabs` for in-page auditors) |
+| Department RBAC / tab visibility | `lib/rbac.ts` (`visibleFloorAuditTabs` for in-page auditors) + `lib/department-access.ts` (granted extras) |
 | Cross-app Navigation Hub | `lib/nav-hub.ts` + `NavigationHub` + `admin-tools-events.ts` (`subscribeAdminTools` → host `AdminToolsDrawer` 2-col tool grid; Floor Pad/TipTap lazy inside drawer; `ChunkErrorBoundary`) |
 | Department weekly quotas | `DepartmentTargetsMatrix` (blur / Save All) + `PATCH /api/departments` |
-| Store Operations map + rotations | `lib/store-ops/*` + `/admin/store-map` + `/dashboard` (bulk bays: `bay-pattern.ts` odd/even; floor checklist: `ZebraChecklist`; bay edit/delete + heatmap: `StoreLocationGrid` + `map-readiness.ts`; hard `DELETE /api/store-locations`) |
+| Store Operations map + rotations | `lib/store-ops/*` + `/admin/store-map` + `/dashboard` (bulk bays: `bay-pattern.ts` odd/even; floor checklist: `ZebraChecklist`; bay edit/delete + Standard vs Velocity Heatmap: `StoreLocationGrid` + `map-readiness.ts` + `velocity.ts`; walk log: `bay-service.ts` + `POST /api/store-locations/service`; Sunday velocity pick: `rotation.ts` → `rotations.ts`; hard `DELETE /api/store-locations`) |
 | Sunday assignments | `lib/store-ops/sunday-audit.ts` (persist) + `SundayAuditAssignmentModal` |
 | Downstock / packdown queue | `lib/store-ops/downstock.ts` (flags) + `/stock` + Zebra `lockedQueue="downstock"` (assign via sunday-audit) |
 | Supervisor weekly rollup | `lib/store-ops/audit-summary.ts` + `SupervisorAuditSummaryModal` |
@@ -132,6 +146,8 @@ supabase/migrations/20260812_sunday_bay_assignments.sql → sunday specialist↔
 | Rotation verification / barriers | `lib/store-ops/verification.ts` + `/verify-rotation` + `/admin/exceptions` + `POST /api/rotations/exceptions` |
 | Manager notes / Executive Floor Pad | `lib/store-ops/ai-note-extract.ts`, `manager-notes.ts`, `app/actions/manager-notes.ts`, `components/manager-notes/*` (Copilot: plain text ≤ 8k; `ai-note-summary` retired 410) |
 | Team roster (Master Admin) | `AdminRosterManager`, `lib/specialists.ts` (`is_active` soft-delete) |
+| Cross-department grants | `lib/department-access.ts` + `POST /api/admin/department-access` + `/admin/roles` chips |
+| Working department pin | `lib/admin-department-context.ts` (Master full-store; multi-dept clamped to grants) |
 | Store context | `lib/store.ts` + `lib/store-ops/stores.ts` |
 | Offline sync queue | `lib/sync-queue.ts`, `lib/sync-conflict.ts`, `ConflictResolutionModal` |
 | Header network / pending queue | `lib/network.ts` + `HeaderNetworkStatus` (hook isolated from hub forms) |
@@ -151,7 +167,7 @@ supabase/migrations/20260812_sunday_bay_assignments.sql → sunday specialist↔
 | Specialists session / credentials | `lib/specialists.ts`, `SpecialistModal` |
 | Zero-access auth wall / idle lock | `lib/auth-session.ts`, `components/auth/AuthWall.tsx` |
 | Store Ops Auth (JWT → profiles) | `lib/store-ops/auth.ts`, `lib/supabase/server.ts`, `lib/supabase/browser.ts`, `link-auth-profile.ts` |
-| JWT / RLS policies | `supabase/migrations/20260812_jwt_rls_policies.sql` (Custom Access Token Hook + store/dept isolation) |
+| JWT / RLS policies | `20260812_jwt_rls_policies.sql` + `20260814_multi_department_access.sql` (`jwt_matches_department_code` ORs `app_metadata.accessible_departments`) |
 | Phone SMS OTP recovery + profile link | `lib/phone-auth.ts`, `lib/phone.ts`, `POST /api/auth/phone-reset/*` |
 | Biometric / WebAuthn unlock | `lib/biometric-auth.ts`, `AuthWall` |
 | PIN change / default notice | `ChangePinModal` |

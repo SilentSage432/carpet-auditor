@@ -20,9 +20,10 @@ import {
   findDuplicateLegacyBays,
   pruneIdsFromDuplicateGroups,
 } from "@/lib/store-ops/locations";
-import { VisualBayScannerModal } from "@/components/store-ops/VisualBayScannerModal";
+import dynamic from "next/dynamic";
 import { HubIcon } from "@/components/hub/NavIcons";
 import { openAdminTools } from "@/components/hub/admin-tools-events";
+import { WalkTheFloorSheet } from "@/components/admin/WalkTheFloorSheet";
 import type { BayScanMeta } from "@/lib/store-ops/ai-bay-scan";
 import {
   BAY_READINESS_EVENT,
@@ -33,6 +34,24 @@ import {
   type BayReadinessEventDetail,
   type MapReadinessTone,
 } from "@/lib/store-ops/map-readiness";
+import {
+  classifyVelocityHeat,
+  VELOCITY_HEAT_LEGEND,
+  velocityHeatDotClass,
+  velocityHeatLabel,
+  velocityHeatPillClass,
+  velocityHeatRowClass,
+  worstVelocityHeat,
+  type VelocityHeatTone,
+} from "@/lib/store-ops/velocity";
+
+const VisualBayScannerModal = dynamic(
+  () =>
+    import("@/components/store-ops/VisualBayScannerModal").then(
+      (mod) => mod.VisualBayScannerModal
+    ),
+  { ssr: false }
+);
 
 type Props = {
   specialist: StoreSpecialist;
@@ -73,6 +92,8 @@ type SheetBay = {
 };
 
 type SheetMode = "actions" | "history" | "edit";
+
+type MapViewMode = "standard" | "heatmap";
 
 const ROTATION_STATUSES: RotationStatus[] = [
   "PENDING",
@@ -134,6 +155,9 @@ export function StoreLocationGrid({
   const [openAisles, setOpenAisles] = useState<Record<string, boolean>>({});
   const [sheetBay, setSheetBay] = useState<SheetBay | null>(null);
   const [sheetInitialMode, setSheetInitialMode] = useState<SheetMode>("actions");
+  const [walkBay, setWalkBay] = useState<SheetBay | null>(null);
+  const [mapMode, setMapMode] = useState<MapViewMode>("standard");
+  const heatmap = mapMode === "heatmap";
   const [pruneBusy, setPruneBusy] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [confirmDeleteKey, setConfirmDeleteKey] = useState<string | null>(null);
@@ -186,6 +210,10 @@ export function StoreLocationGrid({
       hasBarrier: barrierSet.has(loc.id),
       weekLabel: assignedWeek,
     });
+  }
+
+  function velocityFor(loc: StoreLocation | null | undefined): VelocityHeatTone {
+    return classifyVelocityHeat(loc);
   }
 
   const duplicateGroups = useMemo(
@@ -273,6 +301,22 @@ export function StoreLocationGrid({
     };
   }, [sheetBay, departmentGroups]);
 
+  const liveWalkBay = useMemo(() => {
+    if (!walkBay) return null;
+    const group = departmentGroups.find(
+      (d) => d.departmentId === walkBay.departmentId
+    );
+    const aisle = group?.aisles.find((a) => a.aisle === walkBay.aisle);
+    const pair = aisle?.bays.find((b) => b.bay === walkBay.pair.bay);
+    if (!group || !aisle || !pair) return walkBay;
+    return {
+      departmentId: group.departmentId,
+      departmentName: group.departmentName,
+      aisle: aisle.aisle,
+      pair,
+    };
+  }, [walkBay, departmentGroups]);
+
   function toggleDept(id: string) {
     setOpenDepts((prev) => ({ ...prev, [id]: !prev[id] }));
   }
@@ -335,8 +379,14 @@ export function StoreLocationGrid({
   }
 
   function openBaySheet(bay: SheetBay, mode: SheetMode = "actions") {
+    setWalkBay(null);
     setSheetInitialMode(mode);
     setSheetBay(bay);
+  }
+
+  function openWalkSheet(bay: SheetBay) {
+    setSheetBay(null);
+    setWalkBay(bay);
   }
 
   async function deleteIds(ids: string[]) {
@@ -407,30 +457,62 @@ export function StoreLocationGrid({
         <h2 className="font-mono text-xs font-semibold uppercase tracking-[0.16em] text-accent">
           Store Location Grid
         </h2>
-        <p className="mt-1 text-sm text-zinc-400">
-          Expand a department, then an aisle. Heatmap: green verified this week,
-          yellow scheduled, red stale (&gt;7d) or barrier. Tap a bay for pin and
-          history{canMutate ? ", and edits" : ""}.
-        </p>
-        <div className="mt-2 flex flex-wrap gap-2">
-          {(
-            [
-              ["verified", "Verified"],
-              ["scheduled", "Scheduled"],
-              ["attention", "Stale / barrier"],
-            ] as const
-          ).map(([tone, label]) => (
-            <span
-              key={tone}
-              className="inline-flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wide text-zinc-400"
-            >
-              <span
-                className={`inline-block h-2.5 w-2.5 rounded-full ${mapReadinessDotClass(tone)}`}
-              />
-              {label}
-            </span>
-          ))}
+        <div
+          className="mt-2 inline-flex h-11 items-center rounded-full border border-zinc-700/80 bg-zinc-950/70 p-0.5"
+          role="group"
+          aria-label="Map view mode"
+        >
+          <button
+            type="button"
+            aria-pressed={mapMode === "standard"}
+            onClick={() => setMapMode("standard")}
+            className={`inline-flex h-10 min-w-[7.5rem] items-center justify-center rounded-full px-3 font-mono text-[11px] font-bold ${
+              mapMode === "standard"
+                ? "bg-accent/25 text-accent"
+                : "text-zinc-400"
+            }`}
+          >
+            Standard Map
+          </button>
+          <button
+            type="button"
+            aria-pressed={mapMode === "heatmap"}
+            onClick={() => setMapMode("heatmap")}
+            className={`inline-flex h-10 min-w-[8.5rem] items-center justify-center rounded-full px-3 font-mono text-[11px] font-bold ${
+              mapMode === "heatmap"
+                ? "bg-accent/25 text-accent"
+                : "text-zinc-400"
+            }`}
+          >
+            Velocity Heatmap
+          </button>
         </div>
+        <p className="mt-2 text-sm text-zinc-400">
+          {heatmap
+            ? "IRP cadence by last_serviced_at. Green/cyan ≤7 days, amber 8–18, gray/orange >18 or never. Pulse red/purple = high or critical hotspot. Tap a bay to log a 2-second walk."
+            : `Expand a department, then an aisle. Green verified this week, yellow scheduled, red stale (>7d) or barrier. Tap a bay to log a walk${canMutate ? ", or use More for edits" : ""}.`}
+        </p>
+        {!heatmap ? (
+          <div className="mt-2 flex flex-wrap gap-2">
+            {(
+              [
+                ["verified", "Verified"],
+                ["scheduled", "Scheduled"],
+                ["attention", "Stale / barrier"],
+              ] as const
+            ).map(([tone, label]) => (
+              <span
+                key={tone}
+                className="inline-flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wide text-zinc-400"
+              >
+                <span
+                  className={`inline-block h-2.5 w-2.5 rounded-full ${mapReadinessDotClass(tone)}`}
+                />
+                {label}
+              </span>
+            ))}
+          </div>
+        ) : null}
       </div>
 
       {canMutate && duplicateGroups.length > 0 ? (
@@ -547,9 +629,19 @@ export function StoreLocationGrid({
                   const aisleKey = `${dept.departmentId}:${aisle.aisle}`;
                   const aisleOpen = Boolean(openAisles[aisleKey]);
                   const bayCount = aisle.bays.length;
-                  const aisleTone = worstMapReadiness(
-                    aisle.locations.map((loc) => readinessFor(loc))
-                  );
+                  const aisleTone = heatmap
+                    ? worstVelocityHeat(
+                        aisle.locations.map((loc) => velocityFor(loc))
+                      )
+                    : worstMapReadiness(
+                        aisle.locations.map((loc) => readinessFor(loc))
+                      );
+                  const aisleDotClass = heatmap
+                    ? velocityHeatDotClass(aisleTone as VelocityHeatTone)
+                    : mapReadinessDotClass(aisleTone as MapReadinessTone);
+                  const aisleDotLabel = heatmap
+                    ? velocityHeatLabel(aisleTone as VelocityHeatTone)
+                    : mapReadinessLabel(aisleTone as MapReadinessTone);
                   return (
                       <div
                         key={aisleKey}
@@ -586,8 +678,8 @@ export function StoreLocationGrid({
                           >
                             <p className="flex items-center gap-2 font-mono text-sm font-semibold text-zinc-100">
                               <span
-                                className={`inline-block h-2.5 w-2.5 shrink-0 rounded-full ${mapReadinessDotClass(aisleTone)}`}
-                                title={mapReadinessLabel(aisleTone)}
+                                className={`inline-block h-2.5 w-2.5 shrink-0 rounded-full ${aisleDotClass}`}
+                                title={aisleDotLabel}
                               />
                               Aisle {aisle.aisle}
                               <span className="ml-1 text-xs font-medium text-zinc-400">
@@ -619,6 +711,17 @@ export function StoreLocationGrid({
                                 readinessFor(loc)
                               )
                             );
+                            const pairHeat = worstVelocityHeat(
+                              [pair.selling, pair.topstock].map((loc) =>
+                                velocityFor(loc)
+                              )
+                            );
+                            const rowToneLabel = heatmap
+                              ? velocityHeatLabel(pairHeat)
+                              : mapReadinessLabel(pairTone);
+                            const rowDotClass = heatmap
+                              ? velocityHeatDotClass(pairHeat)
+                              : mapReadinessDotClass(pairTone);
                             const sheetPayload: SheetBay = {
                               departmentId: dept.departmentId,
                               departmentName: dept.departmentName,
@@ -628,7 +731,9 @@ export function StoreLocationGrid({
                             return (
                               <li
                                 key={`${aisleKey}-bay-${pair.bay}`}
-                                className="flex min-h-[44px] items-center gap-2 px-2 py-1.5"
+                                className={`flex min-h-[44px] items-center gap-2 px-2 py-1.5 ${
+                                  heatmap ? velocityHeatRowClass(pairHeat) : ""
+                                }`}
                               >
                                 {canMutate ? (
                                 <label className="flex h-11 w-11 shrink-0 items-center justify-center">
@@ -645,21 +750,21 @@ export function StoreLocationGrid({
                                 ) : null}
                                 <button
                                   type="button"
-                                  onClick={() => openBaySheet(sheetPayload)}
+                                  onClick={() => openWalkSheet(sheetPayload)}
                                   className="min-w-0 flex-1 rounded-xl px-1 py-1 text-left active:bg-zinc-800/80"
-                                  aria-label={`Bay ${pair.bay} ${mapReadinessLabel(pairTone)}`}
+                                  aria-label={`Bay ${pair.bay} ${rowToneLabel}`}
                                 >
                                   <span className="flex items-center gap-1.5">
                                     <span
-                                      className={`inline-block h-2.5 w-2.5 shrink-0 rounded-full ${mapReadinessDotClass(pairTone)}`}
-                                      title={mapReadinessLabel(pairTone)}
+                                      className={`inline-block h-2.5 w-2.5 shrink-0 rounded-full ${rowDotClass}`}
+                                      title={rowToneLabel}
                                     />
                                     <span className="truncate font-mono text-xs font-bold text-zinc-100">
                                       Bay {pair.bay}
                                     </span>
                                   </span>
                                   <span className="mt-0.5 block truncate font-mono text-[10px] font-semibold uppercase tracking-wide text-zinc-500">
-                                    {mapReadinessLabel(pairTone)}
+                                    {rowToneLabel}
                                   </span>
                                 </button>
                                 <DualTypePill
@@ -668,6 +773,9 @@ export function StoreLocationGrid({
                                   pendingId={pendingId}
                                   sellingReady={readinessFor(pair.selling)}
                                   topstockReady={readinessFor(pair.topstock)}
+                                  sellingHeat={velocityFor(pair.selling)}
+                                  topstockHeat={velocityFor(pair.topstock)}
+                                  heatmap={heatmap}
                                   canMutate={canMutate}
                                   onToggle={toggleActive}
                                 />
@@ -712,6 +820,45 @@ export function StoreLocationGrid({
         );
       })}
 
+      {heatmap ? (
+        <div
+          className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 rounded-xl border border-zinc-800/80 bg-zinc-950/60 px-3 py-2"
+          aria-label="Velocity heatmap legend"
+        >
+          {VELOCITY_HEAT_LEGEND.map((item) => (
+            <span
+              key={item.tone}
+              className="inline-flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wide text-zinc-400"
+            >
+              <span
+                className={`inline-block h-2.5 w-2.5 rounded-full ${velocityHeatDotClass(item.tone)}`}
+              />
+              {item.label}
+            </span>
+          ))}
+        </div>
+      ) : null}
+
+      {liveWalkBay ? (
+        <WalkTheFloorSheet
+          specialist={specialist}
+          departments={departments}
+          bay={liveWalkBay}
+          canMutate={canMutate}
+          onClose={() => setWalkBay(null)}
+          onChanged={onChanged}
+          onError={setError}
+          onOpenAdvanced={
+            canMutate
+              ? () => {
+                  setWalkBay(null);
+                  openBaySheet(liveWalkBay, "actions");
+                }
+              : undefined
+          }
+        />
+      ) : null}
+
       {liveSheetBay ? (
         <BayActionsSheet
           specialist={specialist}
@@ -737,6 +884,9 @@ function DualTypePill({
   pendingId,
   sellingReady,
   topstockReady,
+  sellingHeat,
+  topstockHeat,
+  heatmap = false,
   canMutate,
   onToggle,
 }: {
@@ -745,6 +895,9 @@ function DualTypePill({
   pendingId: string | null;
   sellingReady: MapReadinessTone;
   topstockReady: MapReadinessTone;
+  sellingHeat: VelocityHeatTone;
+  topstockHeat: VelocityHeatTone;
+  heatmap?: boolean;
   canMutate: boolean;
   onToggle: (loc: StoreLocation) => void;
 }) {
@@ -755,6 +908,8 @@ function DualTypePill({
         label="Sell"
         fullLabel="Selling"
         readiness={sellingReady}
+        velocity={sellingHeat}
+        heatmap={heatmap}
         pendingId={pendingId}
         canMutate={canMutate}
         onToggle={onToggle}
@@ -764,6 +919,8 @@ function DualTypePill({
         label="Top"
         fullLabel="Topstock"
         readiness={topstockReady}
+        velocity={topstockHeat}
+        heatmap={heatmap}
         pendingId={pendingId}
         canMutate={canMutate}
         onToggle={onToggle}
@@ -777,6 +934,8 @@ function TypePill({
   label,
   fullLabel,
   readiness,
+  velocity,
+  heatmap = false,
   pendingId,
   canMutate,
   onToggle,
@@ -785,6 +944,8 @@ function TypePill({
   label: string;
   fullLabel: string;
   readiness: MapReadinessTone;
+  velocity: VelocityHeatTone;
+  heatmap?: boolean;
   pendingId: string | null;
   canMutate: boolean;
   onToggle: (loc: StoreLocation) => void;
@@ -800,8 +961,9 @@ function TypePill({
     );
   }
 
-  const heatClass =
-    readiness === "verified"
+  const heatClass = heatmap
+    ? velocityHeatPillClass(velocity)
+    : readiness === "verified"
       ? "bg-emerald-500/25 text-emerald-100"
       : readiness === "scheduled"
         ? "bg-amber-500/20 text-amber-100"
@@ -1456,12 +1618,14 @@ function BayActionsSheet({
         ) : null}
       </div>
 
-      <VisualBayScannerModal
-        open={bayScanOpen}
-        onClose={() => setBayScanOpen(false)}
-        specialist={specialist}
-        meta={bayScanMeta}
-      />
+      {bayScanOpen ? (
+        <VisualBayScannerModal
+          open={bayScanOpen}
+          onClose={() => setBayScanOpen(false)}
+          specialist={specialist}
+          meta={bayScanMeta}
+        />
+      ) : null}
     </div>
   );
 }

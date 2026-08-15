@@ -5,7 +5,7 @@ import {
   requireStoreOpsActor,
   StoreOpsAuthError,
 } from "@/lib/store-ops/auth-server";
-import { resolveDepartmentIdByCode } from "@/lib/store-ops/rotations";
+import { resolveScopedDepartmentId } from "@/lib/store-ops/department-scope";
 import { resolveStoreByNumber } from "@/lib/store-ops/stores";
 import { getSupabaseAdmin } from "@/lib/store-ops/supabase-admin";
 import { isoWeekLabel } from "@/lib/store-ops/week";
@@ -63,23 +63,12 @@ export async function GET(request: Request) {
     let departmentId: string | null = departmentIdParam;
 
     if (isDeptFloorActor(actor)) {
-      if (!actor.departmentCode) {
-        return NextResponse.json(
-          { error: "No department assigned" },
-          { status: 403 }
-        );
-      }
-      departmentId = await resolveDepartmentIdByCode(
+      departmentId = await resolveScopedDepartmentId(
         supabase,
-        actor.departmentCode,
-        storeId
+        actor,
+        storeId,
+        departmentIdParam
       );
-      if (!departmentId) {
-        return NextResponse.json(
-          { error: "Department not found" },
-          { status: 404 }
-        );
-      }
     }
 
     const rotations = await fetchWeekRotations(supabase, {

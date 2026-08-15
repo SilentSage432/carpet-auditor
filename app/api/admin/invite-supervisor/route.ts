@@ -15,8 +15,9 @@ import {
   requireSuperAdmin,
   StoreOpsAuthError,
 } from "@/lib/store-ops/auth-server";
-import { readableError } from "@/lib/store-ops/errors";
+import { isMissingColumnError, readableError } from "@/lib/store-ops/errors";
 import { requireSupabaseAdmin } from "@/lib/supabase/admin-response";
+import { composeAccessibleDepartments } from "@/lib/department-access";
 import { sendInviteSms } from "@/lib/twilio-sms";
 import { departmentMeta, type DepartmentScope } from "@/lib/types";
 
@@ -26,6 +27,7 @@ type InviteBody = {
   name?: string;
   username?: string;
   department?: string;
+  accessible_departments?: string[];
   phone?: string;
   role?: "Supervisor" | "Associate" | "MasterAdmin";
   /**
@@ -127,18 +129,35 @@ export async function POST(request: Request) {
       username,
       role,
       assigned_department: role === "MasterAdmin" ? "all" : department,
+      accessible_departments:
+        role === "MasterAdmin"
+          ? []
+          : composeAccessibleDepartments(department, body.accessible_departments),
     };
 
     let saved: Record<string, unknown> | null = null;
+    const { accessible_departments: _accessCol, ...invitePatchWithoutAccess } =
+      invitePatch;
 
     if (rowId) {
-      const { data, error } = await supabase
+      let { data, error } = await supabase
         .from("store_specialists")
         .update(invitePatch)
         .eq("id", rowId)
         .eq("store_number", actor.storeNumber)
         .select("*")
         .maybeSingle();
+      if (error && isMissingColumnError(error, "accessible_departments")) {
+        const retry = await supabase
+          .from("store_specialists")
+          .update(invitePatchWithoutAccess)
+          .eq("id", rowId)
+          .eq("store_number", actor.storeNumber)
+          .select("*")
+          .maybeSingle();
+        data = retry.data;
+        error = retry.error;
+      }
       if (error) {
         return NextResponse.json(
           { error: readableError(error, "Could not update invite") },
@@ -147,11 +166,20 @@ export async function POST(request: Request) {
       }
       saved = data;
     } else {
-      const { data, error } = await supabase
+      let { data, error } = await supabase
         .from("store_specialists")
         .insert(invitePatch)
         .select("*")
         .maybeSingle();
+      if (error && isMissingColumnError(error, "accessible_departments")) {
+        const retry = await supabase
+          .from("store_specialists")
+          .insert(invitePatchWithoutAccess)
+          .select("*")
+          .maybeSingle();
+        data = retry.data;
+        error = retry.error;
+      }
       if (error) {
         return NextResponse.json(
           { error: readableError(error, "Could not create invited supervisor") },

@@ -6,6 +6,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Department, StoreLocation, WeeklyRotation } from "./types";
 import { listActiveStores } from "./stores";
+import { pickSundayVelocityPrioritized } from "./rotation";
 import {
   isoWeekLabel,
   pickWeightedByPriorityAndAge,
@@ -302,13 +303,12 @@ async function finishGenerate(
 
   const remaining = drawCount - pool.length;
   if (remaining > 0) {
-    const pendingAvailable = pending
-      .filter(isStandardAisleLocation)
-      .filter((p) => !pool.some((s) => s.id === p.id));
+    const pendingAvailable = pending.filter(isStandardAisleLocation);
     pool.push(
-      ...pickWeightedByPriorityAndAge(
+      ...pickSundayVelocityPrioritized(
         pendingAvailable,
-        Math.min(remaining, pendingAvailable.length)
+        remaining,
+        pool.map((s) => s.id)
       )
     );
   }

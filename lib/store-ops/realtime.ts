@@ -2,18 +2,13 @@
  * Supabase Realtime channel lifecycle — register postgres_changes BEFORE subscribe.
  * Domain modules (sunday-audit, manager-notes) compose this; they own filters.
  *
- * Unique channel instance names prevent the SDK error:
- * "cannot add postgres_changes callbacks after subscribe()"
- * which fires when two mounts reuse the same topic (Strict Mode, Fast Refresh,
- * ZebraChecklist + Sunday assignment drawer).
- *
- * Do not remove other channels that share the logical name — concurrent
- * subscribers each need their own instance. Cleanup is per-instance on unmount.
+ * One shared channel per logicalName: extra subscribers add JS listeners only
+ * (never a second .on after subscribe). Last unsubscriber removes the channel.
+ * Rapid tab switches / keep-alive Floor+Stock Zebra share one socket.
  */
 
+import type { RealtimeChannel } from "@supabase/supabase-js";
 import { getSupabase } from "@/lib/supabase";
-
-let channelSeq = 0;
 
 export type PostgresChangeFilter = {
   table: string;
@@ -22,9 +17,17 @@ export type PostgresChangeFilter = {
   event?: "*" | "INSERT" | "UPDATE" | "DELETE";
 };
 
+type SharedChannel = {
+  channel: RealtimeChannel;
+  listeners: Set<() => void>;
+};
+
+const registry = new Map<string, SharedChannel>();
+
 /**
  * Subscribe to postgres_changes. Listeners are always bound before subscribe().
- * Returns an unsubscribe that removes this channel instance.
+ * Returns an unsubscribe that drops this callback; the channel is removed when
+ * the last listener leaves.
  */
 export function subscribePostgresChanges(
   logicalName: string,
@@ -34,28 +37,39 @@ export function subscribePostgresChanges(
   const supabase = getSupabase();
   if (!supabase || !logicalName) return () => undefined;
 
-  const instanceName = `${logicalName}:${++channelSeq}`;
-  const channel = supabase.channel(instanceName);
+  let entry = registry.get(logicalName);
+  if (!entry) {
+    const channel = supabase.channel(logicalName);
+    const listeners = new Set<() => void>();
+    channel.on(
+      "postgres_changes",
+      {
+        event: spec.event ?? "*",
+        schema: spec.schema ?? "public",
+        table: spec.table,
+        ...(spec.filter ? { filter: spec.filter } : {}),
+      },
+      () => {
+        for (const fn of listeners) fn();
+      }
+    );
+    channel.subscribe();
+    entry = { channel, listeners };
+    registry.set(logicalName, entry);
+  }
 
-  channel.on(
-    "postgres_changes",
-    {
-      event: spec.event ?? "*",
-      schema: spec.schema ?? "public",
-      table: spec.table,
-      ...(spec.filter ? { filter: spec.filter } : {}),
-    },
-    () => {
-      onChange();
-    }
-  );
-
-  channel.subscribe();
+  entry.listeners.add(onChange);
 
   let active = true;
   return () => {
     if (!active) return;
     active = false;
-    void supabase.removeChannel(channel);
+    const current = registry.get(logicalName);
+    if (!current) return;
+    current.listeners.delete(onChange);
+    if (current.listeners.size === 0) {
+      registry.delete(logicalName);
+      void supabase.removeChannel(current.channel);
+    }
   };
 }

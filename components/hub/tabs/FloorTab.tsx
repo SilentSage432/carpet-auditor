@@ -2,23 +2,20 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import dynamic from "next/dynamic";
 import { SundayAuditStagingCard } from "@/components/admin/SundayAuditStagingCard";
 import { StoreHealthCard } from "@/components/StoreHealthCard";
 import { ShowroomQuickTouchCard } from "@/components/dashboard/ShowroomQuickTouchCard";
 import { ZebraChecklist } from "@/components/store-ops/ZebraChecklist";
-import { SupervisorAuditSummaryModal } from "@/components/store-ops/SupervisorAuditSummaryModal";
-import { NavigationHub } from "@/components/hub/NavigationHub";
-import { SessionGate } from "@/components/hub/SessionGate";
 import { ShiftBriefingCard } from "@/components/store-ops/ShiftBriefingCard";
 import { StoreHealthChart } from "@/components/store-ops/StoreHealthChart";
 import {
   ADMIN_DEPT_CONTEXT_EVENT,
   isFlooringWorkingContext,
-  workingDepartment,
+  workingDepartmentId,
 } from "@/lib/admin-department-context";
 import { isAssociate, isMasterAdmin, visibleFloorAuditTabs } from "@/lib/rbac";
 import { isSupervisor } from "@/lib/specialists";
-import { actorFromSpecialist } from "@/lib/store-ops/auth";
 import {
   fetchDepartments,
   fetchThisWeekRotations,
@@ -29,34 +26,17 @@ import {
   SUNDAY_AUDIT_EVENT,
 } from "@/lib/store-ops/sunday-audit";
 import type { WeeklyRotationWithLocation } from "@/lib/store-ops/types";
-import { departmentMeta, type StoreSpecialist } from "@/lib/types";
+import type { WorkflowTabProps } from "@/components/hub/tabs/tab-props";
 
-export default function SupervisorDashboardPage() {
-  return (
-    <SessionGate
-      allow={(m) => Boolean(actorFromSpecialist(m))}
-      denyMessage="Rotation dashboard is for department associates, supervisors, and Master Admin."
-    >
-      {({ specialist, storeNumber, logout }) => (
-        <DashboardBody
-          specialist={specialist}
-          storeNumber={storeNumber}
-          logout={logout}
-        />
-      )}
-    </SessionGate>
-  );
-}
+const SupervisorAuditSummaryModal = dynamic(
+  () =>
+    import("@/components/store-ops/SupervisorAuditSummaryModal").then(
+      (mod) => mod.SupervisorAuditSummaryModal
+    ),
+  { ssr: false }
+);
 
-function DashboardBody({
-  specialist,
-  storeNumber,
-  logout,
-}: {
-  specialist: StoreSpecialist;
-  storeNumber: string;
-  logout: () => void;
-}) {
+export function FloorTab({ specialist }: WorkflowTabProps) {
   const [week, setWeek] = useState("");
   const [rotations, setRotations] = useState<WeeklyRotationWithLocation[]>([]);
   const [flooringDeptId, setFlooringDeptId] = useState<string | null>(null);
@@ -65,24 +45,17 @@ function DashboardBody({
   const [healthKey, setHealthKey] = useState(0);
   const [contextTick, setContextTick] = useState(0);
   const [rollupOpen, setRollupOpen] = useState(false);
-  const working = workingDepartment(specialist);
-  const dept = departmentMeta(working === "all" ? "flooring" : working);
-  const flooringFocus =
-    isFlooringWorkingContext(specialist) ||
-    (!isMasterAdmin(specialist) &&
-      (specialist.assigned_department === "flooring" ||
-        specialist.assigned_department == null));
+  const flooringFocus = isFlooringWorkingContext(specialist);
   const associate = isAssociate(specialist);
 
   const reload = useCallback(
-    async (member: StoreSpecialist, opts?: { silent?: boolean }) => {
+    async (member: typeof specialist, opts?: { silent?: boolean }) => {
       if (!opts?.silent) setLoading(true);
       setError(null);
       try {
-        const [data, depts] = await Promise.all([
-          fetchThisWeekRotations(member),
-          fetchDepartments(member).catch(() => []),
-        ]);
+        const depts = await fetchDepartments(member).catch(() => []);
+        const deptId = workingDepartmentId(member, depts);
+        const data = await fetchThisWeekRotations(member, deptId);
         setWeek(data.assigned_week || "");
         setRotations(data.rotations ?? []);
         setFlooringDeptId(findFlooringDepartment(depts)?.id ?? null);
@@ -127,14 +100,7 @@ function DashboardBody({
   }, [rotations, flooringFocus, flooringDeptId]);
 
   return (
-    <div className="flex min-h-dvh flex-col">
-      <NavigationHub
-        title={`${dept.shortLabel} Rotation`}
-        specialist={specialist}
-        storeNumber={storeNumber}
-        onLogout={logout}
-      />
-
+    <>
       <main className="hub-main">
         {!associate ? (
           <SundayAuditStagingCard
@@ -256,6 +222,6 @@ function DashboardBody({
         assignedWeek={week}
         onClose={() => setRollupOpen(false)}
       />
-    </div>
+    </>
   );
 }

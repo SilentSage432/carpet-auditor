@@ -6,6 +6,7 @@
  * is specialty scan tools only — never the Floor tab.
  */
 
+import { workingDepartment } from "@/lib/admin-department-context";
 import {
   defaultSectionForMember,
   effectiveDepartment,
@@ -27,6 +28,7 @@ export type SpecialtyHubHref =
 export type NavHubHref =
   | "/admin/store-map"
   | "/admin/supervisors"
+  | "/admin/roles"
   | "/admin/exceptions"
   | "/dashboard"
   | "/verify-rotation"
@@ -77,6 +79,60 @@ export function shouldStayOnSpecialtyHub(
   section: HubSection | string | null | undefined
 ): boolean {
   return isSpecialtyHubSection(section);
+}
+
+export const WORKFLOW_TAB_HREFS = [
+  "/dashboard",
+  "/admin/store-map",
+  "/stock",
+  "/settings",
+] as const;
+
+export type WorkflowTabHref = (typeof WORKFLOW_TAB_HREFS)[number];
+
+export function workflowTabFromPathname(
+  pathname: string
+): WorkflowTabHref | null {
+  if (pathname === "/dashboard" || pathname.startsWith("/dashboard/")) {
+    return "/dashboard";
+  }
+  if (
+    pathname === "/admin/store-map" ||
+    pathname.startsWith("/admin/store-map/")
+  ) {
+    return "/admin/store-map";
+  }
+  if (pathname === "/stock" || pathname.startsWith("/stock/")) {
+    return "/stock";
+  }
+  if (pathname === "/settings" || pathname.startsWith("/settings/")) {
+    return "/settings";
+  }
+  return null;
+}
+
+export function prefetchWorkflowTab(href: string): void {
+  if (href === "/dashboard") {
+    void import("@/components/hub/tabs/FloorTab");
+  } else if (href === "/admin/store-map") {
+    void import("@/components/hub/tabs/MapTab");
+  } else if (href === "/stock") {
+    void import("@/components/hub/tabs/StockTab");
+  } else if (href === "/settings") {
+    void import("@/components/hub/tabs/SettingsTab");
+  }
+}
+
+export function workflowTabTitle(
+  href: WorkflowTabHref,
+  specialist?: StoreSpecialist | null
+): string {
+  if (href === "/admin/store-map") return "Store Map";
+  if (href === "/stock") return "Downstock & Stock";
+  if (href === "/settings") return "Settings & Config";
+  const working = specialist ? workingDepartment(specialist) : "flooring";
+  const dept = departmentMeta(working === "all" ? "flooring" : working);
+  return `${dept.shortLabel} Rotation`;
 }
 
 export type NavHubLink = {
@@ -154,7 +210,7 @@ export function navRoleLinks(
         label: "Supervisor & Role Management",
         shortLabel: "Team",
         icon: "users",
-        description: "Issue and manage department logins",
+        description: "Issue logins and grant cross-department access",
         overflow: true,
       },
       {
@@ -183,6 +239,14 @@ export function navRoleLinks(
       MAP_LINK,
       STOCK_LINK,
       SETTINGS_LINK,
+      {
+        href: "/admin/roles",
+        label: "Roles & Department Access",
+        shortLabel: "Roles",
+        icon: "users",
+        description: "Grant associates cross-department Floor / Map / Stock access",
+        overflow: true,
+      },
       {
         href: "/verify-rotation",
         label: "Verify & Report Exceptions",

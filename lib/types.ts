@@ -533,6 +533,11 @@ export type StoreSpecialist = {
   username: string | null;
   /** Department workspace this profile may access. */
   assigned_department: DepartmentScope | null;
+  /**
+   * Primary assigned_department plus granted cross-department scopes.
+   * Master Admin is implied full-store (not stored as `all` in this array).
+   */
+  accessible_departments?: OperationalDepartment[];
   /** First-login must set custom username + password. */
   must_change_credentials: boolean;
   /** Invite onboarding: must set a permanent PIN before dashboard access. */

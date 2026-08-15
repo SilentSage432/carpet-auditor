@@ -1,5 +1,29 @@
 # DeptSync Hub — Development Journal
 
+## 2026-08-14 — Multi-department role & scope access
+
+### Shipped
+- **`accessible_departments`** on `store_specialists` (hub scopes) and `profiles` (store-ops codes). Session list is always primary `assigned_department` plus granted extras (`lib/department-access.ts`).
+- **JWT / RLS** — `jwt_matches_department_code` also matches `app_metadata.accessible_departments`. Token hook + profile sync inject the array.
+- **Roster chips** — Associate edit/invite drawers and Settings / `/admin/roles` toggle extra departments. Supervisors grant on associates via instant `POST /api/admin/department-access`.
+- **Header switcher** — if `accessible_departments.length > 1`, the department pill becomes a dropdown. Pinning updates Floor / Map / Stock (no reload) and APIs reject department ids outside the granted set.
+
+## 2026-08-14 — IRP velocity heatmap on store_locations
+
+### Shipped
+- **Canonical bay table** — IRP cadence lives on `store_locations` (`last_serviced_at`, `velocity_tier`, `priority_override`, denormalized `department_code`). Walk-the-floor writes `bay_service_logs.location_id` (no `bays` / `bay_tags` tables). Weekly `last_completed_at` is unchanged.
+- **Store Map modes** — `[ Standard Map | Velocity Heatmap ]` on `StoreLocationGrid` (Map tab / `/admin/store-map`). Standard still uses `map-readiness.ts`. Heatmap colors by `classifyVelocityHeat`: cyan ≤7d, amber 8–18d, gray/orange >18d or null, pulse red/purple for `high` / `critical_hotspot`. Legend at the bottom of heatmap view.
+- **2-second walk-the-floor** — tapping a bay opens `WalkTheFloorSheet` (`light_touch` / `heavy_packdown` / `critical_hole`). `POST /api/store-locations/service` inserts the log, stamps `last_serviced_at`, and promotes velocity when 2+ heavy/critical logs land in 30 days (`lib/store-ops/velocity.ts` + `bay-service.ts`).
+- **Sunday draw** — `lib/store-ops/rotation.ts` `pickSundayVelocityPrioritized` runs after CARRIED_OVER so `velocity_tier IN ('high','critical_hotspot')` and `priority_override` fill the remaining weekly target first. `adaptiveDrawWeight` also multiplies those locations.
+
+## 2026-08-14 — Instant Floor/Map/Stock/Settings tab shell
+
+### Shipped
+- **Keep-alive workflow shell** — `app/(workflow)/layout.tsx` + `WorkflowTabShell` keep Floor / Map / Stock / Settings mounted behind `hidden`. Tab switches no longer unmount SessionGate, NavigationHub, Zebra, or scroll position.
+- **Stale-while-revalidate** — `createTtlCache.getSWR` (45s) on departments, weekly rotations, store locations, and roster so revisiting a tab paints cached data before the network.
+- **Shared Realtime** — one `postgres_changes` channel per logical name; extra subscribers add JS listeners only. Rapid tab switches do not reconnect.
+- **Code-split modals** — Snap Bay, Bulk Generate, Force Rotation, Sunday assign, Taxonomy, and Floor Pad stay out of the primary tab tree via `next/dynamic`.
+
 ## 2026-08-14 — Department seed respects UNIQUE(code) so D29 duplicate is not an error
 
 ### Shipped

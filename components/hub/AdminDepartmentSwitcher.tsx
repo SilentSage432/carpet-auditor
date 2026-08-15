@@ -3,7 +3,8 @@
 /**
  * Department context pill — presentation only.
  * Context ownership: lib/admin-department-context.ts
- * Master Admin: compact dropdown. Other roles: read-only department chip.
+ * Master Admin: compact dropdown. Multi-department associates/supervisors:
+ * granted-scope dropdown. Single-department roles: read-only chip.
  */
 
 import { useEffect, useId, useRef, useState } from "react";
@@ -14,12 +15,21 @@ import {
   adminWorkingDepartmentLabel,
   adminWorkingDepartmentPillLabel,
   preferredHubSectionForWorkingDept,
-  readAdminWorkingDepartment,
   setAdminWorkingDepartment,
+  workingDepartment,
   type AdminWorkingDepartment,
 } from "@/lib/admin-department-context";
+import {
+  accessibleDepartments,
+  hasMultipleDepartmentAccess,
+} from "@/lib/department-access";
 import { effectiveDepartment, isMasterAdmin } from "@/lib/rbac";
-import { departmentMeta, type StoreSpecialist } from "@/lib/types";
+import { invalidateStoreOpsListCaches } from "@/lib/store-ops/client";
+import {
+  departmentMeta,
+  type OperationalDepartment,
+  type StoreSpecialist,
+} from "@/lib/types";
 
 type Props = {
   specialist: StoreSpecialist | null;
@@ -37,11 +47,13 @@ export function AdminDepartmentSwitcher({
   const wrapRef = useRef<HTMLDivElement>(null);
   const menuId = useId();
   const master = isMasterAdmin(specialist);
+  const multi = hasMultipleDepartmentAccess(specialist);
+  const granted = specialist ? accessibleDepartments(specialist) : [];
 
   useEffect(() => {
-    setDept(readAdminWorkingDepartment());
+    setDept(workingDepartment(specialist));
     function onChange() {
-      setDept(readAdminWorkingDepartment());
+      setDept(workingDepartment(specialist));
     }
     window.addEventListener(ADMIN_DEPT_CONTEXT_EVENT, onChange);
     window.addEventListener("storage", onChange);
@@ -49,7 +61,7 @@ export function AdminDepartmentSwitcher({
       window.removeEventListener(ADMIN_DEPT_CONTEXT_EVENT, onChange);
       window.removeEventListener("storage", onChange);
     };
-  }, []);
+  }, [specialist]);
 
   useEffect(() => {
     if (!open) return;
@@ -62,7 +74,7 @@ export function AdminDepartmentSwitcher({
 
   if (!specialist) return null;
 
-  if (!master) {
+  if (!master && !multi) {
     const scoped = departmentMeta(effectiveDepartment(specialist));
     return (
       <span
@@ -78,12 +90,15 @@ export function AdminDepartmentSwitcher({
     );
   }
 
-  const options: AdminWorkingDepartment[] = [
-    "all",
-    ...ADMIN_PINNABLE_DEPARTMENTS,
-  ];
+  const options: AdminWorkingDepartment[] = master
+    ? ["all", ...ADMIN_PINNABLE_DEPARTMENTS]
+    : granted;
 
   function pin(next: AdminWorkingDepartment) {
+    if (!master && next !== "all" && !granted.includes(next as OperationalDepartment)) {
+      return;
+    }
+    invalidateStoreOpsListCaches();
     const saved = setAdminWorkingDepartment(next);
     setDept(saved);
     setOpen(false);

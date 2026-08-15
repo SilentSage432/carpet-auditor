@@ -71,12 +71,15 @@ export function pickRandom<T>(items: T[], count: number): T[] {
 type WeightedPickable = {
   manual_priority_count?: number | null;
   last_completed_at?: string | null;
+  velocity_tier?: string | null;
+  priority_override?: boolean | null;
 };
 
 /**
  * Adaptive draw: weight = (1 + manual_priority_count) × age_days
- * (null last_completed_at ≈ never audited → high age). Oldest + highest
- * manual frequency dominate selection without full determinism.
+ * × velocity multiplier. Null last_completed_at ≈ never audited → high age.
+ * High / critical_hotspot and priority_override are boosted inside a pool;
+ * Sunday generate still draws those pools first via rotation.ts.
  */
 export function pickWeightedByPriorityAndAge<T extends WeightedPickable>(
   items: T[],
@@ -165,5 +168,9 @@ export function adaptiveDrawWeight(loc: WeightedPickable): number {
     ? Math.max(0, Date.now() - last)
     : 365 * 86_400_000;
   const ageDays = Math.max(1, ageMs / 86_400_000);
-  return priority * ageDays;
+  let velocity = 1;
+  if (loc.priority_override === true) velocity *= 4;
+  if (loc.velocity_tier === "critical_hotspot") velocity *= 6;
+  else if (loc.velocity_tier === "high") velocity *= 3;
+  return priority * ageDays * velocity;
 }

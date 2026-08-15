@@ -108,10 +108,13 @@
 - [x] Lucide department glyphs (roster / pickers / Store Map) + Realtime subscribe-before-on + Cabinets D29 on Store Map overview (target 6)
 - [x] Admin Tools department load: UUID-safe list, SELECT-then-INSERT seed, static fallback instead of red banner
 - [x] Department seed upsert matches live UNIQUE(code) / departments_code_key so duplicate D29 does not red-banner Store Map
+- [x] Instant Floor/Map/Stock/Settings keep-alive shell + SWR list cache + shared Realtime + dynamic Snap Bay / Bulk Generate
+- [x] IRP / down-stocking velocity heatmap on `store_locations` + `bay_service_logs` (Map toggle, walk-the-floor log, Sunday velocity-priority draw)
+- [x] Multi-department role & scope access (`accessible_departments`, header switcher, `/admin/roles` chips)
 
 ## Next
 - [x] Apply Phase 1 JWT/RLS migration in Supabase + enable Custom Access Token Hook
-- [ ] Apply Phase 2 migrations (`20260812_manager_notes.sql`, `20260812_sunday_bay_assignments.sql`, `20260812_manager_notes_archive.sql`, `20260812_fix_manager_notes_rls.sql`, **`20260812_manager_notes_metadata.sql`**, **`enable_rls_flagged_tables.sql`**, **`20260813_p0_query_indexes.sql`**, **`20260814_downstock_queue.sql`**, **`20260814_cabinets_d29.sql`**) + Realtime on notes/assignments tables
+- [ ] Apply Phase 2 migrations (`20260812_manager_notes.sql`, `20260812_sunday_bay_assignments.sql`, `20260812_manager_notes_archive.sql`, `20260812_fix_manager_notes_rls.sql`, **`20260812_manager_notes_metadata.sql`**, **`enable_rls_flagged_tables.sql`**, **`20260813_p0_query_indexes.sql`**, **`20260814_downstock_queue.sql`**, **`20260814_cabinets_d29.sql`**, **`20260814_bay_velocity_heatmap.sql`**, **`20260814_multi_department_access.sql`**) + Realtime on notes/assignments tables
 - [ ] Confirm every Master Admin has `store_number` set so Hub bridge can link `profiles`
 - [ ] Additional Gemini product surfaces beyond current AI ops widgets (Slice 1 transport/auth/compact-then-narrate shipped)
 ## Non-goals

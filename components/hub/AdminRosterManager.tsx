@@ -4,7 +4,9 @@ import { useEffect, useMemo, useState } from "react";
 import { TextField } from "@/components/ui/NumberField";
 import { ConfirmModal } from "@/components/hub/ConfirmModal";
 import { DepartmentPicker } from "@/components/hub/DepartmentPicker";
+import { DepartmentAccessChips } from "@/components/hub/DepartmentAccessChips";
 import { DepartmentIcon, HubIcon } from "@/components/hub/NavIcons";
+import { composeAccessibleDepartments } from "@/lib/department-access";
 import {
   canManageTeamRoster,
   suggestUsername,
@@ -16,10 +18,11 @@ import {
   roleBadge,
   updateSpecialistScope,
 } from "@/lib/specialists";
-import { inviteSupervisor } from "@/lib/store-ops/client";
+import { inviteSupervisor, updateDepartmentAccess } from "@/lib/store-ops/client";
 import {
   departmentMeta,
   type DepartmentScope,
+  type OperationalDepartment,
   type SpecialistRole,
   type StoreSpecialist,
 } from "@/lib/types";
@@ -373,6 +376,7 @@ export function AdminRosterManager({
       <AdminEditScopeModal
         open={editTarget != null}
         member={editTarget}
+        actor={activeSpecialist}
         onClose={() => setEditTarget(null)}
         onSaved={async (record) => {
           await refreshRoster(record);
@@ -653,6 +657,7 @@ function AdminAddMemberModal({
   const [role, setRole] = useState<SpecialistRole>("Supervisor");
   const [department, setDepartment] =
     useState<DepartmentScope>("plumbing");
+  const [access, setAccess] = useState<OperationalDepartment[]>(["plumbing"]);
   const [username, setUsername] = useState("");
   const [phone, setPhone] = useState("");
   const [usernameTouched, setUsernameTouched] = useState(false);
@@ -664,6 +669,7 @@ function AdminAddMemberModal({
     setName("");
     setRole("Supervisor");
     setDepartment("plumbing");
+    setAccess(["plumbing"]);
     setUsername("");
     setPhone("");
     setUsernameTouched(false);
@@ -702,6 +708,7 @@ function AdminAddMemberModal({
         name: name.trim(),
         username: username.trim(),
         department: assigned,
+        accessible_departments: composeAccessibleDepartments(assigned, access),
         phone: phone.trim() || undefined,
         role:
           role === "Associate"
@@ -782,11 +789,21 @@ function AdminAddMemberModal({
           </fieldset>
 
           {role !== "MasterAdmin" ? (
-            <DepartmentPicker
-              value={department === "all" ? "flooring" : department}
-              onChange={setDepartment}
-              label="Assigned Department"
-            />
+            <>
+              <DepartmentPicker
+                value={department === "all" ? "flooring" : department}
+                onChange={(next) => {
+                  setDepartment(next);
+                  setAccess(composeAccessibleDepartments(next, access));
+                }}
+                label="Assigned Department"
+              />
+              <DepartmentAccessChips
+                primary={department === "all" ? "flooring" : department}
+                value={access}
+                onChange={setAccess}
+              />
+            </>
           ) : null}
 
           <TextField
@@ -861,15 +878,17 @@ function AdminAddMemberModal({
 type EditProps = {
   open: boolean;
   member: StoreSpecialist | null;
+  actor: StoreSpecialist | null;
   onClose: () => void;
   onSaved: (record: StoreSpecialist) => void;
 };
 
-function AdminEditScopeModal({ open, member, onClose, onSaved }: EditProps) {
+function AdminEditScopeModal({ open, member, actor, onClose, onSaved }: EditProps) {
   const [name, setName] = useState("");
   const [role, setRole] = useState<SpecialistRole>("Supervisor");
   const [department, setDepartment] =
     useState<DepartmentScope>("flooring");
+  const [access, setAccess] = useState<OperationalDepartment[]>([]);
   const [username, setUsername] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -878,12 +897,32 @@ function AdminEditScopeModal({ open, member, onClose, onSaved }: EditProps) {
     if (!open || !member) return;
     setName(member.name);
     setRole(member.role);
-    setDepartment(member.assigned_department ?? "flooring");
+    const home = member.assigned_department ?? "flooring";
+    setDepartment(home);
+    setAccess(composeAccessibleDepartments(home, member.accessible_departments));
     setUsername(member.username ?? "");
     setError(null);
   }, [open, member]);
 
   if (!open || !member) return null;
+
+  async function persistAccess(next: OperationalDepartment[]) {
+    setAccess(next);
+    if (!actor || !member || role === "MasterAdmin") return;
+    const assigned = department === "all" ? "flooring" : department;
+    setError(null);
+    try {
+      await updateDepartmentAccess(actor, {
+        specialist_id: member.id,
+        assigned_department: assigned,
+        accessible_departments: composeAccessibleDepartments(assigned, next),
+      });
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Could not update department access"
+      );
+    }
+  }
 
   async function handleSave() {
     if (!member) return;
@@ -894,12 +933,23 @@ function AdminEditScopeModal({ open, member, onClose, onSaved }: EditProps) {
     setSaving(true);
     setError(null);
     try {
+      const assigned = role === "MasterAdmin" ? "all" : department;
       const { record } = await updateSpecialistScope(member, {
         name: name.trim(),
         role,
-        assigned_department: role === "MasterAdmin" ? "all" : department,
+        assigned_department: assigned,
+        accessible_departments: composeAccessibleDepartments(assigned, access),
         username: username.trim() || null,
       });
+      if (actor && role !== "MasterAdmin") {
+        await updateDepartmentAccess(actor, {
+          specialist_id: member.id,
+          assigned_department: assigned,
+          accessible_departments: composeAccessibleDepartments(assigned, access),
+        }).catch(() => {
+          /* store_specialists already saved */
+        });
+      }
       onSaved(record);
     } catch {
       setError("Could not update scope");
@@ -966,11 +1016,21 @@ function AdminEditScopeModal({ open, member, onClose, onSaved }: EditProps) {
             </div>
           </fieldset>
           {role !== "MasterAdmin" ? (
-            <DepartmentPicker
-              value={department === "all" ? "flooring" : department}
-              onChange={setDepartment}
-              label="Department"
-            />
+            <>
+              <DepartmentPicker
+                value={department === "all" ? "flooring" : department}
+                onChange={(next) => {
+                  setDepartment(next);
+                  setAccess(composeAccessibleDepartments(next, access));
+                }}
+                label="Department"
+              />
+              <DepartmentAccessChips
+                primary={department === "all" ? "flooring" : department}
+                value={access}
+                onChange={(next) => void persistAccess(next)}
+              />
+            </>
           ) : null}
         </div>
 

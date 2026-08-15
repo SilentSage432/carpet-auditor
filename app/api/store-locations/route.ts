@@ -8,9 +8,9 @@ import {
 } from "@/lib/store-ops/auth-server";
 import { isValidAisle, normalizeAisle } from "@/lib/store-ops/aisle";
 import { storeOpsAuthRequiredBody } from "@/lib/store-ops/auth-soft";
+import { resolveScopedDepartmentId, assertActorCanAccessDepartmentId } from "@/lib/store-ops/department-scope";
 import { isMissingColumnError } from "@/lib/store-ops/errors";
 import { getSupabaseAdmin } from "@/lib/store-ops/supabase-admin";
-import { resolveDepartmentIdByCode } from "@/lib/store-ops/rotations";
 import { resolveStoreByNumber } from "@/lib/store-ops/stores";
 import { supabaseAdminMissingMessage } from "@/lib/supabase/env";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -19,6 +19,7 @@ const STORE_LOCATION_LIST_COLUMNS = [
   "id",
   "store_id",
   "department_id",
+  "department_code",
   "aisle",
   "bay",
   "type",
@@ -26,20 +27,41 @@ const STORE_LOCATION_LIST_COLUMNS = [
   "status",
   "manual_priority_count",
   "last_completed_at",
+  "last_serviced_at",
+  "velocity_tier",
+  "priority_override",
   "updated_at",
   "is_active",
   "cycle_number",
   "audit_frequency_days",
 ] as const;
 
-const STORE_LOCATION_LIST_COLUMNS_WITHOUT_LAST_COMPLETED =
-  STORE_LOCATION_LIST_COLUMNS.filter((column) => column !== "last_completed_at");
+const OPTIONAL_LIST_COLUMNS = [
+  "last_completed_at",
+  "last_serviced_at",
+  "velocity_tier",
+  "priority_override",
+  "department_code",
+] as const;
+
+function listSelect(omit: readonly string[]): string {
+  return STORE_LOCATION_LIST_COLUMNS.filter(
+    (column) => !omit.includes(column)
+  ).join(", ");
+}
 
 function normalizeStoreLocationRow(row: Record<string, unknown>) {
   return {
     ...row,
     last_completed_at:
       row.last_completed_at == null ? null : String(row.last_completed_at),
+    last_serviced_at:
+      row.last_serviced_at == null ? null : String(row.last_serviced_at),
+    velocity_tier:
+      row.velocity_tier == null ? "standard" : String(row.velocity_tier),
+    priority_override: Boolean(row.priority_override),
+    department_code:
+      row.department_code == null ? null : String(row.department_code),
   };
 }
 
@@ -75,55 +97,41 @@ export async function GET(request: Request) {
         ? storeIdParam
         : store.id;
 
-    const storeLocationSelect = STORE_LOCATION_LIST_COLUMNS.join(", ");
-    const storeLocationSelectFallback =
-      STORE_LOCATION_LIST_COLUMNS_WITHOUT_LAST_COMPLETED.join(", ");
-
     let departmentFilter: string | null = null;
     if (isDeptFloorActor(actor)) {
-      if (!actor.departmentCode) {
-        return NextResponse.json({ error: "No department assigned" }, { status: 403 });
-      }
-      const deptId = await resolveDepartmentIdByCode(
+      departmentFilter = await resolveScopedDepartmentId(
         supabase,
-        actor.departmentCode,
-        store.id
+        actor,
+        store.id,
+        departmentIdParam
       );
-      if (!deptId) {
-        return NextResponse.json(
-          { error: "Department not found" },
-          { status: 404 }
-        );
-      }
-      departmentFilter = deptId;
     } else if (departmentIdParam) {
       departmentFilter = departmentIdParam;
     }
 
-    let query = supabase
-      .from("store_locations")
-      .select(storeLocationSelect)
-      .eq("store_id", storeId)
-      .order("aisle")
-      .order("bay");
-    if (departmentFilter) {
-      query = query.eq("department_id", departmentFilter);
-    }
-
-    let { data, error } = await query;
-    if (error && isMissingColumnError(error, "last_completed_at")) {
-      let fallback = supabase
+    const omitted: string[] = [];
+    let data: unknown[] | null = null;
+    let error: { message?: string } | null = null;
+    for (let attempt = 0; attempt < OPTIONAL_LIST_COLUMNS.length + 1; attempt += 1) {
+      let query = supabase
         .from("store_locations")
-        .select(storeLocationSelectFallback)
+        .select(listSelect(omitted))
         .eq("store_id", storeId)
         .order("aisle")
         .order("bay");
       if (departmentFilter) {
-        fallback = fallback.eq("department_id", departmentFilter);
+        query = query.eq("department_id", departmentFilter);
       }
-      const retry = await fallback;
-      data = retry.data;
-      error = retry.error;
+      const result = await query;
+      data = result.data as unknown[] | null;
+      error = result.error;
+      if (!error) break;
+      const missing = OPTIONAL_LIST_COLUMNS.find(
+        (column) =>
+          !omitted.includes(column) && isMissingColumnError(error, column)
+      );
+      if (!missing) break;
+      omitted.push(missing);
     }
 
     if (error) {
@@ -197,15 +205,18 @@ export async function PATCH(request: Request) {
     }
 
     if (actor.role === "department_supervisor") {
-      const deptId = actor.departmentCode
-        ? await resolveDepartmentIdByCode(
-            supabase,
-            actor.departmentCode,
-            store.id
-          )
-        : null;
-      if (!deptId || existing.department_id !== deptId) {
-        return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      try {
+        await assertActorCanAccessDepartmentId(
+          supabase,
+          actor,
+          store.id,
+          String(existing.department_id ?? "")
+        );
+      } catch (err) {
+        if (err instanceof StoreOpsAuthError) {
+          return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+        }
+        throw err;
       }
       // Supervisors may only toggle bay is_active
       if (

@@ -11,6 +11,8 @@ import {
   type OperationalDepartment,
   type StoreSpecialist,
 } from "@/lib/types";
+import { toStoreOpsDepartmentCode } from "@/lib/store-ops/department-codes";
+import { accessibleDepartments } from "@/lib/department-access";
 import { effectiveDepartment, isMasterAdmin } from "@/lib/rbac";
 
 const STORAGE_KEY = "deptsync_admin_working_department";
@@ -101,14 +103,20 @@ export function setAdminWorkingDepartment(
 /**
  * Effective working department for filters / staging priority.
  * Master Admin: pinned context when set, else "all".
- * Everyone else: RBAC effectiveDepartment (unchanged).
+ * Multi-department associates/supervisors: pinned scope when granted, else primary.
+ * Single-department profiles: RBAC effectiveDepartment (unchanged).
  */
 export function workingDepartment(
   member: StoreSpecialist | null | undefined
 ): DepartmentScope {
   if (!member) return "flooring";
-  if (!isMasterAdmin(member)) return effectiveDepartment(member);
-  return readAdminWorkingDepartment();
+  if (isMasterAdmin(member)) return readAdminWorkingDepartment();
+  const allowed = accessibleDepartments(member);
+  if (allowed.length > 1) {
+    const pin = readAdminWorkingDepartment();
+    if (pin !== "all" && allowed.includes(pin)) return pin;
+  }
+  return effectiveDepartment(member);
 }
 
 export function isFlooringWorkingContext(
@@ -116,6 +124,18 @@ export function isFlooringWorkingContext(
 ): boolean {
   const dept = workingDepartment(member);
   return dept === "flooring";
+}
+
+/** Store-ops departments.id for the current working pin, or undefined for all. */
+export function workingDepartmentId(
+  member: StoreSpecialist | null | undefined,
+  departments: Array<{ id: string; code: string }>
+): string | undefined {
+  const scope = workingDepartment(member);
+  if (!member || scope === "all") return undefined;
+  const code = toStoreOpsDepartmentCode(scope);
+  if (!code) return undefined;
+  return departments.find((row) => row.code === code)?.id;
 }
 
 /** Prefer flooring hub section when Master Admin pins D23. */

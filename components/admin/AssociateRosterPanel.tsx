@@ -9,7 +9,12 @@
 import { useMemo, useState } from "react";
 import { DepartmentPicker } from "@/components/hub/DepartmentPicker";
 import { DepartmentIcon, HubIcon } from "@/components/hub/NavIcons";
-import { canManageTeamRoster, suggestUsername } from "@/lib/rbac";
+import { canGrantDepartmentAccess, canManageTeamRoster, suggestUsername } from "@/lib/rbac";
+import { DepartmentAccessChips } from "@/components/hub/DepartmentAccessChips";
+import {
+  composeAccessibleDepartments,
+} from "@/lib/department-access";
+import { updateDepartmentAccess } from "@/lib/store-ops/client";
 import {
   dedupeRoster,
   fetchSpecialists,
@@ -63,6 +68,7 @@ export function AssociateRosterPanel({
   compact = false,
 }: Props) {
   const canManage = canManageTeamRoster(specialist);
+  const canGrant = canGrantDepartmentAccess(specialist);
   const [name, setName] = useState("");
   const [department, setDepartment] = useState<DepartmentScope>("flooring");
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -96,6 +102,32 @@ export function AssociateRosterPanel({
     } catch (err) {
       setError(
         err instanceof Error ? err.message : "Could not update department"
+      );
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function handleAccess(
+    member: StoreSpecialist,
+    next: StoreSpecialist["accessible_departments"]
+  ) {
+    const primary =
+      member.assigned_department && member.assigned_department !== "all"
+        ? member.assigned_department
+        : "flooring";
+    setBusyId(member.id);
+    setError(null);
+    try {
+      await updateDepartmentAccess(specialist, {
+        specialist_id: member.id,
+        assigned_department: primary,
+        accessible_departments: composeAccessibleDepartments(primary, next),
+      });
+      await refresh();
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Could not update department access"
       );
     } finally {
       setBusyId(null);
@@ -240,6 +272,21 @@ export function AssociateRosterPanel({
                       {departmentMeta(dept).shortLabel}
                     </p>
                   )}
+                  {canGrant &&
+                  member.role !== "MasterAdmin" &&
+                  (canManage || member.role === "Associate") ? (
+                    <div className="mt-2">
+                      <DepartmentAccessChips
+                        primary={dept}
+                        value={composeAccessibleDepartments(
+                          dept,
+                          member.accessible_departments
+                        )}
+                        disabled={busyId === member.id}
+                        onChange={(next) => void handleAccess(member, next)}
+                      />
+                    </div>
+                  ) : null}
                   {onShiftHoursChange && onDuty ? (
                     <div className="mt-1.5 flex flex-wrap gap-1">
                       {SHIFT_HOUR_PRESETS.map((h) => (

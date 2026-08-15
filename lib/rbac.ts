@@ -4,6 +4,8 @@
  * Presentation consumes; specialists ownership stays in lib/specialists.ts.
  */
 
+import type { NavIconId } from "@/components/hub/NavIcons";
+import { accessibleDepartments } from "./department-access";
 import {
   DEPARTMENT_META,
   isDepartmentScope,
@@ -13,7 +15,6 @@ import {
   type StoreSpecialist,
   HUB_SECTIONS,
 } from "./types";
-import type { NavIconId } from "@/components/hub/NavIcons";
 
 export type NavTab = {
   id: HubSection;
@@ -95,6 +96,13 @@ export function canAccessSection(
   return visibleSections(member).includes(section);
 }
 
+function sectionsForDepartment(dept: DepartmentScope): HubSection[] {
+  if (dept === "appliances") return ["appliances", "settings"];
+  if (dept === "flooring") return ["audit", "remnants", "settings"];
+  if (dept === "all") return ["audit", "appliances", "remnants", "settings"];
+  return ["department", "settings"];
+}
+
 /** Sections visible for the active profile (Master Admin → full store). */
 export function visibleSections(
   member: StoreSpecialist | null | undefined
@@ -103,22 +111,25 @@ export function visibleSections(
     return ["audit", "appliances", "remnants", "settings"];
   }
 
-  const dept = effectiveDepartment(member);
-
-  if (dept === "appliances") {
-    return ["appliances", "settings"];
+  const granted = accessibleDepartments(member);
+  if (granted.length === 0) {
+    return sectionsForDepartment(effectiveDepartment(member));
   }
 
-  if (dept === "flooring") {
-    return ["audit", "remnants", "settings"];
+  const allowed = new Set<HubSection>(["settings"]);
+  for (const dept of granted) {
+    for (const section of sectionsForDepartment(dept)) {
+      allowed.add(section);
+    }
   }
-
-  if (dept === "all") {
-    return ["audit", "appliances", "remnants", "settings"];
-  }
-
-  // Plumbing, electrical, lawn_garden, paint, millwork, cabinets, building_materials, hardware
-  return ["department", "settings"];
+  const order: HubSection[] = [
+    "audit",
+    "appliances",
+    "department",
+    "remnants",
+    "settings",
+  ];
+  return order.filter((section) => allowed.has(section));
 }
 
 /** Bottom-nav tabs filtered + labeled for the active role/department. */
@@ -226,6 +237,13 @@ export function canManageTeamRoster(
   member: StoreSpecialist | null | undefined
 ): boolean {
   return isMasterAdmin(member);
+}
+
+/** Master Admin or Supervisor may grant cross-department access on associates. */
+export function canGrantDepartmentAccess(
+  member: StoreSpecialist | null | undefined
+): boolean {
+  return isMasterAdmin(member) || member?.role === "Supervisor";
 }
 
 export function canPrePopulateAnyDepartment(

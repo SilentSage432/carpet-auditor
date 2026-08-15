@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import {
+  actorAccessibleDepartmentCodes,
   isDeptFloorActor,
   resolveStoreOpsActor,
   requireSuperAdmin,
@@ -59,10 +60,9 @@ export async function GET(request: Request) {
     await ensureDepartmentsForStore(supabase, store.id);
 
     let departments = await listDepartmentsForStore(supabase, store);
-    if (isDeptFloorActor(actor) && actor.departmentCode) {
-      departments = departments.filter(
-        (row) => row.code === actor.departmentCode
-      );
+    if (isDeptFloorActor(actor)) {
+      const allowed = actorAccessibleDepartmentCodes(actor);
+      departments = departments.filter((row) => allowed.includes(row.code));
     }
 
     return NextResponse.json({

@@ -1,3 +1,6 @@
+import { composeAccessibleDepartments } from "./department-access";
+import { isMissingColumnError } from "./store-ops/errors";
+import { createTtlCache } from "@/lib/store-ops/ttl-cache";
 import { uid } from "./uid";
 import type {
   DepartmentScope,
@@ -16,9 +19,29 @@ import {
 const STORAGE_KEY = "carpet_specialists_offline";
 const ACTIVE_KEY = "carpet_active_specialist";
 const TABLE = "store_specialists";
+const rosterCache = createTtlCache<StoreSpecialist[]>(45_000);
+
+function invalidateRosterCache() {
+  rosterCache.invalidate();
+}
 
 /** Roster list columns — never pin_code or temp_pin_hash. */
 const SPECIALIST_LIST_SELECT = [
+  "id",
+  "store_number",
+  "name",
+  "role",
+  "username",
+  "assigned_department",
+  "accessible_departments",
+  "must_change_credentials",
+  "must_change_pin",
+  "phone_number",
+  "is_active",
+  "created_at",
+].join(", ");
+
+const SPECIALIST_LIST_SELECT_FALLBACK = [
   "id",
   "store_number",
   "name",
@@ -171,6 +194,10 @@ export function mapRow(row: Record<string, unknown>): StoreSpecialist {
     phone_number: phone,
     is_active: isActive,
     created_at: String(row.created_at ?? new Date().toISOString()),
+    accessible_departments: composeAccessibleDepartments(
+      assigned,
+      row.accessible_departments
+    ),
     offline: Boolean(row.offline),
   };
 }
@@ -257,6 +284,10 @@ export function dedupeRoster(roster: StoreSpecialist[]): StoreSpecialist[] {
             : winner.role,
         assigned_department:
           winner.assigned_department ?? existing.assigned_department,
+        accessible_departments: composeAccessibleDepartments(
+          winner.assigned_department ?? existing.assigned_department,
+          winner.accessible_departments ?? existing.accessible_departments
+        ),
         is_active: inactive ? false : winner.is_active !== false,
       });
     }
@@ -513,6 +544,12 @@ function specialistPayload(record: StoreSpecialist): Record<string, unknown> {
   if (record.assigned_department !== undefined) {
     payload.assigned_department = record.assigned_department;
   }
+  if (record.accessible_departments !== undefined) {
+    payload.accessible_departments = composeAccessibleDepartments(
+      record.assigned_department,
+      record.accessible_departments
+    );
+  }
   if (record.phone_number != null && String(record.phone_number).trim() !== "") {
     payload.phone_number = String(record.phone_number).trim();
   }
@@ -535,6 +572,7 @@ function buildSpecialistDbPatch(
       | "must_change_credentials"
       | "name"
       | "assigned_department"
+      | "accessible_departments"
       | "is_active"
       | "phone_number"
       | "must_change_pin"
@@ -563,6 +601,12 @@ function buildSpecialistDbPatch(
   }
   if (patch.assigned_department !== undefined) {
     update.assigned_department = patch.assigned_department;
+  }
+  if (patch.accessible_departments !== undefined) {
+    update.accessible_departments = composeAccessibleDepartments(
+      patch.assigned_department,
+      patch.accessible_departments
+    );
   }
   if (patch.is_active !== undefined) {
     update.is_active = patch.is_active;
@@ -594,6 +638,10 @@ export function isFallbackProfileId(id: string): boolean {
 
 export async function fetchSpecialists(): Promise<StoreSpecialist[]> {
   const store = getStoreNumber();
+  return rosterCache.getSWR(`roster:${store}`, () => loadSpecialists(store));
+}
+
+async function loadSpecialists(store: string): Promise<StoreSpecialist[]> {
   // Drop legacy hardcoded offline seeds from localStorage on every load.
   const local = readLocal(store);
   writeLocal(local, store);
@@ -604,11 +652,21 @@ export async function fetchSpecialists(): Promise<StoreSpecialist[]> {
   }
 
   try {
-    const { data, error } = await supabase
+    let { data, error } = await supabase
       .from(TABLE)
       .select(SPECIALIST_LIST_SELECT)
       .eq("store_number", store)
       .order("name", { ascending: true });
+
+    if (error && isMissingColumnError(error, "accessible_departments")) {
+      const retry = await supabase
+        .from(TABLE)
+        .select(SPECIALIST_LIST_SELECT_FALLBACK)
+        .eq("store_number", store)
+        .order("name", { ascending: true });
+      data = retry.data;
+      error = retry.error;
+    }
 
     if (error) throw error;
 
@@ -661,8 +719,10 @@ export async function saveSpecialist(input: {
   pin_code?: string | null;
   username?: string | null;
   assigned_department?: DepartmentScope | null;
+  accessible_departments?: StoreSpecialist["accessible_departments"];
   must_change_credentials?: boolean;
 }): Promise<{ record: StoreSpecialist; offline: boolean }> {
+  invalidateRosterCache();
   const now = new Date().toISOString();
   const store = input.store_number ?? getStoreNumber();
   const role = normalizeRole(input.role ?? "Associate");
@@ -698,6 +758,10 @@ export async function saveSpecialist(input: {
         ? null
         : String(input.username).trim(),
     assigned_department: assigned,
+    accessible_departments: composeAccessibleDepartments(
+      assigned,
+      input.accessible_departments
+    ),
     must_change_credentials: Boolean(input.must_change_credentials),
     is_active: true,
     created_at: now,
@@ -1088,11 +1152,24 @@ async function persistSpecialistFields(
       saved = await insertProfile();
     } else {
       // Update only patched columns — never require or force assigned_department
-      const { data, error } = await supabase
+      let payload = buildSpecialistDbPatch(patch);
+      let { data, error } = await supabase
         .from(TABLE)
-        .update(buildSpecialistDbPatch(patch))
+        .update(payload)
         .eq("id", targetId)
         .select("*");
+
+      if (error && isMissingColumnError(error, "accessible_departments")) {
+        const { accessible_departments: _drop, ...rest } = payload;
+        payload = rest;
+        const retry = await supabase
+          .from(TABLE)
+          .update(payload)
+          .eq("id", targetId)
+          .select("*");
+        data = retry.data;
+        error = retry.error;
+      }
 
       if (error) {
         console.error("Failed to update specialist PIN/profile:", error);
@@ -1218,6 +1295,7 @@ export async function updateSpecialistScope(
     name?: string;
     role?: SpecialistRole;
     assigned_department?: DepartmentScope | null;
+    accessible_departments?: StoreSpecialist["accessible_departments"];
     username?: string | null;
     is_active?: boolean;
   }
@@ -1235,6 +1313,13 @@ export async function updateSpecialistScope(
       : input.username == null || String(input.username).trim() === ""
         ? null
         : String(input.username).trim();
+  const accessible =
+    role === "MasterAdmin"
+      ? []
+      : composeAccessibleDepartments(
+          assigned,
+          input.accessible_departments ?? member.accessible_departments
+        );
 
   return saveSpecialist({
     id: member.id,
@@ -1244,6 +1329,7 @@ export async function updateSpecialistScope(
     pin_code: member.pin_code,
     username,
     assigned_department: assigned,
+    accessible_departments: accessible,
     must_change_credentials: member.must_change_credentials,
   }).then(async (saved) => {
     if (input.is_active === undefined || input.is_active === saved.record.is_active) {

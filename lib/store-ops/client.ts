@@ -17,9 +17,12 @@ import {
   isShiftBriefingTransportError,
 } from "./shift-briefing";
 import type {
+  BayServiceIntensity,
+  BayServiceLog,
   BulkGenerateInput,
   Department,
   StoreLocation,
+  VelocityTier,
   WeeklyRotationWithLocation,
 } from "./types";
 
@@ -32,6 +35,9 @@ const rotationsCache = createTtlCache<{
   assigned_week: string;
   rotations: WeeklyRotationWithLocation[];
 }>(STORE_OPS_LIST_TTL_MS);
+const locationsCache = createTtlCache<StoreOpsListResult<StoreLocation>>(
+  STORE_OPS_LIST_TTL_MS
+);
 
 function storeOpsListCacheKey(
   specialist: StoreSpecialist,
@@ -44,6 +50,7 @@ function storeOpsListCacheKey(
 export function invalidateStoreOpsListCaches(): void {
   departmentsCache.invalidate();
   rotationsCache.invalidate();
+  locationsCache.invalidate();
 }
 
 async function storeOpsFetch<T>(
@@ -120,7 +127,7 @@ export async function fetchDepartmentsDetailed(
     return { items: [], authRequired: false };
   }
 
-  return departmentsCache.get(
+  return departmentsCache.getSWR(
     storeOpsListCacheKey(specialist, `departments:${store}`),
     async () => {
       try {
@@ -165,28 +172,33 @@ export async function fetchStoreLocationsDetailed(
   const qs = departmentId
     ? `?department_id=${encodeURIComponent(departmentId)}`
     : "";
-  try {
-    const data = await storeOpsFetch<{
-      locations: StoreLocation[];
-      auth_required?: boolean;
-      hint?: string;
-    }>(`/api/store-locations${qs}`, specialist);
-    return {
-      items: data.locations ?? [],
-      authRequired: Boolean(data.auth_required),
-      hint: data.hint,
-    };
-  } catch (err) {
-    const message = String((err as { message?: string } | null)?.message ?? "");
-    if (isStoreOpsAuthFailureMessage(message)) {
-      return {
-        items: [],
-        authRequired: true,
-        hint: STORE_OPS_AUTH_HINT,
-      };
+  return locationsCache.getSWR(
+    storeOpsListCacheKey(specialist, `locations:${qs}`),
+    async () => {
+      try {
+        const data = await storeOpsFetch<{
+          locations: StoreLocation[];
+          auth_required?: boolean;
+          hint?: string;
+        }>(`/api/store-locations${qs}`, specialist);
+        return {
+          items: data.locations ?? [],
+          authRequired: Boolean(data.auth_required),
+          hint: data.hint,
+        };
+      } catch (err) {
+        const message = String((err as { message?: string } | null)?.message ?? "");
+        if (isStoreOpsAuthFailureMessage(message)) {
+          return {
+            items: [],
+            authRequired: true,
+            hint: STORE_OPS_AUTH_HINT,
+          };
+        }
+        throw err;
+      }
     }
-    throw err;
-  }
+  );
 }
 
 export async function bulkGenerateLocations(
@@ -226,6 +238,31 @@ export async function aiParseLocations(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),
   });
+}
+
+export async function logBayService(
+  specialist: StoreSpecialist,
+  input: {
+    location_id: string;
+    intensity: BayServiceIntensity;
+    notes?: string | null;
+  }
+): Promise<{
+  log: BayServiceLog;
+  location: StoreLocation;
+  velocity_tier: VelocityTier;
+}> {
+  const data = await storeOpsFetch<{
+    log: BayServiceLog;
+    location: StoreLocation;
+    velocity_tier: VelocityTier;
+  }>("/api/store-locations/service", specialist, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  invalidateStoreOpsListCaches();
+  return data;
 }
 
 export async function patchStoreLocation(
@@ -331,20 +368,45 @@ export async function fetchBayLocationHistory(
   };
 }
 
+export async function updateDepartmentAccess(
+  specialist: StoreSpecialist,
+  input: {
+    specialist_id: string;
+    accessible_departments: string[];
+    assigned_department?: string | null;
+  }
+): Promise<{ accessible_departments: string[] }> {
+  const data = await storeOpsFetch<{
+    accessible_departments?: string[];
+  }>("/api/admin/department-access", specialist, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  invalidateStoreOpsListCaches();
+  return {
+    accessible_departments: data.accessible_departments ?? [],
+  };
+}
+
 export async function fetchThisWeekRotations(
-  specialist: StoreSpecialist
+  specialist: StoreSpecialist,
+  departmentId?: string
 ): Promise<{
   assigned_week: string;
   rotations: WeeklyRotationWithLocation[];
 }> {
-  return rotationsCache.get(
-    storeOpsListCacheKey(specialist, "weekly-rotations"),
+  const qs = departmentId
+    ? `?department_id=${encodeURIComponent(departmentId)}`
+    : "";
+  return rotationsCache.getSWR(
+    storeOpsListCacheKey(specialist, `weekly-rotations:${qs}`),
     async () => {
       try {
         const data = await storeOpsFetch<{
           assigned_week?: string | null;
           rotations?: WeeklyRotationWithLocation[] | null;
-        }>("/api/weekly-rotations", specialist);
+        }>("/api/weekly-rotations" + qs, specialist);
 
         const week = String(data.assigned_week ?? "").trim();
         const rotations = Array.isArray(data.rotations)
@@ -823,6 +885,7 @@ export async function inviteSupervisor(
     name?: string;
     username?: string;
     department?: string;
+    accessible_departments?: string[];
     phone?: string;
     role?: "Supervisor" | "Associate" | "MasterAdmin";
     test_mode?: boolean;

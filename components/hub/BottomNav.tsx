@@ -9,6 +9,7 @@ import Link from "next/link";
 import { NavIcon } from "@/components/hub/NavIcons";
 import {
   isNavHubPathActive,
+  prefetchWorkflowTab,
   type NavHubLink,
 } from "@/lib/nav-hub";
 
@@ -49,6 +50,8 @@ export function BottomNav({
             <Link
               key={link.href}
               href={link.href}
+              prefetch
+              onPointerEnter={() => prefetchWorkflowTab(link.href)}
               aria-current={active ? "page" : undefined}
               className={`relative flex min-h-16 flex-col items-center justify-center gap-0.5 px-1 pt-1 ${
                 active

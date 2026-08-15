@@ -6,6 +6,7 @@
 import type { DepartmentScope, StoreSpecialist } from "@/lib/types";
 import { isMasterAdmin } from "@/lib/rbac";
 import { normalizeStoreNumber } from "@/lib/store";
+import { accessibleStoreOpsCodes } from "@/lib/department-access";
 import { toStoreOpsDepartmentCode } from "./department-codes";
 import type { StoreOpsUserRole } from "./types";
 
@@ -16,9 +17,35 @@ export type StoreOpsActor = {
   role: StoreOpsUserRole;
   /** Store-ops departments.code (Lowe's / mapped hub scope). */
   departmentCode: string | null;
+  /** Primary + granted store-ops department codes. */
+  accessibleDepartmentCodes: string[];
   /** Hub store_number for multi-store scoping. */
   storeNumber: string;
 };
+
+export function actorAccessibleDepartmentCodes(
+  actor: StoreOpsActor | null | undefined
+): string[] {
+  if (!actor || actor.role === "super_admin") return [];
+  const codes = new Set(
+    (actor.accessibleDepartmentCodes ?? [])
+      .map((code) => String(code ?? "").trim())
+      .filter(Boolean)
+  );
+  if (actor.departmentCode) codes.add(actor.departmentCode);
+  return [...codes];
+}
+
+export function actorAllowsDepartmentCode(
+  actor: StoreOpsActor | null | undefined,
+  code: string | null | undefined
+): boolean {
+  if (!actor) return false;
+  if (actor.role === "super_admin") return true;
+  const needle = String(code ?? "").trim();
+  if (!needle) return false;
+  return actorAccessibleDepartmentCodes(actor).includes(needle);
+}
 
 /** Client UI gating from local specialist roster (not API auth). */
 export function actorFromSpecialist(
@@ -36,6 +63,7 @@ export function actorFromSpecialist(
       specialistId: member.id,
       role: "super_admin",
       departmentCode: null,
+      accessibleDepartmentCodes: [],
       storeNumber: store,
     };
   }
@@ -50,6 +78,7 @@ export function actorFromSpecialist(
       role:
         member.role === "Associate" ? "associate" : "department_supervisor",
       departmentCode: code,
+      accessibleDepartmentCodes: accessibleStoreOpsCodes(member),
       storeNumber: store,
     };
   }

@@ -15,12 +15,8 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { BulkLocationGenerator } from "@/components/admin/BulkLocationGenerator";
-import { ForceRotationModal } from "@/components/admin/ForceRotationModal";
-import { SundayAuditAssignmentModal } from "@/components/admin/SundayAuditAssignmentModal";
 import { DepartmentTargetsMatrix } from "@/components/admin/DepartmentTargetsMatrix";
 import { AssociateRosterPanel } from "@/components/admin/AssociateRosterPanel";
-import { TaxonomyManagerModal } from "@/components/catalog/TaxonomyManagerModal";
 import { HubIcon, type HubIconId } from "@/components/hub/NavIcons";
 import { selectOnFocus } from "@/lib/number-input";
 import { isMasterAdmin } from "@/lib/rbac";
@@ -49,6 +45,34 @@ import type {
 import type { Department } from "@/lib/store-ops/types";
 import type { StoreSpecialist } from "@/lib/types";
 
+const BulkLocationGenerator = dynamic(
+  () =>
+    import("@/components/admin/BulkLocationGenerator").then(
+      (mod) => mod.BulkLocationGenerator
+    ),
+  { ssr: false }
+);
+const ForceRotationModal = dynamic(
+  () =>
+    import("@/components/admin/ForceRotationModal").then(
+      (mod) => mod.ForceRotationModal
+    ),
+  { ssr: false }
+);
+const SundayAuditAssignmentModal = dynamic(
+  () =>
+    import("@/components/admin/SundayAuditAssignmentModal").then(
+      (mod) => mod.SundayAuditAssignmentModal
+    ),
+  { ssr: false }
+);
+const TaxonomyManagerModal = dynamic(
+  () =>
+    import("@/components/catalog/TaxonomyManagerModal").then(
+      (mod) => mod.TaxonomyManagerModal
+    ),
+  { ssr: false }
+);
 const ManagerNotesWorkspace = dynamic(
   () =>
     import("@/components/store-ops/ManagerNotesWorkspace").then(
@@ -286,6 +310,7 @@ export function AdminToolsDrawer({
         </aside>
       </div>
 
+      {forceOpen ? (
       <ForceRotationModal
         open={forceOpen}
         onClose={() => setForceOpen(false)}
@@ -299,17 +324,22 @@ export function AdminToolsDrawer({
           void reloadDepts();
         }}
       />
+      ) : null}
+      {sundayOpen ? (
       <SundayAuditAssignmentModal
         open={sundayOpen}
         onClose={() => setSundayOpen(false)}
         specialist={specialist}
         onChanged={() => void reloadDepts()}
       />
+      ) : null}
+      {taxonomyOpen ? (
       <TaxonomyManagerModal
         open={taxonomyOpen}
         onClose={() => setTaxonomyOpen(false)}
         departments={departments}
       />
+      ) : null}
       {notesOpen ? (
         <ManagerNotesWorkspace
           open={notesOpen}
@@ -484,7 +514,12 @@ function ToolCard({
 
   if (href) {
     return (
-      <Link href={href} onClick={onNavigate} className={className}>
+      <Link
+        href={href}
+        prefetch
+        onClick={onNavigate}
+        className={className}
+      >
         {body}
       </Link>
     );

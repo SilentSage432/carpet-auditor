@@ -5,6 +5,7 @@ import {
   requireStoreOpsActor,
   StoreOpsAuthError,
 } from "@/lib/store-ops/auth-server";
+import { resolveScopedDepartmentId } from "@/lib/store-ops/department-scope";
 import { buildStoreHealthSnapshot } from "@/lib/store-ops/health";
 import { resolveStoreByNumber } from "@/lib/store-ops/stores";
 import { getSupabaseAdmin } from "@/lib/store-ops/supabase-admin";
@@ -30,11 +31,21 @@ export async function GET(request: Request) {
     const url = new URL(request.url);
     const week = url.searchParams.get("week")?.trim() || isoWeekLabel();
 
+    const departmentIdParam = url.searchParams.get("department_id");
+    const departmentId = isDeptFloorActor(actor)
+      ? await resolveScopedDepartmentId(
+          supabase,
+          actor,
+          store.id,
+          departmentIdParam
+        )
+      : departmentIdParam;
+
     const snapshot = await buildStoreHealthSnapshot(supabase, {
       storeId: store.id,
       weekLabel: week,
-      departmentCode: isDeptFloorActor(actor) ? actor.departmentCode : null,
-      departmentId: null,
+      departmentCode: null,
+      departmentId,
     });
 
     return NextResponse.json(snapshot);

@@ -6,6 +6,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { toStoreOpsDepartmentCode } from "./department-codes";
+import { accessibleStoreOpsCodes } from "@/lib/department-access";
 import type { StoreSpecialist } from "@/lib/types";
 import { normalizeStoreNumber } from "@/lib/store";
 
@@ -86,6 +87,7 @@ export async function linkAuthUserToSpecialistProfile(
       input.specialist.assigned_department !== "all"
         ? input.specialist.assigned_department
         : null,
+    accessible_departments: accessibleStoreOpsCodes(input.specialist),
   };
 
   const { error: profileError } = await admin
@@ -120,6 +122,7 @@ export async function linkAuthUserToSpecialistProfile(
         department: departmentCode,
         role: jwtRole,
         specialist_id: String(input.specialist.id),
+        accessible_departments: accessibleStoreOpsCodes(input.specialist),
       },
     }
   );

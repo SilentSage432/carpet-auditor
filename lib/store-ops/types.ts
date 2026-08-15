@@ -23,6 +23,15 @@ export type RotationStatus =
   | "COMPLETED"
   | "CARRIED_OVER";
 
+/** IRP walk-the-floor intensity on bay_service_logs. */
+export type BayServiceIntensity =
+  | "light_touch"
+  | "heavy_packdown"
+  | "critical_hole";
+
+/** Down-stocking velocity on store_locations (auto-tier + Sunday draw). */
+export type VelocityTier = "standard" | "high" | "critical_hotspot";
+
 export type Department = {
   id: string;
   store_id: string;
@@ -49,10 +58,27 @@ export type StoreLocation = {
   manual_priority_count?: number;
   status: RotationStatus;
   last_completed_at: string | null;
+  /** Denormalized departments.code (IRP logs / heatmap). */
+  department_code?: string | null;
+  /** Walk-the-floor last touch — distinct from last_completed_at. */
+  last_serviced_at?: string | null;
+  velocity_tier?: VelocityTier | null;
+  priority_override?: boolean | null;
   cycle_number: number;
   is_active: boolean;
   created_at?: string;
   updated_at?: string;
+};
+
+export type BayServiceLog = {
+  id: string;
+  store_id: string;
+  location_id: string;
+  department_code: string;
+  serviced_by: string | null;
+  intensity: BayServiceIntensity;
+  notes: string | null;
+  created_at: string;
 };
 
 export type WeeklyRotation = {

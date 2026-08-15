@@ -5,10 +5,8 @@ import {
   requireStoreOpsActor,
   StoreOpsAuthError,
 } from "@/lib/store-ops/auth-server";
-import {
-  completeWeeklyRotation,
-  resolveDepartmentIdByCode,
-} from "@/lib/store-ops/rotations";
+import { completeWeeklyRotation } from "@/lib/store-ops/rotations";
+import { assertActorCanAccessDepartmentId } from "@/lib/store-ops/department-scope";
 import { resolveStoreByNumber } from "@/lib/store-ops/stores";
 import { getSupabaseAdmin } from "@/lib/store-ops/supabase-admin";
 import { supabaseAdminMissingMessage } from "@/lib/supabase/env";
@@ -42,23 +40,18 @@ export async function POST(request: Request) {
 
     let expectedDepartmentId: string | null = null;
     if (isDeptFloorActor(actor)) {
-      if (!actor.departmentCode) {
-        return NextResponse.json(
-          { error: "No department assigned" },
-          { status: 403 }
-        );
-      }
-      expectedDepartmentId = await resolveDepartmentIdByCode(
+      const { data: rotation } = await supabase
+        .from("weekly_rotations")
+        .select("department_id")
+        .eq("id", rotationId)
+        .maybeSingle();
+      await assertActorCanAccessDepartmentId(
         supabase,
-        actor.departmentCode,
-        store.id
+        actor,
+        store.id,
+        String(rotation?.department_id ?? "")
       );
-      if (!expectedDepartmentId) {
-        return NextResponse.json(
-          { error: "Department not found" },
-          { status: 404 }
-        );
-      }
+      expectedDepartmentId = String(rotation?.department_id ?? "");
     }
 
     const result = await completeWeeklyRotation(
