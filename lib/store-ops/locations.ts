@@ -8,13 +8,19 @@ import {
   parseBayNumberingPattern,
 } from "./bay-pattern";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { readableError } from "./errors";
+import { isMissingColumnError, readableError } from "./errors";
 import type {
   BayNumberingPattern,
   BulkGenerateInput,
   StoreLocation,
   StoreLocationType,
 } from "./types";
+import {
+  parseCustomDecayDays,
+  parseVelocitySeedPreset,
+  parseVelocityTier,
+  velocitySeedFromPreset,
+} from "./velocity";
 
 /** Unique key on public.store_locations — Selling + Topstock per aisle/bay. */
 export const STORE_LOCATIONS_ON_CONFLICT =
@@ -157,6 +163,9 @@ export function buildBulkLocationRows(
   status: "PENDING";
   cycle_number: number;
   is_active: true;
+  velocity_tier: "standard" | "high" | "critical_hotspot";
+  priority_override: boolean;
+  custom_decay_days: number;
 }> {
   const { store_id, department_id, start_bay, end_bay, types } = input;
   const aisle = normalizeAisle(input.aisle);
@@ -183,6 +192,19 @@ export function buildBulkLocationRows(
     parseBayNumberingPattern(input.bay_pattern)
   );
 
+  const seed = velocitySeedFromPreset(
+    parseVelocitySeedPreset(input.velocity_seed)
+  );
+  const velocity_tier = parseVelocityTier(
+    input.velocity_tier ?? seed.velocity_tier
+  );
+  const priority_override =
+    typeof input.priority_override === "boolean"
+      ? input.priority_override
+      : seed.priority_override;
+  const custom_decay_days =
+    parseCustomDecayDays(input.custom_decay_days) ?? seed.custom_decay_days;
+
   const rows: Array<{
     store_id: string;
     department_id: string;
@@ -192,6 +214,9 @@ export function buildBulkLocationRows(
     status: "PENDING";
     cycle_number: number;
     is_active: true;
+    velocity_tier: "standard" | "high" | "critical_hotspot";
+    priority_override: boolean;
+    custom_decay_days: number;
   }> = [];
 
   for (const bay of bays) {
@@ -205,6 +230,9 @@ export function buildBulkLocationRows(
         status: "PENDING",
         cycle_number: 1,
         is_active: true,
+        velocity_tier,
+        priority_override,
+        custom_decay_days,
       });
     }
   }
@@ -221,6 +249,24 @@ export async function bulkInsertLocations(
       .from("store_locations")
       .upsert(payload, { onConflict: STORE_LOCATIONS_ON_CONFLICT })
       .select("*");
+
+    if (error && isMissingColumnError(error, "custom_decay_days")) {
+      const fallback = payload.map((row) => {
+        const next = { ...row } as Record<string, unknown>;
+        delete next.custom_decay_days;
+        return next;
+      });
+      const retry = await supabase
+        .from("store_locations")
+        .upsert(fallback, { onConflict: STORE_LOCATIONS_ON_CONFLICT })
+        .select("*");
+      if (retry.error) {
+        throw new Error(
+          readableError(retry.error, "Bulk location upsert failed")
+        );
+      }
+      return (retry.data ?? []) as StoreLocation[];
+    }
 
     if (error) {
       throw new Error(readableError(error, "Bulk location upsert failed"));

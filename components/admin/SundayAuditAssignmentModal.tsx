@@ -13,6 +13,7 @@ import {
 } from "@/lib/store-ops/client";
 import { readableError } from "@/lib/store-ops/errors";
 import { diagnoseBayHealth } from "@/lib/store-ops/bay-health";
+import { CarryOverPriorityBadge } from "@/components/store-ops/CarryOverPriorityBadge";
 import {
   autoAssignSundayBaysToSpecialist,
   applySundayAssignmentPlan,
@@ -598,9 +599,21 @@ export function SundayAuditAssignmentModal({
                           ? ` · → ${bay.assignment.specialist_name}`
                           : " · unassigned"}
                       </p>
+                      <p className="mt-1">
+                        <CarryOverPriorityBadge
+                          location={bay.rotation.store_locations}
+                          assignment={bay.assignment}
+                        />
+                      </p>
                     </div>
                     {!bay.assignment ? (
                       <span className="glass-pill-amber shrink-0">Pending</span>
+                    ) : bay.assignment.is_carried_over ||
+                      String(bay.assignment.status ?? "").toUpperCase() ===
+                        "CARRIED_OVER" ? (
+                      <span className="glass-pill-amber shrink-0 font-mono tracking-tight">
+                        Carry-over
+                      </span>
                     ) : (
                       <span className="glass-pill-emerald shrink-0">Assigned</span>
                     )}

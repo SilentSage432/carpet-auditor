@@ -2,6 +2,9 @@
  * ISO week helpers for weekly_rotations.assigned_week (e.g. "2026-W32").
  */
 
+import { decayDrawMultiplier } from "./velocity";
+import type { VelocityTier } from "./types";
+
 /** Safe draw size from departments.weekly_bay_target (null/0/invalid → 10). */
 export function resolveWeeklyBayTarget(raw: unknown): number {
   const n = Number(raw);
@@ -71,15 +74,17 @@ export function pickRandom<T>(items: T[], count: number): T[] {
 type WeightedPickable = {
   manual_priority_count?: number | null;
   last_completed_at?: string | null;
+  last_serviced_at?: string | null;
   velocity_tier?: string | null;
   priority_override?: boolean | null;
+  custom_decay_days?: number | null;
 };
 
 /**
  * Adaptive draw: weight = (1 + manual_priority_count) × age_days
- * × velocity multiplier. Null last_completed_at ≈ never audited → high age.
- * High / critical_hotspot and priority_override are boosted inside a pool;
- * Sunday generate still draws those pools first via rotation.ts.
+ * × velocity multiplier × custom-decay urgency. Null last_completed_at ≈ never
+ * audited → high age. High / critical_hotspot and priority_override are boosted
+ * inside a pool; Sunday generate still draws those pools first via rotation.ts.
  */
 export function pickWeightedByPriorityAndAge<T extends WeightedPickable>(
   items: T[],
@@ -168,7 +173,12 @@ export function adaptiveDrawWeight(loc: WeightedPickable): number {
     ? Math.max(0, Date.now() - last)
     : 365 * 86_400_000;
   const ageDays = Math.max(1, ageMs / 86_400_000);
-  let velocity = 1;
+  let velocity = decayDrawMultiplier({
+    velocity_tier: loc.velocity_tier as VelocityTier | null,
+    custom_decay_days: loc.custom_decay_days,
+    last_serviced_at: loc.last_serviced_at ?? null,
+    last_completed_at: loc.last_completed_at ?? null,
+  });
   if (loc.priority_override === true) velocity *= 4;
   if (loc.velocity_tier === "critical_hotspot") velocity *= 6;
   else if (loc.velocity_tier === "high") velocity *= 3;

@@ -10,6 +10,7 @@ import {
   Archive,
   BrickWall,
   Building2,
+  CalendarDays,
   Camera,
   CheckSquare,
   ChevronDown,
@@ -95,7 +96,8 @@ export type HubIconId =
   | "logOut"
   | "moreVertical"
   | "edit"
-  | "trash";
+  | "trash"
+  | "calendar";
 
 const HUB_ICON_MAP: Record<HubIconId, LucideIcon> = {
   map: Map,
@@ -117,6 +119,7 @@ const HUB_ICON_MAP: Record<HubIconId, LucideIcon> = {
   moreVertical: MoreVertical,
   edit: Pencil,
   trash: Trash2,
+  calendar: CalendarDays,
   close: X,
   chevronUp: ChevronUp,
   chevronDown: ChevronDown,

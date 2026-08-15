@@ -114,10 +114,15 @@
 - [x] UX lockdown — 4-tab Floor/Map/Roster/Settings, unified Edit Bay sheet, roster chips + PIN add, Sonner toasts, exception feed on Floor
 - [x] Chrome consolidation — remove hamburger / More / Admin Tools; Settings owns bulk/taxonomies/force/targets; Floor owns verify+exceptions; dead Catalog/AdminRoster/StockTab pruned
 - [x] Geist + Geist Mono typography (`next/font/google`) + compact bay tags (`formatBayTag`) with `font-mono tracking-tight`
+- [x] Map Manage Aisles & Bays console (`AisleBayManager` + `AddBaySheet` + `EditBayDrawer`; Visual Grid unchanged)
+- [x] Roster department grouping + daily shift board + call-out redistribute (`shift-status.ts` + `call-out.ts`)
+- [x] Call-out carry-over priority loop (`carried_over` prepend on Sunday draw + Floor/Sunday badge)
+- [x] Predictive Shift Copilot on Floor (`predictive-copilot.ts` + `PredictiveCopilotBanner`)
+- [x] Map velocity/priority seeding (Bulk Generator presets + EditBayDrawer hotspot/lock/decay → Sunday `custom_decay_days`)
 
 ## Next
 - [x] Apply Phase 1 JWT/RLS migration in Supabase + enable Custom Access Token Hook
-- [ ] Apply Phase 2 migrations (`20260812_manager_notes.sql`, `20260812_sunday_bay_assignments.sql`, `20260812_manager_notes_archive.sql`, `20260812_fix_manager_notes_rls.sql`, **`20260812_manager_notes_metadata.sql`**, **`enable_rls_flagged_tables.sql`**, **`20260813_p0_query_indexes.sql`**, **`20260814_downstock_queue.sql`**, **`20260814_cabinets_d29.sql`**, **`20260814_bay_velocity_heatmap.sql`**, **`20260814_multi_department_access.sql`**) + Realtime on notes/assignments tables
+- [ ] Apply Phase 2 migrations (`20260812_manager_notes.sql`, `20260812_sunday_bay_assignments.sql`, `20260812_manager_notes_archive.sql`, `20260812_fix_manager_notes_rls.sql`, **`20260812_manager_notes_metadata.sql`**, **`enable_rls_flagged_tables.sql`**, **`20260813_p0_query_indexes.sql`**, **`20260814_downstock_queue.sql`**, **`20260814_cabinets_d29.sql`**, **`20260814_bay_velocity_heatmap.sql`**, **`20260814_multi_department_access.sql`**, **`20260815_associate_shift_days.sql`**, **`20260815_carry_over_priority.sql`**, **`20260815_custom_decay_days.sql`**) + Realtime on notes/assignments tables
 - [ ] Confirm every Master Admin has `store_number` set so Hub bridge can link `profiles`
 - [ ] Additional Gemini product surfaces beyond current AI ops widgets (Slice 1 transport/auth/compact-then-narrate shipped)
 ## Non-goals

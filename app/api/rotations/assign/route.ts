@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import {
   resolveStoreOpsActor,
-  requireSuperAdmin,
+  requireSupervisorOrAdmin,
   StoreOpsAuthError,
 } from "@/lib/store-ops/auth-server";
 import { assignLocationsToCurrentWeek } from "@/lib/store-ops/rotations";
@@ -11,13 +11,13 @@ import { readableError } from "@/lib/store-ops/errors";
 
 /**
  * POST /api/rotations/assign
- * Super Admin — manually add bay(s) to this week's rotation and bump
- * manual_priority_count for adaptive future draws.
+ * Supervisor or Super Admin — add bay(s) to this week's rotation and bump
+ * manual_priority_count for adaptive future draws (copilot Stage to Shift).
  * Body: { location_ids: string[], department_id?: string }
  */
 export async function POST(request: Request) {
   try {
-    const actor = requireSuperAdmin(await resolveStoreOpsActor(request));
+    const actor = requireSupervisorOrAdmin(await resolveStoreOpsActor(request));
     const { supabase, response } = requireSupabaseAdmin();
     if (!supabase) return response;
 

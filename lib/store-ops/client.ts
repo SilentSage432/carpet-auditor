@@ -280,6 +280,10 @@ export async function patchStoreLocation(
       | "type"
       | "department_id"
       | "priority_override"
+      | "carried_over"
+      | "last_carried_over_at"
+      | "velocity_tier"
+      | "custom_decay_days"
     >
   >
 ): Promise<StoreLocation> {
@@ -502,7 +506,7 @@ export async function updateDepartmentActive(
   return data.department;
 }
 
-/** Super Admin — add bay(s) to this week's rotation and bump adaptive priority. */
+/** Supervisor or Super Admin — add bay(s) to this week's rotation and bump adaptive priority. */
 export async function assignLocationsToWeek(
   specialist: StoreSpecialist,
   locationIds: string[],

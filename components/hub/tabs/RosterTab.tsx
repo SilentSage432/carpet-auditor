@@ -1,9 +1,8 @@
 "use client";
 
 /**
- * Roster tab — unified team list, PIN issue, and department chips.
- * Persistence: lib/specialists.ts + POST /api/admin/department-access.
- * Presentation only; does not own RBAC or department knowledge.
+ * Roster tab — department-grouped team, shift board, and call-out rebalance.
+ * Persistence: lib/specialists.ts + shift-status + sunday-audit (call-out).
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -11,9 +10,12 @@ import { DepartmentAccessChips } from "@/components/hub/DepartmentAccessChips";
 import { DepartmentPicker } from "@/components/hub/DepartmentPicker";
 import { DepartmentIcon, HubIcon } from "@/components/hub/NavIcons";
 import { TextField } from "@/components/ui/NumberField";
+import { adminWorkingDepartmentLabel } from "@/lib/admin-department-context";
+import { redistributeCallOutBays } from "@/lib/store-ops/call-out";
 import { composeAccessibleDepartments } from "@/lib/department-access";
 import {
   canGrantDepartmentAccess,
+  canManageShiftBoard,
   canManageTeamRoster,
   suggestUsername,
 } from "@/lib/rbac";
@@ -24,6 +26,15 @@ import {
   saveSpecialist,
 } from "@/lib/specialists";
 import { updateDepartmentAccess } from "@/lib/store-ops/client";
+import {
+  composeShiftBoard,
+  fetchShiftDays,
+  formatShiftPill,
+  localWorkDate,
+  SHIFT_STATUS_EVENT,
+  upsertShiftDay,
+  type AssociateShiftDay,
+} from "@/lib/store-ops/shift-status";
 import { toastError, toastSuccess } from "@/lib/toast";
 import {
   associateFloorTitle,
@@ -47,48 +58,132 @@ function homeDepartment(member: StoreSpecialist): DepartmentScope {
   return member.role === "MasterAdmin" ? "all" : "flooring";
 }
 
+function departmentHeading(home: DepartmentScope): string {
+  if (home === "all") return "Full Store";
+  if (
+    home === "flooring" ||
+    home === "appliances" ||
+    home === "cabinets" ||
+    home === "millwork" ||
+    home === "paint"
+  ) {
+    return adminWorkingDepartmentLabel(home);
+  }
+  return departmentMeta(home).label;
+}
+
+type DeptGroup = {
+  home: DepartmentScope;
+  heading: string;
+  members: StoreSpecialist[];
+  onDuty: number;
+};
+
 export function RosterTab({ specialist, storeNumber }: WorkflowTabProps) {
   const [roster, setRoster] = useState<StoreSpecialist[]>([]);
+  const [days, setDays] = useState<Record<string, AssociateShiftDay>>({});
   const [loading, setLoading] = useState(true);
   const [addOpen, setAddOpen] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<StoreSpecialist | null>(
     null
   );
+  const [openDepts, setOpenDepts] = useState<Record<string, boolean>>({});
+  const [scheduleTarget, setScheduleTarget] = useState<StoreSpecialist | null>(
+    null
+  );
+  const [callOutTarget, setCallOutTarget] = useState<StoreSpecialist | null>(
+    null
+  );
+  const [startDraft, setStartDraft] = useState("07:00");
+  const [endDraft, setEndDraft] = useState("15:30");
+  const today = localWorkDate();
   const canManage = canManageTeamRoster(specialist);
   const canGrant = canGrantDepartmentAccess(specialist);
+  const canShift = canManageShiftBoard(specialist);
 
   const reload = useCallback(async () => {
-    const team = await fetchSpecialists();
+    const [team, saved] = await Promise.all([
+      fetchSpecialists(),
+      fetchShiftDays(today).catch(() => ({})),
+    ]);
     setRoster(dedupeRoster(team));
-  }, []);
+    setDays(saved);
+  }, [today]);
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    void fetchSpecialists().then((team) => {
-      if (cancelled) return;
-      setRoster(dedupeRoster(team));
-      setLoading(false);
+    void reload().finally(() => {
+      if (!cancelled) setLoading(false);
     });
+    function onShift() {
+      void fetchShiftDays(today)
+        .then(setDays)
+        .catch(() => undefined);
+    }
+    window.addEventListener(SHIFT_STATUS_EVENT, onShift);
     return () => {
       cancelled = true;
+      window.removeEventListener(SHIFT_STATUS_EVENT, onShift);
     };
-  }, [storeNumber]);
+  }, [reload, storeNumber, today]);
 
-  const rows = useMemo(
-    () =>
-      [...roster]
-        .filter((m) => m.is_active !== false)
-        .sort((a, b) => {
+  const board = useMemo(
+    () => composeShiftBoard(roster, days, today),
+    [roster, days, today]
+  );
+  const dayById = useMemo(
+    () => new Map(board.map((row) => [row.specialist_id, row])),
+    [board]
+  );
+
+  const groups = useMemo((): DeptGroup[] => {
+    const active = roster.filter((m) => m.is_active !== false);
+    const buckets = new Map<DepartmentScope, StoreSpecialist[]>();
+    for (const member of active) {
+      const home = homeDepartment(member);
+      const list = buckets.get(home) ?? [];
+      list.push(member);
+      buckets.set(home, list);
+    }
+    const order: DepartmentScope[] = [
+      "flooring",
+      "cabinets",
+      "appliances",
+      "millwork",
+      "paint",
+      "plumbing",
+      "electrical",
+      "tools",
+      "building_materials",
+      "inside_garden",
+      "outside_garden",
+      "lawn_garden",
+      "hardware",
+      "all",
+    ];
+    return order
+      .filter((home) => buckets.has(home))
+      .map((home) => {
+        const members = (buckets.get(home) ?? []).sort((a, b) => {
           const rank = (m: StoreSpecialist) =>
             m.role === "MasterAdmin" ? 0 : m.role === "Supervisor" ? 1 : 2;
           const d = rank(a) - rank(b);
           if (d !== 0) return d;
           return a.name.localeCompare(b.name);
-        }),
-    [roster]
-  );
+        });
+        return {
+          home,
+          heading: departmentHeading(home),
+          members,
+          onDuty: members.filter((m) => {
+            const day = dayById.get(String(m.id));
+            return day?.status === "ON_DUTY";
+          }).length,
+        };
+      });
+  }, [roster, dayById]);
 
   async function handleAccess(
     member: StoreSpecialist,
@@ -149,6 +244,97 @@ export function RosterTab({ specialist, storeNumber }: WorkflowTabProps) {
     }
   }
 
+  async function saveSchedule() {
+    if (!scheduleTarget) return;
+    setBusyId(scheduleTarget.id);
+    try {
+      const next = await upsertShiftDay({
+        specialist_id: String(scheduleTarget.id),
+        start_time: startDraft,
+        end_time: endDraft,
+        is_scheduled_today: true,
+        is_call_out: false,
+      });
+      setDays((curr) => ({ ...curr, [next.specialist_id]: next }));
+      toastSuccess(`Saved shift for ${scheduleTarget.name}`);
+      setScheduleTarget(null);
+    } catch (err) {
+      toastError(
+        err instanceof Error ? err.message : "Could not save schedule"
+      );
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function markCallOut(absent: StoreSpecialist, nextCallOut: boolean) {
+    if (!nextCallOut) {
+      setBusyId(absent.id);
+      try {
+        const next = await upsertShiftDay({
+          specialist_id: String(absent.id),
+          is_call_out: false,
+          is_scheduled_today: true,
+        });
+        setDays((curr) => ({ ...curr, [next.specialist_id]: next }));
+        toastSuccess(`${absent.name} is on-duty`);
+      } catch (err) {
+        toastError(
+          err instanceof Error ? err.message : "Could not update duty status"
+        );
+      } finally {
+        setBusyId(null);
+      }
+      return;
+    }
+    setCallOutTarget(absent);
+  }
+
+  async function applyCallOut(
+    mode: "pool" | "auto" | "carry"
+  ) {
+    if (!callOutTarget) return;
+    const absent = callOutTarget;
+    setBusyId(absent.id);
+    try {
+      const next = await upsertShiftDay({
+        specialist_id: String(absent.id),
+        is_call_out: true,
+        is_scheduled_today: true,
+      });
+      setDays((curr) => ({ ...curr, [next.specialist_id]: next }));
+      const result = await redistributeCallOutBays({
+        actor: specialist,
+        absent,
+        peers: roster,
+        days: composeShiftBoard(
+          roster,
+          { ...days, [next.specialist_id]: next },
+          today
+        ),
+        mode,
+      });
+      const label =
+        mode === "pool"
+          ? "returned to the department pool"
+          : mode === "auto"
+            ? "auto-redistributed to on-duty peers"
+            : "carried over to the next shift";
+      toastSuccess(
+        `${absent.name} marked call-out · ${result.moved} bay${
+          result.moved === 1 ? "" : "s"
+        } ${label}`
+      );
+      setCallOutTarget(null);
+    } catch (err) {
+      toastError(
+        err instanceof Error ? err.message : "Could not rebalance bays"
+      );
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   return (
     <main className="hub-main">
       <div className="mb-3 flex items-start justify-between gap-3">
@@ -157,7 +343,7 @@ export function RosterTab({ specialist, storeNumber }: WorkflowTabProps) {
             Team roster
           </p>
           <p className="mt-1 text-sm text-zinc-400">
-            Name, role, home department, and Floor / Map / Roster access chips.
+            Grouped by home department · today {today}
           </p>
         </div>
         {canManage ? (
@@ -173,73 +359,201 @@ export function RosterTab({ specialist, storeNumber }: WorkflowTabProps) {
 
       {loading ? (
         <p className="text-sm text-zinc-400">Loading roster…</p>
-      ) : rows.length === 0 ? (
+      ) : groups.length === 0 ? (
         <p className="glass-card border-dashed px-4 py-8 text-center text-sm text-zinc-400">
           No active team members on this store yet.
         </p>
       ) : (
         <ul className="space-y-2">
-          {rows.map((member) => {
-            const home = homeDepartment(member);
-            const grantable =
-              canGrant &&
-              member.role !== "MasterAdmin" &&
-              (canManage || member.role === "Associate");
+          {groups.map((group) => {
+            const open = openDepts[group.home] !== false;
             return (
-              <li key={member.id} className="glass-card !rounded-xl !p-3">
-                <div className="flex items-start justify-between gap-2">
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-bold text-white">
-                      {member.name}
-                    </p>
-                    <p className="mt-0.5 flex items-center gap-1.5 font-mono text-[10px] font-bold uppercase tracking-wider text-accent">
-                      {member.role === "MasterAdmin" ? (
-                        <HubIcon id="crown" className="h-3.5 w-3.5" />
-                      ) : member.role === "Supervisor" ? (
-                        <HubIcon id="shield" className="h-3.5 w-3.5" />
-                      ) : (
-                        <HubIcon id="user" className="h-3.5 w-3.5" />
-                      )}
-                      {rosterRoleLabel(member)}
-                    </p>
-                    <p className="mt-1 flex items-center gap-1.5 text-xs text-zinc-400">
-                      <DepartmentIcon
-                        department={home}
-                        className="h-3.5 w-3.5 shrink-0 text-accent"
-                      />
-                      {home === "all"
-                        ? "Full store"
-                        : departmentMeta(home).label}
-                    </p>
-                  </div>
-                  {canManage && member.role !== "MasterAdmin" ? (
-                    <button
-                      type="button"
-                      disabled={busyId === member.id}
-                      onClick={() => setDeleteTarget(member)}
-                      className="btn-icon-touch text-rose-300"
-                      aria-label={`Remove ${member.name}`}
-                    >
-                      <HubIcon id="trash" className="h-4 w-4" />
-                    </button>
-                  ) : null}
-                </div>
-                {grantable ? (
-                  <div className="mt-3">
-                    <DepartmentAccessChips
-                      primary={home === "all" ? "flooring" : home}
-                      value={composeAccessibleDepartments(
-                        home,
-                        member.accessible_departments
-                      )}
-                      disabled={busyId === member.id}
-                      onChange={(next) => void handleAccess(member, next)}
+              <li
+                key={group.home}
+                className="glass-card overflow-hidden !rounded-xl !p-0"
+              >
+                <button
+                  type="button"
+                  aria-expanded={open}
+                  onClick={() =>
+                    setOpenDepts((prev) => ({
+                      ...prev,
+                      [group.home]: !open,
+                    }))
+                  }
+                  className="flex min-h-12 w-full items-center justify-between gap-3 px-3 py-2 text-left"
+                >
+                  <span className="flex min-w-0 items-center gap-2">
+                    <DepartmentIcon
+                      department={group.home}
+                      className="h-4 w-4 shrink-0 text-accent"
                     />
-                  </div>
-                ) : member.role === "MasterAdmin" ? (
-                  <p className="mt-2 text-[11px] text-zinc-500">
-                    Full-store access — chips are not required.
-                  </p>
+                    <span>
+                      <span className="block truncate text-sm font-bold text-white">
+                        {group.heading}
+                      </span>
+                      <span className="font-mono text-[11px] tracking-tight text-zinc-500">
+                        {group.members.length} roster · {group.onDuty} on-duty
+                      </span>
+                    </span>
+                  </span>
+                  <HubIcon
+                    id={open ? "chevronUp" : "chevronDown"}
+                    className="h-4 w-4 text-zinc-400"
+                  />
+                </button>
+                {open ? (
+                  <ul className="space-y-2 border-t border-zinc-800/80 px-2 py-2">
+                    {group.members.map((member) => {
+                      const home = homeDepartment(member);
+                      const day = dayById.get(String(member.id));
+                      const grantable =
+                        canGrant &&
+                        member.role !== "MasterAdmin" &&
+                        (canManage || member.role === "Associate");
+                      const calledOut = day?.is_call_out === true;
+                      return (
+                        <li
+                          key={member.id}
+                          className="rounded-xl border border-zinc-800 bg-zinc-950/50 p-3"
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <div className="min-w-0">
+                              <p className="truncate text-sm font-bold text-white">
+                                {member.name}
+                              </p>
+                              <p className="mt-0.5 flex items-center gap-1.5 font-mono text-[10px] font-bold uppercase tracking-wider text-accent">
+                                {member.role === "MasterAdmin" ? (
+                                  <HubIcon id="crown" className="h-3.5 w-3.5" />
+                                ) : member.role === "Supervisor" ? (
+                                  <HubIcon id="shield" className="h-3.5 w-3.5" />
+                                ) : (
+                                  <HubIcon id="user" className="h-3.5 w-3.5" />
+                                )}
+                                {rosterRoleLabel(member)}
+                              </p>
+                            </div>
+                            {canManage && member.role !== "MasterAdmin" ? (
+                              <button
+                                type="button"
+                                disabled={busyId === member.id}
+                                onClick={() => setDeleteTarget(member)}
+                                className="btn-icon-touch text-rose-300"
+                                aria-label={`Remove ${member.name}`}
+                              >
+                                <HubIcon id="trash" className="h-4 w-4" />
+                              </button>
+                            ) : null}
+                          </div>
+
+                          {member.role !== "MasterAdmin" ? (
+                            <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                              <span
+                                className={`inline-flex min-h-8 items-center rounded-full border px-2.5 font-mono text-[11px] font-bold tracking-tight ${
+                                  calledOut
+                                    ? "border-rose-500/40 bg-rose-950/40 text-rose-100"
+                                    : "border-zinc-700 bg-zinc-900 text-zinc-200"
+                                }`}
+                              >
+                                {formatShiftPill(
+                                  day?.start_time,
+                                  day?.end_time
+                                )}
+                              </span>
+                              {canShift ? (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setStartDraft(day?.start_time || "07:00");
+                                    setEndDraft(day?.end_time || "15:30");
+                                    setScheduleTarget(member);
+                                  }}
+                                  className="inline-flex min-h-8 items-center gap-1 rounded-full border border-zinc-700 px-2.5 text-[11px] font-bold"
+                                >
+                                  <HubIcon
+                                    id="calendar"
+                                    className="h-3.5 w-3.5"
+                                  />
+                                  Edit Schedule
+                                </button>
+                              ) : null}
+                            </div>
+                          ) : null}
+
+                          {canShift && member.role !== "MasterAdmin" ? (
+                            <button
+                              type="button"
+                              role="switch"
+                              aria-checked={calledOut}
+                              disabled={busyId === member.id}
+                              onClick={() =>
+                                void markCallOut(member, !calledOut)
+                              }
+                              className={`mt-2 flex min-h-11 w-full items-center justify-between rounded-xl border px-3 text-sm font-bold ${
+                                calledOut
+                                  ? "border-rose-500/45 bg-rose-950/40 text-rose-100"
+                                  : "border-emerald-500/35 bg-emerald-950/25 text-emerald-100"
+                              }`}
+                            >
+                              <span className="inline-flex items-center gap-1.5">
+                                <HubIcon id="zap" className="h-4 w-4" />
+                                {calledOut ? "Call-Out" : "On-Duty"}
+                              </span>
+                              <span
+                                className={`relative h-7 w-12 shrink-0 rounded-full ${
+                                  calledOut ? "bg-rose-500" : "bg-emerald-500"
+                                }`}
+                              >
+                                <span
+                                  className={`absolute top-0.5 h-6 w-6 rounded-full bg-white transition ${
+                                    calledOut ? "left-[1.35rem]" : "left-0.5"
+                                  }`}
+                                />
+                              </span>
+                            </button>
+                          ) : null}
+
+                          {member.role === "MasterAdmin" ? (
+                            <p className="mt-2 text-[11px] text-zinc-500">
+                              Full-store access — chips are not required.
+                            </p>
+                          ) : grantable ? (
+                            <div className="mt-3">
+                              <DepartmentAccessChips
+                                primary={home === "all" ? "flooring" : home}
+                                value={composeAccessibleDepartments(
+                                  home,
+                                  member.accessible_departments
+                                )}
+                                disabled={busyId === member.id}
+                                onChange={(next) =>
+                                  void handleAccess(member, next)
+                                }
+                              />
+                            </div>
+                          ) : (
+                            <div className="mt-2 flex flex-wrap gap-1">
+                              {composeAccessibleDepartments(
+                                home,
+                                member.accessible_departments
+                              ).map((dept) => (
+                                <span
+                                  key={dept}
+                                  className="inline-flex min-h-8 items-center gap-1 rounded-full border border-zinc-700 bg-zinc-900 px-2 font-mono text-[10px] font-bold uppercase tracking-wide text-zinc-300"
+                                >
+                                  <DepartmentIcon
+                                    department={dept}
+                                    className="h-3.5 w-3.5"
+                                  />
+                                  {departmentMeta(dept).shortLabel}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </li>
+                      );
+                    })}
+                  </ul>
                 ) : null}
               </li>
             );
@@ -266,6 +580,121 @@ export function RosterTab({ specialist, storeNumber }: WorkflowTabProps) {
             setAddOpen(false);
           }}
         />
+      ) : null}
+
+      {scheduleTarget ? (
+        <div className="glass-backdrop fixed inset-0 z-[80] flex flex-col justify-end">
+          <button
+            type="button"
+            className="absolute inset-0"
+            aria-label="Close schedule"
+            onClick={() => setScheduleTarget(null)}
+          />
+          <div
+            role="dialog"
+            aria-modal="true"
+            className="glass-card theme-modal relative z-10 w-full !rounded-t-2xl px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3"
+          >
+            <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-zinc-600" />
+            <h2 className="glass-title text-lg">
+              Edit schedule · {scheduleTarget.name}
+            </h2>
+            <div className="mt-4 grid grid-cols-2 gap-2">
+              <label className="block space-y-1.5">
+                <span className="text-sm font-medium text-zinc-200">Start</span>
+                <input
+                  type="time"
+                  value={startDraft}
+                  onChange={(e) => setStartDraft(e.target.value)}
+                  className="min-h-12 w-full rounded-xl border border-zinc-700 bg-zinc-900 px-3 font-mono tracking-tight text-zinc-100"
+                />
+              </label>
+              <label className="block space-y-1.5">
+                <span className="text-sm font-medium text-zinc-200">End</span>
+                <input
+                  type="time"
+                  value={endDraft}
+                  onChange={(e) => setEndDraft(e.target.value)}
+                  className="min-h-12 w-full rounded-xl border border-zinc-700 bg-zinc-900 px-3 font-mono tracking-tight text-zinc-100"
+                />
+              </label>
+            </div>
+            <div className="mt-4 grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setScheduleTarget(null)}
+                className="flex min-h-12 items-center justify-center rounded-xl border border-zinc-700 text-sm font-semibold"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={busyId === scheduleTarget.id}
+                onClick={() => void saveSchedule()}
+                className="btn-primary-glow flex min-h-12 items-center justify-center rounded-xl text-sm font-bold disabled:opacity-40"
+              >
+                Save shift
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {callOutTarget ? (
+        <div className="glass-backdrop fixed inset-0 z-[80] flex items-end justify-center sm:items-center">
+          <button
+            type="button"
+            className="absolute inset-0"
+            aria-label="Cancel call-out"
+            onClick={() => setCallOutTarget(null)}
+          />
+          <div
+            role="dialog"
+            aria-modal="true"
+            className="glass-card theme-modal relative z-10 w-full max-w-md !rounded-t-2xl p-4 sm:!rounded-2xl"
+          >
+            <h2 className="glass-title text-lg">
+              Rebalance {callOutTarget.name}&apos;s bays?
+            </h2>
+            <p className="mt-2 text-sm text-zinc-400">
+              Marks them ABSENT_CALLOUT for today, then moves their open
+              checklist bays.
+            </p>
+            <div className="mt-4 space-y-2">
+              <button
+                type="button"
+                disabled={busyId === callOutTarget.id}
+                onClick={() => void applyCallOut("pool")}
+                className="flex min-h-12 w-full items-center justify-center rounded-xl border border-zinc-700 text-sm font-bold"
+              >
+                Return to Department Pool
+              </button>
+              <button
+                type="button"
+                disabled={busyId === callOutTarget.id}
+                onClick={() => void applyCallOut("auto")}
+                className="btn-primary-glow flex min-h-12 w-full items-center justify-center rounded-xl text-sm font-bold"
+              >
+                Auto-Redistribute to On-Duty Peers
+              </button>
+              <button
+                type="button"
+                disabled={busyId === callOutTarget.id}
+                onClick={() => void applyCallOut("carry")}
+                className="flex min-h-12 w-full items-center justify-center rounded-xl border border-amber-500/40 bg-amber-950/30 text-sm font-bold text-amber-100"
+              >
+                Carry Over to Next Shift
+              </button>
+              <button
+                type="button"
+                onClick={() => setCallOutTarget(null)}
+                className="flex min-h-11 w-full items-center justify-center text-sm font-semibold text-zinc-400"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
       ) : null}
 
       {deleteTarget ? (

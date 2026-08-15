@@ -78,9 +78,9 @@ Master Admin: compact department **dropdown pill** in the header. Close glyphs a
 
 | Tab | Route | Meaning |
 |-----|-------|---------|
-| Floor | `/dashboard` | Live checklist, Downstock tab, Sunday drawer, inline barriers, exception feed, week sign-off |
-| Map | `/admin/store-map` | Heatmap + Add Bay + unified Walk/Edit sheet |
-| Roster | `/roster` | Team, PINs, department chips |
+| Floor | `/dashboard` | Checklist, Shift Briefing, Predictive Copilot, Downstock, Sunday drawer, barriers |
+| Map | `/admin/store-map` | Visual Grid (heatmap + walk) · Manage Aisles & Bays (hotspot / lock / decay) · Bulk Generator velocity seed |
+| Roster | `/roster` | Department-grouped team, shift pills, call-out rebalance |
 | Settings | `/settings` | Theme, sync, targets, push, Master tools (bulk / taxonomies / force / Floor Pad / remnants) |
 
 Store Ops pages use `.hub-main` (`px-3 pt-2 pb-28`) so bay lists, status pills, and pace timers clear the fold on handhelds. Quick Touch / filter chips use `.btn-quick-touch` / `.chip-filter` (44px min).
@@ -239,6 +239,8 @@ Stacked cards (~1.5–2 handheld screens):
 |-----------|------|---------|------------|
 | **BottomNav** | `BottomNav.tsx` | Always on workflow routes | Fixed 4 tabs |
 | **WalkTheFloorSheet** | `WalkTheFloorSheet.tsx` | Map bay tap | Walk log + Snap Bay + edit/pin |
+| **EditBayDrawer** | `admin/EditBayDrawer.tsx` | Map Manage bay Edit | Hotspot / priority lock / 3–21 decay slider |
+| **BulkLocationGenerator** | `admin/BulkLocationGenerator.tsx` | Map Manage + Settings | Aisle range + Default Velocity Tier seed |
 | **TextPromptModal** | `TextPromptModal.tsx` | Reserve remnant; Link barcode | Bottom sheet input |
 | **ConfirmModal** | `ConfirmModal.tsx` | Delete remnant | Confirm / cancel sheet |
 | **SpecialistModal** | `SpecialistModal.tsx` | Header chip; auto if no specialist | Bottom sheet / dialog; roster + Add Team Member |

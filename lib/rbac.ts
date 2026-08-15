@@ -239,6 +239,13 @@ export function canManageTeamRoster(
   return isMasterAdmin(member);
 }
 
+/** Master or Supervisor may edit today's shift board and mark call-outs. */
+export function canManageShiftBoard(
+  member: StoreSpecialist | null | undefined
+): boolean {
+  return isMasterAdmin(member) || member?.role === "Supervisor";
+}
+
 /** Master Admin or Supervisor may grant cross-department access on associates. */
 export function canGrantDepartmentAccess(
   member: StoreSpecialist | null | undefined

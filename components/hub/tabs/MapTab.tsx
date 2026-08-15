@@ -4,10 +4,13 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { StoreLocationGrid } from "@/components/admin/StoreLocationGrid";
+import { AisleBayManager } from "@/components/admin/AisleBayManager";
 import { HubIcon, DepartmentIcon } from "@/components/hub/NavIcons";
 import { isMasterAdmin } from "@/lib/rbac";
 import {
   ADMIN_DEPT_CONTEXT_EVENT,
+  adminWorkingDepartmentLabel,
+  workingDepartment,
   workingDepartmentId,
 } from "@/lib/admin-department-context";
 import {
@@ -48,6 +51,7 @@ export function MapTab({ specialist }: WorkflowTabProps) {
   const [isOverviewOpen, setIsOverviewOpen] = useState(false);
   const [toggleBusyId, setToggleBusyId] = useState<string | null>(null);
   const [bayScanOpen, setBayScanOpen] = useState(false);
+  const [mapSurface, setMapSurface] = useState<"visual" | "manage">("visual");
   const [weekRotationLocations, setWeekRotationLocations] = useState<
     Array<{ locationId: string; completed: boolean }>
   >([]);
@@ -55,6 +59,13 @@ export function MapTab({ specialist }: WorkflowTabProps) {
   const [contextTick, setContextTick] = useState(0);
   const currentWeek = isoWeekLabel();
   const master = isMasterAdmin(specialist);
+  const contextLabel = (() => {
+    const scope = workingDepartment(specialist);
+    if (scope === "all") return "Full Store";
+    return adminWorkingDepartmentLabel(
+      scope as Parameters<typeof adminWorkingDepartmentLabel>[0]
+    );
+  })();
 
   const reload = useCallback(async (member: typeof specialist) => {
     setLoading(true);
@@ -210,14 +221,47 @@ export function MapTab({ specialist }: WorkflowTabProps) {
           )}
         </p>
 
-        <button
-          type="button"
-          onClick={() => setBayScanOpen(true)}
-          className="btn-primary-glow mb-3 flex min-h-11 w-full items-center justify-center gap-2 rounded-xl px-4 text-sm"
+        <div
+          className="mb-3 inline-flex h-11 w-full items-center rounded-full border border-zinc-700/80 bg-zinc-950/70 p-0.5"
+          role="group"
+          aria-label="Map surface"
         >
-          <HubIcon id="camera" className="h-4 w-4" />
-          Snap Bay AI Audit
-        </button>
+          <button
+            type="button"
+            aria-pressed={mapSurface === "visual"}
+            onClick={() => setMapSurface("visual")}
+            className={`inline-flex h-10 flex-1 items-center justify-center rounded-full px-3 font-mono text-[11px] font-bold ${
+              mapSurface === "visual"
+                ? "bg-accent/25 text-accent"
+                : "text-zinc-400"
+            }`}
+          >
+            Visual Grid
+          </button>
+          <button
+            type="button"
+            aria-pressed={mapSurface === "manage"}
+            onClick={() => setMapSurface("manage")}
+            className={`inline-flex h-10 flex-1 items-center justify-center rounded-full px-3 font-mono text-[11px] font-bold ${
+              mapSurface === "manage"
+                ? "bg-accent/25 text-accent"
+                : "text-zinc-400"
+            }`}
+          >
+            Manage Aisles & Bays
+          </button>
+        </div>
+
+        {mapSurface === "visual" ? (
+          <button
+            type="button"
+            onClick={() => setBayScanOpen(true)}
+            className="btn-primary-glow mb-3 flex min-h-11 w-full items-center justify-center gap-2 rounded-xl px-4 text-sm"
+          >
+            <HubIcon id="camera" className="h-4 w-4" />
+            Snap Bay AI Audit
+          </button>
+        ) : null}
 
         {authRequired ? (
           <p className="glass-card mb-3 border-amber-500/40 bg-amber-950/25 px-3 py-2.5 text-sm text-amber-100">
@@ -368,6 +412,15 @@ export function MapTab({ specialist }: WorkflowTabProps) {
 
           {loading ? (
             <p className="text-sm text-zinc-400">Loading locations…</p>
+          ) : mapSurface === "manage" ? (
+            <AisleBayManager
+              specialist={specialist}
+              departments={departments}
+              locations={locations}
+              canMutate={master}
+              contextLabel={contextLabel}
+              onChanged={() => void reload(specialist)}
+            />
           ) : (
             <StoreLocationGrid
               specialist={specialist}

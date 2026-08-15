@@ -54,6 +54,7 @@ export type SundayBayAssignment = {
   assigned_at: string;
   assigned_specialist_id?: string | null;
   status?: string;
+  is_carried_over?: boolean;
 };
 
 export type SundayAssignmentMap = Record<string, SundayBayAssignment>;
@@ -76,6 +77,7 @@ type SundayBayAssignmentRow = {
   roster_specialist_id: string | null;
   specialist_name: string | null;
   status: string;
+  is_carried_over?: boolean | null;
   created_at: string;
   updated_at?: string | null;
 };
@@ -107,6 +109,9 @@ function mapRow(row: SundayBayAssignmentRow): SundayBayAssignment | null {
     assigned_at: String(row.updated_at ?? row.created_at),
     assigned_specialist_id: profileId || null,
     status: row.status,
+    is_carried_over:
+      row.is_carried_over === true ||
+      String(row.status ?? "").toUpperCase() === "CARRIED_OVER",
   };
 }
 
@@ -210,6 +215,7 @@ export async function setSundayBayAssignment(
         roster_specialist_id: null,
         specialist_name: "",
         status: "cleared",
+        is_carried_over: false,
         updated_at: new Date().toISOString(),
       },
       { onConflict: "store_number,department,week_starting,bay_id" }
@@ -223,22 +229,49 @@ export async function setSundayBayAssignment(
     assignment.assigned_specialist_id ||
     (await resolveProfileIdForRoster(assignment.specialist_id));
 
-  const { error } = await supabase.from("sunday_bay_assignments").upsert(
-    {
-      store_number: store,
-      department,
-      week_starting: weekStarting,
-      bay_id: bayId,
-      assigned_specialist_id: profileId,
-      roster_specialist_id: assignment.specialist_id,
-      specialist_name: assignment.specialist_name,
-      status: "assigned",
-      updated_at: new Date().toISOString(),
-    },
-    { onConflict: "store_number,department,week_starting,bay_id" }
-  );
+  const status =
+    String(assignment.status ?? "assigned").trim() || "assigned";
+  const isCarried =
+    assignment.is_carried_over === true ||
+    status.toUpperCase() === "CARRIED_OVER";
 
-  if (error) throw new Error(error.message || "Could not save assignment");
+  const payload: Record<string, unknown> = {
+    store_number: store,
+    department,
+    week_starting: weekStarting,
+    bay_id: bayId,
+    assigned_specialist_id: profileId,
+    roster_specialist_id: assignment.specialist_id,
+    specialist_name: assignment.specialist_name,
+    status,
+    is_carried_over: isCarried,
+    updated_at: new Date().toISOString(),
+  };
+
+  const { error } = await supabase
+    .from("sunday_bay_assignments")
+    .upsert(payload, {
+      onConflict: "store_number,department,week_starting,bay_id",
+    });
+
+  if (error) {
+    const fallback = { ...payload };
+    if (status === "CARRIED_OVER") fallback.status = "assigned";
+    const retryStatus = await supabase.from("sunday_bay_assignments").upsert(
+      fallback,
+      { onConflict: "store_number,department,week_starting,bay_id" }
+    );
+    if (retryStatus.error) {
+      delete fallback.is_carried_over;
+      const retryCols = await supabase.from("sunday_bay_assignments").upsert(
+        fallback,
+        { onConflict: "store_number,department,week_starting,bay_id" }
+      );
+      if (retryCols.error) {
+        throw new Error(retryCols.error.message || "Could not save assignment");
+      }
+    }
+  }
   emitSundayEvent();
 }
 
@@ -249,6 +282,39 @@ export async function clearSundayBayAssignment(
   department = SUNDAY_DEPARTMENT
 ): Promise<void> {
   await setSundayBayAssignment(week, bayId, null, storeNumber, department);
+}
+
+/** Flag this week's specialist assignments as carry-over (does not clear them). */
+export async function markSundayBaysCarriedOver(
+  week: string,
+  bayIds: string[],
+  storeNumber = getStoreNumber(),
+  department = SUNDAY_DEPARTMENT
+): Promise<number> {
+  const unique = [...new Set(bayIds.map(String).filter(Boolean))];
+  if (unique.length === 0) return 0;
+  const assignments = await fetchSundayAssignments(week, storeNumber, department);
+  const stamp = new Date().toISOString();
+  let marked = 0;
+  for (const bayId of unique) {
+    const existing = assignments[bayId];
+    await setSundayBayAssignment(
+      week,
+      bayId,
+      {
+        specialist_id: existing?.specialist_id || "carry-over",
+        specialist_name: existing?.specialist_name || "Carry-over",
+        assigned_at: existing?.assigned_at || stamp,
+        assigned_specialist_id: existing?.assigned_specialist_id ?? null,
+        status: "CARRIED_OVER",
+        is_carried_over: true,
+      },
+      storeNumber,
+      department
+    );
+    marked += 1;
+  }
+  return marked;
 }
 
 export async function autoAssignSundayBaysToSpecialist(

@@ -15,6 +15,7 @@ import { bulkInsertLocations } from "@/lib/store-ops/locations";
 import { getSupabaseAdmin } from "@/lib/store-ops/supabase-admin";
 import { resolveStoreByNumber } from "@/lib/store-ops/stores";
 import type { StoreLocationType } from "@/lib/store-ops/types";
+import { parseVelocitySeedPreset } from "@/lib/store-ops/velocity";
 import { supabaseAdminMissingMessage } from "@/lib/supabase/env";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -51,6 +52,7 @@ export async function POST(request: Request) {
       types?: StoreLocationType[];
       store_id?: string;
       bay_pattern?: string;
+      velocity_seed?: string;
     };
 
     const departmentId = String(body.department_id ?? "");
@@ -89,6 +91,7 @@ export async function POST(request: Request) {
       end_bay: Number(body.end_bay),
       types: Array.isArray(body.types) ? body.types : [],
       bay_pattern: parseBayNumberingPattern(body.bay_pattern),
+      velocity_seed: parseVelocitySeedPreset(body.velocity_seed),
     });
 
     return NextResponse.json({

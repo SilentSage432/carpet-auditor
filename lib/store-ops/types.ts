@@ -64,6 +64,12 @@ export type StoreLocation = {
   last_serviced_at?: string | null;
   velocity_tier?: VelocityTier | null;
   priority_override?: boolean | null;
+  /** Sunday-draw cadence override (3–21). Null uses velocity-tier default. */
+  custom_decay_days?: number | null;
+  /** Next Sunday draw prepend flag — cleared when assigned or completed. */
+  carried_over?: boolean | null;
+  /** When the bay last entered the call-out carry-over loop. */
+  last_carried_over_at?: string | null;
   cycle_number: number;
   is_active: boolean;
   created_at?: string;
@@ -128,6 +134,11 @@ export type BulkGenerateInput = {
    * Default odd. Step is 2 so facing sides do not duplicate.
    */
   bay_pattern?: BayNumberingPattern;
+  /** Bulk seed: standard (14d) · high (5d) · priority_lock (always in Sunday draw). */
+  velocity_seed?: "standard" | "high" | "priority_lock";
+  velocity_tier?: VelocityTier;
+  priority_override?: boolean;
+  custom_decay_days?: number;
 };
 
 /** Compact bay tag for tabular mono display — `A14-B06`, `BW-B12`. */
@@ -156,6 +167,28 @@ export function formatLocationLabel(
     .filter(Boolean)
     .join(" · ");
   return parts ? `${base} [${parts}]` : base;
+}
+
+const CARRY_OVER_BADGE_MS = 14 * 86_400_000;
+
+/** Floor / Sunday amber badge — assignment or location carry-over window. */
+export function isCarryOverPriorityBadge(
+  loc?: Pick<
+    StoreLocation,
+    "carried_over" | "last_carried_over_at" | "status"
+  > | null,
+  assignment?: { status?: string | null; is_carried_over?: boolean | null } | null
+): boolean {
+  if (assignment?.is_carried_over === true) return true;
+  if (String(assignment?.status ?? "").toUpperCase() === "CARRIED_OVER") {
+    return true;
+  }
+  if (loc?.carried_over === true) return true;
+  if (loc?.status === "CARRIED_OVER") return true;
+  const at = loc?.last_carried_over_at;
+  if (!at) return false;
+  const t = Date.parse(at);
+  return Number.isFinite(t) && Date.now() - t < CARRY_OVER_BADGE_MS;
 }
 
 /** True when a showroom/stack-out bay is due for a quick touch. */

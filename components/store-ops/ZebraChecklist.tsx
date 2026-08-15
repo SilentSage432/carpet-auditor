@@ -12,6 +12,7 @@ import Link from "next/link";
 import { AuditLocationModeToggle } from "@/components/store-ops/AuditLocationModeToggle";
 import { BarrierReasonChips } from "@/components/store-ops/BarrierReasonChips";
 import { BayHealthScorecard } from "@/components/store-ops/BayHealthScorecard";
+import { CarryOverPriorityBadge } from "@/components/store-ops/CarryOverPriorityBadge";
 import { formatAuditLocationBadge } from "@/lib/store-ops/audit-location-mode";
 import { diagnoseBayHealth } from "@/lib/store-ops/bay-health";
 import {
@@ -602,6 +603,7 @@ export function ZebraChecklist({
               specialist,
               shiftHours
             )}
+            assignment={assignments[rotation.id] ?? null}
             assignedToMe={isSundayAssignmentForSpecialist(
               assignments[rotation.id],
               specialist
@@ -678,6 +680,7 @@ export function ZebraChecklist({
                     <span className="min-w-0 flex-1 truncate font-mono text-sm tracking-tight tabular-nums text-slate-400 line-through">
                       {label}
                     </span>
+                    <CarryOverPriorityBadge location={loc} />
                     <span className="shrink-0 font-mono text-[10px] tracking-tight tabular-nums text-slate-500">
                       {formatTouchTime(rotation.completed_at)}
                     </span>
@@ -721,6 +724,7 @@ function assignmentCaption(
 function ZebraBayRow({
   rotation,
   assignmentLabel,
+  assignment,
   assignedToMe,
   pulsing,
   flagged,
@@ -741,6 +745,7 @@ function ZebraBayRow({
 }: {
   rotation: WeeklyRotationWithLocation;
   assignmentLabel: string | null;
+  assignment: SundayBayAssignment | null;
   assignedToMe: boolean;
   pulsing: boolean;
   flagged: boolean;
@@ -786,6 +791,10 @@ function ZebraBayRow({
               {label}
             </span>
             <span className="mt-0.5 flex flex-wrap items-center gap-1">
+              <CarryOverPriorityBadge
+                location={loc}
+                assignment={assignment}
+              />
               {typeBadge ? (
                 <span
                   className={

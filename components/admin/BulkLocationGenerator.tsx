@@ -21,6 +21,12 @@ import type {
 } from "@/lib/store-ops/types";
 import type { StoreSpecialist } from "@/lib/types";
 import {
+  parseVelocitySeedPreset,
+  type VelocitySeedPreset,
+  VELOCITY_CADENCE_HIGH_DAYS,
+  VELOCITY_CADENCE_STANDARD_DAYS,
+} from "@/lib/store-ops/velocity";
+import {
   aiParseLocations,
   bulkGenerateLocations,
   deleteStoreLocations,
@@ -65,6 +71,8 @@ export function BulkLocationGenerator({
   const [locationMode, setLocationMode] = useState<LocationMode>("BOTH");
   const [bayPattern, setBayPattern] =
     useState<BayNumberingPattern>(DEFAULT_BAY_PATTERN);
+  const [velocitySeed, setVelocitySeed] =
+    useState<VelocitySeedPreset>("standard");
   const [mapLocations, setMapLocations] = useState<StoreLocation[]>([]);
   const [cleanupEntireAisle, setCleanupEntireAisle] = useState(false);
   const [cleanupConfirm, setCleanupConfirm] = useState(false);
@@ -172,6 +180,7 @@ export function BulkLocationGenerator({
         end_bay: Number(endBay),
         types,
         bay_pattern: bayPattern,
+        velocity_seed: parseVelocitySeedPreset(velocitySeed),
       });
 
       const expected = bayPreview.length * types.length;
@@ -229,6 +238,7 @@ export function BulkLocationGenerator({
             end_bay: row.end_bay,
             types: row.types,
             bay_pattern: row.bay_pattern ?? DEFAULT_BAY_PATTERN,
+            velocity_seed: parseVelocitySeedPreset(velocitySeed),
           });
           created += result.created;
         } catch (err) {
@@ -318,6 +328,7 @@ export function BulkLocationGenerator({
             start_bay: row.start_bay,
             end_bay: row.end_bay,
             types: typesFromAiLocationMode(row.type),
+            velocity_seed: parseVelocitySeedPreset(velocitySeed),
           });
           created += result.created;
         } catch (err) {
@@ -589,6 +600,55 @@ export function BulkLocationGenerator({
             </div>
           </fieldset>
 
+          <fieldset className="mt-4">
+            <legend className="mb-2 text-sm text-zinc-300">
+              Default velocity tier
+            </legend>
+            <p className="mb-2 text-xs text-zinc-500">
+              Seeds `velocity_tier`, Sunday-draw weight, and cadence days on
+              every generated tag.
+            </p>
+            <div className="space-y-2">
+              {(
+                [
+                  {
+                    value: "standard" as const,
+                    label: `Standard (${VELOCITY_CADENCE_STANDARD_DAYS}-day cadence)`,
+                  },
+                  {
+                    value: "high" as const,
+                    label: `High Velocity / Fast Mover (${VELOCITY_CADENCE_HIGH_DAYS}-day cadence)`,
+                  },
+                  {
+                    value: "priority_lock" as const,
+                    label: "Priority Lock (always eligible for weekly Sunday draw)",
+                  },
+                ]
+              ).map((option) => {
+                const selected = velocitySeed === option.value;
+                return (
+                  <label
+                    key={option.value}
+                    className={`flex min-h-12 cursor-pointer items-center gap-2 rounded-xl border px-3 text-sm transition ${
+                      selected
+                        ? "border-amber-500/50 bg-amber-950/40 text-amber-100 ring-1 ring-amber-500/30"
+                        : "border-zinc-800/80 bg-zinc-950/50 text-zinc-100"
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="bulk-velocity-seed"
+                      checked={selected}
+                      onChange={() => setVelocitySeed(option.value)}
+                      className="h-5 w-5 accent-amber-500"
+                    />
+                    {option.label}
+                  </label>
+                );
+              })}
+            </div>
+          </fieldset>
+
           <button
             type="button"
             disabled={busy || !departmentId || !isValidAisle(aisle)}
@@ -671,6 +731,51 @@ export function BulkLocationGenerator({
               ))}
             </select>
           </label>
+
+          <fieldset>
+            <legend className="mb-2 text-sm text-zinc-300">
+              Default velocity tier
+            </legend>
+            <div className="space-y-2">
+              {(
+                [
+                  {
+                    value: "standard" as const,
+                    label: `Standard (${VELOCITY_CADENCE_STANDARD_DAYS}-day)`,
+                  },
+                  {
+                    value: "high" as const,
+                    label: `High Velocity (${VELOCITY_CADENCE_HIGH_DAYS}-day)`,
+                  },
+                  {
+                    value: "priority_lock" as const,
+                    label: "Priority Lock",
+                  },
+                ]
+              ).map((option) => {
+                const selected = velocitySeed === option.value;
+                return (
+                  <label
+                    key={option.value}
+                    className={`flex min-h-11 cursor-pointer items-center gap-2 rounded-xl border px-3 text-sm ${
+                      selected
+                        ? "border-amber-500/50 bg-amber-950/40 text-amber-100"
+                        : "border-zinc-800/80 bg-zinc-950/50 text-zinc-100"
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="ai-velocity-seed"
+                      checked={selected}
+                      onChange={() => setVelocitySeed(option.value)}
+                      className="h-5 w-5 accent-amber-500"
+                    />
+                    {option.label}
+                  </label>
+                );
+              })}
+            </div>
+          </fieldset>
 
           <div className="rounded-2xl border border-dashed border-cyan-500/30 bg-zinc-950/60 p-3 focus-within:border-cyan-500/50 focus-within:ring-1 focus-within:ring-cyan-500/30">
             <textarea

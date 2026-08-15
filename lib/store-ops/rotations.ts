@@ -6,12 +6,12 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Department, StoreLocation, WeeklyRotation } from "./types";
 import { listActiveStores } from "./stores";
-import { pickSundayVelocityPrioritized } from "./rotation";
+import { pickSundayCarryOverFirst, pickSundayVelocityPrioritized } from "./rotation";
 import {
   isoWeekLabel,
-  pickWeightedByPriorityAndAge,
   resolveWeeklyBayTarget,
 } from "./week";
+import { isMissingColumnError } from "./errors";
 
 function isStandardAisleLocation(loc: StoreLocation): boolean {
   return (loc.location_type ?? "STANDARD") !== "SHOWROOM_STACKOUT";
@@ -230,41 +230,7 @@ export async function generateWeeklyRotations(
     departmentId
   );
 
-  // Prioritize CARRIED_OVER (missed last week) ahead of fresh PENDING
-  const { data: carriedRows, error: carriedError } = await supabase
-    .from("store_locations")
-    .select("*")
-    .eq("department_id", departmentId)
-    .eq("is_active", true)
-    .eq("status", "CARRIED_OVER")
-    .neq("location_type", "SHOWROOM_STACKOUT");
-
-  if (carriedError) {
-    if (/location_type/i.test(carriedError.message)) {
-      const legacy = await supabase
-        .from("store_locations")
-        .select("*")
-        .eq("department_id", departmentId)
-        .eq("is_active", true)
-        .eq("status", "CARRIED_OVER");
-      if (legacy.error) throw new Error(legacy.error.message);
-      // fall through with legacy data via reassignment below
-      const carried = (legacy.data ?? []) as StoreLocation[];
-      return finishGenerate(
-        supabase,
-        departmentId,
-        department,
-        weekLabel,
-        drawCount,
-        dbTarget,
-        cycleNumber,
-        reset,
-        pending,
-        carried
-      );
-    }
-    throw new Error(carriedError.message);
-  }
+  const carried = await loadCarryOverPriorityPool(supabase, departmentId);
 
   return finishGenerate(
     supabase,
@@ -276,8 +242,72 @@ export async function generateWeeklyRotations(
     cycleNumber,
     reset,
     pending,
-    (carriedRows ?? []) as StoreLocation[]
+    carried
   );
+}
+
+async function loadCarryOverPriorityPool(
+  supabase: SupabaseClient,
+  departmentId: string
+): Promise<StoreLocation[]> {
+  const base = () =>
+    supabase
+      .from("store_locations")
+      .select("*")
+      .eq("department_id", departmentId)
+      .eq("is_active", true);
+
+  const withType = await base()
+    .or("status.eq.CARRIED_OVER,carried_over.eq.true,priority_override.eq.true")
+    .neq("location_type", "SHOWROOM_STACKOUT");
+
+  if (!withType.error) {
+    return (withType.data ?? []) as StoreLocation[];
+  }
+
+  if (isMissingColumnError(withType.error, "carried_over")) {
+    const pins = await base()
+      .or("status.eq.CARRIED_OVER,priority_override.eq.true")
+      .neq("location_type", "SHOWROOM_STACKOUT");
+    if (!pins.error) return (pins.data ?? []) as StoreLocation[];
+    if (/location_type/i.test(pins.error.message)) {
+      const legacy = await base().eq("status", "CARRIED_OVER");
+      if (legacy.error) throw new Error(legacy.error.message);
+      return (legacy.data ?? []) as StoreLocation[];
+    }
+  }
+
+  if (/location_type/i.test(withType.error.message)) {
+    const legacy = await base().eq("status", "CARRIED_OVER");
+    if (legacy.error) throw new Error(legacy.error.message);
+    return (legacy.data ?? []) as StoreLocation[];
+  }
+
+  throw new Error(withType.error.message);
+}
+
+async function clearCarryOverFlags(
+  supabase: SupabaseClient,
+  locationIds: string[],
+  extra: Record<string, unknown> = {}
+): Promise<void> {
+  const ids = [...new Set(locationIds.filter(Boolean))];
+  if (ids.length === 0) return;
+  const now = new Date().toISOString();
+  const { error } = await supabase
+    .from("store_locations")
+    .update({ carried_over: false, updated_at: now, ...extra })
+    .in("id", ids);
+  if (error && !isMissingColumnError(error, "carried_over")) {
+    throw new Error(error.message);
+  }
+  if (error && isMissingColumnError(error, "carried_over") && Object.keys(extra).length > 0) {
+    const retry = await supabase
+      .from("store_locations")
+      .update({ updated_at: now, ...extra })
+      .in("id", ids);
+    if (retry.error) throw new Error(retry.error.message);
+  }
 }
 
 async function finishGenerate(
@@ -294,10 +324,9 @@ async function finishGenerate(
 ): Promise<GenerateRotationsResult> {
   const pool: StoreLocation[] = [];
 
-  // CARRIED_OVER still first — then adaptive weights among them
-  const carriedPick = pickWeightedByPriorityAndAge(
+  const carriedPick = pickSundayCarryOverFirst(
     carried.filter(isStandardAisleLocation),
-    Math.min(drawCount, carried.length)
+    drawCount
   );
   pool.push(...carriedPick);
 
@@ -329,6 +358,7 @@ async function finishGenerate(
     .in("id", ids);
 
   if (assignError) throw new Error(assignError.message);
+  await clearCarryOverFlags(supabase, ids);
 
   const rows = selected.map((loc) => ({
     store_id: loc.store_id || department.store_id,
@@ -434,6 +464,7 @@ export async function assignLocationsToCurrentWeek(
       .eq("id", loc.id);
     if (bumpError) throw new Error(bumpError.message);
   }
+  await clearCarryOverFlags(supabase, ids);
 
   const rows = locations.map((loc) => ({
     store_id: loc.store_id || department.store_id,
@@ -651,16 +682,32 @@ export async function completeWeeklyRotation(
 
   if (rotError) throw new Error(rotError.message);
 
-  const { data: location, error: locError } = await supabase
+  let { data: location, error: locError } = await supabase
     .from("store_locations")
     .update({
       status: "COMPLETED",
       last_completed_at: now,
+      carried_over: false,
       updated_at: now,
     })
     .eq("id", rotation.location_id)
     .select("*")
     .single();
+
+  if (locError && isMissingColumnError(locError, "carried_over")) {
+    const retry = await supabase
+      .from("store_locations")
+      .update({
+        status: "COMPLETED",
+        last_completed_at: now,
+        updated_at: now,
+      })
+      .eq("id", rotation.location_id)
+      .select("*")
+      .single();
+    location = retry.data;
+    locError = retry.error;
+  }
 
   if (locError) throw new Error(locError.message);
 

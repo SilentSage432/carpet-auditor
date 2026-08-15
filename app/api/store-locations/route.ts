@@ -14,6 +14,10 @@ import { getSupabaseAdmin } from "@/lib/store-ops/supabase-admin";
 import { resolveStoreByNumber } from "@/lib/store-ops/stores";
 import { supabaseAdminMissingMessage } from "@/lib/supabase/env";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import {
+  parseCustomDecayDays,
+  parseVelocityTier,
+} from "@/lib/store-ops/velocity";
 
 const STORE_LOCATION_LIST_COLUMNS = [
   "id",
@@ -30,6 +34,9 @@ const STORE_LOCATION_LIST_COLUMNS = [
   "last_serviced_at",
   "velocity_tier",
   "priority_override",
+  "carried_over",
+  "last_carried_over_at",
+  "custom_decay_days",
   "updated_at",
   "is_active",
   "cycle_number",
@@ -41,6 +48,9 @@ const OPTIONAL_LIST_COLUMNS = [
   "last_serviced_at",
   "velocity_tier",
   "priority_override",
+  "carried_over",
+  "last_carried_over_at",
+  "custom_decay_days",
   "department_code",
 ] as const;
 
@@ -60,6 +70,15 @@ function normalizeStoreLocationRow(row: Record<string, unknown>) {
     velocity_tier:
       row.velocity_tier == null ? "standard" : String(row.velocity_tier),
     priority_override: Boolean(row.priority_override),
+    carried_over: Boolean(row.carried_over),
+    last_carried_over_at:
+      row.last_carried_over_at == null
+        ? null
+        : String(row.last_carried_over_at),
+    custom_decay_days:
+      row.custom_decay_days == null
+        ? null
+        : Math.floor(Number(row.custom_decay_days)),
     department_code:
       row.department_code == null ? null : String(row.department_code),
   };
@@ -186,6 +205,10 @@ export async function PATCH(request: Request) {
       audit_frequency_days?: number;
       department_id?: string;
       priority_override?: boolean;
+      carried_over?: boolean;
+      last_carried_over_at?: string | null;
+      velocity_tier?: string;
+      custom_decay_days?: number | null;
     };
 
     if (!body.id) {
@@ -206,6 +229,16 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: "Location not found" }, { status: 404 });
     }
 
+    const mapEdit =
+      body.location_type !== undefined ||
+      body.audit_frequency_days !== undefined ||
+      body.aisle !== undefined ||
+      body.bay !== undefined ||
+      body.type !== undefined ||
+      body.department_id !== undefined ||
+      body.velocity_tier !== undefined ||
+      body.custom_decay_days !== undefined;
+
     if (actor.role === "department_supervisor") {
       try {
         await assertActorCanAccessDepartmentId(
@@ -220,17 +253,7 @@ export async function PATCH(request: Request) {
         }
         throw err;
       }
-      // Supervisors may only toggle bay is_active
-      if (
-        body.location_type !== undefined ||
-        body.audit_frequency_days !== undefined ||
-        body.status !== undefined ||
-        body.aisle !== undefined ||
-        body.bay !== undefined ||
-        body.type !== undefined ||
-        body.department_id !== undefined ||
-        body.priority_override !== undefined
-      ) {
+      if (mapEdit || (body.status !== undefined && body.status !== "CARRIED_OVER")) {
         return NextResponse.json(
           { error: "Only Super Admin can edit zone / map fields" },
           { status: 403 }
@@ -246,6 +269,23 @@ export async function PATCH(request: Request) {
     if (typeof body.is_active === "boolean") patch.is_active = body.is_active;
     if (body.status === "PENDING" || body.status === "ASSIGNED" || body.status === "COMPLETED") {
       if (actor.role === "super_admin") patch.status = body.status;
+    }
+    if (body.status === "CARRIED_OVER") {
+      patch.status = body.status;
+    }
+    if (typeof body.priority_override === "boolean") {
+      patch.priority_override = body.priority_override;
+    }
+    if (typeof body.carried_over === "boolean") {
+      patch.carried_over = body.carried_over;
+      if (body.carried_over && body.last_carried_over_at === undefined) {
+        patch.last_carried_over_at = new Date().toISOString();
+      }
+    }
+    if (body.last_carried_over_at !== undefined) {
+      patch.last_carried_over_at = body.last_carried_over_at
+        ? String(body.last_carried_over_at)
+        : null;
     }
     if (actor.role === "super_admin") {
       if (
@@ -287,11 +327,22 @@ export async function PATCH(request: Request) {
       if (body.type === "SELLING" || body.type === "TOPSTOCK") {
         patch.type = body.type;
       }
-      if (body.status === "CARRIED_OVER") {
-        patch.status = body.status;
+      if (body.velocity_tier !== undefined) {
+        patch.velocity_tier = parseVelocityTier(body.velocity_tier);
       }
-      if (typeof body.priority_override === "boolean") {
-        patch.priority_override = body.priority_override;
+      if (body.custom_decay_days !== undefined) {
+        if (body.custom_decay_days == null) {
+          patch.custom_decay_days = null;
+        } else {
+          const days = parseCustomDecayDays(body.custom_decay_days);
+          if (days == null) {
+            return NextResponse.json(
+              { error: "custom_decay_days must be 3–21" },
+              { status: 400 }
+            );
+          }
+          patch.custom_decay_days = days;
+        }
       }
       if (body.department_id !== undefined) {
         const nextDeptId = String(body.department_id).trim();
@@ -359,13 +410,34 @@ export async function PATCH(request: Request) {
       }
     }
 
-    const { data, error } = await supabase
+    let { data, error } = await supabase
       .from("store_locations")
       .update(patch)
       .eq("id", body.id)
       .eq("store_id", store.id)
       .select("*")
       .single();
+
+    if (
+      error &&
+      (isMissingColumnError(error, "carried_over") ||
+        isMissingColumnError(error, "last_carried_over_at") ||
+        isMissingColumnError(error, "custom_decay_days"))
+    ) {
+      const fallback = { ...patch };
+      delete fallback.carried_over;
+      delete fallback.last_carried_over_at;
+      delete fallback.custom_decay_days;
+      const retry = await supabase
+        .from("store_locations")
+        .update(fallback)
+        .eq("id", body.id)
+        .eq("store_id", store.id)
+        .select("*")
+        .single();
+      data = retry.data;
+      error = retry.error;
+    }
 
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 });

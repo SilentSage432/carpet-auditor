@@ -8,6 +8,7 @@ import { StoreHealthCard } from "@/components/StoreHealthCard";
 import { ShowroomQuickTouchCard } from "@/components/dashboard/ShowroomQuickTouchCard";
 import { ZebraChecklist } from "@/components/store-ops/ZebraChecklist";
 import { ShiftBriefingCard } from "@/components/store-ops/ShiftBriefingCard";
+import { PredictiveCopilotBanner } from "@/components/store-ops/PredictiveCopilotBanner";
 import { StoreHealthChart } from "@/components/store-ops/StoreHealthChart";
 import {
   ADMIN_DEPT_CONTEXT_EVENT,
@@ -159,10 +160,27 @@ export function FloorTab({ specialist }: WorkflowTabProps) {
         {!associate ? (
           <>
             <ShiftBriefingCard specialist={specialist} refreshKey={healthKey} />
+            <PredictiveCopilotBanner
+              specialist={specialist}
+              week={week}
+              rotations={displayRotations}
+              departmentId={deptId}
+              refreshKey={healthKey}
+              onApplied={silentRefresh}
+            />
             <StoreHealthChart specialist={specialist} refreshKey={healthKey} />
             <StoreHealthCard specialist={specialist} refreshKey={healthKey} />
           </>
-        ) : null}
+        ) : (
+          <PredictiveCopilotBanner
+            specialist={specialist}
+            week={week}
+            rotations={displayRotations}
+            departmentId={deptId}
+            refreshKey={healthKey}
+            onApplied={silentRefresh}
+          />
+        )}
 
         {supervisor ? (
           <button

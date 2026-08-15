@@ -1,5 +1,28 @@
 # DeptSync Hub — Development Journal
 
+## 2026-08-15 — Velocity tier & priority seeding on Map tools
+
+### Shipped
+- **Bulk Generator** — Default Velocity Tier: Standard (14-day), High Velocity / Fast Mover (5-day), Priority Lock (always in Sunday draw). Writes `velocity_tier`, `priority_override`, and `custom_decay_days` via `velocitySeedFromPreset` (`lib/store-ops/velocity.ts`).
+- **Edit bay drawer** — High-Velocity Hotspot, Lock Priority Override, and 3–21 day decay slider persist on `store_locations`. Manage list shows LOCK when `priority_override`.
+- **Sunday draw** — `rotation.ts` pulls cadence-due bays (age ≥ custom/tier decay) into the velocity-priority pool. `adaptiveDrawWeight` multiplies by `decayDrawMultiplier`. Apply `20260815_custom_decay_days.sql`.
+
+## 2026-08-15 — Call-out carry-over loop + Predictive Shift Copilot
+
+### Shipped
+- **Carry-over loop** — Call-out "Carry Over" (and auto fallback when no on-duty peers) stamps `sunday_bay_assignments` `CARRIED_OVER` / `is_carried_over` and `store_locations` `priority_override`, `carried_over`, `last_carried_over_at`. Sunday generate (`rotation.ts` `pickSundayCarryOverFirst` → `rotations.ts`) prepends `carried_over` OR `priority_override` OR status `CARRIED_OVER` before cadence decay, then clears `carried_over` on assign/complete. Amber Geist Mono **Carry-Over Priority** badge on Floor checklist + Sunday modal.
+- **Predictive Copilot** — `lib/store-ops/predictive-copilot.ts` composes walk logs, Sunday assignments, downstock queue, and locations (hot weekday packdowns, 14-day adjacent decay, on-duty pace). `PredictiveCopilotBanner` sits under Shift Briefing with 1-tap Stage / Downstock (optimistic + toast). Does not call Gemini or invent bays.
+- Apply `20260815_carry_over_priority.sql` (with `20260815_associate_shift_days.sql`).
+
+## 2026-08-15 — Map aisle console + Roster shift / call-out
+
+### Shipped
+- **Map `[ Visual Grid | Manage Aisles & Bays ]`** — Visual Grid stays `StoreLocationGrid` (heatmap + `WalkTheFloorSheet`). Manage console is `AisleBayManager`: department-filtered aisle accordions, mapped-bay badge, Add Single Bay (`AddBaySheet`), Bulk Generator sheet, Select All / Delete Selected, Edit drawer (`EditBayDrawer`: aisle / bay / department / priority), per-bay delete toast. Locations still filter via header pin (`workingDepartmentId`).
+- **Roster department groups** — associates accordion by primary `assigned_department` with roster count + on-duty today. Shift pill `07:00 - 15:30` + Edit Schedule (Supervisor/Master). Access chips remain on the card (`accessible_departments`).
+- **Daily shift board** — `lib/store-ops/shift-status.ts` owns `start_time` / `end_time` / `is_scheduled_today` / `is_call_out` / `ABSENT_CALLOUT`. localStorage first; upserts `associate_shift_days` when the table exists; mirrors hours into `ShiftRosterMember` so Sunday balancer stays in sync.
+- **Call-out rebalance** — `lib/store-ops/call-out.ts` composes `sunday-audit` + `planProportionalBayAssignments`. Dialog: Return to Department Pool · Auto-Redistribute to On-Duty Peers · Carry Over (`CARRIED_OVER`). Does not generate rotations.
+- **RBAC** — `canManageShiftBoard` = Master or Supervisor. Team add/delete stays Master-only. Apply `20260815_associate_shift_days.sql`.
+
 ## 2026-08-15 — Geist typography + 4-tab chrome lock
 
 ### Shipped

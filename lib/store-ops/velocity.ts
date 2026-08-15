@@ -15,6 +15,19 @@ export const VELOCITY_FRESH_DAYS = 7;
 export const VELOCITY_DECAY_DAYS = 18;
 export const VELOCITY_AUTO_TIER_WINDOW_DAYS = 30;
 export const VELOCITY_AUTO_TIER_HOT_COUNT = 2;
+/** Seeded aisle cadence — Standard / High Velocity bulk presets. */
+export const VELOCITY_CADENCE_STANDARD_DAYS = 14;
+export const VELOCITY_CADENCE_HIGH_DAYS = 5;
+export const CUSTOM_DECAY_MIN_DAYS = 3;
+export const CUSTOM_DECAY_MAX_DAYS = 21;
+
+export type VelocitySeedPreset = "standard" | "high" | "priority_lock";
+
+export type VelocitySeed = {
+  velocity_tier: VelocityTier;
+  priority_override: boolean;
+  custom_decay_days: number;
+};
 
 export type VelocityHeatTone = "fresh" | "decaying" | "untouched" | "hotspot";
 
@@ -31,6 +44,95 @@ export function parseVelocityTier(
     return raw;
   }
   return "standard";
+}
+
+export function parseVelocitySeedPreset(raw: unknown): VelocitySeedPreset {
+  if (raw === "high" || raw === "priority_lock" || raw === "standard") {
+    return raw;
+  }
+  return "standard";
+}
+
+export function parseCustomDecayDays(raw: unknown): number | null {
+  const n = Math.floor(Number(raw));
+  if (!Number.isFinite(n)) return null;
+  if (n < CUSTOM_DECAY_MIN_DAYS || n > CUSTOM_DECAY_MAX_DAYS) return null;
+  return n;
+}
+
+export function defaultDecayDaysForTier(tier: VelocityTier): number {
+  if (tier === "high" || tier === "critical_hotspot") {
+    return VELOCITY_CADENCE_HIGH_DAYS;
+  }
+  return VELOCITY_CADENCE_STANDARD_DAYS;
+}
+
+export function velocitySeedFromPreset(
+  preset: VelocitySeedPreset
+): VelocitySeed {
+  if (preset === "high") {
+    return {
+      velocity_tier: "high",
+      priority_override: false,
+      custom_decay_days: VELOCITY_CADENCE_HIGH_DAYS,
+    };
+  }
+  if (preset === "priority_lock") {
+    return {
+      velocity_tier: "high",
+      priority_override: true,
+      custom_decay_days: VELOCITY_CADENCE_HIGH_DAYS,
+    };
+  }
+  return {
+    velocity_tier: "standard",
+    priority_override: false,
+    custom_decay_days: VELOCITY_CADENCE_STANDARD_DAYS,
+  };
+}
+
+export function resolveDecayDays(
+  loc: Pick<StoreLocation, "velocity_tier" | "custom_decay_days">
+): number {
+  return (
+    parseCustomDecayDays(loc.custom_decay_days) ??
+    defaultDecayDaysForTier(parseVelocityTier(loc.velocity_tier))
+  );
+}
+
+/**
+ * Sunday-draw decay multiplier — shorter cadence (5-day high) weights
+ * the same calendar age higher than 14-day standard.
+ */
+export function decayDrawMultiplier(
+  loc: Pick<
+    StoreLocation,
+    "velocity_tier" | "custom_decay_days" | "last_serviced_at" | "last_completed_at"
+  >
+): number {
+  const days = resolveDecayDays(loc);
+  const age =
+    daysSinceIso(loc.last_serviced_at) ?? daysSinceIso(loc.last_completed_at);
+  const ageDays = age == null ? days * 2 : Math.max(1, age);
+  let multiplier = ageDays / days;
+  if (ageDays >= days) multiplier *= 2;
+  return Math.max(0.5, multiplier);
+}
+
+/** Overdue vs seeded cadence — joins the Sunday velocity-priority pool. */
+export function isCadenceDueForSundayDraw(
+  loc: Pick<
+    StoreLocation,
+    | "velocity_tier"
+    | "custom_decay_days"
+    | "last_serviced_at"
+    | "last_completed_at"
+  >
+): boolean {
+  const age =
+    daysSinceIso(loc.last_serviced_at) ?? daysSinceIso(loc.last_completed_at);
+  if (age == null) return false;
+  return age >= resolveDecayDays(loc);
 }
 
 export function parseBayServiceIntensity(

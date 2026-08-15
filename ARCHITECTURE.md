@@ -23,7 +23,11 @@ components/hub/NavigationHub.tsx  → Cross-app Navigation Hub (composes HubHead
 app/loading.tsx                   → Route-level splash
 app/stock/page.tsx                → Redirect → /dashboard (Downstock lives on Floor)
 app/(workflow)/roster/page.tsx    → Team roster keep-alive tab
-components/hub/tabs/RosterTab.tsx → Unified roster (chips + add member)
+components/hub/tabs/RosterTab.tsx → Department-grouped roster + shift board + call-out
+components/hub/tabs/MapTab.tsx    → Visual Grid | Manage Aisles & Bays (department-filtered)
+components/admin/AisleBayManager.tsx → Map manage console (aisle accordions, batch, bulk)
+components/admin/AddBaySheet.tsx  → Single-bay Selling+Topstock sheet (grid + manage)
+components/admin/EditBayDrawer.tsx → Aisle / bay / department / priority patch
 components/admin/ExceptionFeed.tsx → Floor barrier feed (composes exception summary)
 components/admin/WalkTheFloorSheet.tsx → Unified walk log + Snap Bay + Master Admin edit/pin
 components/inventory/RollMeasurementPad.tsx → Compact roll/carton keypad (presentation; CycleAuditScanForm owns drafts)
@@ -71,11 +75,16 @@ components/admin/SundayAuditStagingCard.tsx → Glowing pending Sunday Flooring 
 components/admin/SundayAuditAssignmentModal.tsx → Assign specialists + shift-hour balancer
 lib/store-ops/weekly-rotations.ts → Proportional clustered bay assignment plan (hours / aisle-face / health risk)
 lib/store-ops/sunday-audit.ts → Persist specialist↔bay; apply balancer plan
+lib/store-ops/shift-status.ts → Daily on-duty / call-out / shift clock (composes ShiftRosterMember)
+lib/store-ops/call-out.ts → Rebalance absent bays (pool / auto / carry-over loop; composes sunday-audit)
+lib/store-ops/predictive-copilot.ts → Floor shift recommendations (logs + assignments + downstock; no Gemini)
+components/store-ops/PredictiveCopilotBanner.tsx → Dismissible Floor briefing under Shift Briefing
+components/store-ops/CarryOverPriorityBadge.tsx → Amber Geist Mono carry-over badge
 lib/store-ops/downstock.ts → Downstock/packdown flags (queue owner; assignment composes sunday-audit)
 lib/store-ops/map-readiness.ts → Store Map green/yellow/red readiness tones (composes bay-health stale + week)
-lib/store-ops/velocity.ts → IRP cadence tones + auto-tier rules (last_serviced_at / velocity_tier)
+lib/store-ops/velocity.ts → IRP cadence tones, seed presets (14d/5d/lock), custom_decay_days, Sunday decay multiplier
 lib/store-ops/bay-service.ts → Persist bay_service_logs + stamp last_serviced_at + promote velocity
-lib/store-ops/rotation.ts → Sunday draw velocity-priority pick (composed by rotations.ts)
+lib/store-ops/rotation.ts → Sunday draw: carry-over prepend then velocity-priority pick (composed by rotations.ts)
 lib/store-ops/audit-summary.ts → Supervisor weekly rollup composition (quota / associate / barriers)
 components/store-ops/SupervisorAuditSummaryModal.tsx → Personal weekly stats + copy
 lib/admin-department-context.ts       → Master Admin working department pin (local)
@@ -97,6 +106,9 @@ lib/types.ts                          → Cabinets D29 + SPECIALTY/CORE + associ
 supabase/migrations/20260814_cabinets_d29.sql → Seed Cabinets per store
 supabase/migrations/20260814_bay_velocity_heatmap.sql → store_locations IRP columns + bay_service_logs
 supabase/migrations/20260814_multi_department_access.sql → profiles + store_specialists accessible_departments + JWT match
+supabase/migrations/20260815_associate_shift_days.sql → daily on-duty / call-out / shift clock + store RLS
+supabase/migrations/20260815_carry_over_priority.sql → store_locations.carried_over + sunday_bay_assignments CARRIED_OVER
+supabase/migrations/20260815_custom_decay_days.sql → store_locations.custom_decay_days (3–21 Sunday cadence)
 app/admin/roles/page.tsx          → Redirect → /roster
 app/api/admin/department-access/route.ts → Instant accessible_departments upsert + JWT app_metadata
 components/hub/DepartmentAccessChips.tsx → Roster multi-select department grants
@@ -139,8 +151,11 @@ supabase/migrations/20260812_sunday_bay_assignments.sql → sunday specialist↔
 | Department RBAC / tab visibility | `lib/rbac.ts` (`visibleFloorAuditTabs` for in-page auditors) + `lib/department-access.ts` (granted extras) |
 | Cross-app Navigation Hub | `lib/nav-hub.ts` + `NavigationHub` + `HubHeader` + `BottomNav` (Floor · Map · Roster · Settings only; Settings hashes for former Admin Tools) |
 | Department weekly quotas | `DepartmentTargetsMatrix` (blur / Save All) + `PATCH /api/departments` + Settings |
-| Store Operations map + rotations | `lib/store-ops/*` + `/admin/store-map` + `/dashboard` (bulk bays: `bay-pattern.ts` odd/even in Settings; floor checklist: `ZebraChecklist`; bay edit + Standard vs Velocity Heatmap: `StoreLocationGrid` + `WalkTheFloorSheet`; walk log: `bay-service.ts` + `POST /api/store-locations/service`; Sunday velocity pick: `rotation.ts` → `rotations.ts`; hard `DELETE /api/store-locations`) |
+| Store Operations map + rotations | `lib/store-ops/*` + `/admin/store-map` + `/dashboard` (bulk bays: `bay-pattern.ts` odd/even + velocity seed in Settings **and** Map Manage console; floor checklist: `ZebraChecklist`; Visual Grid: `StoreLocationGrid` + `WalkTheFloorSheet`; Manage: `AisleBayManager` + `AddBaySheet` + `EditBayDrawer` hotspot/lock/decay; walk log: `bay-service.ts` + `POST /api/store-locations/service`; Sunday pick: carry-over prepend then `rotation.ts` velocity + `custom_decay_days`; hard `DELETE /api/store-locations`) |
 | Sunday assignments | `lib/store-ops/sunday-audit.ts` (persist) + `SundayAuditAssignmentModal` |
+| Daily shift board | `lib/store-ops/shift-status.ts` (`associate_shift_days` + localStorage; mirrors weekly `ShiftRosterMember`) |
+| Call-out bay rebalance | `lib/store-ops/call-out.ts` (pool / auto / carry-over loop; stamps `carried_over` + Sunday `CARRIED_OVER`; does not generate rotations) |
+| Predictive Shift Copilot | `lib/store-ops/predictive-copilot.ts` + `PredictiveCopilotBanner` (local patterns; 1-tap downstock / assign) |
 | Downstock / packdown queue | `lib/store-ops/downstock.ts` (flags) + Zebra Downstock tab on Floor (assign via sunday-audit) |
 | Supervisor weekly rollup | `lib/store-ops/audit-summary.ts` + `SupervisorAuditSummaryModal` |
 | Shift workload balancer | `lib/store-ops/weekly-rotations.ts` (pure plan: hours, clusters, health-risk priority) |
@@ -148,7 +163,7 @@ supabase/migrations/20260812_sunday_bay_assignments.sql → sunday specialist↔
 | Selling vs Topstock audit mode | `lib/store-ops/audit-location-mode.ts` + `AuditLocationModeToggle` (Cycle/Department forms + Zebra filter) |
 | Rotation verification / barriers | `lib/store-ops/verification.ts` + Floor **Verify completed bays** + `ExceptionFeed` + `POST /api/rotations/exceptions` |
 | Manager notes / Executive Floor Pad | `lib/store-ops/ai-note-extract.ts`, `manager-notes.ts`, `app/actions/manager-notes.ts`, `components/manager-notes/*` (opened from Settings `#manager-notes`; `ai-note-summary` retired 410) |
-| Team roster (Master Admin) | `RosterTab` + `lib/specialists.ts` (`is_active` soft-delete); invite via `/invite` |
+| Team roster (Master Admin) | `RosterTab` + `lib/specialists.ts` (`is_active` soft-delete); invite via `/invite`; shift/call-out via `shift-status.ts` (`canManageShiftBoard`) |
 | Cross-department grants | `lib/department-access.ts` + `POST /api/admin/department-access` + Roster chips |
 | Working department pin | `lib/admin-department-context.ts` (Master full-store; multi-dept clamped to grants) |
 | Store context | `lib/store.ts` + `lib/store-ops/stores.ts` |
