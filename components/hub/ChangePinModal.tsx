@@ -99,7 +99,7 @@ export function ChangePinModal({ open, member, onClose, onUpdated }: Props) {
         role="dialog"
         aria-modal="true"
         aria-labelledby="change-pin-title"
-        className="relative z-[76] w-full max-w-md glass-card rounded-t-2xl !rounded-b-none border-emerald-500/20 p-4 sm:!rounded-2xl"
+        className="relative z-[76] w-full max-w-md glass-card theme-modal rounded-t-2xl !rounded-b-none p-4 sm:!rounded-2xl"
       >
         <h2 id="change-pin-title" className="text-lg font-bold text-white">
           Change My PIN

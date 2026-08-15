@@ -64,12 +64,12 @@ export function AuthWall({
         role="dialog"
         aria-modal="true"
         aria-labelledby="auth-wall-title"
-        className="glass-card relative z-[91] w-full max-w-md rounded-t-2xl !rounded-b-none border-emerald-500/35 p-5 shadow-[0_0_60px_-12px_rgba(16,185,129,0.45)] sm:!rounded-2xl"
+        className="glass-card theme-modal relative z-[91] w-full max-w-md rounded-t-2xl !rounded-b-none p-5 sm:!rounded-2xl"
       >
         <div className="flex items-start gap-3">
           <DeptSyncBadge size="md" />
           <div className="min-w-0">
-            <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-emerald-400">
+            <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-accent">
               DeptSync · {storeLabel}
             </p>
             <h1

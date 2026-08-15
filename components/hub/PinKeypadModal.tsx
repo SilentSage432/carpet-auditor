@@ -79,7 +79,7 @@ export function PinKeypadModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby="pin-title"
-        className={`relative z-[71] w-full max-w-sm glass-card rounded-t-2xl !rounded-b-none border-emerald-500/20 p-4 sm:!rounded-2xl ${
+        className={`relative z-[71] w-full max-w-sm glass-card theme-modal rounded-t-2xl !rounded-b-none p-4 sm:!rounded-2xl ${
           shake ? "animate-pin-shake" : ""
         }`}
       >
@@ -112,7 +112,7 @@ export function PinKeypadModal({
                 key={i}
                 className={`h-3 w-3 rounded-full border ${
                   i < pin.length
-                    ? "border-emerald-400 bg-emerald-400"
+                    ? "border-accent bg-accent"
                     : "border-zinc-600 bg-transparent"
                 }`}
               />
@@ -138,7 +138,7 @@ export function PinKeypadModal({
                     key={key}
                     type="button"
                     onClick={backspace}
-                    className="flex min-h-[44px] h-14 items-center justify-center rounded-xl border border-zinc-700/80 bg-zinc-950/80 text-lg font-semibold text-zinc-200 transition focus:outline-none focus:ring-2 focus:ring-emerald-500/50 active:scale-95"
+                    className="flex min-h-[44px] h-14 items-center justify-center rounded-xl border border-zinc-700/80 bg-zinc-950/80 text-lg font-semibold text-zinc-200 transition focus:outline-none focus:ring-2 focus:ring-accent/50 active:scale-95"
                   >
                     ⌫
                   </button>
@@ -149,7 +149,7 @@ export function PinKeypadModal({
                   key={key}
                   type="button"
                   onClick={() => handleDigit(key)}
-                  className="flex min-h-[44px] h-14 items-center justify-center rounded-xl border border-zinc-700/80 bg-zinc-950/80 font-mono text-xl font-bold text-white transition focus:outline-none focus:ring-2 focus:ring-emerald-500/50 active:scale-95"
+                  className="flex min-h-[44px] h-14 items-center justify-center rounded-xl border border-zinc-700/80 bg-zinc-950/80 font-mono text-xl font-bold text-white transition focus:outline-none focus:ring-2 focus:ring-accent/50 active:scale-95"
                 >
                   {key}
                 </button>

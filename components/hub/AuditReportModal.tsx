@@ -145,13 +145,13 @@ export function AuditReportModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby="audit-report-title"
-        className="relative z-[71] glass-card flex max-h-[92dvh] w-full max-w-3xl flex-col overflow-hidden !rounded-t-2xl !rounded-b-none border-emerald-500/20 sm:!rounded-2xl print:max-h-none print:max-w-none print:overflow-visible print:rounded-none print:border-0 print:bg-white print:shadow-none"
+        className="relative z-[71] glass-card theme-modal flex max-h-[92dvh] w-full max-w-3xl flex-col overflow-hidden !rounded-t-2xl !rounded-b-none sm:!rounded-2xl print:max-h-none print:max-w-none print:overflow-visible print:rounded-none print:border-0 print:bg-white print:shadow-none"
       >
         {/* Screen-only chrome */}
         <div className="no-print shrink-0 space-y-3 border-b border-zinc-800 p-4">
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
-              <p className="text-[10px] font-bold uppercase tracking-wide text-emerald-400">
+              <p className="text-[10px] font-bold uppercase tracking-wide text-accent">
                 Export & Print
               </p>
               <h2

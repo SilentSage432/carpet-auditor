@@ -8,10 +8,11 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 - Manifest name: `DeptSync — Department & SIMS Audit Hub`
 - Layout title: `DeptSync Hub · Department & SIMS Audit` · appleWebApp title `DeptSync`
 - Header: brand `DeptSync Hub` · subtitle `DeptSync · Lowe's #{store}` · section title · network
-- Header badge: `DeptSyncBadge` (stacked boxes + barcode, emerald/amber on dark)
+- Header badge: `DeptSyncBadge` (stacked boxes + barcode; fill follows `--accent` / `--warning`)
 - Icons: `public/icons/icon-192.png`, `icon-512.png`, `apple-touch-icon.png`
 - PWA manifest: `app/manifest.ts` → `/manifest.webmanifest`; static `public/manifest.json` → `/manifest.json` (TWA / Bubblewrap)
-- **Obsidian-glass UI:** void `#090d16`; utilities in `app/globals.css` (`.glass-card`, `.glass-panel`, `.glass-input`, `.glass-backdrop`, `.glass-void`, `.btn-primary-glow`, `.btn-grid-action-*`, `.btn-quick-touch`, `.chip-filter`, `.hub-main`, `.pb-safe`, status pills / bay glows). Emerald primary / cyan secondary accents. Canonical Lucide SVG set (`HubIcon` / `NavIcon` in `NavIcons.tsx`, stroke 2) — no emoji nav, network, Quick Touch, or Store Map camera glyphs.
+- **Theme engine:** `lib/theme.ts` owns presets + prefs (`deptsync_theme_prefs`). `data-theme` on `<html>`: `midnight` (default, ice-blue) · `emerald` · `amber` · `obsidian` · `cobalt`. Toggles: `data-contrast=high`, `data-density=compact`. Settings **Appearance** card applies instantly. CSS tokens in `app/globals.css`; glass utilities / nav / primary buttons bind to `--accent`, `--background`, `--border`, `--glow-accent`.
+- **Obsidian-glass UI:** utilities in `app/globals.css` (`.glass-card`, `.glass-panel`, `.theme-accent-surface`, `.theme-nav-active`, `.theme-modal`, `.btn-primary-glow`, `.btn-quick-touch`, `.chip-filter`, `.hub-main`). Canonical Lucide SVG set (`HubIcon` / `NavIcon`, stroke 2, `currentColor`).
 - **Handheld chrome:** sticky header `pt-safe` + compact `min-h-12`; ops bottom tabs `min-h-16` in the thumb zone; Store Ops pages use `.hub-main` so bays / badges / timers clear the fold.
 - **Native shell:** haptics via `utils/haptics.ts` + `HapticsListener`; offline toast `OfflineNetworkBanner` + `ConflictResolutionModal`; sync auto-flush on online/visibility/focus; PWA/TWA splash theme `#090d16`
 

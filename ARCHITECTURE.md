@@ -2,7 +2,11 @@
 
 ```
 app/page.tsx                      → Hub shell (section state + RBAC gate + data load + online flush; keep-alive panes + startTransition)
-app/layout.tsx                    → Fonts, PWA meta (DeptSync), ServiceWorkerRegister
+app/layout.tsx                    → Fonts, PWA meta, ThemeProvider + FOUC boot script
+lib/theme.ts                      → Theme catalog, prefs persistence, document apply (owns personalization)
+lib/theme-context.tsx             → React mirror of theme prefs (presentation)
+components/settings/ThemeSelector.tsx → Appearance swatches + contrast/density toggles
+app/globals.css                   → data-theme tokens + glass / nav / modal utilities bound to CSS variables
 app/manifest.ts                   → short_name DeptSync · Department & SIMS Audit Hub
 public/sw.js                      → Offline shell cache strategies
 components/hub/HubChrome.tsx      → Sticky header (legacy) + role-filtered inventory bottom nav
@@ -10,8 +14,8 @@ components/hub/NavigationHub.tsx  → Cross-app Navigation Hub (hamburger, role 
 components/hub/HeaderNetworkStatus.tsx → Isolated online / pending-queue chip (owns useNetworkBadge)
 components/hub/admin-tools-events.ts → Admin Tools open event + payload types (light; drawer is dynamic)
 components/hub/ChunkErrorBoundary.tsx → Catch failed next/dynamic chunks + child render throws
-components/hub/NavIcons.tsx       → Canonical Lucide HubIcon / NavIcon (stroke 2) for ops + inventory chrome
-app/globals.css                   → Obsidian-glass utilities + .hub-main / .chip-filter / .btn-quick-touch
+components/hub/NavIcons.tsx       → Canonical Lucide HubIcon / NavIcon (stroke 2, currentColor)
+app/globals.css                   → Theme tokens + glass / hub-main / chip-filter / btn-quick-touch
 components/hub/HapticsListener.tsx → Delegated vibrate pulses for taps / toggles / tabs
 components/hub/OfflineNetworkBanner.tsx → Offline toast + installSyncAutoFlush callbacks
 components/offline/ConflictResolutionModal.tsx → Local vs Server sync conflict chooser

@@ -145,7 +145,7 @@ export function ApplyMarkdownModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby="markdown-title"
-        className="relative z-[76] max-h-[90dvh] w-full max-w-md overflow-y-auto glass-card rounded-t-2xl !rounded-b-none border-emerald-500/20 p-4 sm:!rounded-2xl"
+        className="relative z-[76] max-h-[90dvh] w-full max-w-md overflow-y-auto glass-card theme-modal rounded-t-2xl !rounded-b-none p-4 sm:!rounded-2xl"
       >
         <h2 id="markdown-title" className="text-lg font-bold text-white">
           🏷️ Apply Manager Markdown

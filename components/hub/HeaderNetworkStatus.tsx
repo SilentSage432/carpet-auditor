@@ -30,13 +30,13 @@ export const HeaderNetworkStatus = memo(function HeaderNetworkStatus({
         : ` · ${network.pending} queued`
       : "";
   const iconId = online ? "wifi" : "wifiOff";
-  const toneClass = online ? "text-emerald-400" : "text-amber-300";
+  const toneClass = online ? "text-success" : "text-warning";
 
   if (variant === "banner") {
     return (
       <p
         className={`mt-0.5 flex items-center gap-1 truncate text-[10px] font-semibold ${
-          online ? "text-emerald-400/90" : "text-amber-300/90"
+          online ? "text-success/90" : "text-warning/90"
         }`}
         title={network.label}
         aria-live="polite"
@@ -74,7 +74,7 @@ export const HeaderNetworkStatus = memo(function HeaderNetworkStatus({
         {children}
         <span
           className={`mt-0.5 block truncate text-[10px] font-semibold ${
-            online ? "text-zinc-300" : "text-amber-300"
+            online ? "text-muted" : "text-warning"
           }`}
           aria-live="polite"
         >

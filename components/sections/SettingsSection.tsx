@@ -4,6 +4,7 @@ import { useCallback, useState } from "react";
 import { openAdminTools } from "@/components/hub/admin-tools-events";
 import { PushNotificationsCard } from "@/components/hub/PushNotificationsCard";
 import { WeeklyBayTargetCard } from "@/components/hub/WeeklyBayTargetCard";
+import { ThemeSelector } from "@/components/settings/ThemeSelector";
 import {
   clearLocalApplianceScans,
   countLocalApplianceScans,
@@ -115,6 +116,8 @@ export function SettingsSection({
 
   return (
     <div className="space-y-4">
+      <ThemeSelector />
+
       <section className="space-y-3 rounded-2xl border border-slate-800 bg-slate-900/90 p-4">
         <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-400">
           Security &amp; PIN

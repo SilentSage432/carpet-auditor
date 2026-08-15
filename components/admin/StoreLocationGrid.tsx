@@ -389,7 +389,7 @@ export function StoreLocationGrid({
   return (
     <section className="space-y-3">
       <div>
-        <h2 className="font-mono text-xs font-semibold uppercase tracking-[0.16em] text-emerald-400">
+        <h2 className="font-mono text-xs font-semibold uppercase tracking-[0.16em] text-accent">
           Store Location Grid
         </h2>
         <p className="mt-1 text-sm text-zinc-400">
@@ -511,7 +511,7 @@ export function StoreLocationGrid({
               <div className="min-w-0">
                 <p className="text-sm font-bold text-white">
                   {dept.departmentName}
-                  <span className="ml-2 font-mono text-xs font-semibold text-emerald-400/90">
+                  <span className="ml-2 font-mono text-xs font-semibold text-accent">
                     · {dept.tagCount} tag{dept.tagCount === 1 ? "" : "s"}
                   </span>
                 </p>
@@ -557,7 +557,8 @@ export function StoreLocationGrid({
                                 )
                               }
                               aria-label={`Select all bays in aisle ${aisle.aisle}`}
-                              className="h-5 w-5 accent-emerald-500"
+                              className="h-5 w-5"
+                              style={{ accentColor: "var(--accent)" }}
                             />
                           </label>
                           <button
@@ -619,7 +620,8 @@ export function StoreLocationGrid({
                                     disabled={ids.length === 0}
                                     onChange={() => togglePairSelected(ids)}
                                     aria-label={`Select aisle ${aisle.aisle} bay ${pair.bay}`}
-                                    className="h-5 w-5 accent-emerald-500"
+                                    className="h-5 w-5"
+                              style={{ accentColor: "var(--accent)" }}
                                   />
                                 </label>
                                 <button
@@ -755,7 +757,7 @@ function TypeToggle({
             ? "glass-bay-pending"
             : loc.type === "TOPSTOCK"
               ? "glass-bay-cyan"
-              : "border-emerald-500/35 bg-emerald-950/25";
+              : "theme-accent-surface";
 
   return (
     <div
@@ -764,7 +766,7 @@ function TypeToggle({
       }`}
     >
       <div className="min-w-0 pl-1.5">
-        <p className="font-mono text-xs font-bold text-emerald-400/90">
+        <p className="font-mono text-xs font-bold text-accent">
           {label}
           <span className="ml-1 font-sans text-[10px] font-medium text-zinc-500">
             {inRotation ? "week" : loc.status === "PENDING" ? "ready" : loc.status.slice(0, 3).toLowerCase()}
@@ -783,7 +785,7 @@ function TypeToggle({
       >
         <span
           className={`relative block h-6 w-10 rounded-full transition ${
-            loc.is_active ? "bg-emerald-500" : "bg-zinc-600"
+            loc.is_active ? "bg-accent" : "bg-zinc-600"
           }`}
         >
           <span
@@ -1020,13 +1022,13 @@ function BayActionsSheet({
         role="dialog"
         aria-modal="true"
         aria-labelledby="bay-actions-title"
-        className="glass-card relative z-10 max-h-[88dvh] w-full overflow-y-auto !rounded-t-2xl !rounded-b-none border-t-2 border-emerald-500/40 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3"
+        className="glass-card theme-modal relative z-10 max-h-[88dvh] w-full overflow-y-auto !rounded-t-2xl !rounded-b-none border-t-2 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3"
       >
         <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-zinc-600" />
 
         <div className="mb-4 flex items-start justify-between gap-3">
           <div>
-            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-emerald-400">
+            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-accent">
               {bay.departmentName}
             </p>
             <h2
@@ -1054,7 +1056,7 @@ function BayActionsSheet({
         </div>
 
         {message ? (
-          <p className="mb-3 rounded-xl border border-emerald-500/30 bg-emerald-950/40 px-3 py-2 text-sm text-emerald-200">
+          <p className="mb-3 rounded-xl theme-accent-surface border px-3 py-2 text-sm">
             {message}
           </p>
         ) : null}
@@ -1135,7 +1137,7 @@ function BayActionsSheet({
             <button
               type="button"
               onClick={() => setMode("actions")}
-              className="text-sm font-semibold text-emerald-300 underline-offset-2 hover:underline"
+              className="text-sm font-semibold text-accent underline-offset-2 hover:underline"
             >
               ← Back
             </button>
@@ -1187,7 +1189,7 @@ function BayActionsSheet({
             <button
               type="button"
               onClick={() => setMode("actions")}
-              className="text-sm font-semibold text-emerald-300 underline-offset-2 hover:underline"
+              className="text-sm font-semibold text-accent underline-offset-2 hover:underline"
             >
               ← Back
             </button>
@@ -1205,7 +1207,7 @@ function BayActionsSheet({
                       onClick={() => setEditTargetId(loc.id)}
                       className={`min-h-12 rounded-xl border text-sm font-bold ${
                         editTargetId === loc.id
-                          ? "border-emerald-400 bg-emerald-500/15 text-emerald-100"
+                          ? "theme-accent-surface border"
                           : "border-zinc-700 text-zinc-300"
                       }`}
                     >
@@ -1262,7 +1264,7 @@ function BayActionsSheet({
                     onClick={() => setTypeDraft(value)}
                     className={`min-h-12 rounded-xl border text-sm font-bold ${
                       typeDraft === value
-                        ? "border-emerald-400 bg-emerald-500/15 text-emerald-100"
+                        ? "theme-accent-surface border"
                         : "border-zinc-700 text-zinc-300"
                     }`}
                   >

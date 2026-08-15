@@ -115,7 +115,7 @@ export function SpecialistModal({ open, active, onClose, onSelect }: Props) {
             role="dialog"
             aria-modal="true"
             aria-labelledby="specialist-title"
-            className="relative z-[61] max-h-[90dvh] w-full max-w-md overflow-y-auto glass-card rounded-t-2xl !rounded-b-none border-emerald-500/20 p-4 sm:!rounded-2xl"
+            className="relative z-[61] max-h-[90dvh] w-full max-w-md overflow-y-auto glass-card theme-modal rounded-t-2xl !rounded-b-none p-4 sm:!rounded-2xl"
           >
             <h2 id="specialist-title" className="text-lg font-bold text-white">
               Select Active Specialist
@@ -138,7 +138,7 @@ export function SpecialistModal({ open, active, onClose, onSelect }: Props) {
                         onClick={() => requestSelect(member)}
                         className={`flex min-h-14 w-full items-center justify-between gap-2 rounded-xl px-3 py-2 text-left ${
                           selected
-                            ? "bg-emerald-500/20 ring-1 ring-emerald-500/50"
+                            ? "theme-accent-surface ring-1 ring-accent/50"
                             : "bg-zinc-950/70 hover:bg-zinc-800"
                         }`}
                       >
@@ -151,7 +151,7 @@ export function SpecialistModal({ open, active, onClose, onSelect }: Props) {
                           </span>
                         </span>
                         {selected ? (
-                          <span className="shrink-0 text-xs font-bold text-emerald-400">
+                          <span className="shrink-0 text-xs font-bold text-accent">
                             Active
                           </span>
                         ) : null}
@@ -188,7 +188,7 @@ export function SpecialistModal({ open, active, onClose, onSelect }: Props) {
                         onClick={() => setNewRole(value)}
                         className={`flex min-h-12 items-center justify-center rounded-lg text-xs font-semibold ${
                           newRole === value
-                            ? "bg-emerald-500 text-zinc-950"
+                            ? "bg-accent text-accent-fg"
                             : "text-zinc-400"
                         }`}
                       >
@@ -256,7 +256,7 @@ export function SpecialistModal({ open, active, onClose, onSelect }: Props) {
               <button
                 type="button"
                 onClick={() => setAdding(true)}
-                className="mt-4 flex min-h-12 w-full items-center justify-center rounded-xl border border-emerald-500/40 text-sm font-semibold text-emerald-300"
+                className="mt-4 flex min-h-12 w-full items-center justify-center rounded-xl border border-accent/40 text-sm font-semibold text-accent"
               >
                 + Add Team Member
               </button>

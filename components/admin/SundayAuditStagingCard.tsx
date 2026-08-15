@@ -116,7 +116,7 @@ export function SundayAuditStagingCard({
       <button
         type="button"
         onClick={() => setModalOpen(true)}
-        className="glass-card relative mb-3 flex min-h-12 w-full items-center gap-2.5 overflow-hidden border-emerald-500/50 p-3 text-left shadow-[0_0_32px_-10px_rgba(16,185,129,0.55)] transition active:scale-[0.99]"
+        className="glass-card theme-modal relative mb-3 flex min-h-12 w-full items-center gap-2.5 overflow-hidden p-3 text-left transition active:scale-[0.99]"
       >
         <div
           className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_80%_60%_at_20%_-20%,rgba(16,185,129,0.35),transparent_55%)]"
@@ -124,10 +124,10 @@ export function SundayAuditStagingCard({
         />
         <HubIcon
           id="zap"
-          className="relative h-5 w-5 shrink-0 text-emerald-400"
+          className="relative h-5 w-5 shrink-0 text-accent"
         />
         <div className="relative min-w-0 flex-1">
-          <p className="glass-subtitle text-emerald-400">
+          <p className="glass-subtitle text-accent">
             Pending Cycle Audits · D23
           </p>
           <p className="mt-0.5 text-sm font-bold leading-snug text-emerald-50 [text-shadow:0_0_18px_rgba(52,211,153,0.35)]">
@@ -141,7 +141,7 @@ export function SundayAuditStagingCard({
         </div>
         <HubIcon
           id="chevronRight"
-          className="relative h-5 w-5 shrink-0 self-center text-emerald-300"
+          className="relative h-5 w-5 shrink-0 self-center text-accent"
         />
       </button>
 

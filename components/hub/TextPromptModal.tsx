@@ -61,7 +61,7 @@ export function TextPromptModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby="text-prompt-title"
-        className="relative z-[61] w-full max-w-md overflow-hidden glass-card rounded-t-2xl !rounded-b-none border-emerald-500/20 p-4 sm:!rounded-2xl"
+        className="relative z-[61] w-full max-w-md overflow-hidden glass-card theme-modal rounded-t-2xl !rounded-b-none p-4 sm:!rounded-2xl"
       >
         <h2
           id="text-prompt-title"

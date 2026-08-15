@@ -2,6 +2,7 @@
  * Canonical Lucide vector icons for Navigation Hub + department-sync chrome.
  * Presentation only — route ownership stays in lib/nav-hub / lib/rbac.
  * Stroke weight is 2 everywhere so nav, status, and action glyphs match.
+ * Color is currentColor — parent chrome (theme-nav-active / text-accent) owns the theme.
  */
 
 import {

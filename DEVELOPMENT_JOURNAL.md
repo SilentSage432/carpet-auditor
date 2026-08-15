@@ -1,5 +1,13 @@
 # DeptSync Hub — Development Journal
 
+## 2026-08-14 — Theme engine & personalization
+
+### Shipped
+- **Theme catalog** (`lib/theme.ts`) owns five dark tactical presets, localStorage prefs, and `data-theme` / `data-contrast` / `data-density` apply. `ThemeProvider` (`lib/theme-context.tsx`) only mirrors live state. Blocking boot script in `app/layout.tsx` prevents FOUC.
+- **Presets:** Midnight Tactical (default, ice-blue) · Emerald Ops · Amber Precision · Obsidian OLED · Cobalt Command. Glass chrome, primary glow, nav active, and bay pulse bind to CSS variables.
+- **Settings Appearance** (`components/settings/ThemeSelector.tsx`) — live swatches, High Contrast (crisper borders), Compact Density (tighter rows). Instant, no reload.
+- **Token integration** — NavigationHub / HubChrome / NavIcons / ZebraChecklist / StoreLocationGrid / HeaderNetworkStatus / DeptSyncBadge / core modals use `theme-accent-surface`, `theme-nav-active`, `theme-modal`, `text-accent`.
+
 ## 2026-08-14 — Layout, navigation, and vector iconography polish
 
 ### Shipped

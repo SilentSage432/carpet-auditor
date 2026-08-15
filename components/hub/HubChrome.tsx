@@ -41,7 +41,7 @@ export function HubHeader({
       <div className="mx-auto flex min-h-12 max-w-md items-center gap-2 px-3 py-1">
         <DeptSyncBadge size="sm" />
         <div className="min-w-0 flex-1">
-          <p className="glass-subtitle truncate text-emerald-400">
+          <p className="glass-subtitle truncate text-accent">
             DeptSync Hub
           </p>
           <p className="glass-muted truncate text-[10px] font-semibold">
@@ -57,7 +57,7 @@ export function HubHeader({
           <button
             type="button"
             onClick={onOpenSpecialist}
-            className="flex h-12 max-w-[8.5rem] items-center gap-1.5 rounded-xl border border-emerald-500/40 bg-emerald-950/40 px-2.5 text-left backdrop-blur-sm transition active:scale-95"
+            className="theme-accent-surface flex h-12 max-w-[8.5rem] items-center gap-1.5 rounded-xl border px-2.5 text-left backdrop-blur-sm transition active:scale-95"
             aria-label="Switch active specialist"
           >
             <HubIcon
@@ -68,9 +68,9 @@ export function HubHeader({
                     ? "shield"
                     : "user"
               }
-              className="h-4 w-4 shrink-0 text-emerald-300"
+              className="h-4 w-4 shrink-0 text-accent"
             />
-            <span className="min-w-0 truncate text-xs font-semibold text-emerald-200">
+            <span className="min-w-0 truncate text-xs font-semibold text-accent-fg-soft">
               {specialist ? specialist.name : "Locked"}
             </span>
           </button>
@@ -134,7 +134,7 @@ export function AssociateSpecialtySwitcher({
             onClick={() => onSelect(tab.id)}
             className={`flex h-11 shrink-0 items-center gap-1.5 rounded-full border px-3 text-xs font-bold transition ${
               isActive
-                ? "border-emerald-400/60 bg-emerald-500/15 text-emerald-100"
+                ? "theme-accent-surface border"
                 : "border-zinc-700 bg-zinc-950/70 text-zinc-400"
             }`}
           >
@@ -166,7 +166,7 @@ export function BottomNavBar({
   return (
     <nav
       aria-label="Primary"
-      className="fixed bottom-0 left-0 right-0 z-30 mx-auto max-w-md border-t border-zinc-800/80 bg-zinc-900/95 pb-safe backdrop-blur-md shadow-[0_-8px_32px_-12px_rgba(0,0,0,0.55)]"
+      className="theme-bottom-nav fixed bottom-0 left-0 right-0 z-30 mx-auto max-w-md pb-safe backdrop-blur-md"
     >
       <div className={`grid ${cols}`}>
         {tabs.map((tab) => {
@@ -179,13 +179,13 @@ export function BottomNavBar({
               aria-current={isActive ? "page" : undefined}
               className={`relative flex min-h-16 flex-col items-center justify-center gap-0.5 px-0.5 pt-1 transition ${
                 isActive
-                  ? "text-emerald-300"
-                  : "text-zinc-400 active:text-zinc-200"
+                  ? "theme-nav-active"
+                  : "text-muted active:text-foreground"
               }`}
             >
               {isActive ? (
                 <span
-                  className="absolute inset-x-3 top-0 h-0.5 rounded-full bg-emerald-400 shadow-[0_0_10px_rgba(16,185,129,0.85)]"
+                  className="theme-nav-indicator absolute inset-x-3 top-0 h-0.5 rounded-full"
                   aria-hidden
                 />
               ) : null}

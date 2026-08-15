@@ -329,11 +329,11 @@ export function SundayAuditAssignmentModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className="glass-card relative z-10 flex max-h-[92dvh] w-full max-w-lg flex-col overflow-hidden !rounded-b-none border-emerald-500/40 shadow-[0_0_50px_-12px_rgba(16,185,129,0.55)] sm:!rounded-2xl"
+        className="glass-card theme-modal relative z-10 flex max-h-[92dvh] w-full max-w-lg flex-col overflow-hidden !rounded-b-none sm:!rounded-2xl"
       >
         <header className="flex shrink-0 items-start gap-3 border-b border-zinc-800/80 px-4 py-3">
           <div className="min-w-0 flex-1">
-            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-emerald-400">
+            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-accent">
               Sunday Rotation Engine · D23 Flooring
             </p>
             <h2 id={titleId} className="glass-title mt-1 text-base leading-snug">

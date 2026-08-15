@@ -35,7 +35,7 @@ export function ConfirmModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby="confirm-modal-title"
-        className="relative z-[61] w-full max-w-md overflow-hidden glass-card rounded-t-2xl !rounded-b-none border-emerald-500/20 p-4 sm:!rounded-2xl"
+        className="relative z-[61] w-full max-w-md overflow-hidden glass-card theme-modal rounded-t-2xl !rounded-b-none p-4 sm:!rounded-2xl"
       >
         <h2
           id="confirm-modal-title"
@@ -58,7 +58,7 @@ export function ConfirmModal({
             className={`flex h-12 items-center justify-center rounded-xl text-sm font-bold ${
               danger
                 ? "bg-red-500 text-white"
-                : "bg-emerald-500 text-zinc-950"
+                : "bg-accent text-accent-fg"
             }`}
           >
             {confirmLabel}

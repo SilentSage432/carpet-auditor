@@ -424,10 +424,10 @@ export function ZebraChecklist({
   }
 
   return (
-    <div className="space-y-2">
-      <div className="flex items-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-950/30 px-3 py-2">
+    <div className="theme-density-stack space-y-2">
+      <div className="theme-accent-surface flex items-center gap-2 rounded-xl border px-3 py-2">
         <div className="min-w-0 flex-1">
-          <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-emerald-400">
+          <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-accent">
             This Week&apos;s Assigned Rotation
           </p>
           <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 font-mono text-sm font-bold text-slate-50">
@@ -446,10 +446,10 @@ export function ZebraChecklist({
         <p
           className={`inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-1 font-mono text-[10px] font-bold uppercase tracking-wide ${
             weeklyPace.tone === "ahead"
-              ? "border-emerald-400/50 bg-emerald-950/40 text-emerald-200"
+              ? "border-success/50 bg-success/10 text-success"
               : weeklyPace.tone === "behind"
-                ? "border-rose-400/50 bg-rose-950/40 text-rose-200"
-                : "border-amber-400/45 bg-amber-950/35 text-amber-200"
+                ? "border-danger/50 bg-danger/10 text-danger"
+                : "border-warning/45 bg-warning/10 text-warning"
           }`}
           title={weeklyPace.label}
         >
@@ -477,7 +477,7 @@ export function ZebraChecklist({
           onClick={() => setQueueFilter("all")}
           className={`chip-filter w-full rounded-xl ${
             queueFilter === "all"
-              ? "border-emerald-500/50 bg-emerald-950/40 text-emerald-200"
+              ? "theme-accent-surface border"
               : "border-zinc-800/80 bg-zinc-950/50 text-zinc-400"
           }`}
         >
@@ -645,7 +645,8 @@ export function ZebraChecklist({
                       checked
                       disabled
                       readOnly
-                      className="h-4 w-4 accent-emerald-600"
+                      className="h-4 w-4"
+                      style={{ accentColor: "var(--accent)" }}
                     />
                     <span className="min-w-0 flex-1 truncate font-mono text-sm text-slate-400 line-through">
                       {label}
@@ -743,13 +744,14 @@ function ZebraBayRow({
         assignedToMe ? "bg-cyan-950/20" : ""
       }`}
     >
-      <div className="flex items-start gap-1.5 px-2 py-1.5">
+      <div className="theme-density-row flex items-start gap-1.5 px-2 py-1.5">
         <label className="flex min-h-11 min-w-0 flex-1 cursor-pointer items-center gap-2.5 active:bg-slate-800/60">
           <input
             type="checkbox"
             checked={false}
             onChange={onComplete}
-            className="h-6 w-6 shrink-0 accent-emerald-500"
+            className="h-6 w-6 shrink-0"
+            style={{ accentColor: "var(--accent)" }}
             aria-label={`Mark complete: ${label}`}
           />
           <span className="min-w-0 flex-1">
@@ -789,7 +791,7 @@ function ZebraBayRow({
             className={`btn-quick-touch ${
               assignedToMe
                 ? "border-cyan-400/50 bg-cyan-950/40 text-cyan-100"
-                : "border-emerald-500/45 bg-emerald-950/40 text-emerald-200"
+                : "theme-accent-surface border"
             }`}
             aria-label={`Quick Touch facing check: ${label}`}
             title="Quick Touch"

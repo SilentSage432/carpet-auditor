@@ -4,6 +4,8 @@ import { HapticsListener } from "@/components/hub/HapticsListener";
 import { OfflineNetworkBanner } from "@/components/hub/OfflineNetworkBanner";
 import { ServiceWorkerRegister } from "@/components/hub/ServiceWorkerRegister";
 import { ConflictResolutionModal } from "@/components/offline/ConflictResolutionModal";
+import { ThemeProvider } from "@/lib/theme-context";
+import { THEME_BOOT_SCRIPT } from "@/lib/theme";
 import "./globals.css";
 
 const barlow = Barlow({
@@ -59,14 +61,25 @@ export default function RootLayout({
   return (
     <html
       lang="en"
+      data-theme="midnight"
+      data-contrast="normal"
+      data-density="comfortable"
+      suppressHydrationWarning
       className={`${barlow.variable} ${jetbrains.variable} h-full antialiased`}
     >
+      <head>
+        <script
+          dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }}
+        />
+      </head>
       <body className="min-h-full flex flex-col">
-        <ServiceWorkerRegister />
-        <HapticsListener />
-        <OfflineNetworkBanner />
-        <ConflictResolutionModal />
-        {children}
+        <ThemeProvider>
+          <ServiceWorkerRegister />
+          <HapticsListener />
+          <OfflineNetworkBanner />
+          <ConflictResolutionModal />
+          {children}
+        </ThemeProvider>
       </body>
     </html>
   );

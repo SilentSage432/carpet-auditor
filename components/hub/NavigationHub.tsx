@@ -58,7 +58,7 @@ function AdminToolsLoadingShell({
             <button
               type="button"
               onClick={() => retry()}
-              className="mx-4 mt-4 min-h-12 rounded-xl bg-emerald-500 px-4 text-sm font-bold text-slate-950"
+              className="mx-4 mt-4 min-h-12 rounded-xl bg-accent px-4 text-sm font-bold text-accent-fg"
             >
               Retry
             </button>
@@ -222,7 +222,7 @@ export function NavigationHub({
           <DeptSyncBadge size="sm" />
 
           <div className="min-w-0 flex-1">
-            <p className="truncate font-mono text-[10px] font-bold uppercase tracking-[0.12em] text-emerald-400/90">
+            <p className="truncate font-mono text-[10px] font-bold uppercase tracking-[0.12em] text-accent">
               DeptSync
               {storeNumber ? ` · ${formatStoreLabel(storeNumber)}` : ""}
             </p>
@@ -244,7 +244,7 @@ export function NavigationHub({
               aria-expanded={userOpen}
               aria-controls={userMenuId}
               aria-label="Account and status"
-              className="flex h-12 max-w-[10.5rem] items-center gap-1.5 rounded-xl border border-emerald-500/35 bg-emerald-950/35 px-2 text-left backdrop-blur-sm transition active:scale-[0.98] focus-visible:border-emerald-500/50 focus-visible:ring-1 focus-visible:ring-emerald-500/30"
+              className="theme-accent-surface flex h-12 max-w-[10.5rem] items-center gap-1.5 rounded-xl border px-2 text-left backdrop-blur-sm transition active:scale-[0.98] focus-visible:border-accent/50 focus-visible:ring-1 focus-visible:ring-accent/30"
             >
               <HeaderNetworkStatus storeNumber={storeNumber} variant="compact">
                 <span className="block truncate font-mono text-[9px] font-bold leading-none tracking-wide text-amber-300">
@@ -362,7 +362,7 @@ export function NavigationHub({
           >
             <div className="flex items-center justify-between border-b border-zinc-800/80 px-4 py-3">
               <div>
-                <p className="glass-subtitle text-emerald-400">
+                <p className="glass-subtitle text-accent">
                   Navigation Hub
                 </p>
                 <p className="mt-1 font-mono text-xs font-bold text-amber-300">
@@ -416,7 +416,7 @@ export function NavigationHub({
                     onClick={() => setMenuOpen(false)}
                     className="glass-card flex h-14 items-center gap-3 px-4 text-left"
                   >
-                    <NavIcon id="home" className="h-5 w-5 text-emerald-300" />
+                    <NavIcon id="home" className="h-5 w-5 text-accent" />
                     <span>
                       <span className="block text-sm font-bold text-zinc-100">
                         Inventory Hub
@@ -466,7 +466,7 @@ export function NavigationHub({
                     onClick={() => setMoreOpen(false)}
                     className={`flex h-14 items-center gap-3 rounded-xl border px-3 ${
                       isNavHubPathActive(pathname, link.href)
-                        ? "border-emerald-500/45 bg-emerald-950/40 text-emerald-100"
+                        ? "theme-accent-surface border text-accent-fg-soft"
                         : "border-zinc-800 bg-zinc-950/60 text-zinc-100"
                     }`}
                   >
@@ -618,7 +618,7 @@ function NavDrawerItem({
         aria-current={active ? "page" : undefined}
         className={`flex h-14 items-center gap-3 rounded-2xl border px-4 text-left backdrop-blur-sm transition ${
           active
-            ? "border-emerald-500/50 bg-emerald-950/45 text-emerald-100 ring-1 ring-emerald-500/30"
+            ? "theme-accent-surface border ring-1 ring-accent/30"
             : "border-zinc-800/80 bg-zinc-900/70 text-zinc-100"
         }`}
       >
@@ -660,7 +660,7 @@ function OpsBottomNav({
   return (
     <nav
       aria-label="Store Operations"
-      className="fixed bottom-0 left-0 right-0 z-30 mx-auto max-w-lg border-t border-zinc-800/80 bg-zinc-900/95 pb-safe backdrop-blur-md shadow-[0_-8px_32px_-12px_rgba(0,0,0,0.55)]"
+      className="theme-bottom-nav fixed bottom-0 left-0 right-0 z-30 mx-auto max-w-lg pb-safe backdrop-blur-md"
     >
       <div className={`grid ${cols}`}>
         {primaryLinks.map((link) => {
@@ -672,13 +672,13 @@ function OpsBottomNav({
               aria-current={active ? "page" : undefined}
               className={`relative flex min-h-16 flex-col items-center justify-center gap-0.5 px-1 pt-1 ${
                 active
-                  ? "text-emerald-300"
-                  : "text-zinc-400 active:text-zinc-200"
+                  ? "theme-nav-active"
+                  : "text-muted active:text-foreground"
               }`}
             >
               {active ? (
                 <span
-                  className="absolute inset-x-4 top-0 h-0.5 rounded-full bg-emerald-400 shadow-[0_0_10px_rgba(16,185,129,0.85)]"
+                  className="theme-nav-indicator absolute inset-x-4 top-0 h-0.5 rounded-full"
                   aria-hidden
                 />
               ) : null}
@@ -696,13 +696,13 @@ function OpsBottomNav({
             aria-label="More"
             className={`relative flex min-h-16 flex-col items-center justify-center gap-0.5 px-1 pt-1 ${
               overflowActive
-                ? "text-emerald-300"
-                : "text-zinc-400 active:text-zinc-200"
+                ? "theme-nav-active"
+                : "text-muted active:text-foreground"
             }`}
           >
             {overflowActive ? (
               <span
-                className="absolute inset-x-4 top-0 h-0.5 rounded-full bg-emerald-400 shadow-[0_0_10px_rgba(16,185,129,0.85)]"
+                className="theme-nav-indicator absolute inset-x-4 top-0 h-0.5 rounded-full"
                 aria-hidden
               />
             ) : null}
