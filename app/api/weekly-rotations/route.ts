@@ -12,7 +12,7 @@ import { isoWeekLabel } from "@/lib/store-ops/week";
 import { supabaseAdminMissingMessage } from "@/lib/supabase/env";
 
 const ROTATION_SELECT =
-  "id, department_id, location_id, assigned_week, is_completed, completed_at, created_at, store_locations(id, aisle, bay, type, last_completed_at, status, cycle_number)";
+  "id, department_id, location_id, assigned_week, is_completed, completed_at, created_at, store_locations(id, aisle, bay, type, last_completed_at, last_serviced_at, status, cycle_number)";
 const ROTATION_SELECT_NO_LAST =
   "id, department_id, location_id, assigned_week, is_completed, completed_at, created_at, store_locations(id, aisle, bay, type, status, cycle_number)";
 

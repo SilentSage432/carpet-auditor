@@ -13,6 +13,7 @@ import {
   type StoreLocation,
 } from "@/lib/store-ops/types";
 import type { StoreSpecialist } from "@/lib/types";
+import { recordBayTouch } from "@/lib/heatmap/bay-tracker";
 
 type Props = {
   specialist: StoreSpecialist;
@@ -62,6 +63,14 @@ export function ShowroomQuickTouchCard({
       setOptimistic(locationId);
       try {
         await completeShowroomLocation(specialist, locationId);
+        const loc = due.find((row) => row.id === locationId);
+        recordBayTouch({
+          location_id: locationId,
+          aisle: loc?.aisle,
+          bay: loc?.bay,
+          location_tag: loc ? formatBayTag(loc) : undefined,
+          source: "audit",
+        });
         onTouched?.();
         await reload();
       } catch (err) {

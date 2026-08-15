@@ -81,7 +81,7 @@ Master Admin: compact department **dropdown pill** in the header. Close glyphs a
 | Floor / My Shift | `/dashboard` | Master/DS: full floor. CSA: assigned bays, packdown, shift goals |
 | Map | `/admin/store-map` | Visual Grid (walk / heatmap). Manage Aisles & Bays for Master/DS only |
 | Roster | `/roster` | Hidden from CSA. DS sees assigned departments; Master sees full store |
-| Settings | `/settings` | Hidden from CSA. Master tools + DS targets / Floor Pad |
+| Settings | `/settings` | Hidden from CSA. Master tools + DS targets |
 
 Store Ops pages use `.hub-main` (`px-3 pt-2 pb-28`) so bay lists, status pills, and pace timers clear the fold on handhelds. Quick Touch / filter chips use `.btn-quick-touch` / `.chip-filter` (44px min).
 
@@ -232,6 +232,8 @@ Stacked cards (~1.5–2 handheld screens):
 
 **Roster management** lives primarily in **SpecialistModal** (header), not as a Settings sub-page: add team member (name, Associate/Supervisor, optional/required PIN), select active specialist.
 
+Floor Pad is no longer a Settings tool. Master/DS open **Walk & Talk** from the Floor dock (`TacticalVoiceFloorPad`); Settings `#manager-notes` redirects to `/dashboard#floor-pad`.
+
 ---
 
 ## C. Floating Overlays, Modals & Slide-Overs
@@ -255,7 +257,8 @@ Stacked cards (~1.5–2 handheld screens):
 | **ApplyMarkdownModal** | `ApplyMarkdownModal.tsx` | Remnant markdown CTA | % Off / Fixed $ + preview |
 | **Quick-AddCatalogModal** | `QuickAddCatalogModal.tsx` | Cycle Audit / scan flows | Link unlinked barcode → catalog (supersedes retired MarryBarcodeModal) |
 | **VisualBayScannerModal** | `store-ops/VisualBayScannerModal.tsx` | Store Map CTA / bay sheet / Cycle Audit **Snap Bay** chip | Camera or upload → Gemini scan beam → results drawer (z-90) |
-| **ExecutiveFloorPad** | `manager-notes/ExecutiveFloorPad.tsx` | Settings `#manager-notes` | Full-screen TipTap Floor Pad + Gemini Copilot + archive (z-80) |
+| **TacticalVoiceFloorPad** | `dashboard/TacticalVoiceFloorPad.tsx` | Floor Walk & Talk dock | Listening pill + bottom sheet voice/scratchpad + Copilot cards (z-80) |
+| **ExecutiveFloorPad** | `manager-notes/ExecutiveFloorPad.tsx` | Floor Pad sheet “full notes” / `#floor-pad` | Full-screen TipTap Floor Pad + Gemini Copilot + archive (z-80) |
 | Pin / Sync toasts | `app/page.tsx` | PIN save / online flush | Fixed top status pills |
 
 ### Z-index stack

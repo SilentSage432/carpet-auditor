@@ -102,10 +102,16 @@ lib/store-ops/bay-pattern.ts          → Odd / even bay range expansion (Bulk G
 lib/store-ops/manager-notes.ts        → Manager notes Supabase CRUD + realtime + archive (JWT-scoped)
 lib/store-ops/ai-bay-scan.ts          → Visual bay scan prompt / schema / normalize / local fallback
 lib/store-ops/ai-note-extract.ts      → Floor Pad Gemini Extract Tasks & Tag prompt / schema / fallback
+lib/store-ops/ai-walk-parse.ts        → Floor-walk Copilot structured task parse (voice/scratchpad)
+app/api/copilot/parse-walk/route.ts   → POST walk transcript → structured tasks (Supervisor+)
+lib/store-ops/shift-tasks.ts          → Dispatched walk tasks (shift_walk_tasks + localStorage)
+lib/heatmap/bay-tracker.ts            → Behavior-driven bay freshness (Fresh/Warm/Stale overlay)
+components/dashboard/TacticalVoiceFloorPad.tsx → Floor Walk & Talk dock + bottom sheet
+components/dashboard/BayFreshnessGrid.tsx → Compact heatmap chip on Floor
 app/actions/manager-notes.ts          → Server Action extractTasksAndTag (Bearer token auth)
 components/manager-notes/*            → Executive Floor Pad (TipTap rich text + Copilot + archive)
 components/store-ops/ManagerNotesWorkspace.tsx → Compatibility re-export of ExecutiveFloorPad
-app/manager-notes/page.tsx            → Redirect → /settings#manager-notes
+app/manager-notes/page.tsx            → Redirect → /dashboard#floor-pad
 app/api/store-ops/ai-note-summary     → Retired (410 Gone); use extractTasksAndTag
 supabase/migrations/20260812_manager_notes_archive.sql → manager_notes.is_archived
 app/flooring/page.tsx                 → Deep link → /dashboard + Sunday drawer (no 404 hop)
@@ -120,6 +126,7 @@ supabase/migrations/20260815_associate_shift_days.sql → daily on-duty / call-o
 supabase/migrations/20260815_carry_over_priority.sql → store_locations.carried_over + sunday_bay_assignments CARRIED_OVER
 supabase/migrations/20260815_performance_indexes.sql → composite indexes: dept+aisle+bay, service logs by bay/time, rotations by dept+is_completed
 supabase/migrations/20260815_custom_decay_days.sql → store_locations.custom_decay_days (3–21 Sunday cadence)
+supabase/migrations/20260815_shift_walk_tasks.sql → shift_walk_tasks (floor-walk Copilot dispatch)
 app/admin/roles/page.tsx          → Redirect → /roster
 app/api/admin/department-access/route.ts → Instant accessible_departments upsert + JWT app_metadata
 components/hub/DepartmentAccessChips.tsx → Roster multi-select department grants
@@ -174,7 +181,9 @@ supabase/migrations/20260812_sunday_bay_assignments.sql → sunday specialist↔
 | Bay health / floor discrepancies | `lib/store-ops/bay-health.ts` + `BayHealthScorecard` (composes location cycle age + hub audits / SIMS / variance) |
 | Selling vs Topstock audit mode | `lib/store-ops/audit-location-mode.ts` + `AuditLocationModeToggle` (Cycle/Department forms + Zebra filter) |
 | Rotation verification / barriers | `lib/store-ops/verification.ts` + Floor **Verify completed bays** + `ExceptionFeed` + `POST /api/rotations/exceptions` |
-| Manager notes / Executive Floor Pad | `lib/store-ops/ai-note-extract.ts`, `manager-notes.ts`, `app/actions/manager-notes.ts`, `components/manager-notes/*` (opened from Settings `#manager-notes`; `ai-note-summary` retired 410) |
+| Manager notes / Executive Floor Pad | `lib/store-ops/ai-note-extract.ts`, `manager-notes.ts`, `app/actions/manager-notes.ts`, `components/manager-notes/*` (opened from Floor `TacticalVoiceFloorPad`; `ai-note-summary` retired 410) |
+| Floor-walk Copilot / shift dispatch | `lib/store-ops/ai-walk-parse.ts` + `POST /api/copilot/parse-walk` + `lib/store-ops/shift-tasks.ts` (`TacticalVoiceFloorPad`) |
+| Bay freshness overlay | `lib/heatmap/bay-tracker.ts` + `BayFreshnessGrid` (composes last_serviced_at / last_completed_at / walk touches; not velocity or bay-health) |
 | Team roster (Master Admin) | `RosterTab` + `AssociateScheduleModal` + `lib/specialists.ts`; weekly matrix via `shift-status.ts` (`canManageShiftBoard`) |
 | Cross-department grants | `lib/department-access.ts` + `POST /api/admin/department-access` + Roster chips |
 | Working department pin | `lib/admin-department-context.ts` (Master full-store; multi-dept clamped to grants) |
@@ -223,7 +232,7 @@ supabase/migrations/20260812_sunday_bay_assignments.sql → sunday specialist↔
    - APIs: `/api/appliances/catalog`, `/api/appliances/scans` (`GET|POST|PATCH|DELETE`)
 3. **Universal / Appliance Catalog** — removed from bottom nav; SKU linking remains via Quick-Add / scan flows (`carpet_catalog` / `appliance_catalog`). `/catalog` redirects to `/appliances`.
 4. **Remnant Rack** — Settings accordion (`#remnants`) when RBAC allows
-5. **Settings** — theme, PIN, weekly targets, push, device/sync; Master: bulk / taxonomies / force rotation / store #; Floor Pad modal
+5. **Settings** — theme, PIN, weekly targets, push, device/sync; Master: bulk / taxonomies / force rotation / store #. Floor Pad lives on Floor.
 
 ## Dual audit modes
 

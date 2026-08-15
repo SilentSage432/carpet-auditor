@@ -6,6 +6,8 @@ import { SundayAuditStagingCard } from "@/components/admin/SundayAuditStagingCar
 import { ExceptionFeed } from "@/components/admin/ExceptionFeed";
 import { StoreHealthCard } from "@/components/StoreHealthCard";
 import { ShowroomQuickTouchCard } from "@/components/dashboard/ShowroomQuickTouchCard";
+import { TacticalVoiceFloorPad } from "@/components/dashboard/TacticalVoiceFloorPad";
+import { BayFreshnessGrid } from "@/components/dashboard/BayFreshnessGrid";
 import { ZebraChecklist } from "@/components/store-ops/ZebraChecklist";
 import { ShiftBriefingCard } from "@/components/store-ops/ShiftBriefingCard";
 import { PredictiveCopilotBanner } from "@/components/store-ops/PredictiveCopilotBanner";
@@ -46,7 +48,7 @@ const SupervisorAuditSummaryModal = dynamic(
   { ssr: false }
 );
 
-export function FloorTab({ specialist }: WorkflowTabProps) {
+export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
   const [week, setWeek] = useState("");
   const [deptId, setDeptId] = useState<string | null>(null);
   const [rotations, setRotations] = useState<WeeklyRotationWithLocation[]>([]);
@@ -148,6 +150,14 @@ export function FloorTab({ specialist }: WorkflowTabProps) {
     return filterFlooringRotations(rotations, flooringDeptId);
   }, [rotations, flooringFocus, flooringDeptId]);
 
+  const freshnessLocations = useMemo(
+    () =>
+      displayRotations
+        .map((row) => row.store_locations)
+        .filter((loc): loc is NonNullable<typeof loc> => Boolean(loc)),
+    [displayRotations]
+  );
+
   async function signOffCompleted() {
     if (!deptId || !week) return;
     setVerifyBusy(true);
@@ -175,6 +185,21 @@ export function FloorTab({ specialist }: WorkflowTabProps) {
   return (
     <>
       <main className="hub-main">
+        {!simplified ? (
+          <TacticalVoiceFloorPad
+            specialist={specialist}
+            storeNumber={storeNumber}
+            week={week}
+            rotations={displayRotations}
+            departmentId={deptId}
+          />
+        ) : null}
+
+        <BayFreshnessGrid
+          locations={freshnessLocations}
+          refreshKey={healthKey}
+        />
+
         {!simplified ? (
           <SundayAuditStagingCard
             specialist={specialist}

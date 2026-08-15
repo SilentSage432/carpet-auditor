@@ -22,6 +22,7 @@ import {
   buildSessionRefreshShiftBriefing,
   isShiftBriefingTransportError,
 } from "./shift-briefing";
+import type { WalkParseResult } from "./ai-walk-parse";
 import type {
   BayServiceIntensity,
   BayServiceLog,
@@ -353,6 +354,23 @@ export async function aiParseLocations(
   }
 ): Promise<AiParseLocationsResult> {
   return storeOpsFetch("/api/store-locations/ai-parse", specialist, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+}
+
+/** Supervisor / Super Admin — Gemini floor-walk transcript → structured tasks. */
+export async function parseFloorWalk(
+  specialist: StoreSpecialist,
+  input: {
+    transcript: string;
+    department_code?: string;
+    roster_names?: string[];
+    allow_local_fallback?: boolean;
+  }
+): Promise<WalkParseResult> {
+  return storeOpsFetch("/api/copilot/parse-walk", specialist, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),

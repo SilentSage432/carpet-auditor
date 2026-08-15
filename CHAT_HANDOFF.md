@@ -22,6 +22,7 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 - **Multi-department access:** `accessible_departments` on roster + profiles. Header switcher when more than one granted dept. Supervisors grant extras from the **Roster** tab chips. Apply `20260814_multi_department_access.sql`.
 - **Daily shift board / call-out:** Roster groups by home department; department accordions start **collapsed**. `lib/store-ops/shift-status.ts` owns Sun–Sat clocks + `ABSENT_CALLOUT` (`associate_shift_days` + localStorage fallback). Cards show S–S dots, today's pill, and Edit Schedule → `AssociateScheduleModal` (presets Open/Mid/Close, per-day times). Call-out dialog composes `lib/store-ops/call-out.ts` → Sunday pool / proportional redistribute / carry-over loop. Apply `20260815_associate_shift_days.sql` + `20260815_carry_over_priority.sql`. Supervisors + Master toggle duty; Master-only add/delete team.
 - **Predictive Shift Copilot:** Floor banner under Shift Briefing (`PredictiveCopilotBanner`). Local patterns from `bay_service_logs` / Sunday assignments / downstock / locations — not Gemini. 1-tap Stage to Shift (`POST /api/rotations/assign`, Supervisor+) or Add to Downstock.
+- **Tactical Voice Hub:** Floor dock `TacticalVoiceFloorPad` (Master/DS). Web Speech + scratchpad → `POST /api/copilot/parse-walk` → dispatch via `lib/store-ops/shift-tasks.ts`. Bay freshness chip `BayFreshnessGrid` composes `lib/heatmap/bay-tracker.ts` (Fresh 0–2d / Warm 3–4d / Stale 5+d). Apply `20260815_shift_walk_tasks.sql`.
 
 ## AI (`lib/ai/gemini.ts`)
 - Server-only Gemini Flash client (`@google/generative-ai` + `server-only`)
@@ -37,7 +38,7 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 - **Appliance Anomaly Detection:** `POST /api/appliances/ai-anomaly` (Store Ops JWT) — server-fetches scans/catalog, local heuristics first, Gemini narrates the packet
 - **Catalog Taxonomies:** `lib/catalog/taxonomies.ts` + `POST /api/catalog/ai-taxonomy` (supervisor/admin JWT) + Settings `TaxonomyManagerModal`; known-folder packet + registry merge
 - **AI Visual Bay Scan:** `POST /api/store-ops/ai-bay-scan` + `lib/store-ops/ai-bay-scan.ts` + `VisualBayScannerModal` — 720p JPEG q=0.70 / 960px; route cap ~1.5MB; `responseSchema` + 512 output tokens
-- **Executive Floor Pad:** Server Action `extractTasksAndTag` is canonical Copilot (`lib/store-ops/ai-note-extract.ts`, 8k plain text, 2048 tokens). `POST /api/store-ops/ai-note-summary` returns **410 Gone** (unbounded 8MB canvas synthesis retired).
+- **Executive Floor Pad:** Full TipTap notes still owned by `extractTasksAndTag` (`lib/store-ops/ai-note-extract.ts`). Walk-of-consciousness parse is a separate owner: `POST /api/copilot/parse-walk` + `lib/store-ops/ai-walk-parse.ts` (structured location/category/priority JSON, 8k cap, 2048 tokens). `POST /api/store-ops/ai-note-summary` remains **410 Gone**.
 
 ## RBAC (`lib/rbac.ts` + `lib/specialists.ts`)
 | Role | Scope | Tabs |
@@ -64,7 +65,7 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 ### Settings tools (Master Admin / Supervisor)
 - Former Admin Tools live in **Settings** (`SettingsSection`) as accordions and modals — not a second menu
 - Master: store number, Bulk Generator (`#bulk-generate`), Taxonomies (`#taxonomies`), Force Rotation (`#weekly-rotation`)
-- Supervisor + Master: weekly targets matrix, Executive Floor Pad (`#manager-notes`)
+- Supervisor + Master: weekly targets matrix. Floor Pad lives on Floor (`TacticalVoiceFloorPad`); Settings `#manager-notes` redirects to `/dashboard#floor-pad`
 - Remnant inventory (`#remnants`) when RBAC allows; Device & sync for every role
 - Personal **🎨 Appearance & Preferences** (all roles, including CSA via header) — not store configuration
 - Department Supervisors never see Master-only setup controls
@@ -106,7 +107,7 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 - **P0 indexes:** re-run `supabase/migrations/20260813_p0_query_indexes.sql` — hub tables use `store_number`; Store Ops locations/rotations use `store_id`; manager_notes Phase 2 uses `store_number`+`department` (legacy `store_id`+`department_code`). Script skips absent columns. Apply `20260815_performance_indexes.sql` for Map/copilot composites (`idx_store_locations_dept_aisle`, `idx_bay_service_logs_bay_time`, `idx_rotations_active`) on canonical columns (`aisle`/`bay`, `location_id`/`created_at`, `is_completed`).
 - **P1 Gemini/map:** Snap Bay 720p + compressed JPEG; Floor Pad Copilot strips HTML / 8k cap; `GET /api/store-locations` explicit Store Map columns (no `SELECT *`); Slice 1 `responseSchema` + per-route token budgets
 - **P2 hub UI:** `startTransition` + keep-alive Floor/Map/Roster/Settings (`hidden`); Cycle/Appliance scan forms isolated from logs; 300ms debounced draft saves with flush on submit/leave; weekly rotations + Sunday assignments TTL-cached 45s
-- **Settings tools:** Bulk / Taxonomies / Force Rotation / Floor Pad are `next/dynamic` inside `SettingsSection`; SW cache `deptsync-shell-v5-brand-floor`
+- **Settings tools:** Bulk / Taxonomies / Force Rotation are `next/dynamic` inside `SettingsSection`; Floor Pad is the Floor tactical dock; SW cache `deptsync-shell-v5-brand-floor`
 - **Bulk bays:** Odd Only / Even Only (`lib/store-ops/bay-pattern.ts`, default odd); Store Map GET falls back if `last_completed_at` is missing/null
 - Seeds: no hardcoded roster injection — use Invite / Add Supervisor; temp PIN sets `must_change_credentials`
 - Primary: fixed bottom workflow tabs — **Floor · Map · Roster · Settings** only
@@ -170,7 +171,7 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 - **Navigation Hub** (`lib/nav-hub.ts` + `HubHeader.tsx` + `BottomNav.tsx` + `NavigationHub.tsx`): header is title/store # · department pill · account/PIN; primary tabs **Floor · Map · Roster · Settings** for every role (no More overflow)
   - Floor (`/dashboard`) · Map (`/admin/store-map`) · Roster (`/roster`) · Settings (`/settings`)
   - Authenticated `/` without specialty `?section=` replaces to `/dashboard`. Hub `/?section=audit|appliances|department` is scan tools only. Remnants deep-link to `/settings#remnants`
-- `/manager-notes` redirects to `/settings#manager-notes` (Floor Pad modal in Settings)
+- `/manager-notes` redirects to `/dashboard#floor-pad` (Tactical Voice Hub on Floor)
 - `/dashboard` — one Floor layout for all roles: Sunday staging (non-associates), scan chips, health/rollup, showroom, **Verify completed bays**, `ZebraChecklist` (Rotation / Downstock + Barrier chips), `ExceptionFeed`
 - `/stock` redirects to `/dashboard` (Downstock is a Zebra tab on Floor)
 - `/roster` — unified team list, PIN add, and department access chips (optimistic + toast)
@@ -184,6 +185,7 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 - Manager notes: apply `20260811_manager_notes.sql` + `20260812_manager_notes.sql` + `20260812_manager_notes_archive.sql` + `20260812_fix_manager_notes_rls.sql` + **`20260812_manager_notes_metadata.sql`** (`metadata` JSONB from Gemini Copilot)
 - Sunday bay assignments: apply `20260812_sunday_bay_assignments.sql`
 - Downstock queue: apply `20260814_downstock_queue.sql` (localStorage fallback until applied)
+- Shift walk tasks: apply `20260815_shift_walk_tasks.sql` (Floor Copilot dispatch; localStorage fallback until applied)
 - IRP velocity heatmap: apply `20260814_bay_velocity_heatmap.sql` (`store_locations.last_serviced_at` / `velocity_tier` / `priority_override` + `bay_service_logs`)
 - JWT claims / RLS helpers: apply `20260812_jwt_rls_policies.sql` + enable Custom Access Token Hook
 - Requires `SUPABASE_SERVICE_ROLE_KEY` for server routes (apply migration in Supabase SQL editor)

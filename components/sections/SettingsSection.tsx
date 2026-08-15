@@ -55,13 +55,6 @@ const TaxonomyManagerModal = dynamic(
     ),
   { ssr: false }
 );
-const ManagerNotesWorkspace = dynamic(
-  () =>
-    import("@/components/store-ops/ManagerNotesWorkspace").then(
-      (mod) => mod.ManagerNotesWorkspace
-    ),
-  { ssr: false }
-);
 const RemnantSection = dynamic(
   () =>
     import("@/components/sections/RemnantSection").then(
@@ -83,7 +76,7 @@ type SettingsAccordion = "device" | "store" | "bulk" | "remnants" | null;
 /**
  * Settings — floor-first. Themes, PIN, sync, targets, push.
  * Master Admin setup (bulk, taxonomies, force rotation, store #) lives here
- * as accordions / modals — not a second menu.
+ * as accordions / modals — not a second menu. Floor Pad lives on Floor.
  */
 export function SettingsSection({
   activeSpecialist,
@@ -100,7 +93,6 @@ export function SettingsSection({
   const [departments, setDepartments] = useState<Department[]>([]);
   const [forceOpen, setForceOpen] = useState(false);
   const [taxonomyOpen, setTaxonomyOpen] = useState(false);
-  const [notesOpen, setNotesOpen] = useState(false);
   const [catalog, setCatalog] = useState<CatalogItem[]>([]);
   const [remnants, setRemnants] = useState<Remnant[]>([]);
   const [roster, setRoster] = useState<StoreSpecialist[]>([]);
@@ -113,7 +105,6 @@ export function SettingsSection({
   const pending = usePendingSyncCount(storeNumber);
   const showRemnants =
     Boolean(activeSpecialist) && canAccessSection(activeSpecialist, "remnants");
-  const showFloorPad = supervisorSession || masterSession;
   const pathname = usePathname();
 
   void cacheTick;
@@ -171,8 +162,12 @@ export function SettingsSection({
         setOpenSection("bulk");
       } else if (hash === "weekly-rotation") {
         setForceOpen(true);
-      } else if (hash === "manager-notes" || hash === "s-pen-notes") {
-        setNotesOpen(true);
+      } else if (
+        hash === "manager-notes" ||
+        hash === "s-pen-notes" ||
+        hash === "floor-pad"
+      ) {
+        window.location.replace("/dashboard#floor-pad");
       } else if (hash === "taxonomies") {
         setTaxonomyOpen(true);
       } else if (hash === "remnants") {
@@ -350,24 +345,6 @@ export function SettingsSection({
         </section>
       ) : null}
 
-      {showFloorPad && activeSpecialist ? (
-        <button
-          type="button"
-          onClick={() => setNotesOpen(true)}
-          className="flex min-h-12 w-full items-center justify-between rounded-2xl border border-cyan-500/30 bg-cyan-950/20 px-4 text-left"
-        >
-          <span>
-            <span className="block text-sm font-semibold text-cyan-100">
-              Executive Floor Pad
-            </span>
-            <span className="block text-xs text-cyan-200/70">
-              Rich notes + Gemini Copilot
-            </span>
-          </span>
-          <span className="text-cyan-300">→</span>
-        </button>
-      ) : null}
-
       {showRemnants && activeSpecialist ? (
         <Accordion
           id="remnants"
@@ -534,14 +511,6 @@ export function SettingsSection({
           open={taxonomyOpen}
           onClose={() => setTaxonomyOpen(false)}
           departments={departments}
-        />
-      ) : null}
-      {notesOpen && activeSpecialist ? (
-        <ManagerNotesWorkspace
-          open={notesOpen}
-          onClose={() => setNotesOpen(false)}
-          specialist={activeSpecialist}
-          storeNumber={storeNumber}
         />
       ) : null}
     </div>

@@ -53,6 +53,7 @@ import type { CarpetAudit, StoreSpecialist } from "@/lib/types";
 import { playErrorTone, playSuccessTone } from "@/lib/ui/feedback";
 import { hapticPulse } from "@/utils/haptics";
 import { HubIcon } from "@/components/hub/NavIcons";
+import { recordBayTouch } from "@/lib/heatmap/bay-tracker";
 
 type TypeFilter = StoreLocationType | "all";
 type AssociateFilter = "all" | "mine" | string;
@@ -317,6 +318,15 @@ export function ZebraChecklist({
     setBarrierId((id) => (id === rotationId ? null : id));
     if (locationId) {
       emitBayReadiness({ locationIds: [locationId], tone: "verified" });
+      recordBayTouch({
+        location_id: locationId,
+        aisle: rotation?.store_locations?.aisle,
+        bay: rotation?.store_locations?.bay,
+        location_tag: rotation?.store_locations
+          ? formatBayTag(rotation.store_locations)
+          : undefined,
+        source: "checkoff",
+      });
     }
     hapticPulse("success");
     playSuccessTone();

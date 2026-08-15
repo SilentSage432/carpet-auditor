@@ -6,6 +6,7 @@ import { HubIcon } from "@/components/hub/NavIcons";
 import { assignLocationsToWeek, logBayService } from "@/lib/store-ops/client";
 import { toastError, toastSuccess } from "@/lib/toast";
 import { hapticSuccess, playErrorTone, playSuccessTone } from "@/lib/ui/feedback";
+import { recordBayTouch } from "@/lib/heatmap/bay-tracker";
 import type { BayScanMeta } from "@/lib/store-ops/ai-bay-scan";
 
 const VisualBayScannerModal = dynamic(
@@ -155,6 +156,13 @@ export function WalkTheFloorSheet({
       );
       playSuccessTone();
       hapticSuccess();
+      recordBayTouch({
+        location_id: target.id,
+        aisle: target.aisle,
+        bay: target.bay,
+        location_tag: formatBayTag(target),
+        source: "walk",
+      });
       onChanged();
       window.setTimeout(() => onClose(), 350);
     } catch (err) {

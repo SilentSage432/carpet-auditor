@@ -272,6 +272,7 @@ export const SETTINGS_TOOL_HASHES = [
   "weekly-rotation",
   "manager-notes",
   "s-pen-notes",
+  "floor-pad",
   "admin-tools",
   "taxonomies",
   "remnants",

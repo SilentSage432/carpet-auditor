@@ -124,10 +124,11 @@
 - [x] Role-based hub views (`MASTER_ADMIN` / `DEPARTMENT_SUPERVISOR` / `ASSOCIATE_CSA`) + Master-only 3-tap developer sandbox
 - [x] Theme / preferences / audio-haptics engine (`lib/ui/feedback.ts` + `UserPreferencesDrawer` for all roles)
 - [x] Instant-render Store Ops SWR (IndexedDB L2 + silent revalidate) + chunked Map DOM + async briefing decay + `20260815_performance_indexes.sql`
+- [x] Tactical Voice Hub on Floor (`TacticalVoiceFloorPad` + `POST /api/copilot/parse-walk` + `shift-tasks.ts` + `lib/heatmap/bay-tracker.ts`)
 
 ## Next
 - [x] Apply Phase 1 JWT/RLS migration in Supabase + enable Custom Access Token Hook
-- [ ] Apply Phase 2 migrations (`20260812_manager_notes.sql`, `20260812_sunday_bay_assignments.sql`, `20260812_manager_notes_archive.sql`, `20260812_fix_manager_notes_rls.sql`, **`20260812_manager_notes_metadata.sql`**, **`enable_rls_flagged_tables.sql`**, **`20260813_p0_query_indexes.sql`**, **`20260814_downstock_queue.sql`**, **`20260814_cabinets_d29.sql`**, **`20260814_bay_velocity_heatmap.sql`**, **`20260814_multi_department_access.sql`**, **`20260815_associate_shift_days.sql`**, **`20260815_carry_over_priority.sql`**, **`20260815_custom_decay_days.sql`**, **`20260815_performance_indexes.sql`**) + Realtime on notes/assignments tables
+- [ ] Apply Phase 2 migrations (`20260812_manager_notes.sql`, `20260812_sunday_bay_assignments.sql`, `20260812_manager_notes_archive.sql`, `20260812_fix_manager_notes_rls.sql`, **`20260812_manager_notes_metadata.sql`**, **`enable_rls_flagged_tables.sql`**, **`20260813_p0_query_indexes.sql`**, **`20260814_downstock_queue.sql`**, **`20260814_cabinets_d29.sql`**, **`20260814_bay_velocity_heatmap.sql`**, **`20260814_multi_department_access.sql`**, **`20260815_associate_shift_days.sql`**, **`20260815_carry_over_priority.sql`**, **`20260815_custom_decay_days.sql`**, **`20260815_performance_indexes.sql`**, **`20260815_shift_walk_tasks.sql`**) + Realtime on notes/assignments tables
 - [ ] Confirm every Master Admin has `store_number` set so Hub bridge can link `profiles`
 - [ ] Additional Gemini product surfaces beyond current AI ops widgets (Slice 1 transport/auth/compact-then-narrate shipped)
 ## Non-goals

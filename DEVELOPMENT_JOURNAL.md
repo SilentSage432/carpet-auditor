@@ -1,5 +1,13 @@
 # DeptSync Hub — Development Journal
 
+## 2026-08-15 — Tactical Voice Hub + bay freshness on Floor
+
+### Shipped
+- **Promoted Floor Pad** from Settings to the Floor dashboard. `TacticalVoiceFloorPad` is a high-access Walk & Talk dock (Master/DS) with listening pulse + bottom-sheet capture. Full TipTap `ExecutiveFloorPad` remains available from the sheet. `/manager-notes` and Settings `#manager-notes` redirect to `/dashboard#floor-pad`.
+- **Voice-to-task Copilot** — Web Speech API with pause/stop parse and keyboard scratchpad fallback. `POST /api/copilot/parse-walk` + `lib/store-ops/ai-walk-parse.ts` extract structured tasks (location_tag, category, priority, window, assignee). Local heuristic when Gemini or the network is down.
+- **Shift dispatch** — `lib/store-ops/shift-tasks.ts` owns walk tasks (`shift_walk_tasks` + localStorage). **Dispatch All to Shift Board** stamps freshness, syncs Supabase, and composes DOWNSTOCK into `downstock.ts`. Haptic: `hapticSuccess`.
+- **Bay freshness** — `lib/heatmap/bay-tracker.ts` + `BayFreshnessGrid`. Fresh 0–2d (emerald) / Warm 3–4d (amber) / Stale 5+d (crimson). Composes `last_serviced_at` / `last_completed_at` plus walk/dispatch/checkoff/audit overlays. Does not own IRP velocity or bay-health diagnostics. Apply `20260815_shift_walk_tasks.sql`.
+
 ## 2026-08-15 — Store Ops instant-render SWR + map/briefing performance
 
 ### Shipped

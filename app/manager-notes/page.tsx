@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 
-/** Executive Floor Pad opens from Settings. */
+/** Executive Floor Pad opens from the Floor tactical dock. */
 export default function ManagerNotesRedirectPage() {
-  redirect("/settings#manager-notes");
+  redirect("/dashboard#floor-pad");
 }
