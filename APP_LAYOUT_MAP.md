@@ -49,7 +49,7 @@
      + overlay stack (drawers/modals)
 ```
 
-- **Default section on load:** `audit` (Cycle Audit).
+- **Default land after login:** `/dashboard` (Floor checklist). Hub `/` without `?section=` redirects there. Specialty scans use `/?section=audit|appliances|department`.
 - **Primary nav:** fixed bottom tab bar — exclusive section switcher (no header hamburger).
 - **`pb-32` / audit `pb-44`** reserves space for bottom nav (+ sticky Log bar on Audit).
 - Body scroll locks when the specialist modal or change-PIN modal is open.
@@ -80,7 +80,7 @@ Master Admin: compact department **dropdown pill** in the header (no second-row 
 
 | Tab | Route | Meaning |
 |-----|-------|---------|
-| Floor | `/dashboard` (also `/` audits) | Bay cycle checklist + specialty auditors |
+| Floor | `/dashboard` | This week's bay checklist |
 | Map | `/admin/store-map` | Heatmap + bay layout |
 | Stock | `/stock` | Downstock queue + remnants |
 | Settings | `/settings` | Themes, credentials, Admin Tools |
@@ -112,18 +112,16 @@ All four views render inside the shared `max-w-md` column. Only one is mounted a
 
 ```
 ① FIRST VIEWPORT
-   Compact shift summary bar (collapsed by default)
-     📊 N Audited | CLF | Cartons  [Expand ▾]
-   Optional status flash
-   ┌ Scan-to-Catalog form ───────────────────┐
-   │ SKU / Barcode  ← autofocus + scan hooks │
-   │ Product Name · Category                 │
-   │ SIMS Location + [📍 SIMS Stock]         │
-   │ Location Type · Measure / Count         │
+   Remnant Intelligence chip + Snap Bay chip
+   ┌ Roll Measurement Pad ───────────────────┐
+   │ live CLF / SQYD in card header          │
+   │ SKU scan · details drawer               │
+   │ Whole inches · 1/8–7/8 keypad · +5/10/20│
    └─────────────────────────────────────────┘
    sticky Log & Reset (bottom-16, above tabs)
 
-② BELOW FOLD — FORM TAIL + LOG
+② BELOW FOLD — SUMMARY + LOG
+   Collapsed shift summary · Sunday staging
    System On-Hand · Variance · Logging as…
    Supervisor filters · Audit entry cards
 ```
@@ -310,7 +308,7 @@ Stacked cards (~1.5–2 handheld screens):
 | **SimsLocationFinder** | `SimsLocationFinder.tsx` | Catalog CTA + Audit 📍 SIMS Stock | Search drawer / dialog |
 | **ApplyMarkdownModal** | `ApplyMarkdownModal.tsx` | Remnant markdown CTA | % Off / Fixed $ + preview |
 | **Quick-AddCatalogModal** | `QuickAddCatalogModal.tsx` | Cycle Audit / scan flows | Link unlinked barcode → catalog (supersedes retired MarryBarcodeModal) |
-| **VisualBayScannerModal** | `store-ops/VisualBayScannerModal.tsx` | Store Map CTA / bay sheet / Cycle Audit **📷 Snap Bay AI Audit** | Camera or upload → Gemini scan beam → results drawer (z-90) |
+| **VisualBayScannerModal** | `store-ops/VisualBayScannerModal.tsx` | Store Map CTA / bay sheet / Cycle Audit **Snap Bay** chip | Camera or upload → Gemini scan beam → results drawer (z-90) |
 | **ExecutiveFloorPad** | `manager-notes/ExecutiveFloorPad.tsx` | Admin Tools / `/manager-notes` / `#manager-notes` | Full-screen TipTap Floor Pad + Gemini Copilot + archive (z-80) |
 | Pin / Sync toasts | `app/page.tsx` | PIN save / online flush | Fixed top status pills |
 

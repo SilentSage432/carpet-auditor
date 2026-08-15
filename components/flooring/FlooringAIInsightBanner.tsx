@@ -26,6 +26,8 @@ type Props = {
   onRemnantsChange: (items: Remnant[]) => void;
   /** Open full markdown modal when estimated value is missing. */
   onRequestMarkdown?: (remnant: Remnant) => void;
+  /** Chip trigger so the measurement pad stays above the fold. */
+  compact?: boolean;
 };
 
 type InsightsResponse = FlooringAiInsights & {
@@ -40,6 +42,7 @@ export function FlooringAIInsightBanner({
   activeSpecialist,
   onRemnantsChange,
   onRequestMarkdown,
+  compact = false,
 }: Props) {
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -162,7 +165,35 @@ export function FlooringAIInsightBanner({
   }
 
   return (
-    <section className="glass-card space-y-3 border-cyan-500/30 p-4 shadow-lg shadow-cyan-950/20">
+    <section
+      className={
+        compact
+          ? "overflow-hidden rounded-xl border border-cyan-500/30 bg-cyan-950/20"
+          : "glass-card space-y-3 border-cyan-500/30 p-4 shadow-lg shadow-cyan-950/20"
+      }
+    >
+      {compact ? (
+        <button
+          type="button"
+          aria-expanded={open}
+          disabled={busy || (remnants.length === 0 && (auditsProp?.length ?? 0) === 0)}
+          onClick={() => {
+            if (!insights && !busy) {
+              void runAnalyze();
+              return;
+            }
+            setOpen((v) => !v);
+          }}
+          className="flex min-h-11 w-full items-center justify-between gap-2 px-3 text-left disabled:opacity-50"
+        >
+          <span className="font-mono text-[11px] font-bold uppercase tracking-wide text-cyan-200">
+            Remnant Intelligence
+          </span>
+          <span className="shrink-0 text-[11px] font-semibold text-cyan-300">
+            {busy ? "…" : open ? "Hide" : insights ? "Show" : "Analyze"}
+          </span>
+        </button>
+      ) : (
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="glass-subtitle text-cyan-300">
@@ -182,15 +213,16 @@ export function FlooringAIInsightBanner({
           {busy ? "Analyzing…" : open && insights ? "Refresh" : "Analyze"}
         </button>
       </div>
+      )}
 
       {error ? (
-        <p className="text-sm font-medium text-rose-300" role="alert">
+        <p className="px-3 pb-2 text-sm font-medium text-rose-300" role="alert">
           {error}
         </p>
       ) : null}
 
       {open && insights ? (
-        <div className="space-y-3 border-t border-zinc-800/80 pt-3">
+        <div className={`space-y-3 ${compact ? "border-t border-cyan-500/20 px-3 pb-3 pt-2" : "border-t border-zinc-800/80 pt-3"}`}>
           <div className="flex flex-wrap items-center gap-2">
             <span
               className={

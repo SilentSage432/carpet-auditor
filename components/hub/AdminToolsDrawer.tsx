@@ -18,9 +18,9 @@ import {
 import { BulkLocationGenerator } from "@/components/admin/BulkLocationGenerator";
 import { ForceRotationModal } from "@/components/admin/ForceRotationModal";
 import { SundayAuditAssignmentModal } from "@/components/admin/SundayAuditAssignmentModal";
+import { DepartmentTargetsMatrix } from "@/components/admin/DepartmentTargetsMatrix";
 import { TaxonomyManagerModal } from "@/components/catalog/TaxonomyManagerModal";
-import { WeeklyBayTargetCard } from "@/components/hub/WeeklyBayTargetCard";
-import { HubIcon } from "@/components/hub/NavIcons";
+import { HubIcon, type HubIconId } from "@/components/hub/NavIcons";
 import { selectOnFocus } from "@/lib/number-input";
 import { isMasterAdmin } from "@/lib/rbac";
 import { fetchDepartmentsDetailed } from "@/lib/store-ops/client";
@@ -232,7 +232,7 @@ export function AdminToolsDrawer({
             ) : null}
 
             {section === "targets" ? (
-              <WeeklyBayTargetCard specialist={specialist} />
+              <DepartmentTargetsMatrix specialist={specialist} />
             ) : null}
 
             {section === "store" ? (
@@ -307,62 +307,147 @@ function Menu({
   onNavigate: () => void;
 }) {
   return (
-    <div className="grid gap-2">
-      <ToolButton onClick={onBulk}>Bulk Generate Aisles</ToolButton>
-      <ToolButton onClick={onSunday}>Sunday Rotation Engine</ToolButton>
-      <ToolButton onClick={onForce}>Trigger Weekly Rotation</ToolButton>
-      <ToolButton onClick={onNotes}>Executive Floor Pad</ToolButton>
-      <ToolButton onClick={onTaxonomy}>Catalog Taxonomies</ToolButton>
-      <ToolButton onClick={onTargets}>All-Department Bay Targets</ToolButton>
-      <ToolButton onClick={onStore}>Store Number / Location</ToolButton>
-      <Link
-        href="/admin/supervisors"
-        onClick={onNavigate}
-        className="flex min-h-14 items-center justify-center rounded-xl border-2 border-amber-400/50 bg-slate-900 px-3 text-center text-sm font-bold text-amber-100"
-      >
-        Manage Supervisor Logins
-      </Link>
-      <Link
-        href="/admin/store-map"
-        onClick={onNavigate}
-        className="flex min-h-12 items-center justify-center rounded-xl border border-slate-700 bg-slate-900 px-3 text-center text-sm font-semibold text-slate-100"
-      >
-        Open Store Map
-      </Link>
-      <Link
-        href="/admin/exceptions"
-        onClick={onNavigate}
-        className="flex min-h-12 items-center justify-center rounded-xl border border-slate-700 bg-slate-900 px-3 text-center text-sm font-semibold text-slate-100"
-      >
-        Exception Log
-      </Link>
-      <ToolButton onClick={onDiagnostics} subtle>
-        Device &amp; sync diagnostics
-      </ToolButton>
+    <div className="space-y-4">
+      <ToolCategory title="Floor Architecture">
+        <ToolCard
+          icon="grid"
+          label="Bulk Generator"
+          subtitle="Aisle / bay tags"
+          onClick={onBulk}
+        />
+        <ToolCard
+          icon="map"
+          label="Store Map Layout"
+          subtitle="Heatmap & bays"
+          href="/admin/store-map"
+          onNavigate={onNavigate}
+        />
+        <ToolCard
+          icon="building"
+          label="Taxonomies"
+          subtitle="Catalog folders"
+          onClick={onTaxonomy}
+        />
+      </ToolCategory>
+
+      <ToolCategory title="Rotations & Quotas">
+        <ToolCard
+          icon="zap"
+          label="Weekly Rotation"
+          subtitle="Sunday assign & draw"
+          onClick={onSunday}
+        />
+        <ToolCard
+          icon="refresh"
+          label="Trigger Rotation"
+          subtitle="Force a new week"
+          onClick={onForce}
+        />
+        <ToolCard
+          icon="check"
+          label="Department Targets"
+          subtitle="Bays per Sunday"
+          onClick={onTargets}
+        />
+        <ToolCard
+          icon="alert"
+          label="Exception Log"
+          subtitle="Barriers & verify"
+          href="/admin/exceptions"
+          onNavigate={onNavigate}
+        />
+      </ToolCategory>
+
+      <ToolCategory title="System & Security">
+        <ToolCard
+          icon="users"
+          label="Supervisor Roles"
+          subtitle="Logins & PIN"
+          href="/admin/supervisors"
+          onNavigate={onNavigate}
+        />
+        <ToolCard
+          icon="settings"
+          label="Store Config"
+          subtitle="Store number"
+          onClick={onStore}
+        />
+        <ToolCard
+          icon="zebra"
+          label="Diagnostics"
+          subtitle="Sync & database"
+          onClick={onDiagnostics}
+        />
+        <ToolCard
+          icon="notes"
+          label="Floor Pad"
+          subtitle="Notes & Copilot"
+          onClick={onNotes}
+        />
+      </ToolCategory>
     </div>
   );
 }
 
-function ToolButton({
+function ToolCategory({
+  title,
   children,
-  onClick,
-  subtle,
 }: {
+  title: string;
   children: ReactNode;
-  onClick: () => void;
-  subtle?: boolean;
 }) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={
-        subtle
-          ? "flex min-h-12 items-center justify-center rounded-xl border border-slate-700 bg-slate-900 px-3 text-center text-sm font-semibold text-slate-200"
-          : "flex min-h-14 items-center justify-center rounded-xl border-2 border-amber-400/50 bg-slate-900 px-3 text-center text-sm font-bold text-amber-100"
-      }
-    >
-      {children}
+    <section>
+      <h3 className="mb-2 font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-amber-300/90">
+        {title}
+      </h3>
+      <div className="grid grid-cols-2 gap-2">{children}</div>
+    </section>
+  );
+}
+
+function ToolCard({
+  icon,
+  label,
+  subtitle,
+  onClick,
+  href,
+  onNavigate,
+}: {
+  icon: HubIconId;
+  label: string;
+  subtitle: string;
+  onClick?: () => void;
+  href?: string;
+  onNavigate?: () => void;
+}) {
+  const className =
+    "flex min-h-[5.5rem] flex-col items-start gap-1.5 rounded-xl border border-amber-400/35 bg-slate-900/90 px-3 py-2.5 text-left active:scale-[0.99]";
+  const body = (
+    <>
+      <span className="flex h-8 w-8 items-center justify-center rounded-lg border border-amber-400/40 bg-amber-950/40 text-amber-200">
+        <HubIcon id={icon} className="h-4 w-4" />
+      </span>
+      <span className="block text-[13px] font-bold leading-tight text-amber-50">
+        {label}
+      </span>
+      <span className="block text-[11px] leading-snug text-zinc-400">
+        {subtitle}
+      </span>
+    </>
+  );
+
+  if (href) {
+    return (
+      <Link href={href} onClick={onNavigate} className={className}>
+        {body}
+      </Link>
+    );
+  }
+
+  return (
+    <button type="button" onClick={onClick} className={className}>
+      {body}
     </button>
   );
 }

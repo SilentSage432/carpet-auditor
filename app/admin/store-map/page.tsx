@@ -174,9 +174,9 @@ function StoreMapBody({
 
       <main className="hub-main">
         <p className="mb-2 font-mono text-[11px] text-zinc-400">
-          Cron active · ISO week {currentWeek}
           {master ? (
             <>
+              Week {currentWeek}
               {" · "}
               <button
                 type="button"
@@ -186,7 +186,9 @@ function StoreMapBody({
                 Bulk generate / Admin tools
               </button>
             </>
-          ) : null}
+          ) : (
+            <>This week&apos;s bay map</>
+          )}
         </p>
 
         <button
@@ -267,8 +269,9 @@ function StoreMapBody({
                   <p className="text-sm text-zinc-400">Loading departments…</p>
                 ) : departmentOverview.length === 0 ? (
                   <p className="rounded-2xl border border-dashed border-zinc-700 px-4 py-4 text-center text-sm text-zinc-400">
-                    No departments yet. Seed departments, then use Admin Tools →
-                    Bulk Generate.
+                    {master
+                      ? "No departments yet. Open Admin Tools → Bulk Generate after you add departments."
+                      : "No departments on this map yet. Ask your supervisor to set them up."}
                   </p>
                 ) : (
                   <ul className="space-y-2">

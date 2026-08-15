@@ -14,7 +14,7 @@ export default function SupervisorsAdminPage() {
       allow={isMasterAdmin}
       denyMessage="Supervisor management is restricted to Super Admin / Master Admin."
       denyHref="/dashboard"
-      denyLinkLabel="Open Zebra dashboard"
+      denyLinkLabel="Open Floor"
     >
       {({ specialist, storeNumber, logout }) => (
         <SupervisorsBody

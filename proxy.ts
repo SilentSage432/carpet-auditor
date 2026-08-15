@@ -4,16 +4,25 @@ import type { NextRequest } from "next/server";
 /**
  * Next.js 16 Proxy (formerly middleware).
  * Cron routes authenticate with CRON_SECRET — never require a user session.
+ *
+ * Hub auth lives in localStorage (`lib/auth-session.ts`), so this proxy cannot
+ * send signed-in users to /dashboard. Authenticated landing is owned by
+ * `app/page.tsx` (replace to /dashboard unless `?section=` is a specialty scan).
  */
 export function proxy(request: NextRequest) {
-  const { pathname } = request.nextUrl;
+  const { pathname, searchParams } = request.nextUrl;
 
   // Vercel Cron + manual cron probes must reach the route handler as JSON.
   if (pathname.startsWith("/api/cron")) {
     return NextResponse.next();
   }
 
-  // All other matched paths pass through (no session gate here).
+  // Preserve specialty scan deep links (`/?section=audit`). Do not rewrite `/`
+  // here — unauthenticated visitors need the AuthWall on the hub page.
+  if (pathname === "/" && searchParams.get("section")) {
+    return NextResponse.next();
+  }
+
   return NextResponse.next();
 }
 

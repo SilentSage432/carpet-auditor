@@ -67,7 +67,7 @@ export function AuthWall({
         className="glass-card theme-modal relative z-[91] w-full max-w-md rounded-t-2xl !rounded-b-none p-5 sm:!rounded-2xl"
       >
         <div className="flex flex-col items-center text-center">
-          <DeptSyncBadge size="lg" />
+          <DeptSyncBadge size="lg" branded />
           <p className="mt-4 font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-accent">
             DeptSync · {storeLabel}
           </p>

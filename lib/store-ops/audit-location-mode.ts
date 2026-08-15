@@ -19,13 +19,13 @@ export const AUDIT_LOCATION_MODES: AuditLocationModeMeta[] = [
   {
     code: "SELLING",
     hub: "sales_floor",
-    short: "SELLING",
+    short: "Floor",
     hint: "Lower floor level",
   },
   {
     code: "TOPSTOCK",
     hub: "top_stock",
-    short: "TOPSTOCK",
+    short: "Overhead",
     hint: "Overheads / racking",
   },
 ];
@@ -71,7 +71,7 @@ export function auditLocationModeLabel(
   return auditLocationModeMeta(mode).short;
 }
 
-/** Compact floor badge: `SELLING` or `TOPSTOCK`. */
+/** Compact floor badge: Floor or Overhead. */
 export function formatAuditLocationBadge(
   mode: StoreLocationType | LocationType | string | null | undefined
 ): string {

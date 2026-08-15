@@ -239,7 +239,7 @@ export async function notifyDepartmentRotationBatch(
     title: "New weekly rotation batch",
     body: `${name}: ${input.bayCount} bay${
       input.bayCount === 1 ? "" : "s"
-    } assigned for ${input.assignedWeek}. Open your Zebra checklist.`,
+    } assigned for ${input.assignedWeek}. Open your Floor checklist.`,
     url: "/dashboard",
     tag: `rotation-${code ?? input.departmentId}-${input.assignedWeek}`,
     department_id: input.departmentId,

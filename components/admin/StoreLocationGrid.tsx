@@ -22,6 +22,7 @@ import {
 } from "@/lib/store-ops/locations";
 import { VisualBayScannerModal } from "@/components/store-ops/VisualBayScannerModal";
 import { HubIcon } from "@/components/hub/NavIcons";
+import { openAdminTools } from "@/components/hub/admin-tools-events";
 import type { BayScanMeta } from "@/lib/store-ops/ai-bay-scan";
 import {
   BAY_READINESS_EVENT,
@@ -378,10 +379,24 @@ export function StoreLocationGrid({
   if (locations.length === 0) {
     return (
       <section className="glass-card border-dashed p-6 text-center">
-        <p className="text-sm text-zinc-400">
-          No store locations mapped yet. Expand Map Management &amp; Bulk Add
-          to generate aisle tags.
-        </p>
+        {canMutate ? (
+          <>
+            <p className="text-sm text-zinc-400">
+              No aisles mapped yet. Tap below to map your first aisle.
+            </p>
+            <button
+              type="button"
+              onClick={() => openAdminTools({ section: "bulk" })}
+              className="btn-primary-glow mt-3 inline-flex min-h-11 items-center justify-center rounded-xl px-4 text-sm font-bold"
+            >
+              Map your first aisle
+            </button>
+          </>
+        ) : (
+          <p className="text-sm text-zinc-400">
+            No aisles mapped yet. Ask your supervisor to set up the store map.
+          </p>
+        )}
       </section>
     );
   }
@@ -394,8 +409,8 @@ export function StoreLocationGrid({
         </h2>
         <p className="mt-1 text-sm text-zinc-400">
           Expand a department, then an aisle. Heatmap: green verified this week,
-          yellow scheduled, red stale (&gt;7d) or barrier. Tap a bay for pin,
-          history, and edits.
+          yellow scheduled, red stale (&gt;7d) or barrier. Tap a bay for pin and
+          history{canMutate ? ", and edits" : ""}.
         </p>
         <div className="mt-2 flex flex-wrap gap-2">
           {(

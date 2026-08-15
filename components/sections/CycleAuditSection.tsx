@@ -5,6 +5,7 @@ import dynamic from "next/dynamic";
 import { FlooringAIInsightBanner } from "@/components/flooring/FlooringAIInsightBanner";
 import { SundayAuditStagingCard } from "@/components/admin/SundayAuditStagingCard";
 import { CycleAuditScanForm } from "@/components/sections/CycleAuditScanForm";
+import { HubIcon } from "@/components/hub/NavIcons";
 import { ApplyMarkdownModal } from "@/components/hub/ApplyMarkdownModal";
 
 const SimsLocationFinder = dynamic(
@@ -314,32 +315,29 @@ export function CycleAuditSection({
         }}
       />
 
-      <FlooringAIInsightBanner
-        remnants={remnants}
-        audits={shiftAudits.length > 0 ? shiftAudits : audits}
-        specialists={specialists}
-        activeSpecialist={activeSpecialist}
-        onRemnantsChange={onRemnantsChange}
-        onRequestMarkdown={setMarkdownTarget}
-      />
-
-      {activeSpecialist ? (
-        <SundayAuditStagingCard
-          specialist={activeSpecialist}
-          forceShow
-        />
-      ) : null}
-
-      {activeSpecialist ? (
-        <button
-          type="button"
-          onClick={() => setBayScanOpen(true)}
-          className="btn-primary-glow flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl px-4 text-sm"
-        >
-          <span aria-hidden>📷</span>
-          Snap Bay AI Audit
-        </button>
-      ) : null}
+      <div className="flex items-start gap-1.5">
+        <div className="min-w-0 flex-1">
+          <FlooringAIInsightBanner
+            remnants={remnants}
+            audits={shiftAudits.length > 0 ? shiftAudits : audits}
+            specialists={specialists}
+            activeSpecialist={activeSpecialist}
+            onRemnantsChange={onRemnantsChange}
+            onRequestMarkdown={setMarkdownTarget}
+            compact
+          />
+        </div>
+        {activeSpecialist ? (
+          <button
+            type="button"
+            onClick={() => setBayScanOpen(true)}
+            className="flex min-h-11 shrink-0 items-center gap-1.5 rounded-xl border border-accent/40 bg-zinc-950/70 px-3 font-mono text-[11px] font-bold uppercase tracking-wide text-accent"
+          >
+            <HubIcon id="camera" className="h-4 w-4" />
+            Snap Bay
+          </button>
+        ) : null}
+      </div>
 
       {activeSpecialist && bayScanOpen ? (
         <VisualBayScannerModal
@@ -367,6 +365,34 @@ export function CycleAuditSection({
           </button>
         </div>
       ) : null}
+
+      {statusMsg && (
+        <p
+          role="status"
+          className="rounded-xl border border-emerald-500/30 bg-emerald-950/50 px-3 py-2 text-center text-sm font-medium text-emerald-200"
+        >
+          {statusMsg}
+        </p>
+      )}
+
+      <CycleAuditScanForm
+        catalog={catalog}
+        onCatalogChange={onCatalogChange}
+        auditedBy={auditedBy}
+        scannerEnabled={scannerEnabled}
+        onOpenSimsFinder={() => setSimsFinderOpen(true)}
+        onLogged={(record, offline) => {
+          setAudits((prev) => [record, ...prev.filter((a) => a.id !== record.id)]);
+          showUndoToast(record);
+          flashStatus(
+            offline
+              ? "Saved offline — form reset"
+              : record.box_count != null && record.box_count > 0
+                ? "Units logged — form reset"
+                : "Roll logged — form reset"
+          );
+        }}
+      />
 
       <section
         aria-label="Shift summary"
@@ -454,33 +480,12 @@ export function CycleAuditSection({
         ) : null}
       </section>
 
-      {statusMsg && (
-        <p
-          role="status"
-          className="rounded-xl border border-emerald-500/30 bg-emerald-950/50 px-3 py-2 text-center text-sm font-medium text-emerald-200"
-        >
-          {statusMsg}
-        </p>
-      )}
-
-      <CycleAuditScanForm
-        catalog={catalog}
-        onCatalogChange={onCatalogChange}
-        auditedBy={auditedBy}
-        scannerEnabled={scannerEnabled}
-        onOpenSimsFinder={() => setSimsFinderOpen(true)}
-        onLogged={(record, offline) => {
-          setAudits((prev) => [record, ...prev.filter((a) => a.id !== record.id)]);
-          showUndoToast(record);
-          flashStatus(
-            offline
-              ? "Saved offline — form reset"
-              : record.box_count != null && record.box_count > 0
-                ? "Units logged — form reset"
-                : "Roll logged — form reset"
-          );
-        }}
-      />
+      {activeSpecialist ? (
+        <SundayAuditStagingCard
+          specialist={activeSpecialist}
+          forceShow
+        />
+      ) : null}
 
       <section className="space-y-3 overflow-x-hidden" aria-label="Shift audit log">
         <div className="flex items-baseline justify-between gap-2 px-1">

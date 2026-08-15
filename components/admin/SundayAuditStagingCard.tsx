@@ -128,7 +128,7 @@ export function SundayAuditStagingCard({
         />
         <div className="relative min-w-0 flex-1">
           <p className="glass-subtitle text-accent">
-            Pending Cycle Audits · D23
+            Pending Cycle Audits
           </p>
           <p className="mt-0.5 text-sm font-bold leading-snug text-emerald-50 [text-shadow:0_0_18px_rgba(52,211,153,0.35)]">
             {openCount > 0

@@ -24,11 +24,13 @@ import { HubIcon, NavIcon } from "@/components/hub/NavIcons";
 import {
   isNavHubPathActive,
   isNavOverflowActive,
+  isSpecialtyHubHref,
   navLoginIdentity,
   navOverflowLinks,
   navPrimaryLinks,
   navRoleBadge,
   navRoleLinks,
+  specialtyHubHref,
   type NavHubLink,
 } from "@/lib/nav-hub";
 import { isAssociate, isMasterAdmin } from "@/lib/rbac";
@@ -113,6 +115,8 @@ export function NavigationHub({
   showBottomNav = true,
 }: NavigationHubProps) {
   const pathname = usePathname() || "/";
+  const search =
+    typeof window !== "undefined" ? window.location.search : "";
   const router = useRouter();
   const links = navRoleLinks(specialist);
   const primaryLinks = navPrimaryLinks(links);
@@ -133,7 +137,7 @@ export function NavigationHub({
   const userRef = useRef<HTMLDivElement>(null);
   const master = isMasterAdmin(specialist);
   const associate = isAssociate(specialist);
-  const linksIncludeHub = links.some((link) => link.href === "/");
+  const linksIncludeHub = links.some((link) => isSpecialtyHubHref(link.href));
 
   const applyAdminOpen = useCallback((detail: AdminToolsEventDetail = {}) => {
     setAdminSection(detail.section ?? "menu");
@@ -357,24 +361,24 @@ export function NavigationHub({
                 <NavDrawerItem
                   key={link.href}
                   link={link}
-                  active={isNavHubPathActive(pathname, link.href)}
+                  active={isNavHubPathActive(pathname, link.href, search)}
                   onNavigate={() => setMenuOpen(false)}
                 />
               ))}
-              {!linksIncludeHub ? (
+              {!linksIncludeHub && specialist ? (
                 <li>
                   <Link
-                    href="/"
+                    href={specialtyHubHref(specialist)}
                     onClick={() => setMenuOpen(false)}
                     className="glass-card flex h-14 items-center gap-3 px-4 text-left"
                   >
                     <NavIcon id="home" className="h-5 w-5 text-accent" />
                     <span>
                       <span className="block text-sm font-bold text-zinc-100">
-                        Inventory Hub
+                        Scan &amp; Audit
                       </span>
                       <span className="glass-muted block text-xs">
-                        Audits, catalog, remnants
+                        Roll scan, appliances, department audits
                       </span>
                     </span>
                   </Link>
@@ -417,7 +421,7 @@ export function NavigationHub({
                     href={link.href}
                     onClick={() => setMoreOpen(false)}
                     className={`flex h-14 items-center gap-3 rounded-xl border px-3 ${
-                      isNavHubPathActive(pathname, link.href)
+                      isNavHubPathActive(pathname, link.href, search)
                         ? "theme-accent-surface border text-accent-fg-soft"
                         : "border-zinc-800 bg-zinc-950/60 text-zinc-100"
                     }`}
@@ -481,9 +485,10 @@ export function NavigationHub({
       {showBottomNav && primaryLinks.length > 0 ? (
         <BottomNav
           pathname={pathname}
+          search={search}
           primaryLinks={primaryLinks}
           hasOverflow={overflowLinks.length > 0 || master}
-          overflowActive={isNavOverflowActive(pathname, links)}
+          overflowActive={isNavOverflowActive(pathname, links, search)}
           onOpenMore={() => setMoreOpen(true)}
         />
       ) : null}

@@ -26,7 +26,7 @@ export default function ExceptionsAdminPage() {
       allow={isMasterAdmin}
       denyMessage="Exception log is restricted to Super Admin / Master Admin."
       denyHref="/dashboard"
-      denyLinkLabel="Open Zebra dashboard"
+      denyLinkLabel="Open Floor"
     >
       {({ specialist, storeNumber, logout }) => (
         <ExceptionsBody

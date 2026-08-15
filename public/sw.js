@@ -1,5 +1,5 @@
 /* DeptSync Hub — offline shell cache */
-const CACHE_VERSION = "deptsync-shell-v4-admin-tools";
+const CACHE_VERSION = "deptsync-shell-v5-brand-floor";
 const SHELL_ASSETS = [
   "/",
   "/manifest.json",

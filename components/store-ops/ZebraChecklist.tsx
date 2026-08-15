@@ -8,6 +8,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
+import Link from "next/link";
 import { AuditLocationModeToggle } from "@/components/store-ops/AuditLocationModeToggle";
 import { BarrierReasonChips } from "@/components/store-ops/BarrierReasonChips";
 import { BayHealthScorecard } from "@/components/store-ops/BayHealthScorecard";
@@ -26,7 +27,7 @@ import {
   type DownstockMap,
 } from "@/lib/store-ops/downstock";
 import { emitBayReadiness } from "@/lib/store-ops/map-readiness";
-import { effectiveDepartment } from "@/lib/rbac";
+import { effectiveDepartment, isAssociate, isMasterAdmin } from "@/lib/rbac";
 import {
   fetchSundayAssignments,
   isSundayAssignmentForSpecialist,
@@ -478,7 +479,7 @@ export function ZebraChecklist({
       {!lockedQueue ? (
       <div
         role="tablist"
-        aria-label="Zebra queue"
+        aria-label="Bay checklist"
         className="grid grid-cols-2 gap-2"
       >
         <button
@@ -552,17 +553,31 @@ export function ZebraChecklist({
         </p>
       ) : null}
 
-      {open.length === 0 && done.length === 0 ? (
+      {lockedQueue !== "downstock" && open.length === 0 && done.length === 0 ? (
         <p className="rounded-2xl border border-dashed border-slate-700 px-4 py-4 text-center text-sm text-slate-400">
-          No bays assigned this week. Ask Master Admin to generate the weekly
-          rotation.
+          {isAssociate(specialist)
+            ? "No bays scheduled on your rotation — see your supervisor"
+            : isMasterAdmin(specialist)
+              ? "No bays scheduled this week. Open Admin Tools to generate the weekly rotation."
+              : "No bays scheduled this week — ask Master Admin to set the rotation."}
         </p>
       ) : null}
 
       {queueFilter === "downstock" && queueOpen.length === 0 ? (
-        <p className="rounded-2xl border border-dashed border-slate-700 px-4 py-4 text-center text-sm text-slate-400">
-          No overhead pulls flagged. Use Flag for Downstock on a bay card.
-        </p>
+        <div className="rounded-2xl border border-dashed border-slate-700 px-4 py-4 text-center text-sm text-slate-400">
+          <p>
+            No overhead pulls yet. On Floor, open a bay and tap Flag for
+            Downstock.
+          </p>
+          {lockedQueue === "downstock" ? (
+            <Link
+              href="/dashboard"
+              className="mt-3 inline-flex min-h-11 items-center justify-center rounded-xl border border-accent/40 px-3 text-sm font-semibold text-accent"
+            >
+              Go to Floor checklist
+            </Link>
+          ) : null}
+        </div>
       ) : null}
 
       {partition.hasPersonalQueue && queueFilter !== "downstock" ? (
@@ -573,7 +588,7 @@ export function ZebraChecklist({
 
       {queueFilter === "downstock" ? (
         <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-cyan-300">
-          Overhead pulls · assign to a CSA from the shift roster
+          Overhead pulls · assign an associate from today&apos;s roster
         </p>
       ) : null}
 

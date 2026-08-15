@@ -149,8 +149,8 @@ function StockBody({
             Downstock queue
           </h2>
           <p className="mb-2 mt-1 text-sm text-zinc-400">
-            Overhead pulls flagged from the Floor checklist. Assign a CSA from
-            the shift roster.
+            Overhead pulls flagged from a bay on Floor. Assign an associate from
+            today&apos;s roster.
           </p>
           {loadingQueue ? (
             <p className="text-sm text-zinc-400">Loading downstock queue…</p>

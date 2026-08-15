@@ -45,6 +45,7 @@ import type {
 } from "@/lib/types";
 import type { AuthWallMode } from "@/components/auth/AuthWall";
 import { DeptSyncSplash } from "@/components/hub/DeptSyncSplash";
+import { shouldStayOnSpecialtyHub } from "@/lib/nav-hub";
 
 function HubBootFallback() {
   return <DeptSyncSplash message="Loading DeptSync secure session…" />;
@@ -166,26 +167,26 @@ export default function DeptSyncHubPage() {
             new URLSearchParams(window.location.search).get("section")
           )
         : null;
-    const next =
-      fromQuery && canAccessSection(member, fromQuery)
-        ? fromQuery
-        : defaultSectionForMember(member);
-    setSection(next === "catalog" ? "appliances" : next);
     if (needsCredentialSetup(member) || member.must_change_credentials) {
       setGate("setup");
       return;
     }
     const session = readAuthSession();
     if (session) markWorkspaceUnlocked(session.sessionToken);
-    if (next === "remnants") {
+    if (fromQuery === "remnants") {
       router.replace("/stock");
       return;
     }
-    if (next === "settings") {
+    if (fromQuery === "settings") {
       router.replace("/settings");
       return;
     }
-    setGate("ready");
+    if (fromQuery && shouldStayOnSpecialtyHub(fromQuery) && canAccessSection(member, fromQuery)) {
+      setSection(fromQuery === "catalog" ? "appliances" : fromQuery);
+      setGate("ready");
+      return;
+    }
+    router.replace("/dashboard");
   }, [router]);
 
   const requireLogin = useCallback(() => {
@@ -229,8 +230,32 @@ export default function DeptSyncHubPage() {
     touchAuthSession();
     markWorkspaceUnlocked(refreshed.sessionToken);
     setSpecialist(matched);
-    setGate("ready");
-  }, []);
+
+    const fromQuery =
+      typeof window !== "undefined"
+        ? parseHubSectionParam(
+            new URLSearchParams(window.location.search).get("section")
+          )
+        : null;
+    if (fromQuery === "remnants") {
+      router.replace("/stock");
+      return;
+    }
+    if (fromQuery === "settings") {
+      router.replace("/settings");
+      return;
+    }
+    if (
+      fromQuery &&
+      shouldStayOnSpecialtyHub(fromQuery) &&
+      canAccessSection(matched, fromQuery)
+    ) {
+      setSection(fromQuery === "catalog" ? "appliances" : fromQuery);
+      setGate("ready");
+      return;
+    }
+    router.replace("/dashboard");
+  }, [router]);
 
   const loadStoreData = useCallback(async () => {
     const team = await fetchSpecialists();

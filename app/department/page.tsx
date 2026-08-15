@@ -100,23 +100,14 @@ function DepartmentBody({
             href="/dashboard"
             className="flex min-h-14 items-center justify-center rounded-xl border-2 border-emerald-500/40 bg-emerald-950/40 px-4 text-sm font-bold text-emerald-200"
           >
-            Open this week&apos;s Zebra checklist →
+            Open this week&apos;s Floor checklist →
           </Link>
-          {!isMasterAdmin(specialist) ? (
-            <Link
-              href="/"
-              className="flex min-h-14 items-center justify-center rounded-xl border border-slate-700 bg-slate-900 px-4 text-sm font-semibold text-slate-100"
-            >
-              Open Inventory Hub (scan / audit) →
-            </Link>
-          ) : (
-            <Link
-              href="/"
-              className="flex min-h-14 items-center justify-center rounded-xl border border-slate-700 bg-slate-900 px-4 text-sm font-semibold text-slate-100"
-            >
-              Open Inventory Hub →
-            </Link>
-          )}
+          <Link
+            href="/?section=audit"
+            className="flex min-h-14 items-center justify-center rounded-xl border border-slate-700 bg-slate-900 px-4 text-sm font-semibold text-slate-100"
+          >
+            Open Scan &amp; Audit →
+          </Link>
           {!isMasterAdmin(specialist) ? (
             <Link
               href="/verify-rotation"

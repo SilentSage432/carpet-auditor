@@ -464,7 +464,7 @@ function InviteBody() {
           <h2 className="text-base font-bold text-slate-50">You&apos;re set</h2>
           <p className="text-sm text-slate-400">
             Permanent PIN saved
-            {member ? ` for ${member.name}` : ""}. Open your Zebra checklist to
+            {member ? ` for ${member.name}` : ""}. Open your Floor checklist to
             start the week.
           </p>
           <button
@@ -472,7 +472,7 @@ function InviteBody() {
             onClick={finish}
             className="flex min-h-14 w-full items-center justify-center rounded-xl bg-emerald-500 text-base font-bold text-slate-950"
           >
-            Open Zebra Dashboard
+            Open Floor checklist
           </button>
         </div>
       ) : null}
@@ -485,10 +485,10 @@ function Shell({ children }: { children: ReactNode }) {
     <div className="flex min-h-dvh flex-col items-center justify-center bg-slate-950 px-4 py-8">
       <div className="w-full max-w-md rounded-2xl border border-emerald-500/30 bg-slate-900 p-5">
         <div className="mb-4 flex items-start gap-3">
-          <DeptSyncBadge size="md" />
+          <DeptSyncBadge size="md" branded />
           <div>
             <p className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-emerald-400">
-              Supervisor onboarding
+              Account setup
             </p>
             <h1 className="mt-1 text-lg font-bold text-slate-50">
               DeptSync Invite

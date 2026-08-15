@@ -13,18 +13,12 @@ import {
   sanitizeBarcodeScan,
 } from "@/lib/barcode";
 import {
-  CLF_FACTOR,
-  FRACTION_OPTIONS,
   calculateCartonSqFt,
   calculateClf,
   calculateRollSqFt,
   calculateSquareYards,
-  formatCartonBreakdown,
   formatClf,
-  formatDecimalInches,
-  formatFormulaBreakdown,
   formatSqFt,
-  formatSqYd,
   toTotalInches,
 } from "@/lib/calc";
 import {
@@ -46,6 +40,7 @@ import {
   scheduleAuditDraftSave,
 } from "@/lib/storage";
 import { AuditLocationModeToggle } from "@/components/store-ops/AuditLocationModeToggle";
+import { RollMeasurementPad } from "@/components/inventory/RollMeasurementPad";
 import {
   hubLocationFromStoreType,
   storeTypeFromHubLocation,
@@ -430,12 +425,16 @@ export function CycleAuditScanForm({
     setRounds((r) => String(Math.max(0, toNumber(r, 0) + delta)));
   }
 
+  function bumpWhole(delta: number) {
+    setWholeInches((v) => String(Math.max(0, toNumber(v, 0) + delta)));
+  }
+
   function bumpBoxes(delta: number) {
     setBoxCount((r) => String(Math.max(0, toNumber(r, 0) + delta)));
   }
 
   return (
-    <div className="space-y-4 overflow-x-hidden">
+    <div className="space-y-3 overflow-x-hidden">
       <QuickAddCatalogModal
         open={quickAddBarcode != null}
         scannedBarcode={quickAddBarcode ?? ""}
@@ -454,7 +453,7 @@ export function CycleAuditScanForm({
 
       <form
         id="cycle-audit-form"
-        className={`${cardClass} space-y-4 overflow-x-auto`}
+        className={`${cardClass} space-y-3 overflow-x-auto !p-3`}
         onSubmit={(e) => {
           e.preventDefault();
           void handleLog();
@@ -597,183 +596,33 @@ export function CycleAuditScanForm({
         />
 
         {auditMode === "roll" ? (
-          <>
-            <fieldset className="space-y-2">
-              <div className="flex items-center justify-between gap-3">
-                <legend className="text-sm font-medium text-slate-200">
-                  Measurement (inches)
-                </legend>
-                <span className="rounded-lg border border-emerald-500/30 bg-emerald-950/50 px-2.5 py-1 font-mono text-sm font-bold tabular-nums text-emerald-400">
-                  {formatDecimalInches(totalInchesValue)}
-                </span>
-              </div>
-              <NumberField
-                label="Whole inches"
-                mode="integer"
-                value={wholeInches}
-                onChange={setWholeInches}
-                placeholder="0"
-                inputRef={measureInputRef}
-              />
-              <div className="grid grid-cols-4 gap-2">
-                {FRACTION_OPTIONS.map((opt) => {
-                  const active = fraction === opt.value;
-                  return (
-                    <button
-                      key={opt.label}
-                      type="button"
-                      onClick={() => setFraction(opt.value)}
-                      className={`flex min-h-12 items-center justify-center rounded-xl font-mono text-sm font-semibold transition ${
-                        active
-                          ? "bg-emerald-500 text-slate-950"
-                          : "border border-slate-800 bg-slate-950 text-slate-200 active:bg-slate-800"
-                      }`}
-                    >
-                      {opt.label}
-                    </button>
-                  );
-                })}
-              </div>
-            </fieldset>
-
-            <fieldset className="space-y-2">
-              <legend className="text-sm font-medium text-slate-200">Rounds</legend>
-              <div className="flex w-full items-center gap-2.5">
-                <button
-                  type="button"
-                  aria-label="Decrease rounds"
-                  onClick={() => bumpRounds(-1)}
-                  className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-slate-700 bg-slate-800 text-xl font-bold text-slate-100 active:scale-95"
-                >
-                  −
-                </button>
-                <NumberField
-                  mode="integer"
-                  value={rounds}
-                  onChange={setRounds}
-                  placeholder="0"
-                  center
-                  className="min-w-0 flex-1"
-                  aria-label="Rounds"
-                />
-                <button
-                  type="button"
-                  aria-label="Increase rounds"
-                  onClick={() => bumpRounds(1)}
-                  className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-slate-700 bg-slate-800 text-xl font-bold text-slate-100 active:scale-95"
-                >
-                  +
-                </button>
-              </div>
-              <div className="grid grid-cols-3 gap-2">
-                {[5, 10, 20].map((n) => (
-                  <button
-                    key={n}
-                    type="button"
-                    onClick={() => bumpRounds(n)}
-                    className="flex min-h-12 items-center justify-center rounded-xl border border-slate-800 bg-slate-950 font-mono text-sm font-semibold text-emerald-400 active:bg-slate-800"
-                  >
-                    +{n}
-                  </button>
-                ))}
-              </div>
-            </fieldset>
-
-            <div
-              aria-live="polite"
-              className="rounded-xl border border-emerald-500/30 bg-gradient-to-br from-emerald-950/60 to-slate-950 p-4 text-center shadow-[0_0_24px_-8px_rgba(16,185,129,0.45)]"
-            >
-              <p className="break-words font-mono text-xs leading-relaxed text-emerald-300/80">
-                {formatFormulaBreakdown(totalInchesValue, roundsNum, clf)}
-              </p>
-              <p className="mt-1 font-mono text-3xl font-bold tabular-nums tracking-tight text-emerald-400">
-                {formatClf(clf)}{" "}
-                <span className="text-base font-semibold text-emerald-300/90">CLF</span>
-              </p>
-              <p className="mt-2 break-words rounded-lg border border-emerald-500/25 bg-slate-950/70 px-2.5 py-2 font-mono text-[11px] font-semibold leading-relaxed tabular-nums text-emerald-100 sm:text-xs">
-                {formatClf(clf)} CLF{" "}
-                <span className="text-slate-500">|</span> {formatSqFt(rollSqFt)}{" "}
-                SQFT <span className="text-slate-500">|</span>{" "}
-                {formatSqYd(rollSqYd)} SQYD{" "}
-                <span className="text-emerald-300/80">
-                  ({effectiveRollWidth} ft Roll)
-                </span>
-              </p>
-              <p className="mt-1 font-mono text-[10px] text-slate-500">
-                CLF × {effectiveRollWidth} ft · × {CLF_FACTOR} factor
-              </p>
-            </div>
-          </>
+          <RollMeasurementPad
+            mode="roll"
+            wholeInches={wholeInches}
+            onWholeInchesChange={setWholeInches}
+            fraction={fraction}
+            onFractionChange={setFraction}
+            rounds={rounds}
+            onRoundsChange={setRounds}
+            onBumpRounds={bumpRounds}
+            onBumpWhole={bumpWhole}
+            clf={clf}
+            sqFt={rollSqFt}
+            sqYd={rollSqYd}
+            rollWidthFt={effectiveRollWidth}
+            measureInputRef={measureInputRef}
+          />
         ) : (
-          <>
-            <NumberField
-              label="Sq Ft Coverage per Box"
-              mode="decimal"
-              value={sqftPerBox}
-              onChange={setSqftPerBox}
-              placeholder="e.g. 23.64"
-            />
-            <fieldset className="space-y-2">
-              <legend className="text-sm font-medium text-slate-200">
-                Carton / Unit Count
-              </legend>
-              <div className="flex w-full items-center gap-2.5">
-                <button
-                  type="button"
-                  aria-label="Decrease count"
-                  onClick={() => bumpBoxes(-1)}
-                  className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-slate-700 bg-slate-800 text-xl font-bold text-slate-100 active:scale-95"
-                >
-                  −
-                </button>
-                <NumberField
-                  mode="integer"
-                  value={boxCount}
-                  onChange={setBoxCount}
-                  placeholder="0"
-                  center
-                  className="min-w-0 flex-1"
-                  aria-label="Box count"
-                  inputRef={boxCountInputRef}
-                />
-                <button
-                  type="button"
-                  aria-label="Increase count"
-                  onClick={() => bumpBoxes(1)}
-                  className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-slate-700 bg-slate-800 text-xl font-bold text-slate-100 active:scale-95"
-                >
-                  +
-                </button>
-              </div>
-              <div className="grid grid-cols-3 gap-2">
-                {[5, 10, 20].map((n) => (
-                  <button
-                    key={n}
-                    type="button"
-                    onClick={() => bumpBoxes(n)}
-                    className="flex min-h-12 items-center justify-center rounded-xl border border-slate-800 bg-slate-950 font-mono text-sm font-semibold text-emerald-400 active:bg-slate-800"
-                  >
-                    +{n}
-                  </button>
-                ))}
-              </div>
-            </fieldset>
-
-            <div
-              aria-live="polite"
-              className="rounded-xl border border-emerald-500/30 bg-gradient-to-br from-emerald-950/60 to-slate-950 p-4 text-center shadow-[0_0_24px_-8px_rgba(16,185,129,0.45)]"
-            >
-              <p className="break-words font-mono text-xs leading-relaxed text-emerald-300/80">
-                {formatCartonBreakdown(boxCountNum, sqftPerBoxNum, cartonSqFt)}
-              </p>
-              <p className="mt-1 font-mono text-3xl font-bold tabular-nums tracking-tight text-emerald-400">
-                {formatSqFt(cartonSqFt)}{" "}
-                <span className="text-base font-semibold text-emerald-300/90">
-                  sq ft
-                </span>
-              </p>
-            </div>
-          </>
+          <RollMeasurementPad
+            mode="carton"
+            boxCount={boxCount}
+            onBoxCountChange={setBoxCount}
+            onBumpBoxes={bumpBoxes}
+            sqftPerBox={sqftPerBox}
+            onSqftPerBoxChange={setSqftPerBox}
+            cartonSqFt={cartonSqFt}
+            boxCountInputRef={boxCountInputRef}
+          />
         )}
 
         <NumberField

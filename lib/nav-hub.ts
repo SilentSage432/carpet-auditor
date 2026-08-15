@@ -1,16 +1,28 @@
 /**
  * Navigation Hub — owns cross-app route links by role.
- * Inventory section tabs stay in lib/rbac.ts; this module owns Store Ops / Zebra routes.
+ * Inventory section tabs stay in lib/rbac.ts; this module owns Store Ops routes.
  * Primary bottom bar is the Floor / Map / Stock / Settings workflow.
+ * Authenticated home is /dashboard (weekly checklist). Hub `/` with ?section=
+ * is specialty scan tools only — never the Floor tab.
  */
 
 import {
+  defaultSectionForMember,
   effectiveDepartment,
   isAssociate,
   isMasterAdmin,
 } from "@/lib/rbac";
-import { departmentMeta, type StoreSpecialist } from "@/lib/types";
+import {
+  departmentMeta,
+  type HubSection,
+  type StoreSpecialist,
+} from "@/lib/types";
 import type { NavIconId } from "@/components/hub/NavIcons";
+
+export type SpecialtyHubHref =
+  | "/?section=audit"
+  | "/?section=appliances"
+  | "/?section=department";
 
 export type NavHubHref =
   | "/admin/store-map"
@@ -22,7 +34,50 @@ export type NavHubHref =
   | "/manager-notes"
   | "/settings"
   | "/stock"
-  | "/";
+  | "/"
+  | SpecialtyHubHref;
+
+export const SPECIALTY_HUB_SECTIONS = [
+  "audit",
+  "appliances",
+  "department",
+] as const;
+
+export type SpecialtyHubSection = (typeof SPECIALTY_HUB_SECTIONS)[number];
+
+export function isSpecialtyHubSection(
+  section: string | null | undefined
+): section is SpecialtyHubSection {
+  return (
+    section === "audit" ||
+    section === "appliances" ||
+    section === "department"
+  );
+}
+
+export function isSpecialtyHubHref(href: string): boolean {
+  return href === "/" || href.startsWith("/?section=");
+}
+
+/** Cycle / appliance / department scan workspace for this roster member. */
+export function specialtyHubHref(
+  member: StoreSpecialist | null | undefined
+): SpecialtyHubHref {
+  const section = defaultSectionForMember(member);
+  if (section === "appliances") return "/?section=appliances";
+  if (section === "department") return "/?section=department";
+  return "/?section=audit";
+}
+
+/**
+ * True when `/` should keep the specialty scan pane instead of replacing
+ * to /dashboard. Remnants/settings query params still redirect to their routes.
+ */
+export function shouldStayOnSpecialtyHub(
+  section: HubSection | string | null | undefined
+): boolean {
+  return isSpecialtyHubSection(section);
+}
 
 export type NavHubLink = {
   href: NavHubHref;
@@ -34,38 +89,14 @@ export type NavHubLink = {
   overflow?: boolean;
 };
 
-/** Compact role chip for Zebra header / user menu, e.g. [SUPER ADMIN] or [FLR DEPT]. */
+/** Compact role chip — department lives in the header pill, so this is role only. */
 export function navRoleBadge(member: StoreSpecialist | null | undefined): string {
-  if (!member) return "[LOCKED]";
-  if (isMasterAdmin(member)) return "[SUPER ADMIN]";
-  if (member.role === "Supervisor") {
-    const dept = effectiveDepartment(member);
-    const code = DEPT_BADGE_CODE[dept] ?? "DEPT";
-    return `[${code} DEPT]`;
-  }
-  if (isAssociate(member)) {
-    const dept = effectiveDepartment(member);
-    const code = DEPT_BADGE_CODE[dept] ?? "DEPT";
-    return `[${code} ASC]`;
-  }
-  return "[ASSOCIATE]";
+  if (!member) return "Locked";
+  if (isMasterAdmin(member)) return "Master Admin";
+  if (member.role === "Supervisor") return "Supervisor";
+  if (isAssociate(member)) return "Associate";
+  return "Associate";
 }
-
-const DEPT_BADGE_CODE: Record<string, string> = {
-  flooring: "FLR",
-  appliances: "APL",
-  plumbing: "PLB",
-  electrical: "ELC",
-  lawn_garden: "L&G",
-  inside_garden: "IGN",
-  outside_garden: "OGN",
-  paint: "PNT",
-  millwork: "MLW",
-  building_materials: "BLD",
-  hardware: "HDW",
-  tools: "TLS",
-  all: "ALL",
-};
 
 /** Login identity shown in the user menu (username is the hub login key). */
 export function navLoginIdentity(
@@ -80,7 +111,7 @@ const FLOOR_LINK: NavHubLink = {
   label: "Floor",
   shortLabel: "Floor",
   icon: "zebra",
-  description: "Active bay cycle checklist and specialty audits",
+  description: "This week's bay checklist",
 };
 
 const MAP_LINK: NavHubLink = {
@@ -193,11 +224,11 @@ export function navRoleLinks(
       overflow: true,
     },
     {
-      href: "/",
-      label: "Specialty Tools",
-      shortLabel: "Tools",
+      href: specialtyHubHref(member),
+      label: "Scan & Audit",
+      shortLabel: "Scan",
       icon: "tools",
-      description: "Flooring / appliance department auditors",
+      description: "Roll scan, appliances, and department audits",
       overflow: true,
     },
   ];
@@ -227,14 +258,14 @@ export function isNavHubPathActive(
 ): boolean {
   const section = hubSectionParam(search);
 
-  if (href === "/dashboard") {
-    if (pathname === "/dashboard" || pathname.startsWith("/dashboard/")) {
-      return true;
-    }
-    if (pathname === "/" || pathname === "") {
-      return section !== "remnants" && section !== "settings";
-    }
-    return false;
+  const [hrefPath, hrefQuery] = href.split("?");
+  const hrefSection = hrefQuery
+    ? new URLSearchParams(hrefQuery).get("section")
+    : null;
+  const path = hrefPath || "/";
+
+  if (path === "/dashboard") {
+    return pathname === "/dashboard" || pathname.startsWith("/dashboard/");
   }
 
   if (href === "/stock") {
@@ -255,8 +286,15 @@ export function isNavHubPathActive(
     return false;
   }
 
-  if (href === "/") return pathname === "/" || pathname === "";
-  return pathname === href || pathname.startsWith(`${href}/`);
+  if (path === "/" || path === "") {
+    if (pathname !== "/" && pathname !== "") return false;
+    if (hrefSection && isSpecialtyHubSection(hrefSection)) {
+      return isSpecialtyHubSection(section);
+    }
+    return !section || isSpecialtyHubSection(section);
+  }
+
+  return pathname === path || pathname.startsWith(`${path}/`);
 }
 
 /** True when an overflow route is active (highlights More tab). */

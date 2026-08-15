@@ -1,7 +1,8 @@
 # DeptSync Hub — Architecture
 
 ```
-app/page.tsx                      → Hub shell (section state + RBAC gate + data load + online flush; keep-alive panes + startTransition)
+app/page.tsx                      → Hub shell (AuthWall + specialty scan `?section=`; authenticated home redirects to /dashboard)
+app/dashboard/page.tsx            → Floor weekly bay checklist (associates: list first; supervisors: staging/health above)
 app/layout.tsx                    → Fonts, PWA meta, ThemeProvider + FOUC boot script
 lib/theme.ts                      → Theme catalog, prefs persistence, document apply (owns personalization)
 lib/theme-context.tsx             → React mirror of theme prefs (presentation)
@@ -12,11 +13,13 @@ public/sw.js                      → Offline shell cache strategies
 components/hub/HubChrome.tsx      → Legacy inventory header + in-page specialty audit switcher
 components/hub/HubHeader.tsx      → Sticky hub header (brand, department pill, account)
 components/hub/BottomNav.tsx      → Floor · Map · Stock · Settings workflow tabs
-components/hub/DeptSyncSplash.tsx → Boot / loading splash (floating mark)
+components/hub/DeptSyncSplash.tsx → Boot / loading splash (pinned midnight + branded cyan/gold mark)
 components/hub/NavigationHub.tsx  → Cross-app Navigation Hub (composes HubHeader + BottomNav)
 app/loading.tsx                   → Route-level splash
 app/stock/page.tsx                → Downstock queue + remnant inventory (Stock tab)
-components/hub/HeaderNetworkStatus.tsx → Isolated online / pending-queue chip (owns useNetworkBadge)
+components/inventory/RollMeasurementPad.tsx → Compact roll/carton keypad (presentation; CycleAuditScanForm owns drafts)
+components/admin/DepartmentTargetsMatrix.tsx → Weekly bay quota table (auto-save + Save All)
+components/hub/WeeklyBayTargetCard.tsx → Re-export of DepartmentTargetsMatrix for Settings
 components/hub/admin-tools-events.ts → Admin Tools open event + payload types (light; drawer is dynamic)
 components/hub/ChunkErrorBoundary.tsx → Catch failed next/dynamic chunks + child render throws
 components/hub/NavIcons.tsx       → Canonical Lucide HubIcon / NavIcon (stroke 2, currentColor)
@@ -31,9 +34,8 @@ lib/nav-hub.ts                    → Role-aware Store Ops route menus + compact
 lib/push/*                        → Web Push subscribe + VAPID dispatch for rotation alerts
 app/admin/store-map/page.tsx      → Super Admin aisle/bay bulk mapper + weekly generate
 app/admin/supervisors/page.tsx    → Supervisor & role management console
-app/dashboard/page.tsx            → Zebra weekly rotation checklist (silent refresh + Sunday handoff)
-components/store-ops/ZebraChecklist.tsx → Optimistic complete, Quick Touch, downstock queue, assignment badges + associate filter, weekly pace, next-bay pulse, S/T filter, Sunday queue, bay-health badge
-components/store-ops/BayHealthScorecard.tsx → Compact Zebra health badge (presentation)
+components/store-ops/ZebraChecklist.tsx → Floor bay checklist (optimistic complete, Quick Touch, downstock, Sunday handoff)
+components/store-ops/BayHealthScorecard.tsx → Compact bay health badge (presentation)
 lib/store-ops/bay-health.ts       → Aging / SIMS / topstock discrepancy diagnostics (compose only)
 components/store-ops/AuditLocationModeToggle.tsx → SELLING vs TOPSTOCK audit-mode control
 components/store-ops/BarrierReasonChips.tsx → One-tap barrier reasons
@@ -93,7 +95,7 @@ lib/catalog.ts / remnants.ts / storage.ts / specialists.ts → Domain persistenc
 lib/supabase.ts                   → Client factory
 lib/store-ops/*                   → Store Operations domain (rotations, bulk map, auth bridge)
 app/admin/store-map/page.tsx      → Super Admin aisle/bay bulk mapper + weekly generate
-app/dashboard/page.tsx            → Zebra weekly rotation checklist (silent refresh + Sunday handoff)
+app/dashboard/page.tsx            → Floor weekly bay checklist (associates: list first)
 app/api/rotations/*               → Generate + complete + verify; POST /api/rotations/exceptions mid-week barriers
 app/api/store-locations*          → List / patch / bulk location APIs (GET list is column-pruned for Store Map)
 supabase/schema.sql               → Tables + multi-category + SIMS + store_number + RBAC columns + RLS
@@ -110,12 +112,13 @@ supabase/migrations/20260812_sunday_bay_assignments.sql → sunday specialist↔
 
 | Concern | Owner |
 |---|---|
-| Navigation / section routing | `app/page.tsx` + `HubHeader` / `BottomNav` (roster-only boot; `next/dynamic` sections; keep-alive `HubPane` + `startTransition`) |
+| Navigation / section routing | `app/page.tsx` (specialty `?section=` or replace `/dashboard`) + `lib/nav-hub.ts` + `HubHeader` / `BottomNav` |
 | Department RBAC / tab visibility | `lib/rbac.ts` (`visibleFloorAuditTabs` for in-page auditors) |
-| Cross-app Navigation Hub | `lib/nav-hub.ts` + `NavigationHub` + `admin-tools-events.ts` (`subscribeAdminTools` → host `AdminToolsDrawer`; Floor Pad/TipTap lazy inside drawer; `ChunkErrorBoundary`) |
+| Cross-app Navigation Hub | `lib/nav-hub.ts` + `NavigationHub` + `admin-tools-events.ts` (`subscribeAdminTools` → host `AdminToolsDrawer` 2-col tool grid; Floor Pad/TipTap lazy inside drawer; `ChunkErrorBoundary`) |
+| Department weekly quotas | `DepartmentTargetsMatrix` (blur / Save All) + `PATCH /api/departments` |
 | Store Operations map + rotations | `lib/store-ops/*` + `/admin/store-map` + `/dashboard` (bulk bays: `bay-pattern.ts` odd/even; floor checklist: `ZebraChecklist`; bay edit/delete + heatmap: `StoreLocationGrid` + `map-readiness.ts`; hard `DELETE /api/store-locations`) |
 | Sunday assignments | `lib/store-ops/sunday-audit.ts` (persist) + `SundayAuditAssignmentModal` |
-| Downstock / packdown queue | `lib/store-ops/downstock.ts` (flags) + `/stock` + Zebra `lockedQueue="downstock"` (CSA assign via sunday-audit) |
+| Downstock / packdown queue | `lib/store-ops/downstock.ts` (flags) + `/stock` + Zebra `lockedQueue="downstock"` (assign via sunday-audit) |
 | Supervisor weekly rollup | `lib/store-ops/audit-summary.ts` + `SupervisorAuditSummaryModal` |
 | Shift workload balancer | `lib/store-ops/weekly-rotations.ts` (pure plan: hours, clusters, health-risk priority) |
 | Bay health / floor discrepancies | `lib/store-ops/bay-health.ts` + `BayHealthScorecard` (composes location cycle age + hub audits / SIMS / variance) |

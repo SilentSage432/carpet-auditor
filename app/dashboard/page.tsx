@@ -16,7 +16,7 @@ import {
   isFlooringWorkingContext,
   workingDepartment,
 } from "@/lib/admin-department-context";
-import { isMasterAdmin, visibleFloorAuditTabs } from "@/lib/rbac";
+import { isAssociate, isMasterAdmin, visibleFloorAuditTabs } from "@/lib/rbac";
 import { isSupervisor } from "@/lib/specialists";
 import { actorFromSpecialist } from "@/lib/store-ops/auth";
 import {
@@ -72,6 +72,7 @@ function DashboardBody({
     (!isMasterAdmin(specialist) &&
       (specialist.assigned_department === "flooring" ||
         specialist.assigned_department == null));
+  const associate = isAssociate(specialist);
 
   const reload = useCallback(
     async (member: StoreSpecialist, opts?: { silent?: boolean }) => {
@@ -135,12 +136,14 @@ function DashboardBody({
       />
 
       <main className="hub-main">
-        <SundayAuditStagingCard
-          specialist={specialist}
-          refreshKey={healthKey}
-          forceShow={flooringFocus || isMasterAdmin(specialist)}
-        />
-        {visibleFloorAuditTabs(specialist).length > 0 ? (
+        {!associate ? (
+          <SundayAuditStagingCard
+            specialist={specialist}
+            refreshKey={healthKey}
+            forceShow={flooringFocus || isMasterAdmin(specialist)}
+          />
+        ) : null}
+        {!associate && visibleFloorAuditTabs(specialist).length > 0 ? (
           <div className="mb-3 flex gap-1.5 overflow-x-auto pb-0.5 no-scrollbar">
             {visibleFloorAuditTabs(specialist).map((tab) => (
               <Link
@@ -148,14 +151,18 @@ function DashboardBody({
                 href={`/?section=${tab.id}`}
                 className="chip-filter shrink-0 rounded-full border border-zinc-700/80 bg-zinc-950/60 text-zinc-200"
               >
-                {tab.label} audit
+                {tab.label} scan
               </Link>
             ))}
           </div>
         ) : null}
-        <ShiftBriefingCard specialist={specialist} refreshKey={healthKey} />
-        <StoreHealthChart specialist={specialist} refreshKey={healthKey} />
-        <StoreHealthCard specialist={specialist} refreshKey={healthKey} />
+        {!associate ? (
+          <>
+            <ShiftBriefingCard specialist={specialist} refreshKey={healthKey} />
+            <StoreHealthChart specialist={specialist} refreshKey={healthKey} />
+            <StoreHealthCard specialist={specialist} refreshKey={healthKey} />
+          </>
+        ) : null}
         {isSupervisor(specialist) ? (
           <button
             type="button"
@@ -166,26 +173,29 @@ function DashboardBody({
           </button>
         ) : null}
 
-        <ShowroomQuickTouchCard
-          specialist={specialist}
-          refreshKey={healthKey}
-          onTouched={() => setHealthKey((k) => k + 1)}
-        />
-        {!isMasterAdmin(specialist) ? (
+        {!associate ? (
+          <ShowroomQuickTouchCard
+            specialist={specialist}
+            refreshKey={healthKey}
+            onTouched={() => setHealthKey((k) => k + 1)}
+          />
+        ) : null}
+        {!associate && !isMasterAdmin(specialist) ? (
           <Link
             href="/verify-rotation"
             className="mb-3 block text-center text-sm font-semibold text-emerald-300 underline-offset-2 hover:underline"
           >
             End-of-week Verify &amp; Report Exceptions →
           </Link>
-        ) : (
+        ) : null}
+        {!associate && isMasterAdmin(specialist) ? (
           <Link
             href="/admin/exceptions"
             className="mb-3 block text-center text-sm font-semibold text-amber-200 underline-offset-2 hover:underline"
           >
             Exception Log / Verification Status →
           </Link>
-        )}
+        ) : null}
 
         {error ? (
           <p className="mb-4 rounded-xl border border-rose-500/40 bg-rose-950/40 px-3 py-2 text-sm text-rose-200">
@@ -195,8 +205,8 @@ function DashboardBody({
 
         <section className="mb-3">
           <p className="glass-subtitle mb-1.5 text-emerald-400">
-            Pending Cycle Audits
-            {flooringFocus ? " · D23 Flooring" : ""}
+            This week&apos;s bays
+            {flooringFocus ? " · Flooring" : ""}
           </p>
           {loading ? (
             <p className="text-sm text-zinc-400">Loading this week&apos;s bays…</p>
@@ -209,6 +219,35 @@ function DashboardBody({
             />
           )}
         </section>
+
+        {associate && visibleFloorAuditTabs(specialist).length > 0 ? (
+          <div className="mb-3 flex gap-1.5 overflow-x-auto pb-0.5 no-scrollbar">
+            {visibleFloorAuditTabs(specialist).map((tab) => (
+              <Link
+                key={tab.id}
+                href={`/?section=${tab.id}`}
+                className="chip-filter shrink-0 rounded-full border border-zinc-700/80 bg-zinc-950/60 text-zinc-200"
+              >
+                {tab.label} scan
+              </Link>
+            ))}
+          </div>
+        ) : null}
+        {associate ? (
+          <ShowroomQuickTouchCard
+            specialist={specialist}
+            refreshKey={healthKey}
+            onTouched={() => setHealthKey((k) => k + 1)}
+          />
+        ) : null}
+        {associate ? (
+          <Link
+            href="/verify-rotation"
+            className="mb-3 block text-center text-sm font-semibold text-emerald-300 underline-offset-2 hover:underline"
+          >
+            Log a barrier or verify bays →
+          </Link>
+        ) : null}
       </main>
 
       <SupervisorAuditSummaryModal

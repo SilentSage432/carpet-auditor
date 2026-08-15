@@ -1,5 +1,23 @@
 # DeptSync Hub — Development Journal
 
+## 2026-08-14 — P0 FTUX landing + brand unification
+
+### Shipped
+- **PWA mark** — `public/icons/` (192 / 512 / apple-touch) plus `mark.svg` are the cyan/gold floating layers+barcode, not the enclosed green shield. SW cache `deptsync-shell-v5-brand-floor`.
+- **Boot splash** — `DeptSyncSplash` pins midnight `#090d16` and `DeptSyncBadge branded` so SSR/theme FOUC cannot flash emerald. AuthWall and invite use the same branded mark.
+- **First land** — authenticated `/` without a specialty `?section=` replaces to `/dashboard`. Floor tab is only active on `/dashboard`. Scan tools stay at `/?section=audit|appliances|department` (More → Scan & Audit).
+- **Associate Floor** — bay checklist is the first viewport. Sunday engine, shift briefing, and health widgets stay supervisor/Master.
+- **Empty states** — associates see “No bays scheduled on your rotation — see your supervisor.” Stock empty queue explains Flag for Downstock + Go to Floor. Map empty is role-split (Map your first aisle vs ask supervisor).
+- **Microcopy** — user-facing Zebra copy → Floor; role chip is Master Admin / Supervisor / Associate; Floor/Overhead instead of SELLING/TOPSTOCK; measurement pad lin ft / sq yd / sq ft.
+
+## 2026-08-14 — Phase 2 DeptSync UX/UI consolidation
+
+### Shipped
+- **Roll Measurement Pad** (`components/inventory/RollMeasurementPad.tsx`) — Cycle Audit composes a single card: live CLF / SQYD in the header, whole-inch stepper, 1/8–7/8 keypad, +5/+10/+20 rounds. Carton mode uses the same pad shell. Form state stays in `CycleAuditScanForm`.
+- **AI chips** — Remnant Intelligence is a collapsible trigger (`FlooringAIInsightBanner compact`); Snap Bay is a header chip. Measurement pad sits above the fold; Sunday staging and the shift log stay below.
+- **Admin Tools grid** — menu is a 2-column categorized card grid: Floor Architecture · Rotations & Quotas · System & Security. Each card has a Lucide badge + subtitle. Drawer ownership unchanged.
+- **Department targets matrix** (`DepartmentTargetsMatrix`) — compact table (dept / weekly quota / on-off). Auto-save on blur and toggle; one **Save All Targets** footer for dirty rows. Settings still imports `WeeklyBayTargetCard` (re-export).
+
 ## 2026-08-14 — Phase 1 DeptSync UX/UI consolidation
 
 ### Shipped

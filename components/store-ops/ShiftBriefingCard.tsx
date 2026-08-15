@@ -131,7 +131,7 @@ export function ShiftBriefingCard({ specialist, refreshKey }: Props) {
       <div className="relative mt-2">
         {loading && !briefing ? (
           <p className="text-sm text-emerald-200/70">
-            Generating Zebra briefing…
+            Generating shift briefing…
           </p>
         ) : error && !briefing ? (
           <p className="text-sm font-medium text-rose-300" role="alert">
