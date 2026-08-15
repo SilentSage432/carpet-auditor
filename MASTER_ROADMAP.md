@@ -108,9 +108,10 @@
 - [x] Lucide department glyphs (roster / pickers / Store Map) + Realtime subscribe-before-on + Cabinets D29 on Store Map overview (target 6)
 - [x] Admin Tools department load: UUID-safe list, SELECT-then-INSERT seed, static fallback instead of red banner
 - [x] Department seed upsert matches live UNIQUE(code) / departments_code_key so duplicate D29 does not red-banner Store Map
-- [x] Instant Floor/Map/Stock/Settings keep-alive shell + SWR list cache + shared Realtime + dynamic Snap Bay / Bulk Generate
+- [x] Instant Floor/Map/Roster/Settings keep-alive shell + SWR list cache + shared Realtime + dynamic Snap Bay / Bulk Generate
 - [x] IRP / down-stocking velocity heatmap on `store_locations` + `bay_service_logs` (Map toggle, walk-the-floor log, Sunday velocity-priority draw)
-- [x] Multi-department role & scope access (`accessible_departments`, header switcher, `/admin/roles` chips)
+- [x] Multi-department role & scope access (`accessible_departments`, header switcher, Roster chips)
+- [x] UX lockdown — 4-tab Floor/Map/Roster/Settings, unified Edit Bay sheet, roster chips + PIN add, Sonner toasts, exception feed on Floor
 
 ## Next
 - [x] Apply Phase 1 JWT/RLS migration in Supabase + enable Custom Access Token Hook

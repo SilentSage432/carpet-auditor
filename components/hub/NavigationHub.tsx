@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Navigation Hub chrome — HubHeader department pill + Floor/Map/Stock/Settings bottom bar.
+ * Navigation Hub chrome — HubHeader department pill + Floor/Map/Roster/Settings bottom bar.
  * Master Admin: Admin Tools slide-over (defaults closed).
  */
 

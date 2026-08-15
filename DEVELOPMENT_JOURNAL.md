@@ -1,5 +1,15 @@
 # DeptSync Hub — Development Journal
 
+## 2026-08-15 — UX lockdown: Floor / Map / Roster / Settings
+
+### Shipped
+- **Four primary tabs** — `lib/nav-hub.ts` + `BottomNav` + `WorkflowTabShell` host Floor · Map · Roster · Settings. Primary panels mount immediately (`hidden` keep-alive, 0ms switches). Stock moved to More overflow (still keep-alive when visited).
+- **Roster tab** (`/roster`, `RosterTab`) owns team list, PIN add, and `accessible_departments` chips. Chip toggles are optimistic with Sonner `"Updated permissions for [Name]"`. `/admin/supervisors` and `/admin/roles` redirect here.
+- **Edit Bay** — tapping a map bay opens one sheet: header (aisle/bay + department badge), Section A walk logs, Section B aisle/bay/department/priority/delete. **+ Add Bay to Aisle** on the map (parity-matched bulk upsert of Selling+Topstock).
+- **Floor exception feed** — `ExceptionFeed` on Floor composes `fetchExceptionSummary`. Full log stays `/admin/exceptions`.
+- **Toasts** — Sonner host in root layout (`lib/toast.ts`). Mutations on bays, walks, roster, and prune/delete confirm in-place.
+- PATCH `/api/store-locations` accepts `department_id` + `priority_override` (Super Admin).
+
 ## 2026-08-14 — Multi-department role & scope access
 
 ### Shipped

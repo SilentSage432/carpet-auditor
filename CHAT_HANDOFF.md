@@ -14,10 +14,10 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 - **Native shell:** haptics via `utils/haptics.ts` + `HapticsListener`; offline toast `OfflineNetworkBanner` + `ConflictResolutionModal`; sync auto-flush on online/visibility/focus; PWA/TWA splash theme `#090d16`; `app/loading.tsx` + `DeptSyncSplash` (pinned midnight + branded mark)
 - **Theme engine:** `lib/theme.ts` owns presets + prefs (`deptsync_theme_prefs`). `data-theme` on `<html>`: `midnight` (default, ice-blue) · `emerald` · `amber` · `obsidian` · `cobalt`. Toggles: `data-contrast=high`, `data-density=compact`. Settings **Appearance** card applies instantly. CSS tokens in `app/globals.css`; glass utilities / nav / primary buttons bind to `--accent`, `--background`, `--border`, `--glow-accent`.
 - **Obsidian-glass UI:** utilities in `app/globals.css` (`.glass-card`, `.glass-panel`, `.theme-accent-surface`, `.theme-nav-active`, `.theme-modal`, `.btn-primary-glow`, `.btn-quick-touch`, `.chip-filter`, `.hub-main`). Canonical Lucide SVG set (`HubIcon` / `NavIcon`, stroke 2, `currentColor`).
-- **Handheld chrome:** sticky header `pt-safe` + compact `min-h-12`; workflow bottom tabs `min-h-16` in the thumb zone (Floor · Map · Stock · Settings); Store Ops pages use `.hub-main` so bays / badges / timers clear the fold.
-- **Keep-alive tabs:** Floor / Map / Stock / Settings live in `WorkflowTabShell` (`app/(workflow)/layout.tsx`). Switching tabs hides inactive panels (`hidden`) without unmounting. Departments / map / roster use 45s stale-while-revalidate. Realtime channels are refcounted per logical name.
+- **Handheld chrome:** sticky header `pt-safe` + compact `min-h-12`; workflow bottom tabs `min-h-16` in the thumb zone (Floor · Map · Roster · Settings); Store Ops pages use `.hub-main` so bays / badges / timers clear the fold.
+- **Keep-alive tabs:** Floor / Map / Roster / Settings mount in `WorkflowTabShell` (`app/(workflow)/layout.tsx`) so switches are `hidden` only (0ms). Stock stays overflow keep-alive. Departments / map / roster use 45s stale-while-revalidate. Realtime channels are refcounted per logical name.
 - **IRP velocity heatmap:** Map toggle `[ Standard Map | Velocity Heatmap ]`. Standard = rotation readiness (`map-readiness.ts`). Heatmap = `last_serviced_at` cadence + `velocity_tier` pulse (`lib/store-ops/velocity.ts`). Tap bay → 2-second walk log (`bay_service_logs` via `POST /api/store-locations/service`). Sunday generate prioritizes high/critical + `priority_override` (`lib/store-ops/rotation.ts` composed into `rotations.ts`). Apply `20260814_bay_velocity_heatmap.sql`.
-- **Multi-department access:** `accessible_departments` on roster + profiles. Header switcher when more than one granted dept. Supervisors grant extras from Settings / `/admin/roles`. Apply `20260814_multi_department_access.sql`.
+- **Multi-department access:** `accessible_departments` on roster + profiles. Header switcher when more than one granted dept. Supervisors grant extras from the **Roster** tab chips. Apply `20260814_multi_department_access.sql`.
 
 ## AI (`lib/ai/gemini.ts`)
 - Server-only Gemini Flash client (`@google/generative-ai` + `server-only`)
@@ -40,12 +40,13 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 |------|-------|------|
 | 👑 Master Admin | `assigned_department: all` | Flooring · Appliances · Remnants · Master |
 | 🛡️ Department Supervisor | primary `assigned_department` + `accessible_departments[]` | Dept audit / profile; header switcher when 2+ depts |
-| 👤 Floor Associate | primary + granted extras | Floor · Map · Stock · Settings; switcher when 2+ depts |
+| 👤 Floor Associate | primary + granted extras | Floor · Map · Roster · Settings; switcher when 2+ depts |
 
 ### Master Admin roster console
-- Full credential CRUD lives on `/admin/supervisors` (`AdminRosterManager`)
-- **Roles & access** `/admin/roles` — Master sees full roster; Supervisors grant associate cross-department chips (`POST /api/admin/department-access`)
-- Lightweight **Associate Roster** (`AssociateRosterPanel`): Settings, Admin Tools, Sunday drawer, and `/admin/roles`
+- Canonical team UI is the **Roster** tab (`/roster`, `RosterTab`) — name, role (Supervisor / Specialist / CSA), home department, and `accessible_departments` chips with optimistic save + Sonner toast
+- `/admin/supervisors` and `/admin/roles` redirect to `/roster`
+- Full credential invite/reset still lives in `AdminRosterManager` (compose from Roster / Admin Tools if needed)
+- Lightweight **Associate Roster** (`AssociateRosterPanel`): Admin Tools nested section + Sunday drawer
 - Floor titles: specialty (Flooring / Appliances / Millwork / Cabinets) → **Specialist**; core (Paint / Plumbing / Garden / Building Materials / Tools / Electrical) → **CSA**
 - Sunday Shift Balancer allocates weekly bay quotas to on-duty Specialists/CSAs by 4h / 6h / 8h (`planProportionalBayAssignments`)
 
@@ -53,7 +54,7 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 - Slide-over drawer defaults **closed** — header **Admin** chip, hamburger entry, or `openAdminTools()`
 - Hosted after first open (`adminHosted`) so the lazy chunk does not remount; `ChunkErrorBoundary` + loading-shell retry if the chunk fails
 - Floor Pad / TipTap is a nested dynamic import — opening Admin Tools does not evaluate TipTap
-- Owns a 2-column categorized grid: **Floor Architecture** (Bulk Generate, Store Map, Taxonomies) · **Rotations & Quotas** (Sunday assign, Trigger Rotation, Department Targets, Exception Log) · **System & Security** (Supervisors, Store Config, Diagnostics, Floor Pad)
+- Owns a 2-column categorized grid: **Floor Architecture** (Bulk Generate, Store Map, Taxonomies) · **Rotations & Quotas** (Sunday assign, Trigger Rotation, Department Targets, Exception Log) · **System & Security** (Team Roster → `/roster`, Store Config, Diagnostics, Floor Pad)
 - Department targets: compact matrix (`DepartmentTargetsMatrix`) — save on blur / toggle, or **Save All Targets**
 - Department Supervisors never see Admin Tools chrome
 - Master Admin header: **My Department Context** pin (Full Store / D23 Flooring / D35 Appliances / …) — filters dashboard Flooring focus without dropping Master privileges
@@ -97,7 +98,7 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 - **Admin Tools:** chrome `requestAdminTools` sets `adminOpen` + `adminHosted`; `dynamic(() => import(AdminToolsDrawer))` uses the **default** export (avoid `{ default: mod.Named }` — React #306); loading shell handles chunk errors; `ChunkErrorBoundary`; Floor Pad/TipTap nested `dynamic` via named `mod.ManagerNotesWorkspace`; SW cache `deptsync-shell-v5-brand-floor`
 - **Bulk bays:** Odd Only / Even Only (`lib/store-ops/bay-pattern.ts`, default odd); Store Map GET falls back if `last_completed_at` is missing/null
 - Seeds: no hardcoded roster injection — use Invite / Add Supervisor; temp PIN sets `must_change_credentials`
-- Primary: fixed bottom workflow tabs — **Floor · Map · Stock · Settings** (role overflow in More)
+- Primary: fixed bottom workflow tabs — **Floor · Map · Roster · Settings** (Stock / Notes / Verify overflow in More)
 - Header: DeptSync brand + store subtitle · section title · department dropdown pill · network; specialist chip + PIN gear
 - Cycle Audit / Appliances: hardware-scan ready without soft keyboard; sticky Log docked above bottom nav
 
@@ -155,17 +156,18 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
   - RLS: super_admin all; supervisors read/update own `assigned_department_id`
 - Hub bridge: Master Admin → super_admin; Supervisor → department_supervisor (via `departments.code` = hub `assigned_department`)
 - **Navigation Hub** (`lib/nav-hub.ts` + `HubHeader.tsx` + `BottomNav.tsx` + `NavigationHub.tsx`): department dropdown pill in the header; primary workflow tabs Floor · Map · Stock · Settings (Lucide SVG; overflow in More)
-  - All roles primary: Floor (`/dashboard`) · Map (`/admin/store-map`) · Stock (`/stock`) · Settings (`/settings`)
-  - Super Admin More: Team · Alerts · Notes · Admin Tools
-  - Supervisor More: Verify · Dept · Notes
-  - Associate More: Barriers · Scan & Audit (`/?section=` specialty)
+  - All roles primary: Floor (`/dashboard`) · Map (`/admin/store-map`) · Roster (`/roster`) · Settings (`/settings`)
+  - Super Admin More: Stock · Alerts · Notes
+  - Supervisor More: Stock · Verify · Dept · Notes
+  - Associate More: Stock · Barriers · Scan & Audit (`/?section=` specialty)
   - Authenticated `/` without specialty `?section=` replaces to `/dashboard`. Hub `/?section=audit|appliances|department` is scan tools only (Floor tab stays off). Remnants/settings deep links redirect to `/stock` / `/settings`
 - Quick Actions banner (Super Admin): Bulk Generate · Trigger Weekly Rotation · Manage Supervisors
 - `/manager-notes` — Executive Floor Pad (TipTap rich notes + Gemini Copilot Extract Tasks & Tag + archive); also Admin Tools entry + `#manager-notes`
-- `/dashboard` — **this week’s bays** (`ZebraChecklist`) first for associates. Supervisors/Master still see Sunday staging, shift briefing, and health above the list. Completions refresh silently. Supervisor **Weekly audit rollup** modal. Floor scan chips deep-link to hub Cycle / Appliances.
-- `/stock` — unified **Downstock queue** (Zebra compact/locked) + **Remnant inventory** (when RBAC allows remnants)
+- `/dashboard` — **this week’s bays** (`ZebraChecklist`) first for associates. Supervisors/Master still see Sunday staging, shift briefing, health, and the **exception feed** above the list. Completions refresh silently. Supervisor **Weekly audit rollup** modal. Floor scan chips deep-link to hub Cycle / Appliances.
+- `/stock` — overflow **Downstock queue** (Zebra compact/locked) + **Remnant inventory** (when RBAC allows remnants)
+- `/roster` — unified team list, PIN add, and department access chips (optimistic + toast)
+- `/admin/store-map` — department overview + location grid with **Standard Map | Velocity Heatmap** toggle; Standard = rotation readiness; Heatmap = IRP cadence (`last_serviced_at`) + hotspot pulse; tap bay → unified sheet (Section A walk log `light_touch` / `heavy_packdown` / `critical_hole` + Section B edit aisle/bay/department/priority/delete); **+ Add Bay to Aisle**; bay rows: name + status left, Selling/Topstock dual-pill, MoreVertical; **duplicate bay prune** (hard-delete extras, Super Admin); Bulk Add accordion (Master); Trigger Weekly Rotation modal (**Force Draw New Rotation**); **📷 Snap Bay AI Audit** (Gemini visual scan) on page + bay actions sheet. Supervisors/associates may view their department map (`canMutate` false) and still log walks.
 - Sunday staging card opens the assignment modal with **Shift balancer** (hours → proportional clustered zones). Plan owner: `lib/store-ops/weekly-rotations.ts`; persist: `sunday-audit.ts`.
-- `/admin/store-map` — department overview + location grid with **Standard Map | Velocity Heatmap** toggle; Standard = rotation readiness; Heatmap = IRP cadence (`last_serviced_at`) + hotspot pulse; tap bay → 2-second walk-the-floor log (`light_touch` / `heavy_packdown` / `critical_hole`); bay rows: name + status left, Selling/Topstock dual-pill, MoreVertical Edit/Delete; **duplicate bay prune** (hard-delete extras, Super Admin); Bulk Add accordion (Master); Trigger Weekly Rotation modal (**Force Draw New Rotation**); **📷 Snap Bay AI Audit** (Gemini visual scan) on page + bay actions sheet. Supervisors/associates may view their department map (`canMutate` false) and still log walks.
 - `GET /api/store-health` — weekly pace + bottleneck aggregation + compact `bay_health` for DS / Super Admin
 - `POST /api/store-ops/ai-bay-scan` — multimodal bay photo → carton/pallet estimates, cleanliness score, detected issues (Store Ops actor)
 - `POST /api/store-ops/ai-note-summary` — **410 Gone**; Floor Pad Copilot `extractTasksAndTag` is canonical
@@ -227,7 +229,7 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 
 ## Associate floor role
 - Store Ops actor `associate`: read/complete dept rotations + locations; create exceptions via verify; **no** targets, invite, generate/reset, Admin Tools, `/admin/*`
-- Nav: Floor · Map · Stock · Settings (Barriers / Specialty Tools in More)
+- Nav: Floor · Map · Roster · Settings (Stock / Barriers / Specialty Tools in More)
 
 ## Department toggles · adaptive priority · showroom
 - Apply `supabase/migrations/20260810_dept_priority_showroom.sql`

@@ -184,6 +184,8 @@ export async function PATCH(request: Request) {
       type?: "SELLING" | "TOPSTOCK";
       location_type?: "STANDARD" | "SHOWROOM_STACKOUT";
       audit_frequency_days?: number;
+      department_id?: string;
+      priority_override?: boolean;
     };
 
     if (!body.id) {
@@ -225,7 +227,9 @@ export async function PATCH(request: Request) {
         body.status !== undefined ||
         body.aisle !== undefined ||
         body.bay !== undefined ||
-        body.type !== undefined
+        body.type !== undefined ||
+        body.department_id !== undefined ||
+        body.priority_override !== undefined
       ) {
         return NextResponse.json(
           { error: "Only Super Admin can edit zone / map fields" },
@@ -286,21 +290,57 @@ export async function PATCH(request: Request) {
       if (body.status === "CARRIED_OVER") {
         patch.status = body.status;
       }
+      if (typeof body.priority_override === "boolean") {
+        patch.priority_override = body.priority_override;
+      }
+      if (body.department_id !== undefined) {
+        const nextDeptId = String(body.department_id).trim();
+        if (!nextDeptId) {
+          return NextResponse.json(
+            { error: "department_id is required" },
+            { status: 400 }
+          );
+        }
+        const { data: dept, error: deptError } = await supabase
+          .from("departments")
+          .select("id, code")
+          .eq("id", nextDeptId)
+          .eq("store_id", store.id)
+          .maybeSingle();
+        if (deptError) {
+          return NextResponse.json(
+            { error: deptError.message },
+            { status: 500 }
+          );
+        }
+        if (!dept) {
+          return NextResponse.json(
+            { error: "Department not found for this store" },
+            { status: 404 }
+          );
+        }
+        patch.department_id = dept.id;
+        patch.department_code = dept.code;
+      }
     }
 
     const nextAisle = String(patch.aisle ?? existing.aisle);
     const nextBay = Number(patch.bay ?? existing.bay);
     const nextType = String(patch.type ?? existing.type);
+    const nextDepartmentId = String(
+      patch.department_id ?? existing.department_id
+    );
     if (
       nextAisle !== String(existing.aisle) ||
       nextBay !== Number(existing.bay) ||
-      nextType !== String(existing.type)
+      nextType !== String(existing.type) ||
+      nextDepartmentId !== String(existing.department_id)
     ) {
       const { data: clash, error: clashError } = await supabase
         .from("store_locations")
         .select("id")
         .eq("store_id", store.id)
-        .eq("department_id", existing.department_id)
+        .eq("department_id", nextDepartmentId)
         .eq("aisle", nextAisle)
         .eq("bay", nextBay)
         .eq("type", nextType)

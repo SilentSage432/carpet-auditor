@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Primary workflow bottom tabs — Floor · Map · Stock · Settings.
+ * Primary workflow bottom tabs — Floor · Map · Roster · Settings.
  * Route ownership: lib/nav-hub.ts. Overflow routes live in the More sheet.
  */
 

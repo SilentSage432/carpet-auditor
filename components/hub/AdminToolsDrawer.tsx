@@ -265,7 +265,6 @@ export function AdminToolsDrawer({
                 onTaxonomy={() => setTaxonomyOpen(true)}
                 onNotes={() => setNotesOpen(true)}
                 onTargets={() => setSection("targets")}
-                onRoster={() => setSection("roster")}
                 onStore={() => setSection("store")}
                 onDiagnostics={() => setSection("diagnostics")}
                 onNavigate={onClose}
@@ -359,7 +358,6 @@ function Menu({
   onTaxonomy,
   onNotes,
   onTargets,
-  onRoster,
   onStore,
   onDiagnostics,
   onNavigate,
@@ -370,7 +368,6 @@ function Menu({
   onTaxonomy: () => void;
   onNotes: () => void;
   onTargets: () => void;
-  onRoster: () => void;
   onStore: () => void;
   onDiagnostics: () => void;
   onNavigate: () => void;
@@ -430,16 +427,10 @@ function Menu({
       <ToolCategory title="System & Security">
         <ToolCard
           icon="users"
-          label="Supervisor Roles"
-          subtitle="Logins & PIN"
-          href="/admin/supervisors"
+          label="Team Roster"
+          subtitle="PINs & department chips"
+          href="/roster"
           onNavigate={onNavigate}
-        />
-        <ToolCard
-          icon="users"
-          label="Associate Roster"
-          subtitle="Specialist vs CSA"
-          onClick={onRoster}
         />
         <ToolCard
           icon="settings"

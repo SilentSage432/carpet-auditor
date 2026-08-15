@@ -1,9 +1,9 @@
 "use client";
 
 /**
- * Keep-alive shell for Floor / Map / Stock / Settings.
- * First visit mounts the tab; later switches only toggle `hidden` so scroll
- * and local state survive. URL still updates via BottomNav Links.
+ * Keep-alive shell for Floor / Map / Roster / Settings.
+ * Primary tabs mount immediately so switches only toggle `hidden` (0ms).
+ * URL still updates via BottomNav Links. Stock stays overflow keep-alive.
  */
 
 import dynamic from "next/dynamic";
@@ -15,6 +15,7 @@ import { FloorTab } from "@/components/hub/tabs/FloorTab";
 import type { WorkflowTabProps } from "@/components/hub/tabs/tab-props";
 import { updateAuthSessionSpecialist } from "@/lib/auth-session";
 import {
+  PRIMARY_WORKFLOW_TAB_HREFS,
   workflowTabFromPathname,
   workflowTabTitle,
   type WorkflowTabHref,
@@ -31,13 +32,17 @@ const MapTab = dynamic(
   () => import("@/components/hub/tabs/MapTab").then((mod) => mod.MapTab),
   { ssr: false }
 );
-const StockTab = dynamic(
-  () => import("@/components/hub/tabs/StockTab").then((mod) => mod.StockTab),
+const RosterTab = dynamic(
+  () => import("@/components/hub/tabs/RosterTab").then((mod) => mod.RosterTab),
   { ssr: false }
 );
 const SettingsTab = dynamic(
   () =>
     import("@/components/hub/tabs/SettingsTab").then((mod) => mod.SettingsTab),
+  { ssr: false }
+);
+const StockTab = dynamic(
+  () => import("@/components/hub/tabs/StockTab").then((mod) => mod.StockTab),
   { ssr: false }
 );
 
@@ -63,7 +68,7 @@ export function WorkflowTabShell(props: WorkflowTabProps) {
   const pathname = usePathname() || "/dashboard";
   const active = workflowTabFromPathname(pathname) ?? "/dashboard";
   const [visited, setVisited] = useState<Set<WorkflowTabHref>>(
-    () => new Set([active])
+    () => new Set<WorkflowTabHref>(PRIMARY_WORKFLOW_TAB_HREFS)
   );
   const [storeNumber, setStore] = useState(props.storeNumber);
   const [member, setMember] = useState<StoreSpecialist>(props.specialist);
@@ -143,14 +148,19 @@ export function WorkflowTabShell(props: WorkflowTabProps) {
           <MapTab {...tabProps} />
         </KeepAlivePanel>
       ) : null}
-      {visited.has("/stock") ? (
-        <KeepAlivePanel active={active === "/stock"}>
-          <StockTab {...tabProps} />
+      {visited.has("/roster") ? (
+        <KeepAlivePanel active={active === "/roster"}>
+          <RosterTab {...tabProps} />
         </KeepAlivePanel>
       ) : null}
       {visited.has("/settings") ? (
         <KeepAlivePanel active={active === "/settings"}>
           <SettingsTab {...tabProps} />
+        </KeepAlivePanel>
+      ) : null}
+      {visited.has("/stock") ? (
+        <KeepAlivePanel active={active === "/stock"}>
+          <StockTab {...tabProps} />
         </KeepAlivePanel>
       ) : null}
     </div>

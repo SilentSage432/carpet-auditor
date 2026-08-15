@@ -11,11 +11,13 @@ import type {
 import type { StoreSpecialist } from "@/lib/types";
 import {
   assignLocationsToWeek,
+  bulkGenerateLocations,
   deleteStoreLocations,
   fetchBayLocationHistory,
   type BayRotationHistoryRow,
   patchStoreLocation,
 } from "@/lib/store-ops/client";
+import { toastError, toastSuccess } from "@/lib/toast";
 import {
   findDuplicateLegacyBays,
   pruneIdsFromDuplicateGroups,
@@ -163,6 +165,11 @@ export function StoreLocationGrid({
   const [confirmDeleteKey, setConfirmDeleteKey] = useState<string | null>(null);
   const [menuKey, setMenuKey] = useState<string | null>(null);
   const [batchConfirm, setBatchConfirm] = useState(false);
+  const [addBayOpen, setAddBayOpen] = useState(false);
+  const [addBayPrefill, setAddBayPrefill] = useState<{
+    departmentId: string;
+    aisle: string;
+  } | null>(null);
   const [verifiedOverlay, setVerifiedOverlay] = useState<Set<string>>(
     () => new Set()
   );
@@ -332,9 +339,14 @@ export function StoreLocationGrid({
       await patchStoreLocation(specialist, loc.id, {
         is_active: !loc.is_active,
       });
+      toastSuccess(
+        `${loc.is_active ? "Paused" : "Activated"} Aisle ${loc.aisle} Bay ${loc.bay}`
+      );
       onChanged();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Update failed");
+      const msg = err instanceof Error ? err.message : "Update failed";
+      setError(msg);
+      toastError(msg);
     } finally {
       setPendingId(null);
     }
@@ -346,9 +358,13 @@ export function StoreLocationGrid({
     setError(null);
     try {
       await deleteStoreLocations(specialist, pruneIds);
+      toastSuccess(`Removed ${pruneIds.length} duplicate tag${pruneIds.length === 1 ? "" : "s"}`);
       onChanged();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not prune duplicates");
+      const msg =
+        err instanceof Error ? err.message : "Could not prune duplicates";
+      setError(msg);
+      toastError(msg);
     } finally {
       setPruneBusy(false);
     }
@@ -395,6 +411,9 @@ export function StoreLocationGrid({
     setError(null);
     try {
       await deleteStoreLocations(specialist, ids);
+      toastSuccess(
+        `Deleted ${ids.length} tag${ids.length === 1 ? "" : "s"} from the map`
+      );
       setConfirmDeleteKey(null);
       setBatchConfirm(false);
       setSelectedIds((prev) => {
@@ -411,7 +430,10 @@ export function StoreLocationGrid({
       }
       onChanged();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not delete bays");
+      const msg =
+        err instanceof Error ? err.message : "Could not delete bays";
+      setError(msg);
+      toastError(msg);
     } finally {
       setPendingId(null);
     }
@@ -432,15 +454,37 @@ export function StoreLocationGrid({
         {canMutate ? (
           <>
             <p className="text-sm text-zinc-400">
-              No aisles mapped yet. Tap below to map your first aisle.
+              No aisles mapped yet. Add a bay or bulk-generate an aisle.
             </p>
             <button
               type="button"
-              onClick={() => openAdminTools({ section: "bulk" })}
+              onClick={() => {
+                setAddBayPrefill(null);
+                setAddBayOpen(true);
+              }}
               className="btn-primary-glow mt-3 inline-flex min-h-11 items-center justify-center rounded-xl px-4 text-sm font-bold"
             >
-              Map your first aisle
+              + Add Bay to Aisle
             </button>
+            <button
+              type="button"
+              onClick={() => openAdminTools({ section: "bulk" })}
+              className="mt-2 inline-flex min-h-11 items-center justify-center rounded-xl border border-zinc-700 px-4 text-sm font-semibold text-zinc-200"
+            >
+              Bulk generate aisle
+            </button>
+            {addBayOpen ? (
+              <AddBaySheet
+                specialist={specialist}
+                departments={departments}
+                prefill={addBayPrefill}
+                onClose={() => {
+                  setAddBayOpen(false);
+                  setAddBayPrefill(null);
+                }}
+                onChanged={onChanged}
+              />
+            ) : null}
           </>
         ) : (
           <p className="text-sm text-zinc-400">
@@ -490,8 +534,20 @@ export function StoreLocationGrid({
         <p className="mt-2 text-sm text-zinc-400">
           {heatmap
             ? "IRP cadence by last_serviced_at. Green/cyan ≤7 days, amber 8–18, gray/orange >18 or never. Pulse red/purple = high or critical hotspot. Tap a bay to log a 2-second walk."
-            : `Expand a department, then an aisle. Green verified this week, yellow scheduled, red stale (>7d) or barrier. Tap a bay to log a walk${canMutate ? ", or use More for edits" : ""}.`}
+            : `Expand a department, then an aisle. Green verified this week, yellow scheduled, red stale (>7d) or barrier. Tap a bay to walk or edit${canMutate ? "." : "."}`}
         </p>
+        {canMutate ? (
+          <button
+            type="button"
+            onClick={() => {
+              setAddBayPrefill(null);
+              setAddBayOpen(true);
+            }}
+            className="btn-primary-glow mt-3 flex min-h-11 w-full items-center justify-center rounded-xl px-4 text-sm font-bold"
+          >
+            + Add Bay to Aisle
+          </button>
+        ) : null}
         {!heatmap ? (
           <div className="mt-2 flex flex-wrap gap-2">
             {(
@@ -691,6 +747,22 @@ export function StoreLocationGrid({
                               className="h-4 w-4 text-zinc-400"
                             />
                           </button>
+                          {canMutate ? (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setAddBayPrefill({
+                                  departmentId: dept.departmentId,
+                                  aisle: aisle.aisle,
+                                });
+                                setAddBayOpen(true);
+                              }}
+                              className="shrink-0 px-2 font-mono text-[10px] font-bold uppercase tracking-wide text-accent"
+                              aria-label={`Add bay to aisle ${aisle.aisle}`}
+                            >
+                              + Bay
+                            </button>
+                          ) : null}
                         </div>
 
                       {aisleOpen ? (
@@ -794,7 +866,7 @@ export function StoreLocationGrid({
                                     onClose={() => setMenuKey(null)}
                                     onEdit={() => {
                                       setMenuKey(null);
-                                      openBaySheet(sheetPayload, "edit");
+                                      openWalkSheet(sheetPayload);
                                     }}
                                     onDelete={() => {
                                       if (!confirming) {
@@ -872,6 +944,19 @@ export function StoreLocationGrid({
           onChanged={onChanged}
           onError={setError}
           onDeleteIds={(ids) => deleteIds(ids)}
+        />
+      ) : null}
+
+      {addBayOpen && canMutate ? (
+        <AddBaySheet
+          specialist={specialist}
+          departments={departments}
+          prefill={addBayPrefill}
+          onClose={() => {
+            setAddBayOpen(false);
+            setAddBayPrefill(null);
+          }}
+          onChanged={onChanged}
         />
       ) : null}
     </section>
@@ -1175,6 +1260,7 @@ function BayActionsSheet({
           (Number(loc.manual_priority_count) || 0) + 1
         }).`
       );
+      toastSuccess(`Pinned ${loc.type} to this week`);
       onChanged();
     } catch (err) {
       const msg =
@@ -1232,6 +1318,7 @@ function BayActionsSheet({
         audit_frequency_days: days,
       });
       setMessage("Location details saved.");
+      toastSuccess("Bay details saved");
       onChanged();
       if (
         aisleCode !== bay.aisle ||
@@ -1626,6 +1713,166 @@ function BayActionsSheet({
           meta={bayScanMeta}
         />
       ) : null}
+    </div>
+  );
+}
+
+function AddBaySheet({
+  specialist,
+  departments,
+  prefill,
+  onClose,
+  onChanged,
+}: {
+  specialist: StoreSpecialist;
+  departments: Department[];
+  prefill: { departmentId: string; aisle: string } | null;
+  onClose: () => void;
+  onChanged: () => void;
+}) {
+  const [departmentId, setDepartmentId] = useState(
+    prefill?.departmentId || departments[0]?.id || ""
+  );
+  const [aisleDraft, setAisleDraft] = useState(prefill?.aisle ?? "");
+  const [bayDraft, setBayDraft] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, []);
+
+  async function submit() {
+    const aisleCode = normalizeAisle(aisleDraft);
+    if (!departmentId) {
+      setError("Select a department");
+      return;
+    }
+    if (!isValidAisle(aisleCode)) {
+      setError("Enter an aisle code (e.g. BW, RW, 12, A1)");
+      return;
+    }
+    const bayNumber = Math.floor(Number(bayDraft));
+    if (!Number.isFinite(bayNumber) || bayNumber < 0) {
+      setError("Bay must be an integer ≥ 0");
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    try {
+      await bulkGenerateLocations(specialist, {
+        department_id: departmentId,
+        aisle: aisleCode,
+        start_bay: bayNumber,
+        end_bay: bayNumber,
+        types: ["SELLING", "TOPSTOCK"],
+        bay_pattern: bayNumber % 2 === 0 ? "even" : "odd",
+      });
+      toastSuccess(`Added Aisle ${aisleCode} Bay ${bayNumber}`);
+      onChanged();
+      onClose();
+    } catch (err) {
+      const msg =
+        err instanceof Error ? err.message : "Could not add bay";
+      setError(msg);
+      toastError(msg);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="glass-backdrop fixed inset-0 z-[80] flex flex-col justify-end">
+      <button
+        type="button"
+        aria-label="Close add bay"
+        className="absolute inset-0"
+        onClick={onClose}
+      />
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="add-bay-title"
+        className="glass-card theme-modal relative z-10 w-full !rounded-t-2xl !rounded-b-none border-t-2 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3"
+      >
+        <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-zinc-600" />
+        <h2 id="add-bay-title" className="glass-title text-lg">
+          Add Bay to Aisle
+        </h2>
+        <p className="mt-1 text-sm text-zinc-400">
+          Creates Selling + Topstock tags for one bay.
+        </p>
+        <div className="mt-4 space-y-3">
+          <label className="block space-y-1.5">
+            <span className="text-sm font-medium text-zinc-200">
+              Department
+            </span>
+            <select
+              value={departmentId}
+              onChange={(e) => setDepartmentId(e.target.value)}
+              className="min-h-12 w-full rounded-xl border border-zinc-700 bg-zinc-900 px-3 text-sm text-zinc-100"
+            >
+              {departments.map((dept) => (
+                <option key={dept.id} value={dept.id}>
+                  {dept.name} ({dept.code})
+                </option>
+              ))}
+            </select>
+          </label>
+          <div className="grid grid-cols-2 gap-2">
+            <label className="block space-y-1.5">
+              <span className="text-sm font-medium text-zinc-200">Aisle</span>
+              <input
+                type="text"
+                inputMode="text"
+                autoCapitalize="characters"
+                spellCheck={false}
+                value={aisleDraft}
+                onChange={(e) =>
+                  setAisleDraft(formatAisleInput(e.target.value))
+                }
+                onBlur={() => setAisleDraft(normalizeAisle(aisleDraft))}
+                className="min-h-12 w-full rounded-xl border border-zinc-700 bg-zinc-900 px-3 font-mono uppercase text-zinc-100"
+              />
+            </label>
+            <label className="block space-y-1.5">
+              <span className="text-sm font-medium text-zinc-200">Bay</span>
+              <input
+                type="number"
+                min={0}
+                value={bayDraft}
+                onChange={(e) => setBayDraft(e.target.value)}
+                className="min-h-12 w-full rounded-xl border border-zinc-700 bg-zinc-900 px-3 font-mono text-zinc-100"
+              />
+            </label>
+          </div>
+        </div>
+        {error ? (
+          <p className="mt-3 text-sm font-medium text-rose-300" role="alert">
+            {error}
+          </p>
+        ) : null}
+        <div className="mt-4 grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex min-h-12 items-center justify-center rounded-xl border border-zinc-700 text-sm font-semibold"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void submit()}
+            className="btn-primary-glow flex min-h-12 items-center justify-center rounded-xl text-sm font-bold disabled:opacity-40"
+          >
+            {busy ? "Adding…" : "Add bay"}
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

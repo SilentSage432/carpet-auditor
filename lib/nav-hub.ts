@@ -1,7 +1,7 @@
 /**
  * Navigation Hub — owns cross-app route links by role.
  * Inventory section tabs stay in lib/rbac.ts; this module owns Store Ops routes.
- * Primary bottom bar is the Floor / Map / Stock / Settings workflow.
+ * Primary bottom bar is the Floor / Map / Roster / Settings workflow.
  * Authenticated home is /dashboard (weekly checklist). Hub `/` with ?section=
  * is specialty scan tools only — never the Floor tab.
  */
@@ -27,13 +27,12 @@ export type SpecialtyHubHref =
 
 export type NavHubHref =
   | "/admin/store-map"
-  | "/admin/supervisors"
-  | "/admin/roles"
   | "/admin/exceptions"
   | "/dashboard"
   | "/verify-rotation"
   | "/department"
   | "/manager-notes"
+  | "/roster"
   | "/settings"
   | "/stock"
   | "/"
@@ -81,11 +80,16 @@ export function shouldStayOnSpecialtyHub(
   return isSpecialtyHubSection(section);
 }
 
-export const WORKFLOW_TAB_HREFS = [
+export const PRIMARY_WORKFLOW_TAB_HREFS = [
   "/dashboard",
   "/admin/store-map",
-  "/stock",
+  "/roster",
   "/settings",
+] as const;
+
+export const WORKFLOW_TAB_HREFS = [
+  ...PRIMARY_WORKFLOW_TAB_HREFS,
+  "/stock",
 ] as const;
 
 export type WorkflowTabHref = (typeof WORKFLOW_TAB_HREFS)[number];
@@ -102,11 +106,14 @@ export function workflowTabFromPathname(
   ) {
     return "/admin/store-map";
   }
-  if (pathname === "/stock" || pathname.startsWith("/stock/")) {
-    return "/stock";
+  if (pathname === "/roster" || pathname.startsWith("/roster/")) {
+    return "/roster";
   }
   if (pathname === "/settings" || pathname.startsWith("/settings/")) {
     return "/settings";
+  }
+  if (pathname === "/stock" || pathname.startsWith("/stock/")) {
+    return "/stock";
   }
   return null;
 }
@@ -116,10 +123,12 @@ export function prefetchWorkflowTab(href: string): void {
     void import("@/components/hub/tabs/FloorTab");
   } else if (href === "/admin/store-map") {
     void import("@/components/hub/tabs/MapTab");
-  } else if (href === "/stock") {
-    void import("@/components/hub/tabs/StockTab");
+  } else if (href === "/roster") {
+    void import("@/components/hub/tabs/RosterTab");
   } else if (href === "/settings") {
     void import("@/components/hub/tabs/SettingsTab");
+  } else if (href === "/stock") {
+    void import("@/components/hub/tabs/StockTab");
   }
 }
 
@@ -128,6 +137,7 @@ export function workflowTabTitle(
   specialist?: StoreSpecialist | null
 ): string {
   if (href === "/admin/store-map") return "Store Map";
+  if (href === "/roster") return "Team Roster";
   if (href === "/stock") return "Downstock & Stock";
   if (href === "/settings") return "Settings & Config";
   const working = specialist ? workingDepartment(specialist) : "flooring";
@@ -178,12 +188,21 @@ const MAP_LINK: NavHubLink = {
   description: "Visual heatmap and bay layout",
 };
 
+const ROSTER_LINK: NavHubLink = {
+  href: "/roster",
+  label: "Team Roster",
+  shortLabel: "Roster",
+  icon: "users",
+  description: "Team, PINs, and department access",
+};
+
 const STOCK_LINK: NavHubLink = {
   href: "/stock",
   label: "Downstock & Stock",
   shortLabel: "Stock",
   icon: "stock",
   description: "Downstock queue and remnant inventory",
+  overflow: true,
 };
 
 const SETTINGS_LINK: NavHubLink = {
@@ -191,7 +210,7 @@ const SETTINGS_LINK: NavHubLink = {
   label: "Settings",
   shortLabel: "Settings",
   icon: "settings",
-  description: "Themes, credentials, and Admin Tools",
+  description: "Themes, store config, and Admin Tools",
 };
 
 export function navRoleLinks(
@@ -203,16 +222,9 @@ export function navRoleLinks(
     return [
       FLOOR_LINK,
       MAP_LINK,
-      STOCK_LINK,
+      ROSTER_LINK,
       SETTINGS_LINK,
-      {
-        href: "/admin/supervisors",
-        label: "Supervisor & Role Management",
-        shortLabel: "Team",
-        icon: "users",
-        description: "Issue logins and grant cross-department access",
-        overflow: true,
-      },
+      STOCK_LINK,
       {
         href: "/admin/exceptions",
         label: "Exception Log",
@@ -237,16 +249,9 @@ export function navRoleLinks(
     return [
       FLOOR_LINK,
       MAP_LINK,
-      STOCK_LINK,
+      ROSTER_LINK,
       SETTINGS_LINK,
-      {
-        href: "/admin/roles",
-        label: "Roles & Department Access",
-        shortLabel: "Roles",
-        icon: "users",
-        description: "Grant associates cross-department Floor / Map / Stock access",
-        overflow: true,
-      },
+      STOCK_LINK,
       {
         href: "/verify-rotation",
         label: "Verify & Report Exceptions",
@@ -277,8 +282,9 @@ export function navRoleLinks(
   return [
     FLOOR_LINK,
     MAP_LINK,
-    STOCK_LINK,
+    ROSTER_LINK,
     SETTINGS_LINK,
+    STOCK_LINK,
     {
       href: "/verify-rotation",
       label: "Barriers / Log",
@@ -330,6 +336,10 @@ export function isNavHubPathActive(
 
   if (path === "/dashboard") {
     return pathname === "/dashboard" || pathname.startsWith("/dashboard/");
+  }
+
+  if (href === "/roster") {
+    return pathname === "/roster" || pathname.startsWith("/roster/");
   }
 
   if (href === "/stock") {

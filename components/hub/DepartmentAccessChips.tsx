@@ -51,7 +51,7 @@ export function DepartmentAccessChips({
         {label}
       </legend>
       <p className="mb-2 text-[11px] leading-snug text-zinc-500">
-        Primary department stays on. Extra chips grant Floor / Map / Stock
+        Primary department stays on.         Extra chips grant Floor / Map / Roster
         access without changing home department.
       </p>
       <div className="flex flex-wrap gap-1.5">

@@ -4,6 +4,7 @@ import { HapticsListener } from "@/components/hub/HapticsListener";
 import { OfflineNetworkBanner } from "@/components/hub/OfflineNetworkBanner";
 import { ServiceWorkerRegister } from "@/components/hub/ServiceWorkerRegister";
 import { ConflictResolutionModal } from "@/components/offline/ConflictResolutionModal";
+import { Toaster } from "@/components/ui/Toaster";
 import { ThemeProvider } from "@/lib/theme-context";
 import { THEME_BOOT_SCRIPT } from "@/lib/theme";
 import "./globals.css";
@@ -78,6 +79,7 @@ export default function RootLayout({
           <HapticsListener />
           <OfflineNetworkBanner />
           <ConflictResolutionModal />
+          <Toaster />
           {children}
         </ThemeProvider>
       </body>

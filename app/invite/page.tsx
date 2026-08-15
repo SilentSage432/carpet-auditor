@@ -277,7 +277,7 @@ function InviteBody() {
   function finish() {
     if (dryRun) {
       harnessLog("Harness complete — returning without burning token");
-      router.replace("/admin/supervisors");
+      router.replace("/roster");
       return;
     }
     router.replace("/dashboard");

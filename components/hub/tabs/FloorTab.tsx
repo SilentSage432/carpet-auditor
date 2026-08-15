@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import dynamic from "next/dynamic";
 import { SundayAuditStagingCard } from "@/components/admin/SundayAuditStagingCard";
+import { ExceptionFeed } from "@/components/admin/ExceptionFeed";
 import { StoreHealthCard } from "@/components/StoreHealthCard";
 import { ShowroomQuickTouchCard } from "@/components/dashboard/ShowroomQuickTouchCard";
 import { ZebraChecklist } from "@/components/store-ops/ZebraChecklist";
@@ -154,14 +155,6 @@ export function FloorTab({ specialist }: WorkflowTabProps) {
             End-of-week Verify &amp; Report Exceptions →
           </Link>
         ) : null}
-        {!associate && isMasterAdmin(specialist) ? (
-          <Link
-            href="/admin/exceptions"
-            className="mb-3 block text-center text-sm font-semibold text-amber-200 underline-offset-2 hover:underline"
-          >
-            Exception Log / Verification Status →
-          </Link>
-        ) : null}
 
         {error ? (
           <p className="mb-4 rounded-xl border border-rose-500/40 bg-rose-950/40 px-3 py-2 text-sm text-rose-200">
@@ -185,6 +178,8 @@ export function FloorTab({ specialist }: WorkflowTabProps) {
             />
           )}
         </section>
+
+        <ExceptionFeed specialist={specialist} refreshKey={healthKey} />
 
         {associate && visibleFloorAuditTabs(specialist).length > 0 ? (
           <div className="mb-3 flex gap-1.5 overflow-x-auto pb-0.5 no-scrollbar">

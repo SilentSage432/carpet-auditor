@@ -15,6 +15,7 @@ import {
   composeAccessibleDepartments,
 } from "@/lib/department-access";
 import { updateDepartmentAccess } from "@/lib/store-ops/client";
+import { toastError, toastSuccess } from "@/lib/toast";
 import {
   dedupeRoster,
   fetchSpecialists,
@@ -116,6 +117,15 @@ export function AssociateRosterPanel({
       member.assigned_department && member.assigned_department !== "all"
         ? member.assigned_department
         : "flooring";
+    const previous = roster;
+    onRosterChange(
+      roster.map((row) =>
+        row.id === member.id
+          ? { ...row, accessible_departments: composeAccessibleDepartments(primary, next) }
+          : row
+      )
+    );
+    toastSuccess(`Updated permissions for ${member.name}`);
     setBusyId(member.id);
     setError(null);
     try {
@@ -126,9 +136,11 @@ export function AssociateRosterPanel({
       });
       await refresh();
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Could not update department access"
-      );
+      onRosterChange(previous);
+      const msg =
+        err instanceof Error ? err.message : "Could not update department access";
+      setError(msg);
+      toastError(msg);
     } finally {
       setBusyId(null);
     }
@@ -167,9 +179,13 @@ export function AssociateRosterPanel({
         username: suggestUsername(trimmed, department),
       });
       setName("");
+      toastSuccess(`Added ${trimmed} to the roster`);
       await refresh();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not add associate");
+      const msg =
+        err instanceof Error ? err.message : "Could not add associate";
+      setError(msg);
+      toastError(msg);
     } finally {
       setAdding(false);
     }

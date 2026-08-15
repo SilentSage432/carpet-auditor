@@ -80,9 +80,9 @@ Master Admin: compact department **dropdown pill** in the header (no second-row 
 
 | Tab | Route | Meaning |
 |-----|-------|---------|
-| Floor | `/dashboard` | This week's bay checklist |
+| Floor | `/dashboard` | This week's bay checklist + exception feed |
 | Map | `/admin/store-map` | Heatmap + bay layout |
-| Stock | `/stock` | Downstock queue + remnants |
+| Roster | `/roster` | Team, PINs, department chips |
 | Settings | `/settings` | Themes, credentials, Admin Tools |
 
 Store Ops pages use `.hub-main` (`px-3 pt-2 pb-28`) so bay lists, status pills, and pace timers clear the fold on handhelds. Quick Touch / filter chips use `.btn-quick-touch` / `.chip-filter` (44px min).

@@ -3,10 +3,12 @@
 ```
 app/page.tsx                      → Hub shell (AuthWall + specialty scan `?section=`; authenticated home redirects to /dashboard)
 app/dashboard/page.tsx            → Floor weekly bay checklist (associates: list first; supervisors: staging/health above)
-app/(workflow)/layout.tsx         → Keep-alive Floor/Map/Stock/Settings shell (SessionGate once)
-components/hub/WorkflowTabShell.tsx → Persistent tab panels (`hidden`, lazy Map/Stock/Settings)
+app/(workflow)/layout.tsx         → Keep-alive Floor/Map/Roster/Settings shell (SessionGate once)
+components/hub/WorkflowTabShell.tsx → Persistent tab panels (`hidden`; primary tabs hosted immediately)
 lib/store-ops/ttl-cache.ts        → TTL + in-flight + getSWR stale-while-revalidate
-app/layout.tsx                    → Fonts, PWA meta, ThemeProvider + FOUC boot script
+lib/toast.ts                      → Sonner success/error helpers (presentation)
+components/ui/Toaster.tsx         → Global toast host
+app/layout.tsx                    → Fonts, PWA meta, ThemeProvider + FOUC boot script + Toaster
 lib/theme.ts                      → Theme catalog, prefs persistence, document apply (owns personalization)
 lib/theme-context.tsx             → React mirror of theme prefs (presentation)
 components/settings/ThemeSelector.tsx → Appearance swatches + contrast/density toggles
@@ -15,11 +17,15 @@ app/manifest.ts                   → short_name DeptSync · Department & SIMS A
 public/sw.js                      → Offline shell cache strategies
 components/hub/HubChrome.tsx      → Legacy inventory header + in-page specialty audit switcher
 components/hub/HubHeader.tsx      → Sticky hub header (brand, department pill, account)
-components/hub/BottomNav.tsx      → Floor · Map · Stock · Settings workflow tabs
+components/hub/BottomNav.tsx      → Floor · Map · Roster · Settings workflow tabs
 components/hub/DeptSyncSplash.tsx → Boot / loading splash (pinned midnight + branded cyan/gold mark)
 components/hub/NavigationHub.tsx  → Cross-app Navigation Hub (composes HubHeader + BottomNav)
 app/loading.tsx                   → Route-level splash
-app/stock/page.tsx                → Downstock queue + remnant inventory (Stock tab)
+app/(workflow)/stock/page.tsx     → Downstock queue + remnant inventory (More → Stock)
+app/(workflow)/roster/page.tsx    → Team roster keep-alive tab
+components/hub/tabs/RosterTab.tsx → Unified roster (chips + add member)
+components/admin/ExceptionFeed.tsx → Floor barrier feed (composes exception summary)
+components/admin/WalkTheFloorSheet.tsx → Unified walk log + Edit Bay details
 components/inventory/RollMeasurementPad.tsx → Compact roll/carton keypad (presentation; CycleAuditScanForm owns drafts)
 components/admin/DepartmentTargetsMatrix.tsx → Weekly bay quota table (auto-save + Save All)
 components/hub/WeeklyBayTargetCard.tsx → Re-export of DepartmentTargetsMatrix for Settings
@@ -38,7 +44,8 @@ components/hub/SessionGate.tsx    → Auth gate for Store Ops route pages
 lib/nav-hub.ts                    → Role-aware Store Ops route menus + compact role badges + overflow/More
 lib/push/*                        → Web Push subscribe + VAPID dispatch for rotation alerts
 app/admin/store-map/page.tsx      → Super Admin aisle/bay bulk mapper + Department Overview (Cabinets D29 target 6)
-app/admin/supervisors/page.tsx    → Supervisor & role management console
+app/admin/supervisors/page.tsx    → Redirect → /roster
+app/admin/roles/page.tsx          → Redirect → /roster
 components/store-ops/ZebraChecklist.tsx → Floor bay checklist (optimistic complete, Quick Touch, downstock, Sunday handoff)
 components/store-ops/BayHealthScorecard.tsx → Compact bay health badge (presentation)
 lib/store-ops/bay-health.ts       → Aging / SIMS / topstock discrepancy diagnostics (compose only)
@@ -88,12 +95,12 @@ supabase/migrations/20260812_manager_notes_archive.sql → manager_notes.is_arch
 app/flooring/page.tsx                 → Deep link → /dashboard + Sunday drawer (no 404 hop)
 app/sunday-audit/page.tsx             → Redirect → /dashboard + Sunday drawer
 app/sunday-rotation/page.tsx          → Redirect → /dashboard + Sunday drawer
-components/admin/AssociateRosterPanel.tsx → Lightweight Specialist vs CSA roster (Settings / Admin Tools / Sunday)
+components/admin/AssociateRosterPanel.tsx → Lightweight Specialist vs CSA roster (Admin Tools / Sunday)
 lib/types.ts                          → Cabinets D29 + SPECIALTY/CORE + associateFloorTitle
 supabase/migrations/20260814_cabinets_d29.sql → Seed Cabinets per store
 supabase/migrations/20260814_bay_velocity_heatmap.sql → store_locations IRP columns + bay_service_logs
 supabase/migrations/20260814_multi_department_access.sql → profiles + store_specialists accessible_departments + JWT match
-app/admin/roles/page.tsx          → Supervisor (and Master) cross-department grant console
+app/admin/roles/page.tsx          → Redirect → /roster
 app/api/admin/department-access/route.ts → Instant accessible_departments upsert + JWT app_metadata
 components/hub/DepartmentAccessChips.tsx → Roster multi-select department grants
 components/hub/AdminDepartmentSwitcher.tsx → Header pill when accessible_departments.length > 1
@@ -132,21 +139,21 @@ supabase/migrations/20260812_sunday_bay_assignments.sql → sunday specialist↔
 
 | Concern | Owner |
 |---|---|
-| Navigation / section routing | `app/page.tsx` (specialty `?section=` or replace `/dashboard`) + `lib/nav-hub.ts` + `HubHeader` / `BottomNav` |
+| Navigation / section routing | `app/page.tsx` (specialty `?section=` or replace `/dashboard`) + `lib/nav-hub.ts` + `HubHeader` / `BottomNav` (Floor · Map · Roster · Settings) |
 | Department RBAC / tab visibility | `lib/rbac.ts` (`visibleFloorAuditTabs` for in-page auditors) + `lib/department-access.ts` (granted extras) |
 | Cross-app Navigation Hub | `lib/nav-hub.ts` + `NavigationHub` + `admin-tools-events.ts` (`subscribeAdminTools` → host `AdminToolsDrawer` 2-col tool grid; Floor Pad/TipTap lazy inside drawer; `ChunkErrorBoundary`) |
 | Department weekly quotas | `DepartmentTargetsMatrix` (blur / Save All) + `PATCH /api/departments` |
 | Store Operations map + rotations | `lib/store-ops/*` + `/admin/store-map` + `/dashboard` (bulk bays: `bay-pattern.ts` odd/even; floor checklist: `ZebraChecklist`; bay edit/delete + Standard vs Velocity Heatmap: `StoreLocationGrid` + `map-readiness.ts` + `velocity.ts`; walk log: `bay-service.ts` + `POST /api/store-locations/service`; Sunday velocity pick: `rotation.ts` → `rotations.ts`; hard `DELETE /api/store-locations`) |
 | Sunday assignments | `lib/store-ops/sunday-audit.ts` (persist) + `SundayAuditAssignmentModal` |
-| Downstock / packdown queue | `lib/store-ops/downstock.ts` (flags) + `/stock` + Zebra `lockedQueue="downstock"` (assign via sunday-audit) |
+| Downstock / packdown queue | `lib/store-ops/downstock.ts` (flags) + `/stock` (More overflow) + Zebra `lockedQueue="downstock"` (assign via sunday-audit) |
 | Supervisor weekly rollup | `lib/store-ops/audit-summary.ts` + `SupervisorAuditSummaryModal` |
 | Shift workload balancer | `lib/store-ops/weekly-rotations.ts` (pure plan: hours, clusters, health-risk priority) |
 | Bay health / floor discrepancies | `lib/store-ops/bay-health.ts` + `BayHealthScorecard` (composes location cycle age + hub audits / SIMS / variance) |
 | Selling vs Topstock audit mode | `lib/store-ops/audit-location-mode.ts` + `AuditLocationModeToggle` (Cycle/Department forms + Zebra filter) |
 | Rotation verification / barriers | `lib/store-ops/verification.ts` + `/verify-rotation` + `/admin/exceptions` + `POST /api/rotations/exceptions` |
 | Manager notes / Executive Floor Pad | `lib/store-ops/ai-note-extract.ts`, `manager-notes.ts`, `app/actions/manager-notes.ts`, `components/manager-notes/*` (Copilot: plain text ≤ 8k; `ai-note-summary` retired 410) |
-| Team roster (Master Admin) | `AdminRosterManager`, `lib/specialists.ts` (`is_active` soft-delete) |
-| Cross-department grants | `lib/department-access.ts` + `POST /api/admin/department-access` + `/admin/roles` chips |
+| Team roster (Master Admin) | `RosterTab` + `lib/specialists.ts` (`is_active` soft-delete); `AdminRosterManager` remains invite/reset compose |
+| Cross-department grants | `lib/department-access.ts` + `POST /api/admin/department-access` + Roster chips |
 | Working department pin | `lib/admin-department-context.ts` (Master full-store; multi-dept clamped to grants) |
 | Store context | `lib/store.ts` + `lib/store-ops/stores.ts` |
 | Offline sync queue | `lib/sync-queue.ts`, `lib/sync-conflict.ts`, `ConflictResolutionModal` |

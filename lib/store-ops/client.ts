@@ -278,6 +278,8 @@ export async function patchStoreLocation(
       | "aisle"
       | "bay"
       | "type"
+      | "department_id"
+      | "priority_override"
     >
   >
 ): Promise<StoreLocation> {
