@@ -5,7 +5,11 @@
  */
 
 import { workingDepartment } from "@/lib/admin-department-context";
-import { defaultSectionForMember, isMasterAdmin } from "@/lib/rbac";
+import {
+  defaultSectionForMember,
+  isMasterAdmin,
+  isSimplifiedAssociateView,
+} from "@/lib/rbac";
 import {
   departmentMeta,
   type HubSection,
@@ -136,8 +140,8 @@ export type NavHubLink = {
 export function navRoleBadge(member: StoreSpecialist | null | undefined): string {
   if (!member) return "Locked";
   if (isMasterAdmin(member)) return "Master Admin";
-  if (member.role === "Supervisor") return "Supervisor";
-  return "Associate";
+  if (member.role === "Supervisor") return "DS Supervisor";
+  return "CSA / Specialist";
 }
 
 /** Login identity shown in the user menu (username is the hub login key). */
@@ -179,12 +183,33 @@ const PRIMARY_LINKS: NavHubLink[] = [
   },
 ];
 
-/** Primary bottom-bar links — Floor · Map · Roster · Settings for every role. */
+/** Primary bottom-bar links — Floor · Map · Roster · Settings, filtered by role. */
 export function navRoleLinks(
   member: StoreSpecialist | null | undefined
 ): NavHubLink[] {
   if (!member) return [];
+  if (isSimplifiedAssociateView(member)) {
+    return PRIMARY_LINKS.filter(
+      (link) => link.href === "/dashboard" || link.href === "/admin/store-map"
+    ).map((link) =>
+      link.href === "/dashboard"
+        ? {
+            ...link,
+            label: "My Shift",
+            shortLabel: "My Shift",
+            description: "Your assigned bays and shift goals",
+          }
+        : link
+    );
+  }
   return PRIMARY_LINKS;
+}
+
+export function canAccessWorkflowTab(
+  member: StoreSpecialist | null | undefined,
+  href: string
+): boolean {
+  return navRoleLinks(member).some((link) => link.href === href);
 }
 
 export function navPrimaryLinks(links: NavHubLink[]): NavHubLink[] {

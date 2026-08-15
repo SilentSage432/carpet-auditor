@@ -3,19 +3,9 @@
 import { useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import { HubIcon } from "@/components/hub/NavIcons";
-import {
-  compareAisles,
-  formatAisleInput,
-  isValidAisle,
-  normalizeAisle,
-} from "@/lib/store-ops/aisle";
-import {
-  assignLocationsToWeek,
-  deleteStoreLocations,
-  logBayService,
-  patchStoreLocation,
-} from "@/lib/store-ops/client";
+import { assignLocationsToWeek, logBayService } from "@/lib/store-ops/client";
 import { toastError, toastSuccess } from "@/lib/toast";
+import { hapticSuccess, playErrorTone, playSuccessTone } from "@/lib/ui/feedback";
 import type { BayScanMeta } from "@/lib/store-ops/ai-bay-scan";
 
 const VisualBayScannerModal = dynamic(
@@ -75,12 +65,6 @@ const INTENSITY_ACTIONS: ReadonlyArray<{
   },
 ];
 
-function pairLocationIds(pair: BayPair): string[] {
-  return [pair.selling, pair.topstock]
-    .filter((loc): loc is StoreLocation => Boolean(loc))
-    .map((loc) => loc.id);
-}
-
 export function WalkTheFloorSheet({
   specialist,
   departments,
@@ -107,14 +91,6 @@ export function WalkTheFloorSheet({
   );
   const [targetId, setTargetId] = useState(faces[0]?.id ?? "");
   const [busy, setBusy] = useState<BayServiceIntensity | null>(null);
-  const [saving, setSaving] = useState(false);
-  const [confirmDelete, setConfirmDelete] = useState(false);
-  const [aisleDraft, setAisleDraft] = useState(bay.aisle);
-  const [bayDraft, setBayDraft] = useState(String(bay.pair.bay));
-  const [departmentId, setDepartmentId] = useState(bay.departmentId);
-  const [priorityOverride, setPriorityOverride] = useState(
-    faces.some((loc) => loc.priority_override === true)
-  );
   const [bayScanOpen, setBayScanOpen] = useState(false);
   const [pinBusy, setPinBusy] = useState(false);
 
@@ -127,26 +103,12 @@ export function WalkTheFloorSheet({
 
   useEffect(() => {
     setTargetId(faces[0]?.id ?? "");
-    setAisleDraft(bay.aisle);
-    setBayDraft(String(bay.pair.bay));
-    setDepartmentId(bay.departmentId);
-    setPriorityOverride(faces.some((loc) => loc.priority_override === true));
-    setConfirmDelete(false);
-  }, [bay.aisle, bay.departmentId, bay.pair.bay, faces]);
+  }, [faces]);
 
   const target = faces.find((loc) => loc.id === targetId) ?? faces[0] ?? null;
-  const dept =
-    departments.find((d) => d.id === departmentId) ??
-    departments.find((d) => d.id === bay.departmentId);
+  const dept = departments.find((d) => d.id === bay.departmentId);
   const deptCode = dept?.code ?? target?.department_code ?? "";
   const deptName = dept?.name ?? bay.departmentName;
-  const sortedDepts = useMemo(
-    () =>
-      [...departments].sort((a, b) =>
-        a.name.localeCompare(b.name) || compareAisles(a.code, b.code)
-      ),
-    [departments]
-  );
   const pinTargets = faces.filter(
     (loc) => (loc.location_type ?? "STANDARD") !== "SHOWROOM_STACKOUT"
   );
@@ -162,12 +124,15 @@ export function WalkTheFloorSheet({
     try {
       await assignLocationsToWeek(specialist, [loc.id], loc.department_id);
       toastSuccess(`Pinned ${loc.type} to this week`);
+      playSuccessTone();
+      hapticSuccess();
       onChanged();
     } catch (err) {
       const msg =
         err instanceof Error ? err.message : "Could not pin bay to this week";
       onError(msg);
       toastError(msg);
+      playErrorTone();
     } finally {
       setPinBusy(false);
     }
@@ -188,6 +153,8 @@ export function WalkTheFloorSheet({
           ? `Walk logged for Aisle ${bay.aisle} Bay ${bay.pair.bay}`
           : `Walk logged · velocity ${tier.replaceAll("_", " ")}`
       );
+      playSuccessTone();
+      hapticSuccess();
       onChanged();
       window.setTimeout(() => onClose(), 350);
     } catch (err) {
@@ -195,71 +162,9 @@ export function WalkTheFloorSheet({
         err instanceof Error ? err.message : "Could not log bay service";
       onError(msg);
       toastError(msg);
+      playErrorTone();
     } finally {
       setBusy(null);
-    }
-  }
-
-  async function saveDetails() {
-    const ids = pairLocationIds(bay.pair);
-    if (ids.length === 0) return;
-    const aisleCode = normalizeAisle(aisleDraft);
-    if (!isValidAisle(aisleCode)) {
-      const msg = "Enter an aisle code (e.g. BW, RW, 12, A1)";
-      onError(msg);
-      toastError(msg);
-      return;
-    }
-    const bayNumber = Math.floor(Number(bayDraft));
-    if (!Number.isFinite(bayNumber) || bayNumber < 0) {
-      const msg = "Bay must be an integer ≥ 0";
-      onError(msg);
-      toastError(msg);
-      return;
-    }
-    setSaving(true);
-    onError(null);
-    try {
-      for (const loc of faces) {
-        await patchStoreLocation(specialist, loc.id, {
-          aisle: aisleCode,
-          bay: bayNumber,
-          department_id: departmentId,
-          priority_override: priorityOverride,
-        });
-      }
-      toastSuccess(`Saved Aisle ${aisleCode} Bay ${bayNumber}`);
-      onChanged();
-    } catch (err) {
-      const msg =
-        err instanceof Error ? err.message : "Could not save bay details";
-      onError(msg);
-      toastError(msg);
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  async function deleteBay() {
-    const ids = pairLocationIds(bay.pair);
-    if (ids.length === 0) return;
-    if (!confirmDelete) {
-      setConfirmDelete(true);
-      return;
-    }
-    setSaving(true);
-    try {
-      await deleteStoreLocations(specialist, ids);
-      toastSuccess(`Deleted Aisle ${bay.aisle} Bay ${bay.pair.bay}`);
-      onChanged();
-      onClose();
-    } catch (err) {
-      const msg =
-        err instanceof Error ? err.message : "Could not delete bay";
-      onError(msg);
-      toastError(msg);
-    } finally {
-      setSaving(false);
     }
   }
 
@@ -319,7 +224,7 @@ export function WalkTheFloorSheet({
 
         <section className="mb-4">
           <p className="mb-2 font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-accent">
-            A · Walk the floor
+            Walk the floor
           </p>
           {faces.length === 0 ? (
             <p className="rounded-xl border border-dashed border-zinc-700 px-3 py-4 text-sm text-zinc-400">
@@ -331,7 +236,7 @@ export function WalkTheFloorSheet({
                 <button
                   key={action.intensity}
                   type="button"
-                  disabled={Boolean(busy) || saving || !target}
+                  disabled={Boolean(busy) || pinBusy || !target}
                   onClick={() => void submit(action.intensity)}
                   className={`flex min-h-14 w-full flex-col items-center justify-center rounded-xl border px-4 text-sm font-bold disabled:opacity-50 ${action.className}`}
                 >
@@ -353,101 +258,11 @@ export function WalkTheFloorSheet({
           )}
         </section>
 
-        {canMutate ? (
+        {canMutate && pinTargets.length > 0 ? (
           <section className="border-t border-zinc-800/80 pt-4">
             <p className="mb-2 font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-amber-300">
-              B · Edit bay details
+              Pin to this week
             </p>
-            <div className="grid grid-cols-2 gap-2">
-              <label className="block space-y-1.5">
-                <span className="text-sm font-medium text-zinc-200">Aisle</span>
-                <input
-                  type="text"
-                  inputMode="text"
-                  autoCapitalize="characters"
-                  spellCheck={false}
-                  value={aisleDraft}
-                  onChange={(e) =>
-                    setAisleDraft(formatAisleInput(e.target.value))
-                  }
-                  onBlur={() => setAisleDraft(normalizeAisle(aisleDraft))}
-                  className="min-h-12 w-full rounded-xl border border-zinc-700 bg-zinc-900 px-3 font-mono uppercase text-zinc-100"
-                />
-              </label>
-              <label className="block space-y-1.5">
-                <span className="text-sm font-medium text-zinc-200">
-                  Bay number
-                </span>
-                <input
-                  type="number"
-                  min={0}
-                  value={bayDraft}
-                  onChange={(e) => setBayDraft(e.target.value)}
-                  className="min-h-12 w-full rounded-xl border border-zinc-700 bg-zinc-900 px-3 font-mono text-zinc-100"
-                />
-              </label>
-            </div>
-
-            <label className="mt-3 block space-y-1.5">
-              <span className="text-sm font-medium text-zinc-200">
-                Assigned department
-              </span>
-              <select
-                value={departmentId}
-                onChange={(e) => setDepartmentId(e.target.value)}
-                className="min-h-12 w-full rounded-xl border border-zinc-700 bg-zinc-900 px-3 text-sm text-zinc-100"
-              >
-                {sortedDepts.map((row) => (
-                  <option key={row.id} value={row.id}>
-                    {row.name} ({row.code})
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <button
-              type="button"
-              role="switch"
-              aria-checked={priorityOverride}
-              onClick={() => setPriorityOverride((v) => !v)}
-              className="mt-3 flex min-h-12 w-full items-center justify-between rounded-xl border border-zinc-700/80 bg-zinc-950/60 px-3"
-            >
-              <span className="text-sm font-semibold text-zinc-100">
-                Priority override
-              </span>
-              <span
-                className={`relative h-7 w-12 shrink-0 rounded-full transition ${
-                  priorityOverride ? "bg-amber-500" : "bg-zinc-600"
-                }`}
-              >
-                <span
-                  className={`absolute top-0.5 h-6 w-6 rounded-full bg-white transition ${
-                    priorityOverride ? "left-[1.35rem]" : "left-0.5"
-                  }`}
-                />
-              </span>
-            </button>
-
-            <button
-              type="button"
-              disabled={saving || faces.length === 0}
-              onClick={() => void saveDetails()}
-              className="btn-primary-glow mt-3 flex min-h-12 w-full items-center justify-center rounded-xl text-sm disabled:opacity-50"
-            >
-              {saving ? "Saving…" : "Save bay details"}
-            </button>
-            <button
-              type="button"
-              disabled={saving || faces.length === 0}
-              onClick={() => void deleteBay()}
-              className={`mt-2 flex min-h-12 w-full items-center justify-center rounded-xl border px-4 text-sm font-bold disabled:opacity-50 ${
-                confirmDelete
-                  ? "border-rose-400 bg-rose-600 text-white"
-                  : "border-rose-500/40 bg-rose-950/30 text-rose-100"
-              }`}
-            >
-              {confirmDelete ? "Confirm delete this bay" : "Delete bay"}
-            </button>
             {pinTargets.map((loc) => (
               <button
                 key={`pin-${loc.id}`}

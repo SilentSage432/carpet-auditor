@@ -15,7 +15,11 @@ import {
   isFlooringWorkingContext,
   workingDepartmentId,
 } from "@/lib/admin-department-context";
-import { isAssociate, isMasterAdmin, visibleFloorAuditTabs } from "@/lib/rbac";
+import {
+  isMasterAdmin,
+  isSimplifiedAssociateView,
+  visibleFloorAuditTabs,
+} from "@/lib/rbac";
 import { isSupervisor } from "@/lib/specialists";
 import {
   fetchDepartments,
@@ -51,10 +55,10 @@ export function FloorTab({ specialist }: WorkflowTabProps) {
   const [verifyBusy, setVerifyBusy] = useState(false);
   const [verifyMsg, setVerifyMsg] = useState<string | null>(null);
   const flooringFocus = isFlooringWorkingContext(specialist);
-  const associate = isAssociate(specialist);
+  const simplified = isSimplifiedAssociateView(specialist);
   const supervisor = isSupervisor(specialist);
   const master = isMasterAdmin(specialist);
-  const scanTabs = visibleFloorAuditTabs(specialist);
+  const scanTabs = simplified ? [] : visibleFloorAuditTabs(specialist);
   const completedCount = rotations.filter((r) => r.is_completed).length;
 
   const reload = useCallback(
@@ -135,7 +139,7 @@ export function FloorTab({ specialist }: WorkflowTabProps) {
   return (
     <>
       <main className="hub-main">
-        {!associate ? (
+        {!simplified ? (
           <SundayAuditStagingCard
             specialist={specialist}
             refreshKey={healthKey}
@@ -157,7 +161,7 @@ export function FloorTab({ specialist }: WorkflowTabProps) {
           </div>
         ) : null}
 
-        {!associate ? (
+        {!simplified ? (
           <>
             <ShiftBriefingCard specialist={specialist} refreshKey={healthKey} />
             <PredictiveCopilotBanner
@@ -172,17 +176,10 @@ export function FloorTab({ specialist }: WorkflowTabProps) {
             <StoreHealthCard specialist={specialist} refreshKey={healthKey} />
           </>
         ) : (
-          <PredictiveCopilotBanner
-            specialist={specialist}
-            week={week}
-            rotations={displayRotations}
-            departmentId={deptId}
-            refreshKey={healthKey}
-            onApplied={silentRefresh}
-          />
+          <ShiftBriefingCard specialist={specialist} refreshKey={healthKey} />
         )}
 
-        {supervisor ? (
+        {supervisor && !simplified ? (
           <button
             type="button"
             onClick={() => setRollupOpen(true)}
@@ -192,11 +189,13 @@ export function FloorTab({ specialist }: WorkflowTabProps) {
           </button>
         ) : null}
 
-        <ShowroomQuickTouchCard
-          specialist={specialist}
-          refreshKey={healthKey}
-          onTouched={() => setHealthKey((k) => k + 1)}
-        />
+        {!simplified ? (
+          <ShowroomQuickTouchCard
+            specialist={specialist}
+            refreshKey={healthKey}
+            onTouched={() => setHealthKey((k) => k + 1)}
+          />
+        ) : null}
 
         {verifyMsg ? (
           <p className="mb-3 rounded-xl border border-emerald-500/40 bg-emerald-950/40 px-3 py-2 text-sm text-emerald-200">
@@ -204,7 +203,7 @@ export function FloorTab({ specialist }: WorkflowTabProps) {
           </p>
         ) : null}
 
-        {!associate && completedCount > 0 ? (
+        {!simplified && completedCount > 0 ? (
           <button
             type="button"
             disabled={verifyBusy || !deptId}
@@ -219,8 +218,8 @@ export function FloorTab({ specialist }: WorkflowTabProps) {
 
         <section className="mb-3">
           <p className="glass-subtitle mb-1.5 text-emerald-400">
-            This week&apos;s bays
-            {flooringFocus ? " · Flooring" : ""}
+            {simplified ? "Your assigned bays" : "This week's bays"}
+            {flooringFocus && !simplified ? " · Flooring" : ""}
           </p>
           {loading ? (
             <p className="text-sm text-zinc-400">Loading this week&apos;s bays…</p>
@@ -234,7 +233,9 @@ export function FloorTab({ specialist }: WorkflowTabProps) {
           )}
         </section>
 
-        <ExceptionFeed specialist={specialist} refreshKey={healthKey} />
+        {!simplified ? (
+          <ExceptionFeed specialist={specialist} refreshKey={healthKey} />
+        ) : null}
       </main>
 
       <SupervisorAuditSummaryModal

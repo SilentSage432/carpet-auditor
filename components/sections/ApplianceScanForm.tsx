@@ -25,6 +25,7 @@ import { sanitizeBarcodeScan } from "@/lib/barcode";
 import { blurActiveInput } from "@/lib/focus-input";
 import { useGlobalBarcodeScanner } from "@/lib/hardware-scanner";
 import { playScanLoggedFeedback } from "@/lib/scan-feedback";
+import { playErrorTone } from "@/lib/ui/feedback";
 import { getStoreNumber } from "@/lib/store";
 import { useFlushOnLeave } from "@/lib/use-flush-on-leave";
 import {
@@ -192,6 +193,7 @@ export function ApplianceScanForm({
           err instanceof Error ? err.message : "Unknown error";
         console.error("[ApplianceAudit] continuous save failed", err);
         flashStatus(`Failed to save scan: ${message}`, "error");
+        playErrorTone();
       } finally {
         setSaving(false);
       }

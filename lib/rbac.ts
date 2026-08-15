@@ -12,6 +12,7 @@ import {
   type DepartmentScope,
   type HubSection,
   type OperationalDepartment,
+  type SpecialistRole,
   type StoreSpecialist,
   HUB_SECTIONS,
 } from "./types";
@@ -71,6 +72,58 @@ export function isAssociate(
   member: StoreSpecialist | null | undefined
 ): boolean {
   return member?.role === "Associate";
+}
+
+export function isDepartmentSupervisor(
+  member: StoreSpecialist | null | undefined
+): boolean {
+  return member?.role === "Supervisor";
+}
+
+/** Canonical hub view roles for chrome (maps platform SpecialistRole). */
+export type HubViewRole =
+  | "MASTER_ADMIN"
+  | "DEPARTMENT_SUPERVISOR"
+  | "ASSOCIATE_CSA";
+
+export function hubViewRole(
+  member: StoreSpecialist | null | undefined
+): HubViewRole {
+  if (isMasterAdmin(member)) return "MASTER_ADMIN";
+  if (isDepartmentSupervisor(member)) return "DEPARTMENT_SUPERVISOR";
+  return "ASSOCIATE_CSA";
+}
+
+export function hubViewRoleLabel(role: HubViewRole): string {
+  if (role === "MASTER_ADMIN") return "Master Admin";
+  if (role === "DEPARTMENT_SUPERVISOR") return "DS Supervisor";
+  return "CSA / Specialist";
+}
+
+export function specialistRoleFromHubView(role: HubViewRole): SpecialistRole {
+  if (role === "MASTER_ADMIN") return "MasterAdmin";
+  if (role === "DEPARTMENT_SUPERVISOR") return "Supervisor";
+  return "Associate";
+}
+
+/** Floor associates get My Shift + Map only — no Roster / Settings chrome. */
+export function isSimplifiedAssociateView(
+  member: StoreSpecialist | null | undefined
+): boolean {
+  return hubViewRole(member) === "ASSOCIATE_CSA";
+}
+
+/** Master + DS may open Manage Aisles & Bays and edit priorities. */
+export function canManageMapConsole(
+  member: StoreSpecialist | null | undefined
+): boolean {
+  return !isSimplifiedAssociateView(member);
+}
+
+export function canMutateStoreMap(
+  member: StoreSpecialist | null | undefined
+): boolean {
+  return canManageMapConsole(member);
 }
 
 /** Elevated roles that manage PINs / markdown / filters. */

@@ -13,6 +13,7 @@ import {
 } from "@/lib/types";
 import { toStoreOpsDepartmentCode } from "@/lib/store-ops/department-codes";
 import { accessibleDepartments } from "@/lib/department-access";
+import { peekSandboxDepartment } from "@/lib/dev-sandbox";
 import { effectiveDepartment, isMasterAdmin } from "@/lib/rbac";
 
 const STORAGE_KEY = "deptsync_admin_working_department";
@@ -110,6 +111,13 @@ export function workingDepartment(
   member: StoreSpecialist | null | undefined
 ): DepartmentScope {
   if (!member) return "flooring";
+  const sandboxDept = peekSandboxDepartment();
+  if (sandboxDept) {
+    if (isMasterAdmin(member)) {
+      return sandboxDept;
+    }
+    if (sandboxDept !== "all") return sandboxDept;
+  }
   if (isMasterAdmin(member)) return readAdminWorkingDepartment();
   const allowed = accessibleDepartments(member);
   if (allowed.length > 1) {

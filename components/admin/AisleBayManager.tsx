@@ -8,6 +8,10 @@ import { HubIcon } from "@/components/hub/NavIcons";
 import { compareAisles } from "@/lib/store-ops/aisle";
 import { deleteStoreLocations } from "@/lib/store-ops/client";
 import {
+  findDuplicateLegacyBays,
+  pruneIdsFromDuplicateGroups,
+} from "@/lib/store-ops/locations";
+import {
   formatBayTag,
   type Department,
   type StoreLocation,
@@ -106,6 +110,7 @@ export function AisleBayManager({
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [batchConfirm, setBatchConfirm] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [pruneBusy, setPruneBusy] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
   const [addPrefill, setAddPrefill] = useState<{
     departmentId: string;
@@ -135,6 +140,15 @@ export function AisleBayManager({
   const mappedBayCount = useMemo(
     () => groups.reduce((sum, g) => sum + g.bays.length, 0),
     [groups]
+  );
+
+  const duplicateGroups = useMemo(
+    () => findDuplicateLegacyBays(locations),
+    [locations]
+  );
+  const pruneIds = useMemo(
+    () => pruneIdsFromDuplicateGroups(duplicateGroups),
+    [duplicateGroups]
   );
 
   const defaultDeptId =
@@ -189,6 +203,24 @@ export function AisleBayManager({
       );
     } finally {
       setBusy(false);
+    }
+  }
+
+  async function pruneDuplicates() {
+    if (pruneIds.length === 0) return;
+    setPruneBusy(true);
+    try {
+      await deleteStoreLocations(specialist, pruneIds);
+      toastSuccess(
+        `Removed ${pruneIds.length} duplicate tag${pruneIds.length === 1 ? "" : "s"}`
+      );
+      onChanged();
+    } catch (err) {
+      toastError(
+        err instanceof Error ? err.message : "Could not prune duplicates"
+      );
+    } finally {
+      setPruneBusy(false);
     }
   }
 
@@ -276,6 +308,28 @@ export function AisleBayManager({
               : batchConfirm
                 ? `Confirm delete ${selectedIds.size}`
                 : `Delete Selected (${selectedIds.size})`}
+          </button>
+        </div>
+      ) : null}
+
+      {canMutate && duplicateGroups.length > 0 ? (
+        <div className="rounded-xl border border-amber-500/40 bg-amber-950/25 px-3 py-3">
+          <p className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-amber-300">
+            Map prune · duplicate legacy bays
+          </p>
+          <p className="mt-1 text-sm text-amber-100/90">
+            {duplicateGroups.length} duplicate group
+            {duplicateGroups.length === 1 ? "" : "s"} · {pruneIds.length} extra
+            tag{pruneIds.length === 1 ? "" : "s"} to delete. Canonical tags
+            stay on the map.
+          </p>
+          <button
+            type="button"
+            disabled={pruneBusy}
+            onClick={() => void pruneDuplicates()}
+            className="mt-3 flex min-h-11 w-full items-center justify-center rounded-xl border border-amber-400/45 bg-amber-950/40 px-3 text-sm font-bold text-amber-50 disabled:opacity-40"
+          >
+            {pruneBusy ? "Deleting…" : "Delete duplicate tags"}
           </button>
         </div>
       ) : null}

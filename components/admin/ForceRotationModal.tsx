@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { generateRotations } from "@/lib/store-ops/client";
 import { readableError } from "@/lib/store-ops/errors";
+import { playErrorTone, playSuccessTone } from "@/lib/ui/feedback";
 import type { Department } from "@/lib/store-ops/types";
 import { isoWeekLabel } from "@/lib/store-ops/week";
 import type { StoreSpecialist } from "@/lib/types";
@@ -74,6 +75,7 @@ export function ForceRotationModal({
         }${result.cycle_reset ? " (new cycle started)" : ""}.`
       );
       onForced();
+      playSuccessTone();
     } catch (err) {
       setGenError(
         readableError(
@@ -81,6 +83,7 @@ export function ForceRotationModal({
           "Force draw failed — map PENDING bays first, then retry"
         )
       );
+      playErrorTone();
     } finally {
       setGenBusy(false);
     }

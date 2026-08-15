@@ -6,17 +6,22 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { AssociateScheduleModal } from "@/components/hub/AssociateScheduleModal";
 import { DepartmentAccessChips } from "@/components/hub/DepartmentAccessChips";
 import { DepartmentPicker } from "@/components/hub/DepartmentPicker";
 import { DepartmentIcon, HubIcon } from "@/components/hub/NavIcons";
 import { TextField } from "@/components/ui/NumberField";
 import { adminWorkingDepartmentLabel } from "@/lib/admin-department-context";
 import { redistributeCallOutBays } from "@/lib/store-ops/call-out";
-import { composeAccessibleDepartments } from "@/lib/department-access";
+import {
+  accessibleDepartments,
+  composeAccessibleDepartments,
+} from "@/lib/department-access";
 import {
   canGrantDepartmentAccess,
   canManageShiftBoard,
   canManageTeamRoster,
+  isMasterAdmin,
   suggestUsername,
 } from "@/lib/rbac";
 import {
@@ -28,10 +33,16 @@ import {
 import { updateDepartmentAccess } from "@/lib/store-ops/client";
 import {
   composeShiftBoard,
-  fetchShiftDays,
-  formatShiftPill,
+  fetchShiftDaysRange,
+  isScheduledShiftDay,
   localWorkDate,
+  retailWeekDates,
+  retailWeekStart,
+  RETAIL_WEEKDAY_SHORT,
   SHIFT_STATUS_EVENT,
+  shiftRowKey,
+  sliceShiftDaysForDate,
+  todayShiftCaption,
   upsertShiftDay,
   type AssociateShiftDay,
 } from "@/lib/store-ops/shift-status";
@@ -81,7 +92,9 @@ type DeptGroup = {
 
 export function RosterTab({ specialist, storeNumber }: WorkflowTabProps) {
   const [roster, setRoster] = useState<StoreSpecialist[]>([]);
-  const [days, setDays] = useState<Record<string, AssociateShiftDay>>({});
+  const [weekRows, setWeekRows] = useState<Record<string, AssociateShiftDay>>(
+    {}
+  );
   const [loading, setLoading] = useState(true);
   const [addOpen, setAddOpen] = useState(false);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -95,21 +108,22 @@ export function RosterTab({ specialist, storeNumber }: WorkflowTabProps) {
   const [callOutTarget, setCallOutTarget] = useState<StoreSpecialist | null>(
     null
   );
-  const [startDraft, setStartDraft] = useState("07:00");
-  const [endDraft, setEndDraft] = useState("15:30");
   const today = localWorkDate();
+  const weekStart = retailWeekStart(today);
+  const weekDates = useMemo(() => retailWeekDates(weekStart), [weekStart]);
   const canManage = canManageTeamRoster(specialist);
   const canGrant = canGrantDepartmentAccess(specialist);
   const canShift = canManageShiftBoard(specialist);
 
   const reload = useCallback(async () => {
+    const weekEnd = weekDates[6] ?? today;
     const [team, saved] = await Promise.all([
       fetchSpecialists(),
-      fetchShiftDays(today).catch(() => ({})),
+      fetchShiftDaysRange(weekStart, weekEnd).catch(() => ({})),
     ]);
     setRoster(dedupeRoster(team));
-    setDays(saved);
-  }, [today]);
+    setWeekRows(saved);
+  }, [today, weekDates, weekStart]);
 
   useEffect(() => {
     let cancelled = false;
@@ -118,8 +132,9 @@ export function RosterTab({ specialist, storeNumber }: WorkflowTabProps) {
       if (!cancelled) setLoading(false);
     });
     function onShift() {
-      void fetchShiftDays(today)
-        .then(setDays)
+      const weekEnd = weekDates[6] ?? today;
+      void fetchShiftDaysRange(weekStart, weekEnd)
+        .then(setWeekRows)
         .catch(() => undefined);
     }
     window.addEventListener(SHIFT_STATUS_EVENT, onShift);
@@ -127,7 +142,12 @@ export function RosterTab({ specialist, storeNumber }: WorkflowTabProps) {
       cancelled = true;
       window.removeEventListener(SHIFT_STATUS_EVENT, onShift);
     };
-  }, [reload, storeNumber, today]);
+  }, [reload, storeNumber, today, weekDates, weekStart]);
+
+  const days = useMemo(
+    () => sliceShiftDaysForDate(weekRows, today),
+    [weekRows, today]
+  );
 
   const board = useMemo(
     () => composeShiftBoard(roster, days, today),
@@ -139,7 +159,13 @@ export function RosterTab({ specialist, storeNumber }: WorkflowTabProps) {
   );
 
   const groups = useMemo((): DeptGroup[] => {
-    const active = roster.filter((m) => m.is_active !== false);
+    const granted = new Set<DepartmentScope>(accessibleDepartments(specialist));
+    const active = roster.filter((m) => {
+      if (m.is_active === false) return false;
+      if (isMasterAdmin(specialist)) return true;
+      const home = homeDepartment(m);
+      return home !== "all" && granted.has(home);
+    });
     const buckets = new Map<DepartmentScope, StoreSpecialist[]>();
     for (const member of active) {
       const home = homeDepartment(member);
@@ -183,7 +209,7 @@ export function RosterTab({ specialist, storeNumber }: WorkflowTabProps) {
           }).length,
         };
       });
-  }, [roster, dayById]);
+  }, [roster, dayById, specialist]);
 
   async function handleAccess(
     member: StoreSpecialist,
@@ -244,29 +270,6 @@ export function RosterTab({ specialist, storeNumber }: WorkflowTabProps) {
     }
   }
 
-  async function saveSchedule() {
-    if (!scheduleTarget) return;
-    setBusyId(scheduleTarget.id);
-    try {
-      const next = await upsertShiftDay({
-        specialist_id: String(scheduleTarget.id),
-        start_time: startDraft,
-        end_time: endDraft,
-        is_scheduled_today: true,
-        is_call_out: false,
-      });
-      setDays((curr) => ({ ...curr, [next.specialist_id]: next }));
-      toastSuccess(`Saved shift for ${scheduleTarget.name}`);
-      setScheduleTarget(null);
-    } catch (err) {
-      toastError(
-        err instanceof Error ? err.message : "Could not save schedule"
-      );
-    } finally {
-      setBusyId(null);
-    }
-  }
-
   async function markCallOut(absent: StoreSpecialist, nextCallOut: boolean) {
     if (!nextCallOut) {
       setBusyId(absent.id);
@@ -276,7 +279,10 @@ export function RosterTab({ specialist, storeNumber }: WorkflowTabProps) {
           is_call_out: false,
           is_scheduled_today: true,
         });
-        setDays((curr) => ({ ...curr, [next.specialist_id]: next }));
+        setWeekRows((curr) => ({
+          ...curr,
+          [shiftRowKey(next.specialist_id, next.work_date)]: next,
+        }));
         toastSuccess(`${absent.name} is on-duty`);
       } catch (err) {
         toastError(
@@ -302,7 +308,10 @@ export function RosterTab({ specialist, storeNumber }: WorkflowTabProps) {
         is_call_out: true,
         is_scheduled_today: true,
       });
-      setDays((curr) => ({ ...curr, [next.specialist_id]: next }));
+      setWeekRows((curr) => ({
+        ...curr,
+        [shiftRowKey(next.specialist_id, next.work_date)]: next,
+      }));
       const result = await redistributeCallOutBays({
         actor: specialist,
         absent,
@@ -366,7 +375,7 @@ export function RosterTab({ specialist, storeNumber }: WorkflowTabProps) {
       ) : (
         <ul className="space-y-2">
           {groups.map((group) => {
-            const open = openDepts[group.home] !== false;
+            const open = openDepts[group.home] === true;
             return (
               <li
                 key={group.home}
@@ -447,36 +456,68 @@ export function RosterTab({ specialist, storeNumber }: WorkflowTabProps) {
                           </div>
 
                           {member.role !== "MasterAdmin" ? (
-                            <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                              <span
-                                className={`inline-flex min-h-8 items-center rounded-full border px-2.5 font-mono text-[11px] font-bold tracking-tight ${
-                                  calledOut
-                                    ? "border-rose-500/40 bg-rose-950/40 text-rose-100"
-                                    : "border-zinc-700 bg-zinc-900 text-zinc-200"
-                                }`}
+                            <div className="mt-2 space-y-2">
+                              <div
+                                className="flex items-center justify-between gap-1"
+                                aria-label={`${member.name} weekly schedule`}
                               >
-                                {formatShiftPill(
-                                  day?.start_time,
-                                  day?.end_time
-                                )}
-                              </span>
-                              {canShift ? (
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setStartDraft(day?.start_time || "07:00");
-                                    setEndDraft(day?.end_time || "15:30");
-                                    setScheduleTarget(member);
-                                  }}
-                                  className="inline-flex min-h-8 items-center gap-1 rounded-full border border-zinc-700 px-2.5 text-[11px] font-bold"
+                                {weekDates.map((date, index) => {
+                                  const saved =
+                                    weekRows[
+                                      shiftRowKey(String(member.id), date)
+                                    ];
+                                  const on =
+                                    date === today
+                                      ? isScheduledShiftDay(saved ?? day)
+                                      : isScheduledShiftDay(saved);
+                                  return (
+                                    <span
+                                      key={date}
+                                      className="flex flex-1 flex-col items-center gap-1"
+                                    >
+                                      <span className="font-mono text-[9px] font-bold uppercase tracking-wide text-zinc-500">
+                                        {RETAIL_WEEKDAY_SHORT[index]}
+                                      </span>
+                                      <span
+                                        className={`h-2 w-2 rounded-full ${
+                                          on ? "bg-emerald-400" : "bg-zinc-600"
+                                        }`}
+                                        title={
+                                          on
+                                            ? `${RETAIL_WEEKDAY_SHORT[index]} scheduled`
+                                            : `${RETAIL_WEEKDAY_SHORT[index]} off`
+                                        }
+                                      />
+                                    </span>
+                                  );
+                                })}
+                              </div>
+                              <div className="flex flex-wrap items-center gap-1.5">
+                                <span
+                                  className={`inline-flex min-h-8 items-center rounded-full border px-2.5 font-mono text-[11px] font-bold tracking-tight ${
+                                    calledOut
+                                      ? "border-rose-500/40 bg-rose-950/40 text-rose-100"
+                                      : isScheduledShiftDay(day)
+                                        ? "border-emerald-500/35 bg-emerald-950/30 text-emerald-100"
+                                        : "border-zinc-700 bg-zinc-900 text-zinc-300"
+                                  }`}
                                 >
-                                  <HubIcon
-                                    id="calendar"
-                                    className="h-3.5 w-3.5"
-                                  />
-                                  Edit Schedule
-                                </button>
-                              ) : null}
+                                  {todayShiftCaption(day)}
+                                </span>
+                                {canShift ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => setScheduleTarget(member)}
+                                    className="inline-flex min-h-8 items-center gap-1 rounded-full border border-zinc-700 px-2.5 text-[11px] font-bold"
+                                  >
+                                    <HubIcon
+                                      id="calendar"
+                                      className="h-3.5 w-3.5"
+                                    />
+                                    Edit Schedule
+                                  </button>
+                                ) : null}
+                              </div>
                             </div>
                           ) : null}
 
@@ -583,61 +624,12 @@ export function RosterTab({ specialist, storeNumber }: WorkflowTabProps) {
       ) : null}
 
       {scheduleTarget ? (
-        <div className="glass-backdrop fixed inset-0 z-[80] flex flex-col justify-end">
-          <button
-            type="button"
-            className="absolute inset-0"
-            aria-label="Close schedule"
-            onClick={() => setScheduleTarget(null)}
-          />
-          <div
-            role="dialog"
-            aria-modal="true"
-            className="glass-card theme-modal relative z-10 w-full !rounded-t-2xl px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3"
-          >
-            <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-zinc-600" />
-            <h2 className="glass-title text-lg">
-              Edit schedule · {scheduleTarget.name}
-            </h2>
-            <div className="mt-4 grid grid-cols-2 gap-2">
-              <label className="block space-y-1.5">
-                <span className="text-sm font-medium text-zinc-200">Start</span>
-                <input
-                  type="time"
-                  value={startDraft}
-                  onChange={(e) => setStartDraft(e.target.value)}
-                  className="min-h-12 w-full rounded-xl border border-zinc-700 bg-zinc-900 px-3 font-mono tracking-tight text-zinc-100"
-                />
-              </label>
-              <label className="block space-y-1.5">
-                <span className="text-sm font-medium text-zinc-200">End</span>
-                <input
-                  type="time"
-                  value={endDraft}
-                  onChange={(e) => setEndDraft(e.target.value)}
-                  className="min-h-12 w-full rounded-xl border border-zinc-700 bg-zinc-900 px-3 font-mono tracking-tight text-zinc-100"
-                />
-              </label>
-            </div>
-            <div className="mt-4 grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => setScheduleTarget(null)}
-                className="flex min-h-12 items-center justify-center rounded-xl border border-zinc-700 text-sm font-semibold"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                disabled={busyId === scheduleTarget.id}
-                onClick={() => void saveSchedule()}
-                className="btn-primary-glow flex min-h-12 items-center justify-center rounded-xl text-sm font-bold disabled:opacity-40"
-              >
-                Save shift
-              </button>
-            </div>
-          </div>
-        </div>
+        <AssociateScheduleModal
+          member={scheduleTarget}
+          homeLabel={departmentHeading(homeDepartment(scheduleTarget))}
+          onClose={() => setScheduleTarget(null)}
+          onSaved={() => void reload()}
+        />
       ) : null}
 
       {callOutTarget ? (

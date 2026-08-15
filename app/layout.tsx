@@ -7,6 +7,7 @@ import { ConflictResolutionModal } from "@/components/offline/ConflictResolution
 import { Toaster } from "@/components/ui/Toaster";
 import { ThemeProvider } from "@/lib/theme-context";
 import { THEME_BOOT_SCRIPT } from "@/lib/theme";
+import { UserPreferencesHost } from "@/components/hub/UserPreferencesHost";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -75,6 +76,7 @@ export default function RootLayout({
         <ThemeProvider>
           <ServiceWorkerRegister />
           <HapticsListener />
+          <UserPreferencesHost />
           <OfflineNetworkBanner />
           <ConflictResolutionModal />
           <Toaster />

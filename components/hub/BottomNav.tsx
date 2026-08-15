@@ -29,7 +29,9 @@ export function BottomNav({
       aria-label="Primary workflow"
       className="theme-bottom-nav fixed bottom-0 left-0 right-0 z-30 mx-auto max-w-lg pb-safe backdrop-blur-md"
     >
-      <div className="grid grid-cols-4">
+      <div
+        className={`grid ${primaryLinks.length <= 2 ? "grid-cols-2" : "grid-cols-4"}`}
+      >
         {primaryLinks.map((link) => {
           const active = isNavHubPathActive(pathname, link.href, search);
           return (

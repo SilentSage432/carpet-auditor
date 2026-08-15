@@ -23,6 +23,7 @@ import {
   canAccessSection,
   effectiveDepartment,
   isGenericDepartment,
+  isSimplifiedAssociateView,
   sectionTitle,
 } from "@/lib/rbac";
 import {
@@ -44,6 +45,7 @@ import type {
 import type { AuthWallMode } from "@/components/auth/AuthWall";
 import { DeptSyncSplash } from "@/components/hub/DeptSyncSplash";
 import { shouldStayOnSpecialtyHub } from "@/lib/nav-hub";
+import { useDevSandbox } from "@/lib/use-dev-sandbox";
 
 function HubBootFallback() {
   return <DeptSyncSplash message="Loading DeptSync secure session…" />;
@@ -144,6 +146,8 @@ export default function DeptSyncHubPage() {
   const [visitedSections, setVisitedSections] = useState<Set<HubSection>>(
     () => new Set()
   );
+  const { viewSpecialist } = useDevSandbox(specialist);
+  const viewMember = viewSpecialist ?? specialist;
 
   const unlockWorkspace = useCallback((member: StoreSpecialist) => {
     setSpecialist(member);
@@ -403,7 +407,7 @@ export default function DeptSyncHubPage() {
       router.push("/settings");
       return;
     }
-    if (!canAccessSection(specialist, next)) return;
+    if (!canAccessSection(viewMember, next)) return;
     blurActiveInput();
     touchAuthSession();
     if (typeof window !== "undefined") {
@@ -422,7 +426,7 @@ export default function DeptSyncHubPage() {
     });
   }
 
-  const dept = effectiveDepartment(specialist);
+  const dept = effectiveDepartment(viewMember);
   const authenticated = gate === "ready" && specialist != null;
   const activeSection =
     section === "catalog" ? "appliances" : section;
@@ -489,8 +493,9 @@ export default function DeptSyncHubPage() {
   return (
     <div className="flex min-h-dvh flex-col">
       <NavigationHub
-        title={sectionTitle(activeSection, specialist)}
-        specialist={specialist}
+        title={sectionTitle(activeSection, viewMember)}
+        specialist={viewMember}
+        sandboxActor={specialist}
         onOpenSpecialist={() => setSpecialistOpen(true)}
         onChangePin={specialist ? () => setChangePinOpen(true) : undefined}
         onLogout={handleLogout}
@@ -531,13 +536,15 @@ export default function DeptSyncHubPage() {
       {authenticated ? (
         <>
           <div className="mx-auto w-full max-w-md flex-1 overflow-x-hidden px-3 py-2 pb-28">
-            <AssociateSpecialtySwitcher
-              active={activeSection}
-              onSelect={handleSectionSelect}
-              specialist={specialist}
-            />
+            {!isSimplifiedAssociateView(viewMember) ? (
+              <AssociateSpecialtySwitcher
+                active={activeSection}
+                onSelect={handleSectionSelect}
+                specialist={viewMember}
+              />
+            ) : null}
             {visitedSections.has("audit") &&
-              canAccessSection(specialist, "audit") && (
+              canAccessSection(viewMember, "audit") && (
                 <HubPane show={activeSection === "audit"}>
                   <CycleAuditSection
                     catalog={catalog}
@@ -552,7 +559,7 @@ export default function DeptSyncHubPage() {
                 </HubPane>
               )}
             {visitedSections.has("appliances") &&
-              canAccessSection(specialist, "appliances") && (
+              canAccessSection(viewMember, "appliances") && (
                 <HubPane show={activeSection === "appliances"}>
                   <ApplianceAuditSection
                     catalog={applianceCatalog}
@@ -564,7 +571,7 @@ export default function DeptSyncHubPage() {
                 </HubPane>
               )}
             {visitedSections.has("department") &&
-              canAccessSection(specialist, "department") &&
+              canAccessSection(viewMember, "department") &&
               isGenericDepartment(dept) && (
                 <HubPane show={activeSection === "department"}>
                   <DepartmentAuditSection

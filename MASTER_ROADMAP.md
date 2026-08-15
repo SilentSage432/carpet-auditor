@@ -119,6 +119,10 @@
 - [x] Call-out carry-over priority loop (`carried_over` prepend on Sunday draw + Floor/Sunday badge)
 - [x] Predictive Shift Copilot on Floor (`predictive-copilot.ts` + `PredictiveCopilotBanner`)
 - [x] Map velocity/priority seeding (Bulk Generator presets + EditBayDrawer hotspot/lock/decay → Sunday `custom_decay_days`)
+- [x] Map Visual Grid walk-only (no Department Overview, no batch checkboxes; CRUD stays in Manage)
+- [x] Roster weekly schedule matrix (`AssociateScheduleModal` + collapsed department accordions)
+- [x] Role-based hub views (`MASTER_ADMIN` / `DEPARTMENT_SUPERVISOR` / `ASSOCIATE_CSA`) + Master-only 3-tap developer sandbox
+- [x] Theme / preferences / audio-haptics engine (`lib/ui/feedback.ts` + `UserPreferencesDrawer` for all roles)
 
 ## Next
 - [x] Apply Phase 1 JWT/RLS migration in Supabase + enable Custom Access Token Hook

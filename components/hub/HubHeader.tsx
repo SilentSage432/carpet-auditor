@@ -6,11 +6,14 @@
  */
 
 import type { ReactNode, RefObject } from "react";
+import { useRef } from "react";
 import { AdminDepartmentSwitcher } from "@/components/hub/AdminDepartmentSwitcher";
 import { DeptSyncBadge } from "@/components/hub/DeptSyncBadge";
 import { HeaderNetworkStatus } from "@/components/hub/HeaderNetworkStatus";
 import { formatStoreLabel } from "@/lib/store";
 import type { StoreSpecialist } from "@/lib/types";
+
+const LOGO_TAP_WINDOW_MS = 800;
 
 type HubHeaderProps = {
   title: string;
@@ -24,6 +27,7 @@ type HubHeaderProps = {
   onToggleUser: () => void;
   userMenu: ReactNode;
   onPinnedNavigate?: (section: "audit" | "appliances" | "department") => void;
+  onLogoTripleTap?: () => void;
 };
 
 export function HubHeader({
@@ -38,11 +42,38 @@ export function HubHeader({
   onToggleUser,
   userMenu,
   onPinnedNavigate,
+  onLogoTripleTap,
 }: HubHeaderProps) {
+  const tapTimes = useRef<number[]>([]);
+
+  function handleLogoTap() {
+    if (!onLogoTripleTap) return;
+    const now = Date.now();
+    const next = [...tapTimes.current, now].filter(
+      (t) => now - t <= LOGO_TAP_WINDOW_MS
+    );
+    tapTimes.current = next;
+    if (next.length >= 3) {
+      tapTimes.current = [];
+      onLogoTripleTap();
+    }
+  }
+
   return (
-    <header className="glass-panel sticky top-0 z-40 border-b border-zinc-800/80 pt-safe shadow-lg shadow-black/30">
+    <header className="glass-panel border-b border-zinc-800/80 shadow-lg shadow-black/30">
       <div className="mx-auto flex min-h-12 max-w-lg items-center gap-1.5 px-2 py-1 sm:px-3">
-        <DeptSyncBadge size="sm" />
+        {onLogoTripleTap ? (
+          <button
+            type="button"
+            onClick={handleLogoTap}
+            className="shrink-0 rounded-lg focus-visible:ring-1 focus-visible:ring-accent/40"
+            aria-label="DeptSync"
+          >
+            <DeptSyncBadge size="sm" />
+          </button>
+        ) : (
+          <DeptSyncBadge size="sm" />
+        )}
 
         <div className="min-w-0 flex-1">
           <p className="truncate font-mono text-[10px] font-bold uppercase tracking-tight text-accent">

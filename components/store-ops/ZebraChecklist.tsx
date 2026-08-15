@@ -50,6 +50,7 @@ import {
   type WeeklyRotationWithLocation,
 } from "@/lib/store-ops/types";
 import type { CarpetAudit, StoreSpecialist } from "@/lib/types";
+import { playErrorTone, playSuccessTone } from "@/lib/ui/feedback";
 import { hapticPulse } from "@/utils/haptics";
 import { HubIcon } from "@/components/hub/NavIcons";
 
@@ -79,7 +80,9 @@ export function ZebraChecklist({
   const [error, setError] = useState<string | null>(null);
   const [doneOpen, setDoneOpen] = useState(false);
   const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
-  const [associateFilter, setAssociateFilter] = useState<AssociateFilter>("all");
+  const [associateFilter, setAssociateFilter] = useState<AssociateFilter>(
+    () => (isAssociate(specialist) ? "mine" : "all")
+  );
   const [queueFilter, setQueueFilter] = useState<QueueFilter>(
     lockedQueue ?? "all"
   );
@@ -101,6 +104,12 @@ export function ZebraChecklist({
   );
   const [audits, setAudits] = useState<CarpetAudit[]>(() => getLocalAudits());
   const [, startTransition] = useTransition();
+
+  const associateView = isAssociate(specialist);
+
+  useEffect(() => {
+    setAssociateFilter(isAssociate(specialist) ? "mine" : "all");
+  }, [specialist]);
 
   const loadAssignments = useCallback(async () => {
     if (!assignedWeek) {
@@ -310,6 +319,7 @@ export function ZebraChecklist({
       emitBayReadiness({ locationIds: [locationId], tone: "verified" });
     }
     hapticPulse("success");
+    playSuccessTone();
     startTransition(async () => {
       try {
         await completeRotation(specialist, rotationId);
@@ -322,6 +332,7 @@ export function ZebraChecklist({
         });
         setPulseId(null);
         setError(err instanceof Error ? err.message : "Could not complete bay");
+        playErrorTone();
         onRefresh();
       }
     });
@@ -353,6 +364,7 @@ export function ZebraChecklist({
         ],
       });
       hapticPulse("medium");
+      playErrorTone();
       setBarrierOverlay((prev) => {
         const next = new Set(prev);
         next.add(rotation.id);
@@ -385,6 +397,7 @@ export function ZebraChecklist({
       setDownstockNoteId(null);
       setDownstockNote("");
       hapticPulse("medium");
+      playSuccessTone();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not flag downstock");
     } finally {
@@ -406,6 +419,8 @@ export function ZebraChecklist({
         delete next[rotationId];
         return next;
       });
+      playSuccessTone();
+      hapticPulse("success");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not clear downstock");
     } finally {
@@ -475,7 +490,7 @@ export function ZebraChecklist({
         </div>
       ) : null}
 
-      {!compact ? <BayHealthScorecard card={bayHealth} /> : null}
+      {!compact && !associateView ? <BayHealthScorecard card={bayHealth} /> : null}
 
       {!lockedQueue ? (
       <div
@@ -520,7 +535,7 @@ export function ZebraChecklist({
         legend="Selling vs Topstock"
       />
 
-      {associateOptions.length > 0 ? (
+      {associateOptions.length > 0 && !associateView ? (
         <div className="flex gap-1.5 overflow-x-auto pb-0.5 no-scrollbar">
           {(
             [

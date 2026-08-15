@@ -1,21 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
 import { compareAisles } from "@/lib/store-ops/aisle";
 import { formatBayTag, type Department, type StoreLocation } from "@/lib/store-ops/types";
 import type { StoreSpecialist } from "@/lib/types";
-import {
-  deleteStoreLocations,
-  patchStoreLocation,
-} from "@/lib/store-ops/client";
+import { patchStoreLocation } from "@/lib/store-ops/client";
 import { toastError, toastSuccess } from "@/lib/toast";
-import {
-  findDuplicateLegacyBays,
-  pruneIdsFromDuplicateGroups,
-} from "@/lib/store-ops/locations";
 import { HubIcon } from "@/components/hub/NavIcons";
-import { AddBaySheet } from "@/components/admin/AddBaySheet";
 import { WalkTheFloorSheet } from "@/components/admin/WalkTheFloorSheet";
 import {
   BAY_READINESS_EVENT,
@@ -45,8 +36,9 @@ type Props = {
   assignedWeek?: string;
   weekRotationLocations?: Array<{ locationId: string; completed: boolean }>;
   barrierLocationIds?: string[];
-  /** Super Admin may edit/delete/toggle tags. Others get a read heatmap. */
+  /** Super Admin may pause Sell/Top faces. Map CRUD lives in AisleBayManager. */
   canMutate?: boolean;
+  onRequestManage?: () => void;
 };
 
 type BayPair = {
@@ -77,16 +69,6 @@ type SheetBay = {
 
 type MapViewMode = "standard" | "heatmap";
 
-function pairLocationIds(pair: BayPair): string[] {
-  return [pair.selling, pair.topstock]
-    .filter((loc): loc is StoreLocation => Boolean(loc))
-    .map((loc) => loc.id);
-}
-
-function bayRowKey(departmentId: string, aisle: string, bay: number): string {
-  return `${departmentId}:${aisle}:${bay}`;
-}
-
 function buildBayPairs(locs: StoreLocation[]): BayPair[] {
   const byBay = new Map<number, BayPair>();
   for (const loc of locs) {
@@ -101,19 +83,10 @@ function buildBayPairs(locs: StoreLocation[]): BayPair[] {
   return [...byBay.values()].sort((a, b) => a.bay - b.bay);
 }
 
-function formatWhen(iso: string | null | undefined): string {
-  if (!iso) return "Never";
-  const t = Date.parse(iso);
-  if (!Number.isFinite(t)) return "Unknown";
-  return new Date(t).toLocaleString(undefined, {
-    month: "short",
-    day: "numeric",
-    year: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-  });
-}
-
+/**
+ * Visual Grid — operational walk / heatmap. Batch select, prune, and bay
+ * CRUD stay on AisleBayManager.
+ */
 export function StoreLocationGrid({
   specialist,
   departments,
@@ -123,6 +96,7 @@ export function StoreLocationGrid({
   weekRotationLocations = [],
   barrierLocationIds = [],
   canMutate = true,
+  onRequestManage,
 }: Props) {
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -131,16 +105,6 @@ export function StoreLocationGrid({
   const [walkBay, setWalkBay] = useState<SheetBay | null>(null);
   const [mapMode, setMapMode] = useState<MapViewMode>("standard");
   const heatmap = mapMode === "heatmap";
-  const [pruneBusy, setPruneBusy] = useState(false);
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [confirmDeleteKey, setConfirmDeleteKey] = useState<string | null>(null);
-  const [menuKey, setMenuKey] = useState<string | null>(null);
-  const [batchConfirm, setBatchConfirm] = useState(false);
-  const [addBayOpen, setAddBayOpen] = useState(false);
-  const [addBayPrefill, setAddBayPrefill] = useState<{
-    departmentId: string;
-    aisle: string;
-  } | null>(null);
   const [verifiedOverlay, setVerifiedOverlay] = useState<Set<string>>(
     () => new Set()
   );
@@ -193,33 +157,6 @@ export function StoreLocationGrid({
   function velocityFor(loc: StoreLocation | null | undefined): VelocityHeatTone {
     return classifyVelocityHeat(loc);
   }
-
-  const duplicateGroups = useMemo(
-    () => findDuplicateLegacyBays(locations),
-    [locations]
-  );
-  const pruneIds = useMemo(
-    () => pruneIdsFromDuplicateGroups(duplicateGroups),
-    [duplicateGroups]
-  );
-
-  const selectedBayCount = useMemo(() => {
-    const keys = new Set<string>();
-    for (const loc of locations) {
-      if (selectedIds.has(loc.id)) {
-        keys.add(bayRowKey(loc.department_id, loc.aisle, loc.bay));
-      }
-    }
-    return keys.size;
-  }, [locations, selectedIds]);
-
-  useEffect(() => {
-    const live = new Set(locations.map((loc) => loc.id));
-    setSelectedIds((prev) => {
-      const next = new Set([...prev].filter((id) => live.has(id)));
-      return next.size === prev.size ? prev : next;
-    });
-  }, [locations]);
 
   const departmentGroups = useMemo((): DepartmentGroup[] => {
     const nameById = new Map(departments.map((d) => [d.id, d.name]));
@@ -306,136 +243,27 @@ export function StoreLocationGrid({
     }
   }
 
-  async function pruneDuplicates() {
-    if (pruneIds.length === 0) return;
-    setPruneBusy(true);
-    setError(null);
-    try {
-      await deleteStoreLocations(specialist, pruneIds);
-      toastSuccess(`Removed ${pruneIds.length} duplicate tag${pruneIds.length === 1 ? "" : "s"}`);
-      onChanged();
-    } catch (err) {
-      const msg =
-        err instanceof Error ? err.message : "Could not prune duplicates";
-      setError(msg);
-      toastError(msg);
-    } finally {
-      setPruneBusy(false);
-    }
-  }
-
-  function togglePairSelected(ids: string[]) {
-    if (ids.length === 0) return;
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      const allOn = ids.every((id) => next.has(id));
-      if (allOn) ids.forEach((id) => next.delete(id));
-      else ids.forEach((id) => next.add(id));
-      return next;
-    });
-    setBatchConfirm(false);
-  }
-
-  function setAisleSelected(locs: StoreLocation[], selected: boolean) {
-    setSelectedIds((prev) => {
-      const next = new Set(prev);
-      for (const loc of locs) {
-        if (selected) next.add(loc.id);
-        else next.delete(loc.id);
-      }
-      return next;
-    });
-    setBatchConfirm(false);
-  }
-
   function openWalkSheet(bay: SheetBay) {
     setWalkBay(bay);
-  }
-
-  async function deleteIds(ids: string[]) {
-    if (ids.length === 0) return;
-    setPendingId(ids[0] ?? null);
-    setError(null);
-    try {
-      await deleteStoreLocations(specialist, ids);
-      toastSuccess(
-        `Deleted ${ids.length} tag${ids.length === 1 ? "" : "s"} from the map`
-      );
-      setConfirmDeleteKey(null);
-      setBatchConfirm(false);
-      setSelectedIds((prev) => {
-        const next = new Set(prev);
-        ids.forEach((id) => next.delete(id));
-        return next;
-      });
-      if (walkBay) {
-        const openIds = pairLocationIds(walkBay.pair);
-        if (openIds.some((id) => ids.includes(id))) {
-          setWalkBay(null);
-        }
-      }
-      onChanged();
-    } catch (err) {
-      const msg =
-        err instanceof Error ? err.message : "Could not delete bays";
-      setError(msg);
-      toastError(msg);
-    } finally {
-      setPendingId(null);
-    }
-  }
-
-  async function deleteSelected() {
-    if (selectedIds.size === 0) return;
-    if (!batchConfirm) {
-      setBatchConfirm(true);
-      return;
-    }
-    await deleteIds([...selectedIds]);
   }
 
   if (locations.length === 0) {
     return (
       <section className="glass-card border-dashed p-6 text-center">
-        {canMutate ? (
-          <>
-            <p className="text-sm text-zinc-400">
-              No aisles mapped yet. Add a bay or bulk-generate an aisle.
-            </p>
-            <button
-              type="button"
-              onClick={() => {
-                setAddBayPrefill(null);
-                setAddBayOpen(true);
-              }}
-              className="btn-primary-glow mt-3 inline-flex min-h-11 items-center justify-center rounded-xl px-4 text-sm font-bold"
-            >
-              + Add Bay to Aisle
-            </button>
-            <Link
-              href="/settings#bulk-generate"
-              className="mt-2 inline-flex min-h-11 items-center justify-center rounded-xl border border-zinc-700 px-4 text-sm font-semibold text-zinc-200"
-            >
-              Bulk generate aisle
-            </Link>
-            {addBayOpen ? (
-              <AddBaySheet
-                specialist={specialist}
-                departments={departments}
-                prefill={addBayPrefill}
-                onClose={() => {
-                  setAddBayOpen(false);
-                  setAddBayPrefill(null);
-                }}
-                onChanged={onChanged}
-              />
-            ) : null}
-          </>
-        ) : (
-          <p className="text-sm text-zinc-400">
-            No aisles mapped yet. Ask your supervisor to set up the store map.
-          </p>
-        )}
+        <p className="text-sm text-zinc-400">
+          {canMutate
+            ? "No aisles mapped yet. Switch to Manage Aisles & Bays to add them."
+            : "No aisles mapped yet. Ask your supervisor to set up the store map."}
+        </p>
+        {canMutate && onRequestManage ? (
+          <button
+            type="button"
+            onClick={onRequestManage}
+            className="btn-primary-glow mt-3 inline-flex min-h-11 items-center justify-center rounded-xl px-4 text-sm font-bold"
+          >
+            Manage Aisles & Bays
+          </button>
+        ) : null}
       </section>
     );
   }
@@ -479,20 +307,8 @@ export function StoreLocationGrid({
         <p className="mt-2 text-sm text-zinc-400">
           {heatmap
             ? "IRP cadence by last_serviced_at. Green/cyan ≤7 days, amber 8–18, gray/orange >18 or never. Pulse red/purple = high or critical hotspot. Tap a bay to log a 2-second walk."
-            : `Expand a department, then an aisle. Green verified this week, yellow scheduled, red stale (>7d) or barrier. Tap a bay to walk or edit${canMutate ? "." : "."}`}
+            : "Expand a department, then an aisle. Green verified this week, yellow scheduled, red stale (>7d) or barrier. Tap a bay to walk or audit."}
         </p>
-        {canMutate ? (
-          <button
-            type="button"
-            onClick={() => {
-              setAddBayPrefill(null);
-              setAddBayOpen(true);
-            }}
-            className="btn-primary-glow mt-3 flex min-h-11 w-full items-center justify-center rounded-xl px-4 text-sm font-bold"
-          >
-            + Add Bay to Aisle
-          </button>
-        ) : null}
         {!heatmap ? (
           <div className="mt-2 flex flex-wrap gap-2">
             {(
@@ -515,77 +331,6 @@ export function StoreLocationGrid({
           </div>
         ) : null}
       </div>
-
-      {canMutate && duplicateGroups.length > 0 ? (
-        <div className="rounded-xl border border-amber-500/40 bg-amber-950/25 px-3 py-3">
-          <p className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-amber-300">
-            Map prune · duplicate legacy bays
-          </p>
-          <p className="mt-1 text-sm text-amber-100/90">
-            {duplicateGroups.length} duplicate group
-            {duplicateGroups.length === 1 ? "" : "s"} · {pruneIds.length} extra
-            tag{pruneIds.length === 1 ? "" : "s"} to delete. Canonical tags
-            stay on the map. Weekly rotations for pruned tags are removed.
-          </p>
-          <ul className="mt-2 max-h-32 space-y-1 overflow-y-auto text-[11px] text-amber-100/80">
-            {duplicateGroups.slice(0, 8).map((group) => (
-              <li key={group.key}>
-                Aisle {group.aisle} Bay {group.bay} [{group.type}] · keep 1,
-                prune {group.prune.length}
-              </li>
-            ))}
-          </ul>
-          <button
-            type="button"
-            disabled={pruneBusy}
-            onClick={() => void pruneDuplicates()}
-            className="mt-3 flex min-h-11 w-full items-center justify-center rounded-xl border border-amber-400/45 bg-amber-950/40 px-3 text-sm font-bold text-amber-50 disabled:opacity-40"
-          >
-            {pruneBusy ? "Deleting…" : "Delete duplicate tags"}
-          </button>
-        </div>
-      ) : null}
-
-      {canMutate && selectedIds.size > 0 ? (
-        <div className="rounded-xl border border-rose-500/40 bg-rose-950/25 px-3 py-3">
-          <p className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-rose-300">
-            Batch clean-up
-          </p>
-          <p className="mt-1 text-sm text-rose-100/90">
-            {selectedBayCount} bay{selectedBayCount === 1 ? "" : "s"} ·{" "}
-            {selectedIds.size} tag{selectedIds.size === 1 ? "" : "s"} selected.
-            Deletion also removes weekly rotations for those bays.
-          </p>
-          <div className="mt-3 flex flex-wrap gap-2">
-            <button
-              type="button"
-              disabled={Boolean(pendingId)}
-              onClick={() => void deleteSelected()}
-              className={`flex min-h-11 flex-1 items-center justify-center rounded-xl border px-3 text-sm font-bold disabled:opacity-40 ${
-                batchConfirm
-                  ? "border-rose-400 bg-rose-600 text-white"
-                  : "border-rose-400/45 bg-rose-950/40 text-rose-50"
-              }`}
-            >
-              {pendingId
-                ? "Deleting…"
-                : batchConfirm
-                  ? `Confirm delete ${selectedIds.size} tags`
-                  : `Delete Selected (${selectedBayCount}) Bays`}
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setSelectedIds(new Set());
-                setBatchConfirm(false);
-              }}
-              className="flex min-h-11 items-center justify-center rounded-xl border border-zinc-700 px-3 text-sm font-semibold text-zinc-200"
-            >
-              Clear
-            </button>
-          </div>
-        </div>
-      ) : null}
 
       {error ? (
         <p className="text-sm font-medium text-red-300" role="alert">
@@ -644,85 +389,35 @@ export function StoreLocationGrid({
                     ? velocityHeatLabel(aisleTone as VelocityHeatTone)
                     : mapReadinessLabel(aisleTone as MapReadinessTone);
                   return (
-                      <div
-                        key={aisleKey}
-                        className="overflow-hidden rounded-xl border border-zinc-800/80 bg-zinc-950/50"
+                    <div
+                      key={aisleKey}
+                      className="overflow-hidden rounded-xl border border-zinc-800/80 bg-zinc-950/50"
+                    >
+                      <button
+                        type="button"
+                        aria-expanded={aisleOpen}
+                        onClick={() => toggleAisle(aisleKey)}
+                        className="flex min-h-[44px] w-full items-center justify-between gap-3 px-3 py-2 text-left"
                       >
-                        <div className="flex items-center gap-1 pr-2">
-                          {canMutate ? (
-                          <label className="flex min-h-[44px] min-w-[44px] items-center justify-center">
-                            <input
-                              type="checkbox"
-                              checked={
-                                aisle.locations.length > 0 &&
-                                aisle.locations.every((loc) =>
-                                  selectedIds.has(loc.id)
-                                )
-                              }
-                              onChange={(e) =>
-                                setAisleSelected(
-                                  aisle.locations,
-                                  e.target.checked
-                                )
-                              }
-                              aria-label={`Select all bays in aisle ${aisle.aisle}`}
-                              className="h-5 w-5"
-                              style={{ accentColor: "var(--accent)" }}
-                            />
-                          </label>
-                          ) : null}
-                          <button
-                            type="button"
-                            aria-expanded={aisleOpen}
-                            onClick={() => toggleAisle(aisleKey)}
-                            className="flex min-h-[44px] min-w-0 flex-1 items-center justify-between gap-3 py-2 text-left"
-                          >
-                            <p className="flex items-center gap-2 font-mono text-sm font-semibold tracking-tight tabular-nums text-zinc-100">
-                              <span
-                                className={`inline-block h-2.5 w-2.5 shrink-0 rounded-full ${aisleDotClass}`}
-                                title={aisleDotLabel}
-                              />
-                              Aisle {aisle.aisle}
-                              <span className="ml-1 text-xs font-medium text-zinc-400">
-                                · {bayCount} bay{bayCount === 1 ? "" : "s"}
-                              </span>
-                            </p>
-                            <HubIcon
-                              id={aisleOpen ? "chevronUp" : "chevronDown"}
-                              className="h-4 w-4 text-zinc-400"
-                            />
-                          </button>
-                          {canMutate ? (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                setAddBayPrefill({
-                                  departmentId: dept.departmentId,
-                                  aisle: aisle.aisle,
-                                });
-                                setAddBayOpen(true);
-                              }}
-                              className="shrink-0 px-2 font-mono text-[10px] font-bold uppercase tracking-wide text-accent"
-                              aria-label={`Add bay to aisle ${aisle.aisle}`}
-                            >
-                              + Bay
-                            </button>
-                          ) : null}
-                        </div>
+                        <p className="flex items-center gap-2 font-mono text-sm font-semibold tracking-tight tabular-nums text-zinc-100">
+                          <span
+                            className={`inline-block h-2.5 w-2.5 shrink-0 rounded-full ${aisleDotClass}`}
+                            title={aisleDotLabel}
+                          />
+                          Aisle {aisle.aisle}
+                          <span className="ml-1 text-xs font-medium text-zinc-400">
+                            · {bayCount} bay{bayCount === 1 ? "" : "s"}
+                          </span>
+                        </p>
+                        <HubIcon
+                          id={aisleOpen ? "chevronUp" : "chevronDown"}
+                          className="h-4 w-4 text-zinc-400"
+                        />
+                      </button>
 
                       {aisleOpen ? (
                         <ul className="divide-y divide-zinc-800/80 border-t border-zinc-800/80">
                           {aisle.bays.map((pair) => {
-                            const ids = pairLocationIds(pair);
-                            const rowKey = bayRowKey(
-                              dept.departmentId,
-                              aisle.aisle,
-                              pair.bay
-                            );
-                            const pairSelected =
-                              ids.length > 0 &&
-                              ids.every((id) => selectedIds.has(id));
-                            const confirming = confirmDeleteKey === rowKey;
                             const pairTone = worstMapReadiness(
                               [pair.selling, pair.topstock].map((loc) =>
                                 readinessFor(loc)
@@ -752,19 +447,6 @@ export function StoreLocationGrid({
                                   heatmap ? velocityHeatRowClass(pairHeat) : ""
                                 }`}
                               >
-                                {canMutate ? (
-                                <label className="flex h-11 w-11 shrink-0 items-center justify-center">
-                                  <input
-                                    type="checkbox"
-                                    checked={pairSelected}
-                                    disabled={ids.length === 0}
-                                    onChange={() => togglePairSelected(ids)}
-                                    aria-label={`Select aisle ${aisle.aisle} bay ${pair.bay}`}
-                                    className="h-5 w-5"
-                                    style={{ accentColor: "var(--accent)" }}
-                                  />
-                                </label>
-                                ) : null}
                                 <button
                                   type="button"
                                   onClick={() => openWalkSheet(sheetPayload)}
@@ -799,33 +481,6 @@ export function StoreLocationGrid({
                                   canMutate={canMutate}
                                   onToggle={toggleActive}
                                 />
-                                {canMutate ? (
-                                  <BayRowMenu
-                                    rowKey={rowKey}
-                                    open={menuKey === rowKey}
-                                    confirming={confirming}
-                                    disabled={ids.length === 0 || Boolean(pendingId)}
-                                    onToggle={() => {
-                                      setMenuKey((key) =>
-                                        key === rowKey ? null : rowKey
-                                      );
-                                      setConfirmDeleteKey(null);
-                                    }}
-                                    onClose={() => setMenuKey(null)}
-                                    onEdit={() => {
-                                      setMenuKey(null);
-                                      openWalkSheet(sheetPayload);
-                                    }}
-                                    onDelete={() => {
-                                      if (!confirming) {
-                                        setConfirmDeleteKey(rowKey);
-                                        return;
-                                      }
-                                      setMenuKey(null);
-                                      void deleteIds(ids);
-                                    }}
-                                  />
-                                ) : null}
                               </li>
                             );
                           })}
@@ -868,19 +523,6 @@ export function StoreLocationGrid({
           onClose={() => setWalkBay(null)}
           onChanged={onChanged}
           onError={setError}
-        />
-      ) : null}
-
-      {addBayOpen && canMutate ? (
-        <AddBaySheet
-          specialist={specialist}
-          departments={departments}
-          prefill={addBayPrefill}
-          onClose={() => {
-            setAddBayOpen(false);
-            setAddBayPrefill(null);
-          }}
-          onChanged={onChanged}
         />
       ) : null}
     </section>
@@ -998,81 +640,5 @@ function TypePill({
     >
       {label}
     </button>
-  );
-}
-
-function BayRowMenu({
-  rowKey,
-  open,
-  confirming,
-  disabled,
-  onToggle,
-  onClose,
-  onEdit,
-  onDelete,
-}: {
-  rowKey: string;
-  open: boolean;
-  confirming: boolean;
-  disabled: boolean;
-  onToggle: () => void;
-  onClose: () => void;
-  onEdit: () => void;
-  onDelete: () => void;
-}) {
-  const wrapRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    function onDocClick(e: MouseEvent) {
-      if (!wrapRef.current?.contains(e.target as Node)) onClose();
-    }
-    document.addEventListener("mousedown", onDocClick);
-    return () => document.removeEventListener("mousedown", onDocClick);
-  }, [open, onClose]);
-
-  return (
-    <div className="relative shrink-0" ref={wrapRef}>
-      <button
-        type="button"
-        disabled={disabled}
-        onClick={onToggle}
-        aria-expanded={open}
-        aria-haspopup="menu"
-        aria-label={`Bay actions ${rowKey}`}
-        className="flex h-11 w-11 items-center justify-center rounded-xl text-zinc-300 transition active:scale-95 disabled:opacity-40"
-      >
-        <HubIcon id="moreVertical" className="h-5 w-5" />
-      </button>
-      {open ? (
-        <div
-          role="menu"
-          className="glass-card absolute right-0 top-[calc(100%+0.25rem)] z-20 w-44 overflow-hidden p-1"
-        >
-          <button
-            type="button"
-            role="menuitem"
-            onClick={onEdit}
-            className="flex min-h-11 w-full items-center gap-2 rounded-xl px-3 text-sm font-semibold text-zinc-100 hover:bg-zinc-800/70"
-          >
-            <HubIcon id="edit" className="h-4 w-4" />
-            Edit
-          </button>
-          <button
-            type="button"
-            role="menuitem"
-            onClick={onDelete}
-            className={`flex min-h-11 w-full items-center gap-2 rounded-xl px-3 text-sm font-semibold ${
-              confirming
-                ? "bg-rose-600 text-white"
-                : "text-rose-200 hover:bg-rose-950/50"
-            }`}
-          >
-            <HubIcon id="trash" className="h-4 w-4" />
-            {confirming ? "Confirm delete" : "Delete"}
-          </button>
-        </div>
-      ) : null}
-    </div>
   );
 }

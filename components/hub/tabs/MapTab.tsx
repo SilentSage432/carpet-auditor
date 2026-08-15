@@ -1,12 +1,17 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import dynamic from "next/dynamic";
 import Link from "next/link";
 import { StoreLocationGrid } from "@/components/admin/StoreLocationGrid";
 import { AisleBayManager } from "@/components/admin/AisleBayManager";
-import { HubIcon, DepartmentIcon } from "@/components/hub/NavIcons";
-import { isMasterAdmin } from "@/lib/rbac";
+import { HubIcon } from "@/components/hub/NavIcons";
+import {
+  canManageMapConsole,
+  canMutateStoreMap,
+  isMasterAdmin,
+  isSimplifiedAssociateView,
+} from "@/lib/rbac";
 import {
   ADMIN_DEPT_CONTEXT_EVENT,
   adminWorkingDepartmentLabel,
@@ -19,17 +24,12 @@ import {
   fetchStoreLocationsDetailed,
   fetchThisWeekRotations,
   invalidateStoreOpsListCaches,
-  updateDepartmentActive,
 } from "@/lib/store-ops/client";
 import {
   isStoreOpsAuthFailureMessage,
   STORE_OPS_AUTH_HINT,
 } from "@/lib/store-ops/auth-soft";
 import { readableError, isExistingDepartmentConflict } from "@/lib/store-ops/errors";
-import {
-  hubScopeFromDeptCode,
-  storeOpsDepartmentSortIndex,
-} from "@/lib/store-ops/department-codes";
 import type { Department, StoreLocation } from "@/lib/store-ops/types";
 import { isoWeekLabel } from "@/lib/store-ops/week";
 import type { WorkflowTabProps } from "@/components/hub/tabs/tab-props";
@@ -48,8 +48,6 @@ export function MapTab({ specialist }: WorkflowTabProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [authRequired, setAuthRequired] = useState(false);
-  const [isOverviewOpen, setIsOverviewOpen] = useState(false);
-  const [toggleBusyId, setToggleBusyId] = useState<string | null>(null);
   const [bayScanOpen, setBayScanOpen] = useState(false);
   const [mapSurface, setMapSurface] = useState<"visual" | "manage">("visual");
   const [weekRotationLocations, setWeekRotationLocations] = useState<
@@ -59,6 +57,9 @@ export function MapTab({ specialist }: WorkflowTabProps) {
   const [contextTick, setContextTick] = useState(0);
   const currentWeek = isoWeekLabel();
   const master = isMasterAdmin(specialist);
+  const mapConsole = canManageMapConsole(specialist);
+  const mutateMap = canMutateStoreMap(specialist);
+  const locatorOnly = isSimplifiedAssociateView(specialist);
   const contextLabel = (() => {
     const scope = workingDepartment(specialist);
     if (scope === "all") return "Full Store";
@@ -153,59 +154,17 @@ export function MapTab({ specialist }: WorkflowTabProps) {
     return () => window.removeEventListener(ADMIN_DEPT_CONTEXT_EVENT, onCtx);
   }, []);
 
-  const departmentOverview = useMemo(() => {
-    return [...departments]
-      .sort(
-        (a, b) =>
-          storeOpsDepartmentSortIndex(a.code) -
-          storeOpsDepartmentSortIndex(b.code)
-      )
-      .map((dept) => {
-        const rows = locations.filter((l) => l.department_id === dept.id);
-        const active = rows.filter((l) => l.is_active).length;
-        const pending = rows.filter(
-          (l) => l.is_active && l.status === "PENDING"
-        ).length;
-        const assigned = rows.filter(
-          (l) => l.is_active && l.status === "ASSIGNED"
-        ).length;
-        const aisles = new Set(rows.map((l) => l.aisle)).size;
-        return {
-          id: dept.id,
-          name: dept.name,
-          code: dept.code,
-          hubScope: hubScopeFromDeptCode(dept.code),
-          isActive: dept.is_active !== false,
-          total: rows.length,
-          active,
-          pending,
-          assigned,
-          aisles,
-          weeklyTarget: dept.weekly_bay_target ?? (dept.code === "D29" ? 6 : 10),
-        };
-      });
-  }, [departments, locations]);
-
-  async function toggleDepartment(deptId: string, next: boolean) {
-    setToggleBusyId(deptId);
-    setError(null);
-    try {
-      const updated = await updateDepartmentActive(specialist, deptId, next);
-      setDepartments((prev) =>
-        prev.map((d) => (d.id === updated.id ? updated : d))
-      );
-    } catch (err) {
-      setError(readableError(err, "Could not update department toggle"));
-    } finally {
-      setToggleBusyId(null);
-    }
-  }
+  useEffect(() => {
+    if (!mapConsole) setMapSurface("visual");
+  }, [mapConsole]);
 
   return (
     <>
       <main className="hub-main">
         <p className="mb-2 font-mono text-[11px] text-zinc-400">
-          {master ? (
+          {locatorOnly ? (
+            <>Bay locator · week {currentWeek}</>
+          ) : master ? (
             <>
               Week {currentWeek}
               {" · "}
@@ -221,6 +180,7 @@ export function MapTab({ specialist }: WorkflowTabProps) {
           )}
         </p>
 
+        {mapConsole ? (
         <div
           className="mb-3 inline-flex h-11 w-full items-center rounded-full border border-zinc-700/80 bg-zinc-950/70 p-0.5"
           role="group"
@@ -251,8 +211,9 @@ export function MapTab({ specialist }: WorkflowTabProps) {
             Manage Aisles & Bays
           </button>
         </div>
+        ) : null}
 
-        {mapSurface === "visual" ? (
+        {mapSurface === "visual" && !locatorOnly ? (
           <button
             type="button"
             onClick={() => setBayScanOpen(true)}
@@ -294,130 +255,14 @@ export function MapTab({ specialist }: WorkflowTabProps) {
         ) : null}
 
         <div className="space-y-3">
-          <section className="glass-card overflow-hidden !p-0">
-            <button
-              type="button"
-              aria-expanded={isOverviewOpen}
-              onClick={() => setIsOverviewOpen((open) => !open)}
-              className="flex min-h-11 w-full items-center justify-between gap-3 px-3 py-2 text-left"
-            >
-              <div className="min-w-0 flex-1">
-                <p className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-emerald-400">
-                  Department Overview
-                </p>
-                {!isOverviewOpen ? (
-                  <p className="mt-1">
-                    <span className="inline-flex rounded-lg border border-zinc-700/80 bg-zinc-950/70 px-2 py-1 font-mono text-[11px] font-semibold text-zinc-200">
-                      {loading
-                        ? "Loading…"
-                        : `${departmentOverview.length} Department${
-                            departmentOverview.length === 1 ? "" : "s"
-                          } Registered`}
-                    </span>
-                  </p>
-                ) : (
-                  <p className="mt-0.5 text-sm text-zinc-400">
-                    High-level map status by department
-                  </p>
-                )}
-              </div>
-              <HubIcon
-                id={isOverviewOpen ? "chevronUp" : "chevronDown"}
-                className="h-4 w-4 shrink-0 text-zinc-300"
-              />
-            </button>
-            {isOverviewOpen ? (
-              <div className="border-t border-zinc-800/80 px-3 pb-3 pt-2">
-                {loading ? (
-                  <p className="text-sm text-zinc-400">Loading departments…</p>
-                ) : departmentOverview.length === 0 ? (
-                  <p className="rounded-2xl border border-dashed border-zinc-700 px-4 py-4 text-center text-sm text-zinc-400">
-                    {master
-                      ? "No departments yet. Open Settings → Bulk Generator after you add departments."
-                      : "No departments on this map yet. Ask your supervisor to set them up."}
-                  </p>
-                ) : (
-                  <ul className="space-y-2">
-                    {departmentOverview.map((row) => (
-                      <li
-                        key={row.id}
-                        className={`rounded-xl border px-3 py-2 ${
-                          row.isActive
-                            ? "border-zinc-700/80 bg-zinc-900/70"
-                            : "border-zinc-800 bg-zinc-950/50 opacity-75"
-                        }`}
-                      >
-                        <div className="flex items-center justify-between gap-3">
-                          <div className="flex min-w-0 flex-1 items-center gap-2">
-                            <DepartmentIcon
-                              department={row.hubScope ?? "flooring"}
-                              className="h-4 w-4 shrink-0 text-accent"
-                            />
-                            <div className="min-w-0 flex-1">
-                              <p className="truncate font-semibold text-white">
-                                {row.name}
-                              </p>
-                              <p className="truncate font-mono text-[11px] text-zinc-400">
-                                {row.code} · target {row.weeklyTarget}/week ·{" "}
-                                {row.isActive ? "cron on" : "paused"}
-                              </p>
-                            </div>
-                          </div>
-                          <div className="flex shrink-0 items-center gap-2">
-                            <span className="glass-pill-cyan !rounded-lg px-2 py-1 font-mono text-[10px] !normal-case tracking-normal">
-                              {row.aisles} aisle{row.aisles === 1 ? "" : "s"}
-                            </span>
-                            {master ? (
-                              <button
-                                type="button"
-                                role="switch"
-                                aria-checked={row.isActive}
-                                aria-label={`${row.name} master toggle`}
-                                disabled={toggleBusyId === row.id}
-                                onClick={() =>
-                                  void toggleDepartment(row.id, !row.isActive)
-                                }
-                                className="flex min-h-11 min-w-11 items-center justify-center"
-                              >
-                                <span
-                                  className={`relative h-7 w-12 shrink-0 rounded-full transition ${
-                                    row.isActive
-                                      ? "bg-emerald-500"
-                                      : "bg-zinc-600"
-                                  } ${toggleBusyId === row.id ? "opacity-60" : ""}`}
-                                >
-                                  <span
-                                    className={`absolute top-0.5 h-6 w-6 rounded-full bg-white transition ${
-                                      row.isActive
-                                        ? "left-[1.35rem]"
-                                        : "left-0.5"
-                                    }`}
-                                  />
-                                </span>
-                              </button>
-                            ) : null}
-                          </div>
-                        </div>
-                        <p className="mt-1.5 text-sm text-zinc-300">
-                          {row.total} tags · {row.active} active · {row.pending}{" "}
-                          pending · {row.assigned} assigned
-                        </p>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </div>
-            ) : null}
-          </section>
-
           {loading ? (
             <p className="text-sm text-zinc-400">Loading locations…</p>
-          ) : mapSurface === "manage" ? (
+          ) : mapSurface === "manage" && mapConsole ? (
             <AisleBayManager
               specialist={specialist}
               departments={departments}
               locations={locations}
-              canMutate={master}
+              canMutate={mutateMap}
               contextLabel={contextLabel}
               onChanged={() => void reload(specialist)}
             />
@@ -429,8 +274,11 @@ export function MapTab({ specialist }: WorkflowTabProps) {
               assignedWeek={currentWeek}
               weekRotationLocations={weekRotationLocations}
               barrierLocationIds={barrierLocationIds}
-              canMutate={master}
+              canMutate={mutateMap}
               onChanged={() => void reload(specialist)}
+              onRequestManage={
+                mapConsole ? () => setMapSurface("manage") : undefined
+              }
             />
           )}
         </div>

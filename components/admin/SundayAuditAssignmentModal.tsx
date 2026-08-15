@@ -12,6 +12,7 @@ import {
   generateRotations,
 } from "@/lib/store-ops/client";
 import { readableError } from "@/lib/store-ops/errors";
+import { playErrorTone, playSuccessTone, playTapTone } from "@/lib/ui/feedback";
 import { diagnoseBayHealth } from "@/lib/store-ops/bay-health";
 import { CarryOverPriorityBadge } from "@/components/store-ops/CarryOverPriorityBadge";
 import {
@@ -212,10 +213,12 @@ export function SundayAuditAssignmentModal({
       );
       try {
         await clearSundayBayAssignment(week, rotationId);
+        playTapTone();
         onChanged?.();
       } catch (err) {
         setBays(previous);
         setError(readableError(err, "Could not clear assignment"));
+        playErrorTone();
       }
       return;
     }
@@ -236,10 +239,12 @@ export function SundayAuditAssignmentModal({
     );
     try {
       await setSundayBayAssignment(week, rotationId, assignment);
+      playTapTone();
       onChanged?.();
     } catch (err) {
       setBays(previous);
       setError(readableError(err, "Could not save assignment"));
+      playErrorTone();
     }
   }
 
@@ -255,8 +260,10 @@ export function SundayAuditAssignmentModal({
       );
       await reload();
       onChanged?.();
+      playSuccessTone();
     } catch (err) {
       setError(readableError(err, "Could not auto-assign bays"));
+      playErrorTone();
     } finally {
       setBusy(false);
     }
@@ -286,8 +293,10 @@ export function SundayAuditAssignmentModal({
       );
       await reload();
       onChanged?.();
+      playSuccessTone();
     } catch (err) {
       setError(readableError(err, "Could not apply shift balance"));
+      playErrorTone();
     } finally {
       setBusy(false);
     }
@@ -310,8 +319,10 @@ export function SundayAuditAssignmentModal({
       );
       await reload();
       onChanged?.();
+      playSuccessTone();
     } catch (err) {
       setError(readableError(err, "Could not stage Sunday Flooring rotation"));
+      playErrorTone();
     } finally {
       setBusy(false);
     }

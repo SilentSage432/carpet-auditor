@@ -1,5 +1,36 @@
 # DeptSync Hub — Development Journal
 
+## 2026-08-15 — Theme, preferences, audio & haptics engine
+
+### Shipped
+- **Feedback** (`lib/ui/feedback.ts`) — Web Audio `playSuccessTone` / `playErrorTone` / `playTapTone` (no assets) and `hapticLight` / `hapticSuccess` / `hapticWarning`. Gated by `soundEnabled` / `hapticsEnabled`. `utils/haptics.ts` and `lib/scan-feedback.ts` compose this owner.
+- **Prefs** — same `deptsync_theme_prefs` catalog (`lib/theme.ts`): Cyber-Dark, Midnight Sapphire, Industrial Emerald, Solar Daylight, plus high contrast, comfortable/compact density, sound, haptics. React mirror: `lib/ui/preferences-context.tsx`.
+- **Drawer** — `UserPreferencesDrawer` for every role from header **🎨 Appearance & Preferences** and Settings. CSAs get handheld controls without store Settings. Test Tap / Success / Alert buttons.
+- Wired on bay complete, packdown walk log, barcode hit/mismatch, tab taps (`HapticsListener`), Sunday draw / assign, force draw, and sync conflicts.
+
+## 2026-08-15 — Role-based views + 3-tap developer sandbox
+
+### Shipped
+- **Hub view roles** — `lib/rbac.ts` maps platform roles to `MASTER_ADMIN` / `DEPARTMENT_SUPERVISOR` / `ASSOCIATE_CSA`. Associates get My Shift + Store Map only. DS keeps Floor/Map/Roster/Settings, department-scoped roster, shift schedules, and Map Manage (bay priorities). Master keeps full chrome and admin tools.
+- **Associate Floor** — Shift Briefing + locked “mine” Zebra queue (packdown/downstock). Sunday staging, scan chips, Copilot, health, showroom, verify, and exception feed stay hidden.
+- **Associate Map** — read-only Visual Grid locator. Manage Aisles & Bays and Snap Bay chrome are hidden. Walk-the-floor tap remains.
+- **Developer sandbox** — Master Admin 3-taps the DeptSync logo within 800ms → `DevSandboxDrawer`. Preview As Role + Simulate Department overlays chrome via `sessionStorage` (`lib/dev-sandbox.ts`); JWT and roster credentials are unchanged. Amber banner: “⚡ Simulating: [Role] — Tap to Exit”.
+
+## 2026-08-15 — Roster weekly schedule matrix
+
+### Shipped
+- **Collapsed departments** — Roster accordions start closed; tap to expand a home department.
+- **Weekly calendar** — `AssociateScheduleModal` replaces the time-only sheet: associate + home dept + active week (Sun–Sat), cyan day toggles, Open/Mid/Close presets, per-day start/end. Saves `associate_shift_days` (`specialist_id`, `work_date`, `start_time`, `end_time`, `is_scheduled_today`) via `upsertShiftWeek`; localStorage fallback if the table is missing.
+- **Card summary** — S M T W T F S dots (green scheduled / gray off), `Today: 07:00 - 15:30` or `Today: Off`, Edit Schedule.
+
+## 2026-08-15 — Map Visual Grid walk-only
+
+### Shipped
+- **Map tab** — Removed Department Overview accordion (department cron toggles stay in Settings `DepartmentTargetsMatrix`).
+- **Visual Grid** (`StoreLocationGrid`) — No aisle/bay checkboxes, batch delete, Add Bay, prune, or row Edit/Delete. Cadence dots, bay tags, Sell/Top, tap-to-walk remain. Empty map points to Manage.
+- **Walk sheet** — Walk + Snap Bay + pin only. Aisle/bay/department/delete lives in `EditBayDrawer` on Manage.
+- **Manage Aisles & Bays** — Owns multi-select, batch delete, duplicate prune, Add Bay, Bulk Generator, and full bay edit.
+
 ## 2026-08-15 — Velocity tier & priority seeding on Map tools
 
 ### Shipped

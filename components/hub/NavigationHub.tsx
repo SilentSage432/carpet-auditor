@@ -6,6 +6,8 @@
 
 import { startTransition, useEffect, useId, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
+import { DevSandboxBanner } from "@/components/hub/DevSandboxBanner";
+import { DevSandboxDrawer } from "@/components/hub/DevSandboxDrawer";
 import { HeaderNetworkStatus } from "@/components/hub/HeaderNetworkStatus";
 import { HubHeader } from "@/components/hub/HubHeader";
 import { BottomNav } from "@/components/hub/BottomNav";
@@ -17,6 +19,9 @@ import {
   navRoleLinks,
 } from "@/lib/nav-hub";
 import { requestSundayAuditDrawer } from "@/lib/store-ops/sunday-audit";
+import { requestUserPreferencesDrawer } from "@/lib/ui/preferences-context";
+import { useDevSandbox } from "@/lib/use-dev-sandbox";
+import { writeDevSandbox } from "@/lib/dev-sandbox";
 import type { StoreSpecialist } from "@/lib/types";
 
 type NavigationHubProps = {
@@ -29,6 +34,8 @@ type NavigationHubProps = {
   onOpenSpecialist?: () => void;
   /** Show ops bottom tab bar (default true). */
   showBottomNav?: boolean;
+  /** Real signed-in profile — sandbox 3-tap stays available while previewing. */
+  sandboxActor?: StoreSpecialist | null;
 };
 
 export function NavigationHub({
@@ -40,6 +47,7 @@ export function NavigationHub({
   onChangePin,
   onOpenSpecialist,
   showBottomNav = true,
+  sandboxActor,
 }: NavigationHubProps) {
   const pathname = usePathname() || "/";
   const search =
@@ -48,8 +56,10 @@ export function NavigationHub({
   const links = navRoleLinks(specialist);
   const primaryLinks = navPrimaryLinks(links);
   const [userOpen, setUserOpen] = useState(false);
+  const [sandboxOpen, setSandboxOpen] = useState(false);
   const userMenuId = useId();
   const userRef = useRef<HTMLDivElement>(null);
+  const { canOpen, sandbox } = useDevSandbox(sandboxActor ?? specialist);
 
   useEffect(() => {
     setUserOpen(false);
@@ -86,7 +96,11 @@ export function NavigationHub({
 
   return (
     <>
-      <HubHeader
+      <div className="sticky top-0 z-40 pt-safe">
+        {canOpen && sandbox.previewRole ? (
+          <DevSandboxBanner sandbox={sandbox} />
+        ) : null}
+        <HubHeader
         title={title}
         subtitle={subtitle}
         specialist={specialist}
@@ -101,6 +115,19 @@ export function NavigationHub({
             router.push(`/?section=${section}`);
           });
         }}
+        onLogoTripleTap={
+          canOpen
+            ? () => {
+                if (!sandbox.previewRole) {
+                  writeDevSandbox({
+                    previewRole: "MASTER_ADMIN",
+                    previewDepartment: "all",
+                  });
+                }
+                setSandboxOpen(true);
+              }
+            : undefined
+        }
         userMenu={
           userOpen ? (
             <div
@@ -124,6 +151,13 @@ export function NavigationHub({
                 />
               </div>
               <div className="p-2">
+                <MenuAction
+                  label="🎨 Appearance & Preferences"
+                  onClick={() => {
+                    setUserOpen(false);
+                    requestUserPreferencesDrawer();
+                  }}
+                />
                 {onOpenSpecialist ? (
                   <MenuAction
                     label="Switch profile"
@@ -157,12 +191,21 @@ export function NavigationHub({
           ) : null
         }
       />
+      </div>
 
       {showBottomNav && primaryLinks.length > 0 ? (
         <BottomNav
           pathname={pathname}
           search={search}
           primaryLinks={primaryLinks}
+        />
+      ) : null}
+
+      {canOpen ? (
+        <DevSandboxDrawer
+          open={sandboxOpen}
+          sandbox={sandbox}
+          onClose={() => setSandboxOpen(false)}
         />
       ) : null}
     </>

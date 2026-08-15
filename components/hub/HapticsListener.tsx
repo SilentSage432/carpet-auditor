@@ -6,7 +6,7 @@
  */
 
 import { useEffect } from "react";
-import { hapticPulse } from "@/utils/haptics";
+import { hapticLight, playTapTone } from "@/lib/ui/feedback";
 
 function shouldPulse(target: EventTarget | null): boolean {
   if (!(target instanceof Element)) return false;
@@ -25,7 +25,8 @@ export function HapticsListener() {
     function onPointerDown(e: PointerEvent) {
       if (e.button !== 0) return;
       if (!shouldPulse(e.target)) return;
-      hapticPulse("light");
+      hapticLight();
+      playTapTone();
     }
 
     document.addEventListener("pointerdown", onPointerDown, {

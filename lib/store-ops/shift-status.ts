@@ -1,7 +1,9 @@
 /**
- * Daily associate shift board — schedule, on-duty, and call-out for a work date.
- * Composes weekly-rotations ShiftRosterMember (hours/start/end) so Sunday
- * balancer stays in sync. Does not own bay assignments.
+ * Daily / weekly associate shift board — schedule, on-duty, and call-out.
+ * Composes weekly-rotations ShiftRosterMember so Sunday balancer stays in sync.
+ * Persists associate_shift_days (work_date + start/end + is_scheduled_today)
+ * with localStorage fallback until the migration is applied.
+ * Does not own bay assignments.
  */
 
 import { getStoreNumber } from "@/lib/store";
@@ -31,14 +33,107 @@ export type AssociateShiftDay = {
 };
 
 const STORAGE_PREFIX = "deptsync_shift_day";
-const DEFAULT_START = "07:00";
-const DEFAULT_END = "15:30";
+export const DEFAULT_SHIFT_START = "07:00";
+export const DEFAULT_SHIFT_END = "15:30";
+const DEFAULT_START = DEFAULT_SHIFT_START;
+const DEFAULT_END = DEFAULT_SHIFT_END;
+
+/** Lowe's retail week — Sunday through Saturday (local calendar). */
+export const RETAIL_WEEKDAY_LABELS = [
+  "Sun",
+  "Mon",
+  "Tue",
+  "Wed",
+  "Thu",
+  "Fri",
+  "Sat",
+] as const;
+
+export const RETAIL_WEEKDAY_SHORT = ["S", "M", "T", "W", "T", "F", "S"] as const;
+
+export const SHIFT_CLOCK_PRESETS = [
+  { id: "open", label: "Open", start: "07:00", end: "15:30" },
+  { id: "mid", label: "Mid", start: "10:00", end: "18:30" },
+  { id: "close", label: "Close", start: "14:30", end: "23:00" },
+] as const;
+
+export type WeeklyShiftDraft = {
+  work_date: string;
+  is_scheduled: boolean;
+  start_time: string | null;
+  end_time: string | null;
+};
 
 export function localWorkDate(date = new Date()): string {
   const y = date.getFullYear();
   const m = String(date.getMonth() + 1).padStart(2, "0");
   const d = String(date.getDate()).padStart(2, "0");
   return `${y}-${m}-${d}`;
+}
+
+export function parseLocalWorkDate(iso: string): Date {
+  const [y, m, d] = String(iso)
+    .split("-")
+    .map((part) => Number(part));
+  return new Date(y || 1970, (m || 1) - 1, d || 1);
+}
+
+export function addCalendarDays(isoDate: string, days: number): string {
+  const dt = parseLocalWorkDate(isoDate);
+  dt.setDate(dt.getDate() + days);
+  return localWorkDate(dt);
+}
+
+/** Sunday YYYY-MM-DD for the retail week containing `from`. */
+export function retailWeekStart(from: Date | string = new Date()): string {
+  const dt =
+    typeof from === "string" ? parseLocalWorkDate(from) : new Date(from);
+  const local = new Date(dt.getFullYear(), dt.getMonth(), dt.getDate());
+  local.setDate(local.getDate() - local.getDay());
+  return localWorkDate(local);
+}
+
+export function retailWeekDates(sunday: string): string[] {
+  return Array.from({ length: 7 }, (_, i) => addCalendarDays(sunday, i));
+}
+
+export function formatRetailWeekRange(sunday: string): string {
+  const dates = retailWeekDates(sunday);
+  const start = parseLocalWorkDate(dates[0] ?? sunday);
+  const end = parseLocalWorkDate(dates[6] ?? sunday);
+  const fmt = (d: Date) =>
+    d.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+  return `${fmt(start)}–${fmt(end)}`;
+}
+
+export function shiftRowKey(specialistId: string, workDate: string): string {
+  return `${specialistId}|${workDate}`;
+}
+
+export function sliceShiftDaysForDate(
+  rows: Record<string, AssociateShiftDay>,
+  date: string
+): Record<string, AssociateShiftDay> {
+  const out: Record<string, AssociateShiftDay> = {};
+  for (const row of Object.values(rows)) {
+    if (row.work_date === date) out[row.specialist_id] = row;
+  }
+  return out;
+}
+
+export function isScheduledShiftDay(
+  row: AssociateShiftDay | null | undefined
+): boolean {
+  if (!row) return false;
+  if (row.status === "OFF") return false;
+  return row.is_scheduled_today !== false;
+}
+
+export function todayShiftCaption(
+  row: AssociateShiftDay | null | undefined
+): string {
+  if (!isScheduledShiftDay(row)) return "Today: Off";
+  return `Today: ${formatShiftPill(row?.start_time, row?.end_time)}`;
 }
 
 export function formatShiftPill(
@@ -231,14 +326,74 @@ export async function fetchShiftDays(
   }
 }
 
+export async function fetchShiftDaysRange(
+  startDate: string,
+  endDate: string,
+  store = getStoreNumber()
+): Promise<Record<string, AssociateShiftDay>> {
+  const span: string[] = [];
+  let cursor = startDate;
+  while (cursor <= endDate && span.length < 31) {
+    span.push(cursor);
+    cursor = addCalendarDays(cursor, 1);
+  }
+
+  const merged: Record<string, AssociateShiftDay> = {};
+  for (const date of span) {
+    for (const row of Object.values(readLocal(date, store))) {
+      merged[shiftRowKey(row.specialist_id, row.work_date)] = row;
+    }
+  }
+
+  const supabase = getSupabase();
+  if (!supabase || !store) return merged;
+  try {
+    const { data, error } = await supabase
+      .from("associate_shift_days")
+      .select(
+        "specialist_id, work_date, start_time, end_time, is_scheduled_today, is_call_out, status"
+      )
+      .eq("store_number", store)
+      .gte("work_date", startDate)
+      .lte("work_date", endDate);
+    if (error) {
+      if (isMissingRelation(error)) return merged;
+      throw new Error(error.message || "Could not load weekly schedule");
+    }
+    const byDate: Record<string, Record<string, AssociateShiftDay>> = {};
+    for (const date of span) {
+      byDate[date] = readLocal(date, store);
+    }
+    for (const row of data ?? []) {
+      const date = String(row.work_date ?? "");
+      const next = normalizeDay(String(row.specialist_id), date, row);
+      if (!next) continue;
+      merged[shiftRowKey(next.specialist_id, next.work_date)] = next;
+      const bucket = byDate[date] ?? {};
+      bucket[next.specialist_id] = next;
+      byDate[date] = bucket;
+    }
+    for (const [date, map] of Object.entries(byDate)) {
+      writeLocal(date, map, store);
+    }
+    return merged;
+  } catch (err) {
+    if (isMissingRelation(err)) return merged;
+    throw err;
+  }
+}
+
 export async function upsertShiftDay(
   patch: Partial<AssociateShiftDay> & { specialist_id: string },
   date = localWorkDate(),
   store = getStoreNumber(),
-  week = isoWeekLabel()
+  week = isoWeekLabel(),
+  syncRoster = true
 ): Promise<AssociateShiftDay> {
   const current = readLocal(date, store);
   const prev = current[patch.specialist_id];
+  const scheduled =
+    patch.is_scheduled_today ?? prev?.is_scheduled_today ?? true;
   const merged: AssociateShiftDay = {
     specialist_id: patch.specialist_id,
     work_date: date,
@@ -250,15 +405,50 @@ export async function upsertShiftDay(
       patch.end_time !== undefined
         ? normalizeClock(patch.end_time)
         : (prev?.end_time ?? DEFAULT_END),
-    is_scheduled_today:
-      patch.is_scheduled_today ?? prev?.is_scheduled_today ?? true,
-    is_call_out: patch.is_call_out ?? prev?.is_call_out ?? false,
+    is_scheduled_today: scheduled,
+    is_call_out: scheduled
+      ? (patch.is_call_out ?? prev?.is_call_out ?? false)
+      : false,
     status: "ON_DUTY",
   };
   merged.status = deriveStatus(merged);
   current[merged.specialist_id] = merged;
   writeLocal(date, current, store);
 
+  if (syncRoster) {
+    syncShiftRosterMember(merged, week, store);
+  }
+
+  const supabase = getSupabase();
+  if (supabase && store) {
+    const { error } = await supabase.from("associate_shift_days").upsert(
+      {
+        store_number: store,
+        specialist_id: merged.specialist_id,
+        work_date: date,
+        start_time: merged.start_time,
+        end_time: merged.end_time,
+        is_scheduled_today: merged.is_scheduled_today,
+        is_call_out: merged.is_call_out,
+        status: merged.status,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "store_number,specialist_id,work_date" }
+    );
+    if (error && !isMissingRelation(error)) {
+      throw new Error(error.message || "Could not save shift");
+    }
+  }
+
+  if (syncRoster) emitShift();
+  return merged;
+}
+
+function syncShiftRosterMember(
+  merged: AssociateShiftDay,
+  week: string,
+  store: string
+) {
   const existing = readShiftRoster(week, store);
   const hours =
     hoursBetween(merged.start_time ?? undefined, merged.end_time ?? undefined) ??
@@ -289,28 +479,36 @@ export async function upsertShiftDay(
         },
       ];
   writeShiftRoster(week, nextShift, store);
+}
 
-  const supabase = getSupabase();
-  if (supabase && store) {
-    const { error } = await supabase.from("associate_shift_days").upsert(
+/** Persist a Sun–Sat matrix. localStorage always; Supabase when migrated. */
+export async function upsertShiftWeek(
+  specialistId: string,
+  drafts: WeeklyShiftDraft[],
+  store = getStoreNumber()
+): Promise<AssociateShiftDay[]> {
+  const today = localWorkDate();
+  const saved: AssociateShiftDay[] = [];
+  for (const draft of drafts) {
+    const row = await upsertShiftDay(
       {
-        store_number: store,
-        specialist_id: merged.specialist_id,
-        work_date: date,
-        start_time: merged.start_time,
-        end_time: merged.end_time,
-        is_scheduled_today: merged.is_scheduled_today,
-        is_call_out: merged.is_call_out,
-        status: merged.status,
-        updated_at: new Date().toISOString(),
+        specialist_id: specialistId,
+        start_time: draft.start_time,
+        end_time: draft.end_time,
+        is_scheduled_today: draft.is_scheduled,
+        is_call_out: draft.is_scheduled ? undefined : false,
       },
-      { onConflict: "store_number,specialist_id,work_date" }
+      draft.work_date,
+      store,
+      isoWeekLabel(parseLocalWorkDate(draft.work_date)),
+      false
     );
-    if (error && !isMissingRelation(error)) {
-      throw new Error(error.message || "Could not save shift");
-    }
+    saved.push(row);
   }
-
+  const todayRow = saved.find((row) => row.work_date === today);
+  if (todayRow) {
+    syncShiftRosterMember(todayRow, isoWeekLabel(), store);
+  }
   emitShift();
-  return merged;
+  return saved;
 }

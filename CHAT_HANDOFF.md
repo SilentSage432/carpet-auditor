@@ -13,13 +13,14 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 - Icons: `public/icons/icon-192.png`, `icon-512.png`, `apple-touch-icon.png`, `mark.svg` (cyan/gold floating mark, no enclosed shield)
 - PWA manifest: `app/manifest.ts` → `/manifest.webmanifest`; static `public/manifest.json` → `/manifest.json` (TWA / Bubblewrap)
 - **Native shell:** haptics via `utils/haptics.ts` + `HapticsListener`; offline toast `OfflineNetworkBanner` + `ConflictResolutionModal`; sync auto-flush on online/visibility/focus; PWA/TWA splash theme `#090d16`; `app/loading.tsx` + `DeptSyncSplash` (pinned midnight + branded mark)
-- **Theme engine:** `lib/theme.ts` owns presets + prefs (`deptsync_theme_prefs`). `data-theme` on `<html>`: `midnight` (default, ice-blue) · `emerald` · `amber` · `obsidian` · `cobalt`. Toggles: `data-contrast=high`, `data-density=compact`. Settings **Appearance** card applies instantly. CSS tokens in `app/globals.css`; glass utilities / nav / primary buttons bind to `--accent`, `--background`, `--border`, `--glow-accent`.
+- **Theme engine:** `lib/theme.ts` owns presets + prefs (`deptsync_theme_prefs`). `data-theme` on `<html>`: `midnight` (Cyber-Dark, default) · `cobalt` (Midnight Sapphire) · `emerald` (Industrial Emerald) · `solar` (Solar Daylight) · legacy `amber` / `obsidian`. Toggles: `data-contrast=high`, `data-density=compact`, plus `soundEnabled` / `hapticsEnabled`. Personal UI: header + Settings **🎨 Appearance & Preferences** (`UserPreferencesDrawer`). Store config stays in Settings. CSS tokens in `app/globals.css`; glass utilities / nav / primary buttons bind to `--accent`, `--background`, `--border`, `--glow-accent`.
+- **Audio & haptics:** `lib/ui/feedback.ts` (Web Audio + `navigator.vibrate`). Scan chimes compose via `lib/scan-feedback.ts`; tap pulses via `HapticsListener`.
 - **Obsidian-glass UI:** utilities in `app/globals.css` (`.glass-card`, `.glass-panel`, `.theme-accent-surface`, `.theme-nav-active`, `.theme-modal`, `.btn-primary-glow`, `.btn-quick-touch`, `.chip-filter`, `.hub-main`). Canonical Lucide SVG set (`HubIcon` / `NavIcon`, stroke 2, `currentColor`).
-- **Handheld chrome:** sticky header `pt-safe` + compact `min-h-12`; **exactly four** workflow tabs `min-h-16` (Floor · Map · Roster · Settings). No hamburger, More sheet, or Admin Tools drawer. Store Ops pages use `.hub-main` so bays / badges / timers clear the fold.
+- **Handheld chrome:** sticky header `pt-safe` + compact `min-h-12`; workflow tabs `min-h-16` — Master/DS: Floor · Map · Roster · Settings; CSA/Specialist: **My Shift** + **Store Map** only. No hamburger, More sheet, or Admin Tools drawer. Store Ops pages use `.hub-main` so bays / badges / timers clear the fold.
 - **Keep-alive tabs:** Floor / Map / Roster / Settings mount in `WorkflowTabShell` (`app/(workflow)/layout.tsx`) so switches are `hidden` only (0ms). Departments / map / roster use 45s stale-while-revalidate. Realtime channels are refcounted per logical name.
-- **IRP velocity heatmap:** Map toggle `[ Standard Map | Velocity Heatmap ]` lives on Visual Grid. Map also has `[ Visual Grid | Manage Aisles & Bays ]`. Manage is `AisleBayManager` (aisle accordions, Add Single Bay, Bulk Generator with velocity seed, batch delete, `EditBayDrawer` hotspot/lock/decay). Standard = rotation readiness (`map-readiness.ts`). Heatmap = `last_serviced_at` cadence + `velocity_tier` pulse (`lib/store-ops/velocity.ts`). Tap bay on Visual Grid → 2-second walk log (`bay_service_logs` via `POST /api/store-locations/service`). Sunday generate prepends carry-over/priority lock, then high/critical + bays past `custom_decay_days` (`lib/store-ops/rotation.ts` composed into `rotations.ts`). Apply `20260814_bay_velocity_heatmap.sql` + `20260815_custom_decay_days.sql`.
+- **IRP velocity heatmap:** Map toggle `[ Standard Map | Velocity Heatmap ]` lives on Visual Grid. Map also has `[ Visual Grid | Manage Aisles & Bays ]`. Visual Grid is walk-only (`StoreLocationGrid`: cadence dots, bay tags, Sell/Top, tap → `WalkTheFloorSheet`). Manage is `AisleBayManager` (aisle accordions, Add Single Bay, Bulk Generator with velocity seed, batch delete, duplicate prune, `EditBayDrawer` hotspot/lock/decay). Department cron toggles live in Settings (`DepartmentTargetsMatrix`), not Map. Standard = rotation readiness (`map-readiness.ts`). Heatmap = `last_serviced_at` cadence + `velocity_tier` pulse (`lib/store-ops/velocity.ts`). Sunday generate prepends carry-over/priority lock, then high/critical + bays past `custom_decay_days` (`lib/store-ops/rotation.ts` composed into `rotations.ts`). Apply `20260814_bay_velocity_heatmap.sql` + `20260815_custom_decay_days.sql`.
 - **Multi-department access:** `accessible_departments` on roster + profiles. Header switcher when more than one granted dept. Supervisors grant extras from the **Roster** tab chips. Apply `20260814_multi_department_access.sql`.
-- **Daily shift board / call-out:** Roster groups by home department. `lib/store-ops/shift-status.ts` owns today's clock + `ABSENT_CALLOUT` (localStorage + `associate_shift_days`). Call-out dialog composes `lib/store-ops/call-out.ts` → Sunday pool / proportional redistribute / carry-over loop (`sunday_bay_assignments.status=CARRIED_OVER`, `store_locations.carried_over` prepended on next Sunday draw). Apply `20260815_associate_shift_days.sql` + `20260815_carry_over_priority.sql`. Supervisors + Master toggle duty; Master-only add/delete team.
+- **Daily shift board / call-out:** Roster groups by home department; department accordions start **collapsed**. `lib/store-ops/shift-status.ts` owns Sun–Sat clocks + `ABSENT_CALLOUT` (`associate_shift_days` + localStorage fallback). Cards show S–S dots, today's pill, and Edit Schedule → `AssociateScheduleModal` (presets Open/Mid/Close, per-day times). Call-out dialog composes `lib/store-ops/call-out.ts` → Sunday pool / proportional redistribute / carry-over loop. Apply `20260815_associate_shift_days.sql` + `20260815_carry_over_priority.sql`. Supervisors + Master toggle duty; Master-only add/delete team.
 - **Predictive Shift Copilot:** Floor banner under Shift Briefing (`PredictiveCopilotBanner`). Local patterns from `bay_service_logs` / Sunday assignments / downstock / locations — not Gemini. 1-tap Stage to Shift (`POST /api/rotations/assign`, Supervisor+) or Add to Downstock.
 
 ## AI (`lib/ai/gemini.ts`)
@@ -41,12 +42,19 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 ## RBAC (`lib/rbac.ts` + `lib/specialists.ts`)
 | Role | Scope | Tabs |
 |------|-------|------|
-| 👑 Master Admin | `assigned_department: all` | Flooring · Appliances · Remnants · Master |
-| 🛡️ Department Supervisor | primary `assigned_department` + `accessible_departments[]` | Dept audit / profile; header switcher when 2+ depts |
-| 👤 Floor Associate | primary + granted extras | Floor · Map · Roster · Settings; switcher when 2+ depts |
+| 👑 Master Admin (`MASTER_ADMIN`) | `assigned_department: all` | Floor · Map · Roster · Settings (DB tools, store settings) |
+| 🛡️ Department Supervisor (`DEPARTMENT_SUPERVISOR`) | primary + `accessible_departments[]` | Floor · Map · Roster · Settings; department roster + schedules; Map Manage for bay priorities |
+| 👤 CSA / Specialist (`ASSOCIATE_CSA`) | primary + granted extras | **My Shift** `/dashboard` · **Store Map** `/admin/store-map` only (Roster + Settings hidden) |
+
+### Developer sandbox (Master Admin only)
+- 3 taps on the DeptSync logo within 800ms opens `DevSandboxDrawer` (`HubHeader` + `NavigationHub`)
+- Preview As Role: Master Admin | DS Supervisor | CSA Specialist; Simulate Department overlays chrome without changing JWT
+- State: `sessionStorage` `deptsync_dev_sandbox` + `deptsync:dev-sandbox` event (`lib/dev-sandbox.ts`). `composeViewSpecialist` keeps real `id` / name / store
+- Banner: `⚡ Simulating: [Role · Dept] — Tap to Exit` (`DevSandboxBanner`)
+- 3-tap stays wired to the **real** Master (`sandboxActor`) while previewing CSA
 
 ### Master Admin roster console
-- Canonical team UI is the **Roster** tab (`/roster`, `RosterTab`) — department accordions (home `assigned_department`, roster count, on-duty today), shift pills, call-out toggle, name/role, and `accessible_departments` chips with optimistic save + Sonner toast
+- Canonical team UI is the **Roster** tab (`/roster`, `RosterTab`) — department accordions start collapsed (home `assigned_department`, roster count, on-duty today), weekly S–S dots + today's shift pill, `AssociateScheduleModal`, call-out toggle, name/role, and `accessible_departments` chips with optimistic save + Sonner toast
 - `/admin/supervisors` and `/admin/roles` redirect to `/roster`
 - Invite/reset lives on `/invite` + Roster add-member; dead `AdminRosterManager` was removed
 - Lightweight **Associate Roster** (`AssociateRosterPanel`) remains on the Sunday assignment drawer
@@ -58,6 +66,7 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 - Master: store number, Bulk Generator (`#bulk-generate`), Taxonomies (`#taxonomies`), Force Rotation (`#weekly-rotation`)
 - Supervisor + Master: weekly targets matrix, Executive Floor Pad (`#manager-notes`)
 - Remnant inventory (`#remnants`) when RBAC allows; Device & sync for every role
+- Personal **🎨 Appearance & Preferences** (all roles, including CSA via header) — not store configuration
 - Department Supervisors never see Master-only setup controls
 - Master Admin header: **My Department Context** pin (Full Store / D23 Flooring / D35 Appliances / …) — filters Floor without dropping Master privileges
 
@@ -72,8 +81,8 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 ### Departments
 `flooring` (D23) · `appliances` (D35) · `plumbing` · `electrical` · `lawn_garden` · `paint` (D24P) · `millwork` (D30) · `cabinets` (D29) · `building_materials` · `hardware` · `tools` (D25) · `all`
 
-- Department glyphs: Lucide `DepartmentIcon` (no emoji). Roster / Admin pin / Store Map overview / department pickers.
-- Store Map Department Overview includes Cabinets (D29) with weekly target 6, cron toggle, and tag metrics.
+- Department glyphs: Lucide `DepartmentIcon` (no emoji). Roster / Admin pin / Settings department matrix / department pickers.
+- Store Map Department Overview was removed; Cabinets (D29) weekly target 6 and cron toggle live in Settings `DepartmentTargetsMatrix`.
 - Department seed upserts with `ignoreDuplicates` against live UNIQUE: `(store_id, code)` when present, else `code` (`departments_code_key`). Duplicate D29 is logged, not a 500. List falls back to unscoped `SELECT *` so Store Map hydrates existing rows instead of a red banner.
 
 - Seeds: none auto-injected. Create Master / Supervisor profiles via invite / Add Supervisor; temporary PIN sets `must_change_credentials: true` until first-login change
@@ -227,14 +236,14 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 
 ## Associate floor role
 - Store Ops actor `associate`: read/complete dept rotations + locations; create exceptions via verify; **no** targets, invite, generate/reset, or Master Settings tools
-- Nav: Floor · Map · Roster · Settings only (Downstock on Floor; specialty scans via Floor chips → `/?section=`)
+- Nav: Master/DS Floor · Map · Roster · Settings; CSA **My Shift** + **Store Map** only (Downstock on Floor; specialty scans via Floor chips → `/?section=`)
 
 ## Department toggles · adaptive priority · showroom
 - Apply `supabase/migrations/20260810_dept_priority_showroom.sql`
-- Master toggles: Store Map Overview + Settings Department Overview (`departments.is_active`; Flooring default on)
+- Master toggles: Settings Department Overview (`DepartmentTargetsMatrix`, `departments.is_active`; Flooring default on)
 - Adaptive draw: `manual_priority_count` + `last_completed_at` age + velocity/priority_override boost; after CARRIED_OVER, `pickSundayVelocityPrioritized` fills remaining slots from high/critical/override first; Store Map ★ Week assigns + bumps priority
 - Showroom: `location_type=SHOWROOM_STACKOUT` + `audit_frequency_days`; dashboard Quick Touch card (not in weekly aisle draw)
-- Store Map surfaces: `[ Visual Grid | Manage Aisles & Bays ]`. Visual Grid bay rows: compact dual-pill Selling/Topstock; tap bay → `WalkTheFloorSheet` (walk + Snap Bay + edit/pin). Manage console groups `store_locations` by aisle with `formatBayTag`, Edit drawer (hotspot / priority lock / decay slider), batch delete. Duplicate prune hard-deletes. Bulk Generator (velocity seed) also lives in Settings.
+- Store Map surfaces: `[ Visual Grid | Manage Aisles & Bays ]`. Visual Grid bay rows: cadence dots, `formatBayTag`, dual-pill Selling/Topstock; tap bay → `WalkTheFloorSheet` (walk + Snap Bay + pin). Manage console owns checkboxes, batch delete, duplicate prune, Add Bay, Bulk Generator, and `EditBayDrawer` (hotspot / priority lock / decay slider). Bulk Generator (velocity seed) also lives in Settings.
 
 ## Appliance categories (suite + sub)
 - **Tables:** `appliance_catalog` + `appliance_scans` (not carpet_*). Apply `supabase/migrations/20260810_appliance_catalog_scans.sql` then `enable_rls_flagged_tables.sql` (RLS on appliances + `store_specialists` + verify all public tables)

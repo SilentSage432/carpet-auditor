@@ -7,19 +7,21 @@
  */
 
 import dynamic from "next/dynamic";
-import { usePathname } from "next/navigation";
-import { useEffect, useState, type ReactNode } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { ChangePinModal } from "@/components/hub/ChangePinModal";
 import { NavigationHub } from "@/components/hub/NavigationHub";
 import { FloorTab } from "@/components/hub/tabs/FloorTab";
 import type { WorkflowTabProps } from "@/components/hub/tabs/tab-props";
 import { updateAuthSessionSpecialist } from "@/lib/auth-session";
 import {
+  canAccessWorkflowTab,
   PRIMARY_WORKFLOW_TAB_HREFS,
   workflowTabFromPathname,
   workflowTabTitle,
   type WorkflowTabHref,
 } from "@/lib/nav-hub";
+import { useDevSandbox } from "@/lib/use-dev-sandbox";
 import { setStoreNumber } from "@/lib/store";
 import {
   dedupeRoster,
@@ -62,22 +64,39 @@ function KeepAlivePanel({
 
 export function WorkflowTabShell(props: WorkflowTabProps) {
   const pathname = usePathname() || "/dashboard";
+  const router = useRouter();
   const active = workflowTabFromPathname(pathname) ?? "/dashboard";
-  const [visited, setVisited] = useState<Set<WorkflowTabHref>>(
-    () => new Set<WorkflowTabHref>(PRIMARY_WORKFLOW_TAB_HREFS)
-  );
   const [storeNumber, setStore] = useState(props.storeNumber);
   const [member, setMember] = useState<StoreSpecialist>(props.specialist);
   const [changePinOpen, setChangePinOpen] = useState(false);
+  const { viewSpecialist } = useDevSandbox(member);
+  const view = viewSpecialist ?? member;
+  const allowedTabs = useMemo(
+    () =>
+      PRIMARY_WORKFLOW_TAB_HREFS.filter((href) =>
+        canAccessWorkflowTab(view, href)
+      ),
+    [view]
+  );
+  const [visited, setVisited] = useState<Set<WorkflowTabHref>>(
+    () => new Set<WorkflowTabHref>(allowedTabs)
+  );
+
+  useEffect(() => {
+    if (!canAccessWorkflowTab(view, active)) {
+      router.replace("/dashboard");
+    }
+  }, [active, router, view]);
 
   useEffect(() => {
     setVisited((prev) => {
+      if (!canAccessWorkflowTab(view, active)) return prev;
       if (prev.has(active)) return prev;
       const next = new Set(prev);
       next.add(active);
       return next;
     });
-  }, [active]);
+  }, [active, view]);
 
   useEffect(() => {
     setStore(props.storeNumber);
@@ -103,7 +122,7 @@ export function WorkflowTabShell(props: WorkflowTabProps) {
 
   const tabProps: WorkflowTabProps = {
     ...props,
-    specialist: member,
+    specialist: view,
     storeNumber,
     onStoreNumberChange: (next) => {
       setStore(next);
@@ -122,8 +141,9 @@ export function WorkflowTabShell(props: WorkflowTabProps) {
   return (
     <div className="flex min-h-dvh flex-col">
       <NavigationHub
-        title={workflowTabTitle(active, member)}
-        specialist={member}
+        title={workflowTabTitle(active, view)}
+        specialist={view}
+        sandboxActor={member}
         storeNumber={storeNumber}
         onLogout={props.logout}
         onChangePin={() => setChangePinOpen(true)}
@@ -143,12 +163,12 @@ export function WorkflowTabShell(props: WorkflowTabProps) {
           <MapTab {...tabProps} />
         </KeepAlivePanel>
       ) : null}
-      {visited.has("/roster") ? (
+      {visited.has("/roster") && canAccessWorkflowTab(view, "/roster") ? (
         <KeepAlivePanel active={active === "/roster"}>
           <RosterTab {...tabProps} />
         </KeepAlivePanel>
       ) : null}
-      {visited.has("/settings") ? (
+      {visited.has("/settings") && canAccessWorkflowTab(view, "/settings") ? (
         <KeepAlivePanel active={active === "/settings"}>
           <SettingsTab {...tabProps} />
         </KeepAlivePanel>

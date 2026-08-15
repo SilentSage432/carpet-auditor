@@ -13,6 +13,7 @@ import {
   type SyncConflictDetail,
 } from "@/lib/sync-conflict";
 import { hapticPulse } from "@/utils/haptics";
+import { playErrorTone } from "@/lib/ui/feedback";
 
 export function ConflictResolutionModal() {
   const titleId = useId();
@@ -25,6 +26,7 @@ export function ConflictResolutionModal() {
       if (!custom.detail) return;
       setConflict(custom.detail);
       hapticPulse("medium");
+      playErrorTone();
     }
     window.addEventListener(SYNC_CONFLICT_EVENT, onConflict as EventListener);
     return () => {

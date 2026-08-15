@@ -5,7 +5,7 @@
 > the scanning / auditing workflow for floor operators.
 >
 > Generated from the live codebase (`app/`, `components/`, `lib/types.ts`).
-> Last reviewed: 2026-08-15.
+> Last reviewed: 2026-08-15 (RBAC views + developer sandbox).
 
 ---
 
@@ -53,7 +53,7 @@
 - **`pb-28` / audit `pb-44`** reserves space for bottom nav (+ sticky Log bar on specialty scans).
 - Body scroll locks when the specialist modal or change-PIN modal is open.
 
-**Last reviewed:** 2026-08-15 (4-tab chrome consolidation).
+**Last reviewed:** 2026-08-15 (role-based views + 3-tap sandbox).
 
 ### A.2 Sticky header bar (`NavigationHub`)
 
@@ -62,7 +62,7 @@
 
 | Slot (L → R) | Content | Action |
 |--------------|---------|--------|
-| Brand badge | `DeptSyncBadge` (vector boxes + barcode) | Display only |
+| Brand badge | `DeptSyncBadge` (vector boxes + barcode) | Master Admin: 3 taps in 800ms → sandbox |
 | Title stack | DeptSync · store # · page title | Display only |
 | Department pill | `AdminDepartmentSwitcher` | Switch granted department |
 | Account + network | `HeaderNetworkStatus` Wifi / WifiOff + role chip | Opens account/PIN menu |
@@ -74,14 +74,14 @@ Master Admin: compact department **dropdown pill** in the header. Close glyphs a
 **Primary — BottomNav** (`components/hub/BottomNav.tsx`) composed by `NavigationHub`
 
 - Fixed `bottom-0`, `max-w-lg`, `min-h-16` tabs, `pb-safe`, Lucide `NavIcon` stroke 2.
-- 4-column grid. Active tab: accent top indicator + glow.
+- 2-column grid when CSA (My Shift + Map); 4-column for Master/DS. Active tab: accent top indicator + glow.
 
 | Tab | Route | Meaning |
 |-----|-------|---------|
-| Floor | `/dashboard` | Checklist, Shift Briefing, Predictive Copilot, Downstock, Sunday drawer, barriers |
-| Map | `/admin/store-map` | Visual Grid (heatmap + walk) · Manage Aisles & Bays (hotspot / lock / decay) · Bulk Generator velocity seed |
-| Roster | `/roster` | Department-grouped team, shift pills, call-out rebalance |
-| Settings | `/settings` | Theme, sync, targets, push, Master tools (bulk / taxonomies / force / Floor Pad / remnants) |
+| Floor / My Shift | `/dashboard` | Master/DS: full floor. CSA: assigned bays, packdown, shift goals |
+| Map | `/admin/store-map` | Visual Grid (walk / heatmap). Manage Aisles & Bays for Master/DS only |
+| Roster | `/roster` | Hidden from CSA. DS sees assigned departments; Master sees full store |
+| Settings | `/settings` | Hidden from CSA. Master tools + DS targets / Floor Pad |
 
 Store Ops pages use `.hub-main` (`px-3 pt-2 pb-28`) so bay lists, status pills, and pace timers clear the fold on handhelds. Quick Touch / filter chips use `.btn-quick-touch` / `.chip-filter` (44px min).
 
@@ -223,6 +223,7 @@ Stacked cards (~1.5–2 handheld screens):
 
 | Card | Contents |
 |------|----------|
+| **Appearance** | Opens shared `UserPreferencesDrawer` (theme, contrast, density, sound, haptics) |
 | **Store number / location** | Active `Lowe's #n`; numeric input (500ms debounce auto-save → full data reload) |
 | **Security & PIN** | Signed-in name; **⚙️ Change My PIN**; note for Associates about discrepancy PIN |
 | **Offline sync queue** | Pending count; **Replay queue now** |
@@ -237,8 +238,10 @@ Stacked cards (~1.5–2 handheld screens):
 
 | Component | File | Trigger | UI pattern |
 |-----------|------|---------|------------|
-| **BottomNav** | `BottomNav.tsx` | Always on workflow routes | Fixed 4 tabs |
-| **WalkTheFloorSheet** | `WalkTheFloorSheet.tsx` | Map bay tap | Walk log + Snap Bay + edit/pin |
+| **UserPreferencesDrawer** | `hub/UserPreferencesDrawer.tsx` | Header profile + Settings Appearance | Theme, density, contrast, sound, haptics |
+| **DevSandboxDrawer** | `hub/DevSandboxDrawer.tsx` | Logo 3-tap (Master) | Preview As Role + Simulate Department |
+| **WalkTheFloorSheet** | `WalkTheFloorSheet.tsx` | Visual Grid bay tap | Walk log + Snap Bay + pin |
+| **AssociateScheduleModal** | `hub/AssociateScheduleModal.tsx` | Roster Edit Schedule | Sun–Sat day strip + Open/Mid/Close + per-day times |
 | **EditBayDrawer** | `admin/EditBayDrawer.tsx` | Map Manage bay Edit | Hotspot / priority lock / 3–21 decay slider |
 | **BulkLocationGenerator** | `admin/BulkLocationGenerator.tsx` | Map Manage + Settings | Aisle range + Default Velocity Tier seed |
 | **TextPromptModal** | `TextPromptModal.tsx` | Reserve remnant; Link barcode | Bottom sheet input |

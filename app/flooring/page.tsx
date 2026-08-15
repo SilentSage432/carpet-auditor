@@ -56,6 +56,7 @@ function FlooringBridge({
       <NavigationHub
         title="Flooring Cycle Audit"
         specialist={specialist}
+        sandboxActor={specialist}
         storeNumber={storeNumber}
         onLogout={logout}
       />
