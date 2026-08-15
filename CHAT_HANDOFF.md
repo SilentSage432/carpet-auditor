@@ -90,8 +90,9 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 - First-login: non-dismissible AuthWall setup when `must_change_credentials` (no Remind Later)
 
 ## Authentication (Zero-Access Wall)
-- Unauthenticated visitors never see workspace tabs/data — `AuthWall` only
+- Unauthenticated visitors never see workspace tabs/data — edge `proxy.ts` (Next 16 middleware) redirects to `/login` (`AccessGate` + AuthWall). `public/robots.txt` disallows all crawlers; `X-Robots-Tag: noindex, nofollow, noarchive` is set globally.
 - Login / unlock: username + password/PIN → roster match (`findSpecialistByLogin`); Hub-bridge verifies PIN (roster **list** no longer selects `pin_code` / `temp_pin_hash`)
+- **HTTP-only hub gate:** after PIN + Hub-bridge JWT, `POST /api/auth/gate` sets `deptsync_hub_gate` (8h, HttpOnly). Middleware will not render `/dashboard` without it. Logout clears the cookie.
 - **Hub PIN → Auth bridge (primary Store Ops unlock):** after PIN verify, client calls `POST /api/auth/hub-bridge` (`lib/store-ops/hub-bridge.ts` + `hub-bridge-client.ts`) which service-role verifies the roster PIN (by `specialist_id` / username / name), ensures `auth.users` + `profiles` link, and mints a real Supabase Auth session (`setSession`). **Master PIN** (`1234` or `HUB_MASTER_PIN`) auto-provisions Super Admin when missing so Master Admin never lock out.
 - **Bootstrap recovery:** `POST /api/auth/bootstrap-admin` (Bearer `CRON_SECRET`) or `node --env-file=.env.local scripts/bootstrap-admin.mjs` — resets `master_admin` roster + Auth + profiles
 - **PIN reset:** `POST /api/auth/reset-pin` — Super Admin Bearer or `current_pin`; service-role updates `store_specialists` and upserts `store_profiles` (creates Master Admin profile when missing). Change PIN modal uses this path.
@@ -102,12 +103,12 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 - Native keychain: form `autocomplete` username / current-password
 - Biometric: WebAuthn; requires an existing Store Ops Auth session (otherwise PIN once after fingerprint)
 - `must_change_credentials` → non-dismissible permanent credential setup
-- Session: `deptsync_auth_session` (hub UI) + Supabase Auth localStorage (API Bearer); 8h idle lock on hub session
-- **P0 boot:** `/` fetches roster only before AuthWall; catalog/remnants/appliance catalog after unlock per section; specialty scans + Snap Bay / SIMS / Audit Report / Settings tools are `next/dynamic`
+- Session: `deptsync_auth_session` (hub UI) + `deptsync_hub_gate` HttpOnly cookie (edge gate) + Supabase Auth localStorage (API Bearer); 8h idle lock on hub session
+- **P0 boot:** `/login` fetches roster only before AuthWall; `/` and `/dashboard` require the hub gate cookie. Catalog / remnants / appliance catalog load after unlock when the relevant section mounts; specialty scans + Snap Bay / SIMS / Audit Report / Settings tools are `next/dynamic`
 - **P0 indexes:** re-run `supabase/migrations/20260813_p0_query_indexes.sql` — hub tables use `store_number`; Store Ops locations/rotations use `store_id`; manager_notes Phase 2 uses `store_number`+`department` (legacy `store_id`+`department_code`). Script skips absent columns. Apply `20260815_performance_indexes.sql` for Map/copilot composites (`idx_store_locations_dept_aisle`, `idx_bay_service_logs_bay_time`, `idx_rotations_active`) on canonical columns (`aisle`/`bay`, `location_id`/`created_at`, `is_completed`).
 - **P1 Gemini/map:** Snap Bay 720p + compressed JPEG; Floor Pad Copilot strips HTML / 8k cap; `GET /api/store-locations` explicit Store Map columns (no `SELECT *`); Slice 1 `responseSchema` + per-route token budgets
 - **P2 hub UI:** `startTransition` + keep-alive Floor/Map/Roster/Settings (`hidden`); Cycle/Appliance scan forms isolated from logs; 300ms debounced draft saves with flush on submit/leave; weekly rotations + Sunday assignments TTL-cached 45s
-- **Settings tools:** Bulk / Taxonomies / Force Rotation are `next/dynamic` inside `SettingsSection`; Floor Pad is the Floor tactical dock; SW cache `deptsync-shell-v5-brand-floor`
+- **Settings tools:** Bulk / Taxonomies / Force Rotation are `next/dynamic` inside `SettingsSection`; Floor Pad is the Floor tactical dock; SW cache `deptsync-shell-v6-stealth`
 - **Bulk bays:** Odd Only / Even Only (`lib/store-ops/bay-pattern.ts`, default odd); Store Map GET falls back if `last_completed_at` is missing/null
 - Seeds: no hardcoded roster injection — use Invite / Add Supervisor; temp PIN sets `must_change_credentials`
 - Primary: fixed bottom workflow tabs — **Floor · Map · Roster · Settings** only

@@ -125,6 +125,7 @@
 - [x] Theme / preferences / audio-haptics engine (`lib/ui/feedback.ts` + `UserPreferencesDrawer` for all roles)
 - [x] Instant-render Store Ops SWR (IndexedDB L2 + silent revalidate) + chunked Map DOM + async briefing decay + `20260815_performance_indexes.sql`
 - [x] Tactical Voice Hub on Floor (`TacticalVoiceFloorPad` + `POST /api/copilot/parse-walk` + `shift-tasks.ts` + `lib/heatmap/bay-tracker.ts`)
+- [x] URL stealth + HTTP-only auth gate (`robots.txt`, `X-Robots-Tag`, `proxy.ts`, `/login`)
 
 ## Next
 - [x] Apply Phase 1 JWT/RLS migration in Supabase + enable Custom Access Token Hook

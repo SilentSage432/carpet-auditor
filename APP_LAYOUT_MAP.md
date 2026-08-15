@@ -48,7 +48,7 @@
      + overlay stack (sheets/modals)
 ```
 
-- **Default land after login:** `/dashboard` (Floor checklist). Hub `/` without `?section=` redirects there. Specialty scans use `/?section=audit|appliances|department`.
+- **Default land after login:** `/dashboard` (Floor checklist). Unauthenticated `/` redirects to `/login`. Hub `/` without `?section=` redirects there when signed in. Specialty scans use `/?section=audit|appliances|department`.
 - **Primary nav:** exactly four bottom tabs. No header hamburger, More sheet, or Admin Tools drawer.
 - **`pb-28` / audit `pb-44`** reserves space for bottom nav (+ sticky Log bar on specialty scans).
 - Body scroll locks when the specialist modal or change-PIN modal is open.

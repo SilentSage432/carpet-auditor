@@ -183,6 +183,7 @@ export default function DeptSyncHubPage() {
     clearAuthSession();
     setSpecialist(null);
     setGate("login");
+    window.location.replace("/login");
   }, []);
 
   const resolveGateFromSession = useCallback(async (roster: StoreSpecialist[]) => {

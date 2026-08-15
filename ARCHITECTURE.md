@@ -1,7 +1,14 @@
 # DeptSync Hub — Architecture
 
 ```
-app/page.tsx                      → Hub shell (AuthWall + specialty scan `?section=`; authenticated home redirects to /dashboard)
+app/page.tsx                      → Authenticated specialty scan hub (`?section=`); unauthenticated `/` redirects to /login
+app/login/page.tsx                → Public AccessGate + AuthWall (no dashboard chrome)
+app/access-gate/page.tsx          → Redirect → /login
+app/auth/page.tsx                 → Redirect → /login
+proxy.ts                          → Edge stealth + HTTP-only hub gate (Next 16 middleware)
+lib/auth-gate.ts                  → Gate cookie HMAC + public-path allowlist
+app/api/auth/gate/route.ts        → POST mint / DELETE clear HttpOnly `deptsync_hub_gate`
+public/robots.txt                 → Disallow: /
 app/dashboard/page.tsx            → Floor weekly bay checklist (unified layout; verify + exceptions inline)
 app/(workflow)/layout.tsx         → Keep-alive Floor/Map/Roster/Settings shell (SessionGate once)
 components/hub/WorkflowTabShell.tsx → Persistent tab panels (`hidden`; primary tabs hosted immediately)
@@ -206,7 +213,8 @@ supabase/migrations/20260812_sunday_bay_assignments.sql → sunday specialist↔
 | Focus / keyboard dismiss | `lib/focus-input.ts` (`blurActiveInput` — never auto-focus on tab switch) |
 | SIMS location stock | `lib/sims.ts`, `SimsLocationFinder` |
 | Specialists session / credentials | `lib/specialists.ts`, `SpecialistModal` |
-| Zero-access auth wall / idle lock | `lib/auth-session.ts`, `components/auth/AuthWall.tsx` |
+| Zero-access auth wall / idle lock | `lib/auth-session.ts`, `components/auth/AuthWall.tsx`, `components/auth/AccessGate.tsx` (`/login`) |
+| Edge auth + stealth gate | `lib/auth-gate.ts` + `proxy.ts` + `POST /api/auth/gate` (HttpOnly cookie) |
 | Store Ops Auth (JWT → profiles) | `lib/store-ops/auth.ts`, `lib/supabase/server.ts`, `lib/supabase/browser.ts`, `link-auth-profile.ts` |
 | JWT / RLS policies | `20260812_jwt_rls_policies.sql` + `20260814_multi_department_access.sql` (`jwt_matches_department_code` ORs `app_metadata.accessible_departments`) |
 | Phone SMS OTP recovery + profile link | `lib/phone-auth.ts`, `lib/phone.ts`, `POST /api/auth/phone-reset/*` |

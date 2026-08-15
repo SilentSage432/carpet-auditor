@@ -1,5 +1,12 @@
 # DeptSync Hub — Development Journal
 
+## 2026-08-15 — URL stealth + HTTP-only auth gate
+
+### Shipped
+- **De-index** — `public/robots.txt` (`User-agent: *` / `Disallow: /`) plus global `X-Robots-Tag: noindex, nofollow, noarchive` in `next.config.ts` (`/` and `/:path*`) and root metadata `robots: noindex`.
+- **Edge gate** — `proxy.ts` (Next 16 successor to `middleware.ts`; both files cannot coexist). Unauthenticated `/`, `/dashboard`, and other HTML routes redirect to `/login` before RSC. `/api/*` (except `/api/auth`, `/api/cron`, `/api/invite`) requires the hub cookie or `Authorization: Bearer`. Cron still uses `CRON_SECRET`.
+- **HTTP-only session** — `POST /api/auth/gate` mints `deptsync_hub_gate` (HttpOnly, SameSite=Lax, 8h) after a live Supabase JWT. `startAuthSession` / logout sync it. `/login` (`AccessGate`) is the public AuthWall; `/access-gate` and `/auth` redirect there. SW shell cache is `deptsync-shell-v6-stealth` and no longer precaches `/`.
+
 ## 2026-08-15 — Tactical Voice Hub + bay freshness on Floor
 
 ### Shipped

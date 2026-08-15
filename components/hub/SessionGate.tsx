@@ -46,28 +46,30 @@ export function SessionGate({
     const session = readAuthSession();
 
     if (session && isAuthSessionExpired(session)) {
-      // Only clear when the inactivity timeout actually elapsed
       clearAuthSession();
       setSpecialist(null);
-    } else if (session) {
-      // Valid session → admit. No PIN / biometric re-check on route entry.
+      setStoreNumber(getStoreNumber());
+      setReady(true);
+      window.location.replace("/login");
+      return;
+    }
+    if (session) {
       const touched = touchAuthSession() ?? session;
       setSpecialist(touched.specialist);
-    } else {
-      // Missing session — do NOT clearAuthSession() here.
-      // Clearing on a null read wiped valid sessions when store_number
-      // normalization briefly mismatched during navigation.
-      setSpecialist(null);
+      setStoreNumber(getStoreNumber());
+      setReady(true);
+      return;
     }
-
+    setSpecialist(null);
     setStoreNumber(getStoreNumber());
     setReady(true);
+    window.location.replace("/login");
   }, []);
 
   function logout() {
     clearAuthSession();
     setSpecialist(null);
-    window.location.href = "/";
+    window.location.replace("/login");
   }
 
   if (!ready) {
@@ -75,16 +77,7 @@ export function SessionGate({
   }
 
   if (!specialist) {
-    return (
-      <GateMessage title="Sign in required">
-        <p className="text-slate-300">
-          Open DeptSync Hub, sign in, then return to this page.
-        </p>
-        <Link href="/" className="mt-4 inline-block text-emerald-400 underline">
-          Go to Hub login
-        </Link>
-      </GateMessage>
-    );
+    return <DeptSyncSplash message="Redirecting to sign in…" />;
   }
 
   if (allow && !allow(specialist)) {

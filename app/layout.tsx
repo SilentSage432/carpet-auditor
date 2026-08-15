@@ -25,6 +25,20 @@ export const metadata: Metadata = {
   description:
     "Department & SIMS Inventory Audit Suite for Lowe's Stores",
   applicationName: "DeptSync Hub",
+  robots: {
+    index: false,
+    follow: false,
+    nocache: true,
+    noarchive: true,
+    nosnippet: true,
+    googleBot: {
+      index: false,
+      follow: false,
+      noimageindex: true,
+      nosnippet: true,
+      noarchive: true,
+    },
+  },
   appleWebApp: {
     capable: true,
     title: "DeptSync",
