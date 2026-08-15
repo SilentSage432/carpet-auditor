@@ -10,6 +10,12 @@ import {
   STORE_OPS_AUTH_HINT,
 } from "./auth-soft";
 import { readableError } from "./errors";
+import {
+  clearDurable,
+  durableListKey,
+  peekDurable,
+  putDurable,
+} from "./cache";
 import { createTtlCache } from "./ttl-cache";
 import {
   buildLocalShiftBriefing,
@@ -38,6 +44,9 @@ const rotationsCache = createTtlCache<{
 const locationsCache = createTtlCache<StoreOpsListResult<StoreLocation>>(
   STORE_OPS_LIST_TTL_MS
 );
+const healthCache = createTtlCache<StoreHealthSnapshotClient>(
+  STORE_OPS_LIST_TTL_MS
+);
 
 function storeOpsListCacheKey(
   specialist: StoreSpecialist,
@@ -46,11 +55,111 @@ function storeOpsListCacheKey(
   return `${specialist.id}:${getStoreNumber()}:${extra}`;
 }
 
+function durableStore(
+  specialist: StoreSpecialist,
+  storeNumber?: string | null
+): string {
+  return normalizeStoreNumber(
+    storeNumber || getStoreNumber() || specialist.store_number || ""
+  );
+}
+
+function durableKey(
+  kind: "store_locations" | "weekly_rotations" | "shift_briefings",
+  specialist: StoreSpecialist,
+  extra = "",
+  storeNumber?: string | null
+): string {
+  return durableListKey(
+    kind,
+    specialist.id,
+    durableStore(specialist, storeNumber),
+    extra
+  );
+}
+
+function rememberDurable<T>(
+  kind: "store_locations" | "weekly_rotations" | "shift_briefings",
+  specialist: StoreSpecialist,
+  extra: string,
+  data: T,
+  storeNumber?: string | null
+): T {
+  void putDurable(kind, durableKey(kind, specialist, extra, storeNumber), data);
+  return data;
+}
+
 /** Drop cached Store Map / Zebra list GETs after writes. */
 export function invalidateStoreOpsListCaches(): void {
   departmentsCache.invalidate();
   rotationsCache.invalidate();
   locationsCache.invalidate();
+  healthCache.invalidate();
+  void clearDurable();
+}
+
+export async function peekCachedStoreLocations(
+  specialist: StoreSpecialist,
+  departmentId?: string
+): Promise<StoreOpsListResult<StoreLocation> | undefined> {
+  const qs = departmentId
+    ? `?department_id=${encodeURIComponent(departmentId)}`
+    : "";
+  const row = await peekDurable<StoreOpsListResult<StoreLocation>>(
+    "store_locations",
+    durableKey("store_locations", specialist, qs)
+  );
+  return row?.data;
+}
+
+export async function peekCachedRotations(
+  specialist: StoreSpecialist,
+  departmentId?: string
+): Promise<
+  | {
+      assigned_week: string;
+      rotations: WeeklyRotationWithLocation[];
+    }
+  | undefined
+> {
+  const qs = departmentId
+    ? `?department_id=${encodeURIComponent(departmentId)}`
+    : "";
+  const row = await peekDurable<{
+    assigned_week: string;
+    rotations: WeeklyRotationWithLocation[];
+  }>("weekly_rotations", durableKey("weekly_rotations", specialist, qs));
+  return row?.data;
+}
+
+export async function peekCachedDepartments(
+  specialist: StoreSpecialist,
+  storeNumber?: string | null
+): Promise<StoreOpsListResult<Department> | undefined> {
+  const store = normalizeStoreNumber(
+    storeNumber || getStoreNumber() || specialist.store_number || ""
+  );
+  const row = await peekDurable<StoreOpsListResult<Department>>(
+    "store_locations",
+    durableKey("store_locations", specialist, `departments:${store}`, store)
+  );
+  return row?.data;
+}
+
+export type ShiftBriefingCachePayload = {
+  snapshot: StoreHealthSnapshotClient;
+  briefing: ShiftBriefingClient;
+};
+
+export async function peekCachedShiftBriefing(
+  specialist: StoreSpecialist,
+  week?: string
+): Promise<ShiftBriefingCachePayload | undefined> {
+  const row = await peekDurable<ShiftBriefingCachePayload>(
+    "shift_briefings",
+    durableKey("shift_briefings", specialist, week ?? "")
+  );
+  return row?.data;
 }
 
 async function storeOpsFetch<T>(
@@ -136,11 +245,19 @@ export async function fetchDepartmentsDetailed(
           auth_required?: boolean;
           hint?: string;
         }>("/api/departments", specialist, undefined, store);
-        return {
+        const result = {
           items: data.departments ?? [],
           authRequired: Boolean(data.auth_required),
           hint: data.hint,
         };
+        rememberDurable(
+          "store_locations",
+          specialist,
+          `departments:${store}`,
+          result,
+          store
+        );
+        return result;
       } catch (err) {
         console.error("[fetchDepartmentsDetailed]", err);
         const message = String((err as { message?: string } | null)?.message ?? "");
@@ -181,11 +298,13 @@ export async function fetchStoreLocationsDetailed(
           auth_required?: boolean;
           hint?: string;
         }>(`/api/store-locations${qs}`, specialist);
-        return {
+        const result = {
           items: data.locations ?? [],
           authRequired: Boolean(data.auth_required),
           hint: data.hint,
         };
+        rememberDurable("store_locations", specialist, qs, result);
+        return result;
       } catch (err) {
         const message = String((err as { message?: string } | null)?.message ?? "");
         if (isStoreOpsAuthFailureMessage(message)) {
@@ -419,10 +538,12 @@ export async function fetchThisWeekRotations(
           ? data.rotations.filter((r) => Boolean(r?.assigned_week))
           : [];
 
-        return {
+        const result = {
           assigned_week: week,
           rotations,
         };
+        rememberDurable("weekly_rotations", specialist, qs, result);
+        return result;
       } catch {
         return {
           assigned_week: "",
@@ -753,30 +874,41 @@ export async function fetchStoreHealth(
   week?: string
 ): Promise<StoreHealthSnapshotClient> {
   const qs = week ? `?week=${encodeURIComponent(week)}` : "";
+  const empty: StoreHealthSnapshotClient = {
+    assigned_week: week ?? "",
+    store_id: null,
+    scope: "store",
+    department: null,
+    departments: [],
+    barriers: [],
+    bottleneck_summary: [],
+    totals: {
+      assigned: 0,
+      completed: 0,
+      open: 0,
+      exceptions: 0,
+      completion_pct: 0,
+    },
+    telemetry: null,
+    bay_health: null,
+  };
   try {
-    return await storeOpsFetch<StoreHealthSnapshotClient>(
-      `/api/store-health${qs}`,
-      specialist
+    return await healthCache.getSWR(
+      storeOpsListCacheKey(specialist, `store-health:${qs}`),
+      async () => {
+        const snapshot = await storeOpsFetch<StoreHealthSnapshotClient>(
+          `/api/store-health${qs}`,
+          specialist
+        );
+        rememberDurable("shift_briefings", specialist, week ?? "", {
+          snapshot,
+          briefing: localBriefingFromSnapshot(snapshot),
+        });
+        return snapshot;
+      }
     );
   } catch {
-    return {
-      assigned_week: week ?? "",
-      store_id: null,
-      scope: "store",
-      department: null,
-      departments: [],
-      barriers: [],
-      bottleneck_summary: [],
-      totals: {
-        assigned: 0,
-        completed: 0,
-        open: 0,
-        exceptions: 0,
-        completion_pct: 0,
-      },
-      telemetry: null,
-      bay_health: null,
-    };
+    return empty;
   }
 }
 

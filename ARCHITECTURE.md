@@ -5,7 +5,8 @@ app/page.tsx                      → Hub shell (AuthWall + specialty scan `?sec
 app/dashboard/page.tsx            → Floor weekly bay checklist (unified layout; verify + exceptions inline)
 app/(workflow)/layout.tsx         → Keep-alive Floor/Map/Roster/Settings shell (SessionGate once)
 components/hub/WorkflowTabShell.tsx → Persistent tab panels (`hidden`; primary tabs hosted immediately)
-lib/store-ops/ttl-cache.ts        → TTL + in-flight + getSWR stale-while-revalidate
+lib/store-ops/ttl-cache.ts        → TTL + in-flight + getSWR stale-while-revalidate (L1 memory)
+lib/store-ops/cache.ts            → Durable IndexedDB SWR (L2): store_locations, weekly_rotations, shift_briefings
 lib/toast.ts                      → Sonner success/error helpers (presentation)
 components/ui/Toaster.tsx         → Global toast host
 app/layout.tsx                    → Geist + Geist Mono, PWA meta, ThemeProvider + FOUC boot script + Toaster
@@ -91,7 +92,7 @@ components/store-ops/PredictiveCopilotBanner.tsx → Dismissible Floor briefing 
 components/store-ops/CarryOverPriorityBadge.tsx → Amber Geist Mono carry-over badge
 lib/store-ops/downstock.ts → Downstock/packdown flags (queue owner; assignment composes sunday-audit)
 lib/store-ops/map-readiness.ts → Store Map green/yellow/red readiness tones (composes bay-health stale + week)
-lib/store-ops/velocity.ts → IRP cadence tones, seed presets (14d/5d/lock), custom_decay_days, Sunday decay multiplier
+lib/store-ops/velocity.ts → IRP cadence tones, seed presets (14d/5d/lock), custom_decay_days, Sunday decay multiplier, async decay scores
 lib/store-ops/bay-service.ts → Persist bay_service_logs + stamp last_serviced_at + promote velocity
 lib/store-ops/rotation.ts → Sunday draw: carry-over prepend then velocity-priority pick (composed by rotations.ts)
 lib/store-ops/audit-summary.ts → Supervisor weekly rollup composition (quota / associate / barriers)
@@ -117,6 +118,7 @@ supabase/migrations/20260814_bay_velocity_heatmap.sql → store_locations IRP co
 supabase/migrations/20260814_multi_department_access.sql → profiles + store_specialists accessible_departments + JWT match
 supabase/migrations/20260815_associate_shift_days.sql → daily on-duty / call-out / shift clock + store RLS
 supabase/migrations/20260815_carry_over_priority.sql → store_locations.carried_over + sunday_bay_assignments CARRIED_OVER
+supabase/migrations/20260815_performance_indexes.sql → composite indexes: dept+aisle+bay, service logs by bay/time, rotations by dept+is_completed
 supabase/migrations/20260815_custom_decay_days.sql → store_locations.custom_decay_days (3–21 Sunday cadence)
 app/admin/roles/page.tsx          → Redirect → /roster
 app/api/admin/department-access/route.ts → Instant accessible_departments upsert + JWT app_metadata
@@ -236,6 +238,7 @@ Mid-scan form drafts persist via `carpet_hub_audit_draft` / `carpet_hub_applianc
 `installSyncAutoFlush` replays on `online`, tab focus, and `visibilitychange`.
 Version mismatches / HTTP 409 pause for `ConflictResolutionModal` (keep local vs accept server).
 The service worker caches the app shell for instant cold starts without connectivity.
+Store Map / Floor / Shift Briefing hydrate from IndexedDB (`lib/store-ops/cache.ts`) then revalidate over the network; UI state updates only when the durable fingerprint changes.
 
 ## Schema note
 

@@ -24,8 +24,11 @@ import { isSupervisor } from "@/lib/specialists";
 import {
   fetchDepartments,
   fetchThisWeekRotations,
+  peekCachedDepartments,
+  peekCachedRotations,
   verifyAllCompletedBays,
 } from "@/lib/store-ops/client";
+import { fingerprintsEqual } from "@/lib/store-ops/cache";
 import {
   filterFlooringRotations,
   findFlooringDepartment,
@@ -68,10 +71,17 @@ export function FloorTab({ specialist }: WorkflowTabProps) {
         const depts = await fetchDepartments(member).catch(() => []);
         const nextDeptId = workingDepartmentId(member, depts);
         const data = await fetchThisWeekRotations(member, nextDeptId);
-        setWeek(data.assigned_week || "");
-        setDeptId(nextDeptId ?? null);
-        setRotations(data.rotations ?? []);
-        setFlooringDeptId(findFlooringDepartment(depts)?.id ?? null);
+        const nextWeek = data.assigned_week || "";
+        const nextRotations = data.rotations ?? [];
+        const nextFlooring = findFlooringDepartment(depts)?.id ?? null;
+        setWeek((prev) => (prev === nextWeek ? prev : nextWeek));
+        setDeptId((prev) => (prev === (nextDeptId ?? null) ? prev : nextDeptId ?? null));
+        setRotations((prev) =>
+          fingerprintsEqual(prev, nextRotations) ? prev : nextRotations
+        );
+        setFlooringDeptId((prev) =>
+          prev === nextFlooring ? prev : nextFlooring
+        );
         setHealthKey((k) => k + 1);
       } catch {
         setWeek("");
@@ -79,6 +89,7 @@ export function FloorTab({ specialist }: WorkflowTabProps) {
         setRotations([]);
       } finally {
         if (!opts?.silent) setLoading(false);
+        else setLoading(false);
       }
     },
     []
@@ -89,7 +100,32 @@ export function FloorTab({ specialist }: WorkflowTabProps) {
   }, [reload, specialist]);
 
   useEffect(() => {
-    void reload(specialist);
+    let cancelled = false;
+    async function boot() {
+      const cachedDepts = await peekCachedDepartments(specialist);
+      if (cancelled) return;
+      const deptItems = cachedDepts?.items ?? [];
+      const nextDeptId = workingDepartmentId(specialist, deptItems);
+      if (deptItems.length) {
+        setDeptId(nextDeptId ?? null);
+        setFlooringDeptId(findFlooringDepartment(deptItems)?.id ?? null);
+      }
+      const cachedWeek = await peekCachedRotations(
+        specialist,
+        nextDeptId ?? undefined
+      );
+      if (cancelled) return;
+      if (cachedWeek) {
+        setWeek(cachedWeek.assigned_week || "");
+        setRotations(cachedWeek.rotations ?? []);
+        setLoading(false);
+      }
+      if (!cancelled) void reload(specialist, { silent: true });
+    }
+    void boot();
+    return () => {
+      cancelled = true;
+    };
   }, [specialist, reload, contextTick]);
 
   useEffect(() => {
@@ -221,7 +257,7 @@ export function FloorTab({ specialist }: WorkflowTabProps) {
             {simplified ? "Your assigned bays" : "This week's bays"}
             {flooringFocus && !simplified ? " · Flooring" : ""}
           </p>
-          {loading ? (
+          {loading && displayRotations.length === 0 ? (
             <p className="text-sm text-zinc-400">Loading this week&apos;s bays…</p>
           ) : (
             <ZebraChecklist

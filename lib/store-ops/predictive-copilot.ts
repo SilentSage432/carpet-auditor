@@ -36,7 +36,11 @@ import {
   type StoreLocation,
   type WeeklyRotationWithLocation,
 } from "@/lib/store-ops/types";
-import { isHotServiceIntensity } from "@/lib/store-ops/velocity";
+import {
+  isHotServiceIntensity,
+  scoreLocationDecaysAsync,
+  yieldToMain,
+} from "@/lib/store-ops/velocity";
 import type { StoreSpecialist } from "@/lib/types";
 
 export const COPILOT_DECAY_DAYS = 14;
@@ -176,6 +180,8 @@ export async function composePredictiveCopilot(input: {
 
   const recs: CopilotRecommendation[] = [];
 
+  await yieldToMain();
+
   const carryLocs = locations.filter(
     (loc) =>
       (loc.carried_over === true || loc.status === "CARRIED_OVER") &&
@@ -202,6 +208,7 @@ export async function composePredictiveCopilot(input: {
   const storeId = locations[0]?.store_id || input.rotations[0]?.store_id || "";
   const since = new Date();
   since.setDate(since.getDate() - COPILOT_LOG_WINDOW_DAYS);
+  await yieldToMain();
   const logs = await loadServiceLogs(storeId, since.toISOString());
   const todayWeekday = new Date().getDay();
   const weekdayCounts = new Map<
@@ -261,14 +268,18 @@ export async function composePredictiveCopilot(input: {
     }
   }
 
-  const decaying = locations.filter((loc) => {
-    if (weekLocationIds.has(loc.id)) return false;
-    const age =
-      daysSinceIso(loc.last_serviced_at) ??
-      daysSinceIso(loc.last_completed_at);
-    if (age == null) return true;
-    return age > COPILOT_DECAY_DAYS;
-  });
+  const decayCandidates = locations.filter((loc) => !weekLocationIds.has(loc.id));
+  const decayScores = await scoreLocationDecaysAsync(decayCandidates);
+  const decaying = decayScores
+    .filter((row) => {
+      const loc = row.location;
+      const age =
+        daysSinceIso(loc.last_serviced_at) ??
+        daysSinceIso(loc.last_completed_at);
+      if (age == null) return true;
+      return age > COPILOT_DECAY_DAYS;
+    })
+    .map((row) => row.location);
   const adjacentDecay = decaying.filter((loc) =>
     openZones.some((zone) => adjacent(loc, zone))
   );

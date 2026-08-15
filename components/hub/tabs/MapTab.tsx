@@ -24,7 +24,11 @@ import {
   fetchStoreLocationsDetailed,
   fetchThisWeekRotations,
   invalidateStoreOpsListCaches,
+  peekCachedDepartments,
+  peekCachedRotations,
+  peekCachedStoreLocations,
 } from "@/lib/store-ops/client";
+import { fingerprintsEqual } from "@/lib/store-ops/cache";
 import {
   isStoreOpsAuthFailureMessage,
   STORE_OPS_AUTH_HINT,
@@ -68,8 +72,8 @@ export function MapTab({ specialist }: WorkflowTabProps) {
     );
   })();
 
-  const reload = useCallback(async (member: typeof specialist) => {
-    setLoading(true);
+  const reload = useCallback(async (member: typeof specialist, silent = false) => {
+    if (!silent) setLoading(true);
     setError(null);
     setAuthRequired(false);
     try {
@@ -99,20 +103,27 @@ export function MapTab({ specialist }: WorkflowTabProps) {
         })),
       ]);
 
-      setDepartments(depts.items);
-      setLocations(locs.items);
-      setWeekRotationLocations(
-        (weekData.rotations ?? [])
-          .map((row) => ({
-            locationId: String(row.location_id || row.store_locations?.id || ""),
-            completed: Boolean(row.is_completed),
-          }))
-          .filter((row) => row.locationId)
+      const nextWeek = (weekData.rotations ?? [])
+        .map((row) => ({
+          locationId: String(row.location_id || row.store_locations?.id || ""),
+          completed: Boolean(row.is_completed),
+        }))
+        .filter((row) => row.locationId);
+      const nextBarriers = (exceptions.exceptions ?? [])
+        .map((row) => String(row.bay_id ?? ""))
+        .filter(Boolean);
+
+      setDepartments((prev) =>
+        fingerprintsEqual(prev, depts.items) ? prev : depts.items
       );
-      setBarrierLocationIds(
-        (exceptions.exceptions ?? [])
-          .map((row) => String(row.bay_id ?? ""))
-          .filter(Boolean)
+      setLocations((prev) =>
+        fingerprintsEqual(prev, locs.items) ? prev : locs.items
+      );
+      setWeekRotationLocations((prev) =>
+        fingerprintsEqual(prev, nextWeek) ? prev : nextWeek
+      );
+      setBarrierLocationIds((prev) =>
+        fingerprintsEqual(prev, nextBarriers) ? prev : nextBarriers
       );
       if (depts.authRequired || locs.authRequired) {
         setAuthRequired(true);
@@ -143,7 +154,44 @@ export function MapTab({ specialist }: WorkflowTabProps) {
   }, []);
 
   useEffect(() => {
-    void reload(specialist);
+    let cancelled = false;
+    async function boot() {
+      const cachedDepts = await peekCachedDepartments(specialist);
+      if (cancelled) return;
+      if (cachedDepts?.items.length) {
+        setDepartments(cachedDepts.items);
+        const deptId = workingDepartmentId(specialist, cachedDepts.items);
+        const [cachedLocs, cachedWeek] = await Promise.all([
+          peekCachedStoreLocations(specialist, deptId),
+          peekCachedRotations(specialist, deptId),
+        ]);
+        if (cancelled) return;
+        if (cachedLocs?.items.length) {
+          setLocations(cachedLocs.items);
+          setAuthRequired(
+            Boolean(cachedDepts.authRequired || cachedLocs.authRequired)
+          );
+          setLoading(false);
+        }
+        if (cachedWeek) {
+          setWeekRotationLocations(
+            (cachedWeek.rotations ?? [])
+              .map((row) => ({
+                locationId: String(
+                  row.location_id || row.store_locations?.id || ""
+                ),
+                completed: Boolean(row.is_completed),
+              }))
+              .filter((row) => row.locationId)
+          );
+        }
+      }
+      if (!cancelled) void reload(specialist, true);
+    }
+    void boot();
+    return () => {
+      cancelled = true;
+    };
   }, [specialist, reload, contextTick]);
 
   useEffect(() => {
@@ -255,7 +303,7 @@ export function MapTab({ specialist }: WorkflowTabProps) {
         ) : null}
 
         <div className="space-y-3">
-          {loading ? (
+          {loading && locations.length === 0 ? (
             <p className="text-sm text-zinc-400">Loading locations…</p>
           ) : mapSurface === "manage" && mapConsole ? (
             <AisleBayManager

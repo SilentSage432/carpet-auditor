@@ -12,6 +12,7 @@ import {
   composePredictiveCopilot,
   type CopilotRecommendation,
 } from "@/lib/store-ops/predictive-copilot";
+import { yieldToMain } from "@/lib/store-ops/velocity";
 import { canManageShiftBoard } from "@/lib/rbac";
 import { getStoreNumber } from "@/lib/store";
 import { localWorkDate } from "@/lib/store-ops/shift-status";
@@ -49,6 +50,7 @@ export function PredictiveCopilotBanner({
   const load = useCallback(async () => {
     setLoading(true);
     try {
+      await yieldToMain();
       const next = await composePredictiveCopilot({
         specialist,
         week,
@@ -76,7 +78,24 @@ export function PredictiveCopilotBanner({
   }, [refreshKey]);
 
   useEffect(() => {
-    void load();
+    let idleId = 0;
+    let cancelled = false;
+    const run = () => {
+      if (!cancelled) void load();
+    };
+    if (typeof requestIdleCallback === "function") {
+      idleId = requestIdleCallback(run, { timeout: 120 });
+    } else {
+      idleId = window.setTimeout(run, 0);
+    }
+    return () => {
+      cancelled = true;
+      if (typeof cancelIdleCallback === "function") {
+        cancelIdleCallback(idleId);
+      } else {
+        window.clearTimeout(idleId);
+      }
+    };
   }, [load, refreshKey]);
 
   function dismiss() {

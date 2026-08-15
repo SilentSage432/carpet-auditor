@@ -260,6 +260,51 @@ export function velocityHeatLabel(tone: VelocityHeatTone): string {
   return "Untouched >18 days";
 }
 
+/** Yield so historical decay scoring does not block Floor/Map first paint. */
+export function yieldToMain(): Promise<void> {
+  return new Promise((resolve) => {
+    if (typeof requestIdleCallback === "function") {
+      requestIdleCallback(() => resolve(), { timeout: 24 });
+      return;
+    }
+    setTimeout(resolve, 0);
+  });
+}
+
+export type LocationDecayScore = {
+  location: Pick<
+    StoreLocation,
+    | "id"
+    | "aisle"
+    | "bay"
+    | "type"
+    | "velocity_tier"
+    | "custom_decay_days"
+    | "last_serviced_at"
+    | "last_completed_at"
+  >;
+  score: number;
+};
+
+/** Chunked decay multipliers — yields every `yieldEvery` bays. */
+export async function scoreLocationDecaysAsync<
+  T extends Pick<
+    StoreLocation,
+    | "velocity_tier"
+    | "custom_decay_days"
+    | "last_serviced_at"
+    | "last_completed_at"
+  >,
+>(locations: T[], yieldEvery = 40): Promise<Array<{ location: T; score: number }>> {
+  const out: Array<{ location: T; score: number }> = [];
+  for (let i = 0; i < locations.length; i += 1) {
+    if (i > 0 && i % yieldEvery === 0) await yieldToMain();
+    out.push({ location: locations[i], score: decayDrawMultiplier(locations[i]) });
+  }
+  out.sort((a, b) => b.score - a.score);
+  return out;
+}
+
 export const VELOCITY_HEAT_LEGEND: ReadonlyArray<{
   tone: VelocityHeatTone;
   label: string;

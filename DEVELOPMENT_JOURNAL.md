@@ -1,5 +1,13 @@
 # DeptSync Hub — Development Journal
 
+## 2026-08-15 — Store Ops instant-render SWR + map/briefing performance
+
+### Shipped
+- **Durable SWR** (`lib/store-ops/cache.ts`) — IndexedDB object stores for `store_locations`, `weekly_rotations`, and `shift_briefings`. Map/Floor peek cache first (<20ms), then background network; React state updates only when the fingerprint changes. `ttl-cache.ts` stays L1; `client.ts` write-through + `invalidateStoreOpsListCaches` clears both.
+- **Shift briefing** — `ShiftBriefingCard` hydrates from IDB, memoizes `localShiftBriefingFromHealth`, yields before health fetch. Predictive Copilot defers compose to `requestIdleCallback`; decay scores run in `scoreLocationDecaysAsync` (yield every 40 bays).
+- **Map DOM** — Visual Grid and Manage console chunk 16 aisles / 24 bays; Manage starts collapsed. Cadence maps + SVG aisle heat strips are memoized; Sell/Top uses a local overlay so toggling a face does not reload the map.
+- **Indexes** — apply `20260815_performance_indexes.sql` (`idx_store_locations_dept_aisle`, `idx_bay_service_logs_bay_time`, `idx_rotations_active`) on canonical columns.
+
 ## 2026-08-15 — Theme, preferences, audio & haptics engine
 
 ### Shipped

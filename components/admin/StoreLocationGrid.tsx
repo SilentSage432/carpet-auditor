@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { memo, startTransition, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { compareAisles } from "@/lib/store-ops/aisle";
 import { formatBayTag, type Department, type StoreLocation } from "@/lib/store-ops/types";
 import type { StoreSpecialist } from "@/lib/types";
@@ -27,6 +27,9 @@ import {
   worstVelocityHeat,
   type VelocityHeatTone,
 } from "@/lib/store-ops/velocity";
+
+const AISLE_CHUNK = 16;
+const BAY_CHUNK = 24;
 
 type Props = {
   specialist: StoreSpecialist;
@@ -69,6 +72,11 @@ type SheetBay = {
 
 type MapViewMode = "standard" | "heatmap";
 
+type CadenceEntry = {
+  ready: MapReadinessTone;
+  heat: VelocityHeatTone;
+};
+
 function buildBayPairs(locs: StoreLocation[]): BayPair[] {
   const byBay = new Map<number, BayPair>();
   for (const loc of locs) {
@@ -81,6 +89,17 @@ function buildBayPairs(locs: StoreLocation[]): BayPair[] {
     else if (loc.type === "TOPSTOCK") pair.topstock = loc;
   }
   return [...byBay.values()].sort((a, b) => a.bay - b.bay);
+}
+
+function toneFor(
+  loc: StoreLocation | null | undefined,
+  cadence: Map<string, CadenceEntry>,
+  heatmap: boolean
+): MapReadinessTone | VelocityHeatTone {
+  if (!loc) return heatmap ? "untouched" : "idle";
+  const entry = cadence.get(loc.id);
+  if (!entry) return heatmap ? "untouched" : "idle";
+  return heatmap ? entry.heat : entry.ready;
 }
 
 /**
@@ -108,6 +127,13 @@ export function StoreLocationGrid({
   const [verifiedOverlay, setVerifiedOverlay] = useState<Set<string>>(
     () => new Set()
   );
+  const [activeOverlay, setActiveOverlay] = useState<Record<string, boolean>>(
+    {}
+  );
+  const activeOverlayRef = useRef(activeOverlay);
+  activeOverlayRef.current = activeOverlay;
+  const [aisleVisible, setAisleVisible] = useState<Record<string, number>>({});
+  const [bayVisible, setBayVisible] = useState<Record<string, number>>({});
 
   const weekByLocation = useMemo(() => {
     const map = new Map<string, { assigned: boolean; completed: boolean }>();
@@ -125,6 +151,26 @@ export function StoreLocationGrid({
     [barrierLocationIds]
   );
 
+  const cadenceById = useMemo(() => {
+    const map = new Map<string, CadenceEntry>();
+    for (const loc of locations) {
+      const weekRow = weekByLocation.get(loc.id);
+      map.set(loc.id, {
+        ready: classifyMapReadiness({
+          lastCompletedAt: loc.last_completed_at,
+          status: loc.status,
+          inCurrentWeekRotation: Boolean(weekRow),
+          currentWeekCompleted:
+            verifiedOverlay.has(loc.id) || Boolean(weekRow?.completed),
+          hasBarrier: barrierSet.has(loc.id),
+          weekLabel: assignedWeek,
+        }),
+        heat: classifyVelocityHeat(loc),
+      });
+    }
+    return map;
+  }, [locations, weekByLocation, barrierSet, verifiedOverlay, assignedWeek]);
+
   useEffect(() => {
     function onReady(ev: Event) {
       const detail = (ev as CustomEvent<BayReadinessEventDetail>).detail;
@@ -139,24 +185,6 @@ export function StoreLocationGrid({
     window.addEventListener(BAY_READINESS_EVENT, onReady);
     return () => window.removeEventListener(BAY_READINESS_EVENT, onReady);
   }, []);
-
-  function readinessFor(loc: StoreLocation | null | undefined): MapReadinessTone {
-    if (!loc) return "idle";
-    const weekRow = weekByLocation.get(loc.id);
-    return classifyMapReadiness({
-      lastCompletedAt: loc.last_completed_at,
-      status: loc.status,
-      inCurrentWeekRotation: Boolean(weekRow),
-      currentWeekCompleted:
-        verifiedOverlay.has(loc.id) || Boolean(weekRow?.completed),
-      hasBarrier: barrierSet.has(loc.id),
-      weekLabel: assignedWeek,
-    });
-  }
-
-  function velocityFor(loc: StoreLocation | null | undefined): VelocityHeatTone {
-    return classifyVelocityHeat(loc);
-  }
 
   const departmentGroups = useMemo((): DepartmentGroup[] => {
     const nameById = new Map(departments.map((d) => [d.id, d.name]));
@@ -223,29 +251,37 @@ export function StoreLocationGrid({
     setOpenAisles((prev) => ({ ...prev, [key]: !prev[key] }));
   }
 
-  async function toggleActive(loc: StoreLocation) {
+  const toggleActive = useCallback(async (loc: StoreLocation) => {
+    const nextActive = !(activeOverlayRef.current[loc.id] ?? loc.is_active);
+    startTransition(() => {
+      setActiveOverlay((prev) => ({ ...prev, [loc.id]: nextActive }));
+    });
     setPendingId(loc.id);
     setError(null);
     try {
       await patchStoreLocation(specialist, loc.id, {
-        is_active: !loc.is_active,
+        is_active: nextActive,
       });
       toastSuccess(
-        `${loc.is_active ? "Paused" : "Activated"} Aisle ${loc.aisle} Bay ${loc.bay}`
+        `${nextActive ? "Activated" : "Paused"} Aisle ${loc.aisle} Bay ${loc.bay}`
       );
-      onChanged();
     } catch (err) {
       const msg = err instanceof Error ? err.message : "Update failed";
+      setActiveOverlay((prev) => {
+        const next = { ...prev };
+        delete next[loc.id];
+        return next;
+      });
       setError(msg);
       toastError(msg);
     } finally {
       setPendingId(null);
     }
-  }
+  }, [specialist]);
 
-  function openWalkSheet(bay: SheetBay) {
+  const openWalkSheet = useCallback((bay: SheetBay) => {
     setWalkBay(bay);
-  }
+  }, []);
 
   if (locations.length === 0) {
     return (
@@ -340,6 +376,10 @@ export function StoreLocationGrid({
 
       {departmentGroups.map((dept) => {
         const deptOpen = Boolean(openDepts[dept.departmentId]);
+        const aisleLimit = aisleVisible[dept.departmentId] ?? AISLE_CHUNK;
+        const visibleAisles = deptOpen
+          ? dept.aisles.slice(0, aisleLimit)
+          : [];
         return (
           <div
             key={dept.departmentId}
@@ -371,23 +411,26 @@ export function StoreLocationGrid({
 
             {deptOpen ? (
               <div className="space-y-2 border-t border-zinc-800/80 p-2">
-                {dept.aisles.map((aisle) => {
+                {visibleAisles.map((aisle) => {
                   const aisleKey = `${dept.departmentId}:${aisle.aisle}`;
                   const aisleOpen = Boolean(openAisles[aisleKey]);
                   const bayCount = aisle.bays.length;
+                  const aisleTones = aisle.locations.map((loc) =>
+                    toneFor(loc, cadenceById, heatmap)
+                  );
                   const aisleTone = heatmap
-                    ? worstVelocityHeat(
-                        aisle.locations.map((loc) => velocityFor(loc))
-                      )
-                    : worstMapReadiness(
-                        aisle.locations.map((loc) => readinessFor(loc))
-                      );
+                    ? worstVelocityHeat(aisleTones as VelocityHeatTone[])
+                    : worstMapReadiness(aisleTones as MapReadinessTone[]);
                   const aisleDotClass = heatmap
                     ? velocityHeatDotClass(aisleTone as VelocityHeatTone)
                     : mapReadinessDotClass(aisleTone as MapReadinessTone);
                   const aisleDotLabel = heatmap
                     ? velocityHeatLabel(aisleTone as VelocityHeatTone)
                     : mapReadinessLabel(aisleTone as MapReadinessTone);
+                  const bayLimit = bayVisible[aisleKey] ?? BAY_CHUNK;
+                  const visibleBays = aisleOpen
+                    ? aisle.bays.slice(0, bayLimit)
+                    : [];
                   return (
                     <div
                       key={aisleKey}
@@ -399,7 +442,7 @@ export function StoreLocationGrid({
                         onClick={() => toggleAisle(aisleKey)}
                         className="flex min-h-[44px] w-full items-center justify-between gap-3 px-3 py-2 text-left"
                       >
-                        <p className="flex items-center gap-2 font-mono text-sm font-semibold tracking-tight tabular-nums text-zinc-100">
+                        <p className="flex min-w-0 flex-1 items-center gap-2 font-mono text-sm font-semibold tracking-tight tabular-nums text-zinc-100">
                           <span
                             className={`inline-block h-2.5 w-2.5 shrink-0 rounded-full ${aisleDotClass}`}
                             title={aisleDotLabel}
@@ -409,86 +452,89 @@ export function StoreLocationGrid({
                             · {bayCount} bay{bayCount === 1 ? "" : "s"}
                           </span>
                         </p>
+                        <AisleCadenceHeatmap
+                          tones={aisle.bays.map((pair) => {
+                            const pairTones = [pair.selling, pair.topstock].map(
+                              (loc) => toneFor(loc, cadenceById, heatmap)
+                            );
+                            return heatmap
+                              ? worstVelocityHeat(
+                                  pairTones as VelocityHeatTone[]
+                                )
+                              : worstMapReadiness(
+                                  pairTones as MapReadinessTone[]
+                                );
+                          })}
+                          heatmap={heatmap}
+                        />
                         <HubIcon
                           id={aisleOpen ? "chevronUp" : "chevronDown"}
-                          className="h-4 w-4 text-zinc-400"
+                          className="h-4 w-4 shrink-0 text-zinc-400"
                         />
                       </button>
 
                       {aisleOpen ? (
                         <ul className="divide-y divide-zinc-800/80 border-t border-zinc-800/80">
-                          {aisle.bays.map((pair) => {
-                            const pairTone = worstMapReadiness(
-                              [pair.selling, pair.topstock].map((loc) =>
-                                readinessFor(loc)
-                              )
-                            );
-                            const pairHeat = worstVelocityHeat(
-                              [pair.selling, pair.topstock].map((loc) =>
-                                velocityFor(loc)
-                              )
-                            );
-                            const rowToneLabel = heatmap
-                              ? velocityHeatLabel(pairHeat)
-                              : mapReadinessLabel(pairTone);
-                            const rowDotClass = heatmap
-                              ? velocityHeatDotClass(pairHeat)
-                              : mapReadinessDotClass(pairTone);
-                            const sheetPayload: SheetBay = {
-                              departmentId: dept.departmentId,
-                              departmentName: dept.departmentName,
-                              aisle: aisle.aisle,
-                              pair,
-                            };
-                            return (
-                              <li
-                                key={`${aisleKey}-bay-${pair.bay}`}
-                                className={`flex min-h-[44px] items-center gap-2 px-2 py-1.5 ${
-                                  heatmap ? velocityHeatRowClass(pairHeat) : ""
-                                }`}
-                              >
-                                <button
-                                  type="button"
-                                  onClick={() => openWalkSheet(sheetPayload)}
-                                  className="min-w-0 flex-1 rounded-xl px-1 py-1 text-left active:bg-zinc-800/80"
-                                  aria-label={`Bay ${pair.bay} ${rowToneLabel}`}
-                                >
-                                  <span className="flex items-center gap-1.5">
-                                    <span
-                                      className={`inline-block h-2.5 w-2.5 shrink-0 rounded-full ${rowDotClass}`}
-                                      title={rowToneLabel}
-                                    />
-                                    <span className="truncate font-mono text-xs font-bold tracking-tight tabular-nums text-zinc-100">
-                                      {formatBayTag({
-                                        aisle: aisle.aisle,
-                                        bay: pair.bay,
-                                      })}
-                                    </span>
-                                  </span>
-                                  <span className="mt-0.5 block truncate font-mono text-[10px] font-semibold tracking-tight text-zinc-500">
-                                    {rowToneLabel}
-                                  </span>
-                                </button>
-                                <DualTypePill
-                                  selling={pair.selling}
-                                  topstock={pair.topstock}
-                                  pendingId={pendingId}
-                                  sellingReady={readinessFor(pair.selling)}
-                                  topstockReady={readinessFor(pair.topstock)}
-                                  sellingHeat={velocityFor(pair.selling)}
-                                  topstockHeat={velocityFor(pair.topstock)}
-                                  heatmap={heatmap}
-                                  canMutate={canMutate}
-                                  onToggle={toggleActive}
-                                />
-                              </li>
-                            );
-                          })}
+                          {visibleBays.map((pair) => (
+                            <BayRow
+                              key={`${aisleKey}-bay-${pair.bay}`}
+                              aisle={aisle.aisle}
+                              pair={pair}
+                              heatmap={heatmap}
+                              cadence={cadenceById}
+                              pendingId={pendingId}
+                              canMutate={canMutate}
+                              sellingActive={
+                                pair.selling
+                                  ? (activeOverlay[pair.selling.id] ??
+                                    pair.selling.is_active)
+                                  : false
+                              }
+                              topstockActive={
+                                pair.topstock
+                                  ? (activeOverlay[pair.topstock.id] ??
+                                    pair.topstock.is_active)
+                                  : false
+                              }
+                              departmentId={dept.departmentId}
+                              departmentName={dept.departmentName}
+                              onOpenWalk={openWalkSheet}
+                              onToggle={toggleActive}
+                            />
+                          ))}
                         </ul>
+                      ) : null}
+                      {aisleOpen && bayCount > bayLimit ? (
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setBayVisible((prev) => ({
+                              ...prev,
+                              [aisleKey]: bayLimit + BAY_CHUNK,
+                            }))
+                          }
+                          className="flex min-h-10 w-full items-center justify-center border-t border-zinc-800/80 font-mono text-[11px] font-bold text-accent"
+                        >
+                          Show more bays ({bayCount - bayLimit})
+                        </button>
                       ) : null}
                     </div>
                   );
                 })}
+                {dept.aisles.length > aisleLimit ? (
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setAisleVisible((prev) => ({
+                        ...prev,
+                        [dept.departmentId]: aisleLimit + AISLE_CHUNK,
+                      }))
+                    }
+                    className="flex min-h-10 w-full items-center justify-center rounded-xl border border-zinc-800/80 font-mono text-[11px] font-bold text-accent"
+                  >
+                    Show more aisles ({dept.aisles.length - aisleLimit})
+                  </button>
+                ) : null}
               </div>
             ) : null}
           </div>
@@ -529,7 +575,156 @@ export function StoreLocationGrid({
   );
 }
 
-function DualTypePill({
+const AisleCadenceHeatmap = memo(function AisleCadenceHeatmap({
+  tones,
+  heatmap,
+}: {
+  tones: Array<MapReadinessTone | VelocityHeatTone>;
+  heatmap: boolean;
+}) {
+  if (tones.length === 0) return null;
+  const width = Math.max(48, Math.min(120, tones.length * 3));
+  return (
+    <svg
+      aria-hidden
+      className="h-3 w-[4.5rem] shrink-0"
+      viewBox={`0 0 ${width} 12`}
+      preserveAspectRatio="none"
+    >
+      {tones.map((tone, idx) => {
+        const fill = heatmap
+          ? heatmapFill(tone as VelocityHeatTone)
+          : readinessFill(tone as MapReadinessTone);
+        const slice = width / tones.length;
+        return (
+          <rect
+            key={`${idx}-${tone}`}
+            x={idx * slice}
+            y={2}
+            width={Math.max(1, slice - 0.4)}
+            height={8}
+            rx={0.8}
+            fill={fill}
+          />
+        );
+      })}
+    </svg>
+  );
+});
+
+function heatmapFill(tone: VelocityHeatTone): string {
+  if (tone === "fresh") return "#22d3ee";
+  if (tone === "decaying") return "#fbbf24";
+  if (tone === "hotspot") return "#f43f5e";
+  return "#71717a";
+}
+
+function readinessFill(tone: MapReadinessTone): string {
+  if (tone === "verified") return "#34d399";
+  if (tone === "scheduled") return "#fbbf24";
+  if (tone === "attention") return "#fb7185";
+  return "#52525b";
+}
+
+const BayRow = memo(function BayRow({
+  aisle,
+  pair,
+  heatmap,
+  cadence,
+  pendingId,
+  canMutate,
+  sellingActive,
+  topstockActive,
+  departmentId,
+  departmentName,
+  onOpenWalk,
+  onToggle,
+}: {
+  aisle: string;
+  pair: BayPair;
+  heatmap: boolean;
+  cadence: Map<string, CadenceEntry>;
+  pendingId: string | null;
+  canMutate: boolean;
+  sellingActive: boolean;
+  topstockActive: boolean;
+  departmentId: string;
+  departmentName: string;
+  onOpenWalk: (bay: SheetBay) => void;
+  onToggle: (loc: StoreLocation) => void;
+}) {
+  const pairTone = worstMapReadiness(
+    [pair.selling, pair.topstock].map(
+      (loc) => toneFor(loc, cadence, false) as MapReadinessTone
+    )
+  );
+  const pairHeat = worstVelocityHeat(
+    [pair.selling, pair.topstock].map(
+      (loc) => toneFor(loc, cadence, true) as VelocityHeatTone
+    )
+  );
+  const rowToneLabel = heatmap
+    ? velocityHeatLabel(pairHeat)
+    : mapReadinessLabel(pairTone);
+  const rowDotClass = heatmap
+    ? velocityHeatDotClass(pairHeat)
+    : mapReadinessDotClass(pairTone);
+  const sheetPayload: SheetBay = {
+    departmentId,
+    departmentName,
+    aisle,
+    pair,
+  };
+
+  return (
+    <li
+      className={`flex min-h-[44px] items-center gap-2 px-2 py-1.5 ${
+        heatmap ? velocityHeatRowClass(pairHeat) : ""
+      }`}
+    >
+      <button
+        type="button"
+        onClick={() => onOpenWalk(sheetPayload)}
+        className="min-w-0 flex-1 rounded-xl px-1 py-1 text-left active:bg-zinc-800/80"
+        aria-label={`Bay ${pair.bay} ${rowToneLabel}`}
+      >
+        <span className="flex items-center gap-1.5">
+          <span
+            className={`inline-block h-2.5 w-2.5 shrink-0 rounded-full ${rowDotClass}`}
+            title={rowToneLabel}
+          />
+          <span className="truncate font-mono text-xs font-bold tracking-tight tabular-nums text-zinc-100">
+            {formatBayTag({
+              aisle,
+              bay: pair.bay,
+            })}
+          </span>
+        </span>
+        <span className="mt-0.5 block truncate font-mono text-[10px] font-semibold tracking-tight text-zinc-500">
+          {rowToneLabel}
+        </span>
+      </button>
+      <DualTypePill
+        selling={pair.selling}
+        topstock={pair.topstock}
+        pendingId={pendingId}
+        sellingReady={toneFor(pair.selling, cadence, false) as MapReadinessTone}
+        topstockReady={
+          toneFor(pair.topstock, cadence, false) as MapReadinessTone
+        }
+        sellingHeat={toneFor(pair.selling, cadence, true) as VelocityHeatTone}
+        topstockHeat={toneFor(pair.topstock, cadence, true) as VelocityHeatTone}
+        sellingActive={sellingActive}
+        topstockActive={topstockActive}
+        heatmap={heatmap}
+        canMutate={canMutate}
+        onToggle={onToggle}
+      />
+    </li>
+  );
+});
+
+const DualTypePill = memo(function DualTypePill({
   selling,
   topstock,
   pendingId,
@@ -537,6 +732,8 @@ function DualTypePill({
   topstockReady,
   sellingHeat,
   topstockHeat,
+  sellingActive,
+  topstockActive,
   heatmap = false,
   canMutate,
   onToggle,
@@ -548,6 +745,8 @@ function DualTypePill({
   topstockReady: MapReadinessTone;
   sellingHeat: VelocityHeatTone;
   topstockHeat: VelocityHeatTone;
+  sellingActive: boolean;
+  topstockActive: boolean;
   heatmap?: boolean;
   canMutate: boolean;
   onToggle: (loc: StoreLocation) => void;
@@ -560,6 +759,7 @@ function DualTypePill({
         fullLabel="Selling"
         readiness={sellingReady}
         velocity={sellingHeat}
+        isActive={sellingActive}
         heatmap={heatmap}
         pendingId={pendingId}
         canMutate={canMutate}
@@ -571,6 +771,7 @@ function DualTypePill({
         fullLabel="Topstock"
         readiness={topstockReady}
         velocity={topstockHeat}
+        isActive={topstockActive}
         heatmap={heatmap}
         pendingId={pendingId}
         canMutate={canMutate}
@@ -578,14 +779,15 @@ function DualTypePill({
       />
     </div>
   );
-}
+});
 
-function TypePill({
+const TypePill = memo(function TypePill({
   loc,
   label,
   fullLabel,
   readiness,
   velocity,
+  isActive,
   heatmap = false,
   pendingId,
   canMutate,
@@ -596,6 +798,7 @@ function TypePill({
   fullLabel: string;
   readiness: MapReadinessTone;
   velocity: VelocityHeatTone;
+  isActive: boolean;
   heatmap?: boolean;
   pendingId: string | null;
   canMutate: boolean;
@@ -620,7 +823,7 @@ function TypePill({
         ? "bg-amber-500/20 text-amber-100"
         : readiness === "attention"
           ? "bg-rose-500/25 text-rose-100"
-          : loc.is_active
+          : isActive
             ? "bg-accent/25 text-accent"
             : "text-zinc-500";
 
@@ -628,17 +831,17 @@ function TypePill({
     <button
       type="button"
       role="switch"
-      aria-checked={loc.is_active}
-      aria-label={`${fullLabel} bay ${loc.bay} ${loc.is_active ? "active" : "off"}`}
+      aria-checked={isActive}
+      aria-label={`${fullLabel} bay ${loc.bay} ${isActive ? "active" : "off"}`}
       disabled={!canMutate || pendingId === loc.id}
       onClick={() => {
         if (canMutate) onToggle(loc);
       }}
       className={`inline-flex h-8 min-w-[2.75rem] items-center justify-center rounded-full px-2 font-mono text-[10px] font-bold tracking-tight transition ${heatClass} ${
-        loc.is_active ? "" : "opacity-45"
+        isActive ? "" : "opacity-45"
       } disabled:opacity-40`}
     >
       {label}
     </button>
   );
-}
+});

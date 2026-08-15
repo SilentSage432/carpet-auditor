@@ -107,6 +107,8 @@ export function AisleBayManager({
   onChanged,
 }: Props) {
   const [openAisles, setOpenAisles] = useState<Record<string, boolean>>({});
+  const [aisleVisible, setAisleVisible] = useState(16);
+  const [bayVisible, setBayVisible] = useState<Record<string, number>>({});
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [batchConfirm, setBatchConfirm] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -155,10 +157,7 @@ export function AisleBayManager({
     locations[0]?.department_id || departments[0]?.id || "";
 
   function toggleAisle(aisle: string) {
-    setOpenAisles((prev) => {
-      const currentlyOpen = prev[aisle] !== false;
-      return { ...prev, [aisle]: !currentlyOpen };
-    });
+    setOpenAisles((prev) => ({ ...prev, [aisle]: !prev[aisle] }));
   }
 
   function togglePair(pair: BayPair) {
@@ -339,9 +338,12 @@ export function AisleBayManager({
           No aisles mapped for {contextLabel} yet.
         </p>
       ) : (
+        <>
         <ul className="space-y-2">
-          {groups.map((group) => {
-            const open = openAisles[group.aisle] !== false;
+          {groups.slice(0, aisleVisible).map((group) => {
+            const open = Boolean(openAisles[group.aisle]);
+            const bayLimit = bayVisible[group.aisle] ?? 24;
+            const visibleBays = open ? group.bays.slice(0, bayLimit) : [];
             return (
               <li
                 key={group.aisle}
@@ -370,7 +372,7 @@ export function AisleBayManager({
                 </button>
                 {open ? (
                   <ul className="space-y-1.5 border-t border-zinc-800/80 px-2 py-2">
-                    {group.bays.map((pair) => {
+                    {visibleBays.map((pair) => {
                       const faces = [pair.selling, pair.topstock].filter(
                         (loc): loc is StoreLocation => Boolean(loc)
                       );
@@ -446,12 +448,38 @@ export function AisleBayManager({
                         </li>
                       );
                     })}
+                    {group.bays.length > bayLimit ? (
+                      <li>
+                        <button
+                          type="button"
+                          onClick={() =>
+                            setBayVisible((prev) => ({
+                              ...prev,
+                              [group.aisle]: bayLimit + 24,
+                            }))
+                          }
+                          className="flex min-h-10 w-full items-center justify-center font-mono text-[11px] font-bold text-accent"
+                        >
+                          Show more bays ({group.bays.length - bayLimit})
+                        </button>
+                      </li>
+                    ) : null}
                   </ul>
                 ) : null}
               </li>
             );
           })}
         </ul>
+        {groups.length > aisleVisible ? (
+          <button
+            type="button"
+            onClick={() => setAisleVisible((n) => n + 16)}
+            className="flex min-h-11 w-full items-center justify-center rounded-xl border border-zinc-800 font-mono text-[11px] font-bold text-accent"
+          >
+            Show more aisles ({groups.length - aisleVisible})
+          </button>
+        ) : null}
+        </>
       )}
 
       {addOpen ? (

@@ -6,15 +6,18 @@
  * Manual refresh may call Gemini; quota/RPC errors fall back to the local brief.
  */
 
-import { useCallback, useEffect, useRef, useState, type TouchEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type TouchEvent } from "react";
 import { HubIcon } from "@/components/hub/NavIcons";
 import {
   fetchShiftBriefing,
   fetchStoreHealth,
   localShiftBriefingFromHealth,
+  peekCachedShiftBriefing,
   type ShiftBriefingClient,
   type StoreHealthSnapshotClient,
 } from "@/lib/store-ops/client";
+import { fingerprintsEqual } from "@/lib/store-ops/cache";
+import { yieldToMain } from "@/lib/store-ops/velocity";
 import type { StoreSpecialist } from "@/lib/types";
 
 const BRIEFING_CAPTIONS = [
@@ -39,12 +42,14 @@ export function ShiftBriefingCard({ specialist, refreshKey }: Props) {
   const pullStartY = useRef<number | null>(null);
   const [pullOffset, setPullOffset] = useState(0);
 
-  const loadLocal = useCallback(async () => {
-    setLoading(true);
+  const loadLocal = useCallback(async (opts?: { silent?: boolean }) => {
+    if (!opts?.silent) setLoading(true);
     try {
+      await yieldToMain();
       const nextSnapshot = await fetchStoreHealth(specialist);
-      setSnapshot(nextSnapshot);
-      setBriefing(localShiftBriefingFromHealth(nextSnapshot));
+      setSnapshot((prev) =>
+        fingerprintsEqual(prev, nextSnapshot) ? prev : nextSnapshot
+      );
     } catch {
       setBriefing({
         headline: "Shift health unavailable",
@@ -61,6 +66,14 @@ export function ShiftBriefingCard({ specialist, refreshKey }: Props) {
       setPullOffset(0);
     }
   }, [specialist]);
+
+  const localBriefing = useMemo(
+    () => (snapshot ? localShiftBriefingFromHealth(snapshot) : null),
+    [snapshot]
+  );
+  const shownBriefing = briefing?.source === "gemini" || briefing?.source === "session"
+    ? briefing
+    : (localBriefing ?? briefing);
 
   const refreshAi = useCallback(async () => {
     setAiBusy(true);
@@ -83,8 +96,23 @@ export function ShiftBriefingCard({ specialist, refreshKey }: Props) {
   }, [specialist, snapshot]);
 
   useEffect(() => {
-    void loadLocal();
-  }, [loadLocal, refreshKey]);
+    let cancelled = false;
+    async function boot() {
+      const cached = await peekCachedShiftBriefing(specialist);
+      if (cancelled) return;
+      if (cached?.snapshot) {
+        setSnapshot((prev) =>
+          fingerprintsEqual(prev, cached.snapshot) ? prev : cached.snapshot
+        );
+        setLoading(false);
+      }
+      if (!cancelled) void loadLocal({ silent: true });
+    }
+    void boot();
+    return () => {
+      cancelled = true;
+    };
+  }, [loadLocal, refreshKey, specialist]);
 
   function onTouchStart(e: TouchEvent) {
     if (typeof window !== "undefined" && window.scrollY > 8) return;
@@ -132,14 +160,14 @@ export function ShiftBriefingCard({ specialist, refreshKey }: Props) {
             <HubIcon id="zap" className="h-3.5 w-3.5" />
             Shift Intelligence Briefing
           </p>
-          {briefing?.assigned_week ? (
+          {shownBriefing?.assigned_week ? (
             <p className="mt-0.5 font-mono text-[10px] text-emerald-500/80">
-              Week {briefing.assigned_week}
-              {briefing.source === "local"
+              Week {shownBriefing.assigned_week}
+              {shownBriefing.source === "local"
                 ? " · local metrics"
-                : briefing.source === "gemini"
+                : shownBriefing.source === "gemini"
                   ? " · AI refresh"
-                  : briefing.source === "session"
+                  : shownBriefing.source === "session"
                     ? " · auth refresh needed"
                     : ""}
             </p>
@@ -161,20 +189,20 @@ export function ShiftBriefingCard({ specialist, refreshKey }: Props) {
       </div>
 
       <div className="relative mt-2">
-        {loading && !briefing ? (
+        {loading && !shownBriefing ? (
           <p className="text-sm text-emerald-200/70">
             Loading shift health…
           </p>
-        ) : briefing ? (
+        ) : shownBriefing ? (
           <>
             <h2 className="text-base font-bold tracking-tight text-emerald-300 [text-shadow:0_0_18px_rgba(52,211,153,0.35)]">
-              {briefing.headline}
+              {shownBriefing.headline}
             </h2>
             <p className="mt-0.5 text-[11px] font-semibold uppercase tracking-wider text-emerald-500/90">
-              Priority · {briefing.priority_department}
+              Priority · {shownBriefing.priority_department}
             </p>
             <ul className="mt-2 space-y-1.5">
-              {briefing.bullets.map((bullet, idx) => (
+              {shownBriefing.bullets.map((bullet, idx) => (
                 <li
                   key={`${idx}-${bullet.slice(0, 24)}`}
                   className="flex gap-2 text-sm leading-snug text-emerald-50/95"
@@ -194,7 +222,7 @@ export function ShiftBriefingCard({ specialist, refreshKey }: Props) {
                 </li>
               ))}
             </ul>
-            {briefing.auth_required || briefing.source === "session" ? (
+            {shownBriefing.auth_required || shownBriefing.source === "session" ? (
               <p className="mt-2 rounded-lg border border-amber-500/35 bg-amber-950/30 px-3 py-1.5 text-xs leading-snug text-amber-100">
                 Unlock with your Hub PIN/password to mint Store Ops Auth, then
                 tap refresh. Phone OTP is optional recovery only.
