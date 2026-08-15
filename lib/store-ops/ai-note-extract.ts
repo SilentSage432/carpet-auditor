@@ -1,7 +1,9 @@
 /**
  * Executive Floor Pad — Gemini "Extract Tasks & Tag".
- * Owns prompt / normalize / local fallback. Does not own editor UI or note CRUD.
+ * Owns prompt / schema / normalize / local fallback. Does not own editor UI or note CRUD.
  */
+
+import { asGeminiSchema } from "@/lib/ai/gemini-schema";
 
 export type NoteExtractInput = {
   title: string;
@@ -28,6 +30,66 @@ export type NoteExtractResult = {
   executive_summary: string;
   metadata: NoteExtractMetadata;
 };
+
+const noteEntitySchema = asGeminiSchema({
+  type: "object",
+  properties: {
+    serial: { type: "string", nullable: true },
+    model: { type: "string", nullable: true },
+    location: { type: "string", nullable: true },
+    details: { type: "string", nullable: true },
+    length_clf: { type: "number", nullable: true },
+    brand: { type: "string", nullable: true },
+    missing_tag: { type: "boolean", nullable: true },
+    issue: { type: "string", nullable: true },
+    bay: { type: "string", nullable: true },
+    severity: { type: "string", nullable: true },
+  },
+});
+
+/** Structured output for Floor Pad Copilot. */
+export const NOTE_EXTRACT_RESPONSE_SCHEMA = asGeminiSchema({
+  type: "object",
+  properties: {
+    executive_summary: { type: "string" },
+    tasks: {
+      type: "array",
+      items: { type: "string" },
+    },
+    aisle: { type: "string", nullable: true },
+    bay: { type: "integer", nullable: true },
+    metadata: {
+      type: "object",
+      properties: {
+        appliance_serials: {
+          type: "array",
+          items: noteEntitySchema,
+        },
+        carpet_remnants: {
+          type: "array",
+          items: noteEntitySchema,
+        },
+        operational_hotspots: {
+          type: "array",
+          items: noteEntitySchema,
+        },
+        vendor_mentions: {
+          type: "array",
+          items: { type: "string" },
+        },
+        follow_up_date: { type: "string", nullable: true },
+      },
+      required: [
+        "appliance_serials",
+        "carpet_remnants",
+        "operational_hotspots",
+        "vendor_mentions",
+        "follow_up_date",
+      ],
+    },
+  },
+  required: ["executive_summary", "tasks", "aisle", "bay", "metadata"],
+});
 
 export function emptyNoteExtractMetadata(): NoteExtractMetadata {
   return {
@@ -95,21 +157,7 @@ Title: ${title}
 Note (plain text):
 ${content}
 
-Return ONLY JSON with this schema (no markdown, no examples):
-{
-  "executive_summary": string,
-  "tasks": string[],
-  "aisle": string | null,
-  "bay": number | null,
-  "metadata": {
-    "appliance_serials": object[],
-    "carpet_remnants": object[],
-    "operational_hotspots": object[],
-    "vendor_mentions": string[],
-    "follow_up_date": string | null
-  }
-}
-metadata object fields when evidenced: serial, model, location, details; length_clf, brand, missing_tag; issue, bay, severity.`;
+Do not invent SKUs, aisles, bays, serials, brands, or hazards that are not evidenced.`;
 }
 
 function asRecord(value: unknown): Record<string, any> | null {

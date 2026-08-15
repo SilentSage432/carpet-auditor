@@ -12,15 +12,14 @@ import {
 } from "@/lib/flooring/ai-insights";
 import { computeMarkdown, formatMoney } from "@/lib/markdown";
 import { saveRemnant } from "@/lib/remnants";
-import { getStoreNumber } from "@/lib/store";
-import { fetchAudits, isToday } from "@/lib/storage";
+import { storeOpsAuthHeadersAsync } from "@/lib/store-ops/auth";
 import { findSupervisor, isSupervisor } from "@/lib/specialists";
-import type { CarpetAudit, Remnant, StoreSpecialist } from "@/lib/types";
+import type { Remnant, StoreSpecialist } from "@/lib/types";
 
 type Props = {
   remnants: Remnant[];
-  /** When omitted, shift audits are fetched on analyze. */
-  audits?: CarpetAudit[];
+  /** Unused — server fetches cycle audits. Kept so existing call sites compile. */
+  audits?: unknown;
   specialists: StoreSpecialist[];
   activeSpecialist: StoreSpecialist | null;
   onRemnantsChange: (items: Remnant[]) => void;
@@ -37,7 +36,6 @@ type InsightsResponse = FlooringAiInsights & {
 
 export function FlooringAIInsightBanner({
   remnants,
-  audits: auditsProp,
   specialists,
   activeSpecialist,
   onRemnantsChange,
@@ -56,21 +54,10 @@ export function FlooringAIInsightBanner({
     setBusy(true);
     setError(null);
     try {
-      let audits = auditsProp;
-      if (!audits) {
-        const all = await fetchAudits();
-        audits = all.filter((a) => isToday(a.created_at));
-        if (audits.length === 0) audits = all.slice(0, 40);
-      }
-
       const res = await fetch("/api/flooring/ai-insights", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          audits,
-          remnants,
-          store_number: getStoreNumber(),
-        }),
+        headers: await storeOpsAuthHeadersAsync(),
+        body: JSON.stringify({}),
       });
       const body = (await res.json().catch(() => ({}))) as InsightsResponse & {
         error?: string;
@@ -88,7 +75,7 @@ export function FlooringAIInsightBanner({
     } finally {
       setBusy(false);
     }
-  }, [auditsProp, remnants]);
+  }, []);
 
   async function applyRecommended(candidate: FlooringMarkdownCandidate) {
     const remnant = remnants.find((r) => r.id === candidate.remnant_id);
@@ -176,7 +163,7 @@ export function FlooringAIInsightBanner({
         <button
           type="button"
           aria-expanded={open}
-          disabled={busy || (remnants.length === 0 && (auditsProp?.length ?? 0) === 0)}
+          disabled={busy}
           onClick={() => {
             if (!insights && !busy) {
               void runAnalyze();
@@ -206,7 +193,7 @@ export function FlooringAIInsightBanner({
         </div>
         <button
           type="button"
-          disabled={busy || (remnants.length === 0 && (auditsProp?.length ?? 0) === 0)}
+          disabled={busy}
           onClick={() => void runAnalyze()}
           className="flex min-h-11 shrink-0 items-center justify-center rounded-xl border border-cyan-500/40 bg-cyan-950/50 px-3 text-xs font-bold uppercase tracking-wider text-cyan-100 shadow-lg shadow-cyan-950/30 disabled:opacity-50"
         >

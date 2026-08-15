@@ -34,6 +34,7 @@ import {
   type NavHubLink,
 } from "@/lib/nav-hub";
 import { isAssociate, isMasterAdmin } from "@/lib/rbac";
+import { requestSundayAuditDrawer } from "@/lib/store-ops/sunday-audit";
 import type { StoreSpecialist } from "@/lib/types";
 
 function AdminToolsLoadingShell({
@@ -167,20 +168,26 @@ export function NavigationHub({
   }, [applyAdminOpen]);
 
   useEffect(() => {
-    if (!master || typeof window === "undefined") return;
+    if (typeof window === "undefined") return;
     const hash = window.location.hash.replace(/^#/, "");
+    if (hash === "sunday-audit" || hash === "sunday-rotation") {
+      requestSundayAuditDrawer();
+      if (pathname !== "/dashboard") {
+        router.replace("/dashboard");
+      }
+      return;
+    }
+    if (!master) return;
     if (hash === "bulk-generate" || hash === "map-management") {
       requestAdminTools({ section: "bulk" });
     } else if (hash === "weekly-rotation") {
       requestAdminTools({ section: "menu", openForceRotation: true });
-    } else if (hash === "sunday-audit" || hash === "sunday-rotation") {
-      requestAdminTools({ section: "menu", openSundayAudit: true });
     } else if (hash === "manager-notes" || hash === "s-pen-notes") {
       requestAdminTools({ section: "menu", openManagerNotes: true });
     } else if (hash === "admin-tools") {
       requestAdminTools({ section: "menu" });
     }
-  }, [master, pathname, requestAdminTools]);
+  }, [master, pathname, requestAdminTools, router]);
 
   useEffect(() => {
     if (!userOpen) return;
@@ -220,13 +227,7 @@ export function NavigationHub({
         onToggleUser={() => setUserOpen((o) => !o)}
         onPinnedNavigate={(section) => {
           startTransition(() => {
-            if (pathname === "/" || pathname === "") {
-              router.push(`/?section=${section}`);
-            } else if (section === "audit") {
-              router.push("/flooring");
-            } else {
-              router.push(`/?section=${section}`);
-            }
+            router.push(`/?section=${section}`);
           });
         }}
         userMenu={

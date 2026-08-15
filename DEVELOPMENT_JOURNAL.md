@@ -1,5 +1,21 @@
 # DeptSync Hub — Development Journal
 
+## 2026-08-14 — Shift briefing, Cabinets D29, Specialist vs CSA roster
+
+### Shipped
+- **Local-first shift briefing** — `ShiftBriefingCard` loads a deterministic health brief (open bays, barriers, pace) from `GET /api/store-health` + `buildLocalShiftBriefing`. Gemini is only called on manual refresh / pull-to-refresh. Quota and GoogleGenerativeAI RPC errors fall back silently to the local brief; raw JSON is never shown. `/api/store-health/ai-summary` also returns the local brief when Gemini fails.
+- **Sunday Cycle Audit Engine** — staging card opens the assignment drawer in-place (`requestSundayAuditDrawer`). `/flooring`, `/sunday-audit`, and `/sunday-rotation` redirect to `/dashboard` with the drawer instead of 404 / “page cannot be loaded”. Header Flooring pin no longer hops through `/flooring`.
+- **Cabinets (D29)** — first-class hub department (`cabinets`) with store-ops code `D29`, taxonomy tree, Admin pin, department target seed (`20260814_cabinets_d29.sql`), and rotation template.
+- **Retail roster titles** — specialty depts (Flooring, Appliances, Millwork, Cabinets) display **Specialist**; core depts display **CSA**. Lightweight `AssociateRosterPanel` on Settings, Admin Tools, and the Sunday drawer. Sunday Shift Balancer allocates 4h / 6h / 8h quotas to on-duty Specialists/CSAs.
+
+## 2026-08-14 — Slice 1 Intelligence Architecture Hardening
+
+### Shipped
+- **Structured outputs** — `lib/ai/gemini.ts` is `server-only`. Callers pass `responseSchema` + `maxOutputTokens` via `jsonGenerationConfig`. Regex JSON extract remains a safety net. Budgets: briefing 256, Snap Bay 512, Floor Pad/insights 2048, Pre-Flight parse 2048. Schema types live in isomorphic `lib/ai/gemini-schema.ts` so client domain modules do not load the SDK.
+- **Compact-then-narrate** — Flooring insights and appliance anomalies run local aging/variance/serial heuristics first, then send a findings packet (bound IDs/SKUs) to Gemini for narration. Merge overlays rationale/priority onto local rows; invented SKUs are dropped.
+- **Auth + server fetch** — `/api/flooring/ai-insights` and `/api/appliances/ai-anomaly` require Store Ops JWT and load column-pruned remnants/audits/scans from the actor’s store. `/api/catalog/ai-taxonomy` requires supervisor/admin. Widgets send Bearer headers, not table dumps.
+- **Legacy canvas synthesis retired** — `POST /api/store-ops/ai-note-summary` returns 410. Floor Pad `extractTasksAndTag` is the canonical Copilot. `NoteActionItem` moved to `lib/store-ops/manager-notes.ts`. Pre-Flight input capped at 24k chars.
+
 ## 2026-08-14 — P0 FTUX landing + brand unification
 
 ### Shipped

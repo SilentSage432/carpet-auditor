@@ -1,7 +1,9 @@
 /**
- * AI Visual Bay Scan — owns prompt, normalize, and local fallback.
+ * AI Visual Bay Scan — owns prompt, schema, normalize, and local fallback.
  * Composes Gemini multimodal transport; does not own camera UI or location persistence.
  */
+
+import { asGeminiSchema } from "@/lib/ai/gemini-schema";
 
 export type BayCleanlinessScore = "EXCELLENT" | "NEEDS_ATTENTION" | "HAZARD";
 export type BayIssueSeverity = "HIGH" | "MEDIUM" | "LOW";
@@ -26,6 +28,46 @@ export type BayScanMeta = {
   department_code?: string;
 };
 
+const bayIssueSchema = asGeminiSchema({
+  type: "object",
+  properties: {
+    issue: { type: "string" },
+    severity: {
+      type: "string",
+      format: "enum",
+      enum: ["HIGH", "MEDIUM", "LOW"],
+    },
+    recommendation: { type: "string" },
+  },
+  required: ["issue", "severity", "recommendation"],
+});
+
+/** Structured output for Snap Bay vision. */
+export const BAY_SCAN_RESPONSE_SCHEMA = asGeminiSchema({
+  type: "object",
+  properties: {
+    carton_count_estimate: { type: "integer" },
+    pallet_count: { type: "integer" },
+    cleanliness_score: {
+      type: "string",
+      format: "enum",
+      enum: ["EXCELLENT", "NEEDS_ATTENTION", "HAZARD"],
+    },
+    detected_issues: {
+      type: "array",
+      items: bayIssueSchema,
+    },
+    summary: { type: "string" },
+  },
+  required: [
+    "carton_count_estimate",
+    "pallet_count",
+    "cleanliness_score",
+    "detected_issues",
+    "summary",
+  ],
+});
+
 export function buildBayScanPrompt(meta?: BayScanMeta): string {
   const aisle = String(meta?.aisle ?? "").trim() || "unknown";
   const bay =
@@ -46,22 +88,7 @@ Assess:
 4. Overall cleanliness / presentation readiness.
 
 Be observational and evidence-based from the image. Do not invent SKUs or barcodes.
-If the image is blurry or the bay is not visible, say so in summary and lower confidence via issues.
-
-Return ONLY valid JSON (no markdown fences):
-{
-  "carton_count_estimate": 0,
-  "pallet_count": 0,
-  "cleanliness_score": "EXCELLENT" | "NEEDS_ATTENTION" | "HAZARD",
-  "detected_issues": [
-    {
-      "issue": "Short issue title",
-      "severity": "HIGH" | "MEDIUM" | "LOW",
-      "recommendation": "Concrete next step for associate/supervisor"
-    }
-  ],
-  "summary": "1-2 sentence operational summary"
-}`;
+If the image is blurry or the bay is not visible, say so in summary and lower confidence via issues.`;
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {

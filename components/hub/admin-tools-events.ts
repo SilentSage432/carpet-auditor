@@ -12,7 +12,8 @@ export type AdminToolsSection =
   | "bulk"
   | "targets"
   | "store"
-  | "diagnostics";
+  | "diagnostics"
+  | "roster";
 
 export const ADMIN_TOOLS_EVENT = "deptsync:admin-tools";
 

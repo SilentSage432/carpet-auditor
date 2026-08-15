@@ -81,6 +81,8 @@ function mapRow(row: Record<string, unknown>): Remnant {
   };
 }
 
+export { mapRow as mapRemnantRow };
+
 function upsertLocal(record: Remnant): Remnant[] {
   const existing = readAllLocal().filter((r) => r.id !== record.id);
   const next = [record, ...existing].sort(

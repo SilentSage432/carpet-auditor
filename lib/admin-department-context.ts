@@ -24,8 +24,11 @@ export const ADMIN_PINNABLE_DEPARTMENTS: OperationalDepartment[] = [
   "electrical",
   "paint",
   "millwork",
+  "cabinets",
   "building_materials",
   "tools",
+  "inside_garden",
+  "outside_garden",
 ];
 
 export type AdminWorkingDepartment = OperationalDepartment | "all";
@@ -36,6 +39,9 @@ export function adminWorkingDepartmentLabel(
   if (dept === "all") return "Full Store";
   if (dept === "flooring") return "D23 · Flooring";
   if (dept === "appliances") return "D35 · Appliances";
+  if (dept === "cabinets") return "D29 · Cabinets";
+  if (dept === "millwork") return "D30 · Millwork";
+  if (dept === "paint") return "D24P · Paint";
   const meta = DEPARTMENT_META[dept];
   return meta ? `${meta.shortLabel}` : dept;
 }
@@ -47,6 +53,9 @@ export function adminWorkingDepartmentPillLabel(
   if (dept === "all") return "All";
   if (dept === "flooring") return "D23";
   if (dept === "appliances") return "D35";
+  if (dept === "cabinets") return "D29";
+  if (dept === "millwork") return "D30";
+  if (dept === "paint") return "D24P";
   return DEPARTMENT_META[dept]?.shortLabel ?? dept;
 }
 
@@ -116,5 +125,6 @@ export function preferredHubSectionForWorkingDept(
   if (dept === "all") return null;
   if (dept === "flooring") return "audit";
   if (dept === "appliances") return "appliances";
+  if (dept === "cabinets") return "department";
   return "department";
 }

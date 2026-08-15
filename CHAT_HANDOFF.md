@@ -17,21 +17,20 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 - **Handheld chrome:** sticky header `pt-safe` + compact `min-h-12`; workflow bottom tabs `min-h-16` in the thumb zone (Floor · Map · Stock · Settings); Store Ops pages use `.hub-main` so bays / badges / timers clear the fold.
 
 ## AI (`lib/ai/gemini.ts`)
-- Server-only Gemini Flash client (`@google/generative-ai`)
+- Server-only Gemini Flash client (`@google/generative-ai` + `server-only`)
 - Env: `GEMINI_API_KEY`, `GEMINI_MODEL` (default `gemini-3.5-flash`) — never `NEXT_PUBLIC_`
-- Exports: `callGeminiFlash(prompt, inlineImage?)`, `callGeminiFlashJson`, `extractGeminiJsonText` / `parseGeminiJson`, `isGeminiConfigured`, `GEMINI_JSON_GENERATION_CONFIG`
-- Generation config: `responseMimeType: application/json`, `maxOutputTokens: 1024` (keeps JSON parseable; bounds output)
-- Inline images accept raw base64 or `data:image/...;base64,...` (prefix stripped)
-- JSON regex extraction remains as a safety net for fenced/chatty replies
-- Does not recommend or own institutional knowledge — callers compose prompts
-- **AI Pre-Flight (Bulk Generator):** `POST /api/store-locations/ai-parse` + `lib/store-ops/ai-parse.ts` normalize to `{ locations, corrections_made }`; UI tab confirms via existing bulk upsert
-- **Flooring AI Insights:** `POST /api/flooring/ai-insights` + `lib/flooring/ai-insights.ts` + `FlooringAIInsightBanner` — Cycle Audit uses a compact collapsible chip so the Roll Measurement Pad stays above the fold; Remnants keeps the full banner; applies markdown via `lib/markdown` + `saveRemnant`; age bands via `agingBand()` (30/60/90+)
-- **Zebra Shift Briefing:** `POST /api/store-health/ai-summary` + `ShiftBriefingCard` on `/dashboard` (composes `lib/store-ops/health` snapshot + `bay_health` from `bay-health.ts` + active-shift `telemetry` → 3-bullet Focus Bay / Pending Barriers / Quick-win)
+- Exports: `callGeminiFlash(prompt, options?)`, `callGeminiFlashJson`, `jsonGenerationConfig`, `GEMINI_TOKEN_BUDGET`, `extractGeminiJsonText` / `parseGeminiJson`, `isGeminiConfigured`
+- Callers pass `responseSchema` (owned by domain modules) + per-route `maxOutputTokens`: briefing 256 · Snap Bay 512 · Floor Pad / insights 2048 · Pre-Flight parse 2048
+- JSON mime is always on; regex fence extraction remains a safety net
+- Does not recommend or own institutional knowledge — callers compose prompts and schemas
+- **AI Pre-Flight (Bulk Generator):** `POST /api/store-locations/ai-parse` + `lib/store-ops/ai-parse.ts` normalize to `{ locations, corrections_made }`; input capped at 24k chars; UI tab confirms via existing bulk upsert
+- **Flooring AI Insights:** `POST /api/flooring/ai-insights` (Store Ops JWT) — server-fetches remnants/audits, runs aging/variance locally, sends a compact findings packet to Gemini (compact-then-narrate). `FlooringAIInsightBanner` does not POST tables.
+- **Zebra Shift Briefing:** On-load uses `buildLocalShiftBriefing` from `GET /api/store-health` only (no Gemini). Manual refresh may POST `/api/store-health/ai-summary`; 429/quota/RPC errors fall back silently to the local brief. Raw GoogleGenerativeAI JSON is never shown.
 - **Audit Velocity Chart:** `lib/store-ops/telemetry.ts` + `StoreHealthChart` on `/dashboard` (06:00–22:00 curve vs linear target; Overall / D23 / D35 pills)
-- **Appliance Anomaly Detection:** `POST /api/appliances/ai-anomaly` + `ApplianceAnomalyWidget` on Appliance Audit (duplicate serials, distant locations, category mismatch, missing high-value floor models)
-- **Catalog Taxonomies:** `lib/catalog/taxonomies.ts` (D21–D28 / D35 / D52 defaults) + `POST /api/catalog/ai-taxonomy` + Admin Tools `TaxonomyManagerModal`; folder accordions on Department Audit + `/department`
-- **AI Visual Bay Scan:** `POST /api/store-ops/ai-bay-scan` + `lib/store-ops/ai-bay-scan.ts` + `VisualBayScannerModal` — immersive full-screen camera (`object-cover`, rear-cam WebRTC cascade targeting **720p**); single-pass JPEG snapshot (q=0.70, max edge 960px); raw base64 payload; route cap ~1.5MB; Gemini JSON mime + 1024 output tokens
-- **Manager Notes / Executive Floor Pad:** `POST /api/store-ops/ai-note-summary` (legacy synthesize) + Server Action `extractTasksAndTag` (`app/actions/manager-notes.ts`) + `lib/store-ops/ai-note-extract.ts` + `lib/store-ops/manager-notes.ts` (Supabase CRUD + realtime + archive) + `components/manager-notes/ExecutiveFloorPad` — dense TipTap pad (sticky title/toolbar, ≥80dvh canvas, 15 Google Fonts, **voice dictation → Gemini parse**, metadata incl. `follow_up_date`), Gemini Copilot on **plain text ≤ 8k chars** (HTML kept for editor/save), schema-only prompt, debounced autosave; Admin Tools + `/manager-notes`
+- **Appliance Anomaly Detection:** `POST /api/appliances/ai-anomaly` (Store Ops JWT) — server-fetches scans/catalog, local heuristics first, Gemini narrates the packet
+- **Catalog Taxonomies:** `lib/catalog/taxonomies.ts` + `POST /api/catalog/ai-taxonomy` (supervisor/admin JWT) + Admin Tools `TaxonomyManagerModal`; known-folder packet + registry merge
+- **AI Visual Bay Scan:** `POST /api/store-ops/ai-bay-scan` + `lib/store-ops/ai-bay-scan.ts` + `VisualBayScannerModal` — 720p JPEG q=0.70 / 960px; route cap ~1.5MB; `responseSchema` + 512 output tokens
+- **Executive Floor Pad:** Server Action `extractTasksAndTag` is canonical Copilot (`lib/store-ops/ai-note-extract.ts`, 8k plain text, 2048 tokens). `POST /api/store-ops/ai-note-summary` returns **410 Gone** (unbounded 8MB canvas synthesis retired).
 
 ## RBAC (`lib/rbac.ts` + `lib/specialists.ts`)
 | Role | Scope | Tabs |
@@ -41,11 +40,10 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 | 👤 Floor Associate | inherits / assigned dept | Floor · Map · Stock · Settings (no Admin Tools) |
 
 ### Master Admin roster console
-- Roster CRUD lives on `/admin/supervisors` and **Admin Tools** (not permanent Settings chrome)
-- **Add** creates via `POST /api/admin/invite-supervisor` — crypto 6-digit temp PIN (never typed by admin); invite/SMS preview shows the returned PIN
-- Reset / Invite re-issues the same invite path (random PIN + `/invite` link)
-- Edit scope / **Deactivate** (soft-delete `is_active: false` + optional hard delete)
-- Deactivated profiles stay out of active roster fetches; seed helpers respect tombstones so Amber is not revived
+- Full credential CRUD lives on `/admin/supervisors` (`AdminRosterManager`)
+- Lightweight **Associate Roster** (`AssociateRosterPanel`): Settings, Admin Tools, and the Sunday Staging Drawer
+- Floor titles: specialty (Flooring / Appliances / Millwork / Cabinets) → **Specialist**; core (Paint / Plumbing / Garden / Building Materials / Tools / Electrical) → **CSA**
+- Sunday Shift Balancer allocates weekly bay quotas to on-duty Specialists/CSAs by 4h / 6h / 8h (`planProportionalBayAssignments`)
 
 ### Admin Tools (Super Admin only)
 - Slide-over drawer defaults **closed** — header **Admin** chip, hamburger entry, or `openAdminTools()`
@@ -57,14 +55,15 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 - Master Admin header: **My Department Context** pin (Full Store / D23 Flooring / D35 Appliances / …) — filters dashboard Flooring focus without dropping Master privileges
 
 ### Sunday Flooring Cycle Audit
-- Staging card + assignment modal: open weekly Flooring bays → assign from Flooring roster; Auto-Assign All to Me; Stage/Draw 12; **Shift balancer** (hours / start–end → proportional clustered zones)
+- Staging card + assignment modal: open weekly Flooring bays → assign from on-duty roster; Auto-Assign All to Me; Stage/Draw 12; **Shift balancer** (hours / start–end → proportional clustered zones)
+- Tap opens the drawer **in-place** (`requestSundayAuditDrawer`). `/flooring`, `/sunday-audit`, and `/sunday-rotation` redirect to `/dashboard` with the drawer — they do not 404
 - Assignments persist in `sunday_bay_assignments` (JWT store/dept RLS); `bay_id` = `weekly_rotations.id`; ISO week → `week_starting` Monday
 - Plan math: `lib/store-ops/weekly-rotations.ts` (does not generate rotations or persist)
 - Entry points: `/dashboard`, Cycle Audit tab, Admin Tools, `/flooring` deep link
 - ZebraChecklist live-handoff: `SUNDAY_AUDIT_EVENT` + Realtime; assigned specialist sees **Your Sunday bays first** without refresh; badges show name + shift hours; filter All / Mine / associate
 
 ### Departments
-`flooring` · `appliances` · `plumbing` · `electrical` · `lawn_garden` · `paint` · `millwork` · `building_materials` · `hardware` · `all`
+`flooring` (D23) · `appliances` (D35) · `plumbing` · `electrical` · `lawn_garden` · `paint` (D24P) · `millwork` (D30) · `cabinets` (D29) · `building_materials` · `hardware` · `tools` (D25) · `all`
 
 - Seeds: none auto-injected. Create Master / Supervisor profiles via invite / Add Supervisor; temporary PIN sets `must_change_credentials: true` until first-login change
 - First-login: non-dismissible AuthWall setup when `must_change_credentials` (no Remind Later)
@@ -85,7 +84,7 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 - Session: `deptsync_auth_session` (hub UI) + Supabase Auth localStorage (API Bearer); 8h idle lock on hub session
 - **P0 boot:** `/` fetches roster only before AuthWall; catalog/remnants/appliance catalog after unlock per section; hub sections + Admin Tools + Snap Bay / SIMS / Audit Report are `next/dynamic`
 - **P0 indexes:** re-run `supabase/migrations/20260813_p0_query_indexes.sql` — hub tables use `store_number`; Store Ops locations/rotations use `store_id`; manager_notes Phase 2 uses `store_number`+`department` (legacy `store_id`+`department_code`). Script skips absent columns.
-- **P1 Gemini/map:** Snap Bay 720p + compressed JPEG; Floor Pad Copilot strips HTML / 8k cap; `GET /api/store-locations` explicit Store Map columns (no `SELECT *`)
+- **P1 Gemini/map:** Snap Bay 720p + compressed JPEG; Floor Pad Copilot strips HTML / 8k cap; `GET /api/store-locations` explicit Store Map columns (no `SELECT *`); Slice 1 `responseSchema` + per-route token budgets
 - **P2 hub UI:** `startTransition` + keep-alive hub panes (`hidden`); Cycle/Appliance scan forms isolated from logs; 300ms debounced draft saves with flush on submit/leave; weekly rotations + Sunday assignments TTL-cached 45s
 - **Admin Tools:** chrome `requestAdminTools` sets `adminOpen` + `adminHosted`; `dynamic(() => import(AdminToolsDrawer))` uses the **default** export (avoid `{ default: mod.Named }` — React #306); loading shell handles chunk errors; `ChunkErrorBoundary`; Floor Pad/TipTap nested `dynamic` via named `mod.ManagerNotesWorkspace`; SW cache `deptsync-shell-v5-brand-floor`
 - **Bulk bays:** Odd Only / Even Only (`lib/store-ops/bay-pattern.ts`, default odd); Store Map GET falls back if `last_completed_at` is missing/null
@@ -161,7 +160,7 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 - `/admin/store-map` — department overview + location grid **readiness heatmap**; bay rows: name + status left, Selling/Topstock dual-pill, MoreVertical Edit/Delete; **duplicate bay prune** (hard-delete extras, Super Admin); Bulk Add accordion (Master); Trigger Weekly Rotation modal (**Force Draw New Rotation**); **📷 Snap Bay AI Audit** (Gemini visual scan) on page + bay actions sheet. Supervisors/associates may view their department heatmap (`canMutate` false).
 - `GET /api/store-health` — weekly pace + bottleneck aggregation + compact `bay_health` for DS / Super Admin
 - `POST /api/store-ops/ai-bay-scan` — multimodal bay photo → carton/pallet estimates, cleanliness score, detected issues (Store Ops actor)
-- `POST /api/store-ops/ai-note-summary` — manager note + optional S Pen PNG → executive summary + action items (Store Ops actor)
+- `POST /api/store-ops/ai-note-summary` — **410 Gone**; Floor Pad Copilot `extractTasksAndTag` is canonical
 - APIs under `/api/rotations/*`, `/api/store-locations*`, `/api/departments`, `/api/weekly-rotations`
 - Multi-store: apply `20260809_multi_store.sql`; store scope comes from JWT `app_metadata.store_number` / `profiles.store_number`
 - Manager notes: apply `20260811_manager_notes.sql` + `20260812_manager_notes.sql` + `20260812_manager_notes_archive.sql` + `20260812_fix_manager_notes_rls.sql` + **`20260812_manager_notes_metadata.sql`** (`metadata` JSONB from Gemini Copilot)

@@ -117,7 +117,7 @@ export function visibleSections(
     return ["audit", "appliances", "remnants", "settings"];
   }
 
-  // Plumbing, electrical, lawn_garden, paint, millwork, building_materials, hardware
+  // Plumbing, electrical, lawn_garden, paint, millwork, cabinets, building_materials, hardware
   return ["department", "settings"];
 }
 

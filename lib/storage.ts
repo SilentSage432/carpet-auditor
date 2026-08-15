@@ -172,6 +172,8 @@ function mapRow(row: Record<string, unknown>): CarpetAudit {
   };
 }
 
+export { mapRow as mapAuditRow };
+
 function auditPayload(record: CarpetAudit) {
   return {
     id: record.id,

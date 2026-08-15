@@ -33,6 +33,7 @@ export const CATALOG_TAXONOMY_CODES = [
   "D26",
   "D27",
   "D28",
+  "D29",
   "D35",
   "D52",
 ] as const;
@@ -54,6 +55,7 @@ export const TAXONOMY_CODE_META: Record<
     name: "Lawn & Garden",
     hubDepartments: ["lawn_garden", "inside_garden", "outside_garden"],
   },
+  D29: { name: "Cabinets", hubDepartments: ["cabinets"] },
   D35: { name: "Appliances", hubDepartments: ["appliances"] },
   D52: { name: "Tools", hubDepartments: ["tools", "hardware"] },
 };
@@ -103,6 +105,7 @@ export function taxonomyCodeForHubDepartment(
     flooring: "D23",
     paint: "D24",
     millwork: "D25",
+    cabinets: "D29",
     plumbing: "D26",
     electrical: "D27",
     lawn_garden: "D28",
@@ -246,6 +249,17 @@ export const DEFAULT_DEPARTMENT_TAXONOMIES: Record<
       cat("Outdoor Power", ["Mowers", "Trimmers", "Blowers", "Pressure Washers"]),
       cat("Patio & Grills", ["Grills", "Patio Furniture", "Fire Pits", "Umbrellas"]),
       cat("Irrigation", ["Hose", "Sprinklers", "Timers", "Drip"]),
+    ],
+  },
+  D29: {
+    department_code: "D29",
+    department_name: "Cabinets",
+    categories: [
+      cat("Kitchen Cabinets", ["Stock", "Semi-Custom", "Base", "Wall", "Tall"]),
+      cat("Bath Cabinets", ["Vanities", "Linen", "Medicine Cabinets"]),
+      cat("Cabinet Hardware", ["Knobs", "Pulls", "Hinges", "Slides"]),
+      cat("Countertops", ["Laminate", "Butcher Block", "Quartz", "Granite"]),
+      cat("Accessories", ["Organizers", "Lazy Susans", "Trash Pull-Outs", "Lighting"]),
     ],
   },
   D35: {

@@ -8,6 +8,7 @@
 import { useCallback, useEffect, useId, useMemo, useState } from "react";
 import { TaxonomyDrillDown } from "@/components/catalog/TaxonomyDrillDown";
 import type { AiTaxonomyResult } from "@/lib/catalog/ai-taxonomy";
+import { storeOpsAuthHeadersAsync } from "@/lib/store-ops/auth";
 import {
   CATALOG_TAXONOMY_CODES,
   clearTaxonomyOverride,
@@ -141,7 +142,7 @@ export function TaxonomyManagerModal({
     try {
       const res = await fetch("/api/catalog/ai-taxonomy", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: await storeOpsAuthHeadersAsync(),
         body: JSON.stringify({
           department_code: code,
           department_name: name,

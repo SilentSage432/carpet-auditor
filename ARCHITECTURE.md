@@ -68,16 +68,20 @@ components/store-ops/SupervisorAuditSummaryModal.tsx → Personal weekly stats +
 lib/admin-department-context.ts       → Master Admin working department pin (local)
 lib/store-ops/bay-pattern.ts          → Odd / even bay range expansion (Bulk Generator; default odd)
 lib/store-ops/manager-notes.ts        → Manager notes Supabase CRUD + realtime + archive (JWT-scoped)
-lib/store-ops/ai-bay-scan.ts          → Visual bay scan prompt / normalize / local fallback
-lib/store-ops/ai-note-summary.ts      → Legacy manager note synthesis prompt / normalize / fallback
-lib/store-ops/ai-note-extract.ts      → Floor Pad Gemini Extract Tasks & Tag prompt / normalize / fallback
+lib/store-ops/ai-bay-scan.ts          → Visual bay scan prompt / schema / normalize / local fallback
+lib/store-ops/ai-note-extract.ts      → Floor Pad Gemini Extract Tasks & Tag prompt / schema / fallback
 app/actions/manager-notes.ts          → Server Action extractTasksAndTag (Bearer token auth)
 components/manager-notes/*            → Executive Floor Pad (TipTap rich text + Copilot + archive)
 components/store-ops/ManagerNotesWorkspace.tsx → Compatibility re-export of ExecutiveFloorPad
 app/manager-notes/page.tsx            → Hub route for Executive Floor Pad
-app/api/store-ops/ai-note-summary     → Gemini Flash manager note synthesis (legacy API)
+app/api/store-ops/ai-note-summary     → Retired (410 Gone); use extractTasksAndTag
 supabase/migrations/20260812_manager_notes_archive.sql → manager_notes.is_archived
-app/flooring/page.tsx                 → Deep link → Cycle Audit + D23 pin
+app/flooring/page.tsx                 → Deep link → /dashboard + Sunday drawer (no 404 hop)
+app/sunday-audit/page.tsx             → Redirect → /dashboard + Sunday drawer
+app/sunday-rotation/page.tsx          → Redirect → /dashboard + Sunday drawer
+components/admin/AssociateRosterPanel.tsx → Lightweight Specialist vs CSA roster (Settings / Admin Tools / Sunday)
+lib/types.ts                          → Cabinets D29 + SPECIALTY/CORE + associateFloorTitle
+supabase/migrations/20260814_cabinets_d29.sql → Seed Cabinets per store
 lib/auth-session.ts               → Auth session token + inactivity lock
 lib/biometric-auth.ts             → WebAuthn fingerprint / Face ID register + assert
 lib/audit-report.ts               → Audit report metrics + email/clipboard composition
@@ -124,7 +128,7 @@ supabase/migrations/20260812_sunday_bay_assignments.sql → sunday specialist↔
 | Bay health / floor discrepancies | `lib/store-ops/bay-health.ts` + `BayHealthScorecard` (composes location cycle age + hub audits / SIMS / variance) |
 | Selling vs Topstock audit mode | `lib/store-ops/audit-location-mode.ts` + `AuditLocationModeToggle` (Cycle/Department forms + Zebra filter) |
 | Rotation verification / barriers | `lib/store-ops/verification.ts` + `/verify-rotation` + `/admin/exceptions` + `POST /api/rotations/exceptions` |
-| Manager notes / Executive Floor Pad | `lib/store-ops/ai-note-extract.ts`, `manager-notes.ts`, `app/actions/manager-notes.ts`, `components/manager-notes/*` (Copilot: plain text ≤ 8k) |
+| Manager notes / Executive Floor Pad | `lib/store-ops/ai-note-extract.ts`, `manager-notes.ts`, `app/actions/manager-notes.ts`, `components/manager-notes/*` (Copilot: plain text ≤ 8k; `ai-note-summary` retired 410) |
 | Team roster (Master Admin) | `AdminRosterManager`, `lib/specialists.ts` (`is_active` soft-delete) |
 | Store context | `lib/store.ts` + `lib/store-ops/stores.ts` |
 | Offline sync queue | `lib/sync-queue.ts`, `lib/sync-conflict.ts`, `ConflictResolutionModal` |
@@ -137,7 +141,7 @@ supabase/migrations/20260812_sunday_bay_assignments.sql → sunday specialist↔
 | Shift audit velocity telemetry | `lib/store-ops/telemetry.ts`, `StoreHealthChart` |
 | Zebra shift briefing | `lib/store-ops/shift-briefing.ts`, `ShiftBriefingCard` (composes health snapshot + `bay_health`) |
 | Visual bay scan | `lib/store-ops/ai-bay-scan.ts`, `VisualBayScannerModal` (720p stream; JPEG q=0.70 / 960px) |
-| Gemini transport | `lib/ai/gemini.ts` (`GEMINI_JSON_GENERATION_CONFIG`: JSON mime, 1024 output tokens) |
+| Gemini transport | `lib/ai/gemini.ts` (`responseSchema` per caller + `GEMINI_TOKEN_BUDGET`) |
 | Barcode resolve / Quick-Add | `lib/barcode.ts`, `NumberField` scan hooks, `QuickAddCatalogModal` |
 | Hardware wedge (no soft keyboard) | `lib/hardware-scanner.ts` |
 | Focus / keyboard dismiss | `lib/focus-input.ts` (`blurActiveInput` — never auto-focus on tab switch) |

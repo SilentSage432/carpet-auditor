@@ -6,6 +6,7 @@
  */
 
 import type { StoreHealthSnapshot } from "@/lib/store-ops/health";
+import { asGeminiSchema } from "@/lib/ai/gemini-schema";
 import {
   compactTelemetryForPrompt,
   type StoreAuditTelemetry,
@@ -16,6 +17,22 @@ export type ShiftBriefing = {
   bullets: [string, string, string];
   priority_department: string;
 };
+
+/** Structured output for Zebra shift briefing (256-token budget). */
+export const SHIFT_BRIEFING_RESPONSE_SCHEMA = asGeminiSchema({
+  type: "object",
+  properties: {
+    headline: { type: "string" },
+    bullets: {
+      type: "array",
+      items: { type: "string" },
+      minItems: 3,
+      maxItems: 3,
+    },
+    priority_department: { type: "string" },
+  },
+  required: ["headline", "bullets", "priority_department"],
+});
 
 /** Soft empty state when Store Ops Auth session is missing (no hard 401 for Zebra card). */
 export function buildSessionRefreshShiftBriefing(): ShiftBriefing {
@@ -84,13 +101,6 @@ Return bullets in this exact order:
 3. Quick-win maintenance recommendation — one concrete facing/Quick Touch or top-stock walk the floor can finish this shift.
 
 When audit_velocity is present, fold pace into the headline (not a fourth bullet).
-
-Return ONLY valid JSON:
-{
-  "headline": "Short punchy status line (≤60 chars)",
-  "bullets": ["bullet 1", "bullet 2", "bullet 3"],
-  "priority_department": "Department name that needs attention first (or storewide focus)"
-}
 
 STORE HEALTH SNAPSHOT:
 ${JSON.stringify(compact)}`;
@@ -207,4 +217,22 @@ export function buildLocalShiftBriefing(
     bullets: padBullets([focus, barriers, quickWin]),
     priority_department,
   };
+}
+
+/** True when a transport/quota error should never be shown in the Zebra UI. */
+export function isShiftBriefingTransportError(error: unknown): boolean {
+  const msg = [
+    error instanceof Error ? error.message : "",
+    typeof error === "string" ? error : "",
+    error && typeof error === "object"
+      ? JSON.stringify(error).slice(0, 400)
+      : "",
+  ]
+    .join(" ")
+    .toLowerCase();
+  return (
+    /429|quota|rate.?limit|resource.?exhausted|googlegenerativeai|generativelanguage\.googleapis|jsonrpc|rpc error|gemini/i.test(
+      msg
+    ) || /"error"\s*:\s*\{/.test(msg)
+  );
 }

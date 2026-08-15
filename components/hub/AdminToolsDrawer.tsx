@@ -19,10 +19,12 @@ import { BulkLocationGenerator } from "@/components/admin/BulkLocationGenerator"
 import { ForceRotationModal } from "@/components/admin/ForceRotationModal";
 import { SundayAuditAssignmentModal } from "@/components/admin/SundayAuditAssignmentModal";
 import { DepartmentTargetsMatrix } from "@/components/admin/DepartmentTargetsMatrix";
+import { AssociateRosterPanel } from "@/components/admin/AssociateRosterPanel";
 import { TaxonomyManagerModal } from "@/components/catalog/TaxonomyManagerModal";
 import { HubIcon, type HubIconId } from "@/components/hub/NavIcons";
 import { selectOnFocus } from "@/lib/number-input";
 import { isMasterAdmin } from "@/lib/rbac";
+import { dedupeRoster, fetchSpecialists } from "@/lib/specialists";
 import { fetchDepartmentsDetailed } from "@/lib/store-ops/client";
 import {
   isStoreOpsAuthFailureMessage,
@@ -83,6 +85,7 @@ export function AdminToolsDrawer({
   const [sundayOpen, setSundayOpen] = useState(false);
   const [notesOpen, setNotesOpen] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [roster, setRoster] = useState<StoreSpecialist[]>([]);
 
   const reloadDepts = useCallback(async () => {
     if (!isMasterAdmin(specialist)) return;
@@ -113,6 +116,7 @@ export function AdminToolsDrawer({
     setNotesOpen(openManagerNotesOnMount);
     setTaxonomyOpen(false);
     void reloadDepts();
+    void fetchSpecialists().then((team) => setRoster(dedupeRoster(team)));
   }, [
     open,
     initialSection,
@@ -213,6 +217,7 @@ export function AdminToolsDrawer({
                 onTaxonomy={() => setTaxonomyOpen(true)}
                 onNotes={() => setNotesOpen(true)}
                 onTargets={() => setSection("targets")}
+                onRoster={() => setSection("roster")}
                 onStore={() => setSection("store")}
                 onDiagnostics={() => setSection("diagnostics")}
                 onNavigate={onClose}
@@ -233,6 +238,14 @@ export function AdminToolsDrawer({
 
             {section === "targets" ? (
               <DepartmentTargetsMatrix specialist={specialist} />
+            ) : null}
+
+            {section === "roster" ? (
+              <AssociateRosterPanel
+                specialist={specialist}
+                roster={roster}
+                onRosterChange={setRoster}
+              />
             ) : null}
 
             {section === "store" ? (
@@ -292,6 +305,7 @@ function Menu({
   onTaxonomy,
   onNotes,
   onTargets,
+  onRoster,
   onStore,
   onDiagnostics,
   onNavigate,
@@ -302,6 +316,7 @@ function Menu({
   onTaxonomy: () => void;
   onNotes: () => void;
   onTargets: () => void;
+  onRoster: () => void;
   onStore: () => void;
   onDiagnostics: () => void;
   onNavigate: () => void;
@@ -365,6 +380,12 @@ function Menu({
           subtitle="Logins & PIN"
           href="/admin/supervisors"
           onNavigate={onNavigate}
+        />
+        <ToolCard
+          icon="users"
+          label="Associate Roster"
+          subtitle="Specialist vs CSA"
+          onClick={onRoster}
         />
         <ToolCard
           icon="settings"

@@ -3,6 +3,7 @@
  * Composes appliance_scans + appliance_catalog snapshots; Gemini owns transport.
  */
 
+import { asGeminiSchema } from "@/lib/ai/gemini-schema";
 import type { ApplianceCatalogItem, ApplianceScan } from "@/lib/types";
 
 export type AnomalySeverity = "HIGH" | "MEDIUM" | "LOW";
@@ -18,6 +19,40 @@ export type ApplianceAnomaly = {
 export type ApplianceAnomalyResult = {
   anomalies: ApplianceAnomaly[];
 };
+
+export type ApplianceAnomalyPacket = {
+  scan_count: number;
+  catalog_count: number;
+  anomalies: ApplianceAnomaly[];
+};
+
+const anomalyItemSchema = asGeminiSchema({
+  type: "object",
+  properties: {
+    severity: {
+      type: "string",
+      format: "enum",
+      enum: ["HIGH", "MEDIUM", "LOW"],
+    },
+    sku: { type: "string" },
+    title: { type: "string" },
+    description: { type: "string" },
+    action_suggested: { type: "string" },
+  },
+  required: ["severity", "sku", "title", "description", "action_suggested"],
+});
+
+/** Structured output for appliance anomaly narration. */
+export const APPLIANCE_ANOMALY_RESPONSE_SCHEMA = asGeminiSchema({
+  type: "object",
+  properties: {
+    anomalies: {
+      type: "array",
+      items: anomalyItemSchema,
+    },
+  },
+  required: ["anomalies"],
+});
 
 function normalizeLocationKey(raw: string): string {
   return String(raw ?? "")
@@ -72,60 +107,58 @@ function categoryLooksMismatched(
   return scanCategory !== catalogCategory;
 }
 
-export function buildApplianceAnomalyPrompt(input: {
-  scans: ApplianceScan[];
-  catalog: ApplianceCatalogItem[];
-  storeNumber?: string;
-}): string {
-  const scans = input.scans.slice(0, 120).map((s) => ({
-    id: s.id,
-    item_number: s.item_number,
-    serial_number: s.serial_number,
-    location: s.location,
-    category: s.category,
-    sub_category: s.sub_category ?? "",
-    scanned_by: s.scanned_by,
-    scanned_at: s.scanned_at,
-  }));
-  const catalog = input.catalog.slice(0, 120).map((c) => ({
-    item_number: c.item_number,
-    upc: c.upc,
-    description: c.description,
-    category: c.category,
-    sub_category: c.sub_category ?? "",
-  }));
-
-  return `You are DeptSync Hub's Appliance Scan Anomaly Detection analyst for a Lowe's store.
-
-Analyze recent floor scans against catalog entries. Flag only real, evidence-backed discrepancies — do not invent SKUs.
-
-Look for:
-1. Duplicate serial numbers or the same serial/SKU logged in physically incompatible or distant locations (e.g. Aisle 12 vs Topstock Bay 99).
-2. Category mismatch indicators (e.g. French Door Fridge tagged under Microwaves).
-3. Missing high-value floor display models (Refrigeration / Cooking) with no sales-floor-like location, or unexpected scan velocity drops vs catalog coverage.
-
-Return ONLY valid JSON (no markdown fences):
-{
-  "anomalies": [
-    {
-      "severity": "HIGH",
-      "sku": "12345678",
-      "title": "Short title",
-      "description": "What was observed in the data",
-      "action_suggested": "Concrete next step for the associate/supervisor"
-    }
-  ]
+/** Compact local anomalies for Gemini — SKUs already bound. */
+export function compactApplianceAnomaliesForPrompt(
+  local: ApplianceAnomalyResult,
+  meta: { scan_count: number; catalog_count: number }
+): ApplianceAnomalyPacket {
+  return {
+    scan_count: meta.scan_count,
+    catalog_count: meta.catalog_count,
+    anomalies: local.anomalies.slice(0, 12),
+  };
 }
 
-Use severity HIGH | MEDIUM | LOW. Prefer an empty anomalies array when nothing is wrong.
+export function buildApplianceAnomalyPrompt(input: {
+  packet: ApplianceAnomalyPacket;
+  storeNumber?: string;
+}): string {
+  return `You are DeptSync Hub's Appliance Scan Anomaly Detection analyst for a Lowe's store.
+
+Duplicate serials, distant locations, category mismatches, and missing high-value models are already flagged in the packet. Narrate those findings for the floor — do not invent SKUs or anomalies not in the packet. You may tighten title, description, action_suggested, and severity when evidenced.
+
+Prefer an empty anomalies array only when the packet is empty.
 
 Store: ${input.storeNumber ?? "unknown"}
 
-SCANS (${scans.length}):
-${JSON.stringify(scans)}
+FINDINGS PACKET:
+${JSON.stringify(input.packet)}`;
+}
 
-CATALOG (${catalog.length}):
-${JSON.stringify(catalog)}`;
+/**
+ * Overlay Gemini narration onto local anomalies. Local SKUs stay authoritative.
+ */
+export function mergeNarratedApplianceAnomalies(
+  local: ApplianceAnomalyResult,
+  raw: unknown
+): ApplianceAnomalyResult {
+  const narrated = normalizeApplianceAnomalies(raw);
+  const allowedSku = new Set(local.anomalies.map((a) => a.sku));
+  const overlaid = narrated.anomalies.filter((a) => allowedSku.has(a.sku));
+  if (overlaid.length === 0) return local;
+
+  const seenSku = new Set(overlaid.map((a) => a.sku));
+  const missing = local.anomalies.filter((a) => !seenSku.has(a.sku));
+  const rank: Record<AnomalySeverity, number> = {
+    HIGH: 0,
+    MEDIUM: 1,
+    LOW: 2,
+  };
+  return {
+    anomalies: [...overlaid, ...missing].sort(
+      (a, b) => rank[a.severity] - rank[b.severity]
+    ),
+  };
 }
 
 function asRecord(value: unknown): Record<string, unknown> | null {

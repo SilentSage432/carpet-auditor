@@ -1,25 +1,34 @@
 import { NextResponse } from "next/server";
 import {
-  callGeminiFlash,
+  callGeminiFlashJson,
+  GEMINI_TOKEN_BUDGET,
   isGeminiConfigured,
-  parseGeminiJson,
 } from "@/lib/ai/gemini";
 import {
   buildLocalTaxonomy,
   buildTaxonomyPrompt,
   composeTaxonomyWithDefaults,
   normalizeAiTaxonomy,
+  TAXONOMY_RESPONSE_SCHEMA,
   type AiTaxonomyResult,
 } from "@/lib/catalog/ai-taxonomy";
 import { normalizeTaxonomyCode } from "@/lib/catalog/taxonomies";
+import {
+  resolveStoreOpsActor,
+  requireSupervisorOrAdmin,
+  StoreOpsAuthError,
+} from "@/lib/store-ops/auth-server";
 import { readableError } from "@/lib/store-ops/errors";
 
 /**
  * POST /api/catalog/ai-taxonomy
  * Gemini (or registry defaults) department catalog taxonomy for folder browse.
+ * Supervisor or Super Admin JWT required.
  */
 export async function POST(request: Request) {
   try {
+    requireSupervisorOrAdmin(await resolveStoreOpsActor(request));
+
     const body = (await request.json()) as {
       department_code?: string;
       department_name?: string;
@@ -54,12 +63,17 @@ export async function POST(request: Request) {
       return NextResponse.json(result);
     }
 
-    const prompt = buildTaxonomyPrompt({
-      department_code: code,
-      department_name: name,
-    });
-    const rawText = await callGeminiFlash(prompt);
-    const parsed = parseGeminiJson<unknown>(rawText, "object");
+    const parsed = await callGeminiFlashJson<unknown>(
+      buildTaxonomyPrompt({
+        department_code: code,
+        department_name: name,
+      }),
+      {
+        maxOutputTokens: GEMINI_TOKEN_BUDGET.taxonomy,
+        responseSchema: TAXONOMY_RESPONSE_SCHEMA,
+        prefer: "object",
+      }
+    );
     const normalized = normalizeAiTaxonomy(parsed, code, name);
     const composed = composeTaxonomyWithDefaults(normalized, code, name);
 
@@ -69,6 +83,9 @@ export async function POST(request: Request) {
     };
     return NextResponse.json(result);
   } catch (err) {
+    if (err instanceof StoreOpsAuthError) {
+      return NextResponse.json({ error: err.message }, { status: err.status });
+    }
     console.error("[catalog/ai-taxonomy]", err);
     return NextResponse.json(
       {

@@ -14,6 +14,7 @@ import type { DepartmentScope, SpecialistRole, StoreSpecialist } from "@/lib/typ
 import {
   DEPARTMENT_META,
   OPERATIONAL_DEPARTMENTS,
+  associateFloorTitle,
 } from "@/lib/types";
 
 type Props = {
@@ -213,7 +214,7 @@ export function SpecialistModal({ open, active, onClose, onSelect }: Props) {
                         const meta = DEPARTMENT_META[id];
                         return (
                           <option key={id} value={id}>
-                            {meta.icon} {meta.label}
+                            {meta.icon} {meta.label} — {associateFloorTitle(id)}
                           </option>
                         );
                       })}

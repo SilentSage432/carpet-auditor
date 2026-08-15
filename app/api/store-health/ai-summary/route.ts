@@ -1,8 +1,8 @@
 import { NextResponse } from "next/server";
 import {
-  callGeminiFlash,
+  callGeminiFlashJson,
+  GEMINI_TOKEN_BUDGET,
   isGeminiConfigured,
-  parseGeminiJson,
 } from "@/lib/ai/gemini";
 import {
   isDeptFloorActor,
@@ -20,6 +20,7 @@ import {
   buildSessionRefreshShiftBriefing,
   buildShiftBriefingPrompt,
   normalizeShiftBriefing,
+  SHIFT_BRIEFING_RESPONSE_SCHEMA,
   type ShiftBriefing,
 } from "@/lib/store-ops/shift-briefing";
 import { resolveStoreByNumber } from "@/lib/store-ops/stores";
@@ -90,18 +91,9 @@ export async function POST(request: Request) {
           });
 
     const telemetry = body.telemetry ?? snapshot.telemetry ?? null;
+    const local = buildLocalShiftBriefing(snapshot, telemetry);
 
     if (!isGeminiConfigured()) {
-      if (body.allow_local_fallback === false) {
-        return NextResponse.json(
-          {
-            error:
-              "GEMINI_API_KEY is not configured — set it in .env.local for Shift Briefing",
-          },
-          { status: 503 }
-        );
-      }
-      const local = buildLocalShiftBriefing(snapshot, telemetry);
       return NextResponse.json({
         ...local,
         assigned_week: snapshot.assigned_week,
@@ -109,16 +101,27 @@ export async function POST(request: Request) {
       });
     }
 
-    const prompt = buildShiftBriefingPrompt(snapshot, telemetry);
-    const rawText = await callGeminiFlash(prompt);
-    const parsed = parseGeminiJson<unknown>(rawText, "object");
-    const briefing: ShiftBriefing = normalizeShiftBriefing(parsed, snapshot);
-
-    return NextResponse.json({
-      ...briefing,
-      assigned_week: snapshot.assigned_week,
-      source: "gemini" as const,
-    });
+    try {
+      const prompt = buildShiftBriefingPrompt(snapshot, telemetry);
+      const parsed = await callGeminiFlashJson<unknown>(prompt, {
+        maxOutputTokens: GEMINI_TOKEN_BUDGET.briefing,
+        responseSchema: SHIFT_BRIEFING_RESPONSE_SCHEMA,
+        prefer: "object",
+      });
+      const briefing: ShiftBriefing = normalizeShiftBriefing(parsed, snapshot);
+      return NextResponse.json({
+        ...briefing,
+        assigned_week: snapshot.assigned_week,
+        source: "gemini" as const,
+      });
+    } catch (geminiErr) {
+      console.warn("[store-health/ai-summary] Gemini unavailable — local brief", geminiErr);
+      return NextResponse.json({
+        ...local,
+        assigned_week: snapshot.assigned_week,
+        source: "local" as const,
+      });
+    }
   } catch (err) {
     if (err instanceof StoreOpsAuthError) {
       const soft = buildSessionRefreshShiftBriefing();
@@ -135,7 +138,7 @@ export async function POST(request: Request) {
       {
         error: readableError(
           err,
-          "Shift Intelligence Briefing failed — check Gemini and store health data"
+          "Could not load store health for shift briefing"
         ),
       },
       { status: 400 }

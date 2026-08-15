@@ -15,7 +15,32 @@ import { isoWeekLabel, isoWeekToMondayDate } from "@/lib/store-ops/week";
 import type { StoreSpecialist } from "@/lib/types";
 
 export const SUNDAY_AUDIT_EVENT = "deptsync:sunday-audit-assignments";
+export const SUNDAY_OPEN_EVENT = "deptsync:sunday-audit-open";
+export const SUNDAY_OPEN_STORAGE_KEY = "deptsync_open_sunday_audit";
 export const SUNDAY_DEPARTMENT = "flooring";
+
+/** Open the Sunday staging drawer in-place — never navigate to a missing route. */
+export function requestSundayAuditDrawer() {
+  if (typeof window === "undefined") return;
+  try {
+    sessionStorage.setItem(SUNDAY_OPEN_STORAGE_KEY, "1");
+  } catch {
+    /* ignore */
+  }
+  window.dispatchEvent(new CustomEvent(SUNDAY_OPEN_EVENT));
+}
+
+export function consumeSundayAuditOpenRequest(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    const raw = sessionStorage.getItem(SUNDAY_OPEN_STORAGE_KEY);
+    if (!raw) return false;
+    sessionStorage.removeItem(SUNDAY_OPEN_STORAGE_KEY);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 const SUNDAY_ASSIGNMENTS_TTL_MS = 45_000;
 const sundayAssignmentsCache = createTtlCache<SundayAssignmentMap>(
@@ -365,6 +390,13 @@ export function flooringRoster(
     const dept = m.assigned_department;
     return !dept || dept === "flooring" || dept === "all";
   });
+}
+
+/** On-duty Specialists + CSAs for Sunday shift balancer (all departments). */
+export function sundayAssignableRoster(
+  roster: StoreSpecialist[]
+): StoreSpecialist[] {
+  return roster.filter((m) => m.is_active !== false);
 }
 
 export function buildSundayStagedBays(

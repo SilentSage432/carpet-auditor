@@ -39,6 +39,14 @@ export class ChunkErrorBoundary extends Component<Props, State> {
     if (!this.state.error) return this.props.children;
 
     const label = this.props.label || "This panel";
+    const raw = String(this.state.error.message ?? "").trim();
+    const looksLikeRpc =
+      /googlegenerativeai|jsonrpc|429|quota|generativelanguage|resource.?exhausted/i.test(
+        raw
+      ) || raw.startsWith("{");
+    const message = looksLikeRpc
+      ? "This panel could not load. Retry, or continue with local tools."
+      : raw || "This panel could not load.";
     return (
       <div className="fixed inset-0 z-[70]" role="alert">
         <div className="absolute inset-0 bg-slate-950/70" />
@@ -50,7 +58,7 @@ export class ChunkErrorBoundary extends Component<Props, State> {
             <p className="mt-1 text-sm font-bold text-rose-100">{label}</p>
           </div>
           <p className="px-4 pt-4 text-sm text-zinc-300">
-            {this.state.error.message || "This panel could not load."}
+            {message}
           </p>
           <button
             type="button"

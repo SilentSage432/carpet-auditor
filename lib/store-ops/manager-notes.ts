@@ -4,7 +4,15 @@
  */
 
 import { getSupabase } from "@/lib/supabase";
-import type { NoteActionItem } from "./ai-note-summary";
+
+export type NoteActionPriority = "HIGH" | "MEDIUM" | "LOW";
+
+/** Persisted Floor Pad / manager-note action row (JSONB). */
+export type NoteActionItem = {
+  task: string;
+  priority: NoteActionPriority;
+  assignee_role: string;
+};
 
 export type ManagerNoteCategory = "shift_handover" | "audit" | "general";
 

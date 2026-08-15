@@ -7,11 +7,13 @@
 
 import {
   callGeminiFlashJson,
+  GEMINI_TOKEN_BUDGET,
   isGeminiConfigured,
 } from "@/lib/ai/gemini";
 import {
   buildLocalNoteExtract,
   buildNoteExtractPrompt,
+  NOTE_EXTRACT_RESPONSE_SCHEMA,
   normalizeNoteExtractResult,
   prepareNoteExtractContent,
   type NoteExtractInput,
@@ -65,7 +67,12 @@ export async function extractTasksAndTag(
     }
 
     const raw = await callGeminiFlashJson<unknown>(
-      buildNoteExtractPrompt(payload)
+      buildNoteExtractPrompt(payload),
+      {
+        maxOutputTokens: GEMINI_TOKEN_BUDGET.copilot,
+        responseSchema: NOTE_EXTRACT_RESPONSE_SCHEMA,
+        prefer: "object",
+      }
     );
     return {
       ...normalizeNoteExtractResult(raw, payload),

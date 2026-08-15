@@ -21,11 +21,11 @@ import {
   fetchSundayAssignments,
   filterFlooringRotations,
   findFlooringDepartment,
-  flooringRoster,
   pendingSundayAssignmentCount,
   setSundayBayAssignment,
   subscribeSundayBayAssignments,
   SUNDAY_AUDIT_EVENT,
+  sundayAssignableRoster,
   sundayStagingHeadline,
   type SundayStagedBay,
 } from "@/lib/store-ops/sunday-audit";
@@ -43,8 +43,9 @@ import {
 } from "@/lib/store-ops/weekly-rotations";
 import { getStoreNumber } from "@/lib/store";
 import { fetchSpecialists } from "@/lib/specialists";
+import { AssociateRosterPanel } from "@/components/admin/AssociateRosterPanel";
 import type { Department } from "@/lib/store-ops/types";
-import type { StoreSpecialist } from "@/lib/types";
+import { associateFloorTitleLabel, type StoreSpecialist } from "@/lib/types";
 
 type Props = {
   open: boolean;
@@ -91,11 +92,11 @@ export function SundayAuditAssignmentModal({
       );
       setWeek(rotData.assigned_week);
       setBays(buildSundayStagedBays(flooringRots, assignments));
-      const floorRoster = flooringRoster(specialists);
-      setRoster(floorRoster);
+      const assignable = sundayAssignableRoster(specialists);
+      setRoster(assignable);
       setShiftRoster(
         mergeShiftRoster(
-          floorRoster,
+          assignable,
           readShiftRoster(rotData.assigned_week, getStoreNumber())
         )
       );
@@ -376,6 +377,47 @@ export function SundayAuditAssignmentModal({
             </button>
           </div>
 
+          <AssociateRosterPanel
+            compact
+            specialist={specialist}
+            roster={roster}
+            onRosterChange={(next) => {
+              const assignable = sundayAssignableRoster(next);
+              setRoster(assignable);
+              persistRoster(mergeShiftRoster(assignable, shiftRoster));
+            }}
+            shiftHours={Object.fromEntries(
+              shiftRoster.map((row) => [row.specialist_id, row.hours])
+            )}
+            shiftActive={Object.fromEntries(
+              shiftRoster.map((row) => [row.specialist_id, row.active])
+            )}
+            onShiftHoursChange={(patch) => {
+              const exists = shiftRoster.some(
+                (row) => row.specialist_id === patch.specialist_id
+              );
+              if (!exists) {
+                const member = roster.find(
+                  (m) => String(m.id) === patch.specialist_id
+                );
+                persistRoster([
+                  ...shiftRoster,
+                  {
+                    specialist_id: patch.specialist_id,
+                    specialist_name: member?.name ?? "Associate",
+                    active: patch.active !== false,
+                    hours: patch.hours,
+                  },
+                ]);
+                return;
+              }
+              patchMember(patch.specialist_id, {
+                hours: patch.hours,
+                ...(patch.active !== undefined ? { active: patch.active } : {}),
+              });
+            }}
+          />
+
           {shiftRoster.length > 0 ? (
             <section className="rounded-xl border border-cyan-500/30 bg-cyan-950/20 p-3">
               <p className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-cyan-300">
@@ -404,6 +446,19 @@ export function SundayAuditAssignmentModal({
                       />
                       <span className="min-w-0 flex-1 truncate text-sm font-semibold text-white">
                         {row.specialist_name}
+                        {(() => {
+                          const member = roster.find(
+                            (m) => String(m.id) === row.specialist_id
+                          );
+                          if (!member || member.role !== "Associate") return null;
+                          return (
+                            <span className="ml-1 font-mono text-[10px] font-normal text-cyan-300/80">
+                              {associateFloorTitleLabel(
+                                member.assigned_department
+                              )}
+                            </span>
+                          );
+                        })()}
                       </span>
                       <span className="shrink-0 font-mono text-[10px] text-cyan-300">
                         {row.active

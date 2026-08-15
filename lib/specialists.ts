@@ -4,7 +4,7 @@ import type {
   SpecialistRole,
   StoreSpecialist,
 } from "./types";
-import { departmentMeta } from "./types";
+import { departmentMeta, associateFloorTitleLabel } from "./types";
 import { getStoreNumber, normalizeStoreNumber } from "./store";
 import { getSupabase } from "./supabase";
 import { normalizePhoneE164 } from "./phone";
@@ -91,14 +91,19 @@ function normalizeDepartment(raw: unknown, role: SpecialistRole): DepartmentScop
     value === "plumbing" ||
     value === "electrical" ||
     value === "lawn_garden" ||
+    value === "inside_garden" ||
+    value === "outside_garden" ||
     value === "paint" ||
     value === "millwork" ||
+    value === "cabinets" ||
     value === "building_materials" ||
     value === "hardware" ||
+    value === "tools" ||
     value === "all"
   ) {
     return value;
   }
+  if (value === "d29" || value === "cabinet") return "cabinets";
   if (role === "MasterAdmin") return "all";
   return null;
 }
@@ -454,7 +459,11 @@ export function roleBadge(member: StoreSpecialist): string {
     }
     return "🛡️ Department Supervisor";
   }
-  return "👤 Floor Associate";
+  const dept = member.assigned_department;
+  if (dept && dept !== "all") {
+    return `👤 ${associateFloorTitleLabel(dept)}`;
+  }
+  return "👤 Floor CSA";
 }
 
 export function getActiveSpecialist(): StoreSpecialist | null {
@@ -873,6 +882,7 @@ async function persistSpecialistFields(
       | "name"
       | "assigned_department"
       | "phone_number"
+      | "is_active"
     >
   >
 ): Promise<{ record: StoreSpecialist; offline: boolean }> {
@@ -1209,6 +1219,7 @@ export async function updateSpecialistScope(
     role?: SpecialistRole;
     assigned_department?: DepartmentScope | null;
     username?: string | null;
+    is_active?: boolean;
   }
 ): Promise<{ record: StoreSpecialist; offline: boolean }> {
   const role = input.role ?? member.role;
@@ -1234,7 +1245,20 @@ export async function updateSpecialistScope(
     username,
     assigned_department: assigned,
     must_change_credentials: member.must_change_credentials,
+  }).then(async (saved) => {
+    if (input.is_active === undefined || input.is_active === saved.record.is_active) {
+      return saved;
+    }
+    return persistSpecialistFields(saved.record, { is_active: input.is_active });
   });
+}
+
+/** Toggle whether a roster member is on-duty / active for Sunday allocation. */
+export async function setSpecialistActive(
+  member: StoreSpecialist,
+  is_active: boolean
+): Promise<{ record: StoreSpecialist; offline: boolean }> {
+  return persistSpecialistFields(member, { is_active });
 }
 
 function deactivateLocal(

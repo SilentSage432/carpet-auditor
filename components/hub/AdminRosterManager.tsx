@@ -18,6 +18,7 @@ import { inviteSupervisor } from "@/lib/store-ops/client";
 import {
   DEPARTMENT_META,
   OPERATIONAL_DEPARTMENTS,
+  associateFloorTitle,
   departmentMeta,
   type DepartmentScope,
   type SpecialistRole,
@@ -745,7 +746,7 @@ function AdminAddMemberModal({
               {(
                 [
                   ["Supervisor", "🛡️ Department Supervisor"],
-                  ["Associate", "👤 Floor Associate"],
+                  ["Associate", "👤 Specialist / CSA"],
                   ["MasterAdmin", "👑 Master Admin"],
                 ] as const
               ).map(([value, label]) => (
@@ -781,7 +782,7 @@ function AdminAddMemberModal({
                   const meta = DEPARTMENT_META[id];
                   return (
                     <option key={id} value={id}>
-                      {meta.icon} {meta.label} — {meta.description}
+                      {meta.icon} {meta.label} — {associateFloorTitle(id)}
                     </option>
                   );
                 })}
@@ -980,7 +981,7 @@ function AdminEditScopeModal({ open, member, onClose, onSaved }: EditProps) {
                   const meta = DEPARTMENT_META[id];
                   return (
                     <option key={id} value={id}>
-                      {meta.icon} {meta.label}
+                      {meta.icon} {meta.label} — {associateFloorTitle(id)}
                     </option>
                   );
                 })}

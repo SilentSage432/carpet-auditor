@@ -1,9 +1,11 @@
 import { NextResponse } from "next/server";
 import {
   callGeminiFlashJson,
+  GEMINI_TOKEN_BUDGET,
   isGeminiConfigured,
 } from "@/lib/ai/gemini";
 import {
+  BAY_SCAN_RESPONSE_SCHEMA,
   buildBayScanPrompt,
   buildLocalBayScanResult,
   normalizeBayScanResult,
@@ -80,10 +82,11 @@ export async function POST(request: Request) {
 
     const mimeType = resolveImageMimeType(image, body.mime_type);
     const prompt = buildBayScanPrompt(meta);
-    // JSON mime + maxOutputTokens 1024 applied in lib/ai/gemini.ts
     const parsed = await callGeminiFlashJson<unknown>(prompt, {
       inlineImageData: { mimeType, data: image },
       prefer: "object",
+      maxOutputTokens: GEMINI_TOKEN_BUDGET.bayScan,
+      responseSchema: BAY_SCAN_RESPONSE_SCHEMA,
     });
     const result: BayScanResult = normalizeBayScanResult(parsed);
 

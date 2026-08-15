@@ -2,6 +2,7 @@
 
 import { useCallback, useState } from "react";
 import { openAdminTools } from "@/components/hub/admin-tools-events";
+import { AssociateRosterPanel } from "@/components/admin/AssociateRosterPanel";
 import { PushNotificationsCard } from "@/components/hub/PushNotificationsCard";
 import { WeeklyBayTargetCard } from "@/components/hub/WeeklyBayTargetCard";
 import { ThemeSelector } from "@/components/settings/ThemeSelector";
@@ -43,6 +44,8 @@ type ConnectionStatus = "idle" | "checking" | "ok" | "fail";
  */
 export function SettingsSection({
   activeSpecialist,
+  specialists,
+  onRosterChange,
   onOpenChangePin,
   storeNumber,
 }: Props) {
@@ -163,14 +166,23 @@ export function SettingsSection({
         <PushNotificationsCard specialist={activeSpecialist} />
       )}
 
+      {masterSession && activeSpecialist ? (
+        <AssociateRosterPanel
+          specialist={activeSpecialist}
+          roster={specialists}
+          onRosterChange={onRosterChange}
+        />
+      ) : null}
+
       {masterSession ? (
         <section className="rounded-2xl border-2 border-amber-400/40 bg-amber-950/20 p-4">
           <p className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-amber-300">
             Super Admin
           </p>
           <p className="mt-1 text-sm text-slate-300">
-            Roster, store number, all-department targets, bulk generate, and
-            diagnostics live in Admin Tools — not on this page.
+            Store number, all-department targets, bulk generate, and diagnostics
+            live in Admin Tools. Associate roster is on this page and in Admin
+            Tools.
           </p>
           <button
             type="button"

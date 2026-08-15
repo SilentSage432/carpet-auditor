@@ -2,7 +2,8 @@
 
 /**
  * Zebra Shift Intelligence Briefing — presentation for Store Ops dashboard.
- * Composes fetchShiftBriefing; does not recompute store health metrics.
+ * On load: deterministic local health brief only (no Gemini).
+ * Manual refresh may call Gemini; quota/RPC errors fall back to the local brief.
  */
 
 import { useCallback, useEffect, useRef, useState, type TouchEvent } from "react";
@@ -10,7 +11,9 @@ import { HubIcon } from "@/components/hub/NavIcons";
 import {
   fetchShiftBriefing,
   fetchStoreHealth,
+  localShiftBriefingFromHealth,
   type ShiftBriefingClient,
+  type StoreHealthSnapshotClient,
 } from "@/lib/store-ops/client";
 import type { StoreSpecialist } from "@/lib/types";
 
@@ -28,35 +31,60 @@ type Props = {
 
 export function ShiftBriefingCard({ specialist, refreshKey }: Props) {
   const [briefing, setBriefing] = useState<ShiftBriefingClient | null>(null);
+  const [snapshot, setSnapshot] = useState<StoreHealthSnapshotClient | null>(
+    null
+  );
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [aiBusy, setAiBusy] = useState(false);
   const pullStartY = useRef<number | null>(null);
   const [pullOffset, setPullOffset] = useState(0);
 
-  const reload = useCallback(async () => {
+  const loadLocal = useCallback(async () => {
     setLoading(true);
-    setError(null);
     try {
-      const snapshot = await fetchStoreHealth(specialist);
-      const next = await fetchShiftBriefing(specialist, {
-        snapshot,
-        telemetry: snapshot.telemetry ?? null,
+      const nextSnapshot = await fetchStoreHealth(specialist);
+      setSnapshot(nextSnapshot);
+      setBriefing(localShiftBriefingFromHealth(nextSnapshot));
+    } catch {
+      setBriefing({
+        headline: "Shift health unavailable",
+        bullets: [
+          "Focus: could not load open-bay counts for this shift.",
+          "Barriers: local metrics unavailable — check Store Ops Auth.",
+          "Quick-win: unlock with Hub PIN, then pull to refresh.",
+        ],
+        priority_department: "Storewide",
+        source: "local",
       });
-      setBriefing(next);
-    } catch (err) {
-      setError(
-        (err as { message?: string } | null)?.message ||
-          "Could not load shift briefing"
-      );
     } finally {
       setLoading(false);
       setPullOffset(0);
     }
   }, [specialist]);
 
+  const refreshAi = useCallback(async () => {
+    setAiBusy(true);
+    try {
+      const nextSnapshot = snapshot ?? (await fetchStoreHealth(specialist));
+      setSnapshot(nextSnapshot);
+      const next = await fetchShiftBriefing(specialist, {
+        snapshot: nextSnapshot,
+        telemetry: nextSnapshot.telemetry ?? null,
+      });
+      setBriefing(next);
+    } catch {
+      if (snapshot) {
+        setBriefing(localShiftBriefingFromHealth(snapshot));
+      }
+    } finally {
+      setAiBusy(false);
+      setPullOffset(0);
+    }
+  }, [specialist, snapshot]);
+
   useEffect(() => {
-    void reload();
-  }, [reload, refreshKey]);
+    void loadLocal();
+  }, [loadLocal, refreshKey]);
 
   function onTouchStart(e: TouchEvent) {
     if (typeof window !== "undefined" && window.scrollY > 8) return;
@@ -64,7 +92,7 @@ export function ShiftBriefingCard({ specialist, refreshKey }: Props) {
   }
 
   function onTouchMove(e: TouchEvent) {
-    if (pullStartY.current == null || loading) return;
+    if (pullStartY.current == null || loading || aiBusy) return;
     const y = e.touches[0]?.clientY ?? pullStartY.current;
     const delta = Math.max(0, Math.min(72, y - pullStartY.current));
     setPullOffset(delta);
@@ -72,11 +100,13 @@ export function ShiftBriefingCard({ specialist, refreshKey }: Props) {
 
   function onTouchEnd() {
     if (pullStartY.current == null) return;
-    const shouldRefresh = pullOffset >= 56 && !loading;
+    const shouldRefresh = pullOffset >= 56 && !loading && !aiBusy;
     pullStartY.current = null;
     setPullOffset(0);
-    if (shouldRefresh) void reload();
+    if (shouldRefresh) void refreshAi();
   }
+
+  const busy = loading || aiBusy;
 
   return (
     <section
@@ -107,23 +137,25 @@ export function ShiftBriefingCard({ specialist, refreshKey }: Props) {
               Week {briefing.assigned_week}
               {briefing.source === "local"
                 ? " · local metrics"
-                : briefing.source === "session"
-                  ? " · auth refresh needed"
-                  : ""}
+                : briefing.source === "gemini"
+                  ? " · AI refresh"
+                  : briefing.source === "session"
+                    ? " · auth refresh needed"
+                    : ""}
             </p>
           ) : null}
         </div>
         <button
           type="button"
-          onClick={() => void reload()}
-          disabled={loading}
-          aria-label="Re-analyze shift briefing"
-          title="Tap to re-analyze · pull down to refresh"
+          onClick={() => void refreshAi()}
+          disabled={busy}
+          aria-label="Re-analyze shift briefing with AI"
+          title="Tap to ask AI · pull down to refresh. Falls back to local metrics if quota is exhausted."
           className="btn-icon-touch h-11 w-11 border-emerald-500/40 bg-emerald-950/50 text-emerald-300 shadow-lg shadow-emerald-950/40"
         >
           <HubIcon
             id="refresh"
-            className={`h-5 w-5 ${loading ? "animate-spin" : ""}`}
+            className={`h-5 w-5 ${busy ? "animate-spin" : ""}`}
           />
         </button>
       </div>
@@ -131,11 +163,7 @@ export function ShiftBriefingCard({ specialist, refreshKey }: Props) {
       <div className="relative mt-2">
         {loading && !briefing ? (
           <p className="text-sm text-emerald-200/70">
-            Generating shift briefing…
-          </p>
-        ) : error && !briefing ? (
-          <p className="text-sm font-medium text-rose-300" role="alert">
-            {error}
+            Loading shift health…
           </p>
         ) : briefing ? (
           <>
@@ -172,18 +200,13 @@ export function ShiftBriefingCard({ specialist, refreshKey }: Props) {
                 tap refresh. Phone OTP is optional recovery only.
               </p>
             ) : null}
-            {error ? (
-              <p className="mt-2 text-xs text-amber-300/90" role="status">
-                Refresh note: {error}
-              </p>
-            ) : null}
             {pullOffset > 24 ? (
               <p className="mt-1.5 text-center text-[10px] font-semibold uppercase tracking-wider text-emerald-400/80">
                 {pullOffset >= 56 ? "Release to refresh" : "Pull to refresh"}
               </p>
             ) : (
               <p className="mt-1.5 text-center text-[10px] font-semibold uppercase tracking-wider text-emerald-600/70">
-                Pull down or tap refresh for a new shift brief
+                Local health brief · tap refresh for optional AI rewrite
               </p>
             )}
           </>

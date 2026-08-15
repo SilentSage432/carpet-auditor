@@ -1,17 +1,18 @@
 "use client";
 
 /**
- * /flooring — Flooring Cycle Audit deep link for dual-role Master Admin / Flooring DS.
- * Redirects into Inventory Hub audit section (no duplicate auditor).
+ * /flooring — Flooring Cycle Audit deep link.
+ * Never leaves the user on a dead hop: pin D23 context and open the Floor
+ * dashboard with the Sunday staging drawer in-place.
  */
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { SundayAuditStagingCard } from "@/components/admin/SundayAuditStagingCard";
 import { NavigationHub } from "@/components/hub/NavigationHub";
 import { SessionGate } from "@/components/hub/SessionGate";
 import { setAdminWorkingDepartment } from "@/lib/admin-department-context";
 import { canAccessSection, isMasterAdmin } from "@/lib/rbac";
+import { requestSundayAuditDrawer } from "@/lib/store-ops/sunday-audit";
 import type { StoreSpecialist } from "@/lib/types";
 
 export default function FlooringDeepLinkPage() {
@@ -46,10 +47,8 @@ function FlooringBridge({
     if (isMasterAdmin(specialist)) {
       setAdminWorkingDepartment("flooring");
     }
-    const t = window.setTimeout(() => {
-      router.replace("/?section=audit");
-    }, 900);
-    return () => window.clearTimeout(t);
+    requestSundayAuditDrawer();
+    router.replace("/dashboard");
   }, [router, specialist]);
 
   return (
@@ -61,23 +60,10 @@ function FlooringBridge({
         onLogout={logout}
       />
       <main className="hub-main">
-        <SundayAuditStagingCard specialist={specialist} forceShow />
         <p className="glass-card mt-2 px-4 py-3 text-sm text-zinc-300">
-          Opening Flooring Cycle Audit workspace…
-          <LinkHint />
+          Opening Sunday Cycle Audit Engine…
         </p>
       </main>
     </div>
-  );
-}
-
-function LinkHint() {
-  return (
-    <a
-      href="/?section=audit"
-      className="mt-2 block font-semibold text-emerald-300 underline-offset-2 hover:underline"
-    >
-      Continue to Cycle Audit →
-    </a>
   );
 }

@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
 import {
-  callGeminiFlash,
+  callGeminiFlashJson,
+  GEMINI_TOKEN_BUDGET,
   isGeminiConfigured,
-  parseGeminiJson,
 } from "@/lib/ai/gemini";
 import {
+  AI_PARSE_MAX_CHARS,
+  AI_PARSE_RESPONSE_SCHEMA,
   buildAiLocationParsePrompt,
   normalizeAiParsePayload,
   type AiParseResult,
@@ -43,6 +45,7 @@ export async function POST(request: Request) {
         { status: 400 }
       );
     }
+    const capped = text.slice(0, AI_PARSE_MAX_CHARS);
 
     const knownDepartmentCodes = Array.isArray(body.known_department_codes)
       ? body.known_department_codes.map((c) => String(c).trim()).filter(Boolean)
@@ -52,13 +55,16 @@ export async function POST(request: Request) {
     ).trim();
 
     const prompt = buildAiLocationParsePrompt({
-      text,
+      text: capped,
       knownDepartmentCodes,
       defaultDepartmentCode: defaultDepartmentCode || undefined,
     });
 
-    const rawText = await callGeminiFlash(prompt);
-    const parsed = parseGeminiJson<unknown>(rawText, "object");
+    const parsed = await callGeminiFlashJson<unknown>(prompt, {
+      maxOutputTokens: GEMINI_TOKEN_BUDGET.parse,
+      responseSchema: AI_PARSE_RESPONSE_SCHEMA,
+      prefer: "object",
+    });
     const result: AiParseResult = normalizeAiParsePayload(parsed, {
       knownDepartmentCodes,
       defaultDepartmentCode: defaultDepartmentCode || undefined,

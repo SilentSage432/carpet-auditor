@@ -14,6 +14,7 @@ export const STORE_OPS_DEPARTMENT_CODES = [
   "D28I",
   "D28O",
   "D30",
+  "D29",
   "D25",
   "building_materials",
 ] as const;
@@ -35,6 +36,8 @@ const HUB_TO_CODE: Record<string, StoreOpsDepartmentCode> = {
   D28O: "D28O",
   millwork: "D30",
   D30: "D30",
+  cabinets: "D29",
+  D29: "D29",
   hardware: "D25",
   tools: "D25",
   D25: "D25",
@@ -58,6 +61,7 @@ export function hubScopeFromDeptCode(code: string): DepartmentScope | null {
     D28I: "inside_garden",
     D28O: "outside_garden",
     D30: "millwork",
+    D29: "cabinets",
     D25: "tools",
     building_materials: "building_materials",
   };

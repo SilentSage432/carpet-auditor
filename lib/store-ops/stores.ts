@@ -24,6 +24,7 @@ const DEPARTMENT_TEMPLATES: Array<{ name: string; code: string }> = [
   { name: "Inside Garden", code: "D28I" },
   { name: "Outside Garden", code: "D28O" },
   { name: "Millwork", code: "D30" },
+  { name: "Cabinets", code: "D29" },
   { name: "Tools", code: "D25" },
   { name: "Building Materials", code: "building_materials" },
 ];

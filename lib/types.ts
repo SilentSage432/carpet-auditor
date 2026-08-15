@@ -28,6 +28,7 @@ export const STORE_DEPARTMENTS = [
   "outside_garden",
   "paint",
   "millwork",
+  "cabinets",
   "building_materials",
   "hardware",
   "tools",
@@ -48,9 +49,62 @@ export const OPERATIONAL_DEPARTMENTS: OperationalDepartment[] = [
   "inside_garden",
   "outside_garden",
   "millwork",
+  "cabinets",
   "tools",
   "building_materials",
 ];
+
+/**
+ * Lowe's specialty sales departments — floor title is Specialist.
+ * Platform role stays Associate | Supervisor | MasterAdmin.
+ */
+export const SPECIALTY_DEPARTMENTS = [
+  "flooring",
+  "appliances",
+  "millwork",
+  "cabinets",
+] as const;
+
+export type SpecialtyDepartment = (typeof SPECIALTY_DEPARTMENTS)[number];
+
+/**
+ * Lowe's core departments — floor title is CSA (Customer Service Associate).
+ * Includes Electrical (not listed as specialty) and legacy garden/hardware aliases.
+ */
+export const CORE_DEPARTMENTS = [
+  "paint",
+  "plumbing",
+  "electrical",
+  "lawn_garden",
+  "inside_garden",
+  "outside_garden",
+  "building_materials",
+  "hardware",
+  "tools",
+] as const;
+
+export type CoreDepartment = (typeof CORE_DEPARTMENTS)[number];
+
+export type AssociateFloorTitle = "Specialist" | "CSA";
+
+export function isSpecialtyDepartment(
+  dept: DepartmentScope | string | null | undefined
+): dept is SpecialtyDepartment {
+  return (SPECIALTY_DEPARTMENTS as readonly string[]).includes(String(dept ?? ""));
+}
+
+export function isCoreDepartment(
+  dept: DepartmentScope | string | null | undefined
+): dept is CoreDepartment {
+  return (CORE_DEPARTMENTS as readonly string[]).includes(String(dept ?? ""));
+}
+
+/** Retail floor designation for an Associate in this department. */
+export function associateFloorTitle(
+  dept: DepartmentScope | string | null | undefined
+): AssociateFloorTitle {
+  return isSpecialtyDepartment(dept) ? "Specialist" : "CSA";
+}
 
 export type DepartmentMeta = {
   id: DepartmentScope;
@@ -124,6 +178,13 @@ export const DEPARTMENT_META: Record<DepartmentScope, DepartmentMeta> = {
     shortLabel: "Millwork",
     description: "Millwork (D30)",
   },
+  cabinets: {
+    id: "cabinets",
+    icon: "🗄️",
+    label: "Cabinets",
+    shortLabel: "Cabinets",
+    description: "Cabinets (D29)",
+  },
   building_materials: {
     id: "building_materials",
     icon: "🪵",
@@ -164,6 +225,16 @@ export function isDepartmentScope(raw: unknown): raw is DepartmentScope {
 export function departmentMeta(id: DepartmentScope | null | undefined): DepartmentMeta {
   if (id && isDepartmentScope(id)) return DEPARTMENT_META[id];
   return DEPARTMENT_META.flooring;
+}
+
+/** Short label: "Flooring Specialist" / "Paint CSA". */
+export function associateFloorTitleLabel(
+  dept: DepartmentScope | string | null | undefined
+): string {
+  const meta = departmentMeta(
+    dept && isDepartmentScope(dept) ? dept : "flooring"
+  );
+  return `${meta.shortLabel} ${associateFloorTitle(dept)}`;
 }
 
 /** Flooring / SIMS catalog categories. */

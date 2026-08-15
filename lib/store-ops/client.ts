@@ -11,6 +11,11 @@ import {
 } from "./auth-soft";
 import { readableError } from "./errors";
 import { createTtlCache } from "./ttl-cache";
+import {
+  buildLocalShiftBriefing,
+  buildSessionRefreshShiftBriefing,
+  isShiftBriefingTransportError,
+} from "./shift-briefing";
 import type {
   BulkGenerateInput,
   Department,
@@ -703,6 +708,35 @@ export type ShiftBriefingClient = {
   auth_required?: boolean;
 };
 
+function localBriefingFromSnapshot(
+  snapshot: StoreHealthSnapshotClient
+): ShiftBriefingClient {
+  const local = buildLocalShiftBriefing({
+    assigned_week: snapshot.assigned_week,
+    store_id: snapshot.store_id ?? "",
+    scope: snapshot.scope,
+    department: snapshot.department,
+    departments: snapshot.departments,
+    barriers: snapshot.barriers,
+    bottleneck_summary: snapshot.bottleneck_summary,
+    totals: snapshot.totals,
+    telemetry: snapshot.telemetry ?? null,
+    bay_health: snapshot.bay_health ?? null,
+  });
+  return {
+    ...local,
+    assigned_week: snapshot.assigned_week,
+    source: "local",
+  };
+}
+
+/** Instant deterministic brief from store health — no Gemini. */
+export function localShiftBriefingFromHealth(
+  snapshot: StoreHealthSnapshotClient
+): ShiftBriefingClient {
+  return localBriefingFromSnapshot(snapshot);
+}
+
 /** Zebra Shift Intelligence Briefing from store health metrics + velocity. */
 export async function fetchShiftBriefing(
   specialist: StoreSpecialist,
@@ -712,6 +746,9 @@ export async function fetchShiftBriefing(
     telemetry?: import("@/lib/store-ops/telemetry").StoreAuditTelemetry | null;
   }
 ): Promise<ShiftBriefingClient> {
+  const fallback = options?.snapshot
+    ? localBriefingFromSnapshot(options.snapshot)
+    : null;
   try {
     return await storeOpsFetch<ShiftBriefingClient>(
       "/api/store-health/ai-summary",
@@ -731,18 +768,17 @@ export async function fetchShiftBriefing(
   } catch (err) {
     const message = String((err as { message?: string } | null)?.message ?? "");
     if (/unauthorized|auth session|sign in|401/i.test(message)) {
+      const soft = buildSessionRefreshShiftBriefing();
       return {
-        headline: "Sign in again to load shift intel",
-        bullets: [
-          "Store Ops Auth session missing — unlock with your Hub PIN/password to mint an Auth token.",
-          "Master Admin no longer needs phone OTP for briefing, map, or admin tools.",
-          "After signing in, pull to refresh or tap re-analyze for a live briefing.",
-        ],
-        priority_department: "Storewide",
+        ...soft,
         assigned_week: options?.week || options?.snapshot?.assigned_week,
         source: "session",
         auth_required: true,
       };
+    }
+    if (fallback) return fallback;
+    if (isShiftBriefingTransportError(err)) {
+      throw new Error("Could not load AI briefing");
     }
     throw err;
   }
@@ -820,35 +856,6 @@ export async function scanBayVisual(
         image: rawBase64,
         mime_type: input.mime_type || "image/jpeg",
       }),
-    }
-  );
-}
-
-export type NoteSummaryClientResult =
-  import("./ai-note-summary").NoteSummaryResult & {
-    source?: "gemini" | "local";
-  };
-
-/** Gemini Flash manager note (+ optional S Pen PNG) → summary + action items. */
-export async function synthesizeManagerNote(
-  specialist: StoreSpecialist,
-  input: {
-    title: string;
-    content: string;
-    canvas_data_url?: string;
-    department_code?: string;
-    aisle?: string;
-    bay?: number;
-    allow_local_fallback?: boolean;
-  }
-): Promise<NoteSummaryClientResult> {
-  return storeOpsFetch<NoteSummaryClientResult>(
-    "/api/store-ops/ai-note-summary",
-    specialist,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(input),
     }
   );
 }

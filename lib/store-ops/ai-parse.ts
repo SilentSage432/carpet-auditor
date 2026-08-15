@@ -5,6 +5,7 @@
  */
 
 import { isValidAisle, normalizeAisle } from "@/lib/store-ops/aisle";
+import { asGeminiSchema } from "@/lib/ai/gemini-schema";
 import type { StoreLocationType } from "@/lib/store-ops/types";
 
 export type AiLocationMode = "SELLING" | "TOPSTOCK" | "BOTH";
@@ -21,6 +22,41 @@ export type AiParseResult = {
   locations: AiParsedLocation[];
   corrections_made: string[];
 };
+
+/** Cap messy Pre-Flight input so Gemini is not fed unbounded CSV. */
+export const AI_PARSE_MAX_CHARS = 24_000;
+
+const parsedLocationSchema = asGeminiSchema({
+  type: "object",
+  properties: {
+    department_code: { type: "string" },
+    aisle: { type: "string" },
+    start_bay: { type: "integer" },
+    end_bay: { type: "integer" },
+    type: {
+      type: "string",
+      format: "enum",
+      enum: ["SELLING", "TOPSTOCK", "BOTH"],
+    },
+  },
+  required: ["department_code", "aisle", "start_bay", "end_bay", "type"],
+});
+
+/** Structured output for aisle/bay Pre-Flight parse. */
+export const AI_PARSE_RESPONSE_SCHEMA = asGeminiSchema({
+  type: "object",
+  properties: {
+    locations: {
+      type: "array",
+      items: parsedLocationSchema,
+    },
+    corrections_made: {
+      type: "array",
+      items: { type: "string" },
+    },
+  },
+  required: ["locations", "corrections_made"],
+});
 
 export function typesFromAiLocationMode(
   mode: AiLocationMode
@@ -212,22 +248,8 @@ Rules:
 - Expand informal lists like "aisles 1-3 bays 1-15" into discrete aisle rows when clear.
 - Record every normalization or fix in corrections_made (short human-readable strings).
 
-Return ONLY valid JSON (no markdown) matching:
-{
-  "locations": [
-    {
-      "department_code": "flooring",
-      "aisle": "A12",
-      "start_bay": 1,
-      "end_bay": 15,
-      "type": "BOTH"
-    }
-  ],
-  "corrections_made": ["Normalized aisle 'a12' to 'A12'"]
-}
-
 INPUT:
 """
-${input.text}
+${input.text.slice(0, AI_PARSE_MAX_CHARS)}
 """`;
 }

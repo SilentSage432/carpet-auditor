@@ -10,12 +10,12 @@ import type {
   AnomalySeverity,
   ApplianceAnomaly,
 } from "@/lib/appliances/ai-anomaly";
-import { getStoreNumber } from "@/lib/store";
-import type { ApplianceCatalogItem, ApplianceScan } from "@/lib/types";
+import { storeOpsAuthHeadersAsync } from "@/lib/store-ops/auth";
 
 type Props = {
-  scans: ApplianceScan[];
-  catalog: ApplianceCatalogItem[];
+  /** Unused — server fetches scans. Kept so existing call sites compile. */
+  scans?: unknown;
+  catalog?: unknown;
   /** Optional: jump to SKU in the scan log search. */
   onFocusSku?: (sku: string) => void;
 };
@@ -68,8 +68,6 @@ function statusTone(anomalies: ApplianceAnomaly[] | null): {
 }
 
 export function ApplianceAnomalyWidget({
-  scans,
-  catalog,
   onFocusSku,
 }: Props) {
   const [busy, setBusy] = useState(false);
@@ -86,12 +84,8 @@ export function ApplianceAnomalyWidget({
     try {
       const res = await fetch("/api/appliances/ai-anomaly", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          scans,
-          catalog,
-          store_number: getStoreNumber(),
-        }),
+        headers: await storeOpsAuthHeadersAsync(),
+        body: JSON.stringify({}),
       });
       const body = (await res.json().catch(() => ({}))) as AnomalyResponse;
       if (!res.ok) {
@@ -108,7 +102,7 @@ export function ApplianceAnomalyWidget({
     } finally {
       setBusy(false);
     }
-  }, [scans, catalog]);
+  }, []);
 
   return (
     <section
@@ -136,7 +130,7 @@ export function ApplianceAnomalyWidget({
         </div>
         <button
           type="button"
-          disabled={busy || (scans.length === 0 && catalog.length === 0)}
+          disabled={busy}
           onClick={() => void runDetect()}
           className="flex min-h-[44px] shrink-0 items-center justify-center rounded-xl border border-cyan-500/40 bg-cyan-950/50 px-3 text-xs font-bold uppercase tracking-wider text-cyan-100 shadow-lg shadow-cyan-950/30 disabled:opacity-50"
         >

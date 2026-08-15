@@ -17,6 +17,8 @@ import {
   pendingSundayAssignmentCount,
   shouldShowSundayStaging,
   SUNDAY_AUDIT_EVENT,
+  SUNDAY_OPEN_EVENT,
+  consumeSundayAuditOpenRequest,
   sundayStagingHeadline,
 } from "@/lib/store-ops/sunday-audit";
 import { getStoreNumber } from "@/lib/store";
@@ -81,11 +83,19 @@ export function SundayAuditStagingCard({
     function onEvt() {
       setWorkingTick((n) => n + 1);
     }
+    function onOpen() {
+      setModalOpen(true);
+    }
     window.addEventListener(SUNDAY_AUDIT_EVENT, onEvt);
     window.addEventListener("deptsync:admin-dept-context", onEvt);
+    window.addEventListener(SUNDAY_OPEN_EVENT, onOpen);
+    if (consumeSundayAuditOpenRequest()) {
+      setModalOpen(true);
+    }
     return () => {
       window.removeEventListener(SUNDAY_AUDIT_EVENT, onEvt);
       window.removeEventListener("deptsync:admin-dept-context", onEvt);
+      window.removeEventListener(SUNDAY_OPEN_EVENT, onOpen);
     };
   }, []);
 
@@ -97,13 +107,7 @@ export function SundayAuditStagingCard({
       (specialist.assigned_department === "flooring" ||
         specialist.assigned_department == null));
 
-  if (!flooringContext || (!visible && !forceShow)) {
-    // Still allow Master Admin / Flooring DS to open engine when zero bays via forceShow parents
-    if (!forceShow || !flooringContext) return null;
-  }
-
-  const showCard = visible || forceShow;
-  if (!showCard) return null;
+  const showCard = flooringContext && (visible || forceShow);
 
   const headline = sundayStagingHeadline({
     openCount: openCount || 0,
@@ -111,11 +115,18 @@ export function SundayAuditStagingCard({
     week,
   });
 
+  if (!showCard && !modalOpen) return null;
+
   return (
     <>
+      {showCard ? (
       <button
         type="button"
-        onClick={() => setModalOpen(true)}
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          setModalOpen(true);
+        }}
         className="glass-card theme-modal relative mb-3 flex min-h-12 w-full items-center gap-2.5 overflow-hidden p-3 text-left transition active:scale-[0.99]"
       >
         <div
@@ -136,7 +147,7 @@ export function SundayAuditStagingCard({
               : "Sunday Cycle Audit Engine — tap to stage Flooring bays"}
           </p>
           <p className="mt-0.5 text-xs text-emerald-200/75">
-            Assign Flooring specialists · shift hours · clustered balance
+            Assign Specialists / CSAs · 4h / 6h / 8h · clustered balance
           </p>
         </div>
         <HubIcon
@@ -144,6 +155,7 @@ export function SundayAuditStagingCard({
           className="relative h-5 w-5 shrink-0 self-center text-accent"
         />
       </button>
+      ) : null}
 
       <SundayAuditAssignmentModal
         open={modalOpen}

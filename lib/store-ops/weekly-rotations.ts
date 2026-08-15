@@ -98,7 +98,7 @@ export function formatSpecialistShiftLabel(
   name: string,
   hours?: number | null
 ): string {
-  const base = String(name ?? "").trim() || "Specialist";
+  const base = String(name ?? "").trim() || "Associate";
   if (hours == null || hours <= 0) return base;
   return `${base} · ${formatShiftTag(hours)}`;
 }
@@ -173,7 +173,7 @@ export function readShiftRoster(
         if (!id) return null;
         const member: ShiftRosterMember = {
           specialist_id: id,
-          specialist_name: String(rec.specialist_name ?? "").trim() || "Specialist",
+          specialist_name: String(rec.specialist_name ?? "").trim() || "Associate",
           active: rec.active !== false,
           hours: clampShiftHours(rec.hours),
         };

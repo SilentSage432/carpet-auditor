@@ -102,13 +102,15 @@
 - [x] Theme engine — five dark tactical presets + high-contrast / compact density, CSS variables, Settings Appearance selector
 - [x] Phase 1 UX/UI consolidation — floating splash mark, department dropdown pill, Floor/Map/Stock/Settings workflow tabs, Store Map dual-pill + kebab rows
 - [x] Phase 2 UX/UI consolidation — Roll Measurement Pad, Admin Tools 2-col grid, department targets matrix
-- [x] P0 FTUX — cyan/gold PWA mark, branded splash, land on `/dashboard`, associate checklist-first Floor, role-aware empty states, Floor microcopy
+- [x] Slice 1 Intelligence Architecture Hardening — per-route `responseSchema` + token budgets; Store Ops auth + server-fetch compact-then-narrate on flooring/appliances/taxonomy; `ai-note-summary` 410 Gone
+- [x] Local-first shift briefing (no auto Gemini / silent 429 fallback) + Sunday in-place drawer (no 404 hop)
+- [x] Cabinets D29 first-class department + Specialist vs CSA associate roster wired into Sunday balancer
 
 ## Next
 - [x] Apply Phase 1 JWT/RLS migration in Supabase + enable Custom Access Token Hook
-- [ ] Apply Phase 2 migrations (`20260812_manager_notes.sql`, `20260812_sunday_bay_assignments.sql`, `20260812_manager_notes_archive.sql`, `20260812_fix_manager_notes_rls.sql`, **`20260812_manager_notes_metadata.sql`**, **`enable_rls_flagged_tables.sql`**, **`20260813_p0_query_indexes.sql`**, **`20260814_downstock_queue.sql`**) + Realtime on notes/assignments tables
+- [ ] Apply Phase 2 migrations (`20260812_manager_notes.sql`, `20260812_sunday_bay_assignments.sql`, `20260812_manager_notes_archive.sql`, `20260812_fix_manager_notes_rls.sql`, **`20260812_manager_notes_metadata.sql`**, **`enable_rls_flagged_tables.sql`**, **`20260813_p0_query_indexes.sql`**, **`20260814_downstock_queue.sql`**, **`20260814_cabinets_d29.sql`**) + Realtime on notes/assignments tables
 - [ ] Confirm every Master Admin has `store_number` set so Hub bridge can link `profiles`
-- [ ] Additional Gemini product surfaces beyond current AI ops widgets
+- [ ] Additional Gemini product surfaces beyond current AI ops widgets (Slice 1 transport/auth/compact-then-narrate shipped)
 ## Non-goals
 - Pricing / margin engines
 - Replenishment recommendations

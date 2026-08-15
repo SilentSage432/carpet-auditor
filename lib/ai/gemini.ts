@@ -2,19 +2,28 @@
  * Gemini AI integration layer — server-only.
  *
  * Owns: Gemini Flash client config + generateContent helpers + JSON extraction.
- * Does not own: product prompts, API routes, or institutional recommendations.
- * Callers compose prompts; this module only transports and parses model output.
+ * Does not own: product prompts, response schemas, API routes, or institutional
+ * recommendations. Callers compose prompts and schemas; this module transports
+ * and parses model output.
  *
  * Env (never NEXT_PUBLIC_):
  *   GEMINI_API_KEY
  *   GEMINI_MODEL (default: gemini-3.5-flash)
  */
 
+import "server-only";
+
 import {
   GoogleGenerativeAI,
+  SchemaType,
   type GenerationConfig,
   type Part,
+  type ResponseSchema,
+  type Schema,
 } from "@google/generative-ai";
+
+export { SchemaType };
+export type { ResponseSchema, Schema };
 
 export type GeminiInlineImage = {
   mimeType: string;
@@ -22,13 +31,62 @@ export type GeminiInlineImage = {
   data: string;
 };
 
+export type GeminiCallOptions = {
+  inlineImageData?: GeminiInlineImage;
+  maxOutputTokens?: number;
+  responseSchema?: ResponseSchema;
+  prefer?: "object" | "array" | "auto";
+};
+
 const DEFAULT_MODEL = "gemini-3.5-flash";
 
-/** Shared JSON-mode config — keeps replies parseable and bounds output length. */
-export const GEMINI_JSON_GENERATION_CONFIG: GenerationConfig = {
-  responseMimeType: "application/json",
-  maxOutputTokens: 1024,
-};
+/** Per-route output budgets — callers pick; transport does not guess product needs. */
+export const GEMINI_TOKEN_BUDGET = {
+  briefing: 256,
+  bayScan: 512,
+  copilot: 2048,
+  insights: 2048,
+  parse: 2048,
+  taxonomy: 1024,
+  default: 1024,
+} as const;
+
+export type GeminiTokenBudget = (typeof GEMINI_TOKEN_BUDGET)[keyof typeof GEMINI_TOKEN_BUDGET];
+
+/** JSON-mode config with optional structured output schema. */
+export function jsonGenerationConfig(options: {
+  maxOutputTokens?: number;
+  responseSchema?: ResponseSchema;
+}): GenerationConfig {
+  const config: GenerationConfig = {
+    responseMimeType: "application/json",
+    maxOutputTokens: options.maxOutputTokens ?? GEMINI_TOKEN_BUDGET.default,
+  };
+  if (options.responseSchema) {
+    config.responseSchema = options.responseSchema;
+  }
+  return config;
+}
+
+/**
+ * @deprecated Prefer `jsonGenerationConfig({ maxOutputTokens, responseSchema })`.
+ * Kept so existing imports still compile during the structured-output migration.
+ */
+export const GEMINI_JSON_GENERATION_CONFIG: GenerationConfig = jsonGenerationConfig({
+  maxOutputTokens: GEMINI_TOKEN_BUDGET.default,
+});
+
+export function geminiEnum(
+  values: readonly string[],
+  description?: string
+): Schema {
+  return {
+    type: SchemaType.STRING,
+    format: "enum",
+    enum: [...values],
+    ...(description ? { description } : {}),
+  };
+}
 
 function resolveApiKey(): string {
   return (process.env.GEMINI_API_KEY ?? "").trim();
@@ -67,20 +125,23 @@ function getClient(): GoogleGenerativeAI {
  */
 export async function callGeminiFlash(
   prompt: string,
-  inlineImageData?: GeminiInlineImage
+  options?: GeminiCallOptions
 ): Promise<string> {
   const genAI = getClient();
   const model = genAI.getGenerativeModel({
     model: resolveModelName(),
-    generationConfig: GEMINI_JSON_GENERATION_CONFIG,
+    generationConfig: jsonGenerationConfig({
+      maxOutputTokens: options?.maxOutputTokens ?? GEMINI_TOKEN_BUDGET.default,
+      responseSchema: options?.responseSchema,
+    }),
   });
 
   const content: Part[] = [{ text: prompt }];
-  if (inlineImageData) {
+  if (options?.inlineImageData) {
     content.push({
       inlineData: {
-        mimeType: inlineImageData.mimeType,
-        data: stripDataUrlPrefix(inlineImageData.data),
+        mimeType: options.inlineImageData.mimeType,
+        data: stripDataUrlPrefix(options.inlineImageData.data),
       },
     });
   }
@@ -94,7 +155,8 @@ const JSON_ARRAY_RE = /\[[\s\S]*\]/;
 
 /**
  * Extract the first JSON object or array embedded in model text
- * (handles markdown fences / preamble chatter).
+ * (handles markdown fences / preamble chatter). Safety net when schema
+ * mode still returns fenced text.
  */
 export function extractGeminiJsonText(
   text: string,
@@ -158,11 +220,8 @@ export function parseGeminiJson<T = unknown>(
  */
 export async function callGeminiFlashJson<T = unknown>(
   prompt: string,
-  options?: {
-    inlineImageData?: GeminiInlineImage;
-    prefer?: "object" | "array" | "auto";
-  }
+  options?: GeminiCallOptions
 ): Promise<T> {
-  const text = await callGeminiFlash(prompt, options?.inlineImageData);
+  const text = await callGeminiFlash(prompt, options);
   return parseGeminiJson<T>(text, options?.prefer ?? "auto");
 }
