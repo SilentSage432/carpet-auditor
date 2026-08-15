@@ -1,5 +1,21 @@
 # DeptSync Hub — Development Journal
 
+## 2026-08-14 — Department seed respects UNIQUE(code) so D29 duplicate is not an error
+
+### Shipped
+- **`ensureDepartmentsForStore`** — upserts templates with `ignoreDuplicates: true`. Tries `onConflict: 'store_id,code'` then `'code'` to match live `departments_code_key`. Duplicate D29 is logged and ignored; GET still SELECTs existing rows.
+- **List fallback** — if store-scoped queries are empty, unscoped `SELECT * FROM departments` hydrates the global unique-code catalog.
+- **Store Map** — duplicate-key is not a red banner. Department Overview hydrates from the DB list; seed conflict retries the list after cache invalidate.
+
+## 2026-08-14 — Admin Tools department load no longer red-banners
+
+### Shipped
+- **Exact error logging** — `[departments GET]`, `[ensureDepartmentsForStore]`, `[AdminTools] Could not load departments` log the caught error instead of swallowing it into a generic banner.
+- **Hydration guard** — Admin Tools waits for a store number, retries on `STORE_CHANGED_EVENT`, and GET skips until `store_number` is present.
+- **UUID-safe list** — `listDepartmentsForStore` queries `store_id` only when it is a UUID; otherwise (and on empty/invalid-uuid errors) it uses `store_number` like `2587`.
+- **SELECT then INSERT seed** — `ensureDepartmentsForStore` no longer upserts on `(store_id, code)` (which 500s when live UNIQUE is still `code`). Seed failures are logged and do not fail GET.
+- **Static fallback** — Admin Tools / targets matrix render `STORE_DEPARTMENT_TEMPLATES` when the query is empty or fails. Auth still shows the amber Hub PIN hint; the red “Could not load departments for admin tools” banner is gone.
+
 ## 2026-08-14 — Lucide department glyphs, Realtime subscribe order, Cabinets on Store Map
 
 ### Shipped

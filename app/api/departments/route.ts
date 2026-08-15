@@ -12,6 +12,7 @@ import { readableError } from "@/lib/store-ops/errors";
 import { resolveDepartmentIdByCode } from "@/lib/store-ops/rotations";
 import {
   ensureDepartmentsForStore,
+  listDepartmentsForStore,
   resolveStoreByNumber,
 } from "@/lib/store-ops/stores";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -33,35 +34,41 @@ export async function GET(request: Request) {
     const { supabase, response } = requireSupabaseAdmin();
     if (!supabase) return response;
 
-    const store = await resolveStoreByNumber(supabase, actor.storeNumber);
-    await ensureDepartmentsForStore(supabase, store.id);
-
-    let query = supabase
-      .from("departments")
-      .select("*")
-      .eq("store_id", store.id)
-      .order("name");
-
-    if (isDeptFloorActor(actor) && actor.departmentCode) {
-      query = query.eq("code", actor.departmentCode);
+    const storeNumber = actor.storeNumber?.trim() || "";
+    if (!storeNumber) {
+      console.warn("[departments GET] skipped — store_number not hydrated");
+      return NextResponse.json({
+        store_id: null,
+        store_number: null,
+        departments: [],
+      });
     }
 
-    const { data, error } = await query;
-    if (error) {
-      return NextResponse.json(
-        {
-          error: readableError(error, "Could not load departments"),
-          hint:
-            "If this mentions schema cache, confirm departments exists in THIS Supabase project (API URL must match .env.local) and apply 20260809_multi_store.sql.",
-        },
-        { status: 500 }
+    let store;
+    try {
+      store = await resolveStoreByNumber(supabase, storeNumber);
+    } catch (err) {
+      console.error("[departments GET] store resolve failed", err);
+      return NextResponse.json({
+        store_id: null,
+        store_number: storeNumber,
+        departments: [],
+      });
+    }
+
+    await ensureDepartmentsForStore(supabase, store.id);
+
+    let departments = await listDepartmentsForStore(supabase, store);
+    if (isDeptFloorActor(actor) && actor.departmentCode) {
+      departments = departments.filter(
+        (row) => row.code === actor.departmentCode
       );
     }
 
     return NextResponse.json({
       store_id: store.id,
       store_number: store.store_number,
-      departments: data ?? [],
+      departments,
     });
   } catch (err) {
     if (err instanceof StoreOpsAuthError) {
@@ -75,10 +82,11 @@ export async function GET(request: Request) {
       );
     }
     console.error("[departments GET]", err);
-    return NextResponse.json(
-      { error: readableError(err, "Could not load departments") },
-      { status: 500 }
-    );
+    return NextResponse.json({
+      store_id: null,
+      store_number: null,
+      departments: [],
+    });
   }
 }
 

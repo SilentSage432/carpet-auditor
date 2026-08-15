@@ -66,7 +66,8 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 `flooring` (D23) · `appliances` (D35) · `plumbing` · `electrical` · `lawn_garden` · `paint` (D24P) · `millwork` (D30) · `cabinets` (D29) · `building_materials` · `hardware` · `tools` (D25) · `all`
 
 - Department glyphs: Lucide `DepartmentIcon` (no emoji). Roster / Admin pin / Store Map overview / department pickers.
-- Store Map Department Overview includes Cabinets (D29) with weekly target 6, cron toggle, and tag metrics. `ensureDepartmentsForStore` upserts on `(store_id, code)` so missing D29 rows are inserted.
+- Store Map Department Overview includes Cabinets (D29) with weekly target 6, cron toggle, and tag metrics.
+- Department seed upserts with `ignoreDuplicates` against live UNIQUE: `(store_id, code)` when present, else `code` (`departments_code_key`). Duplicate D29 is logged, not a 500. List falls back to unscoped `SELECT *` so Store Map hydrates existing rows instead of a red banner.
 
 - Seeds: none auto-injected. Create Master / Supervisor profiles via invite / Add Supervisor; temporary PIN sets `must_change_credentials: true` until first-login change
 - First-login: non-dismissible AuthWall setup when `must_change_credentials` (no Remind Later)

@@ -14,13 +14,14 @@ import {
   fetchExceptionSummary,
   fetchStoreLocationsDetailed,
   fetchThisWeekRotations,
+  invalidateStoreOpsListCaches,
   updateDepartmentActive,
 } from "@/lib/store-ops/client";
 import {
   isStoreOpsAuthFailureMessage,
   STORE_OPS_AUTH_HINT,
 } from "@/lib/store-ops/auth-soft";
-import { readableError } from "@/lib/store-ops/errors";
+import { readableError, isExistingDepartmentConflict } from "@/lib/store-ops/errors";
 import {
   hubScopeFromDeptCode,
   storeOpsDepartmentSortIndex,
@@ -77,8 +78,17 @@ function StoreMapBody({
     setError(null);
     setAuthRequired(false);
     try {
-      const [depts, locs, weekData, exceptions] = await Promise.all([
-        fetchDepartmentsDetailed(member),
+      const depts = await fetchDepartmentsDetailed(member).catch(async (err) => {
+        if (!isExistingDepartmentConflict(err)) throw err;
+        console.warn(
+          "[StoreMap] departments already exist — retrying list without seed error",
+          err
+        );
+        invalidateStoreOpsListCaches();
+        return fetchDepartmentsDetailed(member);
+      });
+
+      const [locs, weekData, exceptions] = await Promise.all([
         fetchStoreLocationsDetailed(member),
         fetchThisWeekRotations(member).catch(() => ({
           assigned_week: "",
@@ -92,6 +102,7 @@ function StoreMapBody({
           exceptions: [] as Array<{ bay_id: string }>,
         })),
       ]);
+
       setDepartments(depts.items);
       setLocations(locs.items);
       setWeekRotationLocations(
@@ -108,8 +119,16 @@ function StoreMapBody({
       if (depts.authRequired || locs.authRequired) {
         setAuthRequired(true);
       }
+      if (depts.items.length > 0) {
+        setError(null);
+      }
     } catch (err) {
       const message = readableError(err, "Failed to load store map");
+      if (isExistingDepartmentConflict(err) || isExistingDepartmentConflict(message)) {
+        console.warn("[StoreMap] departments already exist", err);
+        setError(null);
+        return;
+      }
       if (isStoreOpsAuthFailureMessage(message)) {
         setAuthRequired(true);
         setDepartments([]);

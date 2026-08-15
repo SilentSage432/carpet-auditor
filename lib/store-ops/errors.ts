@@ -2,6 +2,64 @@
  * Readable Supabase / Store Ops error messages for UI toasts and API logs.
  */
 
+export function isOnConflictMismatch(error: unknown): boolean {
+  const record = error as {
+    message?: unknown;
+    details?: unknown;
+    hint?: unknown;
+    code?: unknown;
+  } | null;
+  const raw = [
+    record?.message,
+    record?.details,
+    record?.hint,
+    error instanceof Error ? error.message : "",
+  ]
+    .map((part) => (typeof part === "string" ? part.toLowerCase() : ""))
+    .join(" ");
+  return (
+    raw.includes("no unique") ||
+    raw.includes("on conflict") ||
+    raw.includes("matching the on conflict")
+  );
+}
+
+/** Duplicate department code (global UNIQUE(code) / departments_code_key). */
+export function isExistingDepartmentConflict(error: unknown): boolean {
+  const msg = readableError(error, "").toLowerCase();
+  const raw = String(
+    (error as { message?: unknown; details?: unknown } | null)?.details ?? ""
+  ).toLowerCase();
+  return (
+    isUniqueViolationError(error) ||
+    msg.includes("already exists") ||
+    msg.includes("departments_code_key") ||
+    raw.includes("departments_code_key")
+  );
+}
+
+export function isInvalidUuidError(error: unknown): boolean {
+  const record = error as { code?: unknown; message?: unknown } | null;
+  const code = String(record?.code ?? "");
+  const msg = readableError(error, "").toLowerCase();
+  return (
+    code === "22P02" ||
+    msg.includes("invalid input syntax for type uuid") ||
+    msg.includes("22p02")
+  );
+}
+
+export function isUniqueViolationError(error: unknown): boolean {
+  const record = error as { code?: unknown } | null;
+  const code = String(record?.code ?? "");
+  const msg = readableError(error, "").toLowerCase();
+  return (
+    code === "23505" ||
+    msg.includes("duplicate key") ||
+    msg.includes("unique constraint")
+  );
+}
+
 export function isMissingColumnError(
   error: unknown,
   column: string

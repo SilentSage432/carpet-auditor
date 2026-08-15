@@ -13,6 +13,7 @@ import {
   updateDepartmentWeeklyTarget,
 } from "@/lib/store-ops/client";
 import { readableError } from "@/lib/store-ops/errors";
+import { fallbackDepartments } from "@/lib/store-ops/stores";
 import { resolveWeeklyBayTarget } from "@/lib/store-ops/week";
 import type { Department } from "@/lib/store-ops/types";
 import { isMasterAdmin } from "@/lib/rbac";
@@ -44,16 +45,28 @@ export function DepartmentTargetsMatrix({ specialist }: Props) {
     if (!specialist || !canEdit) return;
     try {
       const list = await fetchDepartments(specialist);
-      setDepartments(list);
+      const rows = list.length > 0 ? list : fallbackDepartments();
+      setDepartments(rows);
       const nextDrafts: Record<string, string> = {};
-      for (const d of list) {
+      for (const d of rows) {
         nextDrafts[d.id] = String(
           resolveWeeklyBayTarget(d.weekly_bay_target ?? DEFAULT_TARGET)
         );
       }
       setDrafts(nextDrafts);
+      setError(null);
     } catch (err) {
-      setError(readableError(err, "Failed to load department targets"));
+      console.error("[DepartmentTargetsMatrix] load failed", err);
+      const rows = fallbackDepartments();
+      setDepartments(rows);
+      const nextDrafts: Record<string, string> = {};
+      for (const d of rows) {
+        nextDrafts[d.id] = String(
+          resolveWeeklyBayTarget(d.weekly_bay_target ?? DEFAULT_TARGET)
+        );
+      }
+      setDrafts(nextDrafts);
+      setError(null);
     }
   }, [specialist, canEdit]);
 
@@ -75,6 +88,7 @@ export function DepartmentTargetsMatrix({ specialist }: Props) {
 
   async function saveDepartment(dept: Department) {
     if (!specialist) return;
+    if (dept.id.startsWith("fallback:")) return;
     const raw = drafts[dept.id] ?? String(DEFAULT_TARGET);
     const target = resolveWeeklyBayTarget(Number(raw));
     const current = resolveWeeklyBayTarget(dept.weekly_bay_target);
@@ -115,7 +129,9 @@ export function DepartmentTargetsMatrix({ specialist }: Props) {
     setError(null);
     setMessage(null);
     try {
-      const updates = departments.filter((d) => dirtyIds.includes(d.id));
+      const updates = departments.filter(
+        (d) => dirtyIds.includes(d.id) && !d.id.startsWith("fallback:")
+      );
       const saved: Department[] = [];
       for (const dept of updates) {
         const target = resolveWeeklyBayTarget(Number(drafts[dept.id]));

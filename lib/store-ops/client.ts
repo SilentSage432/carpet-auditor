@@ -3,7 +3,7 @@
  */
 
 import type { StoreSpecialist } from "@/lib/types";
-import { getStoreNumber } from "@/lib/store";
+import { getStoreNumber, normalizeStoreNumber } from "@/lib/store";
 import { actorFromSpecialist, storeOpsAuthHeadersAsync } from "./auth";
 import {
   isStoreOpsAuthFailureMessage,
@@ -49,10 +49,14 @@ export function invalidateStoreOpsListCaches(): void {
 async function storeOpsFetch<T>(
   path: string,
   specialist: StoreSpecialist,
-  init?: RequestInit
+  init?: RequestInit,
+  storeNumber?: string | null
 ): Promise<T> {
   try {
-    const actor = actorFromSpecialist(specialist, getStoreNumber());
+    const actor = actorFromSpecialist(
+      specialist,
+      storeNumber || getStoreNumber()
+    );
     if (!actor) {
       throw new Error("Store Operations access denied for this profile");
     }
@@ -106,23 +110,32 @@ export async function fetchDepartments(
 
 /** Departments list with soft Auth signal for Store Map / Admin Tools. */
 export async function fetchDepartmentsDetailed(
-  specialist: StoreSpecialist
+  specialist: StoreSpecialist,
+  storeNumber?: string | null
 ): Promise<StoreOpsListResult<Department>> {
+  const store = normalizeStoreNumber(
+    storeNumber || getStoreNumber() || specialist.store_number || ""
+  );
+  if (!store) {
+    return { items: [], authRequired: false };
+  }
+
   return departmentsCache.get(
-    storeOpsListCacheKey(specialist, "departments"),
+    storeOpsListCacheKey(specialist, `departments:${store}`),
     async () => {
       try {
         const data = await storeOpsFetch<{
           departments: Department[];
           auth_required?: boolean;
           hint?: string;
-        }>("/api/departments", specialist);
+        }>("/api/departments", specialist, undefined, store);
         return {
           items: data.departments ?? [],
           authRequired: Boolean(data.auth_required),
           hint: data.hint,
         };
       } catch (err) {
+        console.error("[fetchDepartmentsDetailed]", err);
         const message = String((err as { message?: string } | null)?.message ?? "");
         if (isStoreOpsAuthFailureMessage(message)) {
           return {

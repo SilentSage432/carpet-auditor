@@ -90,7 +90,7 @@ lib/audit-report.ts               → Audit report metrics + email/clipboard com
 lib/hardware-scanner.ts           → Window-level Bluetooth/wedge barcode burst listener
 lib/rbac.ts                       → Department-scoped section / catalog visibility (compose only)
 lib/store.ts                      → Active store_number session
-lib/store-ops/stores.ts           → Resolve store_number → stores.id; ensure per-store departments
+lib/store-ops/stores.ts           → Resolve store_number → stores.id; upsert seed (code or store_id,code) + UUID-safe list
 lib/sync-queue.ts                 → Offline queue + backoff + conflict pause + auto-flush
 lib/sync-conflict.ts              → SyncConflictError + conflict event bus
 lib/network.ts                    → Online/offline badge state

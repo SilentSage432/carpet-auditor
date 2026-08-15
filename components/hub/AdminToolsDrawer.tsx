@@ -30,6 +30,8 @@ import {
   isStoreOpsAuthFailureMessage,
   STORE_OPS_AUTH_HINT,
 } from "@/lib/store-ops/auth-soft";
+import { readableError } from "@/lib/store-ops/errors";
+import { fallbackDepartments } from "@/lib/store-ops/stores";
 import { findFlooringDepartment } from "@/lib/store-ops/sunday-audit";
 import { usePendingSyncCount } from "@/lib/network";
 import {
@@ -37,6 +39,7 @@ import {
   getStoreNumber,
   normalizeStoreNumber,
   setStoreNumber,
+  STORE_CHANGED_EVENT,
 } from "@/lib/store";
 import { flushSyncQueue } from "@/lib/sync-queue";
 import { getSupabase, isSupabaseConfigured } from "@/lib/supabase";
@@ -89,24 +92,36 @@ export function AdminToolsDrawer({
 
   const reloadDepts = useCallback(async () => {
     if (!isMasterAdmin(specialist)) return;
+    const store = normalizeStoreNumber(
+      storeNumber || getStoreNumber() || specialist.store_number || ""
+    );
+    if (!store) {
+      setDepartments(fallbackDepartments());
+      setLoadError(null);
+      return;
+    }
     try {
-      const result = await fetchDepartmentsDetailed(specialist);
-      setDepartments(result.items);
-      setLoadError(
-        result.authRequired
-          ? result.hint || STORE_OPS_AUTH_HINT
-          : null
+      const result = await fetchDepartmentsDetailed(specialist, store);
+      if (result.authRequired) {
+        setDepartments(
+          result.items.length > 0 ? result.items : fallbackDepartments()
+        );
+        setLoadError(result.hint || STORE_OPS_AUTH_HINT);
+        return;
+      }
+      setDepartments(
+        result.items.length > 0 ? result.items : fallbackDepartments()
       );
+      setLoadError(null);
     } catch (err) {
-      setDepartments([]);
-      const message = String((err as { message?: string } | null)?.message ?? "");
+      console.error("[AdminTools] Could not load departments", err);
+      setDepartments(fallbackDepartments());
+      const message = readableError(err, "");
       setLoadError(
-        isStoreOpsAuthFailureMessage(message)
-          ? STORE_OPS_AUTH_HINT
-          : "Could not load departments for admin tools."
+        isStoreOpsAuthFailureMessage(message) ? STORE_OPS_AUTH_HINT : null
       );
     }
-  }, [specialist]);
+  }, [specialist, storeNumber]);
 
   useEffect(() => {
     if (!open) return;
@@ -125,6 +140,15 @@ export function AdminToolsDrawer({
     openManagerNotesOnMount,
     reloadDepts,
   ]);
+
+  useEffect(() => {
+    if (!open) return;
+    function onStoreChanged() {
+      void reloadDepts();
+    }
+    window.addEventListener(STORE_CHANGED_EVENT, onStoreChanged);
+    return () => window.removeEventListener(STORE_CHANGED_EVENT, onStoreChanged);
+  }, [open, reloadDepts]);
 
   useEffect(() => {
     if (!open) return;
