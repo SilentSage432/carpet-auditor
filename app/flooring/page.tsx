@@ -60,7 +60,7 @@ function FlooringBridge({
         storeNumber={storeNumber}
         onLogout={logout}
       />
-      <main className="mx-auto w-full max-w-lg flex-1 px-3 pb-28 pt-4">
+      <main className="hub-main">
         <SundayAuditStagingCard specialist={specialist} forceShow />
         <p className="glass-card mt-2 px-4 py-3 text-sm text-zinc-300">
           Opening Flooring Cycle Audit workspace…

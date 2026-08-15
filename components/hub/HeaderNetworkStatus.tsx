@@ -3,9 +3,11 @@
 /**
  * Sticky-header network + pending-queue chip.
  * Owns useNetworkBadge so queue ticks do not re-render hub forms or Admin Tools.
+ * Vector Wifi / WifiOff glyphs — no raster or emoji status marks.
  */
 
 import { memo, type ReactNode } from "react";
+import { HubIcon } from "@/components/hub/NavIcons";
 import { useNetworkBadge } from "@/lib/network";
 
 type Props = {
@@ -27,24 +29,21 @@ export const HeaderNetworkStatus = memo(function HeaderNetworkStatus({
         ? ` · ${network.pending}q`
         : ` · ${network.pending} queued`
       : "";
+  const iconId = online ? "wifi" : "wifiOff";
+  const toneClass = online ? "text-emerald-400" : "text-amber-300";
 
   if (variant === "banner") {
     return (
       <p
-        className={`mt-0.5 flex items-center gap-1.5 truncate text-[10px] font-semibold ${
+        className={`mt-0.5 flex items-center gap-1 truncate text-[10px] font-semibold ${
           online ? "text-emerald-400/90" : "text-amber-300/90"
         }`}
         title={network.label}
         aria-live="polite"
       >
-        <span
-          className={`inline-block h-1.5 w-1.5 shrink-0 rounded-full ${
-            online ? "bg-emerald-400" : "bg-amber-400"
-          }`}
-          aria-hidden
-        />
+        <HubIcon id={iconId} className={`h-3.5 w-3.5 shrink-0 ${toneClass}`} />
         <span className="truncate">
-          {online ? "🟢 Online" : "🟠 Offline Mode"}
+          {online ? "Online" : "Offline Mode"}
           {queued}
         </span>
       </p>
@@ -54,12 +53,11 @@ export const HeaderNetworkStatus = memo(function HeaderNetworkStatus({
   if (variant === "detail") {
     return (
       <p
-        className={`mt-2 text-[11px] font-semibold ${
-          online ? "text-emerald-400" : "text-amber-300"
-        }`}
+        className={`mt-1.5 flex items-center gap-1.5 text-[11px] font-semibold ${toneClass}`}
         title={network.label}
         aria-live="polite"
       >
+        <HubIcon id={iconId} className="h-3.5 w-3.5 shrink-0" />
         {online ? "Online" : "Offline Mode"}
         {queued}
       </p>
@@ -67,12 +65,10 @@ export const HeaderNetworkStatus = memo(function HeaderNetworkStatus({
   }
 
   return (
-    <span className="flex min-w-0 items-center gap-2" title={network.label}>
-      <span
-        className={`inline-block h-2 w-2 shrink-0 rounded-full ${
-          online ? "bg-emerald-400" : "bg-amber-400"
-        }`}
-        aria-hidden
+    <span className="flex min-w-0 items-center gap-1.5" title={network.label}>
+      <HubIcon
+        id={iconId}
+        className={`h-4 w-4 shrink-0 ${toneClass}`}
       />
       <span className="min-w-0">
         {children}

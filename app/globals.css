@@ -103,6 +103,23 @@ body {
     transition active:scale-95 focus-visible:border-emerald-500/50 focus-visible:ring-1 focus-visible:ring-emerald-500/30;
 }
 
+/* Compact page shell — keeps bays / badges above the fold on handhelds */
+.hub-main {
+  @apply mx-auto w-full max-w-lg flex-1 px-3 pt-2 pb-28;
+}
+
+/* Filter chips — 44px hit area, dense label (set radius per surface) */
+.chip-filter {
+  @apply inline-flex min-h-11 shrink-0 items-center justify-center border px-3 text-[10px] font-bold uppercase tracking-wide
+    transition active:scale-[0.98] disabled:opacity-40;
+}
+
+/* Quick Touch / bay action — 44px min, compact width */
+.btn-quick-touch {
+  @apply inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center gap-1 rounded-xl border px-2 text-[10px] font-bold uppercase tracking-wide
+    transition active:scale-[0.98] disabled:opacity-40;
+}
+
 .pb-safe {
   padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
 }

@@ -203,7 +203,7 @@ function VerifyBody({
         onLogout={logout}
       />
 
-      <main className="mx-auto w-full max-w-lg flex-1 px-3 pb-36 pt-4">
+      <main className="hub-main !pb-36">
         <section className="mb-4 rounded-2xl border border-emerald-500/30 bg-emerald-950/30 px-4 py-3">
           <p className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-emerald-400">
             End-of-week verification

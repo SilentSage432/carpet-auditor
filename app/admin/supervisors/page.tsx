@@ -62,7 +62,7 @@ function SupervisorsBody({
         storeNumber={storeNumber}
         onLogout={logout}
       />
-      <main className="mx-auto w-full max-w-lg flex-1 px-3 pb-28 pt-4">
+      <main className="hub-main">
         <p className="mb-4 text-sm text-slate-400">
           Issue department supervisor credentials, reset temporary passwords, and
           deactivate access.

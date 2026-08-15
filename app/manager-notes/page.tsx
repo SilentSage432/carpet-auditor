@@ -53,7 +53,7 @@ function ManagerNotesBody({
         onLogout={logout}
       />
 
-      <main className="mx-auto w-full max-w-lg flex-1 px-3 pb-28 pt-4">
+      <main className="hub-main">
         <section className="glass-card border-cyan-500/30 p-4 shadow-[0_0_40px_-12px_rgba(34,211,238,0.4)]">
           <p className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-cyan-300">
             Floor workspace

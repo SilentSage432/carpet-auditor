@@ -5,7 +5,7 @@
 > the scanning / auditing workflow for floor operators.
 >
 > Generated from the live codebase (`app/`, `components/`, `lib/types.ts`).
-> Last reviewed: 2026-07-26.
+> Last reviewed: 2026-08-14.
 
 ---
 
@@ -54,35 +54,39 @@
 - **`pb-32` / audit `pb-44`** reserves space for bottom nav (+ sticky Log bar on Audit).
 - Body scroll locks when the specialist modal or change-PIN modal is open.
 
-### A.2 Sticky header bar (`HubChrome` → `HubHeader`)
+**Last reviewed:** 2026-08-14 (layout / iconography polish).
 
-**File:** `components/hub/HubChrome.tsx`  
-**Classes:** `sticky top-0 z-40`, `min-h-14`, content `max-w-md`
+### A.2 Sticky header bar (`NavigationHub` primary; `HubChrome` legacy)
+
+**File:** `components/hub/NavigationHub.tsx`  
+**Classes:** `sticky top-0 z-40 pt-safe`, content `min-h-12 max-w-lg`
 
 | Slot (L → R) | Content | Action |
 |--------------|---------|--------|
-| Brand badge | `DeptSyncBadge` (boxes + barcode) | Display only |
-| Brand eyebrow | `DeptSync · Lowe's #{store} · Inventory & SIMS Audit` | Display only (store set in Settings) |
-| Section title | Role-aware title via `sectionTitle()` | Updates when bottom tab selects a section |
-| Network badge | 🟢 Online / 🟠 Offline Mode · `N queued` | Live via `HeaderNetworkStatus` (`useNetworkBadge` isolated from hub forms) |
-| Specialist chip | 👑/🛡️/👤 + name or “Select” | Opens **SpecialistModal** |
-| ⚙️ (conditional) | Shown when a specialist is active | Opens **ChangePinModal** |
+| Hamburger | Lucide-free bars in `btn-icon-touch` (48px) | Opens nav drawer |
+| Brand badge | `DeptSyncBadge` (vector boxes + barcode) | Display only |
+| Title stack | DeptSync · store · page title | Display only |
+| Account + network | `HeaderNetworkStatus` Wifi / WifiOff + role chip | Opens account menu |
 
-### A.3 Main navigation (`BottomNavBar`)
+Master Admin: compact department pin row under the header (no extra “Context” label). Close glyphs are `HubIcon id="close"`.
 
-**Primary — BottomNavBar** (`HubChrome.tsx`)
+### A.3 Main navigation (`OpsBottomNav` / `BottomNavBar`)
 
-- Fixed `bottom-0 left-0 right-0 z-30`, `max-w-md mx-auto`, `bg-slate-900/95 backdrop-blur-md`, top border.
-- Four tabs: 📊 Audit · 🏷️ Catalog · 📦 Remnants · ⚙️ Settings.
-- Active tab: emerald glow + top indicator line.
-- Header hamburger / `NavDrawer` removed — bottom tabs are the exclusive section switcher.
+**Primary — OpsBottomNav** (`NavigationHub.tsx`) + inventory `BottomNavBar` (`HubChrome.tsx`)
 
-| id | Bottom label | Header title | Icon |
-|----|--------------|--------------|------|
-| `audit` | Audit | Flooring Cycle Audit | 📊 |
-| `catalog` | Catalog | SIMS Catalog | 🏷️ |
-| `remnants` | Remnants | Remnant Rack | 📦 |
-| `settings` | Settings | Settings & Sync | ⚙️ |
+- Fixed `bottom-0`, `max-w-lg` / `max-w-md`, `min-h-16` tabs, `pb-safe`, Lucide `NavIcon` stroke 2.
+- Active tab: emerald top indicator + glow.
+- Overflow routes live in the More sheet (same 56px row hit area).
+
+Store Ops pages use `.hub-main` (`px-3 pt-2 pb-28`) so bay lists, status pills, and pace timers clear the fold on handhelds. Quick Touch / filter chips use `.btn-quick-touch` / `.chip-filter` (44px min).
+
+| id | Bottom label | Header title | Icon (`NavIconId`) |
+|----|--------------|--------------|-------------------|
+| `audit` | Flooring | Flooring Cycle Audit | `grid` |
+| `appliances` | Appliances | Appliances | `tools` |
+| `department` | Dept Audit | Department Audit | `building` |
+| `remnants` | Remnants | Remnant Rack | `notes` |
+| `settings` | Settings | Settings & Sync | `settings` |
 
 ### A.4 Page-level toasts & notices (non-modal)
 

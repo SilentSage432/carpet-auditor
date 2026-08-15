@@ -34,7 +34,7 @@ export function AuditLocationModeToggle({
 
   return (
     <fieldset className="min-w-0">
-      <legend className="mb-1.5 text-sm font-medium text-slate-200">
+      <legend className="mb-1 text-xs font-medium text-slate-200">
         {legend}
       </legend>
       <div
@@ -50,7 +50,7 @@ export function AuditLocationModeToggle({
             disabled={disabled}
             aria-pressed={value === "all"}
             onClick={() => onChange("all")}
-            className={`flex min-h-12 flex-col items-center justify-center rounded-lg px-1 text-xs font-bold uppercase tracking-wide transition ${
+            className={`flex min-h-11 flex-col items-center justify-center rounded-lg px-1 text-[11px] font-bold uppercase tracking-wide transition ${
               value === "all"
                 ? "bg-emerald-500 text-slate-950 shadow"
                 : "text-slate-400 hover:text-slate-100"
@@ -75,7 +75,7 @@ export function AuditLocationModeToggle({
               disabled={disabled}
               aria-pressed={active}
               onClick={() => onChange(mode.code)}
-              className={`flex min-h-12 flex-col items-center justify-center rounded-lg px-1 text-xs font-bold uppercase tracking-wide transition ${
+              className={`flex min-h-11 flex-col items-center justify-center rounded-lg px-1 text-[11px] font-bold uppercase tracking-wide transition ${
                 active
                   ? mode.code === "TOPSTOCK"
                     ? "bg-cyan-400 text-slate-950 shadow"

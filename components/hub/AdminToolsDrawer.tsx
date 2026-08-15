@@ -20,6 +20,7 @@ import { ForceRotationModal } from "@/components/admin/ForceRotationModal";
 import { SundayAuditAssignmentModal } from "@/components/admin/SundayAuditAssignmentModal";
 import { TaxonomyManagerModal } from "@/components/catalog/TaxonomyManagerModal";
 import { WeeklyBayTargetCard } from "@/components/hub/WeeklyBayTargetCard";
+import { HubIcon } from "@/components/hub/NavIcons";
 import { selectOnFocus } from "@/lib/number-input";
 import { isMasterAdmin } from "@/lib/rbac";
 import { fetchDepartmentsDetailed } from "@/lib/store-ops/client";
@@ -172,10 +173,10 @@ export function AdminToolsDrawer({
             <button
               type="button"
               onClick={onClose}
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-slate-600 text-slate-200"
+              className="btn-icon-touch"
               aria-label="Close"
             >
-              ✕
+              <HubIcon id="close" className="h-5 w-5" />
             </button>
           </header>
 

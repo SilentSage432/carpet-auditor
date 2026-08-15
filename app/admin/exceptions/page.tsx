@@ -142,7 +142,7 @@ function ExceptionsBody({
         onLogout={logout}
       />
 
-      <main className="mx-auto w-full max-w-lg flex-1 px-3 pb-28 pt-4">
+      <main className="hub-main">
         <section className="mb-3 rounded-2xl border-2 border-amber-400/50 bg-amber-950/30 px-4 py-3">
           <p className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-amber-300">
             Super Admin · Weekly verification

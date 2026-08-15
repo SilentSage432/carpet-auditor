@@ -14,7 +14,7 @@ import { formatStoreLabel } from "@/lib/store";
 import type { HubSection, StoreSpecialist } from "@/lib/types";
 import { DeptSyncBadge } from "@/components/hub/DeptSyncBadge";
 import { HeaderNetworkStatus } from "@/components/hub/HeaderNetworkStatus";
-import { NavIcon } from "@/components/hub/NavIcons";
+import { HubIcon, NavIcon } from "@/components/hub/NavIcons";
 
 type HubHeaderProps = {
   section: HubSection;
@@ -37,8 +37,8 @@ export function HubHeader({
   const title = sectionTitle(section, specialist);
 
   return (
-    <header className="glass-panel sticky top-0 z-40 shadow-lg shadow-black/30">
-      <div className="mx-auto flex min-h-14 max-w-md items-center gap-2 px-3 py-1.5">
+    <header className="glass-panel sticky top-0 z-40 pt-safe shadow-lg shadow-black/30">
+      <div className="mx-auto flex min-h-12 max-w-md items-center gap-2 px-3 py-1">
         <DeptSyncBadge size="sm" />
         <div className="min-w-0 flex-1">
           <p className="glass-subtitle truncate text-emerald-400">
@@ -48,7 +48,7 @@ export function HubHeader({
             DeptSync
             {storeNumber ? ` · ${formatStoreLabel(storeNumber)}` : ""}
           </p>
-          <h1 className="glass-title truncate text-base">
+          <h1 className="glass-title truncate text-[15px] leading-tight">
             {title}
           </h1>
           <HeaderNetworkStatus storeNumber={storeNumber} variant="banner" />
@@ -60,13 +60,16 @@ export function HubHeader({
             className="flex h-12 max-w-[8.5rem] items-center gap-1.5 rounded-xl border border-emerald-500/40 bg-emerald-950/40 px-2.5 text-left backdrop-blur-sm transition active:scale-95"
             aria-label="Switch active specialist"
           >
-            <span aria-hidden>
-              {specialist?.role === "MasterAdmin"
-                ? "👑"
-                : specialist?.role === "Supervisor"
-                  ? "🛡️"
-                  : "👤"}
-            </span>
+            <HubIcon
+              id={
+                specialist?.role === "MasterAdmin"
+                  ? "crown"
+                  : specialist?.role === "Supervisor"
+                    ? "shield"
+                    : "user"
+              }
+              className="h-4 w-4 shrink-0 text-emerald-300"
+            />
             <span className="min-w-0 truncate text-xs font-semibold text-emerald-200">
               {specialist ? specialist.name : "Locked"}
             </span>
@@ -77,9 +80,9 @@ export function HubHeader({
               onClick={onChangePin}
               aria-label="Change PIN"
               title="Change PIN"
-              className="flex h-12 w-11 items-center justify-center rounded-xl border border-zinc-700/80 bg-zinc-900/80 text-zinc-100 transition active:scale-95"
+              className="btn-icon-touch"
             >
-              ⚙️
+              <HubIcon id="settings" className="h-5 w-5" />
             </button>
           ) : null}
           {onLogout ? (
@@ -88,9 +91,9 @@ export function HubHeader({
               onClick={onLogout}
               aria-label="Log out and lock DeptSync"
               title="Log out"
-              className="flex h-12 w-11 items-center justify-center rounded-xl border border-rose-500/40 bg-rose-950/40 text-sm font-bold text-rose-300 transition active:scale-95"
+              className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl border border-rose-500/40 bg-rose-950/40 text-rose-300 transition active:scale-95"
             >
-              🔒
+              <HubIcon id="lock" className="h-5 w-5" />
             </button>
           ) : null}
         </div>
@@ -118,7 +121,7 @@ export function AssociateSpecialtySwitcher({
     <div
       role="tablist"
       aria-label="Specialty tools"
-      className="mb-3 flex gap-1.5 overflow-x-auto pb-1"
+      className="mb-2 flex gap-1.5 overflow-x-auto pb-0.5 no-scrollbar"
     >
       {tabs.map((tab) => {
         const isActive = tab.id === active;
@@ -135,7 +138,7 @@ export function AssociateSpecialtySwitcher({
                 : "border-zinc-700 bg-zinc-950/70 text-zinc-400"
             }`}
           >
-            <NavIcon id={tab.icon} className="h-3.5 w-3.5" />
+            <NavIcon id={tab.icon} className="h-4 w-4" />
             {tab.label}
           </button>
         );
@@ -174,7 +177,7 @@ export function BottomNavBar({
               type="button"
               onClick={() => onSelect(tab.id)}
               aria-current={isActive ? "page" : undefined}
-              className={`relative flex h-16 flex-col items-center justify-center gap-1 px-0.5 pt-1.5 transition ${
+              className={`relative flex min-h-16 flex-col items-center justify-center gap-0.5 px-0.5 pt-1 transition ${
                 isActive
                   ? "text-emerald-300"
                   : "text-zinc-400 active:text-zinc-200"

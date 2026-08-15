@@ -49,6 +49,7 @@ import {
 } from "@/lib/store-ops/types";
 import type { CarpetAudit, StoreSpecialist } from "@/lib/types";
 import { hapticPulse } from "@/utils/haptics";
+import { HubIcon } from "@/components/hub/NavIcons";
 
 export type ZebraChecklistProps = {
   specialist: StoreSpecialist;
@@ -423,25 +424,27 @@ export function ZebraChecklist({
   }
 
   return (
-    <div className="space-y-3">
-      <div className="rounded-2xl border border-emerald-500/30 bg-emerald-950/30 px-4 py-3">
-        <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-emerald-400">
-          This Week&apos;s Assigned Rotation
-        </p>
-        <p className="mt-1 font-mono text-lg font-bold text-slate-50">
-          {assignedWeek || "No week assigned"}
-        </p>
-        <p className="text-sm text-slate-400">
-          {open.length} remaining · {done.length} complete
-          {partition.hasPersonalQueue
-            ? ` · ${partition.assignedToMe.length} assigned to you`
-            : ""}
-          {Object.keys(downstock).length > 0
-            ? ` · ${Object.keys(downstock).length} downstock`
-            : ""}
-        </p>
+    <div className="space-y-2">
+      <div className="flex items-center gap-2 rounded-xl border border-emerald-500/30 bg-emerald-950/30 px-3 py-2">
+        <div className="min-w-0 flex-1">
+          <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-emerald-400">
+            This Week&apos;s Assigned Rotation
+          </p>
+          <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 font-mono text-sm font-bold text-slate-50">
+            <span>{assignedWeek || "No week assigned"}</span>
+            <span className="text-xs font-semibold text-slate-400">
+              {open.length} remaining · {done.length} complete
+              {partition.hasPersonalQueue
+                ? ` · ${partition.assignedToMe.length} yours`
+                : ""}
+              {Object.keys(downstock).length > 0
+                ? ` · ${Object.keys(downstock).length} downstock`
+                : ""}
+            </span>
+          </p>
+        </div>
         <p
-          className={`mt-2 inline-flex rounded-full border px-2 py-0.5 font-mono text-[10px] font-bold uppercase tracking-wide ${
+          className={`inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-1 font-mono text-[10px] font-bold uppercase tracking-wide ${
             weeklyPace.tone === "ahead"
               ? "border-emerald-400/50 bg-emerald-950/40 text-emerald-200"
               : weeklyPace.tone === "behind"
@@ -450,6 +453,7 @@ export function ZebraChecklist({
           }`}
           title={weeklyPace.label}
         >
+          <HubIcon id="clock" className="h-3.5 w-3.5" />
           {weeklyPace.tone === "ahead"
             ? "Ahead"
             : weeklyPace.tone === "behind"
@@ -471,7 +475,7 @@ export function ZebraChecklist({
           role="tab"
           aria-selected={queueFilter === "all"}
           onClick={() => setQueueFilter("all")}
-          className={`flex min-h-11 items-center justify-center rounded-xl border px-3 text-xs font-bold uppercase tracking-wider ${
+          className={`chip-filter w-full rounded-xl ${
             queueFilter === "all"
               ? "border-emerald-500/50 bg-emerald-950/40 text-emerald-200"
               : "border-zinc-800/80 bg-zinc-950/50 text-zinc-400"
@@ -484,7 +488,7 @@ export function ZebraChecklist({
           role="tab"
           aria-selected={queueFilter === "downstock"}
           onClick={() => setQueueFilter("downstock")}
-          className={`flex min-h-11 items-center justify-center rounded-xl border px-3 text-xs font-bold uppercase tracking-wider ${
+          className={`chip-filter w-full rounded-xl ${
             queueFilter === "downstock"
               ? "border-cyan-500/50 bg-cyan-950/40 text-cyan-200"
               : "border-zinc-800/80 bg-zinc-950/50 text-zinc-400"
@@ -503,7 +507,7 @@ export function ZebraChecklist({
       />
 
       {associateOptions.length > 0 ? (
-        <div className="flex gap-1.5 overflow-x-auto pb-1">
+        <div className="flex gap-1.5 overflow-x-auto pb-0.5 no-scrollbar">
           {(
             [
               { id: "all" as const, label: "All shifts" },
@@ -518,7 +522,7 @@ export function ZebraChecklist({
               key={opt.id}
               type="button"
               onClick={() => setAssociateFilter(opt.id)}
-              className={`shrink-0 rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wide ${
+              className={`chip-filter rounded-full ${
                 associateFilter === opt.id
                   ? "border-cyan-400/55 bg-cyan-950/45 text-cyan-100"
                   : "border-slate-700 text-slate-300"
@@ -537,14 +541,14 @@ export function ZebraChecklist({
       ) : null}
 
       {open.length === 0 && done.length === 0 ? (
-        <p className="rounded-2xl border border-dashed border-slate-700 px-4 py-8 text-center text-sm text-slate-400">
+        <p className="rounded-2xl border border-dashed border-slate-700 px-4 py-4 text-center text-sm text-slate-400">
           No bays assigned this week. Ask Master Admin to generate the weekly
           rotation.
         </p>
       ) : null}
 
       {queueFilter === "downstock" && queueOpen.length === 0 ? (
-        <p className="rounded-2xl border border-dashed border-slate-700 px-4 py-8 text-center text-sm text-slate-400">
+        <p className="rounded-2xl border border-dashed border-slate-700 px-4 py-4 text-center text-sm text-slate-400">
           No overhead pulls flagged. Use Flag for Downstock on a bay card.
         </p>
       ) : null}
@@ -619,7 +623,10 @@ export function ZebraChecklist({
             className="flex min-h-11 w-full items-center justify-between px-3 text-left font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500"
           >
             Completed ({done.length}) · cool-down locked
-            <span aria-hidden>{doneOpen ? "▲" : "▼"}</span>
+            <HubIcon
+              id={doneOpen ? "chevronUp" : "chevronDown"}
+              className="h-4 w-4"
+            />
           </button>
           {doneOpen ? (
             <ul className="divide-y divide-slate-800 border-t border-slate-800 opacity-60">
@@ -736,8 +743,8 @@ function ZebraBayRow({
         assignedToMe ? "bg-cyan-950/20" : ""
       }`}
     >
-      <div className="flex min-h-12 items-center gap-2 px-3 py-2">
-        <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-3 active:bg-slate-800/60">
+      <div className="flex items-start gap-1.5 px-2 py-1.5">
+        <label className="flex min-h-11 min-w-0 flex-1 cursor-pointer items-center gap-2.5 active:bg-slate-800/60">
           <input
             type="checkbox"
             checked={false}
@@ -749,7 +756,7 @@ function ZebraBayRow({
             <span className="block truncate font-mono text-sm font-bold text-slate-50">
               {label}
             </span>
-            <span className="mt-0.5 flex flex-wrap items-center gap-1.5">
+            <span className="mt-0.5 flex flex-wrap items-center gap-1">
               {typeBadge ? (
                 <span
                   className={
@@ -775,37 +782,53 @@ function ZebraBayRow({
             </span>
           </span>
         </label>
-        <button
-          type="button"
-          onClick={onComplete}
-          className={`shrink-0 rounded-lg border px-2 py-1.5 text-[10px] font-bold uppercase tracking-wide ${
-            assignedToMe
-              ? "border-cyan-400/50 bg-cyan-950/40 text-cyan-100"
-              : "border-emerald-500/45 bg-emerald-950/40 text-emerald-200"
-          }`}
-          aria-label={`Quick Touch facing check: ${label}`}
-        >
-          Quick Touch
-        </button>
-        <button
-          type="button"
-          disabled={downstockBusy}
-          onClick={onToggleDownstock}
-          className={`shrink-0 rounded-lg border px-2 py-1.5 text-[10px] font-bold uppercase tracking-wide ${
-            downstock
-              ? "border-cyan-400/55 bg-cyan-950/50 text-cyan-100"
-              : "border-cyan-500/35 bg-cyan-950/25 text-cyan-200"
-          }`}
-        >
-          {downstock ? "Clear pull" : "Flag for Downstock"}
-        </button>
-        <button
-          type="button"
-          onClick={onToggleBarrier}
-          className="shrink-0 rounded-lg border border-amber-500/40 bg-amber-950/30 px-2 py-1.5 text-[10px] font-bold uppercase tracking-wide text-amber-200"
-        >
-          Barrier
-        </button>
+        <div className="flex shrink-0 items-center gap-1">
+          <button
+            type="button"
+            onClick={onComplete}
+            className={`btn-quick-touch ${
+              assignedToMe
+                ? "border-cyan-400/50 bg-cyan-950/40 text-cyan-100"
+                : "border-emerald-500/45 bg-emerald-950/40 text-emerald-200"
+            }`}
+            aria-label={`Quick Touch facing check: ${label}`}
+            title="Quick Touch"
+          >
+            <HubIcon id="touch" className="h-4 w-4" />
+            <span className="hidden min-[380px]:inline">Touch</span>
+          </button>
+          <button
+            type="button"
+            disabled={downstockBusy}
+            onClick={onToggleDownstock}
+            className={`btn-quick-touch ${
+              downstock
+                ? "border-cyan-400/55 bg-cyan-950/50 text-cyan-100"
+                : "border-cyan-500/35 bg-cyan-950/25 text-cyan-200"
+            }`}
+            aria-label={
+              downstock
+                ? `Clear downstock pull: ${label}`
+                : `Flag for downstock: ${label}`
+            }
+            title={downstock ? "Clear pull" : "Flag for Downstock"}
+          >
+            <HubIcon id={downstock ? "flagOff" : "flag"} className="h-4 w-4" />
+            <span className="hidden min-[380px]:inline">
+              {downstock ? "Clear" : "Pull"}
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={onToggleBarrier}
+            className="btn-quick-touch border-amber-500/40 bg-amber-950/30 text-amber-200"
+            aria-label={`Log barrier: ${label}`}
+            title="Barrier"
+          >
+            <HubIcon id="barrier" className="h-4 w-4" />
+            <span className="hidden min-[420px]:inline">Barrier</span>
+          </button>
+        </div>
       </div>
       {downstockNoteOpen && !downstock ? (
         <div className="border-t border-slate-800 px-3 py-2">

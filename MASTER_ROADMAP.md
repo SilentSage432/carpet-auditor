@@ -98,6 +98,7 @@
 - [x] Shift workload balancer — hours/start-end → proportional clustered Sunday assignment; Zebra associate filter + weekly pace badge; Store Map duplicate-bay prune
 - [x] Store Map bay edit/delete — per-bay Edit (aisle/bay/type/status) + Delete; multi-select batch delete; Bulk Generator Clean-Up tab; hard DELETE by id or ids[]
 - [x] Downstock queue + Store Map heatmap + supervisor weekly rollup
+- [x] Layout / nav / iconography polish — thumb-zone bottom tabs, compact hub-main, unified Lucide HubIcon (stroke 2), 44px Quick Touch / filter chips
 
 ## Next
 - [x] Apply Phase 1 JWT/RLS migration in Supabase + enable Custom Access Token Hook

@@ -6,6 +6,7 @@
  */
 
 import { useCallback, useEffect, useRef, useState, type TouchEvent } from "react";
+import { HubIcon } from "@/components/hub/NavIcons";
 import {
   fetchShiftBriefing,
   fetchStoreHealth,
@@ -24,24 +25,6 @@ type Props = {
   /** Bump after checklist / rotation completes to refresh briefing. */
   refreshKey?: number | string;
 };
-
-function RefreshIcon({ spinning }: { spinning?: boolean }) {
-  return (
-    <svg
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2.25"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={`h-5 w-5 ${spinning ? "animate-spin" : ""}`}
-      aria-hidden
-    >
-      <path d="M21 12a9 9 0 1 1-2.6-6.3" />
-      <path d="M21 3v6h-6" />
-    </svg>
-  );
-}
 
 export function ShiftBriefingCard({ specialist, refreshKey }: Props) {
   const [briefing, setBriefing] = useState<ShiftBriefingClient | null>(null);
@@ -97,7 +80,7 @@ export function ShiftBriefingCard({ specialist, refreshKey }: Props) {
 
   return (
     <section
-      className="glass-card relative mb-4 overflow-hidden border-emerald-500/40 p-4 shadow-[0_0_40px_-12px_rgba(16,185,129,0.45)]"
+      className="glass-card relative mb-3 overflow-hidden border-emerald-500/40 p-3 shadow-[0_0_32px_-12px_rgba(16,185,129,0.45)]"
       onTouchStart={onTouchStart}
       onTouchMove={onTouchMove}
       onTouchEnd={onTouchEnd}
@@ -107,7 +90,7 @@ export function ShiftBriefingCard({ specialist, refreshKey }: Props) {
         aria-hidden
       />
       <div
-        className="relative flex items-start justify-between gap-3"
+        className="relative flex items-center justify-between gap-2"
         style={
           pullOffset > 0
             ? { transform: `translateY(${pullOffset * 0.25}px)` }
@@ -115,8 +98,9 @@ export function ShiftBriefingCard({ specialist, refreshKey }: Props) {
         }
       >
         <div className="min-w-0">
-          <p className="glass-subtitle text-emerald-400">
-            ⚡ Shift Intelligence Briefing
+          <p className="glass-subtitle flex items-center gap-1.5 text-emerald-400">
+            <HubIcon id="zap" className="h-3.5 w-3.5" />
+            Shift Intelligence Briefing
           </p>
           {briefing?.assigned_week ? (
             <p className="mt-0.5 font-mono text-[10px] text-emerald-500/80">
@@ -135,13 +119,16 @@ export function ShiftBriefingCard({ specialist, refreshKey }: Props) {
           disabled={loading}
           aria-label="Re-analyze shift briefing"
           title="Tap to re-analyze · pull down to refresh"
-          className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-emerald-500/40 bg-emerald-950/50 text-emerald-300 shadow-lg shadow-emerald-950/40 transition active:scale-95 disabled:opacity-60"
+          className="btn-icon-touch h-11 w-11 border-emerald-500/40 bg-emerald-950/50 text-emerald-300 shadow-lg shadow-emerald-950/40"
         >
-          <RefreshIcon spinning={loading} />
+          <HubIcon
+            id="refresh"
+            className={`h-5 w-5 ${loading ? "animate-spin" : ""}`}
+          />
         </button>
       </div>
 
-      <div className="relative mt-3">
+      <div className="relative mt-2">
         {loading && !briefing ? (
           <p className="text-sm text-emerald-200/70">
             Generating Zebra briefing…
@@ -152,13 +139,13 @@ export function ShiftBriefingCard({ specialist, refreshKey }: Props) {
           </p>
         ) : briefing ? (
           <>
-            <h2 className="text-lg font-bold tracking-tight text-emerald-300 [text-shadow:0_0_18px_rgba(52,211,153,0.35)]">
+            <h2 className="text-base font-bold tracking-tight text-emerald-300 [text-shadow:0_0_18px_rgba(52,211,153,0.35)]">
               {briefing.headline}
             </h2>
-            <p className="mt-1 text-[11px] font-semibold uppercase tracking-wider text-emerald-500/90">
+            <p className="mt-0.5 text-[11px] font-semibold uppercase tracking-wider text-emerald-500/90">
               Priority · {briefing.priority_department}
             </p>
-            <ul className="mt-3 space-y-2">
+            <ul className="mt-2 space-y-1.5">
               {briefing.bullets.map((bullet, idx) => (
                 <li
                   key={`${idx}-${bullet.slice(0, 24)}`}
@@ -180,7 +167,7 @@ export function ShiftBriefingCard({ specialist, refreshKey }: Props) {
               ))}
             </ul>
             {briefing.auth_required || briefing.source === "session" ? (
-              <p className="mt-3 rounded-lg border border-amber-500/35 bg-amber-950/30 px-3 py-2 text-xs leading-snug text-amber-100">
+              <p className="mt-2 rounded-lg border border-amber-500/35 bg-amber-950/30 px-3 py-1.5 text-xs leading-snug text-amber-100">
                 Unlock with your Hub PIN/password to mint Store Ops Auth, then
                 tap refresh. Phone OTP is optional recovery only.
               </p>
@@ -191,11 +178,11 @@ export function ShiftBriefingCard({ specialist, refreshKey }: Props) {
               </p>
             ) : null}
             {pullOffset > 24 ? (
-              <p className="mt-2 text-center text-[10px] font-semibold uppercase tracking-wider text-emerald-400/80">
+              <p className="mt-1.5 text-center text-[10px] font-semibold uppercase tracking-wider text-emerald-400/80">
                 {pullOffset >= 56 ? "Release to refresh" : "Pull to refresh"}
               </p>
             ) : (
-              <p className="mt-3 text-center text-[10px] font-semibold uppercase tracking-wider text-emerald-600/70">
+              <p className="mt-1.5 text-center text-[10px] font-semibold uppercase tracking-wider text-emerald-600/70">
                 Pull down or tap refresh for a new shift brief
               </p>
             )}

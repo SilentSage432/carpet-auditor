@@ -513,7 +513,7 @@ export default function DeptSyncHubPage() {
       {authenticated ? (
         <>
           <div
-            className={`mx-auto w-full max-w-md flex-1 overflow-x-hidden px-4 py-4 ${
+            className={`mx-auto w-full max-w-md flex-1 overflow-x-hidden px-3 py-2 ${
               associateSession ? "pb-28" : "pb-44"
             }`}
           >

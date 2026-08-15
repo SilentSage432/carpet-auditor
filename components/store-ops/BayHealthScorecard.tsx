@@ -6,6 +6,7 @@
  */
 
 import { useMemo, useState } from "react";
+import { HubIcon } from "@/components/hub/NavIcons";
 import {
   BAY_STALE_DAYS,
   type BayHealthFlag,
@@ -48,7 +49,7 @@ export function BayHealthScorecard({ card }: Props) {
         type="button"
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
-        className="flex min-h-12 w-full items-center gap-3 px-4 py-2 text-left"
+        className="flex min-h-11 w-full items-center gap-2 px-3 py-1.5 text-left"
       >
         <span className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] opacity-80">
           Bay Health
@@ -62,9 +63,10 @@ export function BayHealthScorecard({ card }: Props) {
             ? ` · Aisle ${card.troubleAisles.slice(0, 3).join(", ")}`
             : ""}
         </span>
-        <span aria-hidden className="text-[10px] opacity-70">
-          {open ? "▲" : "▼"}
-        </span>
+        <HubIcon
+          id={open ? "chevronUp" : "chevronDown"}
+          className="h-4 w-4 opacity-70"
+        />
       </button>
       {open ? (
         <ul className="space-y-1.5 border-t border-white/10 px-4 py-3 text-xs">

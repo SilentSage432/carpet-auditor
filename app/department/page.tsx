@@ -75,8 +75,8 @@ function DepartmentBody({
         storeNumber={storeNumber}
         onLogout={logout}
       />
-      <main className="mx-auto w-full max-w-lg flex-1 space-y-4 px-3 pb-28 pt-4">
-        <div className="mb-1 rounded-2xl border border-emerald-500/25 bg-slate-900/70 px-4 py-3">
+      <main className="hub-main space-y-3">
+        <div className="mb-1 rounded-xl border border-emerald-500/25 bg-slate-900/70 px-3 py-2.5">
           <p className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-emerald-400">
             Department Overview
           </p>

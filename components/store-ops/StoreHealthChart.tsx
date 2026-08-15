@@ -6,6 +6,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { HubIcon } from "@/components/hub/NavIcons";
 import {
   fetchStoreHealth,
   type StoreHealthSnapshotClient,
@@ -144,7 +145,7 @@ export function StoreHealthChart({
   const glowFilterId = `velocity-glow-${tone}`;
 
   return (
-    <section className="glass-card relative mb-4 overflow-hidden border-cyan-500/25 p-4 shadow-lg shadow-black/30">
+    <section className="glass-card relative mb-3 overflow-hidden border-cyan-500/25 p-3 shadow-lg shadow-black/30">
       <div
         className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_70%_50%_at_80%_-10%,rgba(34,211,238,0.14),transparent_55%)]"
         aria-hidden
@@ -177,7 +178,7 @@ export function StoreHealthChart({
       </div>
 
       <div
-        className="relative mt-3 flex gap-2 overflow-x-auto pb-1 no-scrollbar"
+        className="relative mt-2 flex gap-1.5 overflow-x-auto pb-0.5 no-scrollbar"
         role="tablist"
         aria-label="Telemetry department scope"
       >
@@ -193,7 +194,7 @@ export function StoreHealthChart({
                 setSeriesKey(pill.key);
                 setActiveHour(null);
               }}
-              className={`min-h-[44px] shrink-0 rounded-xl border px-3 text-xs font-bold transition active:scale-[0.98] ${
+              className={`chip-filter rounded-xl ${
                 active
                   ? pill.key === "appliances"
                     ? "border-cyan-500/50 bg-cyan-950/50 text-cyan-100 shadow-[0_0_16px_-6px_rgba(34,211,238,0.55)]"
@@ -207,13 +208,13 @@ export function StoreHealthChart({
         })}
       </div>
 
-      <div className="relative mt-3">
+      <div className="relative mt-2">
         {loading && !series ? (
-          <p className="py-10 text-center text-sm text-zinc-400">
+          <p className="py-4 text-center text-sm text-zinc-400">
             Loading shift velocity…
           </p>
         ) : !series ? (
-          <p className="py-10 text-center text-sm text-zinc-400">
+          <p className="py-4 text-center text-sm text-zinc-400">
             No telemetry for this shift yet.
           </p>
         ) : (
@@ -454,10 +455,10 @@ function HourDetail({
       <button
         type="button"
         onClick={onClear}
-        className="min-h-[44px] min-w-[44px] shrink-0 rounded-xl border border-zinc-700 text-zinc-300"
+        className="btn-icon-touch"
         aria-label="Clear hour detail"
       >
-        ✕
+        <HubIcon id="close" className="h-4 w-4" />
       </button>
     </div>
   );

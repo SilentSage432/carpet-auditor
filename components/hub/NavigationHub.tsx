@@ -20,12 +20,7 @@ import { AdminDepartmentSwitcher } from "@/components/hub/AdminDepartmentSwitche
 import { ChunkErrorBoundary } from "@/components/hub/ChunkErrorBoundary";
 import { DeptSyncBadge } from "@/components/hub/DeptSyncBadge";
 import { HeaderNetworkStatus } from "@/components/hub/HeaderNetworkStatus";
-import { NavIcon } from "@/components/hub/NavIcons";
-import {
-  adminWorkingDepartmentLabel,
-  readAdminWorkingDepartment,
-  ADMIN_DEPT_CONTEXT_EVENT,
-} from "@/lib/admin-department-context";
+import { HubIcon, NavIcon } from "@/components/hub/NavIcons";
 import {
   isNavHubPathActive,
   isNavOverflowActive,
@@ -133,7 +128,6 @@ export function NavigationHub({
   const [adminForce, setAdminForce] = useState(false);
   const [adminSunday, setAdminSunday] = useState(false);
   const [adminNotes, setAdminNotes] = useState(false);
-  const [workingLabel, setWorkingLabel] = useState("Full Store");
   const userMenuId = useId();
   const drawerId = useId();
   const moreSheetId = useId();
@@ -164,19 +158,6 @@ export function NavigationHub({
     setUserOpen(false);
     setMoreOpen(false);
   }, [pathname]);
-
-  useEffect(() => {
-    function refreshWorking() {
-      setWorkingLabel(adminWorkingDepartmentLabel(readAdminWorkingDepartment()));
-    }
-    refreshWorking();
-    window.addEventListener(ADMIN_DEPT_CONTEXT_EVENT, refreshWorking);
-    window.addEventListener("storage", refreshWorking);
-    return () => {
-      window.removeEventListener(ADMIN_DEPT_CONTEXT_EVENT, refreshWorking);
-      window.removeEventListener("storage", refreshWorking);
-    };
-  }, []);
 
   useEffect(() => {
     return subscribeAdminTools(applyAdminOpen);
@@ -221,8 +202,8 @@ export function NavigationHub({
 
   return (
     <>
-      <header className="glass-panel sticky top-0 z-40 border-b border-zinc-800/80 shadow-lg shadow-black/30">
-        <div className="mx-auto flex min-h-14 max-w-lg items-center gap-2 px-2 py-1.5 sm:px-3">
+      <header className="glass-panel sticky top-0 z-40 border-b border-zinc-800/80 pt-safe shadow-lg shadow-black/30">
+        <div className="mx-auto flex min-h-12 max-w-lg items-center gap-1.5 px-2 py-1 sm:px-3">
           <button
             type="button"
             onClick={() => setMenuOpen(true)}
@@ -263,7 +244,7 @@ export function NavigationHub({
               aria-expanded={userOpen}
               aria-controls={userMenuId}
               aria-label="Account and status"
-              className="flex h-12 max-w-[10.5rem] items-center gap-2 rounded-xl border border-emerald-500/35 bg-emerald-950/35 px-2.5 text-left backdrop-blur-sm transition active:scale-[0.98] focus-visible:border-emerald-500/50 focus-visible:ring-1 focus-visible:ring-emerald-500/30"
+              className="flex h-12 max-w-[10.5rem] items-center gap-1.5 rounded-xl border border-emerald-500/35 bg-emerald-950/35 px-2 text-left backdrop-blur-sm transition active:scale-[0.98] focus-visible:border-emerald-500/50 focus-visible:ring-1 focus-visible:ring-emerald-500/30"
             >
               <HeaderNetworkStatus storeNumber={storeNumber} variant="compact">
                 <span className="block truncate font-mono text-[9px] font-bold leading-none tracking-wide text-amber-300">
@@ -346,15 +327,7 @@ export function NavigationHub({
         </div>
 
         {master && specialist ? (
-          <div className="mx-auto max-w-lg border-t border-zinc-800/60 px-2 py-1.5 sm:px-3">
-            <div className="mb-1 flex items-center justify-between gap-2">
-              <p className="font-mono text-[9px] font-bold uppercase tracking-[0.14em] text-amber-300/90">
-                Context
-              </p>
-              <p className="truncate font-mono text-[9px] font-semibold text-zinc-500">
-                {workingLabel}
-              </p>
-            </div>
+          <div className="mx-auto max-w-lg border-t border-zinc-800/60 px-2 py-1 sm:px-3">
             <AdminDepartmentSwitcher
               specialist={specialist}
               compact
@@ -387,7 +360,7 @@ export function NavigationHub({
             aria-label="Navigation Hub"
             className="absolute inset-y-0 left-0 flex w-[min(100%,22rem)] flex-col border-r border-zinc-800/80 bg-zinc-950/95 backdrop-blur-xl shadow-2xl shadow-black/50"
           >
-            <div className="flex items-center justify-between border-b border-zinc-800/80 px-4 py-4">
+            <div className="flex items-center justify-between border-b border-zinc-800/80 px-4 py-3">
               <div>
                 <p className="glass-subtitle text-emerald-400">
                   Navigation Hub
@@ -402,7 +375,7 @@ export function NavigationHub({
                 className="btn-icon-touch"
                 aria-label="Close menu"
               >
-                ✕
+                <HubIcon id="close" className="h-5 w-5" />
               </button>
             </div>
             <ul className="flex-1 space-y-2 overflow-y-auto p-3 pb-safe">
@@ -482,7 +455,7 @@ export function NavigationHub({
                 className="btn-icon-touch"
                 aria-label="Close"
               >
-                ✕
+                <HubIcon id="close" className="h-5 w-5" />
               </button>
             </div>
             <ul className="space-y-1.5 p-3">
@@ -697,7 +670,7 @@ function OpsBottomNav({
               key={link.href}
               href={link.href}
               aria-current={active ? "page" : undefined}
-              className={`relative flex h-16 flex-col items-center justify-center gap-1 px-1 pt-1.5 ${
+              className={`relative flex min-h-16 flex-col items-center justify-center gap-0.5 px-1 pt-1 ${
                 active
                   ? "text-emerald-300"
                   : "text-zinc-400 active:text-zinc-200"
@@ -721,7 +694,7 @@ function OpsBottomNav({
             type="button"
             onClick={onOpenMore}
             aria-label="More"
-            className={`relative flex h-16 flex-col items-center justify-center gap-1 px-1 pt-1.5 ${
+            className={`relative flex min-h-16 flex-col items-center justify-center gap-0.5 px-1 pt-1 ${
               overflowActive
                 ? "text-emerald-300"
                 : "text-zinc-400 active:text-zinc-200"

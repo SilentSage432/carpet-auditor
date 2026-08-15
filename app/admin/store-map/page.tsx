@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { StoreLocationGrid } from "@/components/admin/StoreLocationGrid";
 import { openAdminTools } from "@/components/hub/admin-tools-events";
+import { HubIcon } from "@/components/hub/NavIcons";
 import { NavigationHub } from "@/components/hub/NavigationHub";
 import { SessionGate } from "@/components/hub/SessionGate";
 import { VisualBayScannerModal } from "@/components/store-ops/VisualBayScannerModal";
@@ -169,8 +170,8 @@ function StoreMapBody({
         onLogout={logout}
       />
 
-      <main className="mx-auto w-full max-w-lg flex-1 px-3 pb-28 pt-4">
-        <p className="mb-3 font-mono text-[11px] text-zinc-400">
+      <main className="hub-main">
+        <p className="mb-2 font-mono text-[11px] text-zinc-400">
           Cron active · ISO week {currentWeek} ·{" "}
           <button
             type="button"
@@ -184,14 +185,14 @@ function StoreMapBody({
         <button
           type="button"
           onClick={() => setBayScanOpen(true)}
-          className="btn-primary-glow mb-4 flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl px-4 text-sm"
+          className="btn-primary-glow mb-3 flex min-h-11 w-full items-center justify-center gap-2 rounded-xl px-4 text-sm"
         >
-          <span aria-hidden>📷</span>
+          <HubIcon id="camera" className="h-4 w-4" />
           Snap Bay AI Audit
         </button>
 
         {authRequired ? (
-          <p className="glass-card mb-4 border-amber-500/40 bg-amber-950/25 px-4 py-3 text-sm text-amber-100">
+          <p className="glass-card mb-3 border-amber-500/40 bg-amber-950/25 px-3 py-2.5 text-sm text-amber-100">
             {STORE_OPS_AUTH_HINT}
             <span className="mt-1 block text-amber-200/75">
               Enter your Hub PIN on the unlock screen (or sign out and back in).
@@ -209,7 +210,7 @@ function StoreMapBody({
         ) : null}
 
         {error ? (
-          <p className="glass-card mb-4 border-rose-500/40 px-4 py-3 text-sm text-rose-200">
+          <p className="glass-card mb-3 border-rose-500/40 px-3 py-2.5 text-sm text-rose-200">
             {error}
             <span className="mt-1 block text-rose-200/70">
               Check <code className="font-mono text-xs">.env.local</code> has
@@ -220,13 +221,13 @@ function StoreMapBody({
           </p>
         ) : null}
 
-        <div className="space-y-6">
+        <div className="space-y-3">
           <section className="glass-card overflow-hidden !p-0">
             <button
               type="button"
               aria-expanded={isOverviewOpen}
               onClick={() => setIsOverviewOpen((open) => !open)}
-              className="flex min-h-[44px] w-full items-center justify-between gap-3 px-4 py-3 text-left"
+              className="flex min-h-11 w-full items-center justify-between gap-3 px-3 py-2 text-left"
             >
               <div className="min-w-0 flex-1">
                 <p className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-emerald-400">
@@ -248,19 +249,17 @@ function StoreMapBody({
                   </p>
                 )}
               </div>
-              <span
-                aria-hidden
-                className="shrink-0 font-mono text-base text-zinc-300"
-              >
-                {isOverviewOpen ? "▲" : "▼"}
-              </span>
+              <HubIcon
+                id={isOverviewOpen ? "chevronUp" : "chevronDown"}
+                className="h-4 w-4 shrink-0 text-zinc-300"
+              />
             </button>
             {isOverviewOpen ? (
-              <div className="border-t border-zinc-800/80 px-3 pb-4 pt-3">
+              <div className="border-t border-zinc-800/80 px-3 pb-3 pt-2">
                 {loading ? (
                   <p className="text-sm text-zinc-400">Loading departments…</p>
                 ) : departmentOverview.length === 0 ? (
-                  <p className="rounded-2xl border border-dashed border-zinc-700 px-4 py-6 text-center text-sm text-zinc-400">
+                  <p className="rounded-2xl border border-dashed border-zinc-700 px-4 py-4 text-center text-sm text-zinc-400">
                     No departments yet. Seed departments, then use Admin Tools →
                     Bulk Generate.
                   </p>
@@ -269,7 +268,7 @@ function StoreMapBody({
                     {departmentOverview.map((row) => (
                       <li
                         key={row.id}
-                        className={`rounded-2xl border px-4 py-3 ${
+                        className={`rounded-xl border px-3 py-2 ${
                           row.isActive
                             ? "border-zinc-700/80 bg-zinc-900/70"
                             : "border-zinc-800 bg-zinc-950/50 opacity-75"
@@ -298,19 +297,23 @@ function StoreMapBody({
                               onClick={() =>
                                 void toggleDepartment(row.id, !row.isActive)
                               }
-                              className={`relative h-7 w-12 shrink-0 rounded-full transition ${
-                                row.isActive ? "bg-emerald-500" : "bg-zinc-600"
-                              } disabled:opacity-60`}
+                              className="flex min-h-11 min-w-11 items-center justify-center"
                             >
                               <span
-                                className={`absolute top-0.5 h-6 w-6 rounded-full bg-white transition ${
-                                  row.isActive ? "left-[1.35rem]" : "left-0.5"
-                                }`}
-                              />
+                                className={`relative h-7 w-12 shrink-0 rounded-full transition ${
+                                  row.isActive ? "bg-emerald-500" : "bg-zinc-600"
+                                } ${toggleBusyId === row.id ? "opacity-60" : ""}`}
+                              >
+                                <span
+                                  className={`absolute top-0.5 h-6 w-6 rounded-full bg-white transition ${
+                                    row.isActive ? "left-[1.35rem]" : "left-0.5"
+                                  }`}
+                                />
+                              </span>
                             </button>
                           </div>
                         </div>
-                        <p className="mt-2 text-sm text-zinc-300">
+                        <p className="mt-1.5 text-sm text-zinc-300">
                           {row.total} tags · {row.active} active · {row.pending}{" "}
                           pending · {row.assigned} assigned
                         </p>

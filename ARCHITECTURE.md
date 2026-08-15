@@ -10,7 +10,8 @@ components/hub/NavigationHub.tsx  → Cross-app Navigation Hub (hamburger, role 
 components/hub/HeaderNetworkStatus.tsx → Isolated online / pending-queue chip (owns useNetworkBadge)
 components/hub/admin-tools-events.ts → Admin Tools open event + payload types (light; drawer is dynamic)
 components/hub/ChunkErrorBoundary.tsx → Catch failed next/dynamic chunks + child render throws
-components/hub/NavIcons.tsx       → Shared Lucide icons for ops + inventory bottom bars
+components/hub/NavIcons.tsx       → Canonical Lucide HubIcon / NavIcon (stroke 2) for ops + inventory chrome
+app/globals.css                   → Obsidian-glass utilities + .hub-main / .chip-filter / .btn-quick-touch
 components/hub/HapticsListener.tsx → Delegated vibrate pulses for taps / toggles / tabs
 components/hub/OfflineNetworkBanner.tsx → Offline toast + installSyncAutoFlush callbacks
 components/offline/ConflictResolutionModal.tsx → Local vs Server sync conflict chooser

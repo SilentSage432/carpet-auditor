@@ -87,7 +87,7 @@ function SettingsBody({
         onClose={() => setChangePinOpen(false)}
         onUpdated={handleUpdated}
       />
-      <main className="mx-auto w-full max-w-lg flex-1 px-3 pb-28 pt-4">
+      <main className="hub-main">
         {loading ? (
           <p className="text-sm text-slate-400">Loading settings…</p>
         ) : (

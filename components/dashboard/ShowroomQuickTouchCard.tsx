@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useOptimistic, useState, useTransition } from "react";
+import { HubIcon } from "@/components/hub/NavIcons";
 import {
   completeShowroomLocation,
   fetchShowroomLocations,
@@ -78,7 +79,7 @@ export function ShowroomQuickTouchCard({
   }
 
   return (
-    <section className="mb-4 rounded-2xl border-2 border-amber-400/45 bg-amber-950/25 px-4 py-4">
+    <section className="mb-3 rounded-2xl border-2 border-amber-400/45 bg-amber-950/25 px-3 py-2.5">
       <p className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-amber-300">
         Showroom / Stack-Out Quick Touch
       </p>
@@ -113,9 +114,11 @@ export function ShowroomQuickTouchCard({
               <button
                 type="button"
                 onClick={() => handleTouch(loc.id)}
-                className="shrink-0 rounded-lg bg-amber-400 px-3 py-2 text-xs font-bold text-slate-950"
+                className="btn-quick-touch border-amber-400 bg-amber-400 text-slate-950"
+                aria-label={`Quick Touch ${formatLocationLabel(loc)}`}
               >
-                Touched
+                <HubIcon id="touch" className="h-4 w-4" />
+                Touch
               </button>
             </li>
           ))}

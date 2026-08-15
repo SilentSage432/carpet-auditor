@@ -1,5 +1,13 @@
 # DeptSync Hub — Development Journal
 
+## 2026-08-14 — Layout, navigation, and vector iconography polish
+
+### Shipped
+- **Thumb-zone chrome** — sticky header uses `pt-safe` + `min-h-12`; Master Admin context strip dropped the redundant label row; ops/inventory bottom tabs stay `min-h-16` with `pb-safe`.
+- **Above-the-fold density** — `.hub-main` (`px-3 pt-2 pb-28`) on Store Ops routes; dashboard / Store Map / health / briefing / Sunday staging cards dropped `p-4`/`mb-4`/`space-y-6` so bay rows, status pills, and pace timers sit higher on handhelds.
+- **Unified Lucide catalog** (`components/hub/NavIcons.tsx`) — `HubIcon` + `NavIcon` share stroke 2. Replaced emoji/raster marks in `HeaderNetworkStatus`, `SundayAuditStagingCard`, Store Map (`StoreMapBody` + `StoreLocationGrid`), Zebra Quick Touch / downstock / barrier, HubHeader, Admin Tools close.
+- **Touch targets** — `.chip-filter` and `.btn-quick-touch` are 44px minimum; Quick Touch / Pull / Barrier are icon-first with 44px hit boxes; department cron switch padded to 44px; Selling/Topstock toggle `min-h-11`.
+
 ## 2026-08-14 — Downstock queue, Store Map heatmap, supervisor weekly rollup
 
 ### Shipped

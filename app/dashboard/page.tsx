@@ -134,7 +134,7 @@ function DashboardBody({
         onLogout={logout}
       />
 
-      <main className="mx-auto w-full max-w-lg flex-1 px-3 pb-28 pt-4">
+      <main className="hub-main">
         <SundayAuditStagingCard
           specialist={specialist}
           refreshKey={healthKey}
@@ -181,7 +181,7 @@ function DashboardBody({
         ) : null}
 
         <section className="mb-3">
-          <p className="glass-subtitle mb-2 text-emerald-400">
+          <p className="glass-subtitle mb-1.5 text-emerald-400">
             Pending Cycle Audits
             {flooringFocus ? " · D23 Flooring" : ""}
           </p>

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import { HubIcon } from "@/components/hub/NavIcons";
 import {
   fetchStoreHealth,
   type StoreHealthSnapshotClient,
@@ -41,7 +42,7 @@ export function StoreHealthCard({ specialist, refreshKey }: Props) {
 
   if (loading && !data) {
     return (
-      <section className="mb-4 rounded-2xl border border-slate-700 bg-slate-900/80 px-4 py-4">
+      <section className="mb-3 rounded-2xl border border-slate-700 bg-slate-900/80 px-3 py-2.5">
         <p className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-emerald-400">
           Store Health Scorecard
         </p>
@@ -76,17 +77,17 @@ function DepartmentSupervisorHealth({
   const [barriersOpen, setBarriersOpen] = useState(false);
 
   return (
-    <section className="mb-4 rounded-2xl border-2 border-emerald-500/35 bg-emerald-950/25 px-4 py-4">
+    <section className="mb-3 rounded-2xl border-2 border-emerald-500/35 bg-emerald-950/25 px-3 py-2.5">
       <p className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-emerald-400">
         Store Health Scorecard
       </p>
-      <h2 className="mt-1 text-lg font-bold text-slate-50">My Department Pace</h2>
+      <h2 className="mt-0.5 text-base font-bold text-slate-50">My Department Pace</h2>
       <p className="mt-0.5 font-mono text-xs text-slate-400">
         {data.assigned_week || "This week"}
         {dept ? ` · ${dept.department_name}` : ""}
       </p>
 
-      <div className="mt-4">
+      <div className="mt-2">
         <div className="mb-1.5 flex items-end justify-between gap-2">
           <p className="text-sm font-semibold text-slate-100">
             {completed}/{assigned > 0 ? assigned : target} Bays Completed
@@ -111,10 +112,13 @@ function DepartmentSupervisorHealth({
             type="button"
             aria-expanded={barriersOpen}
             onClick={() => setBarriersOpen((o) => !o)}
-            className="flex min-h-10 w-full items-center justify-between text-left font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-amber-300"
+            className="flex min-h-11 w-full items-center justify-between text-left font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-amber-300"
           >
             Logged barriers ({barriers.length})
-            <span aria-hidden>{barriersOpen ? "▲" : "▼"}</span>
+            <HubIcon
+              id={barriersOpen ? "chevronUp" : "chevronDown"}
+              className="h-4 w-4"
+            />
           </button>
           {barriersOpen ? (
             <ul className="mt-2 space-y-1.5">
@@ -139,11 +143,11 @@ function SuperAdminHealth({ data }: { data: StoreHealthSnapshotClient }) {
   const [detailsOpen, setDetailsOpen] = useState(false);
 
   return (
-    <section className="mb-4 rounded-2xl border-2 border-amber-400/40 bg-amber-950/20 px-4 py-4">
+    <section className="mb-3 rounded-2xl border-2 border-amber-400/40 bg-amber-950/20 px-3 py-2.5">
       <p className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-amber-300">
         Store Health Scorecard
       </p>
-      <h2 className="mt-1 text-lg font-bold text-slate-50">
+      <h2 className="mt-0.5 text-base font-bold text-slate-50">
         Storewide Completion
       </h2>
       <p className="mt-0.5 font-mono text-xs text-slate-400">
@@ -170,9 +174,10 @@ function SuperAdminHealth({ data }: { data: StoreHealthSnapshotClient }) {
             ? ` · ${bottleneck_summary.length} flagged`
             : ""}
         </span>
-        <span aria-hidden className="font-mono text-slate-400">
-          {detailsOpen ? "▲" : "▼"}
-        </span>
+        <HubIcon
+          id={detailsOpen ? "chevronUp" : "chevronDown"}
+          className="h-4 w-4 text-slate-400"
+        />
       </button>
 
       {detailsOpen ? (

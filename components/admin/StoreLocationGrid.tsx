@@ -21,6 +21,7 @@ import {
   pruneIdsFromDuplicateGroups,
 } from "@/lib/store-ops/locations";
 import { VisualBayScannerModal } from "@/components/store-ops/VisualBayScannerModal";
+import { HubIcon } from "@/components/hub/NavIcons";
 import type { BayScanMeta } from "@/lib/store-ops/ai-bay-scan";
 import {
   BAY_READINESS_EVENT,
@@ -505,7 +506,7 @@ export function StoreLocationGrid({
               type="button"
               aria-expanded={deptOpen}
               onClick={() => toggleDept(dept.departmentId)}
-              className="flex min-h-[44px] w-full items-center justify-between gap-3 bg-zinc-950/50 px-4 py-3 text-left"
+              className="flex min-h-11 w-full items-center justify-between gap-3 bg-zinc-950/50 px-3 py-2 text-left"
             >
               <div className="min-w-0">
                 <p className="text-sm font-bold text-white">
@@ -519,9 +520,10 @@ export function StoreLocationGrid({
                   {dept.aisles.length === 1 ? "" : "s"}
                 </p>
               </div>
-              <span aria-hidden className="font-mono text-base text-zinc-300">
-                {deptOpen ? "▲" : "▼"}
-              </span>
+              <HubIcon
+                id={deptOpen ? "chevronUp" : "chevronDown"}
+                className="h-4 w-4 text-zinc-300"
+              />
             </button>
 
             {deptOpen ? (
@@ -574,12 +576,10 @@ export function StoreLocationGrid({
                                 · {bayCount} bay{bayCount === 1 ? "" : "s"}
                               </span>
                             </p>
-                            <span
-                              aria-hidden
-                              className="font-mono text-sm text-zinc-400"
-                            >
-                              {aisleOpen ? "▲" : "▼"}
-                            </span>
+                            <HubIcon
+                              id={aisleOpen ? "chevronUp" : "chevronDown"}
+                              className="h-4 w-4 text-zinc-400"
+                            />
                           </button>
                         </div>
 
@@ -1046,10 +1046,10 @@ function BayActionsSheet({
           <button
             type="button"
             onClick={onClose}
-            className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl border border-zinc-700 text-zinc-200"
+            className="btn-icon-touch"
             aria-label="Close"
           >
-            ✕
+            <HubIcon id="close" className="h-5 w-5" />
           </button>
         </div>
 
@@ -1067,7 +1067,7 @@ function BayActionsSheet({
               onClick={() => setBayScanOpen(true)}
               className="btn-primary-glow flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl px-4 text-sm disabled:opacity-50"
             >
-              <span aria-hidden>📷</span>
+              <HubIcon id="camera" className="h-4 w-4" />
               Snap Bay AI Audit
             </button>
 

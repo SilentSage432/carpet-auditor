@@ -7,6 +7,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { SundayAuditAssignmentModal } from "@/components/admin/SundayAuditAssignmentModal";
+import { HubIcon } from "@/components/hub/NavIcons";
 import { fetchDepartments, fetchThisWeekRotations } from "@/lib/store-ops/client";
 import {
   buildSundayStagedBays,
@@ -115,30 +116,33 @@ export function SundayAuditStagingCard({
       <button
         type="button"
         onClick={() => setModalOpen(true)}
-        className="glass-card relative mb-4 flex w-full items-start gap-3 overflow-hidden border-emerald-500/50 p-4 text-left shadow-[0_0_40px_-10px_rgba(16,185,129,0.55)] transition active:scale-[0.99]"
+        className="glass-card relative mb-3 flex min-h-12 w-full items-center gap-2.5 overflow-hidden border-emerald-500/50 p-3 text-left shadow-[0_0_32px_-10px_rgba(16,185,129,0.55)] transition active:scale-[0.99]"
       >
         <div
           className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_80%_60%_at_20%_-20%,rgba(16,185,129,0.35),transparent_55%)]"
           aria-hidden
         />
-        <span
-          className="relative mt-1 inline-block h-2.5 w-2.5 shrink-0 rounded-full bg-emerald-400 shadow-[0_0_12px_rgba(52,211,153,0.95)]"
-          aria-hidden
+        <HubIcon
+          id="zap"
+          className="relative h-5 w-5 shrink-0 text-emerald-400"
         />
         <div className="relative min-w-0 flex-1">
           <p className="glass-subtitle text-emerald-400">
             Pending Cycle Audits · D23
           </p>
-          <p className="mt-1 text-sm font-bold leading-snug text-emerald-50 [text-shadow:0_0_18px_rgba(52,211,153,0.35)]">
+          <p className="mt-0.5 text-sm font-bold leading-snug text-emerald-50 [text-shadow:0_0_18px_rgba(52,211,153,0.35)]">
             {openCount > 0
               ? headline
-              : "⚡ Sunday Cycle Audit Engine — tap to stage Flooring bays"}
+              : "Sunday Cycle Audit Engine — tap to stage Flooring bays"}
           </p>
-          <p className="mt-1 text-xs text-emerald-200/75">
+          <p className="mt-0.5 text-xs text-emerald-200/75">
             Assign Flooring specialists · shift hours · clustered balance
           </p>
         </div>
-        <span className="relative shrink-0 self-center text-emerald-300">→</span>
+        <HubIcon
+          id="chevronRight"
+          className="relative h-5 w-5 shrink-0 self-center text-emerald-300"
+        />
       </button>
 
       <SundayAuditAssignmentModal
