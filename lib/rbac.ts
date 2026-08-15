@@ -147,6 +147,16 @@ export function visibleNavTabs(
   });
 }
 
+/** In-page Floor specialty auditors (Cycle / Appliances / generic dept). */
+export function visibleFloorAuditTabs(
+  member: StoreSpecialist | null | undefined
+): NavTab[] {
+  return visibleNavTabs(member).filter(
+    (tab) =>
+      tab.id === "audit" || tab.id === "appliances" || tab.id === "department"
+  );
+}
+
 export function defaultSectionForMember(
   member: StoreSpecialist | null | undefined
 ): HubSection {

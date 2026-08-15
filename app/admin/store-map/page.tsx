@@ -7,6 +7,7 @@ import { HubIcon } from "@/components/hub/NavIcons";
 import { NavigationHub } from "@/components/hub/NavigationHub";
 import { SessionGate } from "@/components/hub/SessionGate";
 import { VisualBayScannerModal } from "@/components/store-ops/VisualBayScannerModal";
+import { actorFromSpecialist } from "@/lib/store-ops/auth";
 import { isMasterAdmin } from "@/lib/rbac";
 import {
   fetchDepartmentsDetailed,
@@ -27,10 +28,10 @@ import type { StoreSpecialist } from "@/lib/types";
 export default function StoreMapAdminPage() {
   return (
     <SessionGate
-      allow={isMasterAdmin}
-      denyMessage="Store Map is restricted to Super Admin / Master Admin."
+      allow={(m) => Boolean(actorFromSpecialist(m))}
+      denyMessage="Store Map is for department associates, supervisors, and Master Admin."
       denyHref="/dashboard"
-      denyLinkLabel="Open Zebra dashboard"
+      denyLinkLabel="Open Floor dashboard"
     >
       {({ specialist, storeNumber, logout }) => (
         <StoreMapBody
@@ -65,6 +66,7 @@ function StoreMapBody({
   >([]);
   const [barrierLocationIds, setBarrierLocationIds] = useState<string[]>([]);
   const currentWeek = isoWeekLabel();
+  const master = isMasterAdmin(specialist);
 
   const reload = useCallback(async (member: StoreSpecialist) => {
     setLoading(true);
@@ -172,14 +174,19 @@ function StoreMapBody({
 
       <main className="hub-main">
         <p className="mb-2 font-mono text-[11px] text-zinc-400">
-          Cron active · ISO week {currentWeek} ·{" "}
-          <button
-            type="button"
-            onClick={() => openAdminTools({ section: "bulk" })}
-            className="font-semibold text-amber-300 underline-offset-2 hover:underline"
-          >
-            Bulk generate / Admin tools
-          </button>
+          Cron active · ISO week {currentWeek}
+          {master ? (
+            <>
+              {" · "}
+              <button
+                type="button"
+                onClick={() => openAdminTools({ section: "bulk" })}
+                className="font-semibold text-amber-300 underline-offset-2 hover:underline"
+              >
+                Bulk generate / Admin tools
+              </button>
+            </>
+          ) : null}
         </p>
 
         <button
@@ -288,6 +295,7 @@ function StoreMapBody({
                             <span className="glass-pill-cyan !rounded-lg px-2 py-1 font-mono text-[10px] !normal-case tracking-normal">
                               {row.aisles} aisle{row.aisles === 1 ? "" : "s"}
                             </span>
+                            {master ? (
                             <button
                               type="button"
                               role="switch"
@@ -311,6 +319,7 @@ function StoreMapBody({
                                 />
                               </span>
                             </button>
+                            ) : null}
                           </div>
                         </div>
                         <p className="mt-1.5 text-sm text-zinc-300">
@@ -335,6 +344,7 @@ function StoreMapBody({
               assignedWeek={currentWeek}
               weekRotationLocations={weekRotationLocations}
               barrierLocationIds={barrierLocationIds}
+              canMutate={master}
               onChanged={() => void reload(specialist)}
             />
           )}

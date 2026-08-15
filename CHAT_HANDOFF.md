@@ -7,14 +7,14 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 - App: **DeptSync Hub** · PWA short_name **DeptSync**
 - Manifest name: `DeptSync — Department & SIMS Audit Hub`
 - Layout title: `DeptSync Hub · Department & SIMS Audit` · appleWebApp title `DeptSync`
-- Header: brand `DeptSync Hub` · subtitle `DeptSync · Lowe's #{store}` · section title · network
-- Header badge: `DeptSyncBadge` (stacked boxes + barcode; fill follows `--accent` / `--warning`)
+- Header: brand `DeptSync` · store · section title · **department dropdown pill** · network/account
+- Header badge: `DeptSyncBadge` (floating shield + barcode, ambient `--glow-accent` glow; no enclosing tile)
 - Icons: `public/icons/icon-192.png`, `icon-512.png`, `apple-touch-icon.png`
 - PWA manifest: `app/manifest.ts` → `/manifest.webmanifest`; static `public/manifest.json` → `/manifest.json` (TWA / Bubblewrap)
 - **Theme engine:** `lib/theme.ts` owns presets + prefs (`deptsync_theme_prefs`). `data-theme` on `<html>`: `midnight` (default, ice-blue) · `emerald` · `amber` · `obsidian` · `cobalt`. Toggles: `data-contrast=high`, `data-density=compact`. Settings **Appearance** card applies instantly. CSS tokens in `app/globals.css`; glass utilities / nav / primary buttons bind to `--accent`, `--background`, `--border`, `--glow-accent`.
 - **Obsidian-glass UI:** utilities in `app/globals.css` (`.glass-card`, `.glass-panel`, `.theme-accent-surface`, `.theme-nav-active`, `.theme-modal`, `.btn-primary-glow`, `.btn-quick-touch`, `.chip-filter`, `.hub-main`). Canonical Lucide SVG set (`HubIcon` / `NavIcon`, stroke 2, `currentColor`).
-- **Handheld chrome:** sticky header `pt-safe` + compact `min-h-12`; ops bottom tabs `min-h-16` in the thumb zone; Store Ops pages use `.hub-main` so bays / badges / timers clear the fold.
-- **Native shell:** haptics via `utils/haptics.ts` + `HapticsListener`; offline toast `OfflineNetworkBanner` + `ConflictResolutionModal`; sync auto-flush on online/visibility/focus; PWA/TWA splash theme `#090d16`
+- **Handheld chrome:** sticky header `pt-safe` + compact `min-h-12`; workflow bottom tabs `min-h-16` in the thumb zone (Floor · Map · Stock · Settings); Store Ops pages use `.hub-main` so bays / badges / timers clear the fold.
+- **Native shell:** haptics via `utils/haptics.ts` + `HapticsListener`; offline toast `OfflineNetworkBanner` + `ConflictResolutionModal`; sync auto-flush on online/visibility/focus; PWA/TWA splash theme `#090d16`; `app/loading.tsx` + `DeptSyncSplash` for boot
 
 ## AI (`lib/ai/gemini.ts`)
 - Server-only Gemini Flash client (`@google/generative-ai`)
@@ -38,7 +38,7 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 |------|-------|------|
 | 👑 Master Admin | `assigned_department: all` | Flooring · Appliances · Remnants · Master |
 | 🛡️ Department Supervisor | e.g. Amber → `appliances`, Dave → `plumbing` | Dept audit / profile (flooring also gets Remnants) |
-| 👤 Floor Associate | inherits / assigned dept | Checklist · Barriers · Specialty Tools · Profile (no Admin Tools) |
+| 👤 Floor Associate | inherits / assigned dept | Floor · Map · Stock · Settings (no Admin Tools) |
 
 ### Master Admin roster console
 - Roster CRUD lives on `/admin/supervisors` and **Admin Tools** (not permanent Settings chrome)
@@ -89,8 +89,8 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 - **Admin Tools:** chrome `requestAdminTools` sets `adminOpen` + `adminHosted`; `dynamic(() => import(AdminToolsDrawer))` uses the **default** export (avoid `{ default: mod.Named }` — React #306); loading shell handles chunk errors; `ChunkErrorBoundary`; Floor Pad/TipTap nested `dynamic` via named `mod.ManagerNotesWorkspace`; SW cache `deptsync-shell-v4-admin-tools`
 - **Bulk bays:** Odd Only / Even Only (`lib/store-ops/bay-pattern.ts`, default odd); Store Map GET falls back if `last_completed_at` is missing/null
 - Seeds: no hardcoded roster injection — use Invite / Add Supervisor; temp PIN sets `must_change_credentials`
-- Primary: fixed bottom tabs — **filtered by role/department**
-- Header: DeptSync Hub brand + `DeptSync · Lowe's #…` subtitle · section title · network; specialist chip + PIN gear
+- Primary: fixed bottom workflow tabs — **Floor · Map · Stock · Settings** (role overflow in More)
+- Header: DeptSync brand + store subtitle · section title · department dropdown pill · network; specialist chip + PIN gear
 - Cycle Audit / Appliances: hardware-scan ready without soft keyboard; sticky Log docked above bottom nav
 
 ## Store Ops auth transport
@@ -145,15 +145,18 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
   - `departments`, `profiles` (auth.users + `super_admin` / `department_supervisor`), `store_locations` (SELLING/TOPSTOCK + cycle status), `weekly_rotations`
   - RLS: super_admin all; supervisors read/update own `assigned_department_id`
 - Hub bridge: Master Admin → super_admin; Supervisor → department_supervisor (via `departments.code` = hub `assigned_department`)
-- **Navigation Hub** (`lib/nav-hub.ts` + `NavigationHub.tsx`): role-aware hamburger + ops bottom tabs (Lucide SVG, max 5; Notes/Settings in More sheet)
-  - Super Admin primary: Map · Team · Alerts · Zebra · More
-  - Supervisor primary: Zebra · Verify · Dept · More
-  - Associate primary: Zebra · Barriers · Tools · Profile
+- **Navigation Hub** (`lib/nav-hub.ts` + `HubHeader.tsx` + `BottomNav.tsx` + `NavigationHub.tsx`): department dropdown pill in the header; primary workflow tabs Floor · Map · Stock · Settings (Lucide SVG; overflow in More)
+  - All roles primary: Floor (`/dashboard`) · Map (`/admin/store-map`) · Stock (`/stock`) · Settings (`/settings`)
+  - Super Admin More: Team · Alerts · Notes · Admin Tools
+  - Supervisor More: Verify · Dept · Notes
+  - Associate More: Barriers · Specialty Tools
+  - Hub `/` is Floor specialty audits (in-page switcher); remnants/settings deep links redirect to `/stock` / `/settings`
 - Quick Actions banner (Super Admin): Bulk Generate · Trigger Weekly Rotation · Manage Supervisors
 - `/manager-notes` — Executive Floor Pad (TipTap rich notes + Gemini Copilot Extract Tasks & Tag + archive); also Admin Tools entry + `#manager-notes`
-- `/dashboard` — Store Health Scorecard (top) + **ZebraChecklist** (optimistic complete, **Quick Touch**, **Flag for Downstock** + Downstock Queue tab, assignment badges + associate filter, weekly Ahead/On Track/Behind pace, next-bay pulse, SELLING/TOPSTOCK filter, Sunday assignment queue, one-tap barriers). Completions refresh silently (no loading flash). Supervisor **Weekly audit rollup** modal.
+- `/dashboard` — Store Health Scorecard (top) + **ZebraChecklist** (optimistic complete, **Quick Touch**, **Flag for Downstock**, assignment badges + associate filter, weekly Ahead/On Track/Behind pace, next-bay pulse, SELLING/TOPSTOCK filter, Sunday assignment queue, one-tap barriers). Floor audit chips deep-link to hub Cycle / Appliances. Completions refresh silently (no loading flash). Supervisor **Weekly audit rollup** modal.
+- `/stock` — unified **Downstock queue** (Zebra compact/locked) + **Remnant inventory** (when RBAC allows remnants)
 - Sunday staging card opens the assignment modal with **Shift balancer** (hours → proportional clustered zones). Plan owner: `lib/store-ops/weekly-rotations.ts`; persist: `sunday-audit.ts`.
-- `/admin/store-map` — department overview + location grid **readiness heatmap** (green this-week verified / yellow scheduled / red stale or barrier); **duplicate bay prune** (hard-delete extras); Bulk Add accordion; Trigger Weekly Rotation modal (**Force Draw New Rotation**); **📷 Snap Bay AI Audit** (Gemini visual scan) on page + bay actions sheet
+- `/admin/store-map` — department overview + location grid **readiness heatmap**; bay rows: name + status left, Selling/Topstock dual-pill, MoreVertical Edit/Delete; **duplicate bay prune** (hard-delete extras, Super Admin); Bulk Add accordion (Master); Trigger Weekly Rotation modal (**Force Draw New Rotation**); **📷 Snap Bay AI Audit** (Gemini visual scan) on page + bay actions sheet. Supervisors/associates may view their department heatmap (`canMutate` false).
 - `GET /api/store-health` — weekly pace + bottleneck aggregation + compact `bay_health` for DS / Super Admin
 - `POST /api/store-ops/ai-bay-scan` — multimodal bay photo → carton/pallet estimates, cleanliness score, detected issues (Store Ops actor)
 - `POST /api/store-ops/ai-note-summary` — manager note + optional S Pen PNG → executive summary + action items (Store Ops actor)
@@ -214,14 +217,14 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 
 ## Associate floor role
 - Store Ops actor `associate`: read/complete dept rotations + locations; create exceptions via verify; **no** targets, invite, generate/reset, Admin Tools, `/admin/*`
-- Nav: Checklist · Barriers / Log · Specialty Tools · My Profile / PIN
+- Nav: Floor · Map · Stock · Settings (Barriers / Specialty Tools in More)
 
 ## Department toggles · adaptive priority · showroom
 - Apply `supabase/migrations/20260810_dept_priority_showroom.sql`
 - Master toggles: Store Map Overview + Settings Department Overview (`departments.is_active`; Flooring default on)
 - Adaptive draw: `manual_priority_count` + `last_completed_at` age; Store Map ★ Week assigns + bumps priority
 - Showroom: `location_type=SHOWROOM_STACKOUT` + `audit_frequency_days`; dashboard Quick Touch card (not in weekly aisle draw)
-- Store Map bay rows: large S/T toggles; tap Bay label → bottom sheet (pin / history / edit aisle·bay·type·status). Row Edit / Delete; multi-select batch delete. Duplicate prune hard-deletes. Bulk Generator Clean-Up tab prunes aisle or odd/even range.
+- Store Map bay rows: compact dual-pill Selling/Topstock; tap Bay label → bottom sheet (pin / history / edit). Row kebab Edit / Delete; multi-select batch delete (Super Admin). Duplicate prune hard-deletes. Bulk Generator Clean-Up tab prunes aisle or odd/even range.
 
 ## Appliance categories (suite + sub)
 - **Tables:** `appliance_catalog` + `appliance_scans` (not carpet_*). Apply `supabase/migrations/20260810_appliance_catalog_scans.sql` then `enable_rls_flagged_tables.sql` (RLS on appliances + `store_specialists` + verify all public tables)

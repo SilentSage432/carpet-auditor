@@ -8,6 +8,7 @@
 
 import Link from "next/link";
 import { useEffect, useState, type ReactNode } from "react";
+import { DeptSyncSplash } from "@/components/hub/DeptSyncSplash";
 import {
   clearAuthSession,
   isAuthSessionExpired,
@@ -70,13 +71,7 @@ export function SessionGate({
   }
 
   if (!ready) {
-    return (
-      <div className="flex min-h-dvh items-center justify-center bg-slate-950 px-4">
-        <p className="text-sm font-semibold text-slate-400">
-          Loading secure session…
-        </p>
-      </div>
-    );
+    return <DeptSyncSplash message="Loading secure session…" />;
   }
 
   if (!specialist) {

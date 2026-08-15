@@ -66,30 +66,28 @@ export function AuthWall({
         aria-labelledby="auth-wall-title"
         className="glass-card theme-modal relative z-[91] w-full max-w-md rounded-t-2xl !rounded-b-none p-5 sm:!rounded-2xl"
       >
-        <div className="flex items-start gap-3">
-          <DeptSyncBadge size="md" />
-          <div className="min-w-0">
-            <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-accent">
-              DeptSync · {storeLabel}
-            </p>
-            <h1
-              id="auth-wall-title"
-              className="glass-title mt-1 text-lg"
-            >
-              {mode === "setup"
-                ? "Set Your Permanent Credentials"
-                : mode === "unlock"
-                  ? "Unlock DeptSync"
-                  : "DeptSync — Login to Your Department"}
-            </h1>
-            <p className="mt-1 text-sm leading-relaxed text-zinc-400">
-              {mode === "setup"
-                ? "Choose a custom username and password before department access unlocks."
-                : mode === "unlock"
-                  ? `Welcome back, ${member?.name ?? "specialist"}. Enter your PIN or password to continue.`
-                  : "Sign in with your store username and password to unlock your workspace."}
-            </p>
-          </div>
+        <div className="flex flex-col items-center text-center">
+          <DeptSyncBadge size="lg" />
+          <p className="mt-4 font-mono text-[10px] font-semibold uppercase tracking-[0.18em] text-accent">
+            DeptSync · {storeLabel}
+          </p>
+          <h1
+            id="auth-wall-title"
+            className="glass-title mt-1.5 text-xl tracking-tight"
+          >
+            {mode === "setup"
+              ? "Set Your Permanent Credentials"
+              : mode === "unlock"
+                ? "Unlock DeptSync"
+                : "Login to Your Department"}
+          </h1>
+          <p className="mt-1.5 max-w-sm text-sm leading-relaxed text-zinc-400">
+            {mode === "setup"
+              ? "Choose a custom username and password before department access unlocks."
+              : mode === "unlock"
+                ? `Welcome back, ${member?.name ?? "specialist"}. Enter your PIN or password to continue.`
+                : "Sign in with your store username and password to unlock your workspace."}
+          </p>
         </div>
 
         {mode === "login" ? (

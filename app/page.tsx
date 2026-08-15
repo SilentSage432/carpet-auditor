@@ -2,8 +2,9 @@
 
 import dynamic from "next/dynamic";
 import { startTransition, useCallback, useEffect, useState, type ReactNode } from "react";
+import { useRouter } from "next/navigation";
 import { ChangePinModal } from "@/components/hub/ChangePinModal";
-import { BottomNavBar, AssociateSpecialtySwitcher } from "@/components/hub/HubChrome";
+import { AssociateSpecialtySwitcher } from "@/components/hub/HubChrome";
 import { SpecialistModal } from "@/components/hub/SpecialistModal";
 import {
   clearAuthSession,
@@ -43,15 +44,10 @@ import type {
   StoreSpecialist,
 } from "@/lib/types";
 import type { AuthWallMode } from "@/components/auth/AuthWall";
+import { DeptSyncSplash } from "@/components/hub/DeptSyncSplash";
 
 function HubBootFallback() {
-  return (
-    <div className="flex min-h-dvh items-center justify-center bg-slate-950 px-4">
-      <p className="text-sm font-semibold text-slate-400">
-        Loading DeptSync secure session…
-      </p>
-    </div>
-  );
+  return <DeptSyncSplash message="Loading DeptSync secure session…" />;
 }
 
 const AuthWall = dynamic(
@@ -140,6 +136,7 @@ function HubPane({ show, children }: { show: boolean; children: ReactNode }) {
 type Gate = "booting" | AuthWallMode | "ready";
 
 export default function DeptSyncHubPage() {
+  const router = useRouter();
   const [section, setSection] = useState<HubSection>("audit");
   const [catalog, setCatalog] = useState<CatalogItem[]>([]);
   const [applianceCatalog, setApplianceCatalog] = useState<
@@ -180,8 +177,16 @@ export default function DeptSyncHubPage() {
     }
     const session = readAuthSession();
     if (session) markWorkspaceUnlocked(session.sessionToken);
+    if (next === "remnants") {
+      router.replace("/stock");
+      return;
+    }
+    if (next === "settings") {
+      router.replace("/settings");
+      return;
+    }
     setGate("ready");
-  }, []);
+  }, [router]);
 
   const requireLogin = useCallback(() => {
     clearAuthSession();
@@ -379,6 +384,14 @@ export default function DeptSyncHubPage() {
     if (next === "catalog") {
       next = "appliances";
     }
+    if (next === "remnants") {
+      router.push("/stock");
+      return;
+    }
+    if (next === "settings") {
+      router.push("/settings");
+      return;
+    }
     if (!canAccessSection(specialist, next)) return;
     blurActiveInput();
     touchAuthSession();
@@ -476,7 +489,6 @@ export default function DeptSyncHubPage() {
         onChangePin={specialist ? () => setChangePinOpen(true) : undefined}
         onLogout={handleLogout}
         storeNumber={storeNumber}
-        showBottomNav={associateSession}
       />
       <SpecialistModal
         open={specialistOpen}
@@ -512,18 +524,12 @@ export default function DeptSyncHubPage() {
 
       {authenticated ? (
         <>
-          <div
-            className={`mx-auto w-full max-w-md flex-1 overflow-x-hidden px-3 py-2 ${
-              associateSession ? "pb-28" : "pb-44"
-            }`}
-          >
-            {associateSession ? (
-              <AssociateSpecialtySwitcher
-                active={activeSection}
-                onSelect={handleSectionSelect}
-                specialist={specialist}
-              />
-            ) : null}
+          <div className="mx-auto w-full max-w-md flex-1 overflow-x-hidden px-3 py-2 pb-28">
+            <AssociateSpecialtySwitcher
+              active={activeSection}
+              onSelect={handleSectionSelect}
+              specialist={specialist}
+            />
             {visitedSections.has("audit") &&
               canAccessSection(specialist, "audit") && (
                 <HubPane show={activeSection === "audit"}>
@@ -596,14 +602,6 @@ export default function DeptSyncHubPage() {
                 </HubPane>
               )}
           </div>
-
-          {!associateSession ? (
-            <BottomNavBar
-              active={activeSection}
-              onSelect={handleSectionSelect}
-              specialist={specialist}
-            />
-          ) : null}
         </>
       ) : null}
     </div>

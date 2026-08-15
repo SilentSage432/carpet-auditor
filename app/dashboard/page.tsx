@@ -16,7 +16,7 @@ import {
   isFlooringWorkingContext,
   workingDepartment,
 } from "@/lib/admin-department-context";
-import { isMasterAdmin } from "@/lib/rbac";
+import { isMasterAdmin, visibleFloorAuditTabs } from "@/lib/rbac";
 import { isSupervisor } from "@/lib/specialists";
 import { actorFromSpecialist } from "@/lib/store-ops/auth";
 import {
@@ -140,6 +140,19 @@ function DashboardBody({
           refreshKey={healthKey}
           forceShow={flooringFocus || isMasterAdmin(specialist)}
         />
+        {visibleFloorAuditTabs(specialist).length > 0 ? (
+          <div className="mb-3 flex gap-1.5 overflow-x-auto pb-0.5 no-scrollbar">
+            {visibleFloorAuditTabs(specialist).map((tab) => (
+              <Link
+                key={tab.id}
+                href={`/?section=${tab.id}`}
+                className="chip-filter shrink-0 rounded-full border border-zinc-700/80 bg-zinc-950/60 text-zinc-200"
+              >
+                {tab.label} audit
+              </Link>
+            ))}
+          </div>
+        ) : null}
         <ShiftBriefingCard specialist={specialist} refreshKey={healthKey} />
         <StoreHealthChart specialist={specialist} refreshKey={healthKey} />
         <StoreHealthCard specialist={specialist} refreshKey={healthKey} />

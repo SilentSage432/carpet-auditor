@@ -9,8 +9,13 @@ components/settings/ThemeSelector.tsx → Appearance swatches + contrast/density
 app/globals.css                   → data-theme tokens + glass / nav / modal utilities bound to CSS variables
 app/manifest.ts                   → short_name DeptSync · Department & SIMS Audit Hub
 public/sw.js                      → Offline shell cache strategies
-components/hub/HubChrome.tsx      → Sticky header (legacy) + role-filtered inventory bottom nav
-components/hub/NavigationHub.tsx  → Cross-app Navigation Hub (hamburger, role badge, ops bottom nav)
+components/hub/HubChrome.tsx      → Legacy inventory header + in-page specialty audit switcher
+components/hub/HubHeader.tsx      → Sticky hub header (brand, department pill, account)
+components/hub/BottomNav.tsx      → Floor · Map · Stock · Settings workflow tabs
+components/hub/DeptSyncSplash.tsx → Boot / loading splash (floating mark)
+components/hub/NavigationHub.tsx  → Cross-app Navigation Hub (composes HubHeader + BottomNav)
+app/loading.tsx                   → Route-level splash
+app/stock/page.tsx                → Downstock queue + remnant inventory (Stock tab)
 components/hub/HeaderNetworkStatus.tsx → Isolated online / pending-queue chip (owns useNetworkBadge)
 components/hub/admin-tools-events.ts → Admin Tools open event + payload types (light; drawer is dynamic)
 components/hub/ChunkErrorBoundary.tsx → Catch failed next/dynamic chunks + child render throws
@@ -105,12 +110,12 @@ supabase/migrations/20260812_sunday_bay_assignments.sql → sunday specialist↔
 
 | Concern | Owner |
 |---|---|
-| Navigation / section routing | `app/page.tsx` + `HubChrome` (roster-only boot; `next/dynamic` sections; keep-alive `HubPane` + `startTransition`) |
-| Department RBAC / tab visibility | `lib/rbac.ts` |
+| Navigation / section routing | `app/page.tsx` + `HubHeader` / `BottomNav` (roster-only boot; `next/dynamic` sections; keep-alive `HubPane` + `startTransition`) |
+| Department RBAC / tab visibility | `lib/rbac.ts` (`visibleFloorAuditTabs` for in-page auditors) |
 | Cross-app Navigation Hub | `lib/nav-hub.ts` + `NavigationHub` + `admin-tools-events.ts` (`subscribeAdminTools` → host `AdminToolsDrawer`; Floor Pad/TipTap lazy inside drawer; `ChunkErrorBoundary`) |
 | Store Operations map + rotations | `lib/store-ops/*` + `/admin/store-map` + `/dashboard` (bulk bays: `bay-pattern.ts` odd/even; floor checklist: `ZebraChecklist`; bay edit/delete + heatmap: `StoreLocationGrid` + `map-readiness.ts`; hard `DELETE /api/store-locations`) |
 | Sunday assignments | `lib/store-ops/sunday-audit.ts` (persist) + `SundayAuditAssignmentModal` |
-| Downstock / packdown queue | `lib/store-ops/downstock.ts` (flags) + Zebra Downstock Queue tab (CSA assign via sunday-audit) |
+| Downstock / packdown queue | `lib/store-ops/downstock.ts` (flags) + `/stock` + Zebra `lockedQueue="downstock"` (CSA assign via sunday-audit) |
 | Supervisor weekly rollup | `lib/store-ops/audit-summary.ts` + `SupervisorAuditSummaryModal` |
 | Shift workload balancer | `lib/store-ops/weekly-rotations.ts` (pure plan: hours, clusters, health-risk priority) |
 | Bay health / floor discrepancies | `lib/store-ops/bay-health.ts` + `BayHealthScorecard` (composes location cycle age + hub audits / SIMS / variance) |

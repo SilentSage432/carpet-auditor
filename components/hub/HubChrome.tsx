@@ -1,6 +1,6 @@
 /**
- * Inventory Hub chrome — bottom section tabs (Flooring / Appliances / Remnants / Master).
- * Cross-app Navigation Hub header lives in `NavigationHub.tsx`.
+ * Inventory Hub chrome — in-page specialty audit switcher.
+ * Primary workflow tabs live in BottomNav.tsx. Header lives in HubHeader.tsx.
  * `HubHeader` kept as a thin alias for any legacy imports.
  */
 
@@ -8,6 +8,7 @@
 
 import {
   sectionTitle,
+  visibleFloorAuditTabs,
   visibleNavTabs,
 } from "@/lib/rbac";
 import { formatStoreLabel } from "@/lib/store";
@@ -114,7 +115,7 @@ export function AssociateSpecialtySwitcher({
   onSelect,
   specialist,
 }: BottomNavBarProps) {
-  const tabs = visibleNavTabs(specialist).filter((tab) => tab.id !== "settings");
+  const tabs = visibleFloorAuditTabs(specialist);
   if (tabs.length <= 1) return null;
 
   return (

@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Navigation Hub chrome — compact glass header + 4–5 tab SVG bottom bar.
+ * Navigation Hub chrome — HubHeader department pill + Floor/Map/Stock/Settings bottom bar.
  * Master Admin: Admin Tools slide-over (defaults closed).
  */
 
@@ -16,10 +16,10 @@ import {
   type AdminToolsEventDetail,
   type AdminToolsSection,
 } from "@/components/hub/admin-tools-events";
-import { AdminDepartmentSwitcher } from "@/components/hub/AdminDepartmentSwitcher";
+import { BottomNav } from "@/components/hub/BottomNav";
 import { ChunkErrorBoundary } from "@/components/hub/ChunkErrorBoundary";
-import { DeptSyncBadge } from "@/components/hub/DeptSyncBadge";
 import { HeaderNetworkStatus } from "@/components/hub/HeaderNetworkStatus";
+import { HubHeader } from "@/components/hub/HubHeader";
 import { HubIcon, NavIcon } from "@/components/hub/NavIcons";
 import {
   isNavHubPathActive,
@@ -32,7 +32,6 @@ import {
   type NavHubLink,
 } from "@/lib/nav-hub";
 import { isAssociate, isMasterAdmin } from "@/lib/rbac";
-import { formatStoreLabel } from "@/lib/store";
 import type { StoreSpecialist } from "@/lib/types";
 
 function AdminToolsLoadingShell({
@@ -202,150 +201,103 @@ export function NavigationHub({
 
   return (
     <>
-      <header className="glass-panel sticky top-0 z-40 border-b border-zinc-800/80 pt-safe shadow-lg shadow-black/30">
-        <div className="mx-auto flex min-h-12 max-w-lg items-center gap-1.5 px-2 py-1 sm:px-3">
-          <button
-            type="button"
-            onClick={() => setMenuOpen(true)}
-            aria-expanded={menuOpen}
-            aria-controls={drawerId}
-            aria-label="Open navigation menu"
-            className="btn-icon-touch shrink-0"
-          >
-            <span className="flex w-5 flex-col gap-1" aria-hidden>
-              <span className="block h-0.5 w-full rounded bg-current" />
-              <span className="block h-0.5 w-full rounded bg-current" />
-              <span className="block h-0.5 w-full rounded bg-current" />
-            </span>
-          </button>
-
-          <DeptSyncBadge size="sm" />
-
-          <div className="min-w-0 flex-1">
-            <p className="truncate font-mono text-[10px] font-bold uppercase tracking-[0.12em] text-accent">
-              DeptSync
-              {storeNumber ? ` · ${formatStoreLabel(storeNumber)}` : ""}
-            </p>
-            <h1 className="glass-title truncate text-[15px] leading-tight">
-              {title}
-            </h1>
-            {subtitle ? (
-              <p className="glass-muted truncate text-[10px] font-semibold">
-                {subtitle}
-              </p>
-            ) : null}
-          </div>
-
-          {/* Consolidated status + role indicator */}
-          <div className="relative shrink-0" ref={userRef}>
-            <button
-              type="button"
-              onClick={() => setUserOpen((o) => !o)}
-              aria-expanded={userOpen}
-              aria-controls={userMenuId}
-              aria-label="Account and status"
-              className="theme-accent-surface flex h-12 max-w-[10.5rem] items-center gap-1.5 rounded-xl border px-2 text-left backdrop-blur-sm transition active:scale-[0.98] focus-visible:border-accent/50 focus-visible:ring-1 focus-visible:ring-accent/30"
+      <HubHeader
+        title={title}
+        subtitle={subtitle}
+        specialist={specialist}
+        storeNumber={storeNumber}
+        roleBadge={roleBadge}
+        menuOpen={menuOpen}
+        drawerId={drawerId}
+        onOpenMenu={() => setMenuOpen(true)}
+        userOpen={userOpen}
+        userMenuId={userMenuId}
+        userRef={userRef}
+        onToggleUser={() => setUserOpen((o) => !o)}
+        onPinnedNavigate={(section) => {
+          startTransition(() => {
+            if (pathname === "/" || pathname === "") {
+              router.push(`/?section=${section}`);
+            } else if (section === "audit") {
+              router.push("/flooring");
+            } else {
+              router.push(`/?section=${section}`);
+            }
+          });
+        }}
+        userMenu={
+          userOpen ? (
+            <div
+              id={userMenuId}
+              role="menu"
+              className="glass-card absolute right-0 top-[calc(100%+0.35rem)] z-50 w-64 overflow-hidden"
             >
-              <HeaderNetworkStatus storeNumber={storeNumber} variant="compact">
-                <span className="block truncate font-mono text-[9px] font-bold leading-none tracking-wide text-amber-300">
-                  {roleBadge.replace(/^\[|\]$/g, "")}
-                </span>
-              </HeaderNetworkStatus>
-            </button>
-
-            {userOpen ? (
-              <div
-                id={userMenuId}
-                role="menu"
-                className="glass-card absolute right-0 top-[calc(100%+0.35rem)] z-50 w-64 overflow-hidden"
-              >
-                <div className="border-b border-zinc-800/80 bg-zinc-950/50 px-4 py-3">
-                  <p className="font-mono text-[10px] font-bold tracking-wide text-amber-300">
-                    {roleBadge}
-                  </p>
-                  <p className="glass-title mt-1 text-sm">
-                    {specialist?.name ?? "Locked"}
-                  </p>
-                  <p className="glass-muted mt-0.5 break-all font-mono text-xs">
-                    {loginId}
-                  </p>
-                  <HeaderNetworkStatus
-                    storeNumber={storeNumber}
-                    variant="detail"
-                  />
-                </div>
-                <div className="p-2">
-                  {master ? (
-                    <MenuAction
-                      label="Admin Tools"
-                      onClick={() => {
-                        setUserOpen(false);
-                        requestAdminTools({ section: "menu" });
-                      }}
-                    />
-                  ) : null}
-                  {onOpenSpecialist ? (
-                    <MenuAction
-                      label="Switch profile"
-                      onClick={() => {
-                        setUserOpen(false);
-                        onOpenSpecialist();
-                      }}
-                    />
-                  ) : null}
-                  {onChangePin && specialist ? (
-                    <MenuAction
-                      label="Change PIN / password"
-                      onClick={() => {
-                        setUserOpen(false);
-                        onChangePin();
-                      }}
-                    />
-                  ) : null}
-                  <Link
-                    href={associate ? "/settings" : "/"}
-                    role="menuitem"
-                    className="flex h-12 items-center rounded-xl px-3 text-sm font-semibold text-zinc-200 hover:bg-zinc-800/60"
-                    onClick={() => setUserOpen(false)}
-                  >
-                    {associate ? "My Profile / PIN" : "Inventory Hub"}
-                  </Link>
-                  {onLogout ? (
-                    <MenuAction
-                      label="Log out"
-                      danger
-                      onClick={() => {
-                        setUserOpen(false);
-                        onLogout();
-                      }}
-                    />
-                  ) : null}
-                </div>
+              <div className="border-b border-zinc-800/80 bg-zinc-950/50 px-4 py-3">
+                <p className="font-mono text-[10px] font-bold tracking-wide text-amber-300">
+                  {roleBadge}
+                </p>
+                <p className="glass-title mt-1 text-sm">
+                  {specialist?.name ?? "Locked"}
+                </p>
+                <p className="glass-muted mt-0.5 break-all font-mono text-xs">
+                  {loginId}
+                </p>
+                <HeaderNetworkStatus
+                  storeNumber={storeNumber}
+                  variant="detail"
+                />
               </div>
-            ) : null}
-          </div>
-        </div>
-
-        {master && specialist ? (
-          <div className="mx-auto max-w-lg border-t border-zinc-800/60 px-2 py-1 sm:px-3">
-            <AdminDepartmentSwitcher
-              specialist={specialist}
-              compact
-              onPinnedNavigate={(section) => {
-                startTransition(() => {
-                  if (pathname === "/" || pathname === "") {
-                    router.push(`/?section=${section}`);
-                  } else if (section === "audit") {
-                    router.push("/flooring");
-                  } else {
-                    router.push(`/?section=${section}`);
-                  }
-                });
-              }}
-            />
-          </div>
-        ) : null}
-      </header>
+              <div className="p-2">
+                {master ? (
+                  <MenuAction
+                    label="Admin Tools"
+                    onClick={() => {
+                      setUserOpen(false);
+                      requestAdminTools({ section: "menu" });
+                    }}
+                  />
+                ) : null}
+                {onOpenSpecialist ? (
+                  <MenuAction
+                    label="Switch profile"
+                    onClick={() => {
+                      setUserOpen(false);
+                      onOpenSpecialist();
+                    }}
+                  />
+                ) : null}
+                {onChangePin && specialist ? (
+                  <MenuAction
+                    label="Change PIN / password"
+                    onClick={() => {
+                      setUserOpen(false);
+                      onChangePin();
+                    }}
+                  />
+                ) : null}
+                <Link
+                  href={associate ? "/settings" : "/"}
+                  role="menuitem"
+                  className="flex h-12 items-center rounded-xl px-3 text-sm font-semibold text-zinc-200 hover:bg-zinc-800/60"
+                  onClick={() => setUserOpen(false)}
+                >
+                  {associate ? "My Profile / PIN" : "Inventory Hub"}
+                </Link>
+                {onLogout ? (
+                  <MenuAction
+                    label="Log out"
+                    danger
+                    onClick={() => {
+                      setUserOpen(false);
+                      onLogout();
+                    }}
+                  />
+                ) : null}
+              </div>
+            </div>
+          ) : null
+        }
+      />
 
       {menuOpen ? (
         <div className="fixed inset-0 z-[60]" role="dialog" aria-modal="true">
@@ -527,10 +479,10 @@ export function NavigationHub({
       ) : null}
 
       {showBottomNav && primaryLinks.length > 0 ? (
-        <OpsBottomNav
+        <BottomNav
           pathname={pathname}
           primaryLinks={primaryLinks}
-          hasOverflow={overflowLinks.length > 0 || master || !linksIncludeHub}
+          hasOverflow={overflowLinks.length > 0 || master}
           overflowActive={isNavOverflowActive(pathname, links)}
           onOpenMore={() => setMoreOpen(true)}
         />
@@ -633,86 +585,5 @@ function NavDrawerItem({
         </span>
       </Link>
     </li>
-  );
-}
-
-function OpsBottomNav({
-  pathname,
-  primaryLinks,
-  hasOverflow,
-  overflowActive,
-  onOpenMore,
-}: {
-  pathname: string;
-  primaryLinks: NavHubLink[];
-  hasOverflow: boolean;
-  overflowActive: boolean;
-  onOpenMore: () => void;
-}) {
-  const tabCount = primaryLinks.length + (hasOverflow ? 1 : 0);
-  const cols =
-    tabCount <= 3
-      ? "grid-cols-3"
-      : tabCount === 4
-        ? "grid-cols-4"
-        : "grid-cols-5";
-
-  return (
-    <nav
-      aria-label="Store Operations"
-      className="theme-bottom-nav fixed bottom-0 left-0 right-0 z-30 mx-auto max-w-lg pb-safe backdrop-blur-md"
-    >
-      <div className={`grid ${cols}`}>
-        {primaryLinks.map((link) => {
-          const active = isNavHubPathActive(pathname, link.href);
-          return (
-            <Link
-              key={link.href}
-              href={link.href}
-              aria-current={active ? "page" : undefined}
-              className={`relative flex min-h-16 flex-col items-center justify-center gap-0.5 px-1 pt-1 ${
-                active
-                  ? "theme-nav-active"
-                  : "text-muted active:text-foreground"
-              }`}
-            >
-              {active ? (
-                <span
-                  className="theme-nav-indicator absolute inset-x-4 top-0 h-0.5 rounded-full"
-                  aria-hidden
-                />
-              ) : null}
-              <NavIcon id={link.icon} className="h-5 w-5" />
-              <span className="max-w-full truncate text-center text-[10px] font-bold uppercase tracking-wide">
-                {link.shortLabel}
-              </span>
-            </Link>
-          );
-        })}
-        {hasOverflow ? (
-          <button
-            type="button"
-            onClick={onOpenMore}
-            aria-label="More"
-            className={`relative flex min-h-16 flex-col items-center justify-center gap-0.5 px-1 pt-1 ${
-              overflowActive
-                ? "theme-nav-active"
-                : "text-muted active:text-foreground"
-            }`}
-          >
-            {overflowActive ? (
-              <span
-                className="theme-nav-indicator absolute inset-x-4 top-0 h-0.5 rounded-full"
-                aria-hidden
-              />
-            ) : null}
-            <NavIcon id="more" className="h-5 w-5" />
-            <span className="max-w-full truncate text-center text-[10px] font-bold uppercase tracking-wide">
-              More
-            </span>
-          </button>
-        ) : null}
-      </div>
-    </nav>
   );
 }

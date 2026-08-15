@@ -1,22 +1,25 @@
 "use client";
 
 /**
- * Master Admin working-department pin — presentation only.
+ * Department context pill — presentation only.
  * Context ownership: lib/admin-department-context.ts
+ * Master Admin: compact dropdown. Other roles: read-only department chip.
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
+import { HubIcon } from "@/components/hub/NavIcons";
 import {
   ADMIN_DEPT_CONTEXT_EVENT,
   ADMIN_PINNABLE_DEPARTMENTS,
   adminWorkingDepartmentLabel,
+  adminWorkingDepartmentPillLabel,
   preferredHubSectionForWorkingDept,
   readAdminWorkingDepartment,
   setAdminWorkingDepartment,
   type AdminWorkingDepartment,
 } from "@/lib/admin-department-context";
-import { isMasterAdmin } from "@/lib/rbac";
-import type { StoreSpecialist } from "@/lib/types";
+import { effectiveDepartment, isMasterAdmin } from "@/lib/rbac";
+import { departmentMeta, type StoreSpecialist } from "@/lib/types";
 
 type Props = {
   specialist: StoreSpecialist | null;
@@ -28,9 +31,12 @@ type Props = {
 export function AdminDepartmentSwitcher({
   specialist,
   onPinnedNavigate,
-  compact = false,
 }: Props) {
   const [dept, setDept] = useState<AdminWorkingDepartment>("all");
+  const [open, setOpen] = useState(false);
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const menuId = useId();
+  const master = isMasterAdmin(specialist);
 
   useEffect(() => {
     setDept(readAdminWorkingDepartment());
@@ -45,53 +51,89 @@ export function AdminDepartmentSwitcher({
     };
   }, []);
 
-  if (!isMasterAdmin(specialist)) return null;
+  useEffect(() => {
+    if (!open) return;
+    function onDocClick(e: MouseEvent) {
+      if (!wrapRef.current?.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener("mousedown", onDocClick);
+    return () => document.removeEventListener("mousedown", onDocClick);
+  }, [open]);
+
+  if (!specialist) return null;
+
+  if (!master) {
+    const scoped = departmentMeta(effectiveDepartment(specialist));
+    return (
+      <span
+        className="inline-flex h-9 max-w-[5.5rem] shrink-0 items-center rounded-full border border-zinc-700/80 bg-zinc-950/60 px-2.5 font-mono text-[10px] font-bold uppercase tracking-wide text-zinc-300"
+        title={scoped.label}
+      >
+        <span className="truncate">{scoped.shortLabel}</span>
+      </span>
+    );
+  }
 
   const options: AdminWorkingDepartment[] = [
     "all",
-    ...ADMIN_PINNABLE_DEPARTMENTS.filter(
-      (d) => d === "flooring" || d === "appliances" || d === "plumbing"
-    ),
+    ...ADMIN_PINNABLE_DEPARTMENTS,
   ];
 
   function pin(next: AdminWorkingDepartment) {
     const saved = setAdminWorkingDepartment(next);
     setDept(saved);
+    setOpen(false);
     const section = preferredHubSectionForWorkingDept(saved);
     if (section) onPinnedNavigate?.(section);
   }
 
+  const label = adminWorkingDepartmentLabel(dept);
+  const pill = adminWorkingDepartmentPillLabel(dept);
+
   return (
-    <div
-      className={
-        compact
-          ? "flex max-w-full gap-1 overflow-x-auto no-scrollbar"
-          : "flex max-w-full gap-1.5 overflow-x-auto pb-0.5 no-scrollbar"
-      }
-      role="group"
-      aria-label="Master Admin working department"
-    >
-      {options.map((opt) => {
-        const active = dept === opt;
-        return (
-          <button
-            key={opt}
-            type="button"
-            onClick={() => pin(opt)}
-            className={`h-11 shrink-0 rounded-xl border px-2.5 text-[10px] font-bold uppercase tracking-wide transition active:scale-[0.98] ${
-              active
-                ? opt === "flooring"
-                  ? "border-emerald-500/55 bg-emerald-950/55 text-emerald-100 shadow-[0_0_16px_-6px_rgba(16,185,129,0.6)]"
-                  : opt === "appliances"
-                    ? "border-cyan-500/55 bg-cyan-950/50 text-cyan-100 shadow-[0_0_16px_-6px_rgba(34,211,238,0.55)]"
-                    : "border-amber-400/50 bg-amber-950/45 text-amber-100"
-                : "border-zinc-700/80 bg-zinc-950/50 text-zinc-400"
-            }`}
-          >
-            {adminWorkingDepartmentLabel(opt)}
-          </button>
-        );
-      })}
+    <div className="relative shrink-0" ref={wrapRef}>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-expanded={open}
+        aria-haspopup="listbox"
+        aria-controls={menuId}
+        aria-label={`Working department: ${label}`}
+        className="inline-flex h-9 max-w-[5.75rem] items-center gap-1 rounded-full border border-accent/40 bg-zinc-950/70 px-2.5 text-left backdrop-blur-sm transition active:scale-[0.98]"
+      >
+        <span className="min-w-0 truncate font-mono text-[10px] font-bold uppercase tracking-wide text-accent">
+          {pill}
+        </span>
+        <HubIcon id="chevronDown" className="h-3.5 w-3.5 shrink-0 text-accent" />
+      </button>
+
+      {open ? (
+        <ul
+          id={menuId}
+          role="listbox"
+          aria-label="Working department"
+          className="glass-card absolute right-0 top-[calc(100%+0.35rem)] z-50 max-h-[min(70dvh,22rem)] w-56 overflow-y-auto p-1.5"
+        >
+          {options.map((opt) => {
+            const active = dept === opt;
+            return (
+              <li key={opt} role="option" aria-selected={active}>
+                <button
+                  type="button"
+                  onClick={() => pin(opt)}
+                  className={`flex min-h-11 w-full items-center rounded-xl px-3 text-left text-sm font-semibold ${
+                    active
+                      ? "theme-accent-surface text-accent-fg-soft"
+                      : "text-zinc-200 hover:bg-zinc-800/60"
+                  }`}
+                >
+                  {adminWorkingDepartmentLabel(opt)}
+                </button>
+              </li>
+            );
+          })}
+        </ul>
+      ) : null}
     </div>
   );
 }

@@ -68,25 +68,24 @@
 | Title stack | DeptSync · store · page title | Display only |
 | Account + network | `HeaderNetworkStatus` Wifi / WifiOff + role chip | Opens account menu |
 
-Master Admin: compact department pin row under the header (no extra “Context” label). Close glyphs are `HubIcon id="close"`.
+Master Admin: compact department **dropdown pill** in the header (no second-row tabs). Close glyphs are `HubIcon id="close"`.
 
-### A.3 Main navigation (`OpsBottomNav` / `BottomNavBar`)
+### A.3 Main navigation (`BottomNav`)
 
-**Primary — OpsBottomNav** (`NavigationHub.tsx`) + inventory `BottomNavBar` (`HubChrome.tsx`)
+**Primary — BottomNav** (`components/hub/BottomNav.tsx`) composed by `NavigationHub`
 
-- Fixed `bottom-0`, `max-w-lg` / `max-w-md`, `min-h-16` tabs, `pb-safe`, Lucide `NavIcon` stroke 2.
-- Active tab: emerald top indicator + glow.
+- Fixed `bottom-0`, `max-w-lg`, `min-h-16` tabs, `pb-safe`, Lucide `NavIcon` stroke 2.
+- Active tab: accent top indicator + glow.
 - Overflow routes live in the More sheet (same 56px row hit area).
 
-Store Ops pages use `.hub-main` (`px-3 pt-2 pb-28`) so bay lists, status pills, and pace timers clear the fold on handhelds. Quick Touch / filter chips use `.btn-quick-touch` / `.chip-filter` (44px min).
+| Tab | Route | Meaning |
+|-----|-------|---------|
+| Floor | `/dashboard` (also `/` audits) | Bay cycle checklist + specialty auditors |
+| Map | `/admin/store-map` | Heatmap + bay layout |
+| Stock | `/stock` | Downstock queue + remnants |
+| Settings | `/settings` | Themes, credentials, Admin Tools |
 
-| id | Bottom label | Header title | Icon (`NavIconId`) |
-|----|--------------|--------------|-------------------|
-| `audit` | Flooring | Flooring Cycle Audit | `grid` |
-| `appliances` | Appliances | Appliances | `tools` |
-| `department` | Dept Audit | Department Audit | `building` |
-| `remnants` | Remnants | Remnant Rack | `notes` |
-| `settings` | Settings | Settings & Sync | `settings` |
+Store Ops pages use `.hub-main` (`px-3 pt-2 pb-28`) so bay lists, status pills, and pace timers clear the fold on handhelds. Quick Touch / filter chips use `.btn-quick-touch` / `.chip-filter` (44px min).
 
 ### A.4 Page-level toasts & notices (non-modal)
 

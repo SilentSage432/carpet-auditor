@@ -1,6 +1,7 @@
 /**
  * Navigation Hub — owns cross-app route links by role.
  * Inventory section tabs stay in lib/rbac.ts; this module owns Store Ops / Zebra routes.
+ * Primary bottom bar is the Floor / Map / Stock / Settings workflow.
  */
 
 import {
@@ -20,6 +21,7 @@ export type NavHubHref =
   | "/department"
   | "/manager-notes"
   | "/settings"
+  | "/stock"
   | "/";
 
 export type NavHubLink = {
@@ -73,6 +75,38 @@ export function navLoginIdentity(
   return member.username?.trim() || member.name;
 }
 
+const FLOOR_LINK: NavHubLink = {
+  href: "/dashboard",
+  label: "Floor",
+  shortLabel: "Floor",
+  icon: "zebra",
+  description: "Active bay cycle checklist and specialty audits",
+};
+
+const MAP_LINK: NavHubLink = {
+  href: "/admin/store-map",
+  label: "Store Map",
+  shortLabel: "Map",
+  icon: "map",
+  description: "Visual heatmap and bay layout",
+};
+
+const STOCK_LINK: NavHubLink = {
+  href: "/stock",
+  label: "Downstock & Stock",
+  shortLabel: "Stock",
+  icon: "stock",
+  description: "Downstock queue and remnant inventory",
+};
+
+const SETTINGS_LINK: NavHubLink = {
+  href: "/settings",
+  label: "Settings",
+  shortLabel: "Settings",
+  icon: "settings",
+  description: "Themes, credentials, and Admin Tools",
+};
+
 export function navRoleLinks(
   member: StoreSpecialist | null | undefined
 ): NavHubLink[] {
@@ -80,19 +114,17 @@ export function navRoleLinks(
 
   if (isMasterAdmin(member)) {
     return [
-      {
-        href: "/admin/store-map",
-        label: "Store Map & Bulk Generator",
-        shortLabel: "Map",
-        icon: "map",
-        description: "Map aisles and generate bay tags",
-      },
+      FLOOR_LINK,
+      MAP_LINK,
+      STOCK_LINK,
+      SETTINGS_LINK,
       {
         href: "/admin/supervisors",
         label: "Supervisor & Role Management",
         shortLabel: "Team",
         icon: "users",
         description: "Issue and manage department logins",
+        overflow: true,
       },
       {
         href: "/admin/exceptions",
@@ -100,13 +132,7 @@ export function navRoleLinks(
         shortLabel: "Alerts",
         icon: "alert",
         description: "Weekly verification & bottlenecks",
-      },
-      {
-        href: "/dashboard",
-        label: "Zebra Floor View",
-        shortLabel: "Zebra",
-        icon: "zebra",
-        description: "This week’s assigned bay checklist",
+        overflow: true,
       },
       {
         href: "/manager-notes",
@@ -114,14 +140,6 @@ export function navRoleLinks(
         shortLabel: "Notes",
         icon: "notes",
         description: "Rich-text floor notes + Gemini Copilot",
-        overflow: true,
-      },
-      {
-        href: "/settings",
-        label: "Settings & Config",
-        shortLabel: "Settings",
-        icon: "settings",
-        description: "Store context, sync, and credentials",
         overflow: true,
       },
     ];
@@ -130,19 +148,17 @@ export function navRoleLinks(
   if (member.role === "Supervisor") {
     const dept = departmentMeta(effectiveDepartment(member));
     return [
-      {
-        href: "/dashboard",
-        label: "My Department Zebra Checklist",
-        shortLabel: "Zebra",
-        icon: "zebra",
-        description: "This week’s assigned rotation bays",
-      },
+      FLOOR_LINK,
+      MAP_LINK,
+      STOCK_LINK,
+      SETTINGS_LINK,
       {
         href: "/verify-rotation",
         label: "Verify & Report Exceptions",
         shortLabel: "Verify",
         icon: "shield",
         description: "End-of-week confirmation / incomplete bays",
+        overflow: true,
       },
       {
         href: "/department",
@@ -150,6 +166,7 @@ export function navRoleLinks(
         shortLabel: dept.shortLabel,
         icon: "building",
         description: `${dept.label} ops overview + Hub link`,
+        overflow: true,
       },
       {
         href: "/manager-notes",
@@ -159,32 +176,21 @@ export function navRoleLinks(
         description: "Rich-text floor notes + Gemini Copilot",
         overflow: true,
       },
-      {
-        href: "/settings",
-        label: "Settings",
-        shortLabel: "Settings",
-        icon: "settings",
-        description: "Profile, PIN, and sync",
-        overflow: true,
-      },
     ];
   }
 
-  // Associates: floor checklist + barriers + specialty auditors + profile only
   return [
-    {
-      href: "/dashboard",
-      label: "My Department Checklist",
-      shortLabel: "Zebra",
-      icon: "zebra",
-      description: "This week’s assigned rotation bays",
-    },
+    FLOOR_LINK,
+    MAP_LINK,
+    STOCK_LINK,
+    SETTINGS_LINK,
     {
       href: "/verify-rotation",
       label: "Barriers / Log",
       shortLabel: "Barriers",
       icon: "barrier",
       description: "Log barriers and review incomplete bays",
+      overflow: true,
     },
     {
       href: "/",
@@ -192,13 +198,7 @@ export function navRoleLinks(
       shortLabel: "Tools",
       icon: "tools",
       description: "Flooring / appliance department auditors",
-    },
-    {
-      href: "/settings",
-      label: "My Profile / PIN",
-      shortLabel: "Profile",
-      icon: "lock",
-      description: "Credentials and device sync",
+      overflow: true,
     },
   ];
 }
@@ -213,10 +213,48 @@ export function navOverflowLinks(links: NavHubLink[]): NavHubLink[] {
   return links.filter((link) => link.overflow);
 }
 
+function hubSectionParam(search: string | null | undefined): string | null {
+  if (!search) return null;
+  const raw = search.startsWith("?") ? search.slice(1) : search;
+  const value = new URLSearchParams(raw).get("section");
+  return value?.trim() || null;
+}
+
 export function isNavHubPathActive(
   pathname: string,
-  href: NavHubHref
+  href: NavHubHref,
+  search?: string | null
 ): boolean {
+  const section = hubSectionParam(search);
+
+  if (href === "/dashboard") {
+    if (pathname === "/dashboard" || pathname.startsWith("/dashboard/")) {
+      return true;
+    }
+    if (pathname === "/" || pathname === "") {
+      return section !== "remnants" && section !== "settings";
+    }
+    return false;
+  }
+
+  if (href === "/stock") {
+    if (pathname === "/stock" || pathname.startsWith("/stock/")) return true;
+    if ((pathname === "/" || pathname === "") && section === "remnants") {
+      return true;
+    }
+    return false;
+  }
+
+  if (href === "/settings") {
+    if (pathname === "/settings" || pathname.startsWith("/settings/")) {
+      return true;
+    }
+    if ((pathname === "/" || pathname === "") && section === "settings") {
+      return true;
+    }
+    return false;
+  }
+
   if (href === "/") return pathname === "/" || pathname === "";
   return pathname === href || pathname.startsWith(`${href}/`);
 }
@@ -224,9 +262,10 @@ export function isNavHubPathActive(
 /** True when an overflow route is active (highlights More tab). */
 export function isNavOverflowActive(
   pathname: string,
-  links: NavHubLink[]
+  links: NavHubLink[],
+  search?: string | null
 ): boolean {
   return navOverflowLinks(links).some((link) =>
-    isNavHubPathActive(pathname, link.href)
+    isNavHubPathActive(pathname, link.href, search)
   );
 }

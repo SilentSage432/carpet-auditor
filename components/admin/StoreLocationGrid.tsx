@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { compareAisles, formatAisleInput, isValidAisle, normalizeAisle } from "@/lib/store-ops/aisle";
 import type {
   Department,
@@ -41,6 +41,8 @@ type Props = {
   assignedWeek?: string;
   weekRotationLocations?: Array<{ locationId: string; completed: boolean }>;
   barrierLocationIds?: string[];
+  /** Super Admin may edit/delete/toggle tags. Others get a read heatmap. */
+  canMutate?: boolean;
 };
 
 type BayPair = {
@@ -102,10 +104,6 @@ function buildBayPairs(locs: StoreLocation[]): BayPair[] {
   return [...byBay.values()].sort((a, b) => a.bay - b.bay);
 }
 
-function isInActiveRotation(loc: StoreLocation | null | undefined): boolean {
-  return loc?.status === "ASSIGNED";
-}
-
 function formatWhen(iso: string | null | undefined): string {
   if (!iso) return "Never";
   const t = Date.parse(iso);
@@ -127,6 +125,7 @@ export function StoreLocationGrid({
   assignedWeek,
   weekRotationLocations = [],
   barrierLocationIds = [],
+  canMutate = true,
 }: Props) {
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -137,6 +136,7 @@ export function StoreLocationGrid({
   const [pruneBusy, setPruneBusy] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [confirmDeleteKey, setConfirmDeleteKey] = useState<string | null>(null);
+  const [menuKey, setMenuKey] = useState<string | null>(null);
   const [batchConfirm, setBatchConfirm] = useState(false);
   const [verifiedOverlay, setVerifiedOverlay] = useState<Set<string>>(
     () => new Set()
@@ -418,7 +418,7 @@ export function StoreLocationGrid({
         </div>
       </div>
 
-      {duplicateGroups.length > 0 ? (
+      {canMutate && duplicateGroups.length > 0 ? (
         <div className="rounded-xl border border-amber-500/40 bg-amber-950/25 px-3 py-3">
           <p className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-amber-300">
             Map prune · duplicate legacy bays
@@ -448,7 +448,7 @@ export function StoreLocationGrid({
         </div>
       ) : null}
 
-      {selectedIds.size > 0 ? (
+      {canMutate && selectedIds.size > 0 ? (
         <div className="rounded-xl border border-rose-500/40 bg-rose-950/25 px-3 py-3">
           <p className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-rose-300">
             Batch clean-up
@@ -541,6 +541,7 @@ export function StoreLocationGrid({
                         className="overflow-hidden rounded-xl border border-zinc-800/80 bg-zinc-950/50"
                       >
                         <div className="flex items-center gap-1 pr-2">
+                          {canMutate ? (
                           <label className="flex min-h-[44px] min-w-[44px] items-center justify-center">
                             <input
                               type="checkbox"
@@ -561,6 +562,7 @@ export function StoreLocationGrid({
                               style={{ accentColor: "var(--accent)" }}
                             />
                           </label>
+                          ) : null}
                           <button
                             type="button"
                             aria-expanded={aisleOpen}
@@ -611,9 +613,10 @@ export function StoreLocationGrid({
                             return (
                               <li
                                 key={`${aisleKey}-bay-${pair.bay}`}
-                                className="flex min-h-[44px] flex-wrap items-center gap-1.5 px-2 py-1.5"
+                                className="flex min-h-[44px] items-center gap-2 px-2 py-1.5"
                               >
-                                <label className="flex min-h-[44px] min-w-[44px] items-center justify-center">
+                                {canMutate ? (
+                                <label className="flex h-11 w-11 shrink-0 items-center justify-center">
                                   <input
                                     type="checkbox"
                                     checked={pairSelected}
@@ -621,70 +624,65 @@ export function StoreLocationGrid({
                                     onChange={() => togglePairSelected(ids)}
                                     aria-label={`Select aisle ${aisle.aisle} bay ${pair.bay}`}
                                     className="h-5 w-5"
-                              style={{ accentColor: "var(--accent)" }}
+                                    style={{ accentColor: "var(--accent)" }}
                                   />
                                 </label>
+                                ) : null}
                                 <button
                                   type="button"
                                   onClick={() => openBaySheet(sheetPayload)}
-                                  className="flex min-h-[44px] min-w-[4.5rem] shrink-0 items-center gap-1.5 rounded-xl px-1.5 text-left active:bg-zinc-800/80"
-                                  aria-label={`Bay ${pair.bay} actions`}
+                                  className="min-w-0 flex-1 rounded-xl px-1 py-1 text-left active:bg-zinc-800/80"
+                                  aria-label={`Bay ${pair.bay} ${mapReadinessLabel(pairTone)}`}
                                 >
-                                  <span
-                                    className={`inline-block h-2.5 w-2.5 shrink-0 rounded-full ${mapReadinessDotClass(pairTone)}`}
-                                    title={mapReadinessLabel(pairTone)}
-                                    aria-label={mapReadinessLabel(pairTone)}
-                                  />
-                                  <span className="font-mono text-xs font-bold text-zinc-200">
-                                    Bay {pair.bay}
+                                  <span className="flex items-center gap-1.5">
+                                    <span
+                                      className={`inline-block h-2.5 w-2.5 shrink-0 rounded-full ${mapReadinessDotClass(pairTone)}`}
+                                      title={mapReadinessLabel(pairTone)}
+                                    />
+                                    <span className="truncate font-mono text-xs font-bold text-zinc-100">
+                                      Bay {pair.bay}
+                                    </span>
+                                  </span>
+                                  <span className="mt-0.5 block truncate font-mono text-[10px] font-semibold uppercase tracking-wide text-zinc-500">
+                                    {mapReadinessLabel(pairTone)}
                                   </span>
                                 </button>
-                                <div className="grid min-w-0 flex-1 grid-cols-2 gap-1.5">
-                                  <TypeToggle
-                                    label="S"
-                                    fullLabel="Selling"
-                                    loc={pair.selling}
-                                    pendingId={pendingId}
-                                    readiness={readinessFor(pair.selling)}
-                                    onToggle={toggleActive}
+                                <DualTypePill
+                                  selling={pair.selling}
+                                  topstock={pair.topstock}
+                                  pendingId={pendingId}
+                                  sellingReady={readinessFor(pair.selling)}
+                                  topstockReady={readinessFor(pair.topstock)}
+                                  canMutate={canMutate}
+                                  onToggle={toggleActive}
+                                />
+                                {canMutate ? (
+                                  <BayRowMenu
+                                    rowKey={rowKey}
+                                    open={menuKey === rowKey}
+                                    confirming={confirming}
+                                    disabled={ids.length === 0 || Boolean(pendingId)}
+                                    onToggle={() => {
+                                      setMenuKey((key) =>
+                                        key === rowKey ? null : rowKey
+                                      );
+                                      setConfirmDeleteKey(null);
+                                    }}
+                                    onClose={() => setMenuKey(null)}
+                                    onEdit={() => {
+                                      setMenuKey(null);
+                                      openBaySheet(sheetPayload, "edit");
+                                    }}
+                                    onDelete={() => {
+                                      if (!confirming) {
+                                        setConfirmDeleteKey(rowKey);
+                                        return;
+                                      }
+                                      setMenuKey(null);
+                                      void deleteIds(ids);
+                                    }}
                                   />
-                                  <TypeToggle
-                                    label="T"
-                                    fullLabel="Topstock"
-                                    loc={pair.topstock}
-                                    pendingId={pendingId}
-                                    readiness={readinessFor(pair.topstock)}
-                                    onToggle={toggleActive}
-                                  />
-                                </div>
-                                <button
-                                  type="button"
-                                  disabled={ids.length === 0}
-                                  onClick={() =>
-                                    openBaySheet(sheetPayload, "edit")
-                                  }
-                                  className="flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl border border-zinc-700 px-2 text-xs font-bold text-zinc-200 disabled:opacity-40"
-                                >
-                                  Edit
-                                </button>
-                                <button
-                                  type="button"
-                                  disabled={ids.length === 0 || Boolean(pendingId)}
-                                  onClick={() => {
-                                    if (!confirming) {
-                                      setConfirmDeleteKey(rowKey);
-                                      return;
-                                    }
-                                    void deleteIds(ids);
-                                  }}
-                                  className={`flex min-h-[44px] min-w-[44px] items-center justify-center rounded-xl border px-2 text-xs font-bold disabled:opacity-40 ${
-                                    confirming
-                                      ? "border-rose-400 bg-rose-600 text-white"
-                                      : "border-rose-500/40 text-rose-200"
-                                  }`}
-                                >
-                                  {confirming ? "Yes?" : "Delete"}
-                                </button>
+                                ) : null}
                               </li>
                             );
                           })}
@@ -718,83 +716,177 @@ export function StoreLocationGrid({
   );
 }
 
-function TypeToggle({
-  label,
-  fullLabel,
-  loc,
+function DualTypePill({
+  selling,
+  topstock,
   pendingId,
-  readiness = "idle",
+  sellingReady,
+  topstockReady,
+  canMutate,
   onToggle,
 }: {
+  selling: StoreLocation | null;
+  topstock: StoreLocation | null;
+  pendingId: string | null;
+  sellingReady: MapReadinessTone;
+  topstockReady: MapReadinessTone;
+  canMutate: boolean;
+  onToggle: (loc: StoreLocation) => void;
+}) {
+  return (
+    <div className="inline-flex h-9 shrink-0 items-center rounded-full border border-zinc-700/80 bg-zinc-950/70 p-0.5">
+      <TypePill
+        loc={selling}
+        label="Sell"
+        fullLabel="Selling"
+        readiness={sellingReady}
+        pendingId={pendingId}
+        canMutate={canMutate}
+        onToggle={onToggle}
+      />
+      <TypePill
+        loc={topstock}
+        label="Top"
+        fullLabel="Topstock"
+        readiness={topstockReady}
+        pendingId={pendingId}
+        canMutate={canMutate}
+        onToggle={onToggle}
+      />
+    </div>
+  );
+}
+
+function TypePill({
+  loc,
+  label,
+  fullLabel,
+  readiness,
+  pendingId,
+  canMutate,
+  onToggle,
+}: {
+  loc: StoreLocation | null;
   label: string;
   fullLabel: string;
-  loc: StoreLocation | null;
+  readiness: MapReadinessTone;
   pendingId: string | null;
-  readiness?: MapReadinessTone;
+  canMutate: boolean;
   onToggle: (loc: StoreLocation) => void;
 }) {
   if (!loc) {
     return (
-      <div className="flex min-h-[44px] items-center justify-center gap-1.5 rounded-xl border border-dashed border-zinc-800 px-2 opacity-40">
-        <span className="font-mono text-xs font-bold text-zinc-500">
-          {label}
-        </span>
-        <span className="text-[10px] text-zinc-600">—</span>
-      </div>
+      <span
+        className="inline-flex h-8 min-w-[2.75rem] items-center justify-center rounded-full px-2 font-mono text-[10px] font-bold text-zinc-600"
+        aria-label={`${fullLabel} not mapped`}
+      >
+        {label}
+      </span>
     );
   }
 
-  const showroom = (loc.location_type ?? "STANDARD") === "SHOWROOM_STACKOUT";
-  const inRotation = isInActiveRotation(loc);
   const heatClass =
     readiness === "verified"
-      ? "glass-bay-complete"
+      ? "bg-emerald-500/25 text-emerald-100"
       : readiness === "scheduled"
-        ? "glass-bay-pending"
+        ? "bg-amber-500/20 text-amber-100"
         : readiness === "attention"
-          ? "border-rose-500/45 bg-rose-950/35"
-          : showroom
-            ? "glass-bay-pending"
-            : loc.type === "TOPSTOCK"
-              ? "glass-bay-cyan"
-              : "theme-accent-surface";
+          ? "bg-rose-500/25 text-rose-100"
+          : loc.is_active
+            ? "bg-accent/25 text-accent"
+            : "text-zinc-500";
 
   return (
-    <div
-      className={`flex min-h-[44px] items-center justify-between gap-1 rounded-xl border px-1 ${heatClass} ${
-        loc.is_active ? "" : "opacity-50"
-      }`}
+    <button
+      type="button"
+      role="switch"
+      aria-checked={loc.is_active}
+      aria-label={`${fullLabel} bay ${loc.bay} ${loc.is_active ? "active" : "off"}`}
+      disabled={!canMutate || pendingId === loc.id}
+      onClick={() => {
+        if (canMutate) onToggle(loc);
+      }}
+      className={`inline-flex h-8 min-w-[2.75rem] items-center justify-center rounded-full px-2 font-mono text-[10px] font-bold transition ${heatClass} ${
+        loc.is_active ? "" : "opacity-45"
+      } disabled:opacity-40`}
     >
-      <div className="min-w-0 pl-1.5">
-        <p className="font-mono text-xs font-bold text-accent">
-          {label}
-          <span className="ml-1 font-sans text-[10px] font-medium text-zinc-500">
-            {inRotation ? "week" : loc.status === "PENDING" ? "ready" : loc.status.slice(0, 3).toLowerCase()}
-            {showroom ? " · show" : ""}
-          </span>
-        </p>
-      </div>
+      {label}
+    </button>
+  );
+}
+
+function BayRowMenu({
+  rowKey,
+  open,
+  confirming,
+  disabled,
+  onToggle,
+  onClose,
+  onEdit,
+  onDelete,
+}: {
+  rowKey: string;
+  open: boolean;
+  confirming: boolean;
+  disabled: boolean;
+  onToggle: () => void;
+  onClose: () => void;
+  onEdit: () => void;
+  onDelete: () => void;
+}) {
+  const wrapRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function onDocClick(e: MouseEvent) {
+      if (!wrapRef.current?.contains(e.target as Node)) onClose();
+    }
+    document.addEventListener("mousedown", onDocClick);
+    return () => document.removeEventListener("mousedown", onDocClick);
+  }, [open, onClose]);
+
+  return (
+    <div className="relative shrink-0" ref={wrapRef}>
       <button
         type="button"
-        role="switch"
-        aria-checked={loc.is_active}
-        aria-label={`${fullLabel} bay ${loc.bay} ${loc.is_active ? "active" : "off"}`}
-        disabled={pendingId === loc.id}
-        onClick={() => onToggle(loc)}
-        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl disabled:opacity-60"
+        disabled={disabled}
+        onClick={onToggle}
+        aria-expanded={open}
+        aria-haspopup="menu"
+        aria-label={`Bay actions ${rowKey}`}
+        className="flex h-11 w-11 items-center justify-center rounded-xl text-zinc-300 transition active:scale-95 disabled:opacity-40"
       >
-        <span
-          className={`relative block h-6 w-10 rounded-full transition ${
-            loc.is_active ? "bg-accent" : "bg-zinc-600"
-          }`}
-        >
-          <span
-            className={`absolute top-0.5 h-5 w-5 rounded-full bg-white transition ${
-              loc.is_active ? "left-[1.15rem]" : "left-0.5"
-            }`}
-          />
-        </span>
+        <HubIcon id="moreVertical" className="h-5 w-5" />
       </button>
+      {open ? (
+        <div
+          role="menu"
+          className="glass-card absolute right-0 top-[calc(100%+0.25rem)] z-20 w-44 overflow-hidden p-1"
+        >
+          <button
+            type="button"
+            role="menuitem"
+            onClick={onEdit}
+            className="flex min-h-11 w-full items-center gap-2 rounded-xl px-3 text-sm font-semibold text-zinc-100 hover:bg-zinc-800/70"
+          >
+            <HubIcon id="edit" className="h-4 w-4" />
+            Edit
+          </button>
+          <button
+            type="button"
+            role="menuitem"
+            onClick={onDelete}
+            className={`flex min-h-11 w-full items-center gap-2 rounded-xl px-3 text-sm font-semibold ${
+              confirming
+                ? "bg-rose-600 text-white"
+                : "text-rose-200 hover:bg-rose-950/50"
+            }`}
+          >
+            <HubIcon id="trash" className="h-4 w-4" />
+            {confirming ? "Confirm delete" : "Delete"}
+          </button>
+        </div>
+      ) : null}
     </div>
   );
 }

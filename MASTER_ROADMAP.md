@@ -100,6 +100,7 @@
 - [x] Downstock queue + Store Map heatmap + supervisor weekly rollup
 - [x] Layout / nav / iconography polish — thumb-zone bottom tabs, compact hub-main, unified Lucide HubIcon (stroke 2), 44px Quick Touch / filter chips
 - [x] Theme engine — five dark tactical presets + high-contrast / compact density, CSS variables, Settings Appearance selector
+- [x] Phase 1 UX/UI consolidation — floating splash mark, department dropdown pill, Floor/Map/Stock/Settings workflow tabs, Store Map dual-pill + kebab rows
 
 ## Next
 - [x] Apply Phase 1 JWT/RLS migration in Supabase + enable Custom Access Token Hook

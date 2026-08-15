@@ -40,6 +40,16 @@ export function adminWorkingDepartmentLabel(
   return meta ? `${meta.shortLabel}` : dept;
 }
 
+/** Compact header pill — department code only. */
+export function adminWorkingDepartmentPillLabel(
+  dept: AdminWorkingDepartment
+): string {
+  if (dept === "all") return "All";
+  if (dept === "flooring") return "D23";
+  if (dept === "appliances") return "D35";
+  return DEPARTMENT_META[dept]?.shortLabel ?? dept;
+}
+
 export function readAdminWorkingDepartment(): AdminWorkingDepartment {
   if (typeof window === "undefined") return "all";
   try {

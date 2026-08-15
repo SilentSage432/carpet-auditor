@@ -25,11 +25,15 @@ import {
   LogOut,
   Map,
   MoreHorizontal,
+  MoreVertical,
   NotebookPen,
+  Package,
+  Pencil,
   RefreshCw,
   Settings,
   ShieldCheck,
   Smartphone,
+  Trash2,
   User,
   Users,
   Wifi,
@@ -55,7 +59,8 @@ export type NavIconId =
   | "more"
   | "home"
   | "barrier"
-  | "grid";
+  | "grid"
+  | "stock";
 
 export type HubIconId =
   | NavIconId
@@ -74,7 +79,10 @@ export type HubIconId =
   | "flagOff"
   | "crown"
   | "user"
-  | "logOut";
+  | "logOut"
+  | "moreVertical"
+  | "edit"
+  | "trash";
 
 const HUB_ICON_MAP: Record<HubIconId, LucideIcon> = {
   map: Map,
@@ -92,6 +100,10 @@ const HUB_ICON_MAP: Record<HubIconId, LucideIcon> = {
   home: LayoutGrid,
   barrier: Construction,
   grid: ClipboardList,
+  stock: Package,
+  moreVertical: MoreVertical,
+  edit: Pencil,
+  trash: Trash2,
   close: X,
   chevronUp: ChevronUp,
   chevronDown: ChevronDown,

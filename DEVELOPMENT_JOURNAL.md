@@ -1,5 +1,14 @@
 # DeptSync Hub — Development Journal
 
+## 2026-08-14 — Phase 1 DeptSync UX/UI consolidation
+
+### Shipped
+- **Splash** — `DeptSyncBadge` no longer sits in a hard dark tile. The shield/barcode mark floats on a soft `--glow-accent` radial. `DeptSyncSplash` + `app/loading.tsx` (and AuthWall / SessionGate / hub boot) use clean typography instead of a boxed logo.
+- **Department pill** — Master Admin horizontal context tabs are gone. `AdminDepartmentSwitcher` is a compact header dropdown (D23 / D35 / All). Other roles get a read-only department chip. Owner remains `lib/admin-department-context.ts`.
+- **Workflow bottom nav** (`lib/nav-hub.ts` + `BottomNav.tsx` + `HubHeader.tsx`) — one primary bar for every role: **Floor** (`/dashboard` + hub audits) · **Map** (`/admin/store-map`) · **Stock** (`/stock`) · **Settings** (`/settings`). Team / Alerts / Verify / Notes live in More. Inventory `BottomNavBar` no longer mounts on `/`.
+- **Stock** (`app/stock/page.tsx`) composes Zebra `lockedQueue="downstock"` + `RemnantSection`. Hub `?section=remnants|settings` redirects to `/stock` / `/settings`.
+- **Store Map rows** — Bay name + readiness on the left; compact Selling/Topstock dual-pill; Lucide MoreVertical menu (Edit / Trash). Super Admin mutates; supervisors/associates get a read heatmap (`canMutate`).
+
 ## 2026-08-14 — Theme engine & personalization
 
 ### Shipped

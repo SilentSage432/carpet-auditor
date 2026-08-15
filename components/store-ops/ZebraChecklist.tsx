@@ -51,28 +51,36 @@ import type { CarpetAudit, StoreSpecialist } from "@/lib/types";
 import { hapticPulse } from "@/utils/haptics";
 import { HubIcon } from "@/components/hub/NavIcons";
 
+type TypeFilter = StoreLocationType | "all";
+type AssociateFilter = "all" | "mine" | string;
+type QueueFilter = "all" | "downstock";
+
 export type ZebraChecklistProps = {
   specialist: StoreSpecialist;
   assignedWeek: string;
   rotations: WeeklyRotationWithLocation[];
   onRefresh: () => void;
+  /** Lock the queue to downstock (Stock tab). */
+  lockedQueue?: QueueFilter;
+  /** Hide pace / health chrome when composed into Stock. */
+  compact?: boolean;
 };
-
-type TypeFilter = StoreLocationType | "all";
-type AssociateFilter = "all" | "mine" | string;
-type QueueFilter = "all" | "downstock";
 
 export function ZebraChecklist({
   specialist,
   assignedWeek,
   rotations,
   onRefresh,
+  lockedQueue,
+  compact = false,
 }: ZebraChecklistProps) {
   const [error, setError] = useState<string | null>(null);
   const [doneOpen, setDoneOpen] = useState(false);
   const [typeFilter, setTypeFilter] = useState<TypeFilter>("all");
   const [associateFilter, setAssociateFilter] = useState<AssociateFilter>("all");
-  const [queueFilter, setQueueFilter] = useState<QueueFilter>("all");
+  const [queueFilter, setQueueFilter] = useState<QueueFilter>(
+    lockedQueue ?? "all"
+  );
   const [shiftHours, setShiftHours] = useState<Record<string, number>>({});
   const [shiftRoster, setShiftRoster] = useState<ShiftRosterMember[]>([]);
   const [assignments, setAssignments] = useState<SundayAssignmentMap>({});
@@ -425,46 +433,49 @@ export function ZebraChecklist({
 
   return (
     <div className="theme-density-stack space-y-2">
-      <div className="theme-accent-surface flex items-center gap-2 rounded-xl border px-3 py-2">
-        <div className="min-w-0 flex-1">
-          <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-accent">
-            This Week&apos;s Assigned Rotation
-          </p>
-          <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 font-mono text-sm font-bold text-slate-50">
-            <span>{assignedWeek || "No week assigned"}</span>
-            <span className="text-xs font-semibold text-slate-400">
-              {open.length} remaining · {done.length} complete
-              {partition.hasPersonalQueue
-                ? ` · ${partition.assignedToMe.length} yours`
-                : ""}
-              {Object.keys(downstock).length > 0
-                ? ` · ${Object.keys(downstock).length} downstock`
-                : ""}
-            </span>
+      {!compact ? (
+        <div className="theme-accent-surface flex items-center gap-2 rounded-xl border px-3 py-2">
+          <div className="min-w-0 flex-1">
+            <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-accent">
+              This Week&apos;s Assigned Rotation
+            </p>
+            <p className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 font-mono text-sm font-bold text-slate-50">
+              <span>{assignedWeek || "No week assigned"}</span>
+              <span className="text-xs font-semibold text-slate-400">
+                {open.length} remaining · {done.length} complete
+                {partition.hasPersonalQueue
+                  ? ` · ${partition.assignedToMe.length} yours`
+                  : ""}
+                {Object.keys(downstock).length > 0
+                  ? ` · ${Object.keys(downstock).length} downstock`
+                  : ""}
+              </span>
+            </p>
+          </div>
+          <p
+            className={`inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-1 font-mono text-[10px] font-bold uppercase tracking-wide ${
+              weeklyPace.tone === "ahead"
+                ? "border-success/50 bg-success/10 text-success"
+                : weeklyPace.tone === "behind"
+                  ? "border-danger/50 bg-danger/10 text-danger"
+                  : "border-warning/45 bg-warning/10 text-warning"
+            }`}
+            title={weeklyPace.label}
+          >
+            <HubIcon id="clock" className="h-3.5 w-3.5" />
+            {weeklyPace.tone === "ahead"
+              ? "Ahead"
+              : weeklyPace.tone === "behind"
+                ? "Behind"
+                : "On Track"}{" "}
+            · {weeklyPace.actual_pct}%
           </p>
         </div>
-        <p
-          className={`inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-1 font-mono text-[10px] font-bold uppercase tracking-wide ${
-            weeklyPace.tone === "ahead"
-              ? "border-success/50 bg-success/10 text-success"
-              : weeklyPace.tone === "behind"
-                ? "border-danger/50 bg-danger/10 text-danger"
-                : "border-warning/45 bg-warning/10 text-warning"
-          }`}
-          title={weeklyPace.label}
-        >
-          <HubIcon id="clock" className="h-3.5 w-3.5" />
-          {weeklyPace.tone === "ahead"
-            ? "Ahead"
-            : weeklyPace.tone === "behind"
-              ? "Behind"
-              : "On Track"}{" "}
-          · {weeklyPace.actual_pct}%
-        </p>
-      </div>
+      ) : null}
 
-      <BayHealthScorecard card={bayHealth} />
+      {!compact ? <BayHealthScorecard card={bayHealth} /> : null}
 
+      {!lockedQueue ? (
       <div
         role="tablist"
         aria-label="Zebra queue"
@@ -498,6 +509,7 @@ export function ZebraChecklist({
           {downstockOpen.length > 0 ? ` (${downstockOpen.length})` : ""}
         </button>
       </div>
+      ) : null}
 
       <AuditLocationModeToggle
         value={typeFilter}
