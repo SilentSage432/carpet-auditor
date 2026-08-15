@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { StoreLocationGrid } from "@/components/admin/StoreLocationGrid";
 import { openAdminTools } from "@/components/hub/admin-tools-events";
-import { HubIcon } from "@/components/hub/NavIcons";
+import { HubIcon, DepartmentIcon } from "@/components/hub/NavIcons";
 import { NavigationHub } from "@/components/hub/NavigationHub";
 import { SessionGate } from "@/components/hub/SessionGate";
 import { VisualBayScannerModal } from "@/components/store-ops/VisualBayScannerModal";
@@ -21,6 +21,10 @@ import {
   STORE_OPS_AUTH_HINT,
 } from "@/lib/store-ops/auth-soft";
 import { readableError } from "@/lib/store-ops/errors";
+import {
+  hubScopeFromDeptCode,
+  storeOpsDepartmentSortIndex,
+} from "@/lib/store-ops/department-codes";
 import type { Department, StoreLocation } from "@/lib/store-ops/types";
 import { isoWeekLabel } from "@/lib/store-ops/week";
 import type { StoreSpecialist } from "@/lib/types";
@@ -123,7 +127,13 @@ function StoreMapBody({
   }, [specialist, reload]);
 
   const departmentOverview = useMemo(() => {
-    return departments.map((dept) => {
+    return [...departments]
+      .sort(
+        (a, b) =>
+          storeOpsDepartmentSortIndex(a.code) -
+          storeOpsDepartmentSortIndex(b.code)
+      )
+      .map((dept) => {
       const rows = locations.filter((l) => l.department_id === dept.id);
       const active = rows.filter((l) => l.is_active).length;
       const pending = rows.filter(
@@ -137,13 +147,14 @@ function StoreMapBody({
         id: dept.id,
         name: dept.name,
         code: dept.code,
+        hubScope: hubScopeFromDeptCode(dept.code),
         isActive: dept.is_active !== false,
         total: rows.length,
         active,
         pending,
         assigned,
         aisles,
-        weeklyTarget: dept.weekly_bay_target ?? 10,
+        weeklyTarget: dept.weekly_bay_target ?? (dept.code === "D29" ? 6 : 10),
       };
     });
   }, [departments, locations]);
@@ -285,6 +296,11 @@ function StoreMapBody({
                         }`}
                       >
                         <div className="flex items-center justify-between gap-3">
+                        <div className="flex min-w-0 flex-1 items-center gap-2">
+                          <DepartmentIcon
+                            department={row.hubScope ?? "flooring"}
+                            className="h-4 w-4 shrink-0 text-accent"
+                          />
                           <div className="min-w-0 flex-1">
                             <p className="truncate font-semibold text-white">
                               {row.name}
@@ -294,6 +310,7 @@ function StoreMapBody({
                               {row.isActive ? "cron on" : "paused"}
                             </p>
                           </div>
+                        </div>
                           <div className="flex shrink-0 items-center gap-2">
                             <span className="glass-pill-cyan !rounded-lg px-2 py-1 font-mono text-[10px] !normal-case tracking-normal">
                               {row.aisles} aisle{row.aisles === 1 ? "" : "s"}

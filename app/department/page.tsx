@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { TaxonomyDrillDown } from "@/components/catalog/TaxonomyDrillDown";
+import { DepartmentIcon } from "@/components/hub/NavIcons";
 import { NavigationHub } from "@/components/hub/NavigationHub";
 import { SessionGate } from "@/components/hub/SessionGate";
 import { SupervisorAuditSummaryModal } from "@/components/store-ops/SupervisorAuditSummaryModal";
@@ -80,8 +81,12 @@ function DepartmentBody({
           <p className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-emerald-400">
             Department Overview
           </p>
-          <p className="mt-1 text-lg font-bold text-slate-50">
-            {meta.icon} {meta.label}
+          <p className="mt-1 flex items-center gap-2 text-lg font-bold text-slate-50">
+            <DepartmentIcon
+              department={dept === "all" ? "flooring" : dept}
+              className="h-5 w-5 text-accent"
+            />
+            {meta.label}
           </p>
           <p className="mt-1 text-sm text-slate-400">{meta.description}</p>
         </div>

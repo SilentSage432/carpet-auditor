@@ -7,6 +7,8 @@
 
 import {
   AlertTriangle,
+  Archive,
+  BrickWall,
   Building2,
   Camera,
   CheckSquare,
@@ -17,10 +19,16 @@ import {
   Clock,
   Construction,
   Crown,
+  DoorClosed,
+  Droplets,
   Flag,
   FlagOff,
+  Flower2,
+  Hammer,
   Hand,
+  Layers,
   LayoutGrid,
+  Lightbulb,
   Lock,
   LogOut,
   Map,
@@ -28,11 +36,13 @@ import {
   MoreVertical,
   NotebookPen,
   Package,
+  Paintbrush,
   Pencil,
   RefreshCw,
   Settings,
   ShieldCheck,
   Trash2,
+  Trees,
   User,
   Users,
   Wifi,
@@ -42,6 +52,10 @@ import {
   Zap,
   type LucideIcon,
 } from "lucide-react";
+import {
+  isDepartmentScope,
+  type DepartmentScope,
+} from "@/lib/types";
 
 export type NavIconId =
   | "map"
@@ -150,5 +164,40 @@ export function NavIcon({
 }) {
   return (
     <HubIcon id={id} className={className} strokeWidth={strokeWidth} />
+  );
+}
+
+const DEPARTMENT_LUCIDE: Record<DepartmentScope, LucideIcon> = {
+  flooring: Layers,
+  appliances: Zap,
+  plumbing: Droplets,
+  electrical: Lightbulb,
+  lawn_garden: Trees,
+  inside_garden: Flower2,
+  outside_garden: Trees,
+  paint: Paintbrush,
+  millwork: DoorClosed,
+  cabinets: Archive,
+  building_materials: BrickWall,
+  hardware: Hammer,
+  tools: Wrench,
+  all: Crown,
+};
+
+/** Lucide glyph for a hub department — cyan/gold via currentColor on the parent. */
+export function DepartmentIcon({
+  department,
+  className = "h-4 w-4",
+  strokeWidth = DEFAULT_STROKE,
+}: {
+  department: DepartmentScope | string | null | undefined;
+  className?: string;
+  strokeWidth?: number;
+}) {
+  const key =
+    department && isDepartmentScope(department) ? department : "flooring";
+  const Icon = DEPARTMENT_LUCIDE[key] ?? Layers;
+  return (
+    <Icon className={className} strokeWidth={strokeWidth} aria-hidden />
   );
 }

@@ -7,7 +7,8 @@
  */
 
 import { useMemo, useState } from "react";
-import { HubIcon } from "@/components/hub/NavIcons";
+import { DepartmentPicker } from "@/components/hub/DepartmentPicker";
+import { DepartmentIcon, HubIcon } from "@/components/hub/NavIcons";
 import { canManageTeamRoster, suggestUsername } from "@/lib/rbac";
 import {
   dedupeRoster,
@@ -18,8 +19,6 @@ import {
 import { inviteSupervisor } from "@/lib/store-ops/client";
 import { SHIFT_HOUR_PRESETS } from "@/lib/store-ops/weekly-rotations";
 import {
-  OPERATIONAL_DEPARTMENTS,
-  associateFloorTitle,
   associateFloorTitleLabel,
   departmentMeta,
   type DepartmentScope,
@@ -226,27 +225,18 @@ export function AssociateRosterPanel({
                     {!onDuty ? " · off duty" : ""}
                   </p>
                   {canManage ? (
-                    <select
+                    <DepartmentPicker
                       value={dept}
                       disabled={busyId === member.id}
-                      onChange={(e) =>
-                        void handleDept(
-                          member,
-                          e.target.value as DepartmentScope
-                        )
-                      }
-                      className="glass-input mt-1.5 h-9 w-full px-2 text-[11px]"
-                      aria-label={`${member.name} department`}
-                    >
-                      {OPERATIONAL_DEPARTMENTS.map((id) => (
-                        <option key={id} value={id}>
-                          {departmentMeta(id).shortLabel} ·{" "}
-                          {associateFloorTitle(id)}
-                        </option>
-                      ))}
-                    </select>
+                      onChange={(next) => void handleDept(member, next)}
+                      className="mt-1.5"
+                    />
                   ) : (
-                    <p className="mt-0.5 text-[11px] text-zinc-400">
+                    <p className="mt-0.5 flex items-center gap-1.5 text-[11px] text-zinc-400">
+                      <DepartmentIcon
+                        department={dept}
+                        className="h-3.5 w-3.5 text-accent"
+                      />
                       {departmentMeta(dept).shortLabel}
                     </p>
                   )}
@@ -298,18 +288,11 @@ export function AssociateRosterPanel({
             placeholder="Display name"
             className="glass-input min-h-11 w-full text-sm"
           />
-          <select
+          <DepartmentPicker
             value={department}
-            onChange={(e) => setDepartment(e.target.value as DepartmentScope)}
-            className="glass-input min-h-11 w-full text-sm"
-          >
-            {OPERATIONAL_DEPARTMENTS.map((id) => (
-              <option key={id} value={id}>
-                {departmentMeta(id).icon} {departmentMeta(id).shortLabel} —{" "}
-                {associateFloorTitle(id)}
-              </option>
-            ))}
-          </select>
+            onChange={setDepartment}
+            label="Department"
+          />
           <button
             type="submit"
             disabled={adding || !name.trim()}

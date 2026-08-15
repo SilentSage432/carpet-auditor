@@ -22,7 +22,9 @@ components/admin/DepartmentTargetsMatrix.tsx → Weekly bay quota table (auto-sa
 components/hub/WeeklyBayTargetCard.tsx → Re-export of DepartmentTargetsMatrix for Settings
 components/hub/admin-tools-events.ts → Admin Tools open event + payload types (light; drawer is dynamic)
 components/hub/ChunkErrorBoundary.tsx → Catch failed next/dynamic chunks + child render throws
-components/hub/NavIcons.tsx       → Canonical Lucide HubIcon / NavIcon (stroke 2, currentColor)
+components/hub/NavIcons.tsx       → Canonical Lucide HubIcon / NavIcon / DepartmentIcon (stroke 2, currentColor)
+components/hub/DepartmentPicker.tsx → Lucide department listbox (roster / admin selectors)
+lib/store-ops/realtime.ts         → postgres_changes bind-before-subscribe + unique channel instances
 app/globals.css                   → Theme tokens + glass / hub-main / chip-filter / btn-quick-touch
 components/hub/HapticsListener.tsx → Delegated vibrate pulses for taps / toggles / tabs
 components/hub/OfflineNetworkBanner.tsx → Offline toast + installSyncAutoFlush callbacks
@@ -32,7 +34,7 @@ components/hub/SuperAdminQuickActions.tsx → Bulk / Trigger Rotation / Manage S
 components/hub/SessionGate.tsx    → Auth gate for Store Ops route pages
 lib/nav-hub.ts                    → Role-aware Store Ops route menus + compact role badges + overflow/More
 lib/push/*                        → Web Push subscribe + VAPID dispatch for rotation alerts
-app/admin/store-map/page.tsx      → Super Admin aisle/bay bulk mapper + weekly generate
+app/admin/store-map/page.tsx      → Super Admin aisle/bay bulk mapper + Department Overview (Cabinets D29 target 6)
 app/admin/supervisors/page.tsx    → Supervisor & role management console
 components/store-ops/ZebraChecklist.tsx → Floor bay checklist (optimistic complete, Quick Touch, downstock, Sunday handoff)
 components/store-ops/BayHealthScorecard.tsx → Compact bay health badge (presentation)
@@ -98,7 +100,7 @@ lib/calc.ts                       → CLF + carton sq ft + remnant sq ft / sq yd
 lib/catalog.ts / remnants.ts / storage.ts / specialists.ts → Domain persistence
 lib/supabase.ts                   → Client factory
 lib/store-ops/*                   → Store Operations domain (rotations, bulk map, auth bridge)
-app/admin/store-map/page.tsx      → Super Admin aisle/bay bulk mapper + weekly generate
+app/admin/store-map/page.tsx      → Super Admin aisle/bay bulk mapper + Department Overview (Cabinets D29 target 6)
 app/dashboard/page.tsx            → Floor weekly bay checklist (associates: list first)
 app/api/rotations/*               → Generate + complete + verify; POST /api/rotations/exceptions mid-week barriers
 app/api/store-locations*          → List / patch / bulk location APIs (GET list is column-pruned for Store Map)

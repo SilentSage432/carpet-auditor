@@ -4,6 +4,7 @@
  */
 
 import { getSupabase } from "@/lib/supabase";
+import { subscribePostgresChanges } from "@/lib/store-ops/realtime";
 
 export type NoteActionPriority = "HIGH" | "MEDIUM" | "LOW";
 
@@ -248,28 +249,15 @@ export function subscribeManagerNotes(
   onChange: () => void,
   department?: string | null
 ): () => void {
-  const supabase = getSupabase();
-  if (!supabase) return () => undefined;
-
   const store = String(storeNumber ?? "").trim();
-  const channelName = `manager_notes:${store}:${department || "all"}`;
-  const channel = supabase
-    .channel(channelName)
-    .on(
-      "postgres_changes",
-      {
-        event: "*",
-        schema: "public",
-        table: "manager_notes",
-        filter: `store_number=eq.${store}`,
-      },
-      () => {
-        onChange();
-      }
-    )
-    .subscribe();
+  if (!store) return () => undefined;
 
-  return () => {
-    void supabase.removeChannel(channel);
-  };
+  return subscribePostgresChanges(
+    `manager_notes:${store}:${department || "all"}`,
+    {
+      table: "manager_notes",
+      filter: `store_number=eq.${store}`,
+    },
+    onChange
+  );
 }

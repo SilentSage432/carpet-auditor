@@ -7,7 +7,7 @@
  */
 
 import { useEffect, useId, useRef, useState } from "react";
-import { HubIcon } from "@/components/hub/NavIcons";
+import { DepartmentIcon, HubIcon } from "@/components/hub/NavIcons";
 import {
   ADMIN_DEPT_CONTEXT_EVENT,
   ADMIN_PINNABLE_DEPARTMENTS,
@@ -66,9 +66,13 @@ export function AdminDepartmentSwitcher({
     const scoped = departmentMeta(effectiveDepartment(specialist));
     return (
       <span
-        className="inline-flex h-9 max-w-[5.5rem] shrink-0 items-center rounded-full border border-zinc-700/80 bg-zinc-950/60 px-2.5 font-mono text-[10px] font-bold uppercase tracking-wide text-zinc-300"
+        className="inline-flex h-9 max-w-[6.25rem] shrink-0 items-center gap-1 rounded-full border border-zinc-700/80 bg-zinc-950/60 px-2.5 font-mono text-[10px] font-bold uppercase tracking-wide text-zinc-300"
         title={scoped.label}
       >
+        <DepartmentIcon
+          department={effectiveDepartment(specialist)}
+          className="h-3.5 w-3.5 shrink-0 text-accent"
+        />
         <span className="truncate">{scoped.shortLabel}</span>
       </span>
     );
@@ -99,8 +103,12 @@ export function AdminDepartmentSwitcher({
         aria-haspopup="listbox"
         aria-controls={menuId}
         aria-label={`Working department: ${label}`}
-        className="inline-flex h-9 max-w-[5.75rem] items-center gap-1 rounded-full border border-accent/40 bg-zinc-950/70 px-2.5 text-left backdrop-blur-sm transition active:scale-[0.98]"
+        className="inline-flex h-9 max-w-[6.5rem] items-center gap-1 rounded-full border border-accent/40 bg-zinc-950/70 px-2.5 text-left backdrop-blur-sm transition active:scale-[0.98]"
       >
+        <DepartmentIcon
+          department={dept}
+          className="h-3.5 w-3.5 shrink-0 text-accent"
+        />
         <span className="min-w-0 truncate font-mono text-[10px] font-bold uppercase tracking-wide text-accent">
           {pill}
         </span>
@@ -121,12 +129,18 @@ export function AdminDepartmentSwitcher({
                 <button
                   type="button"
                   onClick={() => pin(opt)}
-                  className={`flex min-h-11 w-full items-center rounded-xl px-3 text-left text-sm font-semibold ${
+                  className={`flex min-h-11 w-full items-center gap-2 rounded-xl px-3 text-left text-sm font-semibold ${
                     active
                       ? "theme-accent-surface text-accent-fg-soft"
                       : "text-zinc-200 hover:bg-zinc-800/60"
                   }`}
                 >
+                  <DepartmentIcon
+                    department={opt}
+                    className={`h-4 w-4 shrink-0 ${
+                      active ? "text-accent" : "text-cyan-300/80"
+                    }`}
+                  />
                   {adminWorkingDepartmentLabel(opt)}
                 </button>
               </li>

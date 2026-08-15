@@ -60,10 +60,13 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 - Assignments persist in `sunday_bay_assignments` (JWT store/dept RLS); `bay_id` = `weekly_rotations.id`; ISO week → `week_starting` Monday
 - Plan math: `lib/store-ops/weekly-rotations.ts` (does not generate rotations or persist)
 - Entry points: `/dashboard`, Cycle Audit tab, Admin Tools, `/flooring` deep link
-- ZebraChecklist live-handoff: `SUNDAY_AUDIT_EVENT` + Realtime; assigned specialist sees **Your Sunday bays first** without refresh; badges show name + shift hours; filter All / Mine / associate
+- ZebraChecklist live-handoff: `SUNDAY_AUDIT_EVENT` + Realtime via `lib/store-ops/realtime.ts` (bind `postgres_changes` before `subscribe()`, unique channel names, unsubscribe on unmount)
 
 ### Departments
 `flooring` (D23) · `appliances` (D35) · `plumbing` · `electrical` · `lawn_garden` · `paint` (D24P) · `millwork` (D30) · `cabinets` (D29) · `building_materials` · `hardware` · `tools` (D25) · `all`
+
+- Department glyphs: Lucide `DepartmentIcon` (no emoji). Roster / Admin pin / Store Map overview / department pickers.
+- Store Map Department Overview includes Cabinets (D29) with weekly target 6, cron toggle, and tag metrics. `ensureDepartmentsForStore` upserts on `(store_id, code)` so missing D29 rows are inserted.
 
 - Seeds: none auto-injected. Create Master / Supervisor profiles via invite / Add Supervisor; temporary PIN sets `must_change_credentials: true` until first-login change
 - First-login: non-dismissible AuthWall setup when `must_change_credentials` (no Remind Later)

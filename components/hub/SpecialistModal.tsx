@@ -10,11 +10,12 @@ import {
   roleBadge,
   saveSpecialist,
 } from "@/lib/specialists";
-import type { DepartmentScope, SpecialistRole, StoreSpecialist } from "@/lib/types";
-import {
-  DEPARTMENT_META,
-  OPERATIONAL_DEPARTMENTS,
-  associateFloorTitle,
+import { DepartmentPicker } from "@/components/hub/DepartmentPicker";
+import { DepartmentIcon, HubIcon } from "@/components/hub/NavIcons";
+import type {
+  DepartmentScope,
+  SpecialistRole,
+  StoreSpecialist,
 } from "@/lib/types";
 
 type Props = {
@@ -143,12 +144,18 @@ export function SpecialistModal({ open, active, onClose, onSelect }: Props) {
                             : "bg-zinc-950/70 hover:bg-zinc-800"
                         }`}
                       >
-                        <span className="min-w-0">
+                        <span className="flex min-w-0 items-center gap-2">
+                          <DepartmentIcon
+                            department={member.assigned_department}
+                            className="h-4 w-4 shrink-0 text-accent"
+                          />
+                          <span className="min-w-0">
                           <span className="block truncate font-semibold text-white">
                             {member.name}
                           </span>
                           <span className="mt-0.5 block text-xs text-zinc-400">
                             {roleBadge(member)}
+                          </span>
                           </span>
                         </span>
                         {selected ? (
@@ -178,48 +185,33 @@ export function SpecialistModal({ open, active, onClose, onSelect }: Props) {
                   <div className="grid grid-cols-3 gap-1 rounded-xl border border-zinc-800 bg-zinc-950 p-1">
                     {(
                       [
-                        ["Associate", "👤"],
-                        ["Supervisor", "🛡️"],
-                        ["MasterAdmin", "👑"],
+                        ["Associate", "user"],
+                        ["Supervisor", "shield"],
+                        ["MasterAdmin", "crown"],
                       ] as const
-                    ).map(([value, label]) => (
+                    ).map(([value, icon]) => (
                       <button
                         key={value}
                         type="button"
                         onClick={() => setNewRole(value)}
-                        className={`flex min-h-12 items-center justify-center rounded-lg text-xs font-semibold ${
+                        className={`flex min-h-12 items-center justify-center rounded-lg ${
                           newRole === value
                             ? "bg-accent text-accent-fg"
                             : "text-zinc-400"
                         }`}
+                        aria-label={value}
                       >
-                        {label}
+                        <HubIcon id={icon} className="h-4 w-4" />
                       </button>
                     ))}
                   </div>
                 </fieldset>
                 {(newRole === "Supervisor" || newRole === "Associate") && (
-                  <label className="block space-y-1.5">
-                    <span className="text-sm font-medium text-zinc-200">
-                      Department
-                    </span>
-                    <select
-                      value={newDepartment}
-                      onChange={(e) =>
-                        setNewDepartment(e.target.value as DepartmentScope)
-                      }
-                      className="min-h-12 w-full rounded-xl border border-zinc-800 bg-zinc-950 px-3 text-base text-zinc-100"
-                    >
-                      {OPERATIONAL_DEPARTMENTS.map((id) => {
-                        const meta = DEPARTMENT_META[id];
-                        return (
-                          <option key={id} value={id}>
-                            {meta.icon} {meta.label} — {associateFloorTitle(id)}
-                          </option>
-                        );
-                      })}
-                    </select>
-                  </label>
+                  <DepartmentPicker
+                    value={newDepartment}
+                    onChange={setNewDepartment}
+                    label="Department"
+                  />
                 )}
                 <TextField
                   label={

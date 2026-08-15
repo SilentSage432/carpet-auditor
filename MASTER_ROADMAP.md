@@ -105,6 +105,7 @@
 - [x] Slice 1 Intelligence Architecture Hardening — per-route `responseSchema` + token budgets; Store Ops auth + server-fetch compact-then-narrate on flooring/appliances/taxonomy; `ai-note-summary` 410 Gone
 - [x] Local-first shift briefing (no auto Gemini / silent 429 fallback) + Sunday in-place drawer (no 404 hop)
 - [x] Cabinets D29 first-class department + Specialist vs CSA associate roster wired into Sunday balancer
+- [x] Lucide department glyphs (roster / pickers / Store Map) + Realtime subscribe-before-on + Cabinets D29 on Store Map overview (target 6)
 
 ## Next
 - [x] Apply Phase 1 JWT/RLS migration in Supabase + enable Custom Access Token Hook

@@ -451,19 +451,19 @@ export function findSpecialistByLogin(
 }
 
 export function roleBadge(member: StoreSpecialist): string {
-  if (member.role === "MasterAdmin") return "👑 Master Admin";
+  if (member.role === "MasterAdmin") return "Master Admin";
   if (member.role === "Supervisor") {
     const dept = member.assigned_department;
     if (dept && dept !== "all") {
-      return `🛡️ ${departmentMeta(dept).label} Supervisor`;
+      return `${departmentMeta(dept).label} Supervisor`;
     }
-    return "🛡️ Department Supervisor";
+    return "Department Supervisor";
   }
   const dept = member.assigned_department;
   if (dept && dept !== "all") {
-    return `👤 ${associateFloorTitleLabel(dept)}`;
+    return associateFloorTitleLabel(dept);
   }
-  return "👤 Floor CSA";
+  return "Floor CSA";
 }
 
 export function getActiveSpecialist(): StoreSpecialist | null {

@@ -51,6 +51,11 @@ export function toStoreOpsDepartmentCode(
   return HUB_TO_CODE[hubOrCode] ?? hubOrCode;
 }
 
+export function storeOpsDepartmentSortIndex(code: string): number {
+  const i = (STORE_OPS_DEPARTMENT_CODES as readonly string[]).indexOf(code);
+  return i === -1 ? 999 : i;
+}
+
 export function hubScopeFromDeptCode(code: string): DepartmentScope | null {
   const reverse: Record<string, DepartmentScope> = {
     flooring: "flooring",

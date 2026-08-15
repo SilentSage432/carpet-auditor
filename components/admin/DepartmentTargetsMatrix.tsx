@@ -16,7 +16,12 @@ import { readableError } from "@/lib/store-ops/errors";
 import { resolveWeeklyBayTarget } from "@/lib/store-ops/week";
 import type { Department } from "@/lib/store-ops/types";
 import { isMasterAdmin } from "@/lib/rbac";
+import {
+  hubScopeFromDeptCode,
+  storeOpsDepartmentSortIndex,
+} from "@/lib/store-ops/department-codes";
 import type { StoreSpecialist } from "@/lib/types";
+import { DepartmentIcon } from "@/components/hub/NavIcons";
 
 type Props = {
   specialist: StoreSpecialist | null;
@@ -197,7 +202,13 @@ export function DepartmentTargetsMatrix({ specialist }: Props) {
               </tr>
             </thead>
             <tbody>
-              {departments.map((dept) => {
+              {[...departments]
+                .sort(
+                  (a, b) =>
+                    storeOpsDepartmentSortIndex(a.code) -
+                    storeOpsDepartmentSortIndex(b.code)
+                )
+                .map((dept) => {
                 const draft = drafts[dept.id] ?? String(DEFAULT_TARGET);
                 const current = resolveWeeklyBayTarget(dept.weekly_bay_target);
                 const dirty = Number(draft) !== current;
@@ -210,7 +221,11 @@ export function DepartmentTargetsMatrix({ specialist }: Props) {
                     }`}
                   >
                     <td className="px-2 py-1.5">
-                      <p className="truncate text-sm font-semibold text-zinc-100">
+                      <p className="flex items-center gap-1.5 truncate text-sm font-semibold text-zinc-100">
+                        <DepartmentIcon
+                          department={hubScopeFromDeptCode(dept.code)}
+                          className="h-4 w-4 shrink-0 text-accent"
+                        />
                         {dept.name}
                       </p>
                       <p className="font-mono text-[10px] text-zinc-500">

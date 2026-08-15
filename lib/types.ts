@@ -108,7 +108,6 @@ export function associateFloorTitle(
 
 export type DepartmentMeta = {
   id: DepartmentScope;
-  icon: string;
   label: string;
   shortLabel: string;
   description: string;
@@ -117,98 +116,84 @@ export type DepartmentMeta = {
 export const DEPARTMENT_META: Record<DepartmentScope, DepartmentMeta> = {
   flooring: {
     id: "flooring",
-    icon: "🧶",
     label: "Flooring / Home Decor",
     shortLabel: "Flooring",
     description: "Flooring & Home Decor (merged)",
   },
   appliances: {
     id: "appliances",
-    icon: "🔌",
     label: "Appliances",
     shortLabel: "Appliances",
     description: "Appliances Inventory",
   },
   plumbing: {
     id: "plumbing",
-    icon: "🚿",
     label: "Plumbing",
     shortLabel: "Plumbing",
     description: "Plumbing & Fixtures",
   },
   electrical: {
     id: "electrical",
-    icon: "💡",
     label: "Electrical",
     shortLabel: "Electrical",
     description: "Electrical & Lighting",
   },
   lawn_garden: {
     id: "lawn_garden",
-    icon: "🌿",
     label: "Lawn & Garden",
     shortLabel: "Lawn/Garden",
     description: "Legacy — prefer Inside / Outside Garden",
   },
   inside_garden: {
     id: "inside_garden",
-    icon: "🪴",
     label: "Inside Garden",
     shortLabel: "Inside Garden",
     description: "Inside Garden (D28I)",
   },
   outside_garden: {
     id: "outside_garden",
-    icon: "🌿",
     label: "Outside Garden",
     shortLabel: "Outside Garden",
     description: "Outside Garden (D28O)",
   },
   paint: {
     id: "paint",
-    icon: "🎨",
     label: "Paint",
     shortLabel: "Paint",
     description: "Paint (D24P)",
   },
   millwork: {
     id: "millwork",
-    icon: "🚪",
     label: "Millwork",
     shortLabel: "Millwork",
     description: "Millwork (D30)",
   },
   cabinets: {
     id: "cabinets",
-    icon: "🗄️",
     label: "Cabinets",
     shortLabel: "Cabinets",
     description: "Cabinets (D29)",
   },
   building_materials: {
     id: "building_materials",
-    icon: "🪵",
     label: "Building Materials",
     shortLabel: "Bldg Mat",
     description: "Lumber & Building Materials",
   },
   hardware: {
     id: "hardware",
-    icon: "🔧",
     label: "Hardware",
     shortLabel: "Hardware",
     description: "Legacy — prefer Tools (D25)",
   },
   tools: {
     id: "tools",
-    icon: "🛠️",
     label: "Tools",
     shortLabel: "Tools",
     description: "Tools (D25)",
   },
   all: {
     id: "all",
-    icon: "👑",
     label: "Full Store",
     shortLabel: "All Depts",
     description: "Master Admin — Full Store Access",

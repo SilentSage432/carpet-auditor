@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { TextField } from "@/components/ui/NumberField";
 import { ConfirmModal } from "@/components/hub/ConfirmModal";
+import { DepartmentPicker } from "@/components/hub/DepartmentPicker";
+import { DepartmentIcon, HubIcon } from "@/components/hub/NavIcons";
 import {
   canManageTeamRoster,
   suggestUsername,
@@ -16,9 +18,6 @@ import {
 } from "@/lib/specialists";
 import { inviteSupervisor } from "@/lib/store-ops/client";
 import {
-  DEPARTMENT_META,
-  OPERATIONAL_DEPARTMENTS,
-  associateFloorTitle,
   departmentMeta,
   type DepartmentScope,
   type SpecialistRole,
@@ -239,7 +238,7 @@ export function AdminRosterManager({
           const dept = member.assigned_department;
           const deptBadge =
             member.role === "MasterAdmin"
-              ? DEPARTMENT_META.all
+              ? departmentMeta("all")
               : departmentMeta(dept);
           return (
             <li
@@ -250,13 +249,28 @@ export function AdminRosterManager({
                 <p className="glass-title truncate text-sm">
                   {displayName(member)}
                 </p>
-                <p className="mt-1 font-mono text-[10px] font-bold uppercase tracking-wider text-amber-300/90">
-                  {roleBadge(member)}
-                </p>
-                <p className="mt-0.5 text-xs text-zinc-400">
-                  {deptBadge.label}
-                  {deptBadge.description ? ` · ${deptBadge.description}` : ""}
-                </p>
+                  <p className="mt-1 flex items-center gap-1.5 font-mono text-[10px] font-bold uppercase tracking-wider text-amber-300/90">
+                    {member.role === "MasterAdmin" ? (
+                      <HubIcon id="crown" className="h-3.5 w-3.5 text-accent" />
+                    ) : member.role === "Supervisor" ? (
+                      <HubIcon id="shield" className="h-3.5 w-3.5 text-accent" />
+                    ) : (
+                      <HubIcon id="user" className="h-3.5 w-3.5 text-accent" />
+                    )}
+                    {roleBadge(member)}
+                  </p>
+                  <p className="mt-0.5 flex items-center gap-1.5 text-xs text-zinc-400">
+                    <DepartmentIcon
+                      department={
+                        member.role === "MasterAdmin" ? "all" : dept
+                      }
+                      className="h-3.5 w-3.5 shrink-0 text-accent"
+                    />
+                    <span>
+                      {deptBadge.label}
+                      {deptBadge.description ? ` · ${deptBadge.description}` : ""}
+                    </span>
+                  </p>
                 <p className="mt-1 truncate font-mono text-[11px] text-zinc-500">
                   {member.username ? `@${member.username}` : "No username"}
                 </p>
@@ -745,21 +759,22 @@ function AdminAddMemberModal({
             <div className="space-y-1 rounded-xl border border-slate-800 bg-slate-950 p-1">
               {(
                 [
-                  ["Supervisor", "🛡️ Department Supervisor"],
-                  ["Associate", "👤 Specialist / CSA"],
-                  ["MasterAdmin", "👑 Master Admin"],
+                  ["Supervisor", "shield", "Department Supervisor"],
+                  ["Associate", "user", "Specialist / CSA"],
+                  ["MasterAdmin", "crown", "Master Admin"],
                 ] as const
-              ).map(([value, label]) => (
+              ).map(([value, icon, label]) => (
                 <button
                   key={value}
                   type="button"
                   onClick={() => setRole(value)}
-                  className={`flex min-h-11 w-full items-center rounded-lg px-3 text-left text-sm font-semibold ${
+                  className={`flex min-h-11 w-full items-center gap-2 rounded-lg px-3 text-left text-sm font-semibold ${
                     role === value
                       ? "bg-emerald-500 text-slate-950"
                       : "text-slate-300"
                   }`}
                 >
+                  <HubIcon id={icon} className="h-4 w-4 shrink-0" />
                   {label}
                 </button>
               ))}
@@ -767,27 +782,11 @@ function AdminAddMemberModal({
           </fieldset>
 
           {role !== "MasterAdmin" ? (
-            <label className="block space-y-1.5">
-              <span className="text-sm font-medium text-slate-200">
-                Assigned Department
-              </span>
-              <select
-                value={department}
-                onChange={(e) =>
-                  setDepartment(e.target.value as DepartmentScope)
-                }
-                className="min-h-12 w-full rounded-xl border border-slate-800 bg-slate-950 px-3 text-base text-slate-100"
-              >
-                {OPERATIONAL_DEPARTMENTS.map((id) => {
-                  const meta = DEPARTMENT_META[id];
-                  return (
-                    <option key={id} value={id}>
-                      {meta.icon} {meta.label} — {associateFloorTitle(id)}
-                    </option>
-                  );
-                })}
-              </select>
-            </label>
+            <DepartmentPicker
+              value={department === "all" ? "flooring" : department}
+              onChange={setDepartment}
+              label="Assigned Department"
+            />
           ) : null}
 
           <TextField
@@ -945,48 +944,33 @@ function AdminEditScopeModal({ open, member, onClose, onSaved }: EditProps) {
             <div className="grid grid-cols-3 gap-1 rounded-xl border border-slate-800 bg-slate-950 p-1">
               {(
                 [
-                  ["Associate", "👤"],
-                  ["Supervisor", "🛡️"],
-                  ["MasterAdmin", "👑"],
+                  ["Associate", "user"],
+                  ["Supervisor", "shield"],
+                  ["MasterAdmin", "crown"],
                 ] as const
-              ).map(([value, label]) => (
+              ).map(([value, icon]) => (
                 <button
                   key={value}
                   type="button"
                   onClick={() => setRole(value)}
-                  className={`flex min-h-11 items-center justify-center rounded-lg text-sm font-semibold ${
+                  className={`flex min-h-11 items-center justify-center rounded-lg ${
                     role === value
                       ? "bg-emerald-500 text-slate-950"
                       : "text-slate-400"
                   }`}
+                  aria-label={value}
                 >
-                  {label}
+                  <HubIcon id={icon} className="h-4 w-4" />
                 </button>
               ))}
             </div>
           </fieldset>
           {role !== "MasterAdmin" ? (
-            <label className="block space-y-1.5">
-              <span className="text-sm font-medium text-slate-200">
-                Department
-              </span>
-              <select
-                value={department === "all" ? "flooring" : department}
-                onChange={(e) =>
-                  setDepartment(e.target.value as DepartmentScope)
-                }
-                className="min-h-12 w-full rounded-xl border border-slate-800 bg-slate-950 px-3 text-base text-slate-100"
-              >
-                {OPERATIONAL_DEPARTMENTS.map((id) => {
-                  const meta = DEPARTMENT_META[id];
-                  return (
-                    <option key={id} value={id}>
-                      {meta.icon} {meta.label} — {associateFloorTitle(id)}
-                    </option>
-                  );
-                })}
-              </select>
-            </label>
+            <DepartmentPicker
+              value={department === "all" ? "flooring" : department}
+              onChange={setDepartment}
+              label="Department"
+            />
           ) : null}
         </div>
 

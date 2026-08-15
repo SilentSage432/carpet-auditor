@@ -5,6 +5,7 @@
 
 import { getSupabase } from "@/lib/supabase";
 import { getStoreNumber } from "@/lib/store";
+import { subscribePostgresChanges } from "@/lib/store-ops/realtime";
 import { createTtlCache } from "@/lib/store-ops/ttl-cache";
 import {
   formatLocationLabel,
@@ -323,8 +324,7 @@ export function subscribeSundayBayAssignments(
   onChange: () => void,
   department = SUNDAY_DEPARTMENT
 ): () => void {
-  const supabase = getSupabase();
-  if (!supabase || !storeNumber || !week) return () => undefined;
+  if (!storeNumber || !week) return () => undefined;
 
   let weekStarting: string;
   try {
@@ -333,26 +333,17 @@ export function subscribeSundayBayAssignments(
     return () => undefined;
   }
 
-  const channel = supabase
-    .channel(`sunday_bay:${storeNumber}:${department}:${weekStarting}`)
-    .on(
-      "postgres_changes",
-      {
-        event: "*",
-        schema: "public",
-        table: "sunday_bay_assignments",
-        filter: `store_number=eq.${storeNumber}`,
-      },
-      () => {
-        sundayAssignmentsCache.invalidate();
-        onChange();
-      }
-    )
-    .subscribe();
-
-  return () => {
-    void supabase.removeChannel(channel);
-  };
+  return subscribePostgresChanges(
+    `sunday_bay:${storeNumber}:${department}:${weekStarting}`,
+    {
+      table: "sunday_bay_assignments",
+      filter: `store_number=eq.${storeNumber}`,
+    },
+    () => {
+      sundayAssignmentsCache.invalidate();
+      onChange();
+    }
+  );
 }
 
 export function findFlooringDepartment(

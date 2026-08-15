@@ -1,5 +1,12 @@
 # DeptSync Hub — Development Journal
 
+## 2026-08-14 — Lucide department glyphs, Realtime subscribe order, Cabinets on Store Map
+
+### Shipped
+- **Department Lucide icons** — roster, department pickers, header pin, and Store Map overview use `DepartmentIcon` (Layers / Zap / Paintbrush / DoorClosed / Archive / Wrench / Trees / Droplets). Native `<option>` emoji removed; `DepartmentPicker` hosts SVGs. Role chips use HubIcon crown / shield / user.
+- **Realtime lifecycle** — `lib/store-ops/realtime.ts` binds `postgres_changes` before `subscribe()`, uses unique channel instance names, and unsubscribes on unmount so Zebra + Sunday drawer + Fast Refresh no longer hit “cannot add callbacks after subscribe()”.
+- **Cabinets on Store Map** — `ensureDepartmentsForStore` upserts on `(store_id, code)` so D29 is inserted for existing stores (weekly target 6). Department Overview lists Cabinets with toggle, target, and tag metrics.
+
 ## 2026-08-14 — Shift briefing, Cabinets D29, Specialist vs CSA roster
 
 ### Shipped

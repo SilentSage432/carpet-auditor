@@ -15,6 +15,7 @@ import {
 import { SimsLocationFinder } from "@/components/catalog/SimsLocationFinder";
 import { NumberField, TextField } from "@/components/ui/NumberField";
 import { AuditReportModal } from "@/components/hub/AuditReportModal";
+import { DepartmentIcon } from "@/components/hub/NavIcons";
 import { resolveScan, sanitizeBarcodeScan } from "@/lib/barcode";
 import { findCatalogBySkuOrBarcode } from "@/lib/catalog";
 import {
@@ -341,8 +342,12 @@ export function DepartmentAuditSection({
           aria-expanded={summaryExpanded}
           className="flex min-h-12 w-full items-center gap-2 px-3 py-2 text-left"
         >
-          <span className="min-w-0 flex-1 truncate font-mono text-xs font-semibold tabular-nums text-slate-200 sm:text-sm">
-            {meta.icon} {loaded ? displayShift.length : "—"} Logged
+          <span className="flex min-w-0 flex-1 items-center gap-2 truncate font-mono text-xs font-semibold tabular-nums text-slate-200 sm:text-sm">
+            <DepartmentIcon
+              department={department}
+              className="h-4 w-4 shrink-0 text-accent"
+            />
+            {loaded ? displayShift.length : "—"} Logged
             <span className="text-slate-500"> | </span>
             {loaded ? shiftUnits : "—"} Units today
           </span>
