@@ -2,8 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
+import Link from "next/link";
 import { StoreLocationGrid } from "@/components/admin/StoreLocationGrid";
-import { openAdminTools } from "@/components/hub/admin-tools-events";
 import { HubIcon, DepartmentIcon } from "@/components/hub/NavIcons";
 import { isMasterAdmin } from "@/lib/rbac";
 import {
@@ -198,13 +198,12 @@ export function MapTab({ specialist }: WorkflowTabProps) {
             <>
               Week {currentWeek}
               {" · "}
-              <button
-                type="button"
-                onClick={() => openAdminTools({ section: "bulk" })}
+              <Link
+                href="/settings#bulk-generate"
                 className="font-semibold text-amber-300 underline-offset-2 hover:underline"
               >
-                Bulk generate / Admin tools
-              </button>
+                Bulk generate in Settings
+              </Link>
             </>
           ) : (
             <>This week&apos;s bay map</>
@@ -290,7 +289,7 @@ export function MapTab({ specialist }: WorkflowTabProps) {
                 ) : departmentOverview.length === 0 ? (
                   <p className="rounded-2xl border border-dashed border-zinc-700 px-4 py-4 text-center text-sm text-zinc-400">
                     {master
-                      ? "No departments yet. Open Admin Tools → Bulk Generate after you add departments."
+                      ? "No departments yet. Open Settings → Bulk Generator after you add departments."
                       : "No departments on this map yet. Ask your supervisor to set them up."}
                   </p>
                 ) : (

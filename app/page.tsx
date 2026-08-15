@@ -21,9 +21,7 @@ import { fetchCatalog } from "@/lib/catalog";
 import { fetchRemnants } from "@/lib/remnants";
 import {
   canAccessSection,
-  defaultSectionForMember,
   effectiveDepartment,
-  isAssociate,
   isGenericDepartment,
   sectionTitle,
 } from "@/lib/rbac";
@@ -69,18 +67,6 @@ const ApplianceAuditSection = dynamic(
   () =>
     import("@/components/sections/ApplianceAuditSection").then(
       (m) => m.ApplianceAuditSection
-    ),
-  { ssr: false }
-);
-const RemnantSection = dynamic(
-  () =>
-    import("@/components/sections/RemnantSection").then((m) => m.RemnantSection),
-  { ssr: false }
-);
-const SettingsSection = dynamic(
-  () =>
-    import("@/components/sections/SettingsSection").then(
-      (m) => m.SettingsSection
     ),
   { ssr: false }
 );
@@ -174,7 +160,7 @@ export default function DeptSyncHubPage() {
     const session = readAuthSession();
     if (session) markWorkspaceUnlocked(session.sessionToken);
     if (fromQuery === "remnants") {
-      router.replace("/stock");
+      router.replace("/settings#remnants");
       return;
     }
     if (fromQuery === "settings") {
@@ -238,7 +224,7 @@ export default function DeptSyncHubPage() {
           )
         : null;
     if (fromQuery === "remnants") {
-      router.replace("/stock");
+      router.replace("/settings#remnants");
       return;
     }
     if (fromQuery === "settings") {
@@ -410,7 +396,7 @@ export default function DeptSyncHubPage() {
       next = "appliances";
     }
     if (next === "remnants") {
-      router.push("/stock");
+      router.push("/settings#remnants");
       return;
     }
     if (next === "settings") {
@@ -438,13 +424,8 @@ export default function DeptSyncHubPage() {
 
   const dept = effectiveDepartment(specialist);
   const authenticated = gate === "ready" && specialist != null;
-  const associateSession = isAssociate(specialist);
   const activeSection =
-    section === "catalog"
-      ? "appliances"
-      : associateSession && section === "settings"
-        ? defaultSectionForMember(specialist)
-        : section;
+    section === "catalog" ? "appliances" : section;
 
   useEffect(() => {
     if (gate !== "ready") return;
@@ -570,19 +551,6 @@ export default function DeptSyncHubPage() {
                   />
                 </HubPane>
               )}
-            {visitedSections.has("remnants") &&
-              canAccessSection(specialist, "remnants") && (
-                <HubPane show={activeSection === "remnants"}>
-                  <RemnantSection
-                    catalog={catalog}
-                    remnants={remnants}
-                    onRemnantsChange={setRemnants}
-                    loggedBy={specialist?.name ?? ""}
-                    specialists={specialists}
-                    activeSpecialist={specialist}
-                  />
-                </HubPane>
-              )}
             {visitedSections.has("appliances") &&
               canAccessSection(specialist, "appliances") && (
                 <HubPane show={activeSection === "appliances"}>
@@ -606,23 +574,6 @@ export default function DeptSyncHubPage() {
                     auditedBy={specialist?.name ?? ""}
                     activeSpecialist={specialist}
                     scannerEnabled={activeSection === "department"}
-                  />
-                </HubPane>
-              )}
-            {!associateSession &&
-              visitedSections.has("settings") &&
-              canAccessSection(specialist, "settings") && (
-                <HubPane show={activeSection === "settings"}>
-                  <SettingsSection
-                    catalogCount={catalog.length}
-                    remnantCount={remnants.length}
-                    activeSpecialist={specialist}
-                    specialists={specialists}
-                    onSpecialistUpdated={handleSpecialistUpdated}
-                    onRosterChange={(roster) => setSpecialists(dedupeRoster(roster))}
-                    onOpenChangePin={() => setChangePinOpen(true)}
-                    storeNumber={storeNumber}
-                    onStoreNumberChange={setStoreNumberState}
                   />
                 </HubPane>
               )}

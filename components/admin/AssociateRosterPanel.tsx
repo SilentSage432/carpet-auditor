@@ -1,9 +1,9 @@
 "use client";
 
 /**
- * Lightweight Associate Roster — presentation for Settings / Admin Tools / Sunday drawer.
+ * Lightweight Associate Roster — presentation for Sunday drawer.
  * Knowledge stays in lib/specialists.ts. Floor titles (Specialist vs CSA) come from
- * department taxonomy in lib/types.ts. Does not issue PINs (AdminRosterManager owns that).
+ * department taxonomy in lib/types.ts. PINs are issued on the Roster tab.
  */
 
 import { useMemo, useState } from "react";

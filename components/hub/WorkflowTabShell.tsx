@@ -3,7 +3,7 @@
 /**
  * Keep-alive shell for Floor / Map / Roster / Settings.
  * Primary tabs mount immediately so switches only toggle `hidden` (0ms).
- * URL still updates via BottomNav Links. Stock stays overflow keep-alive.
+ * URL still updates via BottomNav Links.
  */
 
 import dynamic from "next/dynamic";
@@ -39,10 +39,6 @@ const RosterTab = dynamic(
 const SettingsTab = dynamic(
   () =>
     import("@/components/hub/tabs/SettingsTab").then((mod) => mod.SettingsTab),
-  { ssr: false }
-);
-const StockTab = dynamic(
-  () => import("@/components/hub/tabs/StockTab").then((mod) => mod.StockTab),
   { ssr: false }
 );
 
@@ -131,7 +127,6 @@ export function WorkflowTabShell(props: WorkflowTabProps) {
         storeNumber={storeNumber}
         onLogout={props.logout}
         onChangePin={() => setChangePinOpen(true)}
-        onStoreNumberChange={tabProps.onStoreNumberChange}
       />
       <ChangePinModal
         key={changePinOpen ? `pin-${member.id}` : "pin-closed"}
@@ -156,11 +151,6 @@ export function WorkflowTabShell(props: WorkflowTabProps) {
       {visited.has("/settings") ? (
         <KeepAlivePanel active={active === "/settings"}>
           <SettingsTab {...tabProps} />
-        </KeepAlivePanel>
-      ) : null}
-      {visited.has("/stock") ? (
-        <KeepAlivePanel active={active === "/stock"}>
-          <StockTab {...tabProps} />
         </KeepAlivePanel>
       ) : null}
     </div>

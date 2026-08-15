@@ -7,15 +7,16 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 - App: **DeptSync Hub** · PWA short_name **DeptSync**
 - Manifest name: `DeptSync — Department & SIMS Audit Hub`
 - Layout title: `DeptSync Hub · Department & SIMS Audit` · appleWebApp title `DeptSync`
-- Header: brand `DeptSync` · store · section title · **department dropdown pill** · network/account
+- Header: brand `DeptSync` · store # · section title · **department dropdown pill** · account/PIN
+- **Typography:** Geist (`--font-geist-sans` → `font-sans`) + Geist Mono (`--font-geist-mono` → `font-mono`). Bay tags (`formatBayTag`, e.g. `A14-B06`), SKUs, cadence badges, and timestamps use `font-mono tracking-tight`.
 - Header badge: `DeptSyncBadge` (floating layers + barcode; boot/PWA uses `branded` cyan/gold so theme FOUC cannot flash emerald)
 - Icons: `public/icons/icon-192.png`, `icon-512.png`, `apple-touch-icon.png`, `mark.svg` (cyan/gold floating mark, no enclosed shield)
 - PWA manifest: `app/manifest.ts` → `/manifest.webmanifest`; static `public/manifest.json` → `/manifest.json` (TWA / Bubblewrap)
 - **Native shell:** haptics via `utils/haptics.ts` + `HapticsListener`; offline toast `OfflineNetworkBanner` + `ConflictResolutionModal`; sync auto-flush on online/visibility/focus; PWA/TWA splash theme `#090d16`; `app/loading.tsx` + `DeptSyncSplash` (pinned midnight + branded mark)
 - **Theme engine:** `lib/theme.ts` owns presets + prefs (`deptsync_theme_prefs`). `data-theme` on `<html>`: `midnight` (default, ice-blue) · `emerald` · `amber` · `obsidian` · `cobalt`. Toggles: `data-contrast=high`, `data-density=compact`. Settings **Appearance** card applies instantly. CSS tokens in `app/globals.css`; glass utilities / nav / primary buttons bind to `--accent`, `--background`, `--border`, `--glow-accent`.
 - **Obsidian-glass UI:** utilities in `app/globals.css` (`.glass-card`, `.glass-panel`, `.theme-accent-surface`, `.theme-nav-active`, `.theme-modal`, `.btn-primary-glow`, `.btn-quick-touch`, `.chip-filter`, `.hub-main`). Canonical Lucide SVG set (`HubIcon` / `NavIcon`, stroke 2, `currentColor`).
-- **Handheld chrome:** sticky header `pt-safe` + compact `min-h-12`; workflow bottom tabs `min-h-16` in the thumb zone (Floor · Map · Roster · Settings); Store Ops pages use `.hub-main` so bays / badges / timers clear the fold.
-- **Keep-alive tabs:** Floor / Map / Roster / Settings mount in `WorkflowTabShell` (`app/(workflow)/layout.tsx`) so switches are `hidden` only (0ms). Stock stays overflow keep-alive. Departments / map / roster use 45s stale-while-revalidate. Realtime channels are refcounted per logical name.
+- **Handheld chrome:** sticky header `pt-safe` + compact `min-h-12`; **exactly four** workflow tabs `min-h-16` (Floor · Map · Roster · Settings). No hamburger, More sheet, or Admin Tools drawer. Store Ops pages use `.hub-main` so bays / badges / timers clear the fold.
+- **Keep-alive tabs:** Floor / Map / Roster / Settings mount in `WorkflowTabShell` (`app/(workflow)/layout.tsx`) so switches are `hidden` only (0ms). Departments / map / roster use 45s stale-while-revalidate. Realtime channels are refcounted per logical name.
 - **IRP velocity heatmap:** Map toggle `[ Standard Map | Velocity Heatmap ]`. Standard = rotation readiness (`map-readiness.ts`). Heatmap = `last_serviced_at` cadence + `velocity_tier` pulse (`lib/store-ops/velocity.ts`). Tap bay → 2-second walk log (`bay_service_logs` via `POST /api/store-locations/service`). Sunday generate prioritizes high/critical + `priority_override` (`lib/store-ops/rotation.ts` composed into `rotations.ts`). Apply `20260814_bay_velocity_heatmap.sql`.
 - **Multi-department access:** `accessible_departments` on roster + profiles. Header switcher when more than one granted dept. Supervisors grant extras from the **Roster** tab chips. Apply `20260814_multi_department_access.sql`.
 
@@ -31,7 +32,7 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 - **Zebra Shift Briefing:** On-load uses `buildLocalShiftBriefing` from `GET /api/store-health` only (no Gemini). Manual refresh may POST `/api/store-health/ai-summary`; 429/quota/RPC errors fall back silently to the local brief. Raw GoogleGenerativeAI JSON is never shown.
 - **Audit Velocity Chart:** `lib/store-ops/telemetry.ts` + `StoreHealthChart` on `/dashboard` (06:00–22:00 curve vs linear target; Overall / D23 / D35 pills)
 - **Appliance Anomaly Detection:** `POST /api/appliances/ai-anomaly` (Store Ops JWT) — server-fetches scans/catalog, local heuristics first, Gemini narrates the packet
-- **Catalog Taxonomies:** `lib/catalog/taxonomies.ts` + `POST /api/catalog/ai-taxonomy` (supervisor/admin JWT) + Admin Tools `TaxonomyManagerModal`; known-folder packet + registry merge
+- **Catalog Taxonomies:** `lib/catalog/taxonomies.ts` + `POST /api/catalog/ai-taxonomy` (supervisor/admin JWT) + Settings `TaxonomyManagerModal`; known-folder packet + registry merge
 - **AI Visual Bay Scan:** `POST /api/store-ops/ai-bay-scan` + `lib/store-ops/ai-bay-scan.ts` + `VisualBayScannerModal` — 720p JPEG q=0.70 / 960px; route cap ~1.5MB; `responseSchema` + 512 output tokens
 - **Executive Floor Pad:** Server Action `extractTasksAndTag` is canonical Copilot (`lib/store-ops/ai-note-extract.ts`, 8k plain text, 2048 tokens). `POST /api/store-ops/ai-note-summary` returns **410 Gone** (unbounded 8MB canvas synthesis retired).
 
@@ -45,26 +46,25 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 ### Master Admin roster console
 - Canonical team UI is the **Roster** tab (`/roster`, `RosterTab`) — name, role (Supervisor / Specialist / CSA), home department, and `accessible_departments` chips with optimistic save + Sonner toast
 - `/admin/supervisors` and `/admin/roles` redirect to `/roster`
-- Full credential invite/reset still lives in `AdminRosterManager` (compose from Roster / Admin Tools if needed)
-- Lightweight **Associate Roster** (`AssociateRosterPanel`): Admin Tools nested section + Sunday drawer
+- Invite/reset lives on `/invite` + Roster add-member; dead `AdminRosterManager` was removed
+- Lightweight **Associate Roster** (`AssociateRosterPanel`) remains on the Sunday assignment drawer
 - Floor titles: specialty (Flooring / Appliances / Millwork / Cabinets) → **Specialist**; core (Paint / Plumbing / Garden / Building Materials / Tools / Electrical) → **CSA**
 - Sunday Shift Balancer allocates weekly bay quotas to on-duty Specialists/CSAs by 4h / 6h / 8h (`planProportionalBayAssignments`)
 
-### Admin Tools (Super Admin only)
-- Slide-over drawer defaults **closed** — header **Admin** chip, hamburger entry, or `openAdminTools()`
-- Hosted after first open (`adminHosted`) so the lazy chunk does not remount; `ChunkErrorBoundary` + loading-shell retry if the chunk fails
-- Floor Pad / TipTap is a nested dynamic import — opening Admin Tools does not evaluate TipTap
-- Owns a 2-column categorized grid: **Floor Architecture** (Bulk Generate, Store Map, Taxonomies) · **Rotations & Quotas** (Sunday assign, Trigger Rotation, Department Targets, Exception Log) · **System & Security** (Team Roster → `/roster`, Store Config, Diagnostics, Floor Pad)
-- Department targets: compact matrix (`DepartmentTargetsMatrix`) — save on blur / toggle, or **Save All Targets**
-- Department Supervisors never see Admin Tools chrome
-- Master Admin header: **My Department Context** pin (Full Store / D23 Flooring / D35 Appliances / …) — filters dashboard Flooring focus without dropping Master privileges
+### Settings tools (Master Admin / Supervisor)
+- Former Admin Tools live in **Settings** (`SettingsSection`) as accordions and modals — not a second menu
+- Master: store number, Bulk Generator (`#bulk-generate`), Taxonomies (`#taxonomies`), Force Rotation (`#weekly-rotation`)
+- Supervisor + Master: weekly targets matrix, Executive Floor Pad (`#manager-notes`)
+- Remnant inventory (`#remnants`) when RBAC allows; Device & sync for every role
+- Department Supervisors never see Master-only setup controls
+- Master Admin header: **My Department Context** pin (Full Store / D23 Flooring / D35 Appliances / …) — filters Floor without dropping Master privileges
 
 ### Sunday Flooring Cycle Audit
 - Staging card + assignment modal: open weekly Flooring bays → assign from on-duty roster; Auto-Assign All to Me; Stage/Draw 12; **Shift balancer** (hours / start–end → proportional clustered zones)
 - Tap opens the drawer **in-place** (`requestSundayAuditDrawer`). `/flooring`, `/sunday-audit`, and `/sunday-rotation` redirect to `/dashboard` with the drawer — they do not 404
 - Assignments persist in `sunday_bay_assignments` (JWT store/dept RLS); `bay_id` = `weekly_rotations.id`; ISO week → `week_starting` Monday
 - Plan math: `lib/store-ops/weekly-rotations.ts` (does not generate rotations or persist)
-- Entry points: `/dashboard`, Cycle Audit tab, Admin Tools, `/flooring` deep link
+- Entry points: Floor tab, Cycle Audit scan, `/flooring` deep link, `#sunday-audit`
 - ZebraChecklist live-handoff: `SUNDAY_AUDIT_EVENT` + Realtime via `lib/store-ops/realtime.ts` (bind `postgres_changes` before `subscribe()`, unique channel names, unsubscribe on unmount)
 
 ### Departments
@@ -91,15 +91,15 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 - Biometric: WebAuthn; requires an existing Store Ops Auth session (otherwise PIN once after fingerprint)
 - `must_change_credentials` → non-dismissible permanent credential setup
 - Session: `deptsync_auth_session` (hub UI) + Supabase Auth localStorage (API Bearer); 8h idle lock on hub session
-- **P0 boot:** `/` fetches roster only before AuthWall; catalog/remnants/appliance catalog after unlock per section; hub sections + Admin Tools + Snap Bay / SIMS / Audit Report are `next/dynamic`
+- **P0 boot:** `/` fetches roster only before AuthWall; catalog/remnants/appliance catalog after unlock per section; specialty scans + Snap Bay / SIMS / Audit Report / Settings tools are `next/dynamic`
 - **P0 indexes:** re-run `supabase/migrations/20260813_p0_query_indexes.sql` — hub tables use `store_number`; Store Ops locations/rotations use `store_id`; manager_notes Phase 2 uses `store_number`+`department` (legacy `store_id`+`department_code`). Script skips absent columns.
 - **P1 Gemini/map:** Snap Bay 720p + compressed JPEG; Floor Pad Copilot strips HTML / 8k cap; `GET /api/store-locations` explicit Store Map columns (no `SELECT *`); Slice 1 `responseSchema` + per-route token budgets
-- **P2 hub UI:** `startTransition` + keep-alive hub panes (`hidden`); Cycle/Appliance scan forms isolated from logs; 300ms debounced draft saves with flush on submit/leave; weekly rotations + Sunday assignments TTL-cached 45s
-- **Admin Tools:** chrome `requestAdminTools` sets `adminOpen` + `adminHosted`; `dynamic(() => import(AdminToolsDrawer))` uses the **default** export (avoid `{ default: mod.Named }` — React #306); loading shell handles chunk errors; `ChunkErrorBoundary`; Floor Pad/TipTap nested `dynamic` via named `mod.ManagerNotesWorkspace`; SW cache `deptsync-shell-v5-brand-floor`
+- **P2 hub UI:** `startTransition` + keep-alive Floor/Map/Roster/Settings (`hidden`); Cycle/Appliance scan forms isolated from logs; 300ms debounced draft saves with flush on submit/leave; weekly rotations + Sunday assignments TTL-cached 45s
+- **Settings tools:** Bulk / Taxonomies / Force Rotation / Floor Pad are `next/dynamic` inside `SettingsSection`; SW cache `deptsync-shell-v5-brand-floor`
 - **Bulk bays:** Odd Only / Even Only (`lib/store-ops/bay-pattern.ts`, default odd); Store Map GET falls back if `last_completed_at` is missing/null
 - Seeds: no hardcoded roster injection — use Invite / Add Supervisor; temp PIN sets `must_change_credentials`
-- Primary: fixed bottom workflow tabs — **Floor · Map · Roster · Settings** (Stock / Notes / Verify overflow in More)
-- Header: DeptSync brand + store subtitle · section title · department dropdown pill · network; specialist chip + PIN gear
+- Primary: fixed bottom workflow tabs — **Floor · Map · Roster · Settings** only
+- Header: DeptSync brand + store # · section title · department dropdown pill · account/PIN chip
 - Cycle Audit / Appliances: hardware-scan ready without soft keyboard; sticky Log docked above bottom nav
 
 ## Store Ops auth transport
@@ -117,7 +117,7 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 - Focused SKU fields still support Enter **or** rapid burst via NumberField
 - Quick-Add modal for unlinked barcodes
 - Catalog folders (`lib/catalog-folders.ts`); domain-filtered for department supervisors
-- Department taxonomies (`lib/catalog/taxonomies.ts`) for generic dept folder drill-down; AI seed via Admin Tools
+- Department taxonomies (`lib/catalog/taxonomies.ts`) for generic dept folder drill-down; AI seed via Settings
 
 ## Dual audit engine
 - Mode A (Carpet / Sheet Vinyl): CLF; Mode B: cartons × sqft/box
@@ -155,18 +155,14 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
   - `departments`, `profiles` (auth.users + `super_admin` / `department_supervisor`), `store_locations` (SELLING/TOPSTOCK + cycle status), `weekly_rotations`
   - RLS: super_admin all; supervisors read/update own `assigned_department_id`
 - Hub bridge: Master Admin → super_admin; Supervisor → department_supervisor (via `departments.code` = hub `assigned_department`)
-- **Navigation Hub** (`lib/nav-hub.ts` + `HubHeader.tsx` + `BottomNav.tsx` + `NavigationHub.tsx`): department dropdown pill in the header; primary workflow tabs Floor · Map · Stock · Settings (Lucide SVG; overflow in More)
-  - All roles primary: Floor (`/dashboard`) · Map (`/admin/store-map`) · Roster (`/roster`) · Settings (`/settings`)
-  - Super Admin More: Stock · Alerts · Notes
-  - Supervisor More: Stock · Verify · Dept · Notes
-  - Associate More: Stock · Barriers · Scan & Audit (`/?section=` specialty)
-  - Authenticated `/` without specialty `?section=` replaces to `/dashboard`. Hub `/?section=audit|appliances|department` is scan tools only (Floor tab stays off). Remnants/settings deep links redirect to `/stock` / `/settings`
-- Quick Actions banner (Super Admin): Bulk Generate · Trigger Weekly Rotation · Manage Supervisors
-- `/manager-notes` — Executive Floor Pad (TipTap rich notes + Gemini Copilot Extract Tasks & Tag + archive); also Admin Tools entry + `#manager-notes`
-- `/dashboard` — **this week’s bays** (`ZebraChecklist`) first for associates. Supervisors/Master still see Sunday staging, shift briefing, health, and the **exception feed** above the list. Completions refresh silently. Supervisor **Weekly audit rollup** modal. Floor scan chips deep-link to hub Cycle / Appliances.
-- `/stock` — overflow **Downstock queue** (Zebra compact/locked) + **Remnant inventory** (when RBAC allows remnants)
+- **Navigation Hub** (`lib/nav-hub.ts` + `HubHeader.tsx` + `BottomNav.tsx` + `NavigationHub.tsx`): header is title/store # · department pill · account/PIN; primary tabs **Floor · Map · Roster · Settings** for every role (no More overflow)
+  - Floor (`/dashboard`) · Map (`/admin/store-map`) · Roster (`/roster`) · Settings (`/settings`)
+  - Authenticated `/` without specialty `?section=` replaces to `/dashboard`. Hub `/?section=audit|appliances|department` is scan tools only. Remnants deep-link to `/settings#remnants`
+- `/manager-notes` redirects to `/settings#manager-notes` (Floor Pad modal in Settings)
+- `/dashboard` — one Floor layout for all roles: Sunday staging (non-associates), scan chips, health/rollup, showroom, **Verify completed bays**, `ZebraChecklist` (Rotation / Downstock + Barrier chips), `ExceptionFeed`
+- `/stock` redirects to `/dashboard` (Downstock is a Zebra tab on Floor)
 - `/roster` — unified team list, PIN add, and department access chips (optimistic + toast)
-- `/admin/store-map` — department overview + location grid with **Standard Map | Velocity Heatmap** toggle; Standard = rotation readiness; Heatmap = IRP cadence (`last_serviced_at`) + hotspot pulse; tap bay → unified sheet (Section A walk log `light_touch` / `heavy_packdown` / `critical_hole` + Section B edit aisle/bay/department/priority/delete); **+ Add Bay to Aisle**; bay rows: name + status left, Selling/Topstock dual-pill, MoreVertical; **duplicate bay prune** (hard-delete extras, Super Admin); Bulk Add accordion (Master); Trigger Weekly Rotation modal (**Force Draw New Rotation**); **📷 Snap Bay AI Audit** (Gemini visual scan) on page + bay actions sheet. Supervisors/associates may view their department map (`canMutate` false) and still log walks.
+- `/admin/store-map` — department overview + location grid with **Standard Map | Velocity Heatmap** toggle; tap bay → **one** `WalkTheFloorSheet` (walk log + Snap Bay + Master Admin edit/pin); **+ Add Bay to Aisle**; Bulk generate lives in Settings `#bulk-generate`. Supervisors/associates may view their department map and still log walks.
 - Sunday staging card opens the assignment modal with **Shift balancer** (hours → proportional clustered zones). Plan owner: `lib/store-ops/weekly-rotations.ts`; persist: `sunday-audit.ts`.
 - `GET /api/store-health` — weekly pace + bottleneck aggregation + compact `bay_health` for DS / Super Admin
 - `POST /api/store-ops/ai-bay-scan` — multimodal bay photo → carton/pallet estimates, cleanliness score, detected issues (Store Ops actor)
@@ -192,12 +188,12 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 - Migration: `supabase/migrations/20260809_weekly_rotation_cron.sql` (`weekly_bay_target`, Lowe's codes)
 - `vercel.json`: Sunday `59 23 * * 0` → `/api/cron/weekly-rotation`
 - Env on Vercel: `CRON_SECRET` (Bearer token Vercel sends automatically)
-- Settings → Weekly bay target matrix for supervisors (Master: all-dept targets in Admin Tools; blur autosave + Save All)
+- Settings → Weekly bay target matrix (Supervisor + Master; blur autosave + Save All)
 
 ## End-of-week verification
 - Migration: `supabase/migrations/20260809_rotation_verification.sql`
-- `/verify-rotation` — **Verify All Completed Bays** (sign off without completing remaining open) + Report Incomplete with one-tap chips (Blocked Bay / Unpalletized Top-Stock / Missing SIMS Tags)
-- `/admin/exceptions` — Master Admin tabs: Pending / Verified / Barriers / All; batch **Verify All Completed Bays** for depts with 0 open; barrier rows show SELLING/TOPSTOCK
+- Floor tab **Verify completed bays** signs off completed work without completing remaining open bays (`verifyAllCompletedBays`)
+- `/verify-rotation` and `/admin/exceptions` redirect to `/dashboard`; the Floor `ExceptionFeed` is the live barrier list
 - Mid-week floor barriers: `POST /api/rotations/exceptions` (does **not** stamp `last_verified_week`) — Zebra row **Barrier** → tap reason
 - APIs: `POST /api/rotations/verify`, `GET|POST /api/rotations/exceptions`
 
@@ -208,16 +204,16 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 
 ## Store number (dynamic)
 - Owner: `lib/store.ts` — localStorage `carpet_hub_store_number`; **no hardcoded `1234`/`1852`**
-- Blank allowed; Master edits via **Admin Tools → Store Number** (session stays active)
+- Blank allowed; Master edits via **Settings → Store number** (session stays active)
 - Session / active specialist / biometric only reject when both sides have different store numbers
 - Login adopts `store_profiles` / specialist `store_number` when device store is unset
 - Store-ops APIs require a live Supabase Auth session linked to `profiles` (Hub PIN bridge or phone OTP → `linkAuthUserToSpecialistProfile`); store scope from JWT claims, not client headers
 
 ## Mobile floor UX (Waves A–C)
-- Floor job first: Dashboard = pace + checklist; no permanent Super Admin quick-action strip
-- Admin Tools drawer (Master only, defaults closed; `openAdminTools` event + hosted dynamic chunk after first open)
+- Floor job first: Dashboard = pace + checklist; no Super Admin quick-action strip, hamburger, or Admin Tools drawer
+- Master setup tools live in Settings accordions/modals
 - Dense bay/rotation rows; completed lists collapsed by default
-- Catalog/Remnant forms = bottom sheets; `/department` does not embed auditors
+- Remnant forms live in Settings; `/department` redirects to Floor
 
 ## Supervisor Invite & Onboarding
 - Apply migration: `supabase/migrations/20260810_supervisor_invite.sql`
@@ -228,15 +224,15 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 - **Test Invite Flow** (roster): dry-run `test_mode` → modal with PIN + welcome SMS + Copy Invite Link / Copy Full SMS Text; `/invite?test=1` preserves token after PIN reset
 
 ## Associate floor role
-- Store Ops actor `associate`: read/complete dept rotations + locations; create exceptions via verify; **no** targets, invite, generate/reset, Admin Tools, `/admin/*`
-- Nav: Floor · Map · Roster · Settings (Stock / Barriers / Specialty Tools in More)
+- Store Ops actor `associate`: read/complete dept rotations + locations; create exceptions via verify; **no** targets, invite, generate/reset, or Master Settings tools
+- Nav: Floor · Map · Roster · Settings only (Downstock on Floor; specialty scans via Floor chips → `/?section=`)
 
 ## Department toggles · adaptive priority · showroom
 - Apply `supabase/migrations/20260810_dept_priority_showroom.sql`
 - Master toggles: Store Map Overview + Settings Department Overview (`departments.is_active`; Flooring default on)
 - Adaptive draw: `manual_priority_count` + `last_completed_at` age + velocity/priority_override boost; after CARRIED_OVER, `pickSundayVelocityPrioritized` fills remaining slots from high/critical/override first; Store Map ★ Week assigns + bumps priority
 - Showroom: `location_type=SHOWROOM_STACKOUT` + `audit_frequency_days`; dashboard Quick Touch card (not in weekly aisle draw)
-- Store Map bay rows: compact dual-pill Selling/Topstock; tap Bay label → bottom sheet (pin / history / edit). Row kebab Edit / Delete; multi-select batch delete (Super Admin). Duplicate prune hard-deletes. Bulk Generator Clean-Up tab prunes aisle or odd/even range.
+- Store Map bay rows: compact dual-pill Selling/Topstock; tap bay → `WalkTheFloorSheet` (walk + Snap Bay + edit/pin). Row kebab still opens the same sheet. Duplicate prune hard-deletes. Bulk Generator Clean-Up lives in Settings.
 
 ## Appliance categories (suite + sub)
 - **Tables:** `appliance_catalog` + `appliance_scans` (not carpet_*). Apply `supabase/migrations/20260810_appliance_catalog_scans.sql` then `enable_rls_flagged_tables.sql` (RLS on appliances + `store_specialists` + verify all public tables)

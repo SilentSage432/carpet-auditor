@@ -7,6 +7,7 @@
 
 import { useMemo, useState } from "react";
 import { HubIcon } from "@/components/hub/NavIcons";
+import { formatBayTag } from "@/lib/store-ops/types";
 import {
   BAY_STALE_DAYS,
   type BayHealthFlag,
@@ -54,7 +55,7 @@ export function BayHealthScorecard({ card }: Props) {
         <span className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] opacity-80">
           Bay Health
         </span>
-        <span className="font-mono text-lg font-bold tabular-nums">
+        <span className="font-mono text-lg font-bold tracking-tight tabular-nums">
           {card.score}
         </span>
         <span className="min-w-0 flex-1 truncate text-xs opacity-90">
@@ -75,8 +76,8 @@ export function BayHealthScorecard({ card }: Props) {
           ) : (
             card.findings.slice(0, 8).map((row) => (
               <li key={row.rotationId} className="flex flex-wrap gap-x-2">
-                <span className="font-mono font-semibold">
-                  A{row.aisle} B{row.bay}
+                <span className="font-mono font-semibold tracking-tight tabular-nums">
+                  {formatBayTag({ aisle: row.aisle, bay: row.bay })}
                 </span>
                 <span className="opacity-70">{row.type}</span>
                 <span>

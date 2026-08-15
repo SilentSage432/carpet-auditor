@@ -1,18 +1,11 @@
 /**
- * Navigation Hub — owns cross-app route links by role.
+ * Navigation Hub — owns the Floor / Map / Roster / Settings workflow.
  * Inventory section tabs stay in lib/rbac.ts; this module owns Store Ops routes.
- * Primary bottom bar is the Floor / Map / Roster / Settings workflow.
- * Authenticated home is /dashboard (weekly checklist). Hub `/` with ?section=
- * is specialty scan tools only — never the Floor tab.
+ * Authenticated home is /dashboard. Hub `/` with ?section= is specialty scan only.
  */
 
 import { workingDepartment } from "@/lib/admin-department-context";
-import {
-  defaultSectionForMember,
-  effectiveDepartment,
-  isAssociate,
-  isMasterAdmin,
-} from "@/lib/rbac";
+import { defaultSectionForMember, isMasterAdmin } from "@/lib/rbac";
 import {
   departmentMeta,
   type HubSection,
@@ -27,14 +20,9 @@ export type SpecialtyHubHref =
 
 export type NavHubHref =
   | "/admin/store-map"
-  | "/admin/exceptions"
   | "/dashboard"
-  | "/verify-rotation"
-  | "/department"
-  | "/manager-notes"
   | "/roster"
   | "/settings"
-  | "/stock"
   | "/"
   | SpecialtyHubHref;
 
@@ -87,10 +75,7 @@ export const PRIMARY_WORKFLOW_TAB_HREFS = [
   "/settings",
 ] as const;
 
-export const WORKFLOW_TAB_HREFS = [
-  ...PRIMARY_WORKFLOW_TAB_HREFS,
-  "/stock",
-] as const;
+export const WORKFLOW_TAB_HREFS = PRIMARY_WORKFLOW_TAB_HREFS;
 
 export type WorkflowTabHref = (typeof WORKFLOW_TAB_HREFS)[number];
 
@@ -112,9 +97,6 @@ export function workflowTabFromPathname(
   if (pathname === "/settings" || pathname.startsWith("/settings/")) {
     return "/settings";
   }
-  if (pathname === "/stock" || pathname.startsWith("/stock/")) {
-    return "/stock";
-  }
   return null;
 }
 
@@ -127,8 +109,6 @@ export function prefetchWorkflowTab(href: string): void {
     void import("@/components/hub/tabs/RosterTab");
   } else if (href === "/settings") {
     void import("@/components/hub/tabs/SettingsTab");
-  } else if (href === "/stock") {
-    void import("@/components/hub/tabs/StockTab");
   }
 }
 
@@ -138,7 +118,6 @@ export function workflowTabTitle(
 ): string {
   if (href === "/admin/store-map") return "Store Map";
   if (href === "/roster") return "Team Roster";
-  if (href === "/stock") return "Downstock & Stock";
   if (href === "/settings") return "Settings & Config";
   const working = specialist ? workingDepartment(specialist) : "flooring";
   const dept = departmentMeta(working === "all" ? "flooring" : working);
@@ -151,8 +130,6 @@ export type NavHubLink = {
   shortLabel: string;
   icon: NavIconId;
   description: string;
-  /** When true, route is available via More sheet / drawer, not the primary bottom bar. */
-  overflow?: boolean;
 };
 
 /** Compact role chip — department lives in the header pill, so this is role only. */
@@ -160,7 +137,6 @@ export function navRoleBadge(member: StoreSpecialist | null | undefined): string
   if (!member) return "Locked";
   if (isMasterAdmin(member)) return "Master Admin";
   if (member.role === "Supervisor") return "Supervisor";
-  if (isAssociate(member)) return "Associate";
   return "Associate";
 }
 
@@ -172,146 +148,47 @@ export function navLoginIdentity(
   return member.username?.trim() || member.name;
 }
 
-const FLOOR_LINK: NavHubLink = {
-  href: "/dashboard",
-  label: "Floor",
-  shortLabel: "Floor",
-  icon: "zebra",
-  description: "This week's bay checklist",
-};
+const PRIMARY_LINKS: NavHubLink[] = [
+  {
+    href: "/dashboard",
+    label: "Floor",
+    shortLabel: "Floor",
+    icon: "zebra",
+    description: "This week's bay checklist",
+  },
+  {
+    href: "/admin/store-map",
+    label: "Store Map",
+    shortLabel: "Map",
+    icon: "map",
+    description: "Visual heatmap and bay layout",
+  },
+  {
+    href: "/roster",
+    label: "Team Roster",
+    shortLabel: "Roster",
+    icon: "users",
+    description: "Team, PINs, and department access",
+  },
+  {
+    href: "/settings",
+    label: "Settings",
+    shortLabel: "Settings",
+    icon: "settings",
+    description: "Themes, store config, and floor tools",
+  },
+];
 
-const MAP_LINK: NavHubLink = {
-  href: "/admin/store-map",
-  label: "Store Map",
-  shortLabel: "Map",
-  icon: "map",
-  description: "Visual heatmap and bay layout",
-};
-
-const ROSTER_LINK: NavHubLink = {
-  href: "/roster",
-  label: "Team Roster",
-  shortLabel: "Roster",
-  icon: "users",
-  description: "Team, PINs, and department access",
-};
-
-const STOCK_LINK: NavHubLink = {
-  href: "/stock",
-  label: "Downstock & Stock",
-  shortLabel: "Stock",
-  icon: "stock",
-  description: "Downstock queue and remnant inventory",
-  overflow: true,
-};
-
-const SETTINGS_LINK: NavHubLink = {
-  href: "/settings",
-  label: "Settings",
-  shortLabel: "Settings",
-  icon: "settings",
-  description: "Themes, store config, and Admin Tools",
-};
-
+/** Primary bottom-bar links — Floor · Map · Roster · Settings for every role. */
 export function navRoleLinks(
   member: StoreSpecialist | null | undefined
 ): NavHubLink[] {
   if (!member) return [];
-
-  if (isMasterAdmin(member)) {
-    return [
-      FLOOR_LINK,
-      MAP_LINK,
-      ROSTER_LINK,
-      SETTINGS_LINK,
-      STOCK_LINK,
-      {
-        href: "/admin/exceptions",
-        label: "Exception Log",
-        shortLabel: "Alerts",
-        icon: "alert",
-        description: "Weekly verification & bottlenecks",
-        overflow: true,
-      },
-      {
-        href: "/manager-notes",
-        label: "Executive Floor Pad",
-        shortLabel: "Notes",
-        icon: "notes",
-        description: "Rich-text floor notes + Gemini Copilot",
-        overflow: true,
-      },
-    ];
-  }
-
-  if (member.role === "Supervisor") {
-    const dept = departmentMeta(effectiveDepartment(member));
-    return [
-      FLOOR_LINK,
-      MAP_LINK,
-      ROSTER_LINK,
-      SETTINGS_LINK,
-      STOCK_LINK,
-      {
-        href: "/verify-rotation",
-        label: "Verify & Report Exceptions",
-        shortLabel: "Verify",
-        icon: "shield",
-        description: "End-of-week confirmation / incomplete bays",
-        overflow: true,
-      },
-      {
-        href: "/department",
-        label: "Department Overview",
-        shortLabel: dept.shortLabel,
-        icon: "building",
-        description: `${dept.label} ops overview + Hub link`,
-        overflow: true,
-      },
-      {
-        href: "/manager-notes",
-        label: "Executive Floor Pad",
-        shortLabel: "Notes",
-        icon: "notes",
-        description: "Rich-text floor notes + Gemini Copilot",
-        overflow: true,
-      },
-    ];
-  }
-
-  return [
-    FLOOR_LINK,
-    MAP_LINK,
-    ROSTER_LINK,
-    SETTINGS_LINK,
-    STOCK_LINK,
-    {
-      href: "/verify-rotation",
-      label: "Barriers / Log",
-      shortLabel: "Barriers",
-      icon: "barrier",
-      description: "Log barriers and review incomplete bays",
-      overflow: true,
-    },
-    {
-      href: specialtyHubHref(member),
-      label: "Scan & Audit",
-      shortLabel: "Scan",
-      icon: "tools",
-      description: "Roll scan, appliances, and department audits",
-      overflow: true,
-    },
-  ];
+  return PRIMARY_LINKS;
 }
 
-/** Primary bottom-bar links (excludes overflow / More sheet routes). */
 export function navPrimaryLinks(links: NavHubLink[]): NavHubLink[] {
-  return links.filter((link) => !link.overflow);
-}
-
-/** Overflow routes shown under More. */
-export function navOverflowLinks(links: NavHubLink[]): NavHubLink[] {
-  return links.filter((link) => link.overflow);
+  return links;
 }
 
 function hubSectionParam(search: string | null | undefined): string | null {
@@ -342,14 +219,6 @@ export function isNavHubPathActive(
     return pathname === "/roster" || pathname.startsWith("/roster/");
   }
 
-  if (href === "/stock") {
-    if (pathname === "/stock" || pathname.startsWith("/stock/")) return true;
-    if ((pathname === "/" || pathname === "") && section === "remnants") {
-      return true;
-    }
-    return false;
-  }
-
   if (href === "/settings") {
     if (pathname === "/settings" || pathname.startsWith("/settings/")) {
       return true;
@@ -371,13 +240,18 @@ export function isNavHubPathActive(
   return pathname === path || pathname.startsWith(`${path}/`);
 }
 
-/** True when an overflow route is active (highlights More tab). */
-export function isNavOverflowActive(
-  pathname: string,
-  links: NavHubLink[],
-  search?: string | null
-): boolean {
-  return navOverflowLinks(links).some((link) =>
-    isNavHubPathActive(pathname, link.href, search)
-  );
+/** Settings hash targets for tools that used to live in Admin Tools. */
+export const SETTINGS_TOOL_HASHES = [
+  "bulk-generate",
+  "map-management",
+  "weekly-rotation",
+  "manager-notes",
+  "s-pen-notes",
+  "admin-tools",
+  "taxonomies",
+  "remnants",
+] as const;
+
+export function isSettingsToolHash(hash: string): boolean {
+  return (SETTINGS_TOOL_HASHES as readonly string[]).includes(hash);
 }

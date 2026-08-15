@@ -44,7 +44,7 @@ import {
 import { getStoreNumber } from "@/lib/store";
 import { fetchSpecialists } from "@/lib/specialists";
 import { AssociateRosterPanel } from "@/components/admin/AssociateRosterPanel";
-import type { Department } from "@/lib/store-ops/types";
+import { formatBayTag, type Department } from "@/lib/store-ops/types";
 import { associateFloorTitleLabel, type StoreSpecialist } from "@/lib/types";
 
 type Props = {
@@ -578,7 +578,7 @@ export function SundayAuditAssignmentModal({
               <span className="font-semibold text-amber-200">
                 Stage / Draw 12 Flooring Bays
               </span>{" "}
-              or Admin Tools → Trigger Weekly Rotation.
+              Open Settings → Trigger weekly rotation.
             </p>
           ) : (
             <ul className="space-y-2">
@@ -589,11 +589,11 @@ export function SundayAuditAssignmentModal({
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold text-white">
+                      <p className="truncate font-mono text-sm font-semibold tracking-tight tabular-nums text-white">
                         {bay.label}
                       </p>
-                      <p className="font-mono text-[10px] text-zinc-500">
-                        Aisle {bay.aisle} · Bay {bay.bay}
+                      <p className="font-mono text-[10px] tracking-tight tabular-nums text-zinc-500">
+                        {formatBayTag({ aisle: bay.aisle, bay: bay.bay })}
                         {bay.assignment
                           ? ` · → ${bay.assignment.specialist_name}`
                           : " · unassigned"}

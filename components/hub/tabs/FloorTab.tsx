@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import Link from "next/link";
 import dynamic from "next/dynamic";
 import { SundayAuditStagingCard } from "@/components/admin/SundayAuditStagingCard";
 import { ExceptionFeed } from "@/components/admin/ExceptionFeed";
@@ -20,6 +19,7 @@ import { isSupervisor } from "@/lib/specialists";
 import {
   fetchDepartments,
   fetchThisWeekRotations,
+  verifyAllCompletedBays,
 } from "@/lib/store-ops/client";
 import {
   filterFlooringRotations,
@@ -28,6 +28,7 @@ import {
 } from "@/lib/store-ops/sunday-audit";
 import type { WeeklyRotationWithLocation } from "@/lib/store-ops/types";
 import type { WorkflowTabProps } from "@/components/hub/tabs/tab-props";
+import Link from "next/link";
 
 const SupervisorAuditSummaryModal = dynamic(
   () =>
@@ -39,32 +40,38 @@ const SupervisorAuditSummaryModal = dynamic(
 
 export function FloorTab({ specialist }: WorkflowTabProps) {
   const [week, setWeek] = useState("");
+  const [deptId, setDeptId] = useState<string | null>(null);
   const [rotations, setRotations] = useState<WeeklyRotationWithLocation[]>([]);
   const [flooringDeptId, setFlooringDeptId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
   const [healthKey, setHealthKey] = useState(0);
   const [contextTick, setContextTick] = useState(0);
   const [rollupOpen, setRollupOpen] = useState(false);
+  const [verifyBusy, setVerifyBusy] = useState(false);
+  const [verifyMsg, setVerifyMsg] = useState<string | null>(null);
   const flooringFocus = isFlooringWorkingContext(specialist);
   const associate = isAssociate(specialist);
+  const supervisor = isSupervisor(specialist);
+  const master = isMasterAdmin(specialist);
+  const scanTabs = visibleFloorAuditTabs(specialist);
+  const completedCount = rotations.filter((r) => r.is_completed).length;
 
   const reload = useCallback(
     async (member: typeof specialist, opts?: { silent?: boolean }) => {
       if (!opts?.silent) setLoading(true);
-      setError(null);
       try {
         const depts = await fetchDepartments(member).catch(() => []);
-        const deptId = workingDepartmentId(member, depts);
-        const data = await fetchThisWeekRotations(member, deptId);
+        const nextDeptId = workingDepartmentId(member, depts);
+        const data = await fetchThisWeekRotations(member, nextDeptId);
         setWeek(data.assigned_week || "");
+        setDeptId(nextDeptId ?? null);
         setRotations(data.rotations ?? []);
         setFlooringDeptId(findFlooringDepartment(depts)?.id ?? null);
         setHealthKey((k) => k + 1);
       } catch {
         setWeek("");
+        setDeptId(null);
         setRotations([]);
-        setError(null);
       } finally {
         if (!opts?.silent) setLoading(false);
       }
@@ -100,6 +107,30 @@ export function FloorTab({ specialist }: WorkflowTabProps) {
     return filterFlooringRotations(rotations, flooringDeptId);
   }, [rotations, flooringFocus, flooringDeptId]);
 
+  async function signOffCompleted() {
+    if (!deptId || !week) return;
+    setVerifyBusy(true);
+    setVerifyMsg(null);
+    try {
+      await verifyAllCompletedBays(specialist, {
+        department_id: deptId,
+        assigned_week: week,
+      });
+      setVerifyMsg(
+        `Week signed off — ${completedCount} completed bay${
+          completedCount === 1 ? "" : "s"
+        } verified.`
+      );
+      silentRefresh();
+    } catch (err) {
+      setVerifyMsg(
+        err instanceof Error ? err.message : "Could not sign off this week"
+      );
+    } finally {
+      setVerifyBusy(false);
+    }
+  }
+
   return (
     <>
       <main className="hub-main">
@@ -107,12 +138,13 @@ export function FloorTab({ specialist }: WorkflowTabProps) {
           <SundayAuditStagingCard
             specialist={specialist}
             refreshKey={healthKey}
-            forceShow={flooringFocus || isMasterAdmin(specialist)}
+            forceShow={flooringFocus || master}
           />
         ) : null}
-        {!associate && visibleFloorAuditTabs(specialist).length > 0 ? (
+
+        {scanTabs.length > 0 ? (
           <div className="mb-3 flex gap-1.5 overflow-x-auto pb-0.5 no-scrollbar">
-            {visibleFloorAuditTabs(specialist).map((tab) => (
+            {scanTabs.map((tab) => (
               <Link
                 key={tab.id}
                 href={`/?section=${tab.id}`}
@@ -123,6 +155,7 @@ export function FloorTab({ specialist }: WorkflowTabProps) {
             ))}
           </div>
         ) : null}
+
         {!associate ? (
           <>
             <ShiftBriefingCard specialist={specialist} refreshKey={healthKey} />
@@ -130,7 +163,8 @@ export function FloorTab({ specialist }: WorkflowTabProps) {
             <StoreHealthCard specialist={specialist} refreshKey={healthKey} />
           </>
         ) : null}
-        {isSupervisor(specialist) ? (
+
+        {supervisor ? (
           <button
             type="button"
             onClick={() => setRollupOpen(true)}
@@ -140,26 +174,29 @@ export function FloorTab({ specialist }: WorkflowTabProps) {
           </button>
         ) : null}
 
-        {!associate ? (
-          <ShowroomQuickTouchCard
-            specialist={specialist}
-            refreshKey={healthKey}
-            onTouched={() => setHealthKey((k) => k + 1)}
-          />
-        ) : null}
-        {!associate && !isMasterAdmin(specialist) ? (
-          <Link
-            href="/verify-rotation"
-            className="mb-3 block text-center text-sm font-semibold text-emerald-300 underline-offset-2 hover:underline"
-          >
-            End-of-week Verify &amp; Report Exceptions →
-          </Link>
+        <ShowroomQuickTouchCard
+          specialist={specialist}
+          refreshKey={healthKey}
+          onTouched={() => setHealthKey((k) => k + 1)}
+        />
+
+        {verifyMsg ? (
+          <p className="mb-3 rounded-xl border border-emerald-500/40 bg-emerald-950/40 px-3 py-2 text-sm text-emerald-200">
+            {verifyMsg}
+          </p>
         ) : null}
 
-        {error ? (
-          <p className="mb-4 rounded-xl border border-rose-500/40 bg-rose-950/40 px-3 py-2 text-sm text-rose-200">
-            {error}
-          </p>
+        {!associate && completedCount > 0 ? (
+          <button
+            type="button"
+            disabled={verifyBusy || !deptId}
+            onClick={() => void signOffCompleted()}
+            className="mb-3 flex min-h-11 w-full items-center justify-center rounded-xl border border-emerald-500/40 bg-emerald-950/25 px-3 text-sm font-bold text-emerald-100 disabled:opacity-40"
+          >
+            {verifyBusy
+              ? "Signing off…"
+              : `Verify completed bays (${completedCount})`}
+          </button>
         ) : null}
 
         <section className="mb-3">
@@ -180,35 +217,6 @@ export function FloorTab({ specialist }: WorkflowTabProps) {
         </section>
 
         <ExceptionFeed specialist={specialist} refreshKey={healthKey} />
-
-        {associate && visibleFloorAuditTabs(specialist).length > 0 ? (
-          <div className="mb-3 flex gap-1.5 overflow-x-auto pb-0.5 no-scrollbar">
-            {visibleFloorAuditTabs(specialist).map((tab) => (
-              <Link
-                key={tab.id}
-                href={`/?section=${tab.id}`}
-                className="chip-filter shrink-0 rounded-full border border-zinc-700/80 bg-zinc-950/60 text-zinc-200"
-              >
-                {tab.label} scan
-              </Link>
-            ))}
-          </div>
-        ) : null}
-        {associate ? (
-          <ShowroomQuickTouchCard
-            specialist={specialist}
-            refreshKey={healthKey}
-            onTouched={() => setHealthKey((k) => k + 1)}
-          />
-        ) : null}
-        {associate ? (
-          <Link
-            href="/verify-rotation"
-            className="mb-3 block text-center text-sm font-semibold text-emerald-300 underline-offset-2 hover:underline"
-          >
-            Log a barrier or verify bays →
-          </Link>
-        ) : null}
       </main>
 
       <SupervisorAuditSummaryModal

@@ -5,7 +5,7 @@
 > the scanning / auditing workflow for floor operators.
 >
 > Generated from the live codebase (`app/`, `components/`, `lib/types.ts`).
-> Last reviewed: 2026-08-14.
+> Last reviewed: 2026-08-15.
 
 ---
 
@@ -14,7 +14,7 @@
 | Section | Contents |
 |---------|----------|
 | [A. Global shell & header](#a-global-application-shell--header) | Root layout, sticky chrome, network, specialist, nav |
-| [B. Primary workspace views](#b-primary-workspace-views--tabs) | Audit · Catalog · Remnants · Settings |
+| [B. Primary workspace views](#b-primary-workspace-views--tabs) | Floor · Map · Roster · Settings |
 | [C. Overlays & modals](#c-floating-overlays-modals--slide-overs) | Drawers, PIN, Quick-Add, markdown |
 | [D. Operational UX analysis](#d-operational-ux--layout-analysis) | Friction, scroll burden, scan path |
 | [Appendix](#appendix) | Z-index stack, file index, mermaid flows |
@@ -27,7 +27,7 @@
 
 | Layer | File | Role |
 |-------|------|------|
-| HTML shell | `app/layout.tsx` | Barlow + JetBrains Mono fonts; PWA meta; `themeColor #022c22`; `viewportFit: cover`; `maximumScale: 1` |
+| HTML shell | `app/layout.tsx` | Geist + Geist Mono (`--font-geist-sans` / `--font-geist-mono`); PWA meta; `themeColor #090d16`; `viewportFit: cover`; `maximumScale: 1` |
 | PWA | `app/manifest.ts` | Standalone, portrait-primary, short_name **DeptSync** |
 | Visual base | `app/globals.css` | Dark slate body; emerald radial wash on `#020617`; pin-shake animation |
 | Hub page | `app/page.tsx` | Section state, RBAC gate, data load, overlay orchestration |
@@ -37,53 +37,51 @@
 
 ```
 ┌─────────────────────────────────────┐
-│ HubHeader (sticky, z-40)            │  ← always visible
+│ HubHeader (sticky, z-40)            │  ← title / store # · dept pill · account/PIN
 ├─────────────────────────────────────┤
 │                                     │
-│  max-w-md · px-4 · py-4 · pb-32     │  ← one active section
-│  (audit uses pb-44 for Log bar)     │
+│  max-w-lg · hub-main (pb-28)        │  ← keep-alive Floor / Map / Roster / Settings
 │                                     │
 ├─────────────────────────────────────┤
-│ BottomNavBar (fixed, z-30)          │  ← Audit · Catalog · Remnants · Settings
+│ BottomNav (fixed, z-30)             │  ← Floor · Map · Roster · Settings
 └─────────────────────────────────────┘
-     + overlay stack (drawers/modals)
+     + overlay stack (sheets/modals)
 ```
 
 - **Default land after login:** `/dashboard` (Floor checklist). Hub `/` without `?section=` redirects there. Specialty scans use `/?section=audit|appliances|department`.
-- **Primary nav:** fixed bottom tab bar — exclusive section switcher (no header hamburger).
-- **`pb-32` / audit `pb-44`** reserves space for bottom nav (+ sticky Log bar on Audit).
+- **Primary nav:** exactly four bottom tabs. No header hamburger, More sheet, or Admin Tools drawer.
+- **`pb-28` / audit `pb-44`** reserves space for bottom nav (+ sticky Log bar on specialty scans).
 - Body scroll locks when the specialist modal or change-PIN modal is open.
 
-**Last reviewed:** 2026-08-14 (layout / iconography polish).
+**Last reviewed:** 2026-08-15 (4-tab chrome consolidation).
 
-### A.2 Sticky header bar (`NavigationHub` primary; `HubChrome` legacy)
+### A.2 Sticky header bar (`NavigationHub`)
 
 **File:** `components/hub/NavigationHub.tsx`  
 **Classes:** `sticky top-0 z-40 pt-safe`, content `min-h-12 max-w-lg`
 
 | Slot (L → R) | Content | Action |
 |--------------|---------|--------|
-| Hamburger | Lucide-free bars in `btn-icon-touch` (48px) | Opens nav drawer |
 | Brand badge | `DeptSyncBadge` (vector boxes + barcode) | Display only |
-| Title stack | DeptSync · store · page title | Display only |
-| Account + network | `HeaderNetworkStatus` Wifi / WifiOff + role chip | Opens account menu |
+| Title stack | DeptSync · store # · page title | Display only |
+| Department pill | `AdminDepartmentSwitcher` | Switch granted department |
+| Account + network | `HeaderNetworkStatus` Wifi / WifiOff + role chip | Opens account/PIN menu |
 
-Master Admin: compact department **dropdown pill** in the header (no second-row tabs). Close glyphs are `HubIcon id="close"`.
+Master Admin: compact department **dropdown pill** in the header. Close glyphs are `HubIcon id="close"`. No hamburger drawer.
 
 ### A.3 Main navigation (`BottomNav`)
 
 **Primary — BottomNav** (`components/hub/BottomNav.tsx`) composed by `NavigationHub`
 
 - Fixed `bottom-0`, `max-w-lg`, `min-h-16` tabs, `pb-safe`, Lucide `NavIcon` stroke 2.
-- Active tab: accent top indicator + glow.
-- Overflow routes live in the More sheet (same 56px row hit area).
+- 4-column grid. Active tab: accent top indicator + glow.
 
 | Tab | Route | Meaning |
 |-----|-------|---------|
-| Floor | `/dashboard` | This week's bay checklist + exception feed |
-| Map | `/admin/store-map` | Heatmap + bay layout |
+| Floor | `/dashboard` | Live checklist, Downstock tab, Sunday drawer, inline barriers, exception feed, week sign-off |
+| Map | `/admin/store-map` | Heatmap + Add Bay + unified Walk/Edit sheet |
 | Roster | `/roster` | Team, PINs, department chips |
-| Settings | `/settings` | Themes, credentials, Admin Tools |
+| Settings | `/settings` | Theme, sync, targets, push, Master tools (bulk / taxonomies / force / Floor Pad / remnants) |
 
 Store Ops pages use `.hub-main` (`px-3 pt-2 pb-28`) so bay lists, status pills, and pace timers clear the fold on handhelds. Quick Touch / filter chips use `.btn-quick-touch` / `.chip-filter` (44px min).
 
@@ -99,7 +97,7 @@ Store Ops pages use `.hub-main` (`px-3 pt-2 pb-28`) so bay lists, status pills, 
 
 ## B. Primary Workspace Views & Tabs
 
-All four views render inside the shared `max-w-md` column. Only one is mounted at a time.
+Floor / Map / Roster / Settings keep-alive inside `WorkflowTabShell`. Specialty scans (`/?section=`) stay on hub `/`. Catalog tab is deleted. Remnants live in Settings.
 
 ---
 
@@ -164,76 +162,18 @@ Badge on form header: `Mode A · Rolls` / `Mode B · Cartons`.
 
 ---
 
-### B.2 Catalog & SIMS Location Finder (`CatalogSection`)
+### B.2 Catalog (deleted)
 
-**File:** `components/sections/CatalogSection.tsx`  
-**Route state:** `section === "catalog"`
+`CatalogSection` / `ApplianceCatalogSection` / `CatalogItemCard` are unmounted and removed. SKU linking remains via Quick-Add on specialty scan flows. `/catalog` redirects to `/appliances`.
 
-#### Vertical order
-
-```
-① FIRST VIEWPORT
-   [📍 SIMS Location Finder]   ← opens drawer modal
-   [Search SKU/barcode/tag…] [+ Add]
-
-② BELOW FOLD
-   Optional inline Add/Edit form card
-   Catalog item cards (filtered list)
-```
-
-#### Catalog search / filter bar
-
-- Free-text + digit scan (`TextField` with `onScanCommit`).
-- Filters in-memory by SKU, name, vendor, category, SIMS tag, UPC.
-- Unlinked scan → Quick-Add modal.
-
-#### Item card hierarchy
-
-```
-SKU · category chip · 🏷️ Barcode Linked?
-Product name
-Vendor · width or sqft/box · Offline?
-📍 default SIMS location
-UPC …
-[Edit] [Remove]
-[Link Barcode | Unlink Barcode]
-```
-
-#### Inline add/edit form fields
-
-SKU · Product Name · Category · Default SIMS Location · Vendor ·  
-Roll Width **12/15** (roll goods) **or** Sq Ft/box · UPC · Cancel / Save
-
-#### SIMS Location Finder drawer
-
-**File:** `components/catalog/SimsLocationFinder.tsx`
-
-- Full-height bottom sheet / centered dialog.
-- Search by SKU, barcode, or SIMS tag.
-- Result cards: SKU, Sales Floor / Top Stock pill, SIMS tag, cumulative CLF / sq ft / units, audit count, “Catalog default” chip.
-
-#### ⚡ Quick-Add to SIMS Catalog modal
-
-**File:** `components/barcode/QuickAddCatalogModal.tsx`  
-Shared with Audit.
-
-| Field | Notes |
-|-------|-------|
-| UPC banner | Pre-filled scanned barcode (read-only display) |
-| Lowe's Item # / SKU | Required |
-| Product Description | Required |
-| Category | Dropdown (`FLOORING_CATEGORIES`) |
-| Default SIMS Location | Free text |
-| Roll Width 12/15 **or** Sq Ft/box | Depends on category mode |
-| **Save & Continue Audit** | Writes `carpet_catalog`, applies to current form |
-| Cancel | Closes; Audit refocuses SKU |
+SIMS lookup still lives in `SimsLocationFinder` (opened from Cycle Audit). Quick-Add still lives in `QuickAddCatalogModal`.
 
 ---
 
-### B.3 Remnant Rack & Clearance Hub (`RemnantSection`)
+### B.3 Remnant Rack (`RemnantSection`)
 
 **File:** `components/sections/RemnantSection.tsx`  
-**Route state:** `section === "remnants"`
+**Host:** Settings accordion `#remnants` (not a primary tab)
 
 #### Vertical order
 
@@ -297,7 +237,8 @@ Stacked cards (~1.5–2 handheld screens):
 
 | Component | File | Trigger | UI pattern |
 |-----------|------|---------|------------|
-| **BottomNavBar** | `HubChrome.tsx` | Always | Fixed bottom tabs (exclusive section nav) |
+| **BottomNav** | `BottomNav.tsx` | Always on workflow routes | Fixed 4 tabs |
+| **WalkTheFloorSheet** | `WalkTheFloorSheet.tsx` | Map bay tap | Walk log + Snap Bay + edit/pin |
 | **TextPromptModal** | `TextPromptModal.tsx` | Reserve remnant; Link barcode | Bottom sheet input |
 | **ConfirmModal** | `ConfirmModal.tsx` | Delete remnant | Confirm / cancel sheet |
 | **SpecialistModal** | `SpecialistModal.tsx` | Header chip; auto if no specialist | Bottom sheet / dialog; roster + Add Team Member |
@@ -309,13 +250,13 @@ Stacked cards (~1.5–2 handheld screens):
 | **ApplyMarkdownModal** | `ApplyMarkdownModal.tsx` | Remnant markdown CTA | % Off / Fixed $ + preview |
 | **Quick-AddCatalogModal** | `QuickAddCatalogModal.tsx` | Cycle Audit / scan flows | Link unlinked barcode → catalog (supersedes retired MarryBarcodeModal) |
 | **VisualBayScannerModal** | `store-ops/VisualBayScannerModal.tsx` | Store Map CTA / bay sheet / Cycle Audit **Snap Bay** chip | Camera or upload → Gemini scan beam → results drawer (z-90) |
-| **ExecutiveFloorPad** | `manager-notes/ExecutiveFloorPad.tsx` | Admin Tools / `/manager-notes` / `#manager-notes` | Full-screen TipTap Floor Pad + Gemini Copilot + archive (z-80) |
+| **ExecutiveFloorPad** | `manager-notes/ExecutiveFloorPad.tsx` | Settings `#manager-notes` | Full-screen TipTap Floor Pad + Gemini Copilot + archive (z-80) |
 | Pin / Sync toasts | `app/page.tsx` | PIN save / online flush | Fixed top status pills |
 
 ### Z-index stack
 
 ```
-30  BottomNavBar
+30  BottomNav
 40  Header
 55  DefaultPinNotice (above bottom nav)
 56  Toasts
@@ -385,7 +326,7 @@ app/layout.tsx
 app/page.tsx
 app/manifest.ts
 app/globals.css
-components/hub/HubChrome.tsx          HubHeader + BottomNavBar
+components/hub/HubChrome.tsx          AssociateSpecialtySwitcher only
 components/hub/SpecialistModal.tsx
 components/hub/PinKeypadModal.tsx
 components/hub/ChangePinModal.tsx
@@ -395,7 +336,6 @@ components/hub/TextPromptModal.tsx
 components/hub/ConfirmModal.tsx
 components/hub/ServiceWorkerRegister.tsx
 components/sections/CycleAuditSection.tsx
-components/sections/CatalogSection.tsx
 components/sections/RemnantSection.tsx
 components/sections/SettingsSection.tsx
 components/barcode/QuickAddCatalogModal.tsx
@@ -433,4 +373,4 @@ sequenceDiagram
 - **Surfaces:** `rounded-2xl` / `rounded-xl` cards on `slate-900/90` with `border-slate-800`.
 - **Accent:** Emerald CTAs (`bg-emerald-500` / text-emerald) for primary actions.
 - **Alerts:** Amber (offline / top stock / PIN), red (delete / shortage), green (match / online).
-- **Typography:** UI Barlow; mono JetBrains for SKUs, CLF, barcodes, store eyebrow.
+- **Typography:** UI Geist; Geist Mono `tracking-tight` for bay tags (`A14-B06`), SKUs, cadence badges, timestamps, store eyebrow.

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import dynamic from "next/dynamic";
 import { HubIcon } from "@/components/hub/NavIcons";
 import {
   compareAisles,
@@ -9,15 +10,26 @@ import {
   normalizeAisle,
 } from "@/lib/store-ops/aisle";
 import {
+  assignLocationsToWeek,
   deleteStoreLocations,
   logBayService,
   patchStoreLocation,
 } from "@/lib/store-ops/client";
 import { toastError, toastSuccess } from "@/lib/toast";
-import type {
-  BayServiceIntensity,
-  Department,
-  StoreLocation,
+import type { BayScanMeta } from "@/lib/store-ops/ai-bay-scan";
+
+const VisualBayScannerModal = dynamic(
+  () =>
+    import("@/components/store-ops/VisualBayScannerModal").then(
+      (mod) => mod.VisualBayScannerModal
+    ),
+  { ssr: false }
+);
+import {
+  formatBayTag,
+  type BayServiceIntensity,
+  type Department,
+  type StoreLocation,
 } from "@/lib/store-ops/types";
 import type { StoreSpecialist } from "@/lib/types";
 
@@ -77,7 +89,6 @@ export function WalkTheFloorSheet({
   onClose,
   onChanged,
   onError,
-  onOpenAdvanced,
 }: {
   specialist: StoreSpecialist;
   departments: Department[];
@@ -86,7 +97,6 @@ export function WalkTheFloorSheet({
   onClose: () => void;
   onChanged: () => void;
   onError: (msg: string | null) => void;
-  onOpenAdvanced?: () => void;
 }) {
   const faces = useMemo(
     () =>
@@ -105,6 +115,8 @@ export function WalkTheFloorSheet({
   const [priorityOverride, setPriorityOverride] = useState(
     faces.some((loc) => loc.priority_override === true)
   );
+  const [bayScanOpen, setBayScanOpen] = useState(false);
+  const [pinBusy, setPinBusy] = useState(false);
 
   useEffect(() => {
     document.body.style.overflow = "hidden";
@@ -135,6 +147,31 @@ export function WalkTheFloorSheet({
       ),
     [departments]
   );
+  const pinTargets = faces.filter(
+    (loc) => (loc.location_type ?? "STANDARD") !== "SHOWROOM_STACKOUT"
+  );
+  const bayScanMeta: BayScanMeta = {
+    aisle: bay.aisle,
+    bay: bay.pair.bay,
+    department_code: deptCode || undefined,
+  };
+
+  async function pinToWeek(loc: StoreLocation) {
+    setPinBusy(true);
+    onError(null);
+    try {
+      await assignLocationsToWeek(specialist, [loc.id], loc.department_id);
+      toastSuccess(`Pinned ${loc.type} to this week`);
+      onChanged();
+    } catch (err) {
+      const msg =
+        err instanceof Error ? err.message : "Could not pin bay to this week";
+      onError(msg);
+      toastError(msg);
+    } finally {
+      setPinBusy(false);
+    }
+  }
 
   async function submit(intensity: BayServiceIntensity) {
     if (!target) return;
@@ -247,8 +284,8 @@ export function WalkTheFloorSheet({
               {deptName}
               {deptCode ? ` · ${deptCode}` : ""}
             </p>
-            <h2 id="walk-floor-title" className="glass-title mt-1.5 text-lg">
-              Aisle {bay.aisle} · Bay {bay.pair.bay}
+            <h2 id="walk-floor-title" className="mt-1.5 font-mono text-lg font-bold tracking-tight tabular-nums text-foreground">
+              {formatBayTag({ aisle: bay.aisle, bay: bay.pair.bay })}
             </h2>
           </div>
           <button
@@ -304,6 +341,14 @@ export function WalkTheFloorSheet({
                   </span>
                 </button>
               ))}
+              <button
+                type="button"
+                onClick={() => setBayScanOpen(true)}
+                className="btn-primary-glow flex min-h-12 w-full items-center justify-center gap-2 rounded-xl px-4 text-sm"
+              >
+                <HubIcon id="camera" className="h-4 w-4" />
+                Snap Bay AI Audit
+              </button>
             </div>
           )}
         </section>
@@ -403,19 +448,29 @@ export function WalkTheFloorSheet({
             >
               {confirmDelete ? "Confirm delete this bay" : "Delete bay"}
             </button>
+            {pinTargets.map((loc) => (
+              <button
+                key={`pin-${loc.id}`}
+                type="button"
+                disabled={pinBusy}
+                onClick={() => void pinToWeek(loc)}
+                className="mt-2 flex min-h-11 w-full items-center justify-center rounded-xl border border-zinc-700/80 bg-zinc-950/60 px-4 text-sm font-bold text-zinc-100 disabled:opacity-50"
+              >
+                Pin {loc.type === "SELLING" ? "Selling" : "Topstock"} to this week
+              </button>
+            ))}
           </section>
         ) : null}
-
-        {canMutate && onOpenAdvanced ? (
-          <button
-            type="button"
-            onClick={onOpenAdvanced}
-            className="mt-3 flex min-h-11 w-full items-center justify-center text-sm font-semibold text-zinc-400 underline-offset-2 hover:text-zinc-200 hover:underline"
-          >
-            Pin, history, and Snap Bay
-          </button>
-        ) : null}
       </div>
+
+      {bayScanOpen ? (
+        <VisualBayScannerModal
+          open={bayScanOpen}
+          onClose={() => setBayScanOpen(false)}
+          specialist={specialist}
+          meta={bayScanMeta}
+        />
+      ) : null}
     </div>
   );
 }

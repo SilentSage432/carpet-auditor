@@ -112,6 +112,8 @@
 - [x] IRP / down-stocking velocity heatmap on `store_locations` + `bay_service_logs` (Map toggle, walk-the-floor log, Sunday velocity-priority draw)
 - [x] Multi-department role & scope access (`accessible_departments`, header switcher, Roster chips)
 - [x] UX lockdown — 4-tab Floor/Map/Roster/Settings, unified Edit Bay sheet, roster chips + PIN add, Sonner toasts, exception feed on Floor
+- [x] Chrome consolidation — remove hamburger / More / Admin Tools; Settings owns bulk/taxonomies/force/targets; Floor owns verify+exceptions; dead Catalog/AdminRoster/StockTab pruned
+- [x] Geist + Geist Mono typography (`next/font/google`) + compact bay tags (`formatBayTag`) with `font-mono tracking-tight`
 
 ## Next
 - [x] Apply Phase 1 JWT/RLS migration in Supabase + enable Custom Access Token Hook

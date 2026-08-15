@@ -587,7 +587,7 @@ export function CycleAuditSection({
                 className="flex min-h-11 items-center gap-2 px-3 py-2"
               >
                 <div className="min-w-0 flex-1">
-                  <p className="truncate font-mono text-sm font-semibold text-white">
+                  <p className="truncate font-mono text-sm font-semibold tracking-tight tabular-nums text-white">
                     {audit.sku}
                     <span className="ml-2 font-sans text-[10px] font-bold uppercase text-zinc-500">
                       {formatAuditLocationBadge(audit.location_type)}

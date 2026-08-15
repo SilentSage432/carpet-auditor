@@ -2,7 +2,7 @@
 
 /**
  * Sticky-header network + pending-queue chip.
- * Owns useNetworkBadge so queue ticks do not re-render hub forms or Admin Tools.
+ * Owns useNetworkBadge so queue ticks do not re-render hub forms or Settings tools.
  * Vector Wifi / WifiOff glyphs — no raster or emoji status marks.
  */
 

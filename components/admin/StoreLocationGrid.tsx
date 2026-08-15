@@ -1,20 +1,18 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { compareAisles, formatAisleInput, isValidAisle, normalizeAisle } from "@/lib/store-ops/aisle";
-import type {
-  Department,
-  RotationStatus,
-  StoreLocation,
-  StoreLocationType,
-} from "@/lib/store-ops/types";
+import Link from "next/link";
+import {
+  compareAisles,
+  formatAisleInput,
+  isValidAisle,
+  normalizeAisle,
+} from "@/lib/store-ops/aisle";
+import { formatBayTag, type Department, type StoreLocation } from "@/lib/store-ops/types";
 import type { StoreSpecialist } from "@/lib/types";
 import {
-  assignLocationsToWeek,
   bulkGenerateLocations,
   deleteStoreLocations,
-  fetchBayLocationHistory,
-  type BayRotationHistoryRow,
   patchStoreLocation,
 } from "@/lib/store-ops/client";
 import { toastError, toastSuccess } from "@/lib/toast";
@@ -22,11 +20,8 @@ import {
   findDuplicateLegacyBays,
   pruneIdsFromDuplicateGroups,
 } from "@/lib/store-ops/locations";
-import dynamic from "next/dynamic";
 import { HubIcon } from "@/components/hub/NavIcons";
-import { openAdminTools } from "@/components/hub/admin-tools-events";
 import { WalkTheFloorSheet } from "@/components/admin/WalkTheFloorSheet";
-import type { BayScanMeta } from "@/lib/store-ops/ai-bay-scan";
 import {
   BAY_READINESS_EVENT,
   classifyMapReadiness,
@@ -46,14 +41,6 @@ import {
   worstVelocityHeat,
   type VelocityHeatTone,
 } from "@/lib/store-ops/velocity";
-
-const VisualBayScannerModal = dynamic(
-  () =>
-    import("@/components/store-ops/VisualBayScannerModal").then(
-      (mod) => mod.VisualBayScannerModal
-    ),
-  { ssr: false }
-);
 
 type Props = {
   specialist: StoreSpecialist;
@@ -93,16 +80,7 @@ type SheetBay = {
   pair: BayPair;
 };
 
-type SheetMode = "actions" | "history" | "edit";
-
 type MapViewMode = "standard" | "heatmap";
-
-const ROTATION_STATUSES: RotationStatus[] = [
-  "PENDING",
-  "ASSIGNED",
-  "COMPLETED",
-  "CARRIED_OVER",
-];
 
 function pairLocationIds(pair: BayPair): string[] {
   return [pair.selling, pair.topstock]
@@ -155,8 +133,6 @@ export function StoreLocationGrid({
   const [error, setError] = useState<string | null>(null);
   const [openDepts, setOpenDepts] = useState<Record<string, boolean>>({});
   const [openAisles, setOpenAisles] = useState<Record<string, boolean>>({});
-  const [sheetBay, setSheetBay] = useState<SheetBay | null>(null);
-  const [sheetInitialMode, setSheetInitialMode] = useState<SheetMode>("actions");
   const [walkBay, setWalkBay] = useState<SheetBay | null>(null);
   const [mapMode, setMapMode] = useState<MapViewMode>("standard");
   const heatmap = mapMode === "heatmap";
@@ -291,23 +267,6 @@ export function StoreLocationGrid({
     );
   }, [locations, departments]);
 
-  // Keep sheet locators fresh after reload
-  const liveSheetBay = useMemo(() => {
-    if (!sheetBay) return null;
-    const group = departmentGroups.find(
-      (d) => d.departmentId === sheetBay.departmentId
-    );
-    const aisle = group?.aisles.find((a) => a.aisle === sheetBay.aisle);
-    const pair = aisle?.bays.find((b) => b.bay === sheetBay.pair.bay);
-    if (!group || !aisle || !pair) return sheetBay;
-    return {
-      departmentId: group.departmentId,
-      departmentName: group.departmentName,
-      aisle: aisle.aisle,
-      pair,
-    };
-  }, [sheetBay, departmentGroups]);
-
   const liveWalkBay = useMemo(() => {
     if (!walkBay) return null;
     const group = departmentGroups.find(
@@ -394,14 +353,7 @@ export function StoreLocationGrid({
     setBatchConfirm(false);
   }
 
-  function openBaySheet(bay: SheetBay, mode: SheetMode = "actions") {
-    setWalkBay(null);
-    setSheetInitialMode(mode);
-    setSheetBay(bay);
-  }
-
   function openWalkSheet(bay: SheetBay) {
-    setSheetBay(null);
     setWalkBay(bay);
   }
 
@@ -421,11 +373,10 @@ export function StoreLocationGrid({
         ids.forEach((id) => next.delete(id));
         return next;
       });
-      if (sheetBay) {
-        const openIds = pairLocationIds(sheetBay.pair);
+      if (walkBay) {
+        const openIds = pairLocationIds(walkBay.pair);
         if (openIds.some((id) => ids.includes(id))) {
-          setSheetBay(null);
-          setSheetInitialMode("actions");
+          setWalkBay(null);
         }
       }
       onChanged();
@@ -466,13 +417,12 @@ export function StoreLocationGrid({
             >
               + Add Bay to Aisle
             </button>
-            <button
-              type="button"
-              onClick={() => openAdminTools({ section: "bulk" })}
+            <Link
+              href="/settings#bulk-generate"
               className="mt-2 inline-flex min-h-11 items-center justify-center rounded-xl border border-zinc-700 px-4 text-sm font-semibold text-zinc-200"
             >
               Bulk generate aisle
-            </button>
+            </Link>
             {addBayOpen ? (
               <AddBaySheet
                 specialist={specialist}
@@ -732,7 +682,7 @@ export function StoreLocationGrid({
                             onClick={() => toggleAisle(aisleKey)}
                             className="flex min-h-[44px] min-w-0 flex-1 items-center justify-between gap-3 py-2 text-left"
                           >
-                            <p className="flex items-center gap-2 font-mono text-sm font-semibold text-zinc-100">
+                            <p className="flex items-center gap-2 font-mono text-sm font-semibold tracking-tight tabular-nums text-zinc-100">
                               <span
                                 className={`inline-block h-2.5 w-2.5 shrink-0 rounded-full ${aisleDotClass}`}
                                 title={aisleDotLabel}
@@ -831,11 +781,14 @@ export function StoreLocationGrid({
                                       className={`inline-block h-2.5 w-2.5 shrink-0 rounded-full ${rowDotClass}`}
                                       title={rowToneLabel}
                                     />
-                                    <span className="truncate font-mono text-xs font-bold text-zinc-100">
-                                      Bay {pair.bay}
+                                    <span className="truncate font-mono text-xs font-bold tracking-tight tabular-nums text-zinc-100">
+                                      {formatBayTag({
+                                        aisle: aisle.aisle,
+                                        bay: pair.bay,
+                                      })}
                                     </span>
                                   </span>
-                                  <span className="mt-0.5 block truncate font-mono text-[10px] font-semibold uppercase tracking-wide text-zinc-500">
+                                  <span className="mt-0.5 block truncate font-mono text-[10px] font-semibold tracking-tight text-zinc-500">
                                     {rowToneLabel}
                                   </span>
                                 </button>
@@ -920,30 +873,6 @@ export function StoreLocationGrid({
           onClose={() => setWalkBay(null)}
           onChanged={onChanged}
           onError={setError}
-          onOpenAdvanced={
-            canMutate
-              ? () => {
-                  setWalkBay(null);
-                  openBaySheet(liveWalkBay, "actions");
-                }
-              : undefined
-          }
-        />
-      ) : null}
-
-      {liveSheetBay ? (
-        <BayActionsSheet
-          specialist={specialist}
-          departments={departments}
-          bay={liveSheetBay}
-          initialMode={sheetInitialMode}
-          onClose={() => {
-            setSheetBay(null);
-            setSheetInitialMode("actions");
-          }}
-          onChanged={onChanged}
-          onError={setError}
-          onDeleteIds={(ids) => deleteIds(ids)}
         />
       ) : null}
 
@@ -1038,7 +967,7 @@ function TypePill({
   if (!loc) {
     return (
       <span
-        className="inline-flex h-8 min-w-[2.75rem] items-center justify-center rounded-full px-2 font-mono text-[10px] font-bold text-zinc-600"
+        className="inline-flex h-8 min-w-[2.75rem] items-center justify-center rounded-full px-2 font-mono text-[10px] font-bold tracking-tight text-zinc-600"
         aria-label={`${fullLabel} not mapped`}
       >
         {label}
@@ -1068,7 +997,7 @@ function TypePill({
       onClick={() => {
         if (canMutate) onToggle(loc);
       }}
-      className={`inline-flex h-8 min-w-[2.75rem] items-center justify-center rounded-full px-2 font-mono text-[10px] font-bold transition ${heatClass} ${
+      className={`inline-flex h-8 min-w-[2.75rem] items-center justify-center rounded-full px-2 font-mono text-[10px] font-bold tracking-tight transition ${heatClass} ${
         loc.is_active ? "" : "opacity-45"
       } disabled:opacity-40`}
     >
@@ -1148,570 +1077,6 @@ function BayRowMenu({
             {confirming ? "Confirm delete" : "Delete"}
           </button>
         </div>
-      ) : null}
-    </div>
-  );
-}
-
-function BayActionsSheet({
-  specialist,
-  departments,
-  bay,
-  initialMode = "actions",
-  onClose,
-  onChanged,
-  onError,
-  onDeleteIds,
-}: {
-  specialist: StoreSpecialist;
-  departments: Department[];
-  bay: SheetBay;
-  initialMode?: SheetMode;
-  onClose: () => void;
-  onChanged: () => void;
-  onError: (msg: string | null) => void;
-  onDeleteIds: (ids: string[]) => void | Promise<void>;
-}) {
-  const [mode, setMode] = useState<SheetMode>(initialMode);
-  const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
-  const [confirmDelete, setConfirmDelete] = useState(false);
-  const [bayScanOpen, setBayScanOpen] = useState(false);
-  const [historyLoc, setHistoryLoc] = useState<StoreLocation | null>(
-    bay.pair.selling ?? bay.pair.topstock
-  );
-  const [historyRows, setHistoryRows] = useState<BayRotationHistoryRow[]>([]);
-  const [historyLoading, setHistoryLoading] = useState(false);
-
-  const [editTargetId, setEditTargetId] = useState<string>(
-    (bay.pair.selling ?? bay.pair.topstock)?.id ?? ""
-  );
-  const editTarget =
-    [bay.pair.selling, bay.pair.topstock].find((l) => l?.id === editTargetId) ??
-    bay.pair.selling ??
-    bay.pair.topstock;
-  const [zoneDraft, setZoneDraft] = useState<"STANDARD" | "SHOWROOM_STACKOUT">(
-    (editTarget?.location_type as "STANDARD" | "SHOWROOM_STACKOUT") ??
-      "STANDARD"
-  );
-  const [freqDraft, setFreqDraft] = useState(
-    String(editTarget?.audit_frequency_days ?? 7)
-  );
-  const [aisleDraft, setAisleDraft] = useState(bay.aisle);
-  const [bayDraft, setBayDraft] = useState(String(editTarget?.bay ?? bay.pair.bay));
-  const [typeDraft, setTypeDraft] = useState<StoreLocationType>(
-    editTarget?.type === "TOPSTOCK" ? "TOPSTOCK" : "SELLING"
-  );
-  const [statusDraft, setStatusDraft] = useState<RotationStatus>(
-    editTarget?.status ?? "PENDING"
-  );
-
-  useEffect(() => {
-    document.body.style.overflow = "hidden";
-    return () => {
-      document.body.style.overflow = "";
-    };
-  }, []);
-
-  useEffect(() => {
-    setMode(initialMode);
-    setMessage(null);
-    setConfirmDelete(false);
-    const first = bay.pair.selling ?? bay.pair.topstock;
-    setEditTargetId(first?.id ?? "");
-    setZoneDraft(
-      (first?.location_type as "STANDARD" | "SHOWROOM_STACKOUT") ?? "STANDARD"
-    );
-    setFreqDraft(String(first?.audit_frequency_days ?? 7));
-    setAisleDraft(bay.aisle);
-    setBayDraft(String(first?.bay ?? bay.pair.bay));
-    setTypeDraft(first?.type === "TOPSTOCK" ? "TOPSTOCK" : "SELLING");
-    setStatusDraft(first?.status ?? "PENDING");
-  }, [
-    bay.departmentId,
-    bay.aisle,
-    bay.pair.bay,
-    bay.pair.selling?.id,
-    bay.pair.topstock?.id,
-    initialMode,
-  ]);
-
-  useEffect(() => {
-    if (!editTarget) return;
-    setZoneDraft(
-      (editTarget.location_type as "STANDARD" | "SHOWROOM_STACKOUT") ??
-        "STANDARD"
-    );
-    setFreqDraft(String(editTarget.audit_frequency_days ?? 7));
-    setAisleDraft(editTarget.aisle);
-    setBayDraft(String(editTarget.bay));
-    setTypeDraft(editTarget.type === "TOPSTOCK" ? "TOPSTOCK" : "SELLING");
-    setStatusDraft(editTarget.status);
-  }, [editTarget?.id]);
-
-  async function pinToWeek(loc: StoreLocation) {
-    setBusy(true);
-    setMessage(null);
-    onError(null);
-    try {
-      await assignLocationsToWeek(specialist, [loc.id], loc.department_id);
-      setMessage(
-        `${loc.type} pinned to this week (priority ${
-          (Number(loc.manual_priority_count) || 0) + 1
-        }).`
-      );
-      toastSuccess(`Pinned ${loc.type} to this week`);
-      onChanged();
-    } catch (err) {
-      const msg =
-        err instanceof Error ? err.message : "Could not pin bay to this week";
-      setMessage(null);
-      onError(msg);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function openHistory(loc: StoreLocation) {
-    setMode("history");
-    setHistoryLoc(loc);
-    setHistoryLoading(true);
-    setMessage(null);
-    onError(null);
-    try {
-      const data = await fetchBayLocationHistory(specialist, loc.id);
-      setHistoryLoc(data.location);
-      setHistoryRows(data.rotations);
-    } catch (err) {
-      setHistoryRows([]);
-      onError(
-        err instanceof Error ? err.message : "Could not load bay history"
-      );
-    } finally {
-      setHistoryLoading(false);
-    }
-  }
-
-  async function saveEdit() {
-    if (!editTarget) return;
-    const aisleCode = normalizeAisle(aisleDraft);
-    if (!isValidAisle(aisleCode)) {
-      onError("Enter an aisle code (e.g. BW, RW, 12, A1)");
-      return;
-    }
-    const bayNumber = Math.floor(Number(bayDraft));
-    if (!Number.isFinite(bayNumber) || bayNumber < 0) {
-      onError("Bay must be an integer ≥ 0");
-      return;
-    }
-    setBusy(true);
-    setMessage(null);
-    onError(null);
-    try {
-      const days = Math.max(1, Math.floor(Number(freqDraft)) || 7);
-      await patchStoreLocation(specialist, editTarget.id, {
-        aisle: aisleCode,
-        bay: bayNumber,
-        type: typeDraft,
-        status: statusDraft,
-        location_type: zoneDraft,
-        audit_frequency_days: days,
-      });
-      setMessage("Location details saved.");
-      toastSuccess("Bay details saved");
-      onChanged();
-      if (
-        aisleCode !== bay.aisle ||
-        bayNumber !== bay.pair.bay ||
-        typeDraft !== editTarget.type
-      ) {
-        onClose();
-      } else {
-        setMode("actions");
-      }
-    } catch (err) {
-      onError(
-        err instanceof Error ? err.message : "Could not save location details"
-      );
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function deleteCurrent() {
-    const ids = pairLocationIds(bay.pair);
-    if (ids.length === 0) return;
-    if (!confirmDelete) {
-      setConfirmDelete(true);
-      return;
-    }
-    setBusy(true);
-    try {
-      await onDeleteIds(ids);
-      onClose();
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  const pinTargets = [bay.pair.selling, bay.pair.topstock].filter(
-    (loc): loc is StoreLocation =>
-      Boolean(loc) &&
-      (loc!.location_type ?? "STANDARD") !== "SHOWROOM_STACKOUT"
-  );
-
-  const bayScanMeta: BayScanMeta = {
-    aisle: bay.aisle,
-    bay: bay.pair.bay,
-    department_code: departments.find((d) => d.id === bay.departmentId)?.code,
-  };
-
-  return (
-    <div className="glass-backdrop fixed inset-0 z-[80] flex flex-col justify-end">
-      <button
-        type="button"
-        aria-label="Close bay actions"
-        className="absolute inset-0"
-        onClick={onClose}
-      />
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="bay-actions-title"
-        className="glass-card theme-modal relative z-10 max-h-[88dvh] w-full overflow-y-auto !rounded-t-2xl !rounded-b-none border-t-2 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3"
-      >
-        <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-zinc-600" />
-
-        <div className="mb-4 flex items-start justify-between gap-3">
-          <div>
-            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-accent">
-              {bay.departmentName}
-            </p>
-            <h2
-              id="bay-actions-title"
-              className="glass-title mt-1 text-lg"
-            >
-              Aisle {bay.aisle} · Bay {bay.pair.bay}
-            </h2>
-            <p className="mt-0.5 text-sm text-zinc-400">
-              {mode === "actions"
-                ? "Advanced bay actions"
-                : mode === "history"
-                  ? "Rotation history"
-                  : "Edit location details"}
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="btn-icon-touch"
-            aria-label="Close"
-          >
-            <HubIcon id="close" className="h-5 w-5" />
-          </button>
-        </div>
-
-        {message ? (
-          <p className="mb-3 rounded-xl theme-accent-surface border px-3 py-2 text-sm">
-            {message}
-          </p>
-        ) : null}
-
-        {mode === "actions" ? (
-          <div className="space-y-2">
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => setBayScanOpen(true)}
-              className="btn-primary-glow flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl px-4 text-sm disabled:opacity-50"
-            >
-              <HubIcon id="camera" className="h-4 w-4" />
-              Snap Bay AI Audit
-            </button>
-
-            {pinTargets.length === 0 ? (
-              <p className="rounded-xl border border-dashed border-zinc-700 px-3 py-4 text-sm text-zinc-400">
-                No standard aisle tags to pin (showroom zones use Quick Touch).
-              </p>
-            ) : (
-              pinTargets.map((loc) => (
-                <button
-                  key={loc.id}
-                  type="button"
-                  disabled={busy}
-                  onClick={() => void pinToWeek(loc)}
-                  className="flex min-h-[44px] w-full items-center justify-center rounded-xl border border-zinc-700/80 bg-zinc-950/60 px-4 text-sm font-bold text-zinc-100 disabled:opacity-50"
-                >
-                  Pin {loc.type === "SELLING" ? "Selling" : "Topstock"} to
-                  Current Week
-                </button>
-              ))
-            )}
-
-            {[bay.pair.selling, bay.pair.topstock]
-              .filter((loc): loc is StoreLocation => Boolean(loc))
-              .map((loc) => (
-                <button
-                  key={`hist-${loc.id}`}
-                  type="button"
-                  disabled={busy}
-                  onClick={() => void openHistory(loc)}
-                  className="flex min-h-[44px] w-full items-center justify-center rounded-xl border border-zinc-700/80 bg-zinc-950/60 px-4 text-sm font-bold text-zinc-100 disabled:opacity-50"
-                >
-                  View {loc.type === "SELLING" ? "Selling" : "Topstock"} Audit
-                  Log / History
-                </button>
-              ))}
-
-            <button
-              type="button"
-              disabled={busy || !editTarget}
-              onClick={() => setMode("edit")}
-              className="flex min-h-14 w-full items-center justify-center rounded-xl border-2 border-amber-500/40 bg-amber-950/30 px-4 text-sm font-bold text-amber-100 disabled:opacity-50"
-            >
-              Edit Location Details
-            </button>
-            <button
-              type="button"
-              disabled={busy || pairLocationIds(bay.pair).length === 0}
-              onClick={() => void deleteCurrent()}
-              className={`flex min-h-14 w-full items-center justify-center rounded-xl border px-4 text-sm font-bold disabled:opacity-50 ${
-                confirmDelete
-                  ? "border-rose-400 bg-rose-600 text-white"
-                  : "border-rose-500/40 bg-rose-950/30 text-rose-100"
-              }`}
-            >
-              {confirmDelete
-                ? "Confirm delete this bay (rotations too)"
-                : "Delete this bay"}
-            </button>
-          </div>
-        ) : null}
-
-        {mode === "history" ? (
-          <div className="space-y-3">
-            <button
-              type="button"
-              onClick={() => setMode("actions")}
-              className="text-sm font-semibold text-accent underline-offset-2 hover:underline"
-            >
-              ← Back
-            </button>
-            {historyLoc ? (
-              <div className="rounded-xl border border-zinc-800 bg-zinc-900/80 px-3 py-3 text-sm text-zinc-300">
-                <p className="font-semibold text-zinc-100">
-                  {historyLoc.type} · cycle {historyLoc.cycle_number}
-                </p>
-                <p className="mt-1 font-mono text-xs text-zinc-500">
-                  Status {historyLoc.status} · last completed{" "}
-                  {formatWhen(historyLoc.last_completed_at)}
-                </p>
-                <p className="mt-1 font-mono text-xs text-zinc-500">
-                  Priority {historyLoc.manual_priority_count ?? 0} · zone{" "}
-                  {historyLoc.location_type ?? "STANDARD"}
-                </p>
-              </div>
-            ) : null}
-            {historyLoading ? (
-              <p className="text-sm text-zinc-400">Loading history…</p>
-            ) : historyRows.length === 0 ? (
-              <p className="rounded-xl border border-dashed border-zinc-700 px-3 py-6 text-center text-sm text-zinc-400">
-                No weekly rotation history yet for this bay.
-              </p>
-            ) : (
-              <ul className="space-y-2">
-                {historyRows.map((row) => (
-                  <li
-                    key={row.id}
-                    className="rounded-xl border border-zinc-800 bg-zinc-900/70 px-3 py-3"
-                  >
-                    <p className="font-mono text-sm font-bold text-zinc-100">
-                      {row.assigned_week}
-                    </p>
-                    <p className="mt-0.5 text-xs text-zinc-400">
-                      {row.is_completed
-                        ? `Completed ${formatWhen(row.completed_at)}`
-                        : "Open / incomplete"}
-                    </p>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-        ) : null}
-
-        {mode === "edit" && editTarget ? (
-          <div className="space-y-3">
-            <button
-              type="button"
-              onClick={() => setMode("actions")}
-              className="text-sm font-semibold text-accent underline-offset-2 hover:underline"
-            >
-              ← Back
-            </button>
-
-            {[bay.pair.selling, bay.pair.topstock]
-              .filter((loc): loc is StoreLocation => Boolean(loc))
-              .length > 1 ? (
-              <div className="grid grid-cols-2 gap-2">
-                {[bay.pair.selling, bay.pair.topstock]
-                  .filter((loc): loc is StoreLocation => Boolean(loc))
-                  .map((loc) => (
-                    <button
-                      key={loc.id}
-                      type="button"
-                      onClick={() => setEditTargetId(loc.id)}
-                      className={`min-h-12 rounded-xl border text-sm font-bold ${
-                        editTargetId === loc.id
-                          ? "theme-accent-surface border"
-                          : "border-zinc-700 text-zinc-300"
-                      }`}
-                    >
-                      {loc.type === "SELLING" ? "Selling" : "Topstock"}
-                    </button>
-                  ))}
-              </div>
-            ) : null}
-
-            <div className="grid grid-cols-2 gap-2">
-              <label className="block space-y-1.5">
-                <span className="text-sm font-medium text-zinc-200">Aisle</span>
-                <input
-                  type="text"
-                  inputMode="text"
-                  autoCapitalize="characters"
-                  spellCheck={false}
-                  value={aisleDraft}
-                  onChange={(e) =>
-                    setAisleDraft(formatAisleInput(e.target.value))
-                  }
-                  onBlur={() => setAisleDraft(normalizeAisle(aisleDraft))}
-                  className="min-h-12 w-full rounded-xl border border-zinc-700 bg-zinc-900 px-3 font-mono uppercase text-zinc-100"
-                />
-              </label>
-              <label className="block space-y-1.5">
-                <span className="text-sm font-medium text-zinc-200">
-                  Bay number
-                </span>
-                <input
-                  type="number"
-                  min={0}
-                  value={bayDraft}
-                  onChange={(e) => setBayDraft(e.target.value)}
-                  className="min-h-12 w-full rounded-xl border border-zinc-700 bg-zinc-900 px-3 font-mono text-zinc-100"
-                />
-              </label>
-            </div>
-
-            <fieldset>
-              <legend className="mb-1.5 text-sm font-medium text-zinc-200">
-                Location type
-              </legend>
-              <div className="grid grid-cols-2 gap-2">
-                {(
-                  [
-                    ["SELLING", "Selling"],
-                    ["TOPSTOCK", "Topstock"],
-                  ] as const
-                ).map(([value, label]) => (
-                  <button
-                    key={value}
-                    type="button"
-                    onClick={() => setTypeDraft(value)}
-                    className={`min-h-12 rounded-xl border text-sm font-bold ${
-                      typeDraft === value
-                        ? "theme-accent-surface border"
-                        : "border-zinc-700 text-zinc-300"
-                    }`}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-            </fieldset>
-
-            <fieldset>
-              <legend className="mb-1.5 text-sm font-medium text-zinc-200">
-                Status
-              </legend>
-              <div className="grid grid-cols-2 gap-2">
-                {ROTATION_STATUSES.map((value) => (
-                  <button
-                    key={value}
-                    type="button"
-                    onClick={() => setStatusDraft(value)}
-                    className={`min-h-12 rounded-xl border px-2 text-xs font-bold ${
-                      statusDraft === value
-                        ? "border-amber-400 bg-amber-500/15 text-amber-100"
-                        : "border-zinc-700 text-zinc-300"
-                    }`}
-                  >
-                    {value.replace("_", " ")}
-                  </button>
-                ))}
-              </div>
-            </fieldset>
-
-            <fieldset>
-              <legend className="mb-1.5 text-sm font-medium text-zinc-200">
-                Zone
-              </legend>
-              <div className="grid grid-cols-2 gap-2">
-                {(
-                  [
-                    ["STANDARD", "Standard aisle"],
-                    ["SHOWROOM_STACKOUT", "Showroom / stack-out"],
-                  ] as const
-                ).map(([value, label]) => (
-                  <button
-                    key={value}
-                    type="button"
-                    onClick={() => setZoneDraft(value)}
-                    className={`min-h-12 rounded-xl border px-2 text-xs font-bold ${
-                      zoneDraft === value
-                        ? "border-amber-400 bg-amber-500/15 text-amber-100"
-                        : "border-zinc-700 text-zinc-300"
-                    }`}
-                  >
-                    {label}
-                  </button>
-                ))}
-              </div>
-            </fieldset>
-
-            <label className="block space-y-1.5">
-              <span className="text-sm font-medium text-zinc-200">
-                Audit frequency (days)
-              </span>
-              <input
-                type="number"
-                min={1}
-                max={90}
-                value={freqDraft}
-                onChange={(e) => setFreqDraft(e.target.value)}
-                className="min-h-12 w-full rounded-xl border border-zinc-700 bg-zinc-900 px-3 font-mono text-zinc-100"
-              />
-            </label>
-
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => void saveEdit()}
-              className="btn-primary-glow flex min-h-[44px] w-full items-center justify-center rounded-xl text-sm disabled:opacity-50"
-            >
-              {busy ? "Saving…" : "Save location details"}
-            </button>
-          </div>
-        ) : null}
-      </div>
-
-      {bayScanOpen ? (
-        <VisualBayScannerModal
-          open={bayScanOpen}
-          onClose={() => setBayScanOpen(false)}
-          specialist={specialist}
-          meta={bayScanMeta}
-        />
       ) : null}
     </div>
   );

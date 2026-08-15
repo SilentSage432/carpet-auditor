@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Barlow, JetBrains_Mono } from "next/font/google";
+import { Geist, Geist_Mono } from "next/font/google";
 import { HapticsListener } from "@/components/hub/HapticsListener";
 import { OfflineNetworkBanner } from "@/components/hub/OfflineNetworkBanner";
 import { ServiceWorkerRegister } from "@/components/hub/ServiceWorkerRegister";
@@ -9,16 +9,14 @@ import { ThemeProvider } from "@/lib/theme-context";
 import { THEME_BOOT_SCRIPT } from "@/lib/theme";
 import "./globals.css";
 
-const barlow = Barlow({
-  variable: "--font-barlow",
+const geistSans = Geist({
+  variable: "--font-geist-sans",
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
 });
 
-const jetbrains = JetBrains_Mono({
-  variable: "--font-jetbrains",
+const geistMono = Geist_Mono({
+  variable: "--font-geist-mono",
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
 });
 
 export const metadata: Metadata = {
@@ -66,14 +64,14 @@ export default function RootLayout({
       data-contrast="normal"
       data-density="comfortable"
       suppressHydrationWarning
-      className={`${barlow.variable} ${jetbrains.variable} h-full antialiased`}
+      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <head>
         <script
           dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }}
         />
       </head>
-      <body className="min-h-full flex flex-col">
+      <body className="flex min-h-full flex-col font-sans">
         <ThemeProvider>
           <ServiceWorkerRegister />
           <HapticsListener />

@@ -216,7 +216,7 @@ export function NumberField({
             e.currentTarget.blur();
           }
         }}
-        className={`${baseInput} ${leftIcon ? "pl-11" : ""} ${center ? "text-center font-mono tabular-nums" : "font-mono tabular-nums"} ${
+        className={`${baseInput} ${leftIcon ? "pl-11" : ""} ${center ? "text-center font-mono tracking-tight tabular-nums" : "font-mono tracking-tight tabular-nums"} ${
           flash
             ? "border-emerald-400 ring-2 ring-emerald-400/50 shadow-[0_0_20px_-4px_rgba(16,185,129,0.7)]"
             : ""

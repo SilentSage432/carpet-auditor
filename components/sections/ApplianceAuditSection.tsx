@@ -523,7 +523,7 @@ export function ApplianceAuditSection({
                                       className="min-w-0 flex-1 space-y-1 text-left"
                                     >
                                       <div className="flex flex-wrap items-center gap-2">
-                                        <span className="font-mono text-base font-bold text-slate-50">
+                                        <span className="font-mono text-base font-bold tracking-tight tabular-nums text-slate-50">
                                           Item {group.item_number}{" "}
                                           <span className="text-emerald-300">
                                             | Qty: {group.quantity}

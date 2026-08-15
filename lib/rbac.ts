@@ -80,7 +80,7 @@ export function hasElevatedAccess(
   return member?.role === "MasterAdmin" || member?.role === "Supervisor";
 }
 
-/** Admin Tools drawer + `/admin/*` chrome — Master Admin only. */
+/** Master Admin–only setup (Settings bulk / taxonomies / force rotation). */
 export function canAccessAdminTools(
   member: StoreSpecialist | null | undefined
 ): boolean {

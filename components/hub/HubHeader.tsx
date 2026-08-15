@@ -18,9 +18,6 @@ type HubHeaderProps = {
   specialist: StoreSpecialist | null;
   storeNumber?: string;
   roleBadge: string;
-  menuOpen: boolean;
-  drawerId: string;
-  onOpenMenu: () => void;
   userOpen: boolean;
   userMenuId: string;
   userRef: RefObject<HTMLDivElement | null>;
@@ -35,9 +32,6 @@ export function HubHeader({
   specialist,
   storeNumber,
   roleBadge,
-  menuOpen,
-  drawerId,
-  onOpenMenu,
   userOpen,
   userMenuId,
   userRef,
@@ -48,25 +42,10 @@ export function HubHeader({
   return (
     <header className="glass-panel sticky top-0 z-40 border-b border-zinc-800/80 pt-safe shadow-lg shadow-black/30">
       <div className="mx-auto flex min-h-12 max-w-lg items-center gap-1.5 px-2 py-1 sm:px-3">
-        <button
-          type="button"
-          onClick={onOpenMenu}
-          aria-expanded={menuOpen}
-          aria-controls={drawerId}
-          aria-label="Open navigation menu"
-          className="btn-icon-touch shrink-0"
-        >
-          <span className="flex w-5 flex-col gap-1" aria-hidden>
-            <span className="block h-0.5 w-full rounded bg-current" />
-            <span className="block h-0.5 w-full rounded bg-current" />
-            <span className="block h-0.5 w-full rounded bg-current" />
-          </span>
-        </button>
-
         <DeptSyncBadge size="sm" />
 
         <div className="min-w-0 flex-1">
-          <p className="truncate font-mono text-[10px] font-bold uppercase tracking-[0.12em] text-accent">
+          <p className="truncate font-mono text-[10px] font-bold uppercase tracking-tight text-accent">
             DeptSync
             {storeNumber ? ` · ${formatStoreLabel(storeNumber)}` : ""}
           </p>
@@ -92,7 +71,7 @@ export function HubHeader({
             onClick={onToggleUser}
             aria-expanded={userOpen}
             aria-controls={userMenuId}
-            aria-label="Account and status"
+            aria-label="Account and PIN"
             className="theme-accent-surface flex h-12 max-w-[10.5rem] items-center gap-1.5 rounded-xl border px-2 text-left backdrop-blur-sm transition active:scale-[0.98] focus-visible:border-accent/50 focus-visible:ring-1 focus-visible:ring-accent/30"
           >
             <HeaderNetworkStatus storeNumber={storeNumber} variant="compact">

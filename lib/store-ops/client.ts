@@ -115,7 +115,7 @@ export async function fetchDepartments(
   return result.items;
 }
 
-/** Departments list with soft Auth signal for Store Map / Admin Tools. */
+/** Departments list with soft Auth signal for Store Map / Settings tools. */
 export async function fetchDepartmentsDetailed(
   specialist: StoreSpecialist,
   storeNumber?: string | null

@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Settings / Admin Tools department quota card.
+ * Settings department quota card.
  * Matrix UI lives in DepartmentTargetsMatrix (single owner).
  */
 

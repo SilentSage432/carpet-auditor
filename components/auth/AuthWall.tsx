@@ -212,7 +212,7 @@ function LoginForm({
         : { data: { session: null } };
       if (!data.session?.access_token) {
         setError(
-          "Fingerprint unlocked the Hub — enter your PIN/password once to unlock Admin Tools and Store Ops."
+          "Fingerprint unlocked the Hub — enter your PIN/password once to unlock Store Ops."
         );
         return;
       }
@@ -892,7 +892,7 @@ function UnlockForm({
         : { data: { session: null } };
       if (!data.session?.access_token) {
         setError(
-          "Enter your PIN/password once to unlock Admin Tools and Store Ops, then fingerprint works again."
+          "Enter your PIN/password once to unlock Store Ops, then fingerprint works again."
         );
         return;
       }
@@ -918,7 +918,7 @@ function UnlockForm({
         {roleBadge(member)}
       </p>
       <p className="mb-3 text-center text-xs text-zinc-500">
-        Enter your Hub PIN/password to unlock Store Ops (Admin Tools, map,
+        Enter your Hub PIN/password to unlock Store Ops (map,
         briefing).
       </p>
 

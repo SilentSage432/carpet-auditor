@@ -130,13 +130,28 @@ export type BulkGenerateInput = {
   bay_pattern?: BayNumberingPattern;
 };
 
+/** Compact bay tag for tabular mono display — `A14-B06`, `BW-B12`. */
+export function formatBayTag(
+  loc: Pick<StoreLocation, "aisle" | "bay">
+): string {
+  const aisleRaw = String(loc.aisle ?? "").trim().toUpperCase();
+  const bayNum = Math.floor(Number(loc.bay));
+  const bay = Number.isFinite(bayNum)
+    ? String(bayNum).padStart(2, "0")
+    : String(loc.bay ?? "").padStart(2, "0");
+  const aisle = /^\d+$/.test(aisleRaw)
+    ? `A${aisleRaw}`
+    : aisleRaw || "A?";
+  return `${aisle}-B${bay}`;
+}
+
 export function formatLocationLabel(
   loc: Pick<StoreLocation, "aisle" | "bay"> & {
     type?: string | null;
     location_type?: string | null;
   }
 ): string {
-  const base = `Aisle ${loc.aisle} - Bay ${loc.bay}`;
+  const base = formatBayTag(loc);
   const parts = [loc.type, loc.location_type === "SHOWROOM_STACKOUT" ? "SHOWROOM" : null]
     .filter(Boolean)
     .join(" · ");

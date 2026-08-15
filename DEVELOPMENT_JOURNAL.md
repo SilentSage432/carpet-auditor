@@ -1,14 +1,22 @@
 # DeptSync Hub — Development Journal
 
-## 2026-08-15 — UX lockdown: Floor / Map / Roster / Settings
+## 2026-08-15 — Geist typography + 4-tab chrome lock
 
 ### Shipped
-- **Four primary tabs** — `lib/nav-hub.ts` + `BottomNav` + `WorkflowTabShell` host Floor · Map · Roster · Settings. Primary panels mount immediately (`hidden` keep-alive, 0ms switches). Stock moved to More overflow (still keep-alive when visited).
-- **Roster tab** (`/roster`, `RosterTab`) owns team list, PIN add, and `accessible_departments` chips. Chip toggles are optimistic with Sonner `"Updated permissions for [Name]"`. `/admin/supervisors` and `/admin/roles` redirect here.
-- **Edit Bay** — tapping a map bay opens one sheet: header (aisle/bay + department badge), Section A walk logs, Section B aisle/bay/department/priority/delete. **+ Add Bay to Aisle** on the map (parity-matched bulk upsert of Selling+Topstock).
-- **Floor exception feed** — `ExceptionFeed` on Floor composes `fetchExceptionSummary`. Full log stays `/admin/exceptions`.
-- **Toasts** — Sonner host in root layout (`lib/toast.ts`). Mutations on bays, walks, roster, and prune/delete confirm in-place.
-- PATCH `/api/store-locations` accepts `department_id` + `priority_override` (Super Admin).
+- **Geist / Geist Mono** — `next/font/google` in `app/layout.tsx` (`--font-geist-sans`, `--font-geist-mono`). Tailwind `@theme` maps `--font-sans` / `--font-mono`. Body uses `font-sans`.
+- **Identity mono** — `formatBayTag` (`A14-B06`, `BW-B12`) plus `font-mono tracking-tight tabular-nums` on bay tags, SKUs, cadence badges, and timestamps (Floor, Map, Exception feed, Sunday drawer, scan logs).
+- **4-tab chrome** remains locked: Floor · Map · Roster · Settings. Hamburger / More / Admin Tools stay gone. Bulk Generator, Force Rotation, and Department Targets live in Settings accordions/modals.
+
+## 2026-08-15 — Chrome consolidation: 4-tab-only DeptSync
+
+### Shipped
+- **Strict 4-tab bar** — Floor `/dashboard` · Map `/admin/store-map` · Roster `/roster` · Settings `/settings`. Hamburger drawer, More overflow sheet, and Admin Tools slide-over are gone. Header is title/store #, department pill, account/PIN chip only.
+- **Settings owns former Admin Tools** — Bulk Generator, Taxonomies, Force Rotation, store number, Floor Pad, remnants, weekly targets, theme, push, and device/sync live in `SettingsSection` accordions/modals. Hash deep-links (`#bulk-generate`, `#weekly-rotation`, `#taxonomies`, `#manager-notes`, `#remnants`) still work, including keep-alive Settings.
+- **Unified Floor** — one checklist header for every role: Sunday staging (non-associates), scan chips, health/rollup, showroom, in-place **Verify completed bays**, `ZebraChecklist` (Rotation/Downstock + Barrier chips), `ExceptionFeed`. `/verify-rotation`, `/admin/exceptions`, and `/department` redirect to `/dashboard`.
+- **Unified Map bay sheet** — `WalkTheFloorSheet` is the only overlay: 2-second walk log + Snap Bay + Master Admin edit/pin. `BayActionsSheet` deleted. Bulk generate CTAs go to `/settings#bulk-generate`.
+- **Roster** remains canonical team/PINs/chips. `/admin/supervisors` and `/admin/roles` still redirect here.
+- **Dead chrome deleted** — `CatalogSection`, `ApplianceCatalogSection`, `CatalogItemCard`, `SuperAdminQuickActions`, `AdminRosterManager`, `AdminToolsDrawer`, `admin-tools-events.ts`, `StockTab`. `/stock` and `/manager-notes` redirect (Floor / Settings).
+- **Toasts** — Sonner host in root layout (`lib/toast.ts`). PATCH `/api/store-locations` accepts `department_id` + `priority_override`.
 
 ## 2026-08-14 — Multi-department role & scope access
 

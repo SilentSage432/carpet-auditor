@@ -7,6 +7,7 @@ import {
   fetchShowroomLocations,
 } from "@/lib/store-ops/client";
 import {
+  formatBayTag,
   formatLocationLabel,
   isShowroomDue,
   type StoreLocation,
@@ -104,10 +105,10 @@ export function ShowroomQuickTouchCard({
               className="flex min-h-12 items-center justify-between gap-2 rounded-xl border border-amber-500/30 bg-slate-950/50 px-3"
             >
               <div className="min-w-0">
-                <p className="truncate font-mono text-sm font-semibold text-slate-50">
-                  {formatLocationLabel(loc)}
+                <p className="truncate font-mono text-sm font-semibold tracking-tight tabular-nums text-slate-50">
+                  {formatBayTag(loc)}
                 </p>
-                <p className="font-mono text-[10px] text-slate-500">
+                <p className="font-mono text-[10px] tracking-tight tabular-nums text-slate-500">
                   every {loc.audit_frequency_days ?? 7}d
                 </p>
               </div>

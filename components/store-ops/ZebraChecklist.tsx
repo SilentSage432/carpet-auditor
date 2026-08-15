@@ -43,7 +43,7 @@ import { forecastWeeklyPace } from "@/lib/store-ops/week";
 import { getStoreNumber } from "@/lib/store";
 import { fetchAudits, getLocalAudits } from "@/lib/storage";
 import {
-  formatLocationLabel,
+  formatBayTag,
   type ExceptionReason,
   type StoreLocationType,
   type WeeklyRotationWithLocation,
@@ -558,7 +558,7 @@ export function ZebraChecklist({
           {isAssociate(specialist)
             ? "No bays scheduled on your rotation — see your supervisor"
             : isMasterAdmin(specialist)
-              ? "No bays scheduled this week. Open Admin Tools to generate the weekly rotation."
+              ? "No bays scheduled this week. Open Settings → Trigger weekly rotation."
               : "No bays scheduled this week — ask Master Admin to set the rotation."}
         </p>
       ) : null}
@@ -660,7 +660,7 @@ export function ZebraChecklist({
               {done.map((rotation) => {
                 const loc = rotation.store_locations;
                 const label = loc
-                  ? formatLocationLabel(loc)
+                  ? formatBayTag(loc)
                   : rotation.location_id.slice(0, 8);
                 return (
                   <li
@@ -675,10 +675,10 @@ export function ZebraChecklist({
                       className="h-4 w-4"
                       style={{ accentColor: "var(--accent)" }}
                     />
-                    <span className="min-w-0 flex-1 truncate font-mono text-sm text-slate-400 line-through">
+                    <span className="min-w-0 flex-1 truncate font-mono text-sm tracking-tight tabular-nums text-slate-400 line-through">
                       {label}
                     </span>
-                    <span className="shrink-0 font-mono text-[10px] text-slate-500">
+                    <span className="shrink-0 font-mono text-[10px] tracking-tight tabular-nums text-slate-500">
                       {formatTouchTime(rotation.completed_at)}
                     </span>
                   </li>
@@ -761,7 +761,7 @@ function ZebraBayRow({
 }) {
   const loc = rotation.store_locations;
   const label = loc
-    ? formatLocationLabel(loc)
+    ? formatBayTag(loc)
     : `Location ${rotation.location_id.slice(0, 8)}`;
   const typeBadge = loc?.type ? formatAuditLocationBadge(loc.type) : null;
 
@@ -782,7 +782,7 @@ function ZebraBayRow({
             aria-label={`Mark complete: ${label}`}
           />
           <span className="min-w-0 flex-1">
-            <span className="block truncate font-mono text-sm font-bold text-slate-50">
+            <span className="block truncate font-mono text-sm font-bold tracking-tight tabular-nums text-slate-50">
               {label}
             </span>
             <span className="mt-0.5 flex flex-wrap items-center gap-1">

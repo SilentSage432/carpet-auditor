@@ -20,6 +20,12 @@ export type FloorPadFont = {
 export const FLOOR_PAD_FONTS: FloorPadFont[] = [
   // Sans
   {
+    id: "geist",
+    label: "Geist",
+    css: "var(--font-geist-sans), ui-sans-serif, sans-serif",
+    category: "sans",
+  },
+  {
     id: "inter",
     label: "Inter",
     css: '"Inter", ui-sans-serif, sans-serif',
@@ -70,6 +76,12 @@ export const FLOOR_PAD_FONTS: FloorPadFont[] = [
   },
   // Mono
   {
+    id: "geist-mono",
+    label: "Geist Mono",
+    css: "var(--font-geist-mono), ui-monospace, monospace",
+    category: "mono",
+  },
+  {
     id: "roboto-mono",
     label: "Roboto Mono",
     css: '"Roboto Mono", ui-monospace, monospace',
@@ -84,7 +96,7 @@ export const FLOOR_PAD_FONTS: FloorPadFont[] = [
   {
     id: "jetbrains-mono",
     label: "JetBrains Mono",
-    css: '"JetBrains Mono", var(--font-jetbrains), ui-monospace, monospace',
+    css: '"JetBrains Mono", ui-monospace, monospace',
     category: "mono",
   },
   // Handwriting / script
