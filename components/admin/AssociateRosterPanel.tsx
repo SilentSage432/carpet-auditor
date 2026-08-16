@@ -3,8 +3,8 @@
 /**
  * Lightweight Associate Roster — presentation for Sunday drawer.
  * Knowledge stays in lib/specialists.ts. Floor titles (Specialist vs CSA) come from
- * department taxonomy in lib/types.ts. Roster add-member issues an SMS/link invite
- * (no manual PIN).
+ * department taxonomy in lib/types.ts. Add-member is roster-only (no SMS)
+ * so Sunday balancer names are available immediately.
  */
 
 import { useMemo, useState } from "react";
@@ -15,7 +15,7 @@ import { DepartmentAccessChips } from "@/components/hub/DepartmentAccessChips";
 import {
   composeAccessibleDepartments,
 } from "@/lib/department-access";
-import { updateDepartmentAccess } from "@/lib/store-ops/client";
+import { updateDepartmentAccess, createRosterMember } from "@/lib/store-ops/client";
 import { toastError, toastSuccess } from "@/lib/toast";
 import {
   dedupeRoster,
@@ -23,7 +23,6 @@ import {
   setSpecialistActive,
   updateSpecialistScope,
 } from "@/lib/specialists";
-import { inviteSupervisor } from "@/lib/store-ops/client";
 import { SHIFT_HOUR_PRESETS } from "@/lib/store-ops/weekly-rotations";
 import {
   associateFloorTitleLabel,
@@ -173,7 +172,7 @@ export function AssociateRosterPanel({
     setAdding(true);
     setError(null);
     try {
-      await inviteSupervisor(specialist, {
+      await createRosterMember(specialist, {
         name: trimmed,
         department,
         role: "Associate",

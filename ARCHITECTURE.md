@@ -87,6 +87,7 @@ components/auth/InviteOnboardingView.tsx → Legacy invite presentation (unused;
 lib/auth-token.ts                 → SHA-256 one-time tokens, PIN hash, verify-session cookie
 lib/invite.ts                     → SMS copy for invite/reset links
 lib/onboarding/roster-invite.ts   → Issue invite: persist hashes, status=invited, dispatch SMS
+lib/onboarding/create-roster-member.ts → Roster-only insert (status=active, no tokens) or compose invite
 lib/onboarding/pin-reset.ts       → Self-service PIN reset token + SMS
 lib/onboarding/load-invite.ts     → Public token lookup by SHA-256 hash
 lib/onboarding/redeem-token.ts    → Consume token, hash PIN, mint Hub-bridge session
@@ -227,7 +228,7 @@ supabase/migrations/20260812_sunday_bay_assignments.sql → sunday specialist↔
 | Focus / keyboard dismiss | `lib/focus-input.ts` (`blurActiveInput` — never auto-focus on tab switch) |
 | SIMS location stock | `lib/sims.ts`, `SimsLocationFinder` |
 | Specialists session / credentials | `lib/specialists.ts`, `SpecialistModal` |
-| Roster SMS/link invite + PIN setup | `lib/auth-token.ts` + `lib/onboarding/*` + `/auth/verify/[token]` (hashed token consume-on-entry; `pin_hash`; status invited→active) |
+| Roster SMS/link invite + PIN setup | `lib/auth-token.ts` + `lib/onboarding/*` + `/auth/verify/[token]` (hashed token consume-on-entry; `pin_hash`; status invited→active). Roster add-member is roster-only unless “Send Mobile App Invite”. |
 | Zero-access auth wall / idle lock | `lib/auth-session.ts`, `components/auth/AuthWall.tsx`, `components/auth/AccessGate.tsx` (`/login`) |
 | Edge auth + stealth gate | `lib/auth-gate.ts` + `proxy.ts` + `POST /api/auth/gate` (HttpOnly cookie) |
 | Enterprise ingest contracts | `src/types/enterpriseIntegration.ts` (Zod schemas). Transport: `lib/enterprise-integration/ingest.ts`. Stubs: `POST /api/v1/topology/ingest`, `POST /api/v1/freight/stage`. Does not write Store Ops tables or change hub UI. |

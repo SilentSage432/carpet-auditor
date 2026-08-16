@@ -25,11 +25,13 @@ import {
   suggestUsername,
 } from "@/lib/rbac";
 import {
+  appAccessLabel,
+  appAccessStatus,
   dedupeRoster,
   deleteSpecialist,
   fetchSpecialists,
 } from "@/lib/specialists";
-import { updateDepartmentAccess, inviteSupervisor } from "@/lib/store-ops/client";
+import { updateDepartmentAccess, inviteSupervisor, createRosterMember } from "@/lib/store-ops/client";
 import {
   composeShiftBoard,
   fetchShiftDaysRange,
@@ -106,6 +108,9 @@ export function RosterTab({ specialist, storeNumber }: WorkflowTabProps) {
     null
   );
   const [callOutTarget, setCallOutTarget] = useState<StoreSpecialist | null>(
+    null
+  );
+  const [inviteTarget, setInviteTarget] = useState<StoreSpecialist | null>(
     null
   );
   const today = localWorkDate();
@@ -421,6 +426,7 @@ export function RosterTab({ specialist, storeNumber }: WorkflowTabProps) {
                         member.role !== "MasterAdmin" &&
                         (canManage || member.role === "Associate");
                       const calledOut = day?.is_call_out === true;
+                      const access = appAccessStatus(member);
                       return (
                         <li
                           key={member.id}
@@ -430,12 +436,7 @@ export function RosterTab({ specialist, storeNumber }: WorkflowTabProps) {
                             <div className="min-w-0">
                               <p className="truncate text-sm font-bold text-white">
                                 {member.name}
-                                {member.status === "invited" ||
-                                member.must_change_pin ? (
-                                  <span className="ml-2 inline-flex rounded-full border border-amber-500/40 bg-amber-950/40 px-2 py-0.5 font-mono text-[9px] font-bold uppercase tracking-wide text-amber-100">
-                                    Invited
-                                  </span>
-                                ) : null}
+                                <AppAccessBadge member={member} />
                               </p>
                               <p className="mt-0.5 flex items-center gap-1.5 font-mono text-[10px] font-bold uppercase tracking-wider text-accent">
                                 {member.role === "MasterAdmin" ? (
@@ -560,6 +561,20 @@ export function RosterTab({ specialist, storeNumber }: WorkflowTabProps) {
                             </button>
                           ) : null}
 
+                          {canManage &&
+                          member.role !== "MasterAdmin" &&
+                          access === "roster_only" ? (
+                            <button
+                              type="button"
+                              disabled={busyId === member.id}
+                              onClick={() => setInviteTarget(member)}
+                              className="mt-2 flex min-h-11 w-full items-center justify-center gap-1.5 rounded-xl border border-cyan-500/40 bg-cyan-950/25 text-sm font-bold text-cyan-100"
+                            >
+                              <HubIcon id="users" className="h-4 w-4" />
+                              Send App Invite
+                            </button>
+                          ) : null}
+
                           {member.role === "MasterAdmin" ? (
                             <p className="mt-2 text-[11px] text-zinc-500">
                               Full-store access — chips are not required.
@@ -624,6 +639,18 @@ export function RosterTab({ specialist, storeNumber }: WorkflowTabProps) {
           storeNumber={storeNumber}
           onClose={() => setAddOpen(false)}
           onCreated={async () => {
+            await reload();
+          }}
+        />
+      ) : null}
+
+      {inviteTarget ? (
+        <SendAppInviteSheet
+          specialist={specialist}
+          member={inviteTarget}
+          storeNumber={storeNumber}
+          onClose={() => setInviteTarget(null)}
+          onSent={async () => {
             await reload();
           }}
         />
@@ -735,6 +762,23 @@ export function RosterTab({ specialist, storeNumber }: WorkflowTabProps) {
   );
 }
 
+function AppAccessBadge({ member }: { member: StoreSpecialist }) {
+  const access = appAccessStatus(member);
+  const tone =
+    access === "invited"
+      ? "border-amber-500/40 bg-amber-950/40 text-amber-100"
+      : access === "active"
+        ? "border-emerald-500/40 bg-emerald-950/40 text-emerald-100"
+        : "border-zinc-600 bg-zinc-900 text-zinc-300";
+  return (
+    <span
+      className={`ml-2 inline-flex rounded-full border px-2 py-0.5 font-mono text-[9px] font-bold uppercase tracking-wide ${tone}`}
+    >
+      {appAccessLabel(access)}
+    </span>
+  );
+}
+
 function AddTeamMemberSheet({
   specialist,
   storeNumber,
@@ -752,6 +796,7 @@ function AddTeamMemberSheet({
   >("Specialist");
   const [department, setDepartment] = useState<DepartmentScope>("flooring");
   const [phone, setPhone] = useState("");
+  const [sendInvite, setSendInvite] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [issued, setIssued] = useState<{
@@ -780,41 +825,55 @@ function AddTeamMemberSheet({
       setError("Enter a name");
       return;
     }
-    if (!phoneE164) {
+    if (phone.trim() && !phoneE164) {
       setError("Enter a valid phone number");
+      return;
+    }
+    if (sendInvite && !phoneE164) {
+      setError("Phone number is required to send a mobile app invite");
       return;
     }
     setSaving(true);
     setError(null);
     try {
       const assigned = department;
-      const result = await inviteSupervisor(specialist, {
+      const payload = {
         name: trimmed,
         department: assigned,
-        role: platformRole === "Supervisor" ? "Supervisor" : "Associate",
+        role: platformRole === "Supervisor" ? "Supervisor" as const : "Associate" as const,
         username: suggestUsername(trimmed, assigned),
-        phone: phoneE164,
+        phone: phoneE164 ?? undefined,
         accessible_departments: composeAccessibleDepartments(assigned, [
           assigned === "all" ? "flooring" : (assigned as OperationalDepartment),
         ]),
-      });
-      setIssued({
-        name: result.name,
-        invite_url: result.invite_url,
-        sms_reason:
-          result.sms.ok === true
-            ? undefined
-            : result.sms.reason,
-        sms_link: result.sms_preview.sms_link,
-      });
-      toastSuccess(`Invited ${result.name} — status invited`);
-      if (result.sms.ok !== true) {
-        toastInfo(result.sms.reason);
+      };
+      if (sendInvite) {
+        const result = await inviteSupervisor(specialist, {
+          ...payload,
+          send_invite: true,
+        });
+        setIssued({
+          name: result.name,
+          invite_url: result.invite_url ?? "",
+          sms_reason:
+            result.sms && result.sms.ok === true ? undefined : result.sms?.reason,
+          sms_link: result.sms_preview?.sms_link ?? "",
+        });
+        toastSuccess(`Invited ${result.name} — status invited`);
+        if (result.sms && result.sms.ok !== true) {
+          toastInfo(result.sms.reason);
+        }
+      } else {
+        const result = await createRosterMember(specialist, payload);
+        toastSuccess(`${result.name} added to the roster`);
+        await onCreated();
+        onClose();
+        return;
       }
       await onCreated();
     } catch (err) {
       const message =
-        err instanceof Error ? err.message : "Could not send invite";
+        err instanceof Error ? err.message : "Could not add team member";
       setError(message);
       toastError(message);
     } finally {
@@ -843,7 +902,7 @@ function AddTeamMemberSheet({
         <p className="mt-1 text-sm text-zinc-400">
           {issued
             ? "Share the one-time link. They set a 4–6 digit PIN at /auth/verify."
-            : "Name, role, home department, and phone. A one-time invite link issues the PIN — do not set it here."}
+            : "Name, role, and home department add them to the floor roster. App invite is optional."}
         </p>
 
         {issued ? (
@@ -930,7 +989,7 @@ function AddTeamMemberSheet({
 
               <label className="block space-y-1.5">
                 <span className="text-sm font-medium text-zinc-200">
-                  Phone Number
+                  Phone Number{sendInvite ? "" : " (optional)"}
                 </span>
                 <input
                   type="tel"
@@ -941,6 +1000,24 @@ function AddTeamMemberSheet({
                   placeholder="(555) 123-4567"
                   className="glass-input min-h-12 w-full font-mono"
                 />
+              </label>
+
+              <label className="flex min-h-12 items-start gap-3 rounded-xl border border-zinc-700 px-3 py-2.5">
+                <input
+                  type="checkbox"
+                  checked={sendInvite}
+                  onChange={(e) => setSendInvite(e.target.checked)}
+                  className="mt-0.5 h-5 w-5 shrink-0 accent-cyan-500"
+                />
+                <span>
+                  <span className="block text-sm font-bold text-white">
+                    Send Mobile App Invite
+                  </span>
+                  <span className="text-[11px] leading-snug text-zinc-400">
+                    SMS a one-time link so they can set a PIN. Off by default —
+                    they are still available for schedules and rotations.
+                  </span>
+                </span>
               </label>
             </div>
 
@@ -964,7 +1041,183 @@ function AddTeamMemberSheet({
                 onClick={() => void handleSave()}
                 className="btn-primary-glow flex min-h-12 items-center justify-center rounded-xl text-sm font-bold disabled:opacity-40"
               >
-                {saving ? "Sending invite…" : "Send invite"}
+                {saving
+                  ? sendInvite
+                    ? "Sending invite…"
+                    : "Adding…"
+                  : sendInvite
+                    ? "Send invite"
+                    : "Add to roster"}
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function SendAppInviteSheet({
+  specialist,
+  member,
+  storeNumber,
+  onClose,
+  onSent,
+}: {
+  specialist: StoreSpecialist;
+  member: StoreSpecialist;
+  storeNumber: string;
+  onClose: () => void;
+  onSent: () => Promise<void>;
+}) {
+  const [phone, setPhone] = useState(member.phone_number ?? "");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [issued, setIssued] = useState<{
+    invite_url: string;
+    sms_reason?: string;
+    sms_link: string;
+  } | null>(null);
+
+  async function copyText(label: string, value: string) {
+    try {
+      await navigator.clipboard.writeText(value);
+      toastSuccess(`Copied ${label}`);
+    } catch {
+      toastError(`Could not copy ${label}`);
+    }
+  }
+
+  async function handleSend() {
+    const phoneE164 = normalizePhoneE164(phone);
+    if (!phoneE164) {
+      setError("Enter a valid phone number");
+      return;
+    }
+    setSaving(true);
+    setError(null);
+    try {
+      const result = await inviteSupervisor(specialist, {
+        specialist_id: member.id,
+        phone: phoneE164,
+        send_invite: true,
+      });
+      setIssued({
+        invite_url: result.invite_url ?? "",
+        sms_reason:
+          result.sms && result.sms.ok === true ? undefined : result.sms?.reason,
+        sms_link: result.sms_preview?.sms_link ?? "",
+      });
+      toastSuccess(`Invited ${member.name}`);
+      if (result.sms && result.sms.ok !== true) {
+        toastInfo(result.sms.reason);
+      }
+      await onSent();
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Could not send invite";
+      setError(message);
+      toastError(message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="glass-backdrop fixed inset-0 z-[80] flex flex-col justify-end">
+      <button
+        type="button"
+        aria-label="Close send app invite"
+        className="absolute inset-0"
+        onClick={onClose}
+      />
+      <div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="send-invite-title"
+        className="glass-card theme-modal relative z-10 max-h-[88dvh] w-full overflow-y-auto !rounded-t-2xl !rounded-b-none border-t-2 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3"
+      >
+        <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-zinc-600" />
+        <h2 id="send-invite-title" className="glass-title text-lg">
+          {issued ? "Invite sent" : "Send App Invite"}
+        </h2>
+        <p className="mt-1 text-sm text-zinc-400">
+          {issued
+            ? `${member.name} can set a PIN at /auth/verify.`
+            : `SMS a one-time link to ${member.name}. They stay on the floor roster either way.`}
+        </p>
+
+        {issued ? (
+          <div className="mt-4 space-y-3">
+            <p className="break-all font-mono text-[11px] text-zinc-300">
+              {issued.invite_url}
+            </p>
+            {issued.sms_reason ? (
+              <p className="text-xs text-amber-200">{issued.sms_reason}</p>
+            ) : (
+              <p className="text-xs text-emerald-200">
+                SMS dispatched to {formatPhoneDisplay(phone)} · store{" "}
+                {storeNumber}
+              </p>
+            )}
+            <button
+              type="button"
+              onClick={() => void copyText("invite link", issued.invite_url)}
+              className="flex min-h-11 items-center justify-center rounded-xl border border-zinc-700 text-xs font-semibold"
+            >
+              Copy invite link
+            </button>
+            <button
+              type="button"
+              onClick={() => void copyText("SMS text", issued.sms_link)}
+              className="flex min-h-11 w-full items-center justify-center rounded-xl border border-zinc-700 text-xs font-semibold"
+            >
+              Copy SMS link
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="btn-primary-glow flex min-h-12 w-full items-center justify-center rounded-xl text-sm font-bold"
+            >
+              Done
+            </button>
+          </div>
+        ) : (
+          <>
+            <label className="mt-4 block space-y-1.5">
+              <span className="text-sm font-medium text-zinc-200">
+                Phone Number
+              </span>
+              <input
+                type="tel"
+                inputMode="tel"
+                autoComplete="tel"
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                placeholder="(555) 123-4567"
+                className="glass-input min-h-12 w-full font-mono"
+              />
+            </label>
+            {error ? (
+              <p className="mt-3 text-center text-sm font-semibold text-rose-300" role="alert">
+                {error}
+              </p>
+            ) : null}
+            <div className="mt-4 grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={onClose}
+                className="flex min-h-12 items-center justify-center rounded-xl border border-zinc-700 text-sm font-semibold"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={saving}
+                onClick={() => void handleSend()}
+                className="btn-primary-glow flex min-h-12 items-center justify-center rounded-xl text-sm font-bold disabled:opacity-40"
+              >
+                {saving ? "Sending…" : "Send invite"}
               </button>
             </div>
           </>

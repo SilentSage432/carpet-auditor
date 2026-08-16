@@ -3,6 +3,7 @@ import { isMissingColumnError } from "./store-ops/errors";
 import { createTtlCache } from "@/lib/store-ops/ttl-cache";
 import { uid } from "./uid";
 import type {
+  AppAccessStatus,
   AssociateOnboardingStatus,
   DepartmentScope,
   SpecialistRole,
@@ -40,6 +41,7 @@ const SPECIALIST_LIST_SELECT = [
   "phone_number",
   "is_active",
   "status",
+  "pin_updated_at",
   "created_at",
 ].join(", ");
 
@@ -84,6 +86,23 @@ function normalizeOnboardingStatus(
   if (!isActive) return "suspended";
   if (mustChangePin) return "invited";
   return "active";
+}
+
+/**
+ * App access is independent of floor roster status.
+ * Roster-only: active on the team, no PIN yet. Invited: SMS token pending.
+ * Active: completed /auth/verify (pin_updated_at set).
+ */
+export function appAccessStatus(member: StoreSpecialist): AppAccessStatus {
+  if (member.status === "invited" || member.must_change_pin) return "invited";
+  if (member.pin_updated_at) return "active";
+  return "roster_only";
+}
+
+export function appAccessLabel(status: AppAccessStatus): string {
+  if (status === "invited") return "Invited";
+  if (status === "active") return "Active";
+  return "Roster Only";
 }
 
 function normalizeRole(raw: unknown): SpecialistRole {
@@ -221,6 +240,10 @@ export function mapRow(row: Record<string, unknown>): StoreSpecialist {
         row.must_change_pin === "true" ||
         row.must_change_pin === 1
     ),
+    pin_updated_at:
+      row.pin_updated_at == null || String(row.pin_updated_at).trim() === ""
+        ? null
+        : String(row.pin_updated_at),
     created_at: String(row.created_at ?? new Date().toISOString()),
     accessible_departments: composeAccessibleDepartments(
       assigned,
@@ -690,7 +713,8 @@ async function loadSpecialists(store: string): Promise<StoreSpecialist[]> {
     if (
       error &&
       (isMissingColumnError(error, "accessible_departments") ||
-        isMissingColumnError(error, "status"))
+        isMissingColumnError(error, "status") ||
+        isMissingColumnError(error, "pin_updated_at"))
     ) {
       const retry = await supabase
         .from(TABLE)

@@ -20,6 +20,12 @@ export type SpecialistRole = "Associate" | "Supervisor" | "MasterAdmin";
 /** Roster onboarding lifecycle on store_specialists.status */
 export type AssociateOnboardingStatus = "invited" | "active" | "suspended";
 
+/**
+ * App authentication vs floor roster.
+ * Roster-only members are status=active with no PIN — they schedule but cannot sign in.
+ */
+export type AppAccessStatus = "roster_only" | "invited" | "active";
+
 /** Standard Lowe's store departments + master full-store scope. */
 export const STORE_DEPARTMENTS = [
   "flooring",
@@ -551,9 +557,12 @@ export type StoreSpecialist = {
   phone_number?: string | null;
   /**
    * Roster onboarding: invited (awaiting /auth/verify PIN) · active · suspended.
+   * Active includes roster-only members (no PIN / app access).
    * When omitted, derive from is_active + must_change_pin.
    */
   status?: AssociateOnboardingStatus;
+  /** Set when a PIN is created or rotated — roster lists use this (not pin_hash) for app-access. */
+  pin_updated_at?: string | null;
   /** Soft-delete flag — false means deactivated / removed from active roster. */
   is_active: boolean;
   created_at: string;

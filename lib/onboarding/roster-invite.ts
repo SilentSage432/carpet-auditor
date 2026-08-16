@@ -60,10 +60,7 @@ export type IssueRosterInviteResult = {
 export async function issueRosterInvite(
   input: IssueRosterInviteInput
 ): Promise<IssueRosterInviteResult> {
-  const phone = normalizePhoneE164(input.phone);
-  const inviteToken = generateAuthToken();
-  const tokenHash = hashAuthToken(inviteToken);
-  const expires = inviteExpiresAt();
+  let phone = normalizePhoneE164(input.phone);
   const testMode = Boolean(input.testMode);
 
   let rowId = input.specialistId?.trim() || "";
@@ -96,9 +93,22 @@ export async function issueRosterInvite(
         : existing.role === "MasterAdmin"
           ? "MasterAdmin"
           : "Supervisor";
+    if (!phone) {
+      phone = normalizePhoneE164(
+        existing.phone_number == null ? null : String(existing.phone_number)
+      );
+    }
   } else if (!name) {
     throw new Error("name is required");
   }
+
+  if (!phone) {
+    throw new Error("Phone number is required to send a mobile app invite");
+  }
+
+  const inviteToken = generateAuthToken();
+  const tokenHash = hashAuthToken(inviteToken);
+  const expires = inviteExpiresAt();
 
   if (role === "MasterAdmin") {
     department = "all";

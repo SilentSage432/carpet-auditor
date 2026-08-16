@@ -370,6 +370,14 @@ alter table public.store_specialists
 alter table public.store_specialists
   add column if not exists pin_updated_at timestamptz;
 
+update public.store_specialists
+set pin_updated_at = coalesce(pin_updated_at, created_at, now())
+where pin_updated_at is null
+  and (
+    pin_hash is not null
+    or (pin_code is not null and btrim(pin_code) <> '')
+  );
+
 create unique index if not exists store_specialists_invite_token_hash_uidx
   on public.store_specialists (invite_token_hash)
   where invite_token_hash is not null;

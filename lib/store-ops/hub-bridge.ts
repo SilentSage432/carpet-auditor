@@ -8,7 +8,7 @@ import "server-only";
 
 import { createClient } from "@supabase/supabase-js";
 import { randomBytes } from "crypto";
-import { DEFAULT_SUPERVISOR_PIN, mapRow } from "@/lib/specialists";
+import { mapRow } from "@/lib/specialists";
 import { verifyStoredPin } from "@/lib/invite";
 import { normalizeStoreNumber } from "@/lib/store";
 import { getSupabaseAnonKey, getSupabaseUrl } from "@/lib/supabase/env";
@@ -308,9 +308,19 @@ export async function mintHubBridgeSession(input: {
 
   const storedPin =
     specialist?.pin_hash?.trim() || specialist?.pin_code?.trim() || "";
-  const pinMatches = storedPin
-    ? verifyStoredPin(pin, storedPin)
-    : pin === DEFAULT_SUPERVISOR_PIN;
+
+  if (specialist && !storedPin) {
+    if (isHubMasterPin(pin)) {
+      const boot = await ensureMasterAdminBootstrap({
+        store_number: input.store_number ?? specialist.store_number ?? null,
+        mint_session: false,
+      });
+      return mintSessionForSpecialist(boot.specialist);
+    }
+    throw new Error("This profile has no app access yet");
+  }
+
+  const pinMatches = storedPin ? verifyStoredPin(pin, storedPin) : false;
 
   if (
     specialist &&

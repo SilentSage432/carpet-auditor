@@ -1,5 +1,13 @@
 # DeptSync Hub — Development Journal
 
+## 2026-08-15 — Roster-only members vs app invite
+
+### Shipped
+- **Decoupled roster from auth.** Add Team Member defaults to floor roster only: Name, Role, Initial Department required; phone optional; **Send Mobile App Invite** unchecked. Inserts `status=active` with `auth_token_hash`, `auth_token_expires_at`, and `pin_hash` null — immediately available for schedules, walks, and rotations. No SMS, no tokens.
+- **Optional invite** still composes `issueRosterInvite` when the checkbox is on (phone required) or via **Send App Invite** on a Roster Only card.
+- **App access badges** (Roster Only / Invited / Active) use `pin_updated_at` — roster lists never select `pin_hash`. Apply `20260815_roster_app_access.sql` to backfill existing PINs.
+- Hub-bridge refuses roster-only profiles (`This profile has no app access yet`) instead of matching the default PIN.
+
 ## 2026-08-15 — Unified SMS token invite + self-service PIN reset
 
 ### Shipped
