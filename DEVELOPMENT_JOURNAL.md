@@ -1,5 +1,12 @@
 # DeptSync Hub — Development Journal
 
+## 2026-08-15 — Enterprise ingest contracts (stubs)
+
+### Shipped
+- **Contracts** — `src/types/enterpriseIntegration.ts` owns Zod schemas + inferred types for bay topology ingest, freight stage events, and floor-touch telemetry. Does not persist and does not own `store_locations`, rotations, or bay-service.
+- **Transport** — `lib/enterprise-integration/ingest.ts` parses JSON with `.safeParse()` and returns a standardized 400 `{ success: false, error: "Bad Request", issues }`.
+- **Stubs** — `POST /api/v1/topology/ingest` → `{ success: true, processed_bays: 1 }`. `POST /api/v1/freight/stage` → `{ success: true, queued_items }`. No UI or Store Ops write path.
+
 ## 2026-08-15 — URL stealth + HTTP-only auth gate
 
 ### Shipped

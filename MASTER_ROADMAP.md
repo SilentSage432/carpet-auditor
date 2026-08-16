@@ -126,6 +126,7 @@
 - [x] Instant-render Store Ops SWR (IndexedDB L2 + silent revalidate) + chunked Map DOM + async briefing decay + `20260815_performance_indexes.sql`
 - [x] Tactical Voice Hub on Floor (`TacticalVoiceFloorPad` + `POST /api/copilot/parse-walk` + `shift-tasks.ts` + `lib/heatmap/bay-tracker.ts`)
 - [x] URL stealth + HTTP-only auth gate (`robots.txt`, `X-Robots-Tag`, `proxy.ts`, `/login`)
+- [x] Enterprise ingest contracts (Zod) + stub `POST /api/v1/topology/ingest` and `POST /api/v1/freight/stage`
 
 ## Next
 - [x] Apply Phase 1 JWT/RLS migration in Supabase + enable Custom Access Token Hook

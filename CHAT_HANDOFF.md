@@ -182,6 +182,7 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 - `POST /api/store-ops/ai-bay-scan` — multimodal bay photo → carton/pallet estimates, cleanliness score, detected issues (Store Ops actor)
 - `POST /api/store-ops/ai-note-summary` — **410 Gone**; Floor Pad Copilot `extractTasksAndTag` is canonical
 - APIs under `/api/rotations/*`, `/api/store-locations*`, `/api/departments`, `/api/weekly-rotations`
+- **Enterprise ingest (stubs, no UI):** Zod contracts in `src/types/enterpriseIntegration.ts` (`BayTopologyIngestSchema`, `FreightStageEventSchema`, `FloorTouchTelemetrySchema`). `POST /api/v1/topology/ingest` and `POST /api/v1/freight/stage` validate with `.safeParse()` and return 400 `{ success: false, error: "Bad Request", issues }` on mismatch. Does not persist into `store_locations` / rotations. Edge gate still requires hub cookie or `Authorization: Bearer`.
 - Multi-store: apply `20260809_multi_store.sql`; store scope comes from JWT `app_metadata.store_number` / `profiles.store_number`
 - Manager notes: apply `20260811_manager_notes.sql` + `20260812_manager_notes.sql` + `20260812_manager_notes_archive.sql` + `20260812_fix_manager_notes_rls.sql` + **`20260812_manager_notes_metadata.sql`** (`metadata` JSONB from Gemini Copilot)
 - Sunday bay assignments: apply `20260812_sunday_bay_assignments.sql`
