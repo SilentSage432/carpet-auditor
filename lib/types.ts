@@ -17,6 +17,9 @@ export type HubSection =
  */
 export type SpecialistRole = "Associate" | "Supervisor" | "MasterAdmin";
 
+/** Roster onboarding lifecycle on store_specialists.status */
+export type AssociateOnboardingStatus = "invited" | "active" | "suspended";
+
 /** Standard Lowe's store departments + master full-store scope. */
 export const STORE_DEPARTMENTS = [
   "flooring",
@@ -529,6 +532,8 @@ export type StoreSpecialist = {
   role: SpecialistRole;
   /** Optional access PIN / password. Required for Supervisor & Master Admin. */
   pin_code: string | null;
+  /** Salted SHA-256 PIN (server payloads). Roster lists omit this column. */
+  pin_hash?: string | null;
   /** Login username (supervisors / master admin). */
   username: string | null;
   /** Department workspace this profile may access. */
@@ -544,6 +549,11 @@ export type StoreSpecialist = {
   must_change_pin?: boolean;
   /** SMS invite destination (E.164 when set). */
   phone_number?: string | null;
+  /**
+   * Roster onboarding: invited (awaiting /auth/verify PIN) · active · suspended.
+   * When omitted, derive from is_active + must_change_pin.
+   */
+  status?: AssociateOnboardingStatus;
   /** Soft-delete flag — false means deactivated / removed from active roster. */
   is_active: boolean;
   created_at: string;

@@ -3,6 +3,7 @@ import { isMissingColumnError } from "./store-ops/errors";
 import { createTtlCache } from "@/lib/store-ops/ttl-cache";
 import { uid } from "./uid";
 import type {
+  AssociateOnboardingStatus,
   DepartmentScope,
   SpecialistRole,
   StoreSpecialist,
@@ -38,6 +39,7 @@ const SPECIALIST_LIST_SELECT = [
   "must_change_pin",
   "phone_number",
   "is_active",
+  "status",
   "created_at",
 ].join(", ");
 
@@ -68,6 +70,21 @@ const PLACEHOLDER_NAMES = new Set([
   "specialist 1",
   "specialist 2",
 ]);
+
+function normalizeOnboardingStatus(
+  row: Record<string, unknown>,
+  isActive: boolean,
+  mustChangePin: boolean
+): AssociateOnboardingStatus {
+  const raw = String(row.status ?? "").trim().toLowerCase();
+  if (raw === "invited" || raw === "active" || raw === "suspended") {
+    return raw;
+  }
+  if (raw === "inactive") return "suspended";
+  if (!isActive) return "suspended";
+  if (mustChangePin) return "invited";
+  return "active";
+}
 
 function normalizeRole(raw: unknown): SpecialistRole {
   const value = String(raw ?? "").toLowerCase().trim();
@@ -183,6 +200,10 @@ export function mapRow(row: Record<string, unknown>): StoreSpecialist {
     name: String(row.name ?? ""),
     role,
     pin_code: pin,
+    pin_hash:
+      row.pin_hash == null || String(row.pin_hash).trim() === ""
+        ? null
+        : String(row.pin_hash).trim(),
     username,
     assigned_department: assigned,
     must_change_credentials: Boolean(mustChange),
@@ -193,6 +214,13 @@ export function mapRow(row: Record<string, unknown>): StoreSpecialist {
     ),
     phone_number: phone,
     is_active: isActive,
+    status: normalizeOnboardingStatus(
+      row,
+      isActive,
+      row.must_change_pin === true ||
+        row.must_change_pin === "true" ||
+        row.must_change_pin === 1
+    ),
     created_at: String(row.created_at ?? new Date().toISOString()),
     accessible_departments: composeAccessibleDepartments(
       assigned,
@@ -466,6 +494,7 @@ export function findSpecialistByLogin(
 
   const candidates = roster.filter((m) => {
     if (m.is_active === false) return false;
+    if (m.status === "invited" || m.status === "suspended") return false;
     const uname = m.username?.trim().toLowerCase() ?? "";
     const name = m.name.trim().toLowerCase();
     if (uname && aliases.has(uname)) return true;
@@ -658,7 +687,11 @@ async function loadSpecialists(store: string): Promise<StoreSpecialist[]> {
       .eq("store_number", store)
       .order("name", { ascending: true });
 
-    if (error && isMissingColumnError(error, "accessible_departments")) {
+    if (
+      error &&
+      (isMissingColumnError(error, "accessible_departments") ||
+        isMissingColumnError(error, "status"))
+    ) {
       const retry = await supabase
         .from(TABLE)
         .select(SPECIALIST_LIST_SELECT_FALLBACK)
@@ -1430,7 +1463,7 @@ export async function deleteSpecialist(
     // Soft-delete first (survives FK constraints from audit name history).
     const { error: softError } = await supabase
       .from(TABLE)
-      .update({ is_active: false })
+      .update({ is_active: false, status: "suspended" })
       .eq("id", targetId)
       .eq("store_number", store);
 

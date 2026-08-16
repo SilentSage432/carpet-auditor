@@ -1,25 +1,13 @@
 import { NextResponse } from "next/server";
-import {
-  buildInviteSmsBody,
-  buildInviteUrl,
-  buildSmsLink,
-  generateInviteToken,
-  generateTempPin,
-  hashTempPin,
-  inviteExpiresAt,
-  normalizePhoneE164,
-} from "@/lib/invite";
-import { suggestUsername } from "@/lib/rbac";
+import { issueRosterInvite } from "@/lib/onboarding/roster-invite";
 import {
   resolveStoreOpsActor,
   requireSuperAdmin,
   StoreOpsAuthError,
 } from "@/lib/store-ops/auth-server";
-import { isMissingColumnError, readableError } from "@/lib/store-ops/errors";
+import { readableError } from "@/lib/store-ops/errors";
 import { requireSupabaseAdmin } from "@/lib/supabase/admin-response";
-import { composeAccessibleDepartments } from "@/lib/department-access";
-import { sendInviteSms } from "@/lib/twilio-sms";
-import { departmentMeta, type DepartmentScope } from "@/lib/types";
+import type { DepartmentScope } from "@/lib/types";
 
 type InviteBody = {
   /** Re-invite an existing roster member */
@@ -31,15 +19,15 @@ type InviteBody = {
   phone?: string;
   role?: "Supervisor" | "Associate" | "MasterAdmin";
   /**
-   * Staging / Super Admin dry-run: append &test=1 to invite URL,
-   * skip Twilio, and allow /invite to complete without burning the token.
+   * Staging / Super Admin dry-run: append ?test=1 to invite URL,
+   * skip Twilio, and allow /invite/[token] to complete without burning the token.
    */
   test_mode?: boolean;
 };
 
 /**
  * POST /api/admin/invite-supervisor
- * Super Admin only. Issues temp 6-digit PIN + invite UUID; optional Twilio SMS.
+ * Super Admin only. Issues a hashed one-time /auth/verify token and SMS link.
  */
 export async function POST(request: Request) {
   try {
@@ -48,183 +36,54 @@ export async function POST(request: Request) {
     if (!supabase) return response;
 
     const body = (await request.json()) as InviteBody;
-    const phone = normalizePhoneE164(body.phone);
-    const tempPin = generateTempPin();
-    const inviteToken = generateInviteToken();
-    const expires = inviteExpiresAt();
-    const tempPinHash = hashTempPin(tempPin);
-
     const origin =
       request.headers.get("origin") ||
       process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") ||
       new URL(request.url).origin;
 
-    let rowId = body.specialist_id?.trim() || "";
-    let name = (body.name ?? "").trim();
-    let username = (body.username ?? "").trim();
-    let department = (body.department ?? "flooring").trim() as DepartmentScope;
-    let role: "Supervisor" | "Associate" | "MasterAdmin" =
-      body.role === "Associate"
-        ? "Associate"
-        : body.role === "MasterAdmin"
-          ? "MasterAdmin"
-          : "Supervisor";
-
-    if (rowId) {
-      const { data: existing, error: loadErr } = await supabase
-        .from("store_specialists")
-        .select("*")
-        .eq("id", rowId)
-        .eq("store_number", actor.storeNumber)
-        .maybeSingle();
-      if (loadErr || !existing) {
-        return NextResponse.json(
-          { error: "Supervisor not found for this store" },
-          { status: 404 }
-        );
-      }
-      name = String(existing.name ?? name);
-      username = String(existing.username ?? username);
-      department = (existing.assigned_department as DepartmentScope) || department;
-      role =
-        existing.role === "Associate"
-          ? "Associate"
-          : existing.role === "MasterAdmin"
-            ? "MasterAdmin"
-            : "Supervisor";
-    } else {
-      if (!name) {
-        return NextResponse.json({ error: "name is required" }, { status: 400 });
-      }
-      if (role === "MasterAdmin") {
-        department = "all";
-      }
-      if (!username) {
-        username = suggestUsername(name, department);
-      }
-    }
-
-    const testMode = Boolean(body.test_mode);
-    const deptMeta = departmentMeta(department);
-    const inviteUrl = buildInviteUrl(origin, inviteToken, { test: testMode });
-    const smsBody = buildInviteSmsBody({
+    const issued = await issueRosterInvite({
+      supabase,
       storeNumber: actor.storeNumber,
-      departmentLabel: deptMeta.label,
-      tempPin,
-      inviteUrl,
-      style: "welcome",
+      origin,
+      specialistId: body.specialist_id,
+      name: body.name,
+      username: body.username,
+      department: body.department,
+      accessible_departments: body.accessible_departments,
+      phone: body.phone,
+      role: body.role,
+      testMode: Boolean(body.test_mode),
     });
-
-    const invitePatch = {
-      invite_token: inviteToken,
-      invite_token_expires_at: expires.toISOString(),
-      must_change_pin: true,
-      must_change_credentials: true,
-      temp_pin_hash: tempPinHash,
-      pin_code: tempPin,
-      phone_number: phone,
-      is_active: true,
-      store_number: actor.storeNumber,
-      name,
-      username,
-      role,
-      assigned_department: role === "MasterAdmin" ? "all" : department,
-      accessible_departments:
-        role === "MasterAdmin"
-          ? []
-          : composeAccessibleDepartments(department, body.accessible_departments),
-    };
-
-    let saved: Record<string, unknown> | null = null;
-    const { accessible_departments: _accessCol, ...invitePatchWithoutAccess } =
-      invitePatch;
-
-    if (rowId) {
-      let { data, error } = await supabase
-        .from("store_specialists")
-        .update(invitePatch)
-        .eq("id", rowId)
-        .eq("store_number", actor.storeNumber)
-        .select("*")
-        .maybeSingle();
-      if (error && isMissingColumnError(error, "accessible_departments")) {
-        const retry = await supabase
-          .from("store_specialists")
-          .update(invitePatchWithoutAccess)
-          .eq("id", rowId)
-          .eq("store_number", actor.storeNumber)
-          .select("*")
-          .maybeSingle();
-        data = retry.data;
-        error = retry.error;
-      }
-      if (error) {
-        return NextResponse.json(
-          { error: readableError(error, "Could not update invite") },
-          { status: 500 }
-        );
-      }
-      saved = data;
-    } else {
-      let { data, error } = await supabase
-        .from("store_specialists")
-        .insert(invitePatch)
-        .select("*")
-        .maybeSingle();
-      if (error && isMissingColumnError(error, "accessible_departments")) {
-        const retry = await supabase
-          .from("store_specialists")
-          .insert(invitePatchWithoutAccess)
-          .select("*")
-          .maybeSingle();
-        data = retry.data;
-        error = retry.error;
-      }
-      if (error) {
-        return NextResponse.json(
-          { error: readableError(error, "Could not create invited supervisor") },
-          { status: 500 }
-        );
-      }
-      saved = data;
-      rowId = String(data?.id ?? "");
-    }
-
-    const sms =
-      testMode || !phone
-        ? {
-            ok: false as const,
-            skipped: true as const,
-            reason: testMode
-              ? "Test Invite Flow — SMS not sent; use Copy Full SMS Text"
-              : "No phone number provided — use SMS link preview",
-          }
-        : await sendInviteSms({ to: phone, body: smsBody });
-
-    const smsLink = buildSmsLink(phone, smsBody);
 
     return NextResponse.json({
       ok: true,
-      test_mode: testMode,
-      specialist_id: rowId,
-      username,
-      name,
-      department,
-      invite_token: inviteToken,
-      invite_url: inviteUrl,
-      invite_expires_at: expires.toISOString(),
-      temporary_pin: tempPin,
-      phone: phone,
-      sms,
+      test_mode: Boolean(body.test_mode),
+      specialist_id: issued.rowId,
+      username: issued.username,
+      name: issued.name,
+      department: issued.department as DepartmentScope,
+      invite_token: issued.inviteToken,
+      invite_url: issued.inviteUrl,
+      invite_expires_at: issued.expires.toISOString(),
+      phone: issued.phone,
+      status: "invited",
+      sms: issued.sms,
       sms_preview: {
-        body: smsBody,
-        sms_link: smsLink,
+        body: issued.smsBody,
+        sms_link: issued.smsLink,
       },
-      specialist: saved,
+      specialist: issued.saved,
     });
   } catch (err) {
     if (err instanceof StoreOpsAuthError) {
       return NextResponse.json({ error: err.message }, { status: err.status });
+    }
+    const message = err instanceof Error ? err.message : "";
+    if (message === "name is required") {
+      return NextResponse.json({ error: message }, { status: 400 });
+    }
+    if (message === "Roster member not found for this store") {
+      return NextResponse.json({ error: message }, { status: 404 });
     }
     console.error("[invite-supervisor]", err);
     return NextResponse.json(

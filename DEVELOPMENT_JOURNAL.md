@@ -1,5 +1,22 @@
 # DeptSync Hub — Development Journal
 
+## 2026-08-15 — Unified SMS token invite + self-service PIN reset
+
+### Shipped
+- **Schema** — `auth_token_hash`, `auth_token_expires_at`, `pin_hash`, `pin_updated_at`; `status` is `invited | active | suspended`. Apply `20260815_unified_auth_token.sql`.
+- **Invite Associate** (`lib/onboarding/roster-invite.ts`) issues a 256-bit token, stores SHA-256 only, sets `invited`, SMS `/auth/verify/[token]`.
+- **Request PIN Reset** (`lib/onboarding/pin-reset.ts` + `POST /api/auth/pin-reset/request`) validates registered phone, invalidates prior tokens, 30-minute hashed link.
+- **Redemption** (`/auth/verify/[token]`) consumes the hash on GET (replay-safe cookie), then POST sets a 4–6 digit `pin_hash`, `pin_updated_at = now()`, `status=active`, and mints Hub-bridge Auth + hub-gate cookies for RLS.
+- Crypto owner is `lib/auth-token.ts`. `lib/invite.ts` owns SMS copy only. Legacy `/invite/[token]` redirects here.
+
+## 2026-08-15 — Roster SMS/link invite + PIN setup
+
+### Shipped
+- **Roster add-member** no longer accepts a manual PIN. Form is Name, Role, Initial Department, Phone. Master submits → `POST /api/admin/invite-supervisor`.
+- **Onboarding service** (`lib/onboarding/roster-invite.ts`) generates a 6-digit temp PIN and a 256-bit one-time token, SHA-256-hashes the token before persist, sets `status=invited`, and dispatches SMS (`lib/onboarding/sms-dispatch.ts`: Twilio, else webhook stub / copyable `sms:` preview).
+- **Activation** is `/invite/[token]` (`InviteOnboardingView`). Legacy `/invite?token=` redirects. `GET/POST /api/invite/[token]` looks up `invite_token_hash`, verifies the temp PIN, consumes the token (`invite_consumed_at`), hashes the permanent 4–6 digit PIN, and sets `status=active`.
+- Apply `supabase/migrations/20260815_roster_invite_onboarding.sql` (`status`, `invite_token_hash`, `invite_consumed_at`). Hub-bridge refuses `invited` rows until the invite link is completed.
+
 ## 2026-08-15 — Enterprise ingest contracts (stubs)
 
 ### Shipped

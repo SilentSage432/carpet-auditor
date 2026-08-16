@@ -7,7 +7,8 @@
 
 import "server-only";
 
-import { mapRow, verifyPin } from "@/lib/specialists";
+import { DEFAULT_SUPERVISOR_PIN, mapRow } from "@/lib/specialists";
+import { hashPin, verifyStoredPin } from "@/lib/invite";
 import { normalizeStoreNumber } from "@/lib/store";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { StoreSpecialist } from "@/lib/types";
@@ -310,17 +311,26 @@ export async function resetHubPin(input: {
 
   if (input.require_current_pin !== false) {
     const current = String(input.current_pin ?? "").trim();
-    if (!current || !verifyPin(specialist, current)) {
+    const storedPin =
+      specialist.pin_hash?.trim() || specialist.pin_code?.trim() || "";
+    const pinOk = storedPin
+      ? verifyStoredPin(current, storedPin)
+      : current === DEFAULT_SUPERVISOR_PIN;
+    if (!current || !pinOk) {
       throw new Error("Current PIN is incorrect");
     }
   }
 
+  const pinHash = hashPin(newPin);
   const { data: updated, error: updateError } = await admin
     .from("store_specialists")
     .update({
-      pin_code: newPin,
+      pin_code: pinHash,
+      pin_hash: pinHash,
+      pin_updated_at: new Date().toISOString(),
       must_change_credentials: false,
       must_change_pin: false,
+      status: "active",
       username: specialist.username || (specialist.role === "MasterAdmin" ? "master_admin" : specialist.username),
       is_active: true,
     })

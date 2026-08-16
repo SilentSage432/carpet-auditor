@@ -23,6 +23,7 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 - **Daily shift board / call-out:** Roster groups by home department; department accordions start **collapsed**. `lib/store-ops/shift-status.ts` owns Sun–Sat clocks + `ABSENT_CALLOUT` (`associate_shift_days` + localStorage fallback). Cards show S–S dots, today's pill, and Edit Schedule → `AssociateScheduleModal` (presets Open/Mid/Close, per-day times). Call-out dialog composes `lib/store-ops/call-out.ts` → Sunday pool / proportional redistribute / carry-over loop. Apply `20260815_associate_shift_days.sql` + `20260815_carry_over_priority.sql`. Supervisors + Master toggle duty; Master-only add/delete team.
 - **Predictive Shift Copilot:** Floor banner under Shift Briefing (`PredictiveCopilotBanner`). Local patterns from `bay_service_logs` / Sunday assignments / downstock / locations — not Gemini. 1-tap Stage to Shift (`POST /api/rotations/assign`, Supervisor+) or Add to Downstock.
 - **Tactical Voice Hub:** Floor dock `TacticalVoiceFloorPad` (Master/DS). Web Speech + scratchpad → `POST /api/copilot/parse-walk` → dispatch via `lib/store-ops/shift-tasks.ts`. Bay freshness chip `BayFreshnessGrid` composes `lib/heatmap/bay-tracker.ts` (Fresh 0–2d / Warm 3–4d / Stale 5+d). Apply `20260815_shift_walk_tasks.sql`.
+- **Roster invite:** apply `20260815_unified_auth_token.sql`. Add Team Member collects phone (no PIN). Activation is `/auth/verify/[token]`. Forgot PIN sends a 30-minute SMS link.
 
 ## AI (`lib/ai/gemini.ts`)
 - Server-only Gemini Flash client (`@google/generative-ai` + `server-only`)
@@ -57,7 +58,7 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 ### Master Admin roster console
 - Canonical team UI is the **Roster** tab (`/roster`, `RosterTab`) — department accordions start collapsed (home `assigned_department`, roster count, on-duty today), weekly S–S dots + today's shift pill, `AssociateScheduleModal`, call-out toggle, name/role, and `accessible_departments` chips with optimistic save + Sonner toast
 - `/admin/supervisors` and `/admin/roles` redirect to `/roster`
-- Invite/reset lives on `/invite` + Roster add-member; dead `AdminRosterManager` was removed
+- Invite/reset lives on `/auth/verify/[token]` + Roster add-member (no manual PIN); dead `AdminRosterManager` was removed
 - Lightweight **Associate Roster** (`AssociateRosterPanel`) remains on the Sunday assignment drawer
 - Floor titles: specialty (Flooring / Appliances / Millwork / Cabinets) → **Specialist**; core (Paint / Plumbing / Garden / Building Materials / Tools / Electrical) → **CSA**
 - Sunday Shift Balancer allocates weekly bay quotas to on-duty Specialists/CSAs by 4h / 6h / 8h (`planProportionalBayAssignments`)
@@ -86,7 +87,7 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 - Store Map Department Overview was removed; Cabinets (D29) weekly target 6 and cron toggle live in Settings `DepartmentTargetsMatrix`.
 - Department seed upserts with `ignoreDuplicates` against live UNIQUE: `(store_id, code)` when present, else `code` (`departments_code_key`). Duplicate D29 is logged, not a 500. List falls back to unscoped `SELECT *` so Store Map hydrates existing rows instead of a red banner.
 
-- Seeds: none auto-injected. Create Master / Supervisor profiles via invite / Add Supervisor; temporary PIN sets `must_change_credentials: true` until first-login change
+- Seeds: none auto-injected. Create Master / Supervisor profiles via invite / Add Team Member; `status=invited` until `/auth/verify/[token]` sets a hashed PIN
 - First-login: non-dismissible AuthWall setup when `must_change_credentials` (no Remind Later)
 
 ## Authentication (Zero-Access Wall)
@@ -95,10 +96,10 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 - **HTTP-only hub gate:** after PIN + Hub-bridge JWT, `POST /api/auth/gate` sets `deptsync_hub_gate` (8h, HttpOnly). Middleware will not render `/dashboard` without it. Logout clears the cookie.
 - **Hub PIN → Auth bridge (primary Store Ops unlock):** after PIN verify, client calls `POST /api/auth/hub-bridge` (`lib/store-ops/hub-bridge.ts` + `hub-bridge-client.ts`) which service-role verifies the roster PIN (by `specialist_id` / username / name), ensures `auth.users` + `profiles` link, and mints a real Supabase Auth session (`setSession`). **Master PIN** (`1234` or `HUB_MASTER_PIN`) auto-provisions Super Admin when missing so Master Admin never lock out.
 - **Bootstrap recovery:** `POST /api/auth/bootstrap-admin` (Bearer `CRON_SECRET`) or `node --env-file=.env.local scripts/bootstrap-admin.mjs` — resets `master_admin` roster + Auth + profiles
-- **PIN reset:** `POST /api/auth/reset-pin` — Super Admin Bearer or `current_pin`; service-role updates `store_specialists` and upserts `store_profiles` (creates Master Admin profile when missing). Change PIN modal uses this path.
+- **PIN reset:** `POST /api/auth/reset-pin` (Change PIN, Super Admin) hashes `pin_hash`. Self-service: AuthWall **Forgot Access Code** → `POST /api/auth/pin-reset/request` → SMS `/auth/verify/[token]` (30m, consume-on-entry)
 - **Store Ops identity:** `resolveStoreOpsActor` loads `profiles` where `id = auth.users.id` from Bearer/cookie JWT (no `x-store-ops-*` trust headers; emergency unlock removed). API data paths use service role **after** actor resolve.
 - **Returning session:** hub `deptsync_auth_session` alone is not enough — cold restore without a live Supabase Auth JWT forces the PIN unlock wall so bridge can mint Auth.
-- **Phone recovery (optional):** "Forgot Access Code? Reset via Phone" → OTP → `/api/auth/phone-reset/confirm` + `linkAuthUserToSpecialistProfile`
+- **Phone recovery (optional):** "Forgot Access Code? Reset via Phone" → SMS one-time `/auth/verify/[token]` (legacy OTP confirm remains at `/api/auth/phone-reset/*`)
 - Setup requires verified mobile (`phone_number` on `store_specialists`)
 - Native keychain: form `autocomplete` username / current-password
 - Biometric: WebAuthn; requires an existing Store Ops Auth session (otherwise PIN once after fingerprint)
@@ -110,7 +111,7 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 - **P2 hub UI:** `startTransition` + keep-alive Floor/Map/Roster/Settings (`hidden`); Cycle/Appliance scan forms isolated from logs; 300ms debounced draft saves with flush on submit/leave; weekly rotations + Sunday assignments TTL-cached 45s
 - **Settings tools:** Bulk / Taxonomies / Force Rotation are `next/dynamic` inside `SettingsSection`; Floor Pad is the Floor tactical dock; SW cache `deptsync-shell-v6-stealth`
 - **Bulk bays:** Odd Only / Even Only (`lib/store-ops/bay-pattern.ts`, default odd); Store Map GET falls back if `last_completed_at` is missing/null
-- Seeds: no hardcoded roster injection — use Invite / Add Supervisor; temp PIN sets `must_change_credentials`
+- Seeds: no hardcoded roster injection — use Invite / Add Team Member; temp PIN is hashed and `status=invited` until `/invite/[token]`
 - Primary: fixed bottom workflow tabs — **Floor · Map · Roster · Settings** only
 - Header: DeptSync brand + store # · section title · department dropdown pill · account/PIN chip
 - Cycle Audit / Appliances: hardware-scan ready without soft keyboard; sticky Log docked above bottom nav
@@ -232,12 +233,13 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 - Remnant forms live in Settings; `/department` redirects to Floor
 
 ## Supervisor Invite & Onboarding
-- Apply migration: `supabase/migrations/20260810_supervisor_invite.sql`
-- Master Admin: Roster → **Invite** → optional phone → temp PIN + `/invite?token=` link (Twilio if env set, else copyable SMS)
-- Env (optional): `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_FROM_NUMBER`, `NEXT_PUBLIC_APP_URL`
-- Onboarding steps: temp PIN → Create New PIN → Add to Home Screen → WebAuthn biometric → `/dashboard`
-- APIs: `POST /api/admin/invite-supervisor`, `GET|POST /api/invite/[token]`
-- **Test Invite Flow** (roster): dry-run `test_mode` → modal with PIN + welcome SMS + Copy Invite Link / Copy Full SMS Text; `/invite?test=1` preserves token after PIN reset
+- Apply `20260810_supervisor_invite.sql`, `20260815_roster_invite_onboarding.sql`, then **`20260815_unified_auth_token.sql`** (`auth_token_hash`, `auth_token_expires_at`, `pin_hash`, `pin_updated_at`, status invited/active/suspended)
+- Master Admin: Roster → **Add Team Member** → Name, Role, Initial Department, Phone → SMS `/auth/verify/[token]`
+- Self-service reset: AuthWall phone → `POST /api/auth/pin-reset/request` → same verify route (30m TTL)
+- Redemption consumes the token on GET (HttpOnly setup cookie), then hashes a 4–6 digit PIN and mints Hub-bridge Auth
+- Owners: `lib/auth-token.ts` (crypto), `lib/invite.ts` (SMS copy), `lib/onboarding/roster-invite.ts`, `lib/onboarding/pin-reset.ts`, `lib/onboarding/redeem-token.ts`
+- APIs: `POST /api/admin/invite-supervisor`, `POST /api/auth/pin-reset/request`, `GET /api/auth/verify/[token]`, `GET|POST /api/auth/verify`
+- Legacy `/invite/[token]` redirects to `/auth/verify/[token]`
 
 ## Associate floor role
 - Store Ops actor `associate`: read/complete dept rotations + locations; create exceptions via verify; **no** targets, invite, generate/reset, or Master Settings tools

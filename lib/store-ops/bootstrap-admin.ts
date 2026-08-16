@@ -274,7 +274,12 @@ export async function ensureMasterAdminBootstrap(input?: {
     must_change_pin: false,
     invite_token: null,
     invite_token_expires_at: null,
+    invite_token_hash: null,
+    invite_consumed_at: null,
+    auth_token_hash: null,
+    auth_token_expires_at: null,
     temp_pin_hash: null,
+    status: "active",
     updated_at: new Date().toISOString(),
   };
 

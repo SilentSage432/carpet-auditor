@@ -28,9 +28,8 @@ import {
   dedupeRoster,
   deleteSpecialist,
   fetchSpecialists,
-  saveSpecialist,
 } from "@/lib/specialists";
-import { updateDepartmentAccess } from "@/lib/store-ops/client";
+import { updateDepartmentAccess, inviteSupervisor } from "@/lib/store-ops/client";
 import {
   composeShiftBoard,
   fetchShiftDaysRange,
@@ -46,7 +45,7 @@ import {
   upsertShiftDay,
   type AssociateShiftDay,
 } from "@/lib/store-ops/shift-status";
-import { toastError, toastSuccess } from "@/lib/toast";
+import { toastError, toastSuccess, toastInfo } from "@/lib/toast";
 import {
   associateFloorTitle,
   departmentMeta,
@@ -55,6 +54,7 @@ import {
   type SpecialistRole,
   type StoreSpecialist,
 } from "@/lib/types";
+import { normalizePhoneE164, formatPhoneDisplay } from "@/lib/phone";
 import type { WorkflowTabProps } from "@/components/hub/tabs/tab-props";
 
 function rosterRoleLabel(member: StoreSpecialist): string {
@@ -430,6 +430,12 @@ export function RosterTab({ specialist, storeNumber }: WorkflowTabProps) {
                             <div className="min-w-0">
                               <p className="truncate text-sm font-bold text-white">
                                 {member.name}
+                                {member.status === "invited" ||
+                                member.must_change_pin ? (
+                                  <span className="ml-2 inline-flex rounded-full border border-amber-500/40 bg-amber-950/40 px-2 py-0.5 font-mono text-[9px] font-bold uppercase tracking-wide text-amber-100">
+                                    Invited
+                                  </span>
+                                ) : null}
                               </p>
                               <p className="mt-0.5 flex items-center gap-1.5 font-mono text-[10px] font-bold uppercase tracking-wider text-accent">
                                 {member.role === "MasterAdmin" ? (
@@ -614,11 +620,11 @@ export function RosterTab({ specialist, storeNumber }: WorkflowTabProps) {
 
       {addOpen ? (
         <AddTeamMemberSheet
+          specialist={specialist}
           storeNumber={storeNumber}
           onClose={() => setAddOpen(false)}
           onCreated={async () => {
             await reload();
-            setAddOpen(false);
           }}
         />
       ) : null}
@@ -730,10 +736,12 @@ export function RosterTab({ specialist, storeNumber }: WorkflowTabProps) {
 }
 
 function AddTeamMemberSheet({
+  specialist,
   storeNumber,
   onClose,
   onCreated,
 }: {
+  specialist: StoreSpecialist;
   storeNumber: string;
   onClose: () => void;
   onCreated: () => Promise<void>;
@@ -743,48 +751,70 @@ function AddTeamMemberSheet({
     "Supervisor" | "Specialist" | "CSA"
   >("Specialist");
   const [department, setDepartment] = useState<DepartmentScope>("flooring");
-  const [pin, setPin] = useState("");
+  const [phone, setPhone] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [issued, setIssued] = useState<{
+    name: string;
+    invite_url: string;
+    sms_reason?: string;
+    sms_link: string;
+  } | null>(null);
 
   const platformRole: SpecialistRole =
     displayRole === "Supervisor" ? "Supervisor" : "Associate";
 
+  async function copyText(label: string, value: string) {
+    try {
+      await navigator.clipboard.writeText(value);
+      toastSuccess(`Copied ${label}`);
+    } catch {
+      toastError(`Could not copy ${label}`);
+    }
+  }
+
   async function handleSave() {
     const trimmed = name.trim();
-    const pinCode = pin.trim();
+    const phoneE164 = normalizePhoneE164(phone);
     if (!trimmed) {
       setError("Enter a name");
       return;
     }
-    if (!/^\d{4,6}$/.test(pinCode)) {
-      setError("PIN must be 4–6 digits");
+    if (!phoneE164) {
+      setError("Enter a valid phone number");
       return;
     }
     setSaving(true);
     setError(null);
     try {
-      const assigned =
-        platformRole === "Supervisor" || platformRole === "Associate"
-          ? department
-          : "flooring";
-      const result = await saveSpecialist({
+      const assigned = department;
+      const result = await inviteSupervisor(specialist, {
         name: trimmed,
-        role: platformRole,
-        pin_code: pinCode,
+        department: assigned,
+        role: platformRole === "Supervisor" ? "Supervisor" : "Associate",
         username: suggestUsername(trimmed, assigned),
-        assigned_department: assigned,
+        phone: phoneE164,
         accessible_departments: composeAccessibleDepartments(assigned, [
           assigned === "all" ? "flooring" : (assigned as OperationalDepartment),
         ]),
-        store_number: storeNumber,
-        must_change_credentials: false,
       });
-      toastSuccess(`Added ${result.record.name} to the roster`);
+      setIssued({
+        name: result.name,
+        invite_url: result.invite_url,
+        sms_reason:
+          result.sms.ok === true
+            ? undefined
+            : result.sms.reason,
+        sms_link: result.sms_preview.sms_link,
+      });
+      toastSuccess(`Invited ${result.name} — status invited`);
+      if (result.sms.ok !== true) {
+        toastInfo(result.sms.reason);
+      }
       await onCreated();
     } catch (err) {
       const message =
-        err instanceof Error ? err.message : "Could not add team member";
+        err instanceof Error ? err.message : "Could not send invite";
       setError(message);
       toastError(message);
     } finally {
@@ -808,95 +838,137 @@ function AddTeamMemberSheet({
       >
         <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-zinc-600" />
         <h2 id="add-team-title" className="glass-title text-lg">
-          Add Team Member
+          {issued ? "Invite sent" : "Add Team Member"}
         </h2>
         <p className="mt-1 text-sm text-zinc-400">
-          Name, role, PIN, and home department save immediately to the roster.
+          {issued
+            ? "Share the one-time link. They set a 4–6 digit PIN at /auth/verify."
+            : "Name, role, home department, and phone. A one-time invite link issues the PIN — do not set it here."}
         </p>
 
-        <div className="mt-4 space-y-3">
-          <TextField
-            label="Name"
-            value={name}
-            onChange={setName}
-            placeholder="Name badge"
-          />
+        {issued ? (
+          <div className="mt-4 space-y-3">
+            <p className="text-sm font-semibold text-white">
+              {issued.name} · store {storeNumber}
+            </p>
+            <p className="break-all font-mono text-[11px] text-zinc-300">
+              {issued.invite_url}
+            </p>
+            {issued.sms_reason ? (
+              <p className="text-xs text-amber-200">{issued.sms_reason}</p>
+            ) : (
+              <p className="text-xs text-emerald-200">
+                SMS dispatched to {formatPhoneDisplay(phone)}
+              </p>
+            )}
+            <button
+              type="button"
+              onClick={() => void copyText("invite link", issued.invite_url)}
+              className="flex min-h-11 items-center justify-center rounded-xl border border-zinc-700 text-xs font-semibold"
+            >
+              Copy invite link
+            </button>
+            <button
+              type="button"
+              onClick={() => void copyText("SMS text", issued.sms_link)}
+              className="flex min-h-11 w-full items-center justify-center rounded-xl border border-zinc-700 text-xs font-semibold"
+            >
+              Copy SMS link
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="btn-primary-glow flex min-h-12 w-full items-center justify-center rounded-xl text-sm font-bold"
+            >
+              Done
+            </button>
+          </div>
+        ) : (
+          <>
+            <div className="mt-4 space-y-3">
+              <TextField
+                label="Name"
+                value={name}
+                onChange={setName}
+                placeholder="Name badge"
+              />
 
-          <fieldset>
-            <legend className="mb-1.5 text-sm font-medium text-zinc-200">
-              Role
-            </legend>
-            <div className="grid grid-cols-3 gap-1.5">
-              {(
-                [
-                  ["Supervisor", "Supervisor"],
-                  ["Specialist", "Specialist"],
-                  ["CSA", "CSA"],
-                ] as const
-              ).map(([value, label]) => (
-                <button
-                  key={value}
-                  type="button"
-                  onClick={() => setDisplayRole(value)}
-                  className={`min-h-11 rounded-xl border text-xs font-bold ${
-                    displayRole === value
-                      ? "theme-accent-surface border"
-                      : "border-zinc-700 text-zinc-300"
-                  }`}
-                >
-                  {label}
-                </button>
-              ))}
+              <fieldset>
+                <legend className="mb-1.5 text-sm font-medium text-zinc-200">
+                  Role
+                </legend>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {(
+                    [
+                      ["Supervisor", "Supervisor"],
+                      ["Specialist", "Specialist"],
+                      ["CSA", "CSA"],
+                    ] as const
+                  ).map(([value, label]) => (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => setDisplayRole(value)}
+                      className={`min-h-11 rounded-xl border text-xs font-bold ${
+                        displayRole === value
+                          ? "theme-accent-surface border"
+                          : "border-zinc-700 text-zinc-300"
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              </fieldset>
+
+              <DepartmentPicker
+                value={department}
+                onChange={setDepartment}
+                label="Initial Department"
+                showFloorTitle
+              />
+
+              <label className="block space-y-1.5">
+                <span className="text-sm font-medium text-zinc-200">
+                  Phone Number
+                </span>
+                <input
+                  type="tel"
+                  inputMode="tel"
+                  autoComplete="tel"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="(555) 123-4567"
+                  className="glass-input min-h-12 w-full font-mono"
+                />
+              </label>
             </div>
-          </fieldset>
 
-          <DepartmentPicker
-            value={department}
-            onChange={setDepartment}
-            label="Initial Department"
-            showFloorTitle
-          />
+            {error ? (
+              <p className="mt-3 text-center text-sm font-semibold text-rose-300" role="alert">
+                {error}
+              </p>
+            ) : null}
 
-          <label className="block space-y-1.5">
-            <span className="text-sm font-medium text-zinc-200">PIN</span>
-            <input
-              type="password"
-              inputMode="numeric"
-              autoComplete="new-password"
-              maxLength={6}
-              value={pin}
-              onChange={(e) =>
-                setPin(e.target.value.replace(/\D/g, "").slice(0, 6))
-              }
-              placeholder="4–6 digits"
-              className="glass-input min-h-12 w-full font-mono"
-            />
-          </label>
-        </div>
-
-        {error ? (
-          <p className="mt-3 text-center text-sm font-semibold text-rose-300" role="alert">
-            {error}
-          </p>
-        ) : null}
-
-        <div className="mt-4 grid grid-cols-2 gap-2">
-          <button
-            type="button"
-            onClick={onClose}
-            className="flex min-h-12 items-center justify-center rounded-xl border border-zinc-700 text-sm font-semibold"
-          >
-            Cancel
-          </button>
-          <button
-            type="button"
-            disabled={saving}
-            onClick={() => void handleSave()}
-            className="btn-primary-glow flex min-h-12 items-center justify-center rounded-xl text-sm font-bold disabled:opacity-40"
-          >
-            {saving ? "Saving…" : "Save to roster"}
-          </button>
-        </div>
+            <div className="mt-4 grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={onClose}
+                className="flex min-h-12 items-center justify-center rounded-xl border border-zinc-700 text-sm font-semibold"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={saving}
+                onClick={() => void handleSave()}
+                className="btn-primary-glow flex min-h-12 items-center justify-center rounded-xl text-sm font-bold disabled:opacity-40"
+              >
+                {saving ? "Sending invite…" : "Send invite"}
+              </button>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

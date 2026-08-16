@@ -23,6 +23,39 @@ export type PhoneResetResult =
  * Send 6-digit SMS OTP via Supabase Auth phone provider.
  * Requires Phone auth enabled in the Supabase project.
  */
+export async function requestPinResetLink(
+  phoneRaw: string
+): Promise<PhoneOtpSendResult> {
+  const phone = normalizePhoneE164(phoneRaw);
+  if (!phone) {
+    return { ok: false, error: "Enter a valid mobile number (10+ digits)" };
+  }
+
+  try {
+    const res = await fetch("/api/auth/pin-reset/request", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ phone }),
+    });
+    const json = (await res.json().catch(() => ({}))) as {
+      ok?: boolean;
+      error?: string;
+    };
+    if (!res.ok || json.ok === false) {
+      return {
+        ok: false,
+        error: json.error || "Could not send PIN reset link",
+      };
+    }
+    return { ok: true, phone, via: "supabase" };
+  } catch (err) {
+    return {
+      ok: false,
+      error: err instanceof Error ? err.message : "Could not send PIN reset link",
+    };
+  }
+}
+
 export async function sendPhoneAccessOtp(
   phoneRaw: string
 ): Promise<PhoneOtpSendResult> {

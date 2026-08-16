@@ -8,7 +8,8 @@ import "server-only";
 
 import { createClient } from "@supabase/supabase-js";
 import { randomBytes } from "crypto";
-import { mapRow, verifyPin } from "@/lib/specialists";
+import { DEFAULT_SUPERVISOR_PIN, mapRow } from "@/lib/specialists";
+import { verifyStoredPin } from "@/lib/invite";
 import { normalizeStoreNumber } from "@/lib/store";
 import { getSupabaseAnonKey, getSupabaseUrl } from "@/lib/supabase/env";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -297,7 +298,25 @@ export async function mintHubBridgeSession(input: {
     );
   }
 
-  if (specialist && specialist.is_active !== false && verifyPin(specialist, pin)) {
+  if (specialist && (specialist.status === "invited" || specialist.status === "suspended")) {
+    throw new Error(
+      specialist.status === "invited"
+        ? "Finish setup from your invite link before signing in"
+        : "This profile is suspended"
+    );
+  }
+
+  const storedPin =
+    specialist?.pin_hash?.trim() || specialist?.pin_code?.trim() || "";
+  const pinMatches = storedPin
+    ? verifyStoredPin(pin, storedPin)
+    : pin === DEFAULT_SUPERVISOR_PIN;
+
+  if (
+    specialist &&
+    specialist.is_active !== false &&
+    pinMatches
+  ) {
     return mintSessionForSpecialist(specialist);
   }
 

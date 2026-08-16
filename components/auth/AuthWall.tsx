@@ -12,9 +12,7 @@ import {
   registerBiometricCredential,
 } from "@/lib/biometric-auth";
 import {
-  resetAccessViaVerifiedPhone,
-  sendPhoneAccessOtp,
-  verifyPhoneAccessOtp,
+  requestPinResetLink,
 } from "@/lib/phone-auth";
 import { formatStoreLabel, getStoreNumber } from "@/lib/store";
 import {
@@ -276,13 +274,7 @@ function LoginForm({
 
   if (phoneResetOpen) {
     return (
-      <PhoneResetPanel
-        onCancel={() => setPhoneResetOpen(false)}
-        onResetComplete={(member) => {
-          setPhoneResetOpen(false);
-          void finishLogin(member);
-        }}
-      />
+      <PhoneResetPanel onCancel={() => setPhoneResetOpen(false)} />
     );
   }
 
@@ -359,74 +351,24 @@ function LoginForm({
 
 function PhoneResetPanel({
   onCancel,
-  onResetComplete,
 }: {
   onCancel: () => void;
-  onResetComplete: (member: StoreSpecialist) => void;
 }) {
-  const [step, setStep] = useState<"phone" | "otp" | "password">("phone");
   const [phone, setPhone] = useState("");
-  const [otp, setOtp] = useState("");
-  const [verifiedPhone, setVerifiedPhone] = useState("");
-  const [newPassword, setNewPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
-  const [username, setUsername] = useState("");
+  const [sent, setSent] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  async function handleSendOtp() {
+  async function handleSend() {
     setBusy(true);
     setError(null);
     try {
-      const result = await sendPhoneAccessOtp(phone);
+      const result = await requestPinResetLink(phone);
       if (!result.ok) {
         setError(result.error);
         return;
       }
-      setVerifiedPhone(result.phone);
-      setStep("otp");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function handleVerifyOtp() {
-    setBusy(true);
-    setError(null);
-    try {
-      const result = await verifyPhoneAccessOtp({
-        phone: verifiedPhone || phone,
-        token: otp,
-      });
-      if (!result.ok) {
-        setError(result.error);
-        return;
-      }
-      setVerifiedPhone(result.phone);
-      setStep("password");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function handleResetPassword() {
-    if (newPassword !== confirmPassword) {
-      setError("Password and confirmation do not match");
-      return;
-    }
-    setBusy(true);
-    setError(null);
-    try {
-      const result = await resetAccessViaVerifiedPhone({
-        phone: verifiedPhone,
-        newPassword,
-        username: username.trim() || undefined,
-      });
-      if (!result.ok) {
-        setError(result.error);
-        return;
-      }
-      onResetComplete(result.specialist);
+      setSent(true);
     } finally {
       setBusy(false);
     }
@@ -435,11 +377,16 @@ function PhoneResetPanel({
   return (
     <div className="mt-5 space-y-3">
       <p className="rounded-xl border border-emerald-500/30 bg-emerald-950/40 px-3 py-2 text-xs leading-relaxed text-emerald-100">
-        Reset via encrypted SMS OTP. A 6-digit code is sent to the mobile number
-        on your DeptSync profile.
+        We&apos;ll text a one-time link to the mobile number on your DeptSync
+        profile. Open it to set a new 4–6 digit PIN.
       </p>
 
-      {step === "phone" ? (
+      {sent ? (
+        <p className="rounded-xl border border-emerald-500/30 bg-emerald-950/30 px-3 py-3 text-sm text-emerald-100">
+          If that number is on this store roster, a reset link is on the way.
+          The link expires in 30 minutes and can be used once.
+        </p>
+      ) : (
         <>
           <TextField
             id="deptsync-reset-phone"
@@ -452,83 +399,13 @@ function PhoneResetPanel({
           <button
             type="button"
             disabled={busy || !phone.trim()}
-            onClick={() => void handleSendOtp()}
+            onClick={() => void handleSend()}
             className="btn-primary-glow flex min-h-[44px] w-full items-center justify-center rounded-xl text-sm disabled:opacity-40"
           >
-            {busy ? "Sending code…" : "Send 6-Digit SMS Code"}
+            {busy ? "Sending link…" : "Send PIN reset link"}
           </button>
         </>
-      ) : null}
-
-      {step === "otp" ? (
-        <>
-          <TextField
-            id="deptsync-reset-otp"
-            name="one-time-code"
-            label="6-Digit SMS Code"
-            value={otp}
-            onChange={setOtp}
-            autoComplete="one-time-code"
-          />
-          <button
-            type="button"
-            disabled={busy || otp.replace(/\D/g, "").length !== 6}
-            onClick={() => void handleVerifyOtp()}
-            className="btn-primary-glow flex min-h-[44px] w-full items-center justify-center rounded-xl text-sm disabled:opacity-40"
-          >
-            {busy ? "Verifying…" : "Verify Code"}
-          </button>
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => void handleSendOtp()}
-            className="text-center text-xs font-semibold text-emerald-400"
-          >
-            Resend code
-          </button>
-        </>
-      ) : null}
-
-      {step === "password" ? (
-        <>
-          <TextField
-            id="deptsync-reset-username"
-            name="username"
-            label="Username (optional)"
-            value={username}
-            onChange={setUsername}
-            autoComplete="username"
-          />
-          <TextField
-            id="deptsync-reset-password"
-            name="new-password"
-            label="New Password / Access Code"
-            value={newPassword}
-            onChange={setNewPassword}
-            type="password"
-            autoComplete="new-password"
-            passwordToggle
-          />
-          <TextField
-            id="deptsync-reset-password-confirm"
-            name="new-password-confirm"
-            label="Confirm New Password"
-            value={confirmPassword}
-            onChange={setConfirmPassword}
-            type="password"
-            autoComplete="new-password"
-            passwordToggle
-          />
-          <button
-            type="button"
-            disabled={busy || newPassword.trim().length < 6}
-            onClick={() => void handleResetPassword()}
-            className="btn-primary-glow flex min-h-[44px] w-full items-center justify-center rounded-xl text-sm disabled:opacity-40"
-          >
-            {busy ? "Saving…" : "Save New Access Code & Sign In"}
-          </button>
-        </>
-      ) : null}
+      )}
 
       {error ? (
         <p className="text-center text-sm font-semibold text-rose-400" role="alert">

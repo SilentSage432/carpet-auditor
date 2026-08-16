@@ -80,7 +80,17 @@ app/api/cron/weekly-rotation      → Sunday automated rotation engine (CRON_SEC
 vercel.json                       → Cron schedule 59 23 * * 0
 supabase/migrations/20260809_push_notifications.sql → push_subscriptions + RLS
 supabase/migrations/20260809_weekly_rotation_cron.sql → weekly_bay_target + Lowe's dept codes
-components/auth/AuthWall.tsx      → Non-dismissible login / setup / unlock gate
+app/invite/page.tsx               → Redirect `/invite?token=` → `/auth/verify/[token]`
+app/invite/[token]/page.tsx       → Redirect → `/auth/verify/[token]`
+app/auth/verify/[token]/page.tsx  → Consume-on-entry PIN setup (invite + reset)
+components/auth/InviteOnboardingView.tsx → Legacy invite presentation (unused; verify page owns UI)
+lib/auth-token.ts                 → SHA-256 one-time tokens, PIN hash, verify-session cookie
+lib/invite.ts                     → SMS copy for invite/reset links
+lib/onboarding/roster-invite.ts   → Issue invite: persist hashes, status=invited, dispatch SMS
+lib/onboarding/pin-reset.ts       → Self-service PIN reset token + SMS
+lib/onboarding/load-invite.ts     → Public token lookup by SHA-256 hash
+lib/onboarding/redeem-token.ts    → Consume token, hash PIN, mint Hub-bridge session
+lib/onboarding/sms-dispatch.ts    → Twilio or SMS webhook stub (never invents delivery)
 components/hub/AuditReportModal.tsx → Printable / emailable / clipboard audit report
 components/hub/*Modal.tsx         → Specialist / PIN / Markdown modals
 components/barcode/QuickAddCatalogModal.tsx → Scan-to-catalog Quick-Add
@@ -217,6 +227,7 @@ supabase/migrations/20260812_sunday_bay_assignments.sql → sunday specialist↔
 | Focus / keyboard dismiss | `lib/focus-input.ts` (`blurActiveInput` — never auto-focus on tab switch) |
 | SIMS location stock | `lib/sims.ts`, `SimsLocationFinder` |
 | Specialists session / credentials | `lib/specialists.ts`, `SpecialistModal` |
+| Roster SMS/link invite + PIN setup | `lib/auth-token.ts` + `lib/onboarding/*` + `/auth/verify/[token]` (hashed token consume-on-entry; `pin_hash`; status invited→active) |
 | Zero-access auth wall / idle lock | `lib/auth-session.ts`, `components/auth/AuthWall.tsx`, `components/auth/AccessGate.tsx` (`/login`) |
 | Edge auth + stealth gate | `lib/auth-gate.ts` + `proxy.ts` + `POST /api/auth/gate` (HttpOnly cookie) |
 | Enterprise ingest contracts | `src/types/enterpriseIntegration.ts` (Zod schemas). Transport: `lib/enterprise-integration/ingest.ts`. Stubs: `POST /api/v1/topology/ingest`, `POST /api/v1/freight/stage`. Does not write Store Ops tables or change hub UI. |

@@ -1025,8 +1025,9 @@ export type InviteSupervisorResult = {
   invite_token: string;
   invite_url: string;
   invite_expires_at: string;
-  temporary_pin: string;
+  temporary_pin?: string;
   phone: string | null;
+  status?: "invited";
   sms:
     | { ok: true; sid: string }
     | { ok: false; skipped: true; reason: string }

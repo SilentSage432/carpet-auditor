@@ -97,7 +97,12 @@ export async function POST(request: Request) {
       is_active: true,
       invite_token: null,
       invite_token_expires_at: null,
+      invite_token_hash: null,
+      invite_consumed_at: new Date().toISOString(),
+      auth_token_hash: null,
+      auth_token_expires_at: null,
       temp_pin_hash: null,
+      status: "active",
       phone_number: phone,
     };
     if (username.length >= 3) {

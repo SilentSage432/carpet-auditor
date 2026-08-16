@@ -327,6 +327,7 @@ create policy "Allow delete and update for store_specialists"
 -- Weekly cron targets: supabase/migrations/20260809_weekly_rotation_cron.sql
 -- Verification exceptions: supabase/migrations/20260809_rotation_verification.sql
 -- Supervisor invite: supabase/migrations/20260810_supervisor_invite.sql
+-- Roster invite hash + status: supabase/migrations/20260815_roster_invite_onboarding.sql
 -- ---------------------------------------------------------------------------
 
 alter table public.store_specialists
@@ -347,6 +348,31 @@ alter table public.store_specialists
 create unique index if not exists store_specialists_invite_token_uidx
   on public.store_specialists (invite_token)
   where invite_token is not null;
+
+alter table public.store_specialists
+  add column if not exists status text not null default 'active';
+
+alter table public.store_specialists
+  add column if not exists invite_token_hash text;
+
+alter table public.store_specialists
+  add column if not exists invite_consumed_at timestamptz;
+
+alter table public.store_specialists
+  add column if not exists auth_token_hash text;
+
+alter table public.store_specialists
+  add column if not exists auth_token_expires_at timestamptz;
+
+alter table public.store_specialists
+  add column if not exists pin_hash text;
+
+alter table public.store_specialists
+  add column if not exists pin_updated_at timestamptz;
+
+create unique index if not exists store_specialists_invite_token_hash_uidx
+  on public.store_specialists (invite_token_hash)
+  where invite_token_hash is not null;
 
 
 -- ---------------------------------------------------------------------------
