@@ -1,5 +1,14 @@
 # DeptSync Hub — Development Journal
 
+## 2026-08-16 — Sunday draw pre-selects Flooring-tagged associates
+
+### Found
+- `mergeShiftRoster` / `defaultShiftRoster` turned every non-Master associate **on**, so Appliances / Millwork / Cabinets were selected on the Flooring Cycle Audit drawer.
+
+### Shipped
+- Seed `active` from `associateMatchesSundayDepartment` (home / assigned / job-title slug vs D23 Flooring). Other departments start off. Shift roster cache bumped to `deptsync_shift_roster_v3` so old everyone-on caches do not override the seed.
+- Drawer roster + balancer show job-title badges and `Selected: N Flooring associates (… from other depts unselected)`. Cross-dept checkboxes are Master Admin only.
+
 ## 2026-08-16 — Hobby cron blocked Vercel deploys
 
 ### Found

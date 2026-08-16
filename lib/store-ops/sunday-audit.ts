@@ -14,7 +14,16 @@ import {
   type WeeklyRotationWithLocation,
 } from "@/lib/store-ops/types";
 import { isoWeekLabel, isoWeekToMondayDate } from "@/lib/store-ops/week";
-import type { StoreSpecialist } from "@/lib/types";
+import {
+  departmentMeta,
+  parseDepartmentScope,
+  rosterJobTitleLabel,
+  specialistHomeDepartment,
+  type DepartmentScope,
+  type StoreSpecialist,
+} from "@/lib/types";
+import { workingDepartment } from "@/lib/admin-department-context";
+import type { ShiftRosterMember } from "@/lib/store-ops/weekly-rotations";
 
 export const SUNDAY_AUDIT_EVENT = "deptsync:sunday-audit-assignments";
 export const SUNDAY_OPEN_EVENT = "deptsync:sunday-audit-open";
@@ -448,8 +457,7 @@ export function flooringRoster(
   return roster.filter((m) => {
     if (m.is_active === false) return false;
     if (m.role === "MasterAdmin") return true;
-    const dept = m.assigned_department;
-    return !dept || dept === "flooring" || dept === "all";
+    return associateMatchesSundayDepartment(m, "flooring");
   });
 }
 
@@ -458,6 +466,96 @@ export function sundayAssignableRoster(
   roster: StoreSpecialist[]
 ): StoreSpecialist[] {
   return roster.filter((m) => m.is_active !== false);
+}
+
+/**
+ * Department this Sunday Cycle Audit drawer seeds against.
+ * The Flooring engine stays D23; a specific working pin (not `all`) is used
+ * when the same drawer is opened from another department context.
+ */
+export function sundayStagingDepartment(
+  specialist: StoreSpecialist | null | undefined
+): DepartmentScope {
+  const working = workingDepartment(specialist);
+  if (working && working !== "all") return working;
+  return "flooring";
+}
+
+/**
+ * True when the associate's home / assigned dept or job-title slug matches
+ * the staging department (flooring ≡ D23, appliances ≡ D35, …).
+ * Master Admin and paused roster rows are never auto-selected.
+ */
+export function associateMatchesSundayDepartment(
+  member: Pick<
+    StoreSpecialist,
+    | "role"
+    | "is_active"
+    | "assigned_department"
+    | "home_department"
+    | "floor_title"
+  >,
+  stagingDept: DepartmentScope
+): boolean {
+  if (member.is_active === false) return false;
+  if (member.role === "MasterAdmin") return false;
+  const target = stagingDept === "all" ? "flooring" : stagingDept;
+  const home = specialistHomeDepartment(member);
+  if (home === target) return true;
+  const assigned = parseDepartmentScope(member.assigned_department);
+  if (assigned === target) return true;
+  const homeRaw = parseDepartmentScope(member.home_department);
+  if (homeRaw === target) return true;
+  const fromTitle = parseDepartmentScope(rosterJobTitleLabel(member));
+  return fromTitle === target;
+}
+
+export function sundayShiftSeedActive(
+  stagingDept: DepartmentScope
+): (member: StoreSpecialist) => boolean {
+  return (member) => associateMatchesSundayDepartment(member, stagingDept);
+}
+
+export type SundaySelectionSummary = {
+  selectedHome: number;
+  otherUnselected: number;
+  otherSelected: number;
+  deptLabel: string;
+  label: string;
+};
+
+export function sundaySelectionSummary(
+  roster: StoreSpecialist[],
+  shiftRoster: ShiftRosterMember[],
+  stagingDept: DepartmentScope
+): SundaySelectionSummary {
+  const activeById = new Map(
+    shiftRoster.map((row) => [row.specialist_id, row.active === true])
+  );
+  let selectedHome = 0;
+  let otherUnselected = 0;
+  let otherSelected = 0;
+  for (const member of roster) {
+    if (member.role === "MasterAdmin") continue;
+    const on = activeById.get(String(member.id)) === true;
+    const match = associateMatchesSundayDepartment(member, stagingDept);
+    if (match && on) selectedHome += 1;
+    else if (!match && on) otherSelected += 1;
+    else if (!match && !on) otherUnselected += 1;
+  }
+  const deptLabel = departmentMeta(stagingDept === "all" ? "flooring" : stagingDept)
+    .shortLabel;
+  const otherBit =
+    otherSelected > 0
+      ? `${otherUnselected} from other depts unselected · ${otherSelected} cross-dept on`
+      : `${otherUnselected} from other depts unselected`;
+  return {
+    selectedHome,
+    otherUnselected,
+    otherSelected,
+    deptLabel,
+    label: `Selected: ${selectedHome} ${deptLabel} associates (${otherBit})`,
+  };
 }
 
 export function buildSundayStagedBays(

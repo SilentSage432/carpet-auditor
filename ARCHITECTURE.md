@@ -142,7 +142,7 @@ supabase/migrations/20260812_manager_notes_archive.sql → manager_notes.is_arch
 app/flooring/page.tsx                 → Deep link → /dashboard + Sunday drawer (no 404 hop)
 app/sunday-audit/page.tsx             → Redirect → /dashboard + Sunday drawer
 app/sunday-rotation/page.tsx          → Redirect → /dashboard + Sunday drawer
-components/admin/AssociateRosterPanel.tsx → Lightweight Specialist vs CSA roster (Sunday drawer)
+components/admin/AssociateRosterPanel.tsx → Sunday drawer roster (Flooring seed, job-title badges, Master override)
 lib/types.ts                          → Cabinets D29 + SPECIALTY/CORE + associateFloorTitle
 src/types/enterpriseIntegration.ts    → Enterprise ingest Zod contracts (topology / freight / floor-touch)
 lib/enterprise-integration/ingest.ts  → JSON + safeParse transport (standardized 400; no persistence)
@@ -203,7 +203,7 @@ supabase/migrations/20260812_sunday_bay_assignments.sql → sunday specialist↔
 | Department weekly quotas | `DepartmentTargetsMatrix` (blur / Save All) + `PATCH /api/departments` + Settings |
 | Store Operations map + rotations | `lib/store-ops/*` + `/admin/store-map` + `/dashboard` (Visual Grid walk-only: `StoreLocationGrid` + `WalkTheFloorSheet`; Manage CRUD: `AisleBayManager` + `AddBaySheet` + `EditBayDrawer` + prune/batch; bulk velocity seed in Settings **and** Manage; floor checklist: `ZebraChecklist`; walk log: `bay-service.ts` + `POST /api/store-locations/service`; Sunday pick: carry-over prepend then `rotation.ts` velocity + `custom_decay_days`; department cron: Settings `DepartmentTargetsMatrix`; Sunday clock: `sunday-schedule.ts` + Settings `SundayScheduleCard`) |
 | Sunday schedule | `lib/store-ops/sunday-schedule.ts` (time / timezone / auto-run) + `stores` columns + `/api/cron/weekly-rotation` (skip if week already staged) + Master Force Draw overwrite |
-| Sunday assignments | `lib/store-ops/sunday-audit.ts` (persist) + `SundayAuditAssignmentModal` |
+| Sunday assignments | `lib/store-ops/sunday-audit.ts` (persist + department seed `associateMatchesSundayDepartment`) + `SundayAuditAssignmentModal` + `AssociateRosterPanel` |
 | Daily shift board | `lib/store-ops/shift-status.ts` (`associate_shift_days` week matrix; throws on live write failure) |
 | Call-out bay rebalance | `lib/store-ops/call-out.ts` (pool / auto / carry-over loop; stamps `carried_over` + Sunday `CARRIED_OVER`; does not generate rotations) |
 | Predictive Shift Copilot | `lib/store-ops/predictive-copilot.ts` + `PredictiveCopilotBanner` (local patterns; 1-tap downstock / assign) |

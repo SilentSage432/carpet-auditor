@@ -140,6 +140,7 @@
 - [x] Roster Specialist vs CSA job options — `floor_title` on `store_specialists`, Add Team Member dropdown, accordion badges (`20260816_roster_floor_title.sql`)
 - [x] Header store number — compact `DeptSync · #2587` plus overflow marquee; D23 / account chips stay aligned
 - [x] Sunday auto-stage schedule — store timezone + 05:00 default, auto-run toggle, cron skip-if-staged, Master Force Draw overwrite (`20260816_sunday_rotation_schedule.sql`)
+- [x] Sunday Flooring draw pre-selects Flooring-tagged roster (`associateMatchesSundayDepartment`; other depts start off)
 
 ## Next
 - [x] Apply Phase 1 JWT/RLS migration in Supabase + enable Custom Access Token Hook

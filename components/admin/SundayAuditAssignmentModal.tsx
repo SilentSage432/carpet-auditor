@@ -18,6 +18,7 @@ import { CarryOverPriorityBadge } from "@/components/store-ops/CarryOverPriority
 import {
   autoAssignSundayBaysToSpecialist,
   applySundayAssignmentPlan,
+  associateMatchesSundayDepartment,
   buildSundayStagedBays,
   clearSundayBayAssignment,
   fetchSundayAssignments,
@@ -28,6 +29,8 @@ import {
   subscribeSundayBayAssignments,
   SUNDAY_AUDIT_EVENT,
   sundayAssignableRoster,
+  sundaySelectionSummary,
+  sundayShiftSeedActive,
   sundayStagingHeadline,
   type SundayStagedBay,
 } from "@/lib/store-ops/sunday-audit";
@@ -49,6 +52,8 @@ import { AssociateRosterPanel } from "@/components/admin/AssociateRosterPanel";
 import { formatBayTag, type Department } from "@/lib/store-ops/types";
 import { isMasterAdmin } from "@/lib/rbac";
 import { rosterJobTitleLabel, type StoreSpecialist } from "@/lib/types";
+
+const FLOORING_STAGING_DEPT = "flooring" as const;
 
 type Props = {
   open: boolean;
@@ -100,7 +105,8 @@ export function SundayAuditAssignmentModal({
       setShiftRoster(
         mergeShiftRoster(
           assignable,
-          readShiftRoster(rotData.assigned_week, getStoreNumber())
+          readShiftRoster(rotData.assigned_week, getStoreNumber()),
+          sundayShiftSeedActive(FLOORING_STAGING_DEPT)
         )
       );
     } catch (err) {
@@ -179,6 +185,12 @@ export function SundayAuditAssignmentModal({
         shiftRoster
       ),
     [bays, shiftRoster, healthByRotation]
+  );
+
+  const selectionSummary = useMemo(
+    () =>
+      sundaySelectionSummary(roster, shiftRoster, FLOORING_STAGING_DEPT),
+    [roster, shiftRoster]
   );
 
   function persistRoster(next: ShiftRosterMember[]) {
@@ -415,10 +427,18 @@ export function SundayAuditAssignmentModal({
             compact
             specialist={specialist}
             roster={roster}
+            stagingDepartment={FLOORING_STAGING_DEPT}
+            selectionSummary={selectionSummary.label}
             onRosterChange={(next) => {
               const assignable = sundayAssignableRoster(next);
               setRoster(assignable);
-              persistRoster(mergeShiftRoster(assignable, shiftRoster));
+              persistRoster(
+                mergeShiftRoster(
+                  assignable,
+                  shiftRoster,
+                  sundayShiftSeedActive(FLOORING_STAGING_DEPT)
+                )
+              );
             }}
             shiftHours={Object.fromEntries(
               shiftRoster.map((row) => [row.specialist_id, row.hours])
@@ -458,11 +478,22 @@ export function SundayAuditAssignmentModal({
                 Shift balancer · hours → bay quota
               </p>
               <p className="mt-1 text-[11px] text-cyan-100/70">
-                Toggle who is on the floor, set 4/6/8h or start–end. High-risk
-                stale/top-stock clusters go to the longest shifts first.
+                Flooring-tagged associates start selected. Master Admin can
+                toggle anyone for cross-department coverage.
               </p>
               <ul className="mt-2 space-y-2">
-                {shiftRoster.map((row) => (
+                {shiftRoster.map((row) => {
+                  const member = roster.find(
+                    (m) => String(m.id) === row.specialist_id
+                  );
+                  const match = member
+                    ? associateMatchesSundayDepartment(
+                        member,
+                        FLOORING_STAGING_DEPT
+                      )
+                    : false;
+                  const canToggle = isMasterAdmin(specialist) || match;
+                  return (
                   <li
                     key={row.specialist_id}
                     className="rounded-lg border border-zinc-800/80 bg-zinc-950/50 px-2.5 py-2"
@@ -471,6 +502,7 @@ export function SundayAuditAssignmentModal({
                       <input
                         type="checkbox"
                         checked={row.active}
+                        disabled={!canToggle}
                         onChange={(e) =>
                           patchMember(row.specialist_id, {
                             active: e.target.checked,
@@ -480,17 +512,17 @@ export function SundayAuditAssignmentModal({
                       />
                       <span className="min-w-0 flex-1 truncate text-sm font-semibold text-white">
                         {row.specialist_name}
-                        {(() => {
-                          const member = roster.find(
-                            (m) => String(m.id) === row.specialist_id
-                          );
-                          if (!member || member.role !== "Associate") return null;
-                          return (
-                            <span className="ml-1 font-mono text-[10px] font-normal text-cyan-300/80">
-                              {rosterJobTitleLabel(member)}
-                            </span>
-                          );
-                        })()}
+                        {member ? (
+                          <span
+                            className={`ml-1.5 inline-flex rounded-full border px-1.5 py-px font-mono text-[9px] font-bold uppercase tracking-wide ${
+                              match
+                                ? "border-cyan-400/40 text-cyan-200"
+                                : "border-zinc-600 text-zinc-400"
+                            }`}
+                          >
+                            {rosterJobTitleLabel(member)}
+                          </span>
+                        ) : null}
                       </span>
                       <span className="shrink-0 font-mono text-[10px] text-cyan-300">
                         {row.active
@@ -550,7 +582,8 @@ export function SundayAuditAssignmentModal({
                       </div>
                     ) : null}
                   </li>
-                ))}
+                  );
+                })}
               </ul>
               {balancerPlan.loads.length > 0 ? (
                 <ul className="mt-2 space-y-1 text-[11px] text-cyan-100/80">

@@ -74,6 +74,7 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 
 ### Sunday Flooring Cycle Audit
 - Staging card + assignment modal: open weekly Flooring bays → assign from on-duty roster; Auto-Assign All to Me; Stage/Draw 12 or **Recalculate** (Master Admin); **Shift balancer** (hours / start–end → proportional clustered zones)
+- Associate roster in the drawer **pre-selects Flooring / D23** home-department associates (`associateMatchesSundayDepartment`). Appliances / Millwork / Cabinets start off. Master Admin can toggle anyone. Header: `Selected: N Flooring associates (… from other depts unselected)`. Job-title badges (`Flooring CSA`, `Appliance Specialist`)
 - Card shows on Sunday even before bays are drawn (`shouldShowSundayStaging`). Tap opens the drawer **in-place** (`requestSundayAuditDrawer`). `/flooring`, `/sunday-audit`, and `/sunday-rotation` redirect to `/dashboard` with the drawer — they do not 404
 - Assignments persist in `sunday_bay_assignments` (JWT store/dept RLS); `bay_id` = `weekly_rotations.id`; ISO week → `week_starting` Monday
 - Plan math: `lib/store-ops/weekly-rotations.ts` (does not generate rotations or persist)
@@ -178,7 +179,7 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 - `/stock` redirects to `/dashboard` (Downstock is a Zebra tab on Floor)
 - `/roster` — unified team list, PIN add, and department access chips (optimistic + toast)
 - `/admin/store-map` — Visual Grid chunks aisle/bay DOM (16 aisles / 24 bays) with memoized cadence dots + SVG heat strips; Sell/Top is an overlay (no full map reload). Manage Aisles & Bays starts collapsed and chunks the same way. Tap bay → **one** `WalkTheFloorSheet`.
-- Sunday staging card opens the assignment modal with **Shift balancer** (hours → proportional clustered zones). Plan owner: `lib/store-ops/weekly-rotations.ts`; persist: `sunday-audit.ts`.
+- Sunday staging card opens the assignment modal with **Shift balancer** (hours → proportional clustered zones). Plan owner: `lib/store-ops/weekly-rotations.ts`; persist: `sunday-audit.ts`. Drawer seed: Flooring/D23 only (`associateMatchesSundayDepartment`); Master may toggle other depts.
 - `GET /api/store-health` — weekly pace + bottleneck aggregation + compact `bay_health` for DS / Super Admin
 - `POST /api/store-ops/ai-bay-scan` — multimodal bay photo → carton/pallet estimates, cleanliness score, detected issues (Store Ops actor)
 - `POST /api/store-ops/ai-note-summary` — **410 Gone**; Floor Pad Copilot `extractTasksAndTag` is canonical

@@ -10,7 +10,7 @@
 import { useMemo, useState } from "react";
 import { DepartmentPicker } from "@/components/hub/DepartmentPicker";
 import { DepartmentIcon, HubIcon } from "@/components/hub/NavIcons";
-import { canGrantDepartmentAccess, canManageTeamRoster, suggestUsername } from "@/lib/rbac";
+import { canGrantDepartmentAccess, canManageTeamRoster, isMasterAdmin, suggestUsername } from "@/lib/rbac";
 import { DepartmentAccessChips } from "@/components/hub/DepartmentAccessChips";
 import {
   composeAccessibleDepartments,
@@ -28,9 +28,11 @@ import {
   rosterJobTitleLabel,
   rosterFloorBadgeLabel,
   departmentMeta,
+  specialistHomeDepartment,
   type DepartmentScope,
   type StoreSpecialist,
 } from "@/lib/types";
+import { associateMatchesSundayDepartment } from "@/lib/store-ops/sunday-audit";
 
 export type ShiftHoursPatch = {
   specialist_id: string;
@@ -47,6 +49,9 @@ type Props = {
   shiftActive?: Record<string, boolean>;
   onShiftHoursChange?: (patch: ShiftHoursPatch) => void;
   compact?: boolean;
+  /** Sunday staging: pre-select this department; others start off. */
+  stagingDepartment?: DepartmentScope;
+  selectionSummary?: string;
 };
 
 function floorLabel(member: StoreSpecialist): string {
@@ -61,6 +66,8 @@ export function AssociateRosterPanel({
   shiftActive,
   onShiftHoursChange,
   compact = false,
+  stagingDepartment,
+  selectionSummary,
 }: Props) {
   const canManage = canManageTeamRoster(specialist);
   const canGrant = canGrantDepartmentAccess(specialist);
@@ -75,12 +82,27 @@ export function AssociateRosterPanel({
       [...roster]
         .filter((m) => m.role !== "MasterAdmin")
         .sort((a, b) => {
-          const deptA = a.assigned_department ?? "";
-          const deptB = b.assigned_department ?? "";
+          if (stagingDepartment) {
+            const matchA = associateMatchesSundayDepartment(
+              a,
+              stagingDepartment
+            )
+              ? 0
+              : 1;
+            const matchB = associateMatchesSundayDepartment(
+              b,
+              stagingDepartment
+            )
+              ? 0
+              : 1;
+            if (matchA !== matchB) return matchA - matchB;
+          }
+          const deptA = specialistHomeDepartment(a);
+          const deptB = specialistHomeDepartment(b);
           if (deptA !== deptB) return deptA.localeCompare(deptB);
           return a.name.localeCompare(b.name);
         }),
-    [roster]
+    [roster, stagingDepartment]
   );
 
   async function refresh() {
@@ -205,11 +227,15 @@ export function AssociateRosterPanel({
           Associate roster
         </p>
         <p className="mt-1 text-[11px] leading-snug text-zinc-400">
-          Specialty depts can be Specialist or CSA (Flooring CSA still groups
-          under D23). Core depts default to CSA. Cashier and Receiving stay on
-          the chosen home department. On-duty names feed the Sunday shift
-          balancer.
+          {stagingDepartment
+            ? `${departmentMeta(stagingDepartment).shortLabel}-tagged associates start selected. Master Admin can turn anyone on for coverage.`
+            : "Specialty depts can be Specialist or CSA (Flooring CSA still groups under D23). Core depts default to CSA. Cashier and Receiving stay on the chosen home department. On-duty names feed the Sunday shift balancer."}
         </p>
+        {selectionSummary ? (
+          <p className="mt-1.5 font-mono text-[11px] font-bold text-cyan-200">
+            {selectionSummary}
+          </p>
+        ) : null}
       </div>
 
       {error ? (
@@ -225,21 +251,27 @@ export function AssociateRosterPanel({
           </li>
         ) : null}
         {rows.map((member) => {
-          const dept = (member.assigned_department &&
-          member.assigned_department !== "all"
-            ? member.assigned_department
-            : "flooring") as DepartmentScope;
+          const dept =
+            specialistHomeDepartment(member) === "all"
+              ? "flooring"
+              : specialistHomeDepartment(member);
           const hours = shiftHours?.[String(member.id)] ?? 8;
           const onDuty = shiftActive
-            ? shiftActive[String(member.id)] !== false
+            ? shiftActive[String(member.id)] === true
             : member.is_active !== false;
+          const match = stagingDepartment
+            ? associateMatchesSundayDepartment(member, stagingDepartment)
+            : true;
+          const canToggleDuty = onShiftHoursChange
+            ? isMasterAdmin(specialist) || match
+            : canManage;
           return (
             <li
               key={member.id}
               className="rounded-lg border border-zinc-800/80 bg-zinc-950/50 px-2.5 py-2"
             >
               <div className="flex items-start gap-2">
-                {canManage ? (
+                {canToggleDuty ? (
                   <input
                     type="checkbox"
                     checked={onDuty}
@@ -257,26 +289,38 @@ export function AssociateRosterPanel({
                       void handleActive(member, next);
                     }}
                     className="mt-1 h-5 w-5 accent-cyan-500"
-                    aria-label={`${member.name} on duty`}
+                    aria-label={`${member.name} on Sunday draw`}
                   />
                 ) : null}
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-semibold text-white">
-                    {member.name}
-                  </p>
-                  <p className="font-mono text-[10px] uppercase tracking-wider text-cyan-300/90">
-                    {floorLabel(member)}
+                  <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+                    <p className="truncate text-sm font-semibold text-white">
+                      {member.name}
+                    </p>
+                    <span
+                      className={`shrink-0 rounded-full border px-1.5 py-px font-mono text-[9px] font-bold uppercase tracking-wide ${
+                        match
+                          ? "border-cyan-400/40 text-cyan-200"
+                          : "border-zinc-600 text-zinc-400"
+                      }`}
+                    >
+                      {floorLabel(member)}
+                    </span>
                     {member.role === "Associate" ? (
-                      <span className="ml-1.5 rounded-full border border-cyan-500/30 px-1.5 py-px text-[9px] font-bold">
+                      <span className="shrink-0 rounded-full border border-cyan-500/30 px-1.5 py-px font-mono text-[9px] font-bold text-cyan-300/90">
                         {rosterFloorBadgeLabel(member)}
                       </span>
                     ) : member.role === "Supervisor" ? (
-                      <span className="ml-1.5 rounded-full border border-amber-400/30 px-1.5 py-px text-[9px] font-bold text-amber-200">
+                      <span className="shrink-0 rounded-full border border-amber-400/30 px-1.5 py-px font-mono text-[9px] font-bold text-amber-200">
                         Supervisor
                       </span>
                     ) : null}
-                    {!onDuty ? " · off duty" : ""}
-                  </p>
+                    {!onDuty ? (
+                      <span className="font-mono text-[10px] text-zinc-500">
+                        off
+                      </span>
+                    ) : null}
+                  </div>
                   {canManage ? (
                     <DepartmentPicker
                       value={dept}

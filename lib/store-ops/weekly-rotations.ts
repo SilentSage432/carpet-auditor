@@ -56,7 +56,8 @@ export type ProportionalAssignmentPlan = {
   loads: AssociateLoadPreview[];
 };
 
-const SHIFT_ROSTER_PREFIX = "deptsync_shift_roster";
+/** v3: Sunday seed is department-aware; v1/v2 caches had everyone on. */
+const SHIFT_ROSTER_PREFIX = "deptsync_shift_roster_v3";
 
 function storageKey(week: string, store = getStoreNumber()): string {
   return `${SHIFT_ROSTER_PREFIX}:${store}:${week}`;
@@ -118,19 +119,21 @@ export function riskScoreFromFinding(
 }
 
 export function defaultShiftRoster(
-  roster: StoreSpecialist[]
+  roster: StoreSpecialist[],
+  seedActive?: (member: StoreSpecialist) => boolean
 ): ShiftRosterMember[] {
   return roster.map((m) => ({
     specialist_id: String(m.id),
     specialist_name: m.name,
-    active: m.role !== "MasterAdmin",
+    active: seedActive ? seedActive(m) : m.role !== "MasterAdmin",
     hours: DEFAULT_SHIFT_HOURS,
   }));
 }
 
 export function mergeShiftRoster(
   roster: StoreSpecialist[],
-  saved: ShiftRosterMember[] | null | undefined
+  saved: ShiftRosterMember[] | null | undefined,
+  seedActive?: (member: StoreSpecialist) => boolean
 ): ShiftRosterMember[] {
   const byId = new Map((saved ?? []).map((row) => [row.specialist_id, row]));
   return roster.map((m) => {
@@ -139,7 +142,7 @@ export function mergeShiftRoster(
       return {
         specialist_id: String(m.id),
         specialist_name: m.name,
-        active: m.role !== "MasterAdmin",
+        active: seedActive ? seedActive(m) : m.role !== "MasterAdmin",
         hours: DEFAULT_SHIFT_HOURS,
       };
     }
