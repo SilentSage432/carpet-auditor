@@ -77,8 +77,11 @@ app/verify-rotation/page.tsx      → Redirect → /dashboard
 app/admin/exceptions/page.tsx     → Redirect → /dashboard
 app/settings/page.tsx             → Settings & Config (theme, targets, push, Master tools)
 app/api/push/*                    → VAPID public key, subscribe, manual dispatch
-app/api/cron/weekly-rotation      → Sunday automated rotation engine (CRON_SECRET)
-vercel.json                       → Cron schedule 59 23 * * 0
+app/api/cron/weekly-rotation      → Sunday automated rotation engine (CRON_SECRET; per-store schedule)
+vercel.json                       → Cron every 15 min `*/15 * * * *` (dispatch honors store local Sunday time)
+app/api/stores/settings           → GET/PATCH Sunday auto-stage time, auto-run, timezone (Master PATCH)
+lib/store-ops/sunday-schedule.ts  → Store-owned Sunday timing knowledge (defaults 05:00 America/Denver)
+supabase/migrations/20260816_sunday_rotation_schedule.sql → stores.sunday_auto_generate / sunday_auto_stage_time / timezone
 supabase/migrations/20260809_push_notifications.sql → push_subscriptions + RLS
 supabase/migrations/20260809_weekly_rotation_cron.sql → weekly_bay_target + Lowe's dept codes
 app/invite/page.tsx               → Redirect `/invite?token=` → `/auth/verify/[token]`
@@ -102,8 +105,9 @@ components/catalog/SimsLocationFinder.tsx   → SIMS location stock drawer
 components/hub/AdminDepartmentSwitcher.tsx → Master Admin working-dept pin
 components/sections/CycleAuditScanForm.tsx → Flooring scan/input island (drafts + scanner; log stays in parent)
 components/sections/ApplianceScanForm.tsx → Appliance scan/input island (drafts + scanner; log stays in parent)
-components/admin/SundayAuditStagingCard.tsx → Glowing pending Sunday Flooring audit CTA
-components/admin/SundayAuditAssignmentModal.tsx → Assign specialists + shift-hour balancer
+components/admin/SundayAuditStagingCard.tsx → Glowing pending Sunday Flooring audit CTA (Sunday even if empty)
+components/admin/SundayAuditAssignmentModal.tsx → Assign specialists + shift-hour balancer; Master Recalculate
+components/admin/SundayScheduleCard.tsx → Settings Sunday auto-stage time + auto-run toggle
 lib/store-ops/weekly-rotations.ts → Proportional clustered bay assignment plan (hours / aisle-face / health risk)
 lib/store-ops/sunday-audit.ts → Persist specialist↔bay; apply balancer plan
 lib/store-ops/shift-status.ts → Weekly Sun–Sat schedule + on-duty / call-out (`associate_shift_days`; localStorage caches live rows)
@@ -197,7 +201,8 @@ supabase/migrations/20260812_sunday_bay_assignments.sql → sunday specialist↔
 | Developer sandbox (UI preview) | `lib/dev-sandbox.ts` + `useDevSandbox` + `DevSandboxDrawer` / `DevSandboxBanner` (session overlay; JWT unchanged) |
 | Cross-app Navigation Hub | `lib/nav-hub.ts` + `NavigationHub` + `HubHeader` + `BottomNav` (Floor · Map · Roster · Settings only; Settings hashes for former Admin Tools) |
 | Department weekly quotas | `DepartmentTargetsMatrix` (blur / Save All) + `PATCH /api/departments` + Settings |
-| Store Operations map + rotations | `lib/store-ops/*` + `/admin/store-map` + `/dashboard` (Visual Grid walk-only: `StoreLocationGrid` + `WalkTheFloorSheet`; Manage CRUD: `AisleBayManager` + `AddBaySheet` + `EditBayDrawer` + prune/batch; bulk velocity seed in Settings **and** Manage; floor checklist: `ZebraChecklist`; walk log: `bay-service.ts` + `POST /api/store-locations/service`; Sunday pick: carry-over prepend then `rotation.ts` velocity + `custom_decay_days`; department cron: Settings `DepartmentTargetsMatrix`) |
+| Store Operations map + rotations | `lib/store-ops/*` + `/admin/store-map` + `/dashboard` (Visual Grid walk-only: `StoreLocationGrid` + `WalkTheFloorSheet`; Manage CRUD: `AisleBayManager` + `AddBaySheet` + `EditBayDrawer` + prune/batch; bulk velocity seed in Settings **and** Manage; floor checklist: `ZebraChecklist`; walk log: `bay-service.ts` + `POST /api/store-locations/service`; Sunday pick: carry-over prepend then `rotation.ts` velocity + `custom_decay_days`; department cron: Settings `DepartmentTargetsMatrix`; Sunday clock: `sunday-schedule.ts` + Settings `SundayScheduleCard`) |
+| Sunday schedule | `lib/store-ops/sunday-schedule.ts` (time / timezone / auto-run) + `stores` columns + `/api/cron/weekly-rotation` (skip if week already staged) + Master Force Draw overwrite |
 | Sunday assignments | `lib/store-ops/sunday-audit.ts` (persist) + `SundayAuditAssignmentModal` |
 | Daily shift board | `lib/store-ops/shift-status.ts` (`associate_shift_days` week matrix; throws on live write failure) |
 | Call-out bay rebalance | `lib/store-ops/call-out.ts` (pool / auto / carry-over loop; stamps `carried_over` + Sunday `CARRIED_OVER`; does not generate rotations) |
@@ -216,7 +221,7 @@ supabase/migrations/20260812_sunday_bay_assignments.sql → sunday specialist↔
 | Working department pin | `lib/admin-department-context.ts` (Master full-store; multi-dept clamped to grants) |
 | Personal theme / density / contrast / sound / haptics | `lib/theme.ts` + `lib/ui/preferences-context.tsx` + `UserPreferencesDrawer` (all roles) |
 | Audio & haptics playback | `lib/ui/feedback.ts` (`HapticsListener` taps; scan/bay/Sunday compose) |
-| Store context | `lib/store.ts` + `lib/store-ops/stores.ts` |
+| Store context | `lib/store.ts` + `lib/store-ops/stores.ts` (registry + Sunday schedule columns) |
 | Offline sync queue | `lib/sync-queue.ts`, `lib/sync-conflict.ts`, `ConflictResolutionModal` |
 | Header network / pending queue | `lib/network.ts` + `HeaderNetworkStatus` (hook isolated from hub forms) |
 | Shell caching | `public/sw.js` + `ServiceWorkerRegister` |

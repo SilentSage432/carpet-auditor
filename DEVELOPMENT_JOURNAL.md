@@ -1,5 +1,16 @@
 # DeptSync Hub — Development Journal
 
+## 2026-08-16 — Sunday rotation schedule is store-configurable
+
+### Found
+- Trigger was **Vercel Cron only** (`59 23 * * 0` = Sunday 23:59 UTC) → `GET /api/cron/weekly-rotation` (`CRON_SECRET`). No app-mount check. Manual paths: Settings Force Draw and the Flooring staging card Stage/Draw 12 (Master Admin `POST /api/rotations/generate`).
+- Cron always upserted even when the ISO week was already staged. Force Draw UI hard-coded “Automated Cron: Active”.
+
+### Shipped
+- **Store clock.** `stores.sunday_auto_generate` (default on), `sunday_auto_stage_time` (default 05:00), `timezone` (default America/Denver). Knowledge: `lib/store-ops/sunday-schedule.ts`. UI: Settings `SundayScheduleCard`. API: `GET|PATCH /api/stores/settings`. Apply `20260816_sunday_rotation_schedule.sql`.
+- **Dispatch.** Cron polls every 15 minutes. Per store: skip if auto-run off, not Sunday local, or before stage time. Skip if `weekly_rotations` already exist for the staging week. Sunday stages the upcoming Monday ISO week so Floor/checklist align after 05:00.
+- **Manual override.** Staging card shows on Sunday even with 0 bays. Master Recalculate / Force Draw send `force: true` and replace incomplete rows (completed bays stay). Specialist re-assignment stays unrestricted in the drawer.
+
 ## 2026-08-16 — Header store number always visible
 
 ### Shipped

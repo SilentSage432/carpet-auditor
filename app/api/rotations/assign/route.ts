@@ -8,6 +8,7 @@ import { assignLocationsToCurrentWeek } from "@/lib/store-ops/rotations";
 import { resolveStoreByNumber } from "@/lib/store-ops/stores";
 import { requireSupabaseAdmin } from "@/lib/supabase/admin-response";
 import { readableError } from "@/lib/store-ops/errors";
+import { sundayStagingWeekLabel } from "@/lib/store-ops/sunday-schedule";
 
 /**
  * POST /api/rotations/assign
@@ -77,7 +78,8 @@ export async function POST(request: Request) {
     const result = await assignLocationsToCurrentWeek(
       supabase,
       departmentId,
-      locationIds
+      locationIds,
+      sundayStagingWeekLabel(new Date(), store.timezone)
     );
 
     return NextResponse.json({

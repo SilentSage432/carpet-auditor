@@ -69,7 +69,7 @@ export function SundayAuditStagingCard({
       setPending(pendingSundayAssignmentCount(bays));
       setVisible(shouldShowSundayStaging(bays.length));
     } catch {
-      setVisible(false);
+      setVisible(shouldShowSundayStaging(0));
       setOpenCount(0);
       setPending(0);
     }

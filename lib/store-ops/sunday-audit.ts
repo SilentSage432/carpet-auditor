@@ -498,10 +498,14 @@ export function isSundayLocal(now = new Date()): boolean {
 
 /**
  * Whether to surface the glowing Sunday staging card.
- * Show when Flooring has open weekly rotations (Sunday cycle staged / in progress).
+ * Show when Flooring has open weekly rotations, or on Sunday before the
+ * work week begins so Master Admin can stage / recalculate.
  */
-export function shouldShowSundayStaging(openBayCount: number): boolean {
-  return openBayCount > 0;
+export function shouldShowSundayStaging(
+  openBayCount: number,
+  now = new Date()
+): boolean {
+  return openBayCount > 0 || isSundayLocal(now);
 }
 
 export function isSundayAssignmentForSpecialist(

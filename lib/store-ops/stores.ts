@@ -20,6 +20,9 @@ export type StoreRecord = {
   name: string | null;
   is_active: boolean;
   created_at?: string;
+  sunday_auto_generate?: boolean;
+  sunday_auto_stage_time?: string;
+  timezone?: string;
 };
 
 export const STORE_DEPARTMENT_TEMPLATES: Array<{

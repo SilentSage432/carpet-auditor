@@ -8,7 +8,7 @@ import {
 import { resolveScopedDepartmentId, resolveStoreLocationDepartmentIds } from "@/lib/store-ops/department-scope";
 import { resolveStoreByNumber } from "@/lib/store-ops/stores";
 import { getSupabaseAdmin } from "@/lib/store-ops/supabase-admin";
-import { isoWeekLabel } from "@/lib/store-ops/week";
+import { sundayStagingWeekLabel } from "@/lib/store-ops/sunday-schedule";
 import { supabaseAdminMissingMessage } from "@/lib/supabase/env";
 
 const ROTATION_SELECT =
@@ -31,7 +31,8 @@ export async function GET(request: Request) {
       );
     }
 
-    const week = isoWeekLabel() || "";
+    const store = await resolveStoreByNumber(supabase, actor.storeNumber);
+    const week = sundayStagingWeekLabel(new Date(), store.timezone) || "";
     if (!week) {
       return NextResponse.json({
         assigned_week: "",
@@ -40,9 +41,7 @@ export async function GET(request: Request) {
       });
     }
 
-    let storeId: string | null = null;
-    const store = await resolveStoreByNumber(supabase, actor.storeNumber);
-    storeId = store.id;
+    const storeId = store.id;
 
     const url = new URL(request.url);
     const departmentIdParam = url.searchParams.get("department_id");

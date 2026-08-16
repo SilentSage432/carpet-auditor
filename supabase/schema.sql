@@ -325,6 +325,7 @@ create policy "Allow delete and update for store_specialists"
 -- Apply: supabase/migrations/20260809_store_operations_rbac.sql
 -- Web Push: supabase/migrations/20260809_push_notifications.sql
 -- Weekly cron targets: supabase/migrations/20260809_weekly_rotation_cron.sql
+-- Sunday auto-stage clock: supabase/migrations/20260816_sunday_rotation_schedule.sql
 -- Verification exceptions: supabase/migrations/20260809_rotation_verification.sql
 -- Supervisor invite: supabase/migrations/20260810_supervisor_invite.sql
 -- Roster invite hash + status: supabase/migrations/20260815_roster_invite_onboarding.sql

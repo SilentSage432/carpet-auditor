@@ -11,8 +11,9 @@ import {
   isoWeekLabel,
   resolveWeeklyBayTarget,
 } from "./week";
-import { isMissingColumnError } from "./errors";
+import { isMissingColumnError, isMissingRelationError } from "./errors";
 import { departmentCodesMatch } from "./department-codes";
+import { evaluateSundayAutoRun } from "./sunday-schedule";
 
 function isStandardAisleLocation(loc: StoreLocation): boolean {
   return (loc.location_type ?? "STANDARD") !== "SHOWROOM_STACKOUT";
@@ -25,6 +26,18 @@ export type GenerateRotationsResult = {
   rotations: WeeklyRotation[];
   locations: StoreLocation[];
   weekly_bay_target: number;
+  skipped?: boolean;
+  reason?: string;
+  replaced?: number;
+};
+
+export type GenerateRotationsOptions = {
+  weekLabel?: string;
+  count?: number | null;
+  /** Scheduled runner: do not add or replace when the ISO week already has rows. */
+  skipIfExists?: boolean;
+  /** Master Admin explicit replace of incomplete rows for this week. */
+  forceOverwrite?: boolean;
 };
 
 export { resolveWeeklyBayTarget };
@@ -200,12 +213,121 @@ export async function resetDepartmentCycleIfNeeded(
   };
 }
 
+export async function countWeekRotations(
+  supabase: SupabaseClient,
+  departmentId: string,
+  weekLabel: string
+): Promise<number> {
+  const { count, error } = await supabase
+    .from("weekly_rotations")
+    .select("id", { count: "exact", head: true })
+    .eq("department_id", departmentId)
+    .eq("assigned_week", weekLabel);
+
+  if (error) throw new Error(error.message);
+  return count ?? 0;
+}
+
+/**
+ * Drop incomplete rows for this ISO week so Master Admin can restage.
+ * Completed bays stay. Matching sunday_bay_assignments are cleared.
+ */
+export async function replaceIncompleteWeekRotations(
+  supabase: SupabaseClient,
+  departmentId: string,
+  weekLabel: string
+): Promise<number> {
+  const { data: rows, error } = await supabase
+    .from("weekly_rotations")
+    .select("id, location_id")
+    .eq("department_id", departmentId)
+    .eq("assigned_week", weekLabel)
+    .eq("is_completed", false);
+
+  if (error) throw new Error(error.message);
+  if (!rows?.length) return 0;
+
+  const rotationIds = rows.map((row) => String(row.id));
+  const locationIds = [
+    ...new Set(rows.map((row) => String(row.location_id)).filter(Boolean)),
+  ];
+
+  const { error: assignError } = await supabase
+    .from("sunday_bay_assignments")
+    .delete()
+    .in("bay_id", rotationIds);
+  if (
+    assignError &&
+    !isMissingRelationError(assignError) &&
+    !isMissingColumnError(assignError, "bay_id")
+  ) {
+    throw new Error(assignError.message);
+  }
+
+  const { error: deleteError } = await supabase
+    .from("weekly_rotations")
+    .delete()
+    .in("id", rotationIds);
+  if (deleteError) throw new Error(deleteError.message);
+
+  if (locationIds.length > 0) {
+    const now = new Date().toISOString();
+    const { error: resetError } = await supabase
+      .from("store_locations")
+      .update({ status: "PENDING", updated_at: now })
+      .in("id", locationIds);
+    if (resetError) throw new Error(resetError.message);
+  }
+
+  return rows.length;
+}
+
 export async function generateWeeklyRotations(
   supabase: SupabaseClient,
   departmentId: string,
   count?: number | null,
-  weekLabel: string = isoWeekLabel()
+  weekLabel: string = isoWeekLabel(),
+  options: Omit<GenerateRotationsOptions, "weekLabel" | "count"> = {}
 ): Promise<GenerateRotationsResult> {
+  const existingCount = await countWeekRotations(
+    supabase,
+    departmentId,
+    weekLabel
+  );
+
+  if (options.skipIfExists && existingCount > 0) {
+    return {
+      assigned_week: weekLabel,
+      cycle_number: 0,
+      cycle_reset: false,
+      rotations: [],
+      locations: [],
+      weekly_bay_target: 0,
+      skipped: true,
+      reason: `Already staged for ${weekLabel} — scheduled runner will not overwrite`,
+    };
+  }
+
+  let replaced = 0;
+  if (options.forceOverwrite && existingCount > 0) {
+    replaced = await replaceIncompleteWeekRotations(
+      supabase,
+      departmentId,
+      weekLabel
+    );
+  } else if (!options.forceOverwrite && existingCount > 0) {
+    return {
+      assigned_week: weekLabel,
+      cycle_number: 0,
+      cycle_reset: false,
+      rotations: [],
+      locations: [],
+      weekly_bay_target: 0,
+      skipped: true,
+      reason: `Already staged for ${weekLabel} — Master Admin Force Draw is required to replace`,
+    };
+  }
+
   await reclaimStaleAssignments(supabase, departmentId, weekLabel);
 
   const { data: department, error: departmentError } = await supabase
@@ -233,7 +355,7 @@ export async function generateWeeklyRotations(
 
   const carried = await loadCarryOverPriorityPool(supabase, departmentId);
 
-  return finishGenerate(
+  const generated = await finishGenerate(
     supabase,
     departmentId,
     department,
@@ -245,6 +367,8 @@ export async function generateWeeklyRotations(
     pending,
     carried
   );
+
+  return replaced > 0 ? { ...generated, replaced } : generated;
 }
 
 async function loadCarryOverPriorityPool(
@@ -558,16 +682,37 @@ export type DepartmentCronResult = {
 };
 
 /**
- * Sunday cron: for every active store, queue weekly targets per active department.
+ * Sunday cron: for every active store whose schedule window is open, queue
+ * weekly targets per active department. Never overwrites an already-staged week.
  */
 export async function runWeeklyRotationForAllDepartments(
   supabase: SupabaseClient,
-  weekLabel: string = isoWeekLabel()
+  weekLabel?: string,
+  now: Date = new Date()
 ): Promise<DepartmentCronResult[]> {
   const stores = await listActiveStores(supabase);
   const results: DepartmentCronResult[] = [];
 
   for (const store of stores) {
+    const decision = evaluateSundayAutoRun(store, now);
+    const targetWeek = weekLabel ?? decision.weekLabel;
+
+    if (!decision.run) {
+      results.push({
+        department_id: store.id,
+        department_code: "_schedule",
+        department_name: store.name || `Store ${store.store_number}`,
+        weekly_bay_target: 0,
+        ok: true,
+        skipped: true,
+        reason: decision.reason,
+        assigned_week: targetWeek,
+        store_id: store.id,
+        store_number: store.store_number,
+      });
+      continue;
+    }
+
     const { data: departments, error } = await supabase
       .from("departments")
       .select("*")
@@ -578,7 +723,6 @@ export async function runWeeklyRotationForAllDepartments(
     if (error) throw new Error(error.message);
 
     for (const dept of (departments ?? []) as Department[]) {
-      // Always re-read target from this department row (null/0 → 10)
       const target = resolveWeeklyBayTarget(dept.weekly_bay_target);
       const base: DepartmentCronResult = {
         department_id: dept.id,
@@ -605,23 +749,26 @@ export async function runWeeklyRotationForAllDepartments(
             ok: true,
             skipped: true,
             reason: "No mapped store locations",
+            assigned_week: targetWeek,
           });
           continue;
         }
 
-        // Draw count comes from departments.weekly_bay_target inside generate
         const generated = await generateWeeklyRotations(
           supabase,
           dept.id,
           null,
-          weekLabel
+          targetWeek,
+          { skipIfExists: true }
         );
 
         results.push({
           ...base,
           ok: true,
-          weekly_bay_target: generated.weekly_bay_target,
-          created: generated.rotations.length,
+          skipped: generated.skipped,
+          reason: generated.reason,
+          weekly_bay_target: generated.weekly_bay_target || target,
+          created: generated.skipped ? 0 : generated.rotations.length,
           cycle_number: generated.cycle_number,
           cycle_reset: generated.cycle_reset,
           assigned_week: generated.assigned_week,
@@ -631,6 +778,7 @@ export async function runWeeklyRotationForAllDepartments(
           ...base,
           ok: false,
           reason: err instanceof Error ? err.message : "Unknown error",
+          assigned_week: targetWeek,
         });
       }
     }

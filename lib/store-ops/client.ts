@@ -594,24 +594,80 @@ export async function completeRotation(
 export async function generateRotations(
   specialist: StoreSpecialist,
   departmentId: string,
-  count: number
+  count: number,
+  options?: { force?: boolean }
 ): Promise<{
   assigned_week: string;
   cycle_number: number;
   cycle_reset: boolean;
   created: number;
+  skipped?: boolean;
+  reason?: string;
+  replaced?: number;
 }> {
   const result = await storeOpsFetch<{
     assigned_week: string;
     cycle_number: number;
     cycle_reset: boolean;
     created: number;
+    skipped?: boolean;
+    reason?: string;
+    replaced?: number;
   }>("/api/rotations/generate", specialist, {
     method: "POST",
-    body: JSON.stringify({ department_id: departmentId, count }),
+    body: JSON.stringify({
+      department_id: departmentId,
+      count,
+      force: options?.force === true,
+    }),
   });
   await invalidateStoreOpsListCaches();
   return result;
+}
+
+export type StoreScheduleSettingsClient = {
+  store_id: string;
+  store_number: string;
+  name: string | null;
+  sunday_auto_generate: boolean;
+  sunday_auto_stage_time: string;
+  timezone: string;
+  auto_stage_time_display: string;
+  staging_week: string;
+  dispatch: {
+    would_run: boolean;
+    reason: string;
+    local_time: string;
+    timezone: string;
+    week_label: string;
+  };
+};
+
+export async function fetchStoreScheduleSettings(
+  specialist: StoreSpecialist
+): Promise<StoreScheduleSettingsClient> {
+  return storeOpsFetch<StoreScheduleSettingsClient>(
+    "/api/stores/settings",
+    specialist
+  );
+}
+
+export async function updateStoreScheduleSettings(
+  specialist: StoreSpecialist,
+  patch: {
+    sunday_auto_generate?: boolean;
+    sunday_auto_stage_time?: string;
+    timezone?: string;
+  }
+): Promise<StoreScheduleSettingsClient> {
+  return storeOpsFetch<StoreScheduleSettingsClient>(
+    "/api/stores/settings",
+    specialist,
+    {
+      method: "PATCH",
+      body: JSON.stringify(patch),
+    }
+  );
 }
 
 export async function updateDepartmentWeeklyTarget(

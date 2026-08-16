@@ -3,7 +3,7 @@ import { NextResponse } from "next/server";
 import { notifyDepartmentRotationBatch } from "@/lib/push/dispatch";
 import { isWebPushConfigured } from "@/lib/push/vapid";
 import { runWeeklyRotationForAllDepartments } from "@/lib/store-ops/rotations";
-import { isoWeekLabel } from "@/lib/store-ops/week";
+import { sundayStagingWeekLabel } from "@/lib/store-ops/sunday-schedule";
 
 export const dynamic = "force-dynamic";
 export const maxDuration = 60;
@@ -17,7 +17,8 @@ function authorizeCron(request: Request): boolean {
 
 /**
  * GET /api/cron/weekly-rotation
- * Vercel Cron — Sunday 23:59 UTC. Protected by CRON_SECRET Bearer token.
+ * Vercel Cron — every 15 minutes. Per-store Sunday auto-stage (local time)
+ * is owned by stores.sunday_auto_stage_time + timezone. Protected by CRON_SECRET.
  */
 export async function GET(request: Request) {
   try {
@@ -45,10 +46,11 @@ export async function GET(request: Request) {
       },
     });
 
-    const weekLabel = isoWeekLabel();
+    const now = new Date();
     const results = await runWeeklyRotationForAllDepartments(
       supabase,
-      weekLabel
+      undefined,
+      now
     );
 
     const pushSummaries: Array<{
@@ -65,7 +67,7 @@ export async function GET(request: Request) {
             departmentId: row.department_id,
             departmentCode: row.department_code,
             departmentName: row.department_name,
-            assignedWeek: row.assigned_week ?? weekLabel,
+            assignedWeek: row.assigned_week ?? sundayStagingWeekLabel(now),
             bayCount: row.created,
           });
           pushSummaries.push({
@@ -88,12 +90,14 @@ export async function GET(request: Request) {
       (sum, r) => sum + (r.created ?? 0),
       0
     );
+    const skippedTotal = results.filter((r) => r.skipped).length;
 
     return NextResponse.json({
       ok: true,
-      assigned_week: weekLabel,
+      evaluated_at: now.toISOString(),
       departments_processed: results.length,
       departments_ok: okCount,
+      skipped: skippedTotal,
       bays_assigned: createdTotal,
       results,
       push: pushSummaries,

@@ -6,6 +6,7 @@ import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { PushNotificationsCard } from "@/components/hub/PushNotificationsCard";
 import { WeeklyBayTargetCard } from "@/components/hub/WeeklyBayTargetCard";
 import { ThemeSelector } from "@/components/settings/ThemeSelector";
+import { SundayScheduleCard } from "@/components/admin/SundayScheduleCard";
 import {
   clearLocalApplianceScans,
   countLocalApplianceScans,
@@ -272,6 +273,10 @@ export function SettingsSection({
         <WeeklyBayTargetCard specialist={activeSpecialist} />
       ) : null}
 
+      {masterSession && activeSpecialist ? (
+        <SundayScheduleCard specialist={activeSpecialist} />
+      ) : null}
+
       {(supervisorSession || masterSession) && (
         <PushNotificationsCard specialist={activeSpecialist} />
       )}
@@ -335,7 +340,7 @@ export function SettingsSection({
                 Trigger weekly rotation
               </span>
               <span className="block text-xs text-slate-500">
-                Force a new Sunday draw
+                Master Admin overwrite of the staged week
               </span>
             </span>
             <span className="text-slate-500">→</span>

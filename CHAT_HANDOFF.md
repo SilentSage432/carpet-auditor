@@ -65,7 +65,7 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 
 ### Settings tools (Master Admin / Supervisor)
 - Former Admin Tools live in **Settings** (`SettingsSection`) as accordions and modals — not a second menu
-- Master: store number, Bulk Generator (`#bulk-generate`), Taxonomies (`#taxonomies`), Force Rotation (`#weekly-rotation`)
+- Master: store number, Sunday auto-stage time + auto-run (`SundayScheduleCard`), Bulk Generator (`#bulk-generate`), Taxonomies (`#taxonomies`), Force Rotation (`#weekly-rotation`)
 - Supervisor + Master: weekly targets matrix. Floor Pad lives on Floor (`TacticalVoiceFloorPad`); Settings `#manager-notes` redirects to `/dashboard#floor-pad`
 - Remnant inventory (`#remnants`) when RBAC allows; Device & sync for every role
 - Personal **🎨 Appearance & Preferences** (all roles, including CSA via header) — not store configuration
@@ -73,8 +73,8 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 - Master Admin header: **My Department Context** pin (Full Store / D23 Flooring / D35 Appliances / …) — filters Floor without dropping Master privileges
 
 ### Sunday Flooring Cycle Audit
-- Staging card + assignment modal: open weekly Flooring bays → assign from on-duty roster; Auto-Assign All to Me; Stage/Draw 12; **Shift balancer** (hours / start–end → proportional clustered zones)
-- Tap opens the drawer **in-place** (`requestSundayAuditDrawer`). `/flooring`, `/sunday-audit`, and `/sunday-rotation` redirect to `/dashboard` with the drawer — they do not 404
+- Staging card + assignment modal: open weekly Flooring bays → assign from on-duty roster; Auto-Assign All to Me; Stage/Draw 12 or **Recalculate** (Master Admin); **Shift balancer** (hours / start–end → proportional clustered zones)
+- Card shows on Sunday even before bays are drawn (`shouldShowSundayStaging`). Tap opens the drawer **in-place** (`requestSundayAuditDrawer`). `/flooring`, `/sunday-audit`, and `/sunday-rotation` redirect to `/dashboard` with the drawer — they do not 404
 - Assignments persist in `sunday_bay_assignments` (JWT store/dept RLS); `bay_id` = `weekly_rotations.id`; ISO week → `week_starting` Monday
 - Plan math: `lib/store-ops/weekly-rotations.ts` (does not generate rotations or persist)
 - Entry points: Floor tab, Cycle Audit scan, `/flooring` deep link, `#sunday-audit`
@@ -109,7 +109,7 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 - **P0 indexes:** re-run `supabase/migrations/20260813_p0_query_indexes.sql` — hub tables use `store_number`; Store Ops locations/rotations use `store_id`; manager_notes Phase 2 uses `store_number`+`department` (legacy `store_id`+`department_code`). Script skips absent columns. Apply `20260815_performance_indexes.sql` for Map/copilot composites (`idx_store_locations_dept_aisle`, `idx_bay_service_logs_bay_time`, `idx_rotations_active`) on canonical columns (`aisle`/`bay`, `location_id`/`created_at`, `is_completed`).
 - **P1 Gemini/map:** Snap Bay 720p + compressed JPEG; Floor Pad Copilot strips HTML / 8k cap; `GET /api/store-locations` explicit Store Map columns (no `SELECT *`); Slice 1 `responseSchema` + per-route token budgets
 - **P2 hub UI:** `startTransition` + keep-alive Floor/Map/Roster/Settings (`hidden`); Cycle/Appliance scan forms isolated from logs; 300ms debounced draft saves with flush on submit/leave; weekly rotations + Sunday assignments TTL-cached 45s
-- **Settings tools:** Bulk / Taxonomies / Force Rotation are `next/dynamic` inside `SettingsSection`; Floor Pad is the Floor tactical dock; SW cache `deptsync-shell-v6-stealth`
+- **Settings tools:** Bulk / Taxonomies / Force Rotation are `next/dynamic` inside `SettingsSection`; Sunday schedule card is Master-only; Floor Pad is the Floor tactical dock; SW cache `deptsync-shell-v6-stealth`
 - **Bulk bays:** Odd Only / Even Only (`lib/store-ops/bay-pattern.ts`, default odd); Store Map GET falls back if `last_completed_at` is missing/null
 - Seeds: no hardcoded roster injection — use Add Team Member (roster-only) or Send Mobile App Invite (`status=invited` until `/auth/verify/[token]`)
 - Primary: fixed bottom workflow tabs — **Floor · Map · Roster · Settings** only
@@ -185,6 +185,7 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 - APIs under `/api/rotations/*`, `/api/store-locations*`, `/api/departments`, `/api/weekly-rotations`
 - **Enterprise ingest (stubs, no UI):** Zod contracts in `src/types/enterpriseIntegration.ts` (`BayTopologyIngestSchema`, `FreightStageEventSchema`, `FloorTouchTelemetrySchema`). `POST /api/v1/topology/ingest` and `POST /api/v1/freight/stage` validate with `.safeParse()` and return 400 `{ success: false, error: "Bad Request", issues }` on mismatch. Does not persist into `store_locations` / rotations. Edge gate still requires hub cookie or `Authorization: Bearer`.
 - Multi-store: apply `20260809_multi_store.sql`; store scope comes from JWT `app_metadata.store_number` / `profiles.store_number`
+- Sunday auto-stage clock: apply `20260816_sunday_rotation_schedule.sql`
 - Manager notes: apply `20260811_manager_notes.sql` + `20260812_manager_notes.sql` + `20260812_manager_notes_archive.sql` + `20260812_fix_manager_notes_rls.sql` + **`20260812_manager_notes_metadata.sql`** (`metadata` JSONB from Gemini Copilot)
 - Sunday bay assignments: apply `20260812_sunday_bay_assignments.sql`
 - Downstock queue: apply `20260814_downstock_queue.sql` (localStorage fallback until applied)
@@ -202,10 +203,11 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 - SW shows notification and opens `/dashboard` on click
 
 ## Weekly rotation cron
-- Migration: `supabase/migrations/20260809_weekly_rotation_cron.sql` (`weekly_bay_target`, Lowe's codes)
-- `vercel.json`: Sunday `59 23 * * 0` → `/api/cron/weekly-rotation`
+- Migration: `supabase/migrations/20260809_weekly_rotation_cron.sql` (`weekly_bay_target`, Lowe's codes) + **`20260816_sunday_rotation_schedule.sql`** (`stores.sunday_auto_generate`, `sunday_auto_stage_time` default 05:00, `timezone` default America/Denver)
+- `vercel.json`: `*/15 * * * *` → `/api/cron/weekly-rotation` (poll). Dispatch is per-store: Sunday in `stores.timezone` at/after `sunday_auto_stage_time`, and only if auto-generate is on
+- On Sunday the runner stages the **upcoming** ISO week (Monday). It **skips** a department that already has `weekly_rotations` for that week — Master Admin Force Draw / Recalculate (`force: true`) replaces incomplete rows only
 - Env on Vercel: `CRON_SECRET` (Bearer token Vercel sends automatically)
-- Settings → Weekly bay target matrix (Supervisor + Master; blur autosave + Save All)
+- Settings → Sunday rotation schedule (Master) + weekly bay target matrix (Supervisor + Master; blur autosave + Save All)
 
 ## End-of-week verification
 - Migration: `supabase/migrations/20260809_rotation_verification.sql`

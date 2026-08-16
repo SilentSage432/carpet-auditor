@@ -1,11 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { generateRotations } from "@/lib/store-ops/client";
+import { generateRotations, fetchStoreScheduleSettings } from "@/lib/store-ops/client";
 import { readableError } from "@/lib/store-ops/errors";
 import { playErrorTone, playSuccessTone } from "@/lib/ui/feedback";
 import type { Department } from "@/lib/store-ops/types";
-import { isoWeekLabel } from "@/lib/store-ops/week";
+import { formatSundayStageTimeDisplay } from "@/lib/store-ops/sunday-schedule";
 import type { StoreSpecialist } from "@/lib/types";
 
 type Props = {
@@ -34,14 +34,31 @@ export function ForceRotationModal({
   const [genBusy, setGenBusy] = useState(false);
   const [genMsg, setGenMsg] = useState<string | null>(null);
   const [genError, setGenError] = useState<string | null>(null);
-  const currentWeek = isoWeekLabel();
+  const [cronLine, setCronLine] = useState("Loading schedule…");
 
   useEffect(() => {
     if (!open) return;
     setGenDept((current) => current || initialDepartmentId || departments[0]?.id || "");
     setGenMsg(null);
     setGenError(null);
-  }, [open, initialDepartmentId, departments]);
+    let cancelled = false;
+    void fetchStoreScheduleSettings(specialist)
+      .then((settings) => {
+        if (cancelled) return;
+        const auto = settings.sunday_auto_generate
+          ? `Active · ${formatSundayStageTimeDisplay(settings.sunday_auto_stage_time)} ${settings.timezone}`
+          : "Disabled";
+        setCronLine(
+          `Automated Cron: ${auto} · Staging week ${settings.staging_week}`
+        );
+      })
+      .catch(() => {
+        if (!cancelled) setCronLine("Automated Cron: schedule unavailable");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, initialDepartmentId, departments, specialist]);
 
   useEffect(() => {
     if (!open) return;
@@ -67,12 +84,17 @@ export function ForceRotationModal({
       const result = await generateRotations(
         specialist,
         genDept,
-        Number(genCount)
+        Number(genCount),
+        { force: true }
       );
       setGenMsg(
-        `Week ${result.assigned_week}: assigned ${result.created} bay${
-          result.created === 1 ? "" : "s"
-        }${result.cycle_reset ? " (new cycle started)" : ""}.`
+        result.skipped
+          ? result.reason || "Week already staged."
+          : `Week ${result.assigned_week}: assigned ${result.created} bay${
+              result.created === 1 ? "" : "s"
+            }${result.replaced ? ` (replaced ${result.replaced} incomplete)` : ""}${
+              result.cycle_reset ? " (new cycle started)" : ""
+            }.`
       );
       onForced();
       playSuccessTone();
@@ -126,11 +148,11 @@ export function ForceRotationModal({
         </div>
 
         <p className="mt-3 rounded-xl border border-emerald-500/25 bg-emerald-950/30 px-3 py-2 text-sm text-emerald-200">
-          Automated Cron: Active · Last Draw: Current ISO Week ({currentWeek})
+          {cronLine}
         </p>
         <p className="mt-2 text-sm text-zinc-400">
-          Automated rotation runs weekly on schedule. Use this panel for manual
-          overrides or initial department setup.
+          Force Draw replaces incomplete bays for the staging week. The scheduled
+          runner will not overwrite a week that is already staged.
         </p>
 
         <div className="mt-4 space-y-3">

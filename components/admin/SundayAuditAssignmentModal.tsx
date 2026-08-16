@@ -47,6 +47,7 @@ import { getStoreNumber } from "@/lib/store";
 import { fetchSpecialists } from "@/lib/specialists";
 import { AssociateRosterPanel } from "@/components/admin/AssociateRosterPanel";
 import { formatBayTag, type Department } from "@/lib/store-ops/types";
+import { isMasterAdmin } from "@/lib/rbac";
 import { rosterJobTitleLabel, type StoreSpecialist } from "@/lib/types";
 
 type Props = {
@@ -307,16 +308,33 @@ export function SundayAuditAssignmentModal({
       setError("Flooring department not found — seed store-ops departments first.");
       return;
     }
+    if (!isMasterAdmin(specialist)) {
+      setError("Master Admin is required to recalculate the Sunday rotation.");
+      return;
+    }
+    const replacing = bays.length > 0;
+    if (replacing) {
+      const ok = window.confirm(
+        `A Flooring rotation is already staged for ${week || "this week"}. Recalculate and replace incomplete bays? Specialist assignments on those bays will be cleared. Completed bays stay.`
+      );
+      if (!ok) return;
+    }
     setBusy(true);
     setError(null);
     setStatus(null);
     try {
-      const result = await generateRotations(specialist, flooringDept.id, 12);
-      setStatus(
-        `Staged week ${result.assigned_week}: ${result.created} Flooring bay${
-          result.created === 1 ? "" : "s"
-        } drawn.`
-      );
+      const result = await generateRotations(specialist, flooringDept.id, 12, {
+        force: replacing,
+      });
+      if (result.skipped) {
+        setStatus(result.reason || "Week already staged.");
+      } else {
+        setStatus(
+          `Staged week ${result.assigned_week}: ${result.created} Flooring bay${
+            result.created === 1 ? "" : "s"
+          } drawn${result.replaced ? ` (replaced ${result.replaced})` : ""}.`
+        );
+      }
       await reload();
       onChanged?.();
       playSuccessTone();
@@ -381,11 +399,15 @@ export function SundayAuditAssignmentModal({
             </button>
             <button
               type="button"
-              disabled={busy || !flooringDept}
+              disabled={busy || !flooringDept || !isMasterAdmin(specialist)}
               onClick={() => void handleGenerateFlooring()}
               className="flex min-h-[44px] items-center justify-center rounded-xl border border-amber-400/45 bg-amber-950/35 px-3 text-sm font-bold text-amber-100 disabled:opacity-40"
             >
-              {busy ? "Staging…" : "Stage / Draw 12 Flooring Bays"}
+              {busy
+                ? "Staging…"
+                : bays.length > 0
+                  ? "Recalculate Flooring rotation"
+                  : "Stage / Draw 12 Flooring Bays"}
             </button>
           </div>
 
@@ -588,7 +610,7 @@ export function SundayAuditAssignmentModal({
               <span className="font-semibold text-amber-200">
                 Stage / Draw 12 Flooring Bays
               </span>{" "}
-              Open Settings → Trigger weekly rotation.
+              or Settings → Trigger weekly rotation (Master Admin).
             </p>
           ) : (
             <ul className="space-y-2">

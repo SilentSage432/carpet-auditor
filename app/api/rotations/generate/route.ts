@@ -13,11 +13,14 @@ import { getSupabaseAdmin } from "@/lib/store-ops/supabase-admin";
 import { notifyDepartmentRotationBatch } from "@/lib/push/dispatch";
 import { isWebPushConfigured } from "@/lib/push/vapid";
 import { supabaseAdminMissingMessage } from "@/lib/supabase/env";
+import { sundayStagingWeekLabel } from "@/lib/store-ops/sunday-schedule";
 
 /**
  * POST /api/rotations/generate
- * Body: { department_id: uuid, count: number }
+ * Body: { department_id: uuid, count?: number, force?: boolean }
  * Super admin only — picks PENDING bays (auto cycle-reset when exhausted).
+ * Without force, an already-staged ISO week is left untouched.
+ * force=true (Master Admin) replaces incomplete rows for that week.
  * On success, dispatches Web Push alerts to that department's supervisors.
  */
 export async function POST(request: Request) {
@@ -37,6 +40,7 @@ export async function POST(request: Request) {
       department_id?: string;
       department_code?: string;
       count?: number;
+      force?: boolean;
     };
 
     let departmentId = body.department_id?.trim() || "";
@@ -82,18 +86,37 @@ export async function POST(request: Request) {
       );
     }
 
-    // Optional override count for Force Draw; otherwise engine reads weekly_bay_target
     const rawCount = body.count;
     const countOverride =
       rawCount != null && Number.isFinite(Number(rawCount)) && Number(rawCount) >= 1
         ? Math.floor(Number(rawCount))
         : null;
 
+    const forceOverwrite = body.force === true;
+    const weekLabel = sundayStagingWeekLabel(new Date(), store.timezone);
+
     const result = await generateWeeklyRotations(
       supabase,
       departmentId,
-      countOverride
+      countOverride,
+      weekLabel,
+      { forceOverwrite, skipIfExists: !forceOverwrite }
     );
+
+    if (result.skipped) {
+      return NextResponse.json({
+        ...result,
+        created: 0,
+        store_id: store.id,
+        push: {
+          attempted: 0,
+          delivered: 0,
+          failed: 0,
+          removed: 0,
+          skipped: true,
+        },
+      });
+    }
 
     let push = {
       attempted: 0,
