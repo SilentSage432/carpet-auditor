@@ -14,7 +14,7 @@ import {
   departmentMeta,
   parseDepartmentScope,
 } from "./types";
-import { getStoreNumber, normalizeStoreNumber } from "./store";
+import { getStoreNumber, normalizeStoreNumber, storeNumberQueryValues } from "./store";
 import { getSupabase } from "./supabase";
 import { normalizePhoneE164 } from "./phone";
 import {
@@ -671,8 +671,10 @@ export function isFallbackProfileId(id: string): boolean {
   );
 }
 
-export async function fetchSpecialists(): Promise<StoreSpecialist[]> {
-  const store = getStoreNumber();
+export async function fetchSpecialists(
+  storeNumber?: string
+): Promise<StoreSpecialist[]> {
+  const store = normalizeStoreNumber(storeNumber || getStoreNumber());
   return rosterCache.getSWR(`roster:${store}`, () => loadSpecialists(store));
 }
 
@@ -687,11 +689,17 @@ async function loadSpecialists(store: string): Promise<StoreSpecialist[]> {
   }
 
   try {
-    let { data, error } = await supabase
+    const storeKeys = storeNumberQueryValues(store);
+    let query = supabase
       .from(TABLE)
       .select(SPECIALIST_LIST_SELECT)
-      .eq("store_number", store)
       .order("name", { ascending: true });
+    if (storeKeys.length === 1) {
+      query = query.eq("store_number", storeKeys[0]);
+    } else if (storeKeys.length > 1) {
+      query = query.in("store_number", storeKeys);
+    }
+    let { data, error } = await query;
 
     if (
       error &&
@@ -701,16 +709,23 @@ async function loadSpecialists(store: string): Promise<StoreSpecialist[]> {
         isMissingColumnError(error, "email") ||
         isMissingColumnError(error, "auth_user_id"))
     ) {
-      const retry = await supabase
+      let retryQuery = supabase
         .from(TABLE)
         .select(SPECIALIST_LIST_SELECT_FALLBACK)
-        .eq("store_number", store)
         .order("name", { ascending: true });
+      if (storeKeys.length === 1) {
+        retryQuery = retryQuery.eq("store_number", storeKeys[0]);
+      } else if (storeKeys.length > 1) {
+        retryQuery = retryQuery.in("store_number", storeKeys);
+      }
+      const retry = await retryQuery;
       data = retry.data;
       error = retry.error;
     }
 
     if (error) throw error;
+
+    // Include roster-only members (auth_user_id IS NULL). Never filter those out.
 
     const remote = (data ?? [])
       .map((row) => {

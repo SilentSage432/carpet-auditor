@@ -31,6 +31,7 @@ import {
   deleteSpecialist,
   fetchSpecialists,
   invalidateRosterCache,
+  isDatabaseUuid,
   mapRow,
 } from "@/lib/specialists";
 import { updateDepartmentAccess, inviteSupervisor, createRosterMember } from "@/lib/store-ops/client";
@@ -78,25 +79,31 @@ function memberFromCreateResult(
   result: InviteSupervisorResult,
   storeNumber: string
 ): StoreSpecialist | null {
-  if (result.specialist && typeof result.specialist === "object") {
-    return mapRow({
-      ...result.specialist,
-      store_number: result.specialist.store_number ?? storeNumber,
-    });
-  }
-  if (!result.specialist_id) return null;
-  return mapRow({
-    id: result.specialist_id,
-    store_number: storeNumber,
-    name: result.name,
-    role: "Associate",
-    username: result.username,
-    assigned_department: result.department,
-    phone_number: result.phone,
-    is_active: true,
-    status: result.status ?? "active",
-    created_at: new Date().toISOString(),
-  });
+  if (!result.ok) return null;
+  const raw =
+    result.specialist && typeof result.specialist === "object"
+      ? {
+          ...result.specialist,
+          store_number: result.specialist.store_number ?? storeNumber,
+        }
+      : result.specialist_id
+        ? {
+            id: result.specialist_id,
+            store_number: storeNumber,
+            name: result.name,
+            role: "Associate",
+            username: result.username,
+            assigned_department: result.department,
+            phone_number: result.phone,
+            is_active: true,
+            status: result.status ?? "active",
+            created_at: new Date().toISOString(),
+          }
+        : null;
+  if (!raw) return null;
+  const mapped = mapRow(raw);
+  if (!isDatabaseUuid(mapped.id) || !mapped.name.trim()) return null;
+  return mapped;
 }
 
 export function RosterTab({ specialist, storeNumber }: WorkflowTabProps) {
@@ -130,12 +137,12 @@ export function RosterTab({ specialist, storeNumber }: WorkflowTabProps) {
   const reload = useCallback(async () => {
     const weekEnd = weekDates[6] ?? today;
     const [team, saved] = await Promise.all([
-      fetchSpecialists(),
+      fetchSpecialists(storeNumber),
       fetchShiftDaysRange(weekStart, weekEnd).catch(() => ({})),
     ]);
     setRoster(dedupeRoster(team));
     setWeekRows(saved);
-  }, [today, weekDates, weekStart]);
+  }, [today, weekDates, weekStart, storeNumber]);
 
   useEffect(() => {
     let cancelled = false;
@@ -819,6 +826,7 @@ function AddTeamMemberSheet({
         role: platformRole === "Supervisor" ? "Supervisor" as const : "Associate" as const,
         username: suggestUsername(trimmed, assigned),
         phone: phoneE164 ?? undefined,
+        store_number: storeNumber,
         accessible_departments: composeAccessibleDepartments(assigned, [
           assigned === "all" ? "flooring" : (assigned as OperationalDepartment),
         ]),
@@ -828,6 +836,11 @@ function AddTeamMemberSheet({
           ...payload,
           send_invite: true,
         });
+        const created = memberFromCreateResult(result, storeNumber);
+        if (!created) {
+          console.error("Roster Insert Failed:", result);
+          throw new Error("Roster save did not return a specialist row");
+        }
         setIssued({
           name: result.name,
           invite_url: result.invite_url ?? "",
@@ -839,11 +852,16 @@ function AddTeamMemberSheet({
         if (result.sms && result.sms.ok !== true) {
           toastInfo(result.sms.reason);
         }
-        await onCreated(memberFromCreateResult(result, storeNumber));
+        await onCreated(created);
       } else {
         const result = await createRosterMember(specialist, payload);
+        const created = memberFromCreateResult(result, storeNumber);
+        if (!created) {
+          console.error("Roster Insert Failed:", result);
+          throw new Error("Roster save did not return a specialist row");
+        }
         toastSuccess(`${result.name} added to the roster`);
-        await onCreated(memberFromCreateResult(result, storeNumber));
+        await onCreated(created);
         onClose();
         return;
       }

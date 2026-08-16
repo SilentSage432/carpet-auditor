@@ -16,6 +16,7 @@ import {
 } from "@/lib/onboarding/roster-invite";
 import { persistSpecialistPatch } from "@/lib/onboarding/token-persist";
 import { suggestUsername } from "@/lib/rbac";
+import { normalizeStoreNumber, sameStoreNumber } from "@/lib/store";
 import {
   isUniqueViolationError,
   readableError,
@@ -31,6 +32,8 @@ export type CreateRosterMemberInput = IssueRosterInviteInput & {
   email?: string | null;
   /** Persist today's shift as on-duty. Default true for floor associates. */
   onDuty?: boolean;
+  /** Hub session store # — used when it matches the actor so fetch and insert bind the same Lowe's. */
+  clientStoreNumber?: string | null;
 };
 
 export type RosterOnlyCreateResult = {
@@ -97,9 +100,18 @@ async function insertRosterOnlyMember(
   const email = emailRaw.includes("@") ? emailRaw : null;
   const home = role === "MasterAdmin" ? "all" : department;
   const onDuty = input.onDuty !== false && role !== "MasterAdmin";
+  const storeNumber =
+    sameStoreNumber(input.clientStoreNumber, input.storeNumber) &&
+    normalizeStoreNumber(input.clientStoreNumber ?? "")
+      ? normalizeStoreNumber(input.clientStoreNumber ?? "")
+      : normalizeStoreNumber(input.storeNumber);
+  if (!storeNumber) {
+    throw new Error("store_number is required");
+  }
+  const storeId = await resolveStoreId(input.supabase, storeNumber);
 
   const patch: Record<string, unknown> = {
-    store_number: input.storeNumber,
+    store_number: storeNumber,
     name,
     username,
     role,
@@ -126,6 +138,15 @@ async function insertRosterOnlyMember(
     invite_consumed_at: null,
     temp_pin_hash: null,
   };
+  if (storeId) patch.store_id = storeId;
+
+  console.info("[roster insert] createRosterMember", {
+    store_id: storeId,
+    store_number: storeNumber,
+    name,
+    role,
+    home_department: home,
+  });
 
   let persisted = await persistSpecialistPatch(input.supabase, "insert", patch);
   if (
@@ -139,7 +160,11 @@ async function insertRosterOnlyMember(
       username,
     });
   }
-  if (persisted.error || !persisted.data) {
+  if (persisted.error || !persisted.data || !String(persisted.data.id ?? "").trim()) {
+    console.error("Roster Insert Failed:", persisted.error ?? {
+      reason: "empty_data",
+      payload: { store_id: storeId, store_number: storeNumber, name, role, home_department: home },
+    });
     throw new Error(
       readableError(persisted.error, "Could not add associate to the roster")
     );
@@ -148,7 +173,7 @@ async function insertRosterOnlyMember(
   const saved = persisted.data;
   const rowId = String(saved.id ?? "");
   if (rowId) {
-    await seedDefaultShiftDay(input.supabase, input.storeNumber, rowId, onDuty);
+    await seedDefaultShiftDay(input.supabase, storeNumber, rowId, onDuty);
   }
 
   return {
@@ -161,6 +186,19 @@ async function insertRosterOnlyMember(
     role,
     phone,
   };
+}
+
+async function resolveStoreId(
+  supabase: CreateRosterMemberInput["supabase"],
+  storeNumber: string
+): Promise<string | null> {
+  const { data, error } = await supabase
+    .from("stores")
+    .select("id")
+    .eq("store_number", storeNumber)
+    .maybeSingle();
+  if (error || !data?.id) return null;
+  return String(data.id);
 }
 
 async function seedDefaultShiftDay(

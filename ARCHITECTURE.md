@@ -230,7 +230,7 @@ supabase/migrations/20260812_sunday_bay_assignments.sql → sunday specialist↔
 | Focus / keyboard dismiss | `lib/focus-input.ts` (`blurActiveInput` — never auto-focus on tab switch) |
 | SIMS location stock | `lib/sims.ts`, `SimsLocationFinder` |
 | Specialists session / credentials | `lib/specialists.ts`, `SpecialistModal` |
-| Roster SMS/link invite + PIN setup | `lib/auth-token.ts` + `lib/onboarding/*` + `/auth/verify/[token]` (hashed token consume-on-entry; `pin_hash`; status invited→active). Roster add-member is roster-only unless “Send Mobile App Invite”. Signup claims `store_specialists.auth_user_id` (`claim-roster-auth.ts` + `20260815_roster_auth_link.sql`). |
+| Roster SMS/link invite + PIN setup | `lib/auth-token.ts` + `lib/onboarding/*` + `/auth/verify/[token]`. Roster-only insert logs payload/errors and requires a returned UUID. Authenticated RLS: `20260815_roster_insert_rls.sql` (includes `auth_user_id IS NULL`). Signup claims `store_specialists.auth_user_id` (`claim-roster-auth.ts` + `20260815_roster_auth_link.sql`). |
 | Zero-access auth wall / idle lock | `lib/auth-session.ts`, `components/auth/AuthWall.tsx`, `components/auth/AccessGate.tsx` (`/login`) |
 | Edge auth + stealth gate | `lib/auth-gate.ts` + `proxy.ts` + `POST /api/auth/gate` (HttpOnly cookie) |
 | Enterprise ingest contracts | `src/types/enterpriseIntegration.ts` (Zod schemas). Transport: `lib/enterprise-integration/ingest.ts`. Stubs: `POST /api/v1/topology/ingest`, `POST /api/v1/freight/stage`. Does not write Store Ops tables or change hub UI. |

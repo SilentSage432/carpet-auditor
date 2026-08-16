@@ -1050,6 +1050,7 @@ export async function inviteSupervisor(
     role?: "Supervisor" | "Associate" | "MasterAdmin";
     send_invite?: boolean;
     test_mode?: boolean;
+    store_number?: string;
   }
 ): Promise<InviteSupervisorResult> {
   const result = await storeOpsFetch<InviteSupervisorResult>(
@@ -1075,6 +1076,7 @@ export async function createRosterMember(
     accessible_departments?: string[];
     phone?: string;
     role?: "Supervisor" | "Associate" | "MasterAdmin";
+    store_number?: string;
   }
 ): Promise<InviteSupervisorResult> {
   return inviteSupervisor(specialist, { ...input, send_invite: false });

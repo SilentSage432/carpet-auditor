@@ -26,6 +26,22 @@ export function getStoreNumber(): string {
   }
 }
 
+/** Digit-equal store numbers (leading zeros ignored): "1852" and "01852" are the same Lowe's. */
+export function sameStoreNumber(a: string | null | undefined, b: string | null | undefined): boolean {
+  const left = normalizeStoreNumber(a ?? "").replace(/^0+/, "") || "";
+  const right = normalizeStoreNumber(b ?? "").replace(/^0+/, "") || "";
+  return Boolean(left && left === right);
+}
+
+/** Values to use in `.in("store_number", …)` so padded JWT claims still match hub session. */
+export function storeNumberQueryValues(store: string): string[] {
+  const n = normalizeStoreNumber(store);
+  if (!n) return [];
+  const stripped = n.replace(/^0+/, "") || "0";
+  const padded4 = stripped.padStart(4, "0");
+  return [...new Set([n, stripped, padded4])];
+}
+
 /**
  * Persist store number. Allows blank. Fires STORE_CHANGED_EVENT only when the
  * stored value actually changes.

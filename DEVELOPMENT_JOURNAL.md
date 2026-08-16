@@ -1,5 +1,12 @@
 # DeptSync Hub — Development Journal
 
+## 2026-08-15 — Roster insert logging + RLS + store bind
+
+### Shipped
+- **Logged mutation.** `persistSpecialistPatch` logs insert payload (`store_id`, `store_number`, `name`, `role`, `home_department`) and `console.error("Roster Insert Failed:", error)` when Supabase returns an error or 0 rows. Add Team Member does not toast success unless a UUID row comes back.
+- **RLS.** Apply `20260815_roster_insert_rls.sql` — authenticated INSERT/SELECT policies allow roster-only rows (`auth_user_id IS NULL`). Hub-bridge sessions use the authenticated JWT, so the old “anon all” policy never saw those inserts.
+- **Store bind.** Insert writes the same Lowe's `store_number` the Roster tab queries (leading-zero aliases). Fetch uses `.in(store_number, aliases)` and never filters `auth_user_id IS NULL`.
+
 ## 2026-08-15 — Roster create, dynamic departments, auth claim
 
 ### Shipped

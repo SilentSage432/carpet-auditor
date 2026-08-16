@@ -20,6 +20,7 @@ type InviteBody = {
   role?: "Supervisor" | "Associate" | "MasterAdmin";
   /** When true, generate a hashed token and SMS the /auth/verify link. Default false. */
   send_invite?: boolean;
+  store_number?: string;
   /**
    * Staging / Super Admin dry-run: append ?test=1 to invite URL,
    * skip Twilio, and allow /invite/[token] to complete without burning the token.
@@ -47,6 +48,7 @@ export async function POST(request: Request) {
     const created = await createRosterMember({
       supabase,
       storeNumber: actor.storeNumber,
+      clientStoreNumber: body.store_number,
       origin,
       specialistId: body.specialist_id,
       name: body.name,
@@ -60,6 +62,16 @@ export async function POST(request: Request) {
     });
 
     if (created.kind === "roster") {
+      if (!created.rowId) {
+        console.error("Roster Insert Failed:", {
+          reason: "empty_row_id",
+          name: created.name,
+        });
+        return NextResponse.json(
+          { error: "Roster Insert Failed: 0 rows were inserted" },
+          { status: 500 }
+        );
+      }
       return NextResponse.json({
         ok: true,
         send_invite: false,
@@ -101,7 +113,8 @@ export async function POST(request: Request) {
     if (
       message === "name is required" ||
       message === "Phone number is required to send a mobile app invite" ||
-      message === "Enter a valid phone number"
+      message === "Enter a valid phone number" ||
+      message === "store_number is required"
     ) {
       return NextResponse.json({ error: message }, { status: 400 });
     }
@@ -109,6 +122,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: message }, { status: 404 });
     }
     console.error("[invite-supervisor]", err);
+    console.error("Roster Insert Failed:", err);
     return NextResponse.json(
       { error: readableError(err, "Roster save failed") },
       { status: 500 }
