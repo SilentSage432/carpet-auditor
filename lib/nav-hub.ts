@@ -12,6 +12,7 @@ import {
 } from "@/lib/rbac";
 import {
   departmentMeta,
+  rosterFloorBadgeLabel,
   type HubSection,
   type StoreSpecialist,
 } from "@/lib/types";
@@ -141,7 +142,7 @@ export function navRoleBadge(member: StoreSpecialist | null | undefined): string
   if (!member) return "Locked";
   if (isMasterAdmin(member)) return "Master Admin";
   if (member.role === "Supervisor") return "DS Supervisor";
-  return "CSA / Specialist";
+  return rosterFloorBadgeLabel(member);
 }
 
 /** Login identity shown in the user menu (username is the hub login key). */

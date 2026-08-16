@@ -5,12 +5,12 @@
  * Bottom workflow tabs live in BottomNav.tsx. Route ownership: lib/nav-hub.ts.
  */
 
-import type { ReactNode, RefObject } from "react";
-import { useRef } from "react";
+import type { CSSProperties, ReactNode, RefObject } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AdminDepartmentSwitcher } from "@/components/hub/AdminDepartmentSwitcher";
 import { DeptSyncBadge } from "@/components/hub/DeptSyncBadge";
 import { HeaderNetworkStatus } from "@/components/hub/HeaderNetworkStatus";
-import { formatStoreLabel } from "@/lib/store";
+import { formatStoreHeaderTag, formatStoreLabel } from "@/lib/store";
 import type { StoreSpecialist } from "@/lib/types";
 
 const LOGO_TAP_WINDOW_MS = 800;
@@ -61,7 +61,7 @@ export function HubHeader({
 
   return (
     <header className="glass-panel border-b border-zinc-800/80 shadow-lg shadow-black/30">
-      <div className="mx-auto flex min-h-12 max-w-lg items-center gap-1.5 px-2 py-1 sm:px-3">
+      <div className="mx-auto flex min-h-12 max-w-lg items-center gap-1 px-2 py-1 sm:gap-1.5 sm:px-3">
         {onLogoTripleTap ? (
           <button
             type="button"
@@ -76,10 +76,7 @@ export function HubHeader({
         )}
 
         <div className="min-w-0 flex-1">
-          <p className="truncate font-mono text-[10px] font-bold uppercase tracking-tight text-accent">
-            DeptSync
-            {storeNumber ? ` · ${formatStoreLabel(storeNumber)}` : ""}
-          </p>
+          <HeaderBrandTicker storeNumber={storeNumber} />
           <h1 className="glass-title truncate text-[15px] leading-tight">
             {title}
           </h1>
@@ -103,7 +100,7 @@ export function HubHeader({
             aria-expanded={userOpen}
             aria-controls={userMenuId}
             aria-label="Account and PIN"
-            className="theme-accent-surface flex h-12 max-w-[10.5rem] items-center gap-1.5 rounded-xl border px-2 text-left backdrop-blur-sm transition active:scale-[0.98] focus-visible:border-accent/50 focus-visible:ring-1 focus-visible:ring-accent/30"
+            className="theme-accent-surface flex h-12 w-[5.75rem] shrink-0 items-center gap-1 rounded-xl border px-1.5 text-left backdrop-blur-sm transition active:scale-[0.98] focus-visible:border-accent/50 focus-visible:ring-1 focus-visible:ring-accent/30 sm:w-[9.25rem] sm:gap-1.5 sm:px-2"
           >
             <HeaderNetworkStatus storeNumber={storeNumber} variant="compact">
               <span className="block truncate font-mono text-[9px] font-bold leading-none tracking-wide text-amber-300">
@@ -115,5 +112,56 @@ export function HubHeader({
         </div>
       </div>
     </header>
+  );
+}
+
+function HeaderBrandTicker({ storeNumber }: { storeNumber?: string }) {
+  const wrapRef = useRef<HTMLDivElement>(null);
+  const textRef = useRef<HTMLParagraphElement>(null);
+  const [travel, setTravel] = useState(0);
+  const tag = storeNumber ? formatStoreHeaderTag(storeNumber) : "";
+  const text = tag ? `DeptSync · ${tag}` : "DeptSync";
+  const full = storeNumber ? `DeptSync · ${formatStoreLabel(storeNumber)}` : "DeptSync";
+
+  useEffect(() => {
+    const wrap = wrapRef.current;
+    const node = textRef.current;
+    if (!wrap || !node) return;
+
+    function measure() {
+      if (!wrap || !node) return;
+      setTravel(Math.max(0, Math.ceil(node.scrollWidth - wrap.clientWidth)));
+    }
+
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(wrap);
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [text]);
+
+  const overflowing = travel > 1;
+
+  return (
+    <div
+      ref={wrapRef}
+      className="header-brand-ticker min-w-0 overflow-hidden"
+      title={full}
+      aria-label={full}
+    >
+      <p
+        ref={textRef}
+        className={`header-brand-ticker-text whitespace-nowrap font-mono text-[9px] font-bold uppercase tracking-tight text-accent tabular-nums sm:text-[10px] ${
+          overflowing ? "is-overflowing" : ""
+        }`}
+        style={
+          overflowing
+            ? ({ "--ticker-travel": `${travel}px` } as CSSProperties)
+            : undefined
+        }
+      >
+        {text}
+      </p>
+    </div>
   );
 }

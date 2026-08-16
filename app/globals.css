@@ -668,6 +668,31 @@ body {
   }
 }
 
+/* Hub brand line — pause at each end, then reverse. Only applied when overflowing. */
+@keyframes header-brand-ticker {
+  0%,
+  14% {
+    transform: translateX(0);
+  }
+  50%,
+  64% {
+    transform: translateX(calc(-1 * var(--ticker-travel, 0px)));
+  }
+  100% {
+    transform: translateX(0);
+  }
+}
+
+.header-brand-ticker-text.is-overflowing {
+  animation: header-brand-ticker 7.2s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .header-brand-ticker-text.is-overflowing {
+    animation: none;
+  }
+}
+
 input[type="number"]::-webkit-inner-spin-button,
 input[type="number"]::-webkit-outer-spin-button {
   -webkit-appearance: none;

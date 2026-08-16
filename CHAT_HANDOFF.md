@@ -7,7 +7,7 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 - App: **DeptSync Hub** · PWA short_name **DeptSync**
 - Manifest name: `DeptSync — Department & SIMS Audit Hub`
 - Layout title: `DeptSync Hub · Department & SIMS Audit` · appleWebApp title `DeptSync`
-- Header: brand `DeptSync` · store # · section title · **department dropdown pill** · account/PIN
+- Header: brand `DeptSync · #2587` (compact; marquee only if overflow) · section title · **department dropdown pill** · account/PIN
 - **Typography:** Geist (`--font-geist-sans` → `font-sans`) + Geist Mono (`--font-geist-mono` → `font-mono`). Bay tags (`formatBayTag`, e.g. `A14-B06`), SKUs, cadence badges, and timestamps use `font-mono tracking-tight`.
 - Header badge: `DeptSyncBadge` (floating layers + barcode; boot/PWA uses `branded` cyan/gold so theme FOUC cannot flash emerald)
 - Icons: `public/icons/icon-192.png`, `icon-512.png`, `apple-touch-icon.png`, `mark.svg` (cyan/gold floating mark, no enclosed shield)
@@ -23,7 +23,7 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 - **Daily shift board / call-out:** Roster groups by home department; department accordions start **collapsed**. `lib/store-ops/shift-status.ts` writes `associate_shift_days` first (localStorage is cache only). Cards show S–S dots, today's pill, and Edit Schedule → `AssociateScheduleModal` (presets Open/Mid/Close, per-day times). Call-out dialog composes `lib/store-ops/call-out.ts` → Sunday pool / proportional redistribute / carry-over loop. Apply `20260815_associate_shift_days.sql` + `20260815_carry_over_priority.sql`. Supervisors + Master toggle duty; Master-only add/delete team.
 - **Predictive Shift Copilot:** Floor banner under Shift Briefing (`PredictiveCopilotBanner`). Local patterns from `bay_service_logs` / Sunday assignments / downstock / locations — not Gemini. 1-tap Stage to Shift (`POST /api/rotations/assign`, Supervisor+) or Add to Downstock.
 - **Tactical Voice Hub:** Floor dock `TacticalVoiceFloorPad` (Master/DS). Web Speech + scratchpad → `POST /api/copilot/parse-walk` → dispatch via `lib/store-ops/shift-tasks.ts`. Bay freshness chip `BayFreshnessGrid` composes `lib/heatmap/bay-tracker.ts` from live `store_locations` (not only this week's rotations) so newly mapped aisles appear immediately. Apply `20260815_shift_walk_tasks.sql`.
-- **Roster invite:** apply `20260815_unified_auth_token.sql` + `20260815_roster_app_access.sql` + `20260815_roster_auth_link.sql` + `20260815_roster_insert_rls.sql`. Add Team Member is roster-only by default (name/role/home department; no Auth user required). Check **Send Mobile App Invite** to SMS `/auth/verify/[token]`. Signup/invite claims the existing card (`store_specialists.auth_user_id`) instead of duplicating. Cards show Roster Only / Invited / Active. Forgot PIN sends a 30-minute SMS link. Apply **`20260816_rls_read_write_parity.sql`** so authenticated Hub-bridge can SELECT carpet_* and Store Ops client tables (Sunday/downstock) with digit-equal store numbers.
+- **Roster invite:** apply `20260815_unified_auth_token.sql` + `20260815_roster_app_access.sql` + `20260815_roster_auth_link.sql` + `20260815_roster_insert_rls.sql` + **`20260816_roster_floor_title.sql`**. Add Team Member is roster-only by default (name/role/home department; no Auth user required). Check **Send Mobile App Invite** to SMS `/auth/verify/[token]`. Signup/invite claims the existing card (`store_specialists.auth_user_id`) instead of duplicating. Cards show Roster Only / Invited / Active plus Specialist / CSA / Supervisor. Forgot PIN sends a 30-minute SMS link. Apply **`20260816_rls_read_write_parity.sql`** so authenticated Hub-bridge can SELECT carpet_* and Store Ops client tables (Sunday/downstock) with digit-equal store numbers.
 
 ## AI (`lib/ai/gemini.ts`)
 - Server-only Gemini Flash client (`@google/generative-ai` + `server-only`)
@@ -60,7 +60,7 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 - `/admin/supervisors` and `/admin/roles` redirect to `/roster`
 - Invite/reset lives on `/auth/verify/[token]`; Roster add-member is roster-only unless Send Mobile App Invite; dead `AdminRosterManager` was removed
 - Lightweight **Associate Roster** (`AssociateRosterPanel`) remains on the Sunday assignment drawer
-- Floor titles: specialty (Flooring / Appliances / Millwork / Cabinets) → **Specialist**; core (Paint / Plumbing / Garden / Building Materials / Tools / Electrical) → **CSA**
+- Floor titles: `store_specialists.floor_title` owns Specialist vs CSA vs Cashier vs Receiving. Specialty job options (Flooring CSA, Appliances Specialist, …) pin home department (`flooring` / D23 family). Cards badge Specialist / CSA / Supervisor. Apply `20260816_roster_floor_title.sql`.
 - Sunday Shift Balancer allocates weekly bay quotas to on-duty Specialists/CSAs by 4h / 6h / 8h (`planProportionalBayAssignments`)
 
 ### Settings tools (Master Admin / Supervisor)
@@ -170,7 +170,7 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
   - `departments`, `profiles` (auth.users + `super_admin` / `department_supervisor`), `store_locations` (SELLING/TOPSTOCK + cycle status), `weekly_rotations`
   - RLS: super_admin all; supervisors read/update own `assigned_department_id`
 - Hub bridge: Master Admin → super_admin; Supervisor → department_supervisor (via `departments.code` = hub `assigned_department`)
-- **Navigation Hub** (`lib/nav-hub.ts` + `HubHeader.tsx` + `BottomNav.tsx` + `NavigationHub.tsx`): header is title/store # · department pill · account/PIN; primary tabs **Floor · Map · Roster · Settings** for every role (no More overflow)
+- **Navigation Hub** (`lib/nav-hub.ts` + `HubHeader.tsx` + `BottomNav.tsx` + `NavigationHub.tsx`): header is `DeptSync · #2587` · section title · department pill · account/PIN; primary tabs **Floor · Map · Roster · Settings** for every role (no More overflow)
   - Floor (`/dashboard`) · Map (`/admin/store-map`) · Roster (`/roster`) · Settings (`/settings`)
   - Authenticated `/` without specialty `?section=` replaces to `/dashboard`. Hub `/?section=audit|appliances|department` is scan tools only. Remnants deep-link to `/settings#remnants`
 - `/manager-notes` redirects to `/dashboard#floor-pad` (Tactical Voice Hub on Floor)

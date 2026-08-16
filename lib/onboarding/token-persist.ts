@@ -27,6 +27,7 @@ export const OPTIONAL_SPECIALIST_COLUMNS = [
   "phone_number",
   "email",
   "home_department",
+  "floor_title",
   "store_id",
   "auth_user_id",
   "user_id",
@@ -56,6 +57,7 @@ function insertLogPayload(patch: Record<string, unknown>): Record<string, unknow
     role: patch.role ?? null,
     home_department: patch.home_department ?? patch.assigned_department ?? null,
     assigned_department: patch.assigned_department ?? null,
+    floor_title: patch.floor_title ?? null,
     auth_user_id: patch.auth_user_id ?? null,
   };
 }

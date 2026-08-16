@@ -22,7 +22,12 @@ import {
   isUniqueViolationError,
   readableError,
 } from "@/lib/store-ops/errors";
-import { parseDepartmentScope, type DepartmentScope } from "@/lib/types";
+import {
+  associateFloorTitle,
+  parseDepartmentScope,
+  parseRosterFloorTitle,
+  type DepartmentScope,
+} from "@/lib/types";
 
 const DEFAULT_SHIFT_START = "07:00";
 const DEFAULT_SHIFT_END = "15:30";
@@ -100,6 +105,10 @@ async function insertRosterOnlyMember(
   const emailRaw = String(input.email ?? "").trim().toLowerCase();
   const email = emailRaw.includes("@") ? emailRaw : null;
   const home = role === "MasterAdmin" ? "all" : department;
+  const floorTitle =
+    role === "Associate"
+      ? parseRosterFloorTitle(input.floor_title) ?? associateFloorTitle(home)
+      : null;
   const onDuty = input.onDuty !== false && role !== "MasterAdmin";
   const storeNumber =
     sameStoreNumber(input.clientStoreNumber, input.storeNumber) &&
@@ -139,6 +148,7 @@ async function insertRosterOnlyMember(
     invite_consumed_at: null,
     temp_pin_hash: null,
   };
+  if (floorTitle) patch.floor_title = floorTitle;
   if (storeId) patch.store_id = storeId;
 
   console.info("[roster insert] createRosterMember", {
@@ -147,6 +157,7 @@ async function insertRosterOnlyMember(
     name,
     role,
     home_department: home,
+    floor_title: floorTitle,
   });
 
   let persisted = await persistSpecialistPatch(input.supabase, "insert", patch);

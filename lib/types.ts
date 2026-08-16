@@ -10,10 +10,11 @@ export type HubSection =
   | "settings";
 
 /**
- * Platform roles:
+ * Platform roles (RBAC):
  * - MasterAdmin — unrestricted cross-department access
  * - Supervisor — department-scoped (assigned_department)
  * - Associate — shift PIN access within a department
+ * Lowe's job titles (Specialist vs CSA) live on `floor_title`, not `role`.
  */
 export type SpecialistRole = "Associate" | "Supervisor" | "MasterAdmin";
 
@@ -64,8 +65,9 @@ export const OPERATIONAL_DEPARTMENTS: OperationalDepartment[] = [
 ];
 
 /**
- * Lowe's specialty sales departments — floor title is Specialist.
- * Platform role stays Associate | Supervisor | MasterAdmin.
+ * Lowe's specialty sales departments — default floor title is Specialist.
+ * Flooring / Appliances / Millwork / Cabinets may also be staffed as CSA
+ * via `floor_title` (platform role stays Associate).
  */
 export const SPECIALTY_DEPARTMENTS = [
   "flooring",
@@ -96,6 +98,16 @@ export type CoreDepartment = (typeof CORE_DEPARTMENTS)[number];
 
 export type AssociateFloorTitle = "Specialist" | "CSA";
 
+/** Lowe's floor job titles stored on roster cards (orthogonal to platform role). */
+export const ROSTER_FLOOR_TITLES = [
+  "Specialist",
+  "CSA",
+  "Cashier",
+  "Receiving",
+] as const;
+
+export type RosterFloorTitle = (typeof ROSTER_FLOOR_TITLES)[number];
+
 export function isSpecialtyDepartment(
   dept: DepartmentScope | string | null | undefined
 ): dept is SpecialtyDepartment {
@@ -108,7 +120,7 @@ export function isCoreDepartment(
   return (CORE_DEPARTMENTS as readonly string[]).includes(String(dept ?? ""));
 }
 
-/** Retail floor designation for an Associate in this department. */
+/** Default floor title when `floor_title` is unset (specialty → Specialist). */
 export function associateFloorTitle(
   dept: DepartmentScope | string | null | undefined
 ): AssociateFloorTitle {
@@ -350,6 +362,215 @@ export function associateFloorTitleLabel(
     dept && isDepartmentScope(dept) ? dept : "flooring"
   );
   return `${meta.shortLabel} ${associateFloorTitle(dept)}`;
+}
+
+export type RosterJobOption = {
+  id: string;
+  label: string;
+  group: "specialty" | "leadership" | "core";
+  platformRole: SpecialistRole;
+  floorTitle: RosterFloorTitle | null;
+  /** When set, selecting this option pins home department. */
+  department: OperationalDepartment | null;
+};
+
+export const ROSTER_JOB_OPTIONS: RosterJobOption[] = [
+  {
+    id: "flooring_specialist",
+    label: "Flooring Specialist",
+    group: "specialty",
+    platformRole: "Associate",
+    floorTitle: "Specialist",
+    department: "flooring",
+  },
+  {
+    id: "flooring_csa",
+    label: "Flooring CSA",
+    group: "specialty",
+    platformRole: "Associate",
+    floorTitle: "CSA",
+    department: "flooring",
+  },
+  {
+    id: "appliances_specialist",
+    label: "Appliances Specialist",
+    group: "specialty",
+    platformRole: "Associate",
+    floorTitle: "Specialist",
+    department: "appliances",
+  },
+  {
+    id: "appliances_csa",
+    label: "Appliances CSA",
+    group: "specialty",
+    platformRole: "Associate",
+    floorTitle: "CSA",
+    department: "appliances",
+  },
+  {
+    id: "millwork_specialist",
+    label: "Millwork Specialist",
+    group: "specialty",
+    platformRole: "Associate",
+    floorTitle: "Specialist",
+    department: "millwork",
+  },
+  {
+    id: "millwork_csa",
+    label: "Millwork CSA",
+    group: "specialty",
+    platformRole: "Associate",
+    floorTitle: "CSA",
+    department: "millwork",
+  },
+  {
+    id: "cabinets_specialist",
+    label: "Cabinets Specialist",
+    group: "specialty",
+    platformRole: "Associate",
+    floorTitle: "Specialist",
+    department: "cabinets",
+  },
+  {
+    id: "cabinets_csa",
+    label: "Cabinets CSA",
+    group: "specialty",
+    platformRole: "Associate",
+    floorTitle: "CSA",
+    department: "cabinets",
+  },
+  {
+    id: "dept_supervisor",
+    label: "Department Supervisor",
+    group: "leadership",
+    platformRole: "Supervisor",
+    floorTitle: null,
+    department: null,
+  },
+  {
+    id: "associate",
+    label: "Associate",
+    group: "core",
+    platformRole: "Associate",
+    floorTitle: null,
+    department: null,
+  },
+  {
+    id: "cashier",
+    label: "Cashier",
+    group: "core",
+    platformRole: "Associate",
+    floorTitle: "Cashier",
+    department: null,
+  },
+  {
+    id: "receiving",
+    label: "Receiving",
+    group: "core",
+    platformRole: "Associate",
+    floorTitle: "Receiving",
+    department: null,
+  },
+];
+
+export const ROSTER_JOB_GROUPS: {
+  id: RosterJobOption["group"];
+  label: string;
+}[] = [
+  { id: "specialty", label: "Specialty" },
+  { id: "leadership", label: "Leadership" },
+  { id: "core", label: "Core" },
+];
+
+export function rosterJobOptionById(
+  id: string | null | undefined
+): RosterJobOption | null {
+  return ROSTER_JOB_OPTIONS.find((option) => option.id === id) ?? null;
+}
+
+export function parseRosterFloorTitle(
+  raw: unknown
+): RosterFloorTitle | null {
+  const original = String(raw ?? "").trim();
+  if (!original) return null;
+  if ((ROSTER_FLOOR_TITLES as readonly string[]).includes(original)) {
+    return original as RosterFloorTitle;
+  }
+  const value = original.toLowerCase();
+  if (value.includes("cashier")) return "Cashier";
+  if (value.includes("receiving")) return "Receiving";
+  if (/\bcsa\b/.test(value) || value.includes("customer service")) return "CSA";
+  if (value.includes("specialist")) return "Specialist";
+  return null;
+}
+
+/** Persist Associate vs Supervisor; floor title is CSA / Specialist / Cashier / Receiving. */
+export function resolveRosterJobSave(
+  optionId: string,
+  department: DepartmentScope
+): {
+  role: SpecialistRole;
+  floor_title: RosterFloorTitle | null;
+  department: DepartmentScope;
+} {
+  const option = rosterJobOptionById(optionId) ?? rosterJobOptionById("associate");
+  if (!option) {
+    return {
+      role: "Associate",
+      floor_title: associateFloorTitle(department),
+      department,
+    };
+  }
+  const home =
+    option.platformRole === "MasterAdmin"
+      ? "all"
+      : option.department ?? (department === "all" ? "flooring" : department);
+  const floorTitle =
+    option.platformRole === "Supervisor" || option.platformRole === "MasterAdmin"
+      ? null
+      : option.floorTitle ?? associateFloorTitle(home);
+  return {
+    role: option.platformRole,
+    floor_title: floorTitle,
+    department: home,
+  };
+}
+
+/** Compact badge: Specialist · CSA · Supervisor. */
+export function rosterFloorBadgeLabel(
+  member: Pick<
+    StoreSpecialist,
+    "role" | "floor_title" | "assigned_department" | "home_department"
+  >
+): string {
+  if (member.role === "MasterAdmin") return "Master";
+  if (member.role === "Supervisor") return "Supervisor";
+  const title =
+    parseRosterFloorTitle(member.floor_title) ??
+    associateFloorTitle(
+      member.home_department ?? member.assigned_department
+    );
+  return title;
+}
+
+/** Card subtitle: "Flooring CSA" / "Department Supervisor". */
+export function rosterJobTitleLabel(
+  member: Pick<
+    StoreSpecialist,
+    "role" | "floor_title" | "assigned_department" | "home_department"
+  >
+): string {
+  if (member.role === "MasterAdmin") return "Master Admin";
+  const dept = specialistHomeDepartment(member);
+  if (member.role === "Supervisor") {
+    return dept && dept !== "all"
+      ? `${departmentMeta(dept).shortLabel} Supervisor`
+      : "Department Supervisor";
+  }
+  const title =
+    parseRosterFloorTitle(member.floor_title) ?? associateFloorTitle(dept);
+  if (title === "Cashier" || title === "Receiving") return title;
+  return `${departmentMeta(dept).shortLabel} ${title}`;
 }
 
 /** Flooring / SIMS catalog categories. */
@@ -657,6 +878,11 @@ export type StoreSpecialist = {
   store_number: string;
   name: string;
   role: SpecialistRole;
+  /**
+   * Lowe's floor title (Specialist vs CSA vs Cashier vs Receiving).
+   * Orthogonal to platform `role` (Associate | Supervisor | MasterAdmin).
+   */
+  floor_title?: RosterFloorTitle | null;
   /** Optional access PIN / password. Required for Supervisor & Master Admin. */
   pin_code: string | null;
   /** Salted SHA-256 PIN (server payloads). Roster lists omit this column. */

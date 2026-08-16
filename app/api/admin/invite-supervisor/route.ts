@@ -18,6 +18,7 @@ type InviteBody = {
   accessible_departments?: string[];
   phone?: string;
   role?: "Supervisor" | "Associate" | "MasterAdmin";
+  floor_title?: string | null;
   /** When true, generate a hashed token and SMS the /auth/verify link. Default false. */
   send_invite?: boolean;
   store_number?: string;
@@ -67,6 +68,7 @@ export async function POST(request: Request) {
       accessible_departments: body.accessible_departments,
       phone: body.phone,
       role: body.role,
+      floor_title: body.floor_title,
       sendInvite: Boolean(body.send_invite) || Boolean(body.specialist_id),
       testMode: Boolean(body.test_mode),
     });

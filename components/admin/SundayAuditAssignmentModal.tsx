@@ -47,7 +47,7 @@ import { getStoreNumber } from "@/lib/store";
 import { fetchSpecialists } from "@/lib/specialists";
 import { AssociateRosterPanel } from "@/components/admin/AssociateRosterPanel";
 import { formatBayTag, type Department } from "@/lib/store-ops/types";
-import { associateFloorTitleLabel, type StoreSpecialist } from "@/lib/types";
+import { rosterJobTitleLabel, type StoreSpecialist } from "@/lib/types";
 
 type Props = {
   open: boolean;
@@ -465,9 +465,7 @@ export function SundayAuditAssignmentModal({
                           if (!member || member.role !== "Associate") return null;
                           return (
                             <span className="ml-1 font-mono text-[10px] font-normal text-cyan-300/80">
-                              {associateFloorTitleLabel(
-                                member.assigned_department
-                              )}
+                              {rosterJobTitleLabel(member)}
                             </span>
                           );
                         })()}

@@ -58,22 +58,24 @@ import {
 } from "@/lib/store-ops/shift-status";
 import { toastError, toastSuccess, toastInfo } from "@/lib/toast";
 import {
-  associateFloorTitle,
   departmentMeta,
   departmentRosterHeading,
+  rosterFloorBadgeLabel,
+  rosterJobTitleLabel,
+  ROSTER_JOB_GROUPS,
+  ROSTER_JOB_OPTIONS,
+  resolveRosterJobSave,
+  rosterJobOptionById,
   specialistHomeDepartment,
   type DepartmentScope,
   type OperationalDepartment,
-  type SpecialistRole,
   type StoreSpecialist,
 } from "@/lib/types";
 import { normalizePhoneE164, formatPhoneDisplay } from "@/lib/phone";
 import type { WorkflowTabProps } from "@/components/hub/tabs/tab-props";
 
 function rosterRoleLabel(member: StoreSpecialist): string {
-  if (member.role === "MasterAdmin") return "Master Admin";
-  if (member.role === "Supervisor") return "Supervisor";
-  return associateFloorTitle(member.assigned_department);
+  return rosterJobTitleLabel(member);
 }
 
 function homeDepartment(member: StoreSpecialist): DepartmentScope {
@@ -425,6 +427,7 @@ export function RosterTab({ specialist, storeNumber }: WorkflowTabProps) {
                             <div className="min-w-0">
                               <p className="truncate text-sm font-bold text-white">
                                 {member.name}
+                                <FloorTitleBadge member={member} />
                                 <AppAccessBadge member={member} />
                               </p>
                               <p className="mt-0.5 flex items-center gap-1.5 font-mono text-[10px] font-bold uppercase tracking-wider text-accent">
@@ -776,6 +779,25 @@ function AppAccessBadge({ member }: { member: StoreSpecialist }) {
   );
 }
 
+function FloorTitleBadge({ member }: { member: StoreSpecialist }) {
+  const label = rosterFloorBadgeLabel(member);
+  const tone =
+    label === "Supervisor" || label === "Master"
+      ? "border-amber-400/40 bg-amber-500/15 text-amber-200"
+      : label === "CSA"
+        ? "border-cyan-400/40 bg-cyan-500/15 text-cyan-200"
+        : label === "Specialist"
+          ? "border-violet-400/40 bg-violet-500/15 text-violet-200"
+          : "border-zinc-500/40 bg-zinc-500/15 text-zinc-300";
+  return (
+    <span
+      className={`ml-2 inline-flex rounded-full border px-2 py-0.5 font-mono text-[9px] font-bold uppercase tracking-wide ${tone}`}
+    >
+      {label}
+    </span>
+  );
+}
+
 function AddTeamMemberSheet({
   specialist,
   storeNumber,
@@ -788,9 +810,7 @@ function AddTeamMemberSheet({
   onCreated: (created: StoreSpecialist | null) => Promise<void>;
 }) {
   const [name, setName] = useState("");
-  const [displayRole, setDisplayRole] = useState<
-    "Supervisor" | "Specialist" | "CSA"
-  >("Specialist");
+  const [jobOptionId, setJobOptionId] = useState("flooring_specialist");
   const [department, setDepartment] = useState<DepartmentScope>("flooring");
   const [phone, setPhone] = useState("");
   const [sendInvite, setSendInvite] = useState(false);
@@ -803,8 +823,8 @@ function AddTeamMemberSheet({
     sms_link: string;
   } | null>(null);
 
-  const platformRole: SpecialistRole =
-    displayRole === "Supervisor" ? "Supervisor" : "Associate";
+  const jobOption = rosterJobOptionById(jobOptionId);
+  const departmentLocked = Boolean(jobOption?.department);
 
   async function copyText(label: string, value: string) {
     try {
@@ -833,11 +853,13 @@ function AddTeamMemberSheet({
     setSaving(true);
     setError(null);
     try {
-      const assigned = department;
+      const job = resolveRosterJobSave(jobOptionId, department);
+      const assigned = job.department;
       const payload = {
         name: trimmed,
         department: assigned,
-        role: platformRole === "Supervisor" ? "Supervisor" as const : "Associate" as const,
+        role: job.role === "MasterAdmin" ? "MasterAdmin" as const : job.role === "Supervisor" ? "Supervisor" as const : "Associate" as const,
+        floor_title: job.floor_title,
         username: suggestUsername(trimmed, assigned),
         phone: phoneE164 ?? undefined,
         store_number: storeNumber,
@@ -964,35 +986,36 @@ function AddTeamMemberSheet({
                 <legend className="mb-1.5 text-sm font-medium text-zinc-200">
                   Role
                 </legend>
-                <div className="grid grid-cols-3 gap-1.5">
-                  {(
-                    [
-                      ["Supervisor", "Supervisor"],
-                      ["Specialist", "Specialist"],
-                      ["CSA", "CSA"],
-                    ] as const
-                  ).map(([value, label]) => (
-                    <button
-                      key={value}
-                      type="button"
-                      onClick={() => setDisplayRole(value)}
-                      className={`min-h-11 rounded-xl border text-xs font-bold ${
-                        displayRole === value
-                          ? "theme-accent-surface border"
-                          : "border-zinc-700 text-zinc-300"
-                      }`}
-                    >
-                      {label}
-                    </button>
+                <select
+                  value={jobOptionId}
+                  onChange={(e) => {
+                    const nextId = e.target.value;
+                    setJobOptionId(nextId);
+                    const next = rosterJobOptionById(nextId);
+                    if (next?.department) setDepartment(next.department);
+                  }}
+                  className="glass-input min-h-12 w-full text-sm"
+                >
+                  {ROSTER_JOB_GROUPS.map((group) => (
+                    <optgroup key={group.id} label={group.label}>
+                      {ROSTER_JOB_OPTIONS.filter(
+                        (option) => option.group === group.id
+                      ).map((option) => (
+                        <option key={option.id} value={option.id}>
+                          {option.label}
+                        </option>
+                      ))}
+                    </optgroup>
                   ))}
-                </div>
+                </select>
               </fieldset>
 
               <DepartmentPicker
                 value={department}
                 onChange={setDepartment}
-                label="Initial Department"
-                showFloorTitle
+                disabled={departmentLocked}
+                label="Home Department"
+                showFloorTitle={false}
               />
 
               <label className="block space-y-1.5">

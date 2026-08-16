@@ -29,7 +29,7 @@ app/globals.css                   → data-theme tokens + glass / nav / modal ut
 app/manifest.ts                   → short_name DeptSync · Department & SIMS Audit Hub
 public/sw.js                      → Offline shell cache strategies
 components/hub/HubChrome.tsx      → AssociateSpecialtySwitcher (in-page scan tabs only)
-components/hub/HubHeader.tsx      → Sticky hub header (brand/store, department pill, account/PIN; 3-tap logo → sandbox)
+components/hub/HubHeader.tsx      → Sticky hub header (`DeptSync · #2587`, D23 pill, account/PIN; overflow marquee; 3-tap logo → sandbox)
 components/hub/BottomNav.tsx      → Floor · Map · Roster · Settings (2-col for CSA My Shift + Map)
 components/hub/DeptSyncSplash.tsx → Boot / loading splash (pinned midnight + branded cyan/gold mark)
 components/hub/NavigationHub.tsx  → Cross-app Navigation Hub (composes HubHeader + BottomNav + sandbox banner/drawer)
@@ -211,7 +211,7 @@ supabase/migrations/20260812_sunday_bay_assignments.sql → sunday specialist↔
 | Manager notes / Executive Floor Pad | `lib/store-ops/ai-note-extract.ts`, `manager-notes.ts`, `app/actions/manager-notes.ts`, `components/manager-notes/*` (opened from Floor `TacticalVoiceFloorPad`; `ai-note-summary` retired 410) |
 | Floor-walk Copilot / shift dispatch | `lib/store-ops/ai-walk-parse.ts` + `POST /api/copilot/parse-walk` + `lib/store-ops/shift-tasks.ts` (`TacticalVoiceFloorPad`) |
 | Bay freshness overlay | `lib/heatmap/bay-tracker.ts` + `BayFreshnessGrid` (composes last_serviced_at / last_completed_at / walk touches; not velocity or bay-health) |
-| Team roster (Master Admin) | `RosterTab` + `AddTeamMemberSheet` → `POST /api/roster/members` → `store_specialists`; accordion read via `fetchSpecialists`; grouping via `roster-groups.ts`; weekly matrix via `shift-status.ts` (`canManageShiftBoard`) |
+| Team roster (Master Admin) | `RosterTab` + `AddTeamMemberSheet` → `POST /api/roster/members` → `store_specialists`; accordion read via `fetchSpecialists`; grouping via `roster-groups.ts` (home dept, Specialist and CSA together); weekly matrix via `shift-status.ts` (`canManageShiftBoard`). Job options / `floor_title` owned by `lib/types.ts`. |
 | Cross-department grants | `lib/department-access.ts` + `POST /api/admin/department-access` + Roster chips |
 | Working department pin | `lib/admin-department-context.ts` (Master full-store; multi-dept clamped to grants) |
 | Personal theme / density / contrast / sound / haptics | `lib/theme.ts` + `lib/ui/preferences-context.tsx` + `UserPreferencesDrawer` (all roles) |
@@ -283,4 +283,7 @@ Store Map / Floor / Shift Briefing hydrate from IndexedDB (`lib/store-ops/cache.
 
 Tables retain `carpet_*` names (alias: flooring_audits / SIMS catalog) for migration
 compatibility. RBAC columns on `store_specialists`: `username`, `assigned_department`,
-`must_change_credentials`; roles include `MasterAdmin`.
+`home_department`, `floor_title` (Specialist / CSA / Cashier / Receiving),
+`must_change_credentials`; platform roles include `MasterAdmin`. Flooring CSA
+and Flooring Specialist share the flooring accordion (`assigned_department` /
+`home_department`); they are not separate platform roles.

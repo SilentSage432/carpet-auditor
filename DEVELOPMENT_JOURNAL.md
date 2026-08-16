@@ -1,5 +1,20 @@
 # DeptSync Hub — Development Journal
 
+## 2026-08-16 — Header store number always visible
+
+### Shipped
+- Hub brand line is `DeptSync · #2587` (`formatStoreHeaderTag`) instead of truncated `DeptSync · Lowe's #…`.
+- If the brand line still overflows, it marquee-scrolls with a pause at each end (`prefers-reduced-motion` disables the ticker).
+- D23 pill and account/Online chip stay shrink-0 and aligned; the account chip is narrower on phones so the store digits keep the remaining width.
+
+## 2026-08-16 — Roster Specialist vs CSA floor titles
+
+### Shipped
+- Add Team Member role dropdown lists Flooring/Appliances/Millwork/Cabinets **Specialist** and **CSA**, plus Department Supervisor, Associate, Cashier, and Receiving (`ROSTER_JOB_OPTIONS` in `lib/types.ts`).
+- Platform `role` stays Associate / Supervisor / MasterAdmin for RBAC. Lowe's job title persists as `store_specialists.floor_title` (`CSA`, `Specialist`, `Cashier`, `Receiving`). Selecting Flooring CSA writes `floor_title=CSA` and `assigned_department`/`home_department=flooring`.
+- Roster cards show a Specialist / CSA / Supervisor badge. Accordion grouping is still home department — both titles render under D23 Flooring.
+- Apply `20260816_roster_floor_title.sql`.
+
 ## 2026-08-16 — Read/write visibility audit
 
 ### Found

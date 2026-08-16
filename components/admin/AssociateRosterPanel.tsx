@@ -3,7 +3,7 @@
 /**
  * Lightweight Associate Roster — presentation for Sunday drawer.
  * Knowledge stays in lib/specialists.ts. Floor titles (Specialist vs CSA) come from
- * department taxonomy in lib/types.ts. Add-member is roster-only (no SMS)
+ * `floor_title` + job options in lib/types.ts. Add-member is roster-only (no SMS)
  * so Sunday balancer names are available immediately.
  */
 
@@ -25,7 +25,8 @@ import {
 } from "@/lib/specialists";
 import { SHIFT_HOUR_PRESETS } from "@/lib/store-ops/weekly-rotations";
 import {
-  associateFloorTitleLabel,
+  rosterJobTitleLabel,
+  rosterFloorBadgeLabel,
   departmentMeta,
   type DepartmentScope,
   type StoreSpecialist,
@@ -49,14 +50,7 @@ type Props = {
 };
 
 function floorLabel(member: StoreSpecialist): string {
-  if (member.role === "MasterAdmin") return "Master Admin";
-  if (member.role === "Supervisor") {
-    const dept = member.assigned_department;
-    return dept && dept !== "all"
-      ? `${departmentMeta(dept).shortLabel} Supervisor`
-      : "Supervisor";
-  }
-  return associateFloorTitleLabel(member.assigned_department);
+  return rosterJobTitleLabel(member);
 }
 
 export function AssociateRosterPanel({
@@ -211,8 +205,9 @@ export function AssociateRosterPanel({
           Associate roster
         </p>
         <p className="mt-1 text-[11px] leading-snug text-zinc-400">
-          Specialty depts (Flooring, Appliances, Millwork, Cabinets) use
-          Specialist. Core depts use CSA. On-duty names feed the Sunday shift
+          Specialty depts can be Specialist or CSA (Flooring CSA still groups
+          under D23). Core depts default to CSA. Cashier and Receiving stay on
+          the chosen home department. On-duty names feed the Sunday shift
           balancer.
         </p>
       </div>
@@ -271,6 +266,15 @@ export function AssociateRosterPanel({
                   </p>
                   <p className="font-mono text-[10px] uppercase tracking-wider text-cyan-300/90">
                     {floorLabel(member)}
+                    {member.role === "Associate" ? (
+                      <span className="ml-1.5 rounded-full border border-cyan-500/30 px-1.5 py-px text-[9px] font-bold">
+                        {rosterFloorBadgeLabel(member)}
+                      </span>
+                    ) : member.role === "Supervisor" ? (
+                      <span className="ml-1.5 rounded-full border border-amber-400/30 px-1.5 py-px text-[9px] font-bold text-amber-200">
+                        Supervisor
+                      </span>
+                    ) : null}
                     {!onDuty ? " · off duty" : ""}
                   </p>
                   {canManage ? (

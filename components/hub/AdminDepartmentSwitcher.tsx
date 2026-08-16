@@ -41,6 +41,7 @@ type Props = {
 export function AdminDepartmentSwitcher({
   specialist,
   onPinnedNavigate,
+  compact = false,
 }: Props) {
   const [dept, setDept] = useState<AdminWorkingDepartment>("all");
   const [open, setOpen] = useState(false);
@@ -78,7 +79,9 @@ export function AdminDepartmentSwitcher({
     const scoped = departmentMeta(effectiveDepartment(specialist));
     return (
       <span
-        className="inline-flex h-9 max-w-[6.25rem] shrink-0 items-center gap-1 rounded-full border border-zinc-700/80 bg-zinc-950/60 px-2.5 font-mono text-[10px] font-bold uppercase tracking-wide text-zinc-300"
+        className={`inline-flex h-9 shrink-0 items-center gap-1 rounded-full border border-zinc-700/80 bg-zinc-950/60 px-2 font-mono text-[10px] font-bold uppercase tracking-wide text-zinc-300 ${
+          compact ? "max-w-[4.75rem] sm:max-w-[6.25rem]" : "max-w-[6.25rem]"
+        }`}
         title={scoped.label}
       >
         <DepartmentIcon
@@ -118,7 +121,9 @@ export function AdminDepartmentSwitcher({
         aria-haspopup="listbox"
         aria-controls={menuId}
         aria-label={`Working department: ${label}`}
-        className="inline-flex h-9 max-w-[6.5rem] items-center gap-1 rounded-full border border-accent/40 bg-zinc-950/70 px-2.5 text-left backdrop-blur-sm transition active:scale-[0.98]"
+        className={`inline-flex h-9 items-center gap-1 rounded-full border border-accent/40 bg-zinc-950/70 px-2 text-left backdrop-blur-sm transition active:scale-[0.98] ${
+          compact ? "max-w-[4.85rem] sm:max-w-[6.5rem]" : "max-w-[6.5rem]"
+        }`}
       >
         <DepartmentIcon
           department={dept}

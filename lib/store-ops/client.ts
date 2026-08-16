@@ -1038,6 +1038,7 @@ export async function inviteSupervisor(
     accessible_departments?: string[];
     phone?: string;
     role?: "Supervisor" | "Associate" | "MasterAdmin";
+    floor_title?: string | null;
     send_invite?: boolean;
     test_mode?: boolean;
     store_number?: string;
@@ -1066,6 +1067,7 @@ export async function createRosterMember(
     accessible_departments?: string[];
     phone?: string;
     role?: "Supervisor" | "Associate" | "MasterAdmin";
+    floor_title?: string | null;
     store_number?: string;
   }
 ): Promise<InviteSupervisorResult> {

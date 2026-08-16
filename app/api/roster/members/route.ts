@@ -16,6 +16,7 @@ type RosterMemberBody = {
   accessible_departments?: string[];
   phone?: string;
   role?: "Supervisor" | "Associate" | "MasterAdmin";
+  floor_title?: string | null;
   store_number?: string;
 };
 
@@ -48,6 +49,7 @@ export async function POST(request: Request) {
       accessible_departments: body.accessible_departments,
       phone: body.phone,
       role: body.role,
+      floor_title: body.floor_title,
       sendInvite: false,
     });
 

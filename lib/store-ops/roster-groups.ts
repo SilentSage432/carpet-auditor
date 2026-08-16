@@ -8,6 +8,7 @@
 import {
   STORE_DEPARTMENTS,
   departmentRosterHeading,
+  rosterFloorBadgeLabel,
   specialistHomeDepartment,
   type DepartmentScope,
   type StoreSpecialist,
@@ -23,7 +24,12 @@ export type RosterDepartmentGroup = {
 function roleRank(member: StoreSpecialist): number {
   if (member.role === "MasterAdmin") return 0;
   if (member.role === "Supervisor") return 1;
-  return 2;
+  const title = rosterFloorBadgeLabel(member);
+  if (title === "Specialist") return 2;
+  if (title === "CSA") return 3;
+  if (title === "Cashier") return 4;
+  if (title === "Receiving") return 5;
+  return 6;
 }
 
 /**

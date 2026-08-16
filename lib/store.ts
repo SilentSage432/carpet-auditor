@@ -78,5 +78,11 @@ export function formatStoreLabel(storeNumber = getStoreNumber()): string {
   return n ? `Lowe's #${n}` : "Lowe's (set store #)";
 }
 
+/** Compact header tag — always shows the digits (`#2587`), no Lowe's prefix. */
+export function formatStoreHeaderTag(storeNumber = getStoreNumber()): string {
+  const n = normalizeStoreNumber(storeNumber).replace(/^0+/, "") || "";
+  return n ? `#${n}` : "";
+}
+
 /** @deprecated No hardcoded default — use empty string when unset. */
 export const DEFAULT_STORE_NUMBER = "";

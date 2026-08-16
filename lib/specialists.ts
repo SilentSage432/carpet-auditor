@@ -9,8 +9,9 @@ import type {
   StoreSpecialist,
 } from "./types";
 import {
-  associateFloorTitleLabel,
-  departmentMeta,
+  associateFloorTitle,
+  parseRosterFloorTitle,
+  rosterJobTitleLabel,
   parseDepartmentScope,
 } from "./types";
 import { getStoreNumber, normalizeStoreNumber, storeNumberQueryValues, belongsToStore } from "./store";
@@ -36,6 +37,7 @@ const SPECIALIST_LIST_SELECT = [
   "store_number",
   "name",
   "role",
+  "floor_title",
   "username",
   "assigned_department",
   "home_department",
@@ -193,6 +195,10 @@ export function mapRow(row: Record<string, unknown>): StoreSpecialist {
     store_number: String(row.store_number ?? getStoreNumber()),
     name: String(row.name ?? ""),
     role,
+    floor_title:
+      parseRosterFloorTitle(row.floor_title) ??
+      parseRosterFloorTitle(row.role) ??
+      (role === "Associate" ? associateFloorTitle(assigned) : null),
     pin_code: pin,
     pin_hash:
       row.pin_hash == null || String(row.pin_hash).trim() === ""
@@ -524,19 +530,7 @@ export function findSpecialistByLogin(
 }
 
 export function roleBadge(member: StoreSpecialist): string {
-  if (member.role === "MasterAdmin") return "Master Admin";
-  if (member.role === "Supervisor") {
-    const dept = member.assigned_department;
-    if (dept && dept !== "all") {
-      return `${departmentMeta(dept).label} Supervisor`;
-    }
-    return "Department Supervisor";
-  }
-  const dept = member.assigned_department;
-  if (dept && dept !== "all") {
-    return associateFloorTitleLabel(dept);
-  }
-  return "Floor CSA";
+  return rosterJobTitleLabel(member);
 }
 
 export function getActiveSpecialist(): StoreSpecialist | null {
@@ -589,6 +583,9 @@ function specialistPayload(record: StoreSpecialist): Record<string, unknown> {
       record.assigned_department && record.assigned_department !== "all"
         ? record.assigned_department
         : null;
+  }
+  if (record.floor_title) {
+    payload.floor_title = record.floor_title;
   }
   if (record.accessible_departments !== undefined) {
     payload.accessible_departments = composeAccessibleDepartments(
@@ -724,7 +721,8 @@ async function loadSpecialists(store: string): Promise<StoreSpecialist[]> {
         isMissingColumnError(error, "pin_updated_at") ||
         isMissingColumnError(error, "email") ||
         isMissingColumnError(error, "auth_user_id") ||
-        isMissingColumnError(error, "home_department"))
+        isMissingColumnError(error, "home_department") ||
+        isMissingColumnError(error, "floor_title"))
     ) {
       let retryQuery = supabase
         .from(TABLE)
@@ -1170,6 +1168,9 @@ async function persistSpecialistFields(
         nextLocal.assigned_department && nextLocal.assigned_department !== "all"
           ? nextLocal.assigned_department
           : null;
+    }
+    if (nextLocal.floor_title) {
+      insertRow.floor_title = nextLocal.floor_title;
     }
 
     const { data, error } = await supabase!

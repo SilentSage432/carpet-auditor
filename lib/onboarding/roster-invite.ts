@@ -23,7 +23,7 @@ import { suggestUsername } from "@/lib/rbac";
 import { dispatchInviteSms } from "@/lib/onboarding/sms-dispatch";
 import { persistSpecialistPatch } from "@/lib/onboarding/token-persist";
 import { readableError } from "@/lib/store-ops/errors";
-import { departmentMeta, type DepartmentScope } from "@/lib/types";
+import { departmentMeta, parseDepartmentScope, associateFloorTitle, parseRosterFloorTitle, type DepartmentScope } from "@/lib/types";
 
 export type RosterInviteRole = "Supervisor" | "Associate" | "MasterAdmin";
 
@@ -38,6 +38,7 @@ export type IssueRosterInviteInput = {
   accessible_departments?: string[];
   phone?: string | null;
   role?: RosterInviteRole;
+  floor_title?: string | null;
   testMode?: boolean;
 };
 
@@ -66,7 +67,9 @@ export async function issueRosterInvite(
   let rowId = input.specialistId?.trim() || "";
   let name = (input.name ?? "").trim();
   let username = (input.username ?? "").trim();
-  let department = (input.department ?? "flooring").trim() as DepartmentScope;
+  let department =
+    parseDepartmentScope(input.department) ??
+    ((input.department ?? "flooring").trim() as DepartmentScope);
   let role: RosterInviteRole =
     input.role === "Associate"
       ? "Associate"
@@ -126,6 +129,9 @@ export async function issueRosterInvite(
     style: "welcome",
   });
 
+  const home = role === "MasterAdmin" ? "all" : department;
+  const floorTitle = parseRosterFloorTitle(input.floor_title);
+
   const invitePatch: Record<string, unknown> = {
     invite_token: null,
     invite_token_hash: tokenHash,
@@ -145,12 +151,18 @@ export async function issueRosterInvite(
     name,
     username,
     role,
-    assigned_department: role === "MasterAdmin" ? "all" : department,
+    assigned_department: home,
+    home_department: home,
     accessible_departments:
       role === "MasterAdmin"
         ? []
         : composeAccessibleDepartments(department, input.accessible_departments),
   };
+  if (floorTitle) {
+    invitePatch.floor_title = floorTitle;
+  } else if (!rowId && role === "Associate") {
+    invitePatch.floor_title = associateFloorTitle(home);
+  }
 
   const persisted = rowId
     ? await persistSpecialistPatch(input.supabase, "update", invitePatch, {
