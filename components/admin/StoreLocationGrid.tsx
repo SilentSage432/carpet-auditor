@@ -2,7 +2,7 @@
 
 import { memo, startTransition, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { compareAisles } from "@/lib/store-ops/aisle";
-import { formatBayTag, type Department, type StoreLocation } from "@/lib/store-ops/types";
+import { formatBayTag, isPendingDrawLocation, type Department, type StoreLocation } from "@/lib/store-ops/types";
 import type { StoreSpecialist } from "@/lib/types";
 import { patchStoreLocation } from "@/lib/store-ops/client";
 import { toastError, toastSuccess } from "@/lib/toast";
@@ -699,6 +699,15 @@ const BayRow = memo(function BayRow({
               bay: pair.bay,
             })}
           </span>
+          {isPendingDrawLocation(pair.selling) ||
+          isPendingDrawLocation(pair.topstock) ? (
+            <span
+              title="Mapped — available for Sunday draw"
+              className="shrink-0 rounded-full border border-amber-500/45 bg-amber-950/35 px-1.5 py-0.5 font-mono text-[9px] font-bold tracking-tight text-amber-100"
+            >
+              Pending
+            </span>
+          ) : null}
         </span>
         <span className="mt-0.5 block truncate font-mono text-[10px] font-semibold tracking-tight text-zinc-500">
           {rowToneLabel}

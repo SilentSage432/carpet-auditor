@@ -183,6 +183,8 @@ supabase/migrations/20260810_store_locations_type_unique.sql → location unique
 supabase/migrations/20260811_alphanumeric_aisle.sql → store_locations.aisle INTEGER → TEXT (BW/RW/12/A1)
 supabase/migrations/20260811_manager_notes.sql → manager_notes (S Pen canvas + AI action items)
 supabase/migrations/20260812_jwt_rls_policies.sql → JWT claims hook + store/department RLS
+supabase/migrations/20260816_store_locations_read.sql → open SELECT on store_locations (anon + authenticated)
+supabase/migrations/20260816_rls_read_write_parity.sql → digit-equal jwt_matches_store, department aliases, authenticated carpet_* SELECT, open SELECT on Store Ops tables
 supabase/migrations/20260812_manager_notes.sql → durable manager_notes (store_number/department/author) + JWT RLS
 supabase/migrations/20260812_sunday_bay_assignments.sql → sunday specialist↔bay assignments + JWT RLS
 
@@ -236,7 +238,7 @@ supabase/migrations/20260812_sunday_bay_assignments.sql → sunday specialist↔
 | Edge auth + stealth gate | `lib/auth-gate.ts` + `proxy.ts` + `POST /api/auth/gate` (HttpOnly cookie) |
 | Enterprise ingest contracts | `src/types/enterpriseIntegration.ts` (Zod schemas). Transport: `lib/enterprise-integration/ingest.ts`. Stubs: `POST /api/v1/topology/ingest`, `POST /api/v1/freight/stage`. Does not write Store Ops tables or change hub UI. |
 | Store Ops Auth (JWT → profiles) | `lib/store-ops/auth.ts`, `lib/supabase/server.ts`, `lib/supabase/browser.ts`, `link-auth-profile.ts` |
-| JWT / RLS policies | `20260812_jwt_rls_policies.sql` + `20260814_multi_department_access.sql` (`jwt_matches_department_code` ORs `app_metadata.accessible_departments`) |
+| JWT / RLS policies | `20260812_jwt_rls_policies.sql` + `20260814_multi_department_access.sql` (`jwt_matches_department_code` ORs `app_metadata.accessible_departments`) + `20260816_store_locations_read.sql` (open SELECT on `store_locations`; writes still JWT-isolated) |
 | Phone SMS OTP recovery + profile link | `lib/phone-auth.ts`, `lib/phone.ts`, `POST /api/auth/phone-reset/*` |
 | Biometric / WebAuthn unlock | `lib/biometric-auth.ts`, `AuthWall` |
 | PIN change / default notice | `ChangePinModal` |
@@ -275,7 +277,7 @@ Mid-scan form drafts persist via `carpet_hub_audit_draft` / `carpet_hub_applianc
 `installSyncAutoFlush` replays on `online`, tab focus, and `visibilitychange`.
 Version mismatches / HTTP 409 pause for `ConflictResolutionModal` (keep local vs accept server).
 The service worker caches the app shell for instant cold starts without connectivity.
-Store Map / Floor / Shift Briefing hydrate from IndexedDB (`lib/store-ops/cache.ts`) then revalidate over the network; UI state updates only when the durable fingerprint changes.
+Store Map / Floor / Shift Briefing hydrate from IndexedDB (`lib/store-ops/cache.ts`) then revalidate over the network; UI state updates only when the durable fingerprint changes. Bulk location writes await cache clear so a prior empty snapshot cannot hide new `PENDING` bays. `workingDepartmentId` / `GET /api/store-locations` resolve hub slugs and Lowe's codes (`flooring` ≡ `D23`) to the live `departments.id` family before filtering `store_locations`.
 
 ## Schema note
 

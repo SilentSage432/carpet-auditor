@@ -5,7 +5,7 @@ import {
   requireStoreOpsActor,
   StoreOpsAuthError,
 } from "@/lib/store-ops/auth-server";
-import { resolveScopedDepartmentId } from "@/lib/store-ops/department-scope";
+import { resolveScopedDepartmentId, resolveStoreLocationDepartmentIds } from "@/lib/store-ops/department-scope";
 import { resolveStoreByNumber } from "@/lib/store-ops/stores";
 import { getSupabaseAdmin } from "@/lib/store-ops/supabase-admin";
 import { isoWeekLabel } from "@/lib/store-ops/week";
@@ -65,7 +65,11 @@ export async function GET(request: Request) {
     const rotations = await fetchWeekRotations(supabase, {
       week,
       storeId: scopedStoreId,
-      departmentId,
+      departmentIds: await resolveStoreLocationDepartmentIds(
+        supabase,
+        store.id,
+        departmentId
+      ),
     });
 
     return NextResponse.json({
@@ -90,7 +94,7 @@ async function fetchWeekRotations(
   opts: {
     week: string;
     storeId: string | null;
-    departmentId: string | null;
+    departmentIds: string[] | null;
   }
 ): Promise<unknown[]> {
   // Prefer store-scoped query; fall back if store_id column is missing.
@@ -125,7 +129,7 @@ function buildQuery(
   opts: {
     week: string;
     storeId: string | null;
-    departmentId: string | null;
+    departmentIds: string[] | null;
   },
   attempt: { withStoreId: boolean; select: string }
 ) {
@@ -138,8 +142,10 @@ function buildQuery(
   if (attempt.withStoreId && opts.storeId) {
     query = query.eq("store_id", opts.storeId);
   }
-  if (opts.departmentId) {
-    query = query.eq("department_id", opts.departmentId);
+  if (opts.departmentIds && opts.departmentIds.length === 1) {
+    query = query.eq("department_id", opts.departmentIds[0]);
+  } else if (opts.departmentIds && opts.departmentIds.length > 1) {
+    query = query.in("department_id", opts.departmentIds);
   }
   return query;
 }

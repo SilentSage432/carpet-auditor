@@ -7,7 +7,10 @@ import type { DepartmentScope, StoreSpecialist } from "@/lib/types";
 import { isMasterAdmin } from "@/lib/rbac";
 import { normalizeStoreNumber } from "@/lib/store";
 import { accessibleStoreOpsCodes } from "@/lib/department-access";
-import { toStoreOpsDepartmentCode } from "./department-codes";
+import {
+  departmentCodesMatch,
+  toStoreOpsDepartmentCode,
+} from "./department-codes";
 import type { StoreOpsUserRole } from "./types";
 
 export type StoreOpsActor = {
@@ -44,7 +47,9 @@ export function actorAllowsDepartmentCode(
   if (actor.role === "super_admin") return true;
   const needle = String(code ?? "").trim();
   if (!needle) return false;
-  return actorAccessibleDepartmentCodes(actor).includes(needle);
+  return actorAccessibleDepartmentCodes(actor).some((allowed) =>
+    departmentCodesMatch(allowed, needle)
+  );
 }
 
 /** Client UI gating from local specialist roster (not API auth). */

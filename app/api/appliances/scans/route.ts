@@ -3,6 +3,7 @@ import {
   applianceScansToCsv,
   mapApplianceScanRow,
 } from "@/lib/appliance-scans";
+import { storeNumberQueryValues } from "@/lib/store";
 import { getSupabaseAdmin } from "@/lib/store-ops/supabase-admin";
 import { supabaseAdminMissingMessage } from "@/lib/supabase/env";
 import {
@@ -35,11 +36,12 @@ export async function GET(request: Request) {
     const store = storeFromRequest(request);
     const url = new URL(request.url);
     const format = url.searchParams.get("format");
+    const storeKeys = storeNumberQueryValues(store);
 
     const { data, error } = await supabase
       .from("appliance_scans")
       .select("*")
-      .eq("store_number", store)
+      .in("store_number", storeKeys.length ? storeKeys : [store])
       .order("scanned_at", { ascending: false })
       .limit(200);
 
@@ -57,7 +59,7 @@ export async function GET(request: Request) {
       const { data: catalogRows } = await supabase
         .from("appliance_catalog")
         .select("item_number, description")
-        .eq("store_number", store);
+        .in("store_number", storeKeys.length ? storeKeys : [store]);
       for (const row of catalogRows ?? []) {
         const item = String(
           (row as { item_number?: string }).item_number ?? ""

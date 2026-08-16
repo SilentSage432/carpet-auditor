@@ -25,9 +25,12 @@ import {
 import { isSupervisor } from "@/lib/specialists";
 import {
   fetchDepartments,
+  fetchStoreLocationsDetailed,
   fetchThisWeekRotations,
   peekCachedDepartments,
   peekCachedRotations,
+  peekCachedStoreLocations,
+  STORE_OPS_LOCATIONS_CHANGED_EVENT,
   verifyAllCompletedBays,
 } from "@/lib/store-ops/client";
 import { fingerprintsEqual } from "@/lib/store-ops/cache";
@@ -36,7 +39,7 @@ import {
   findFlooringDepartment,
   SUNDAY_AUDIT_EVENT,
 } from "@/lib/store-ops/sunday-audit";
-import type { WeeklyRotationWithLocation } from "@/lib/store-ops/types";
+import type { StoreLocation, WeeklyRotationWithLocation } from "@/lib/store-ops/types";
 import type { WorkflowTabProps } from "@/components/hub/tabs/tab-props";
 import Link from "next/link";
 
@@ -52,6 +55,7 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
   const [week, setWeek] = useState("");
   const [deptId, setDeptId] = useState<string | null>(null);
   const [rotations, setRotations] = useState<WeeklyRotationWithLocation[]>([]);
+  const [mappedLocations, setMappedLocations] = useState<StoreLocation[]>([]);
   const [flooringDeptId, setFlooringDeptId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [healthKey, setHealthKey] = useState(0);
@@ -72,7 +76,10 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
       try {
         const depts = await fetchDepartments(member);
         const nextDeptId = workingDepartmentId(member, depts);
-        const data = await fetchThisWeekRotations(member, nextDeptId);
+        const [data, locs] = await Promise.all([
+          fetchThisWeekRotations(member, nextDeptId),
+          fetchStoreLocationsDetailed(member, nextDeptId),
+        ]);
         const nextWeek = data.assigned_week || "";
         const nextRotations = data.rotations ?? [];
         const nextFlooring = findFlooringDepartment(depts)?.id ?? null;
@@ -80,6 +87,9 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
         setDeptId((prev) => (prev === (nextDeptId ?? null) ? prev : nextDeptId ?? null));
         setRotations((prev) =>
           fingerprintsEqual(prev, nextRotations) ? prev : nextRotations
+        );
+        setMappedLocations((prev) =>
+          fingerprintsEqual(prev, locs.items) ? prev : locs.items
         );
         setFlooringDeptId((prev) =>
           prev === nextFlooring ? prev : nextFlooring
@@ -114,11 +124,18 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
         specialist,
         nextDeptId ?? undefined
       );
+      const cachedLocs = await peekCachedStoreLocations(
+        specialist,
+        nextDeptId ?? undefined
+      );
       if (cancelled) return;
       if (cachedWeek) {
         setWeek(cachedWeek.assigned_week || "");
         setRotations(cachedWeek.rotations ?? []);
         setLoading(false);
+      }
+      if (cachedLocs?.items.length) {
+        setMappedLocations(cachedLocs.items);
       }
       if (!cancelled) void reload(specialist, { silent: true });
     }
@@ -137,9 +154,11 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
     }
     window.addEventListener(ADMIN_DEPT_CONTEXT_EVENT, onCtx);
     window.addEventListener(SUNDAY_AUDIT_EVENT, onSunday);
+    window.addEventListener(STORE_OPS_LOCATIONS_CHANGED_EVENT, onSunday);
     return () => {
       window.removeEventListener(ADMIN_DEPT_CONTEXT_EVENT, onCtx);
       window.removeEventListener(SUNDAY_AUDIT_EVENT, onSunday);
+      window.removeEventListener(STORE_OPS_LOCATIONS_CHANGED_EVENT, onSunday);
     };
   }, [reload, specialist]);
 
@@ -148,13 +167,12 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
     return filterFlooringRotations(rotations, flooringDeptId);
   }, [rotations, flooringFocus, flooringDeptId]);
 
-  const freshnessLocations = useMemo(
-    () =>
-      displayRotations
-        .map((row) => row.store_locations)
-        .filter((loc): loc is NonNullable<typeof loc> => Boolean(loc)),
-    [displayRotations]
-  );
+  const freshnessLocations = useMemo(() => {
+    if (mappedLocations.length > 0) return mappedLocations;
+    return displayRotations
+      .map((row) => row.store_locations)
+      .filter((loc): loc is NonNullable<typeof loc> => Boolean(loc));
+  }, [mappedLocations, displayRotations]);
 
   async function signOffCompleted() {
     if (!deptId || !week) return;

@@ -8,7 +8,11 @@ import {
 } from "@/lib/store-ops/auth-server";
 import { isValidAisle, normalizeAisle } from "@/lib/store-ops/aisle";
 import { storeOpsAuthRequiredBody } from "@/lib/store-ops/auth-soft";
-import { resolveScopedDepartmentId, assertActorCanAccessDepartmentId } from "@/lib/store-ops/department-scope";
+import {
+  resolveScopedDepartmentId,
+  assertActorCanAccessDepartmentId,
+  resolveStoreLocationDepartmentIds,
+} from "@/lib/store-ops/department-scope";
 import { isMissingColumnError } from "@/lib/store-ops/errors";
 import { getSupabaseAdmin } from "@/lib/store-ops/supabase-admin";
 import { resolveStoreByNumber } from "@/lib/store-ops/stores";
@@ -128,18 +132,30 @@ export async function GET(request: Request) {
       departmentFilter = departmentIdParam;
     }
 
+    const departmentIds = await resolveStoreLocationDepartmentIds(
+      supabase,
+      storeId,
+      departmentFilter
+    );
+
     const omitted: string[] = [];
     let data: unknown[] | null = null;
     let error: { message?: string } | null = null;
     for (let attempt = 0; attempt < OPTIONAL_LIST_COLUMNS.length + 1; attempt += 1) {
+      // Map/Floor list every mapped tag. Rotation `status` is PENDING|ASSIGNED|
+      // COMPLETED|CARRIED_OVER (not ACTIVE). PENDING means available for Sunday
+      // draw — never hide those rows. is_active is the pause flag, also unfiltered
+      // so Manage can still show paused faces.
       let query = supabase
         .from("store_locations")
         .select(listSelect(omitted))
         .eq("store_id", storeId)
         .order("aisle")
         .order("bay");
-      if (departmentFilter) {
-        query = query.eq("department_id", departmentFilter);
+      if (departmentIds && departmentIds.length === 1) {
+        query = query.eq("department_id", departmentIds[0]);
+      } else if (departmentIds && departmentIds.length > 1) {
+        query = query.in("department_id", departmentIds);
       }
       const result = await query;
       data = result.data as unknown[] | null;

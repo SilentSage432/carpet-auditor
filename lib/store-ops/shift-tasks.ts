@@ -6,6 +6,7 @@
  */
 
 import { getStoreNumber, storeNumberQueryValues } from "@/lib/store";
+import { departmentCodeQueryValues } from "@/lib/store-ops/department-codes";
 import { getSupabase } from "@/lib/supabase";
 import { liveWriteError } from "@/lib/store-ops/errors";
 import { isoWeekLabel } from "@/lib/store-ops/week";
@@ -158,6 +159,7 @@ export async function fetchShiftWalkTasks(
 
   const supabase = requireClient();
   const keys = storeNumberQueryValues(store);
+  const deptKeys = departmentCodeQueryValues(department);
   const { data, error } = await supabase
     .from("shift_walk_tasks")
     .select(
@@ -165,7 +167,7 @@ export async function fetchShiftWalkTasks(
     )
     .in("store_number", keys.length ? keys : [store])
     .eq("assigned_week", week)
-    .eq("department", department);
+    .in("department", deptKeys.length ? deptKeys : [department]);
 
   if (error) {
     throw liveWriteError(error, "shift_walk_tasks", "Could not load shift walk tasks");

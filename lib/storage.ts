@@ -6,7 +6,7 @@ import {
   normalizeCategory,
   resolveApplianceCategoryPair,
 } from "./types";
-import { getStoreNumber } from "./store";
+import { getStoreNumber, sameStoreNumber, storeNumberQueryValues } from "./store";
 import { getSupabase } from "./supabase";
 import {
   enqueueSyncAction,
@@ -36,7 +36,7 @@ function writeAllLocal(records: CarpetAudit[]): void {
 }
 
 function forStore(store = getStoreNumber()): CarpetAudit[] {
-  return readAllLocal().filter((r) => r.store_number === store);
+  return readAllLocal().filter((r) => sameStoreNumber(r.store_number, store));
 }
 
 export function upsertLocal(record: CarpetAudit): CarpetAudit[] {
@@ -208,10 +208,11 @@ export async function fetchAudits(): Promise<CarpetAudit[]> {
     const startOfDay = new Date();
     startOfDay.setHours(0, 0, 0, 0);
 
+    const keys = storeNumberQueryValues(store);
     const { data, error } = await supabase
       .from(TABLE)
       .select("*")
-      .eq("store_number", store)
+      .in("store_number", keys.length ? keys : [store])
       .gte("created_at", startOfDay.toISOString())
       .order("created_at", { ascending: false })
       .limit(200);

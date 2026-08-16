@@ -27,6 +27,7 @@ import {
   peekCachedDepartments,
   peekCachedRotations,
   peekCachedStoreLocations,
+  STORE_OPS_LOCATIONS_CHANGED_EVENT,
 } from "@/lib/store-ops/client";
 import { fingerprintsEqual } from "@/lib/store-ops/cache";
 import {
@@ -190,7 +191,11 @@ export function MapTab({ specialist }: WorkflowTabProps) {
       setContextTick((n) => n + 1);
     }
     window.addEventListener(ADMIN_DEPT_CONTEXT_EVENT, onCtx);
-    return () => window.removeEventListener(ADMIN_DEPT_CONTEXT_EVENT, onCtx);
+    window.addEventListener(STORE_OPS_LOCATIONS_CHANGED_EVENT, onCtx);
+    return () => {
+      window.removeEventListener(ADMIN_DEPT_CONTEXT_EVENT, onCtx);
+      window.removeEventListener(STORE_OPS_LOCATIONS_CHANGED_EVENT, onCtx);
+    };
   }, []);
 
   useEffect(() => {

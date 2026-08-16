@@ -12,7 +12,10 @@ import {
   type OperationalDepartment,
   type StoreSpecialist,
 } from "@/lib/types";
-import { toStoreOpsDepartmentCode } from "@/lib/store-ops/department-codes";
+import {
+  matchDepartmentIdByCode,
+  toStoreOpsDepartmentCode,
+} from "@/lib/store-ops/department-codes";
 import { accessibleDepartments } from "@/lib/department-access";
 import { peekSandboxDepartment } from "@/lib/dev-sandbox";
 import { effectiveDepartment, isMasterAdmin } from "@/lib/rbac";
@@ -137,7 +140,10 @@ export function workingDepartmentId(
   if (!member || scope === "all") return undefined;
   const code = toStoreOpsDepartmentCode(scope);
   if (!code) return undefined;
-  return departments.find((row) => row.code === code)?.id;
+  return (
+    matchDepartmentIdByCode(departments, code) ??
+    matchDepartmentIdByCode(departments, scope)
+  );
 }
 
 /** Prefer flooring hub section when Master Admin pins D23. */

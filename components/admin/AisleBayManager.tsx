@@ -13,6 +13,7 @@ import {
 } from "@/lib/store-ops/locations";
 import {
   formatBayTag,
+  isPendingDrawLocation,
   type Department,
   type StoreLocation,
   type VelocityTier,
@@ -420,6 +421,15 @@ export function AisleBayManager({
                                   <span className="inline-flex items-center gap-0.5 rounded-full border border-amber-500/40 bg-amber-950/40 px-2 py-0.5 font-mono text-[10px] font-bold tracking-tight text-amber-100">
                                     <HubIcon id="lock" className="h-3 w-3" />
                                     LOCK
+                                  </span>
+                                ) : null}
+                                {isPendingDrawLocation(pair.selling) ||
+                                isPendingDrawLocation(pair.topstock) ? (
+                                  <span
+                                    title="Mapped — available for Sunday draw"
+                                    className="inline-flex items-center rounded-full border border-amber-500/45 bg-amber-950/35 px-2 py-0.5 font-mono text-[10px] font-bold tracking-tight text-amber-100"
+                                  >
+                                    Pending
                                   </span>
                                 ) : null}
                               </p>

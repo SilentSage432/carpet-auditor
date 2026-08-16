@@ -6,6 +6,7 @@
  */
 
 import { getStoreNumber, storeNumberQueryValues } from "@/lib/store";
+import { departmentCodeQueryValues } from "@/lib/store-ops/department-codes";
 import { getSupabase } from "@/lib/supabase";
 import { liveWriteError } from "@/lib/store-ops/errors";
 
@@ -100,6 +101,11 @@ function storeKeys(store: string): string[] {
   return keys.length ? keys : [store];
 }
 
+function deptKeys(department: string): string[] {
+  const keys = departmentCodeQueryValues(department);
+  return keys.length ? keys : [department];
+}
+
 export function activeDownstockFlags(map: DownstockMap): DownstockMap {
   const next: DownstockMap = {};
   for (const [id, flag] of Object.entries(map)) {
@@ -124,7 +130,7 @@ export async function fetchDownstockQueue(
     )
     .in("store_number", storeKeys(store))
     .eq("assigned_week", week)
-    .eq("department", department);
+    .in("department", deptKeys(department));
 
   if (error) {
     throw liveWriteError(error, "downstock_queue", "Could not load downstock queue");
@@ -216,7 +222,7 @@ export async function clearDownstockFlag(input: {
       updated_at: resolvedAt,
     })
     .in("store_number", storeKeys(store))
-    .eq("department", department)
+    .in("department", deptKeys(department))
     .eq("assigned_week", week)
     .eq("rotation_id", rotationId);
   if (error) {

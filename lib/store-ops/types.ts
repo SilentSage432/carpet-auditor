@@ -169,6 +169,13 @@ export function formatLocationLabel(
   return parts ? `${base} [${parts}]` : base;
 }
 
+/** Rotation PENDING = mapped, available for Sunday draw (not an approval gate). */
+export function isPendingDrawLocation(
+  loc: Pick<StoreLocation, "status"> | null | undefined
+): boolean {
+  return String(loc?.status ?? "").toUpperCase() === "PENDING";
+}
+
 const CARRY_OVER_BADGE_MS = 14 * 86_400_000;
 
 /** Floor / Sunday amber badge — assignment or location carry-over window. */

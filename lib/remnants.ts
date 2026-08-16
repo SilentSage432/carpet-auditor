@@ -3,7 +3,7 @@ import { calculateSquareFeet, calculateSquareYards } from "./calc";
 import { uid } from "./uid";
 import type { Remnant, RemnantInsert, RemnantStatus } from "./types";
 import { normalizeCategory } from "./types";
-import { getStoreNumber } from "./store";
+import { getStoreNumber, sameStoreNumber, storeNumberQueryValues } from "./store";
 import { getSupabase } from "./supabase";
 import {
   enqueueSyncAction,
@@ -32,7 +32,7 @@ function writeAllLocal(records: Remnant[]): void {
 }
 
 function forStore(store = getStoreNumber()): Remnant[] {
-  return readAllLocal().filter((r) => r.store_number === store);
+  return readAllLocal().filter((r) => sameStoreNumber(r.store_number, store));
 }
 
 function nullableNumber(value: unknown): number | null {
@@ -141,10 +141,11 @@ export async function fetchRemnants(): Promise<Remnant[]> {
   if (!supabase || shouldSaveOffline()) return local;
 
   try {
+    const keys = storeNumberQueryValues(store);
     const { data, error } = await supabase
       .from(TABLE)
       .select("*")
-      .eq("store_number", store)
+      .in("store_number", keys.length ? keys : [store])
       .order("updated_at", { ascending: false });
 
     if (error) throw error;

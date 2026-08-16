@@ -91,13 +91,21 @@ function rememberDurable<T>(
   return data;
 }
 
-/** Drop cached Store Map / Zebra list GETs after writes. */
-export function invalidateStoreOpsListCaches(): void {
+/** Drop cached Store Map / Zebra list GETs after writes. Awaits IndexedDB clear. */
+export const STORE_OPS_LOCATIONS_CHANGED_EVENT =
+  "deptsync:store-locations-changed";
+
+export async function invalidateStoreOpsListCaches(): Promise<void> {
   departmentsCache.invalidate();
   rotationsCache.invalidate();
   locationsCache.invalidate();
   healthCache.invalidate();
-  void clearDurable();
+  await clearDurable();
+}
+
+function notifyStoreLocationsChanged(): void {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new Event(STORE_OPS_LOCATIONS_CHANGED_EVENT));
 }
 
 export async function peekCachedStoreLocations(
@@ -326,10 +334,16 @@ export async function bulkGenerateLocations(
   specialist: StoreSpecialist,
   input: BulkGenerateInput
 ): Promise<{ created: number; locations: StoreLocation[] }> {
-  return storeOpsFetch("/api/store-locations/bulk", specialist, {
+  const data = await storeOpsFetch<{
+    created: number;
+    locations: StoreLocation[];
+  }>("/api/store-locations/bulk", specialist, {
     method: "POST",
     body: JSON.stringify(input),
   });
+  await invalidateStoreOpsListCaches();
+  notifyStoreLocationsChanged();
+  return data;
 }
 
 export type AiParsedLocationClient = {
@@ -399,7 +413,7 @@ export async function logBayService(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),
   });
-  invalidateStoreOpsListCaches();
+  await invalidateStoreOpsListCaches();
   return data;
 }
 
@@ -434,7 +448,7 @@ export async function patchStoreLocation(
       body: JSON.stringify({ id, ...patch }),
     }
   );
-  invalidateStoreOpsListCaches();
+  await invalidateStoreOpsListCaches();
   return data.location;
 }
 
@@ -454,7 +468,7 @@ export async function deleteStoreLocations(
   });
   const removed = data.ids ?? unique;
   const count = data.deleted ?? data.pruned ?? removed.length;
-  invalidateStoreOpsListCaches();
+  await invalidateStoreOpsListCaches();
   return { deleted: count, pruned: count, ids: removed };
 }
 
@@ -470,7 +484,7 @@ export async function deleteStoreLocation(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ id }),
   });
-  invalidateStoreOpsListCaches();
+  await invalidateStoreOpsListCaches();
   return {
     deleted: data.deleted ?? 1,
     ids: data.ids ?? [id],
@@ -527,7 +541,7 @@ export async function updateDepartmentAccess(
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(input),
   });
-  invalidateStoreOpsListCaches();
+  await invalidateStoreOpsListCaches();
   return {
     accessible_departments: data.accessible_departments ?? [],
   };
@@ -574,7 +588,7 @@ export async function completeRotation(
     method: "POST",
     body: JSON.stringify({ rotation_id: rotationId }),
   });
-  invalidateStoreOpsListCaches();
+  await invalidateStoreOpsListCaches();
 }
 
 export async function generateRotations(
@@ -596,7 +610,7 @@ export async function generateRotations(
     method: "POST",
     body: JSON.stringify({ department_id: departmentId, count }),
   });
-  invalidateStoreOpsListCaches();
+  await invalidateStoreOpsListCaches();
   return result;
 }
 
@@ -616,6 +630,7 @@ export async function updateDepartmentWeeklyTarget(
       }),
     }
   );
+  await invalidateStoreOpsListCaches();
   return data.department;
 }
 
@@ -636,6 +651,7 @@ export async function updateDepartmentActive(
       }),
     }
   );
+  await invalidateStoreOpsListCaches();
   return data.department;
 }
 
@@ -656,7 +672,7 @@ export async function assignLocationsToWeek(
       }),
     }
   );
-  invalidateStoreOpsListCaches();
+  await invalidateStoreOpsListCaches();
   return result;
 }
 
@@ -689,6 +705,8 @@ export async function completeShowroomLocation(
       body: JSON.stringify({ location_id: locationId }),
     }
   );
+  await invalidateStoreOpsListCaches();
+  notifyStoreLocationsChanged();
   return data.location;
 }
 
@@ -709,10 +727,18 @@ export async function verifyWeeklyRotationBatch(
   completed_count: number;
   exception_count: number;
 }> {
-  return storeOpsFetch("/api/rotations/verify", specialist, {
+  const result = await storeOpsFetch<{
+    completed_count?: number;
+    exception_count?: number;
+  }>("/api/rotations/verify", specialist, {
     method: "POST",
     body: JSON.stringify(input),
   });
+  await invalidateStoreOpsListCaches();
+  return {
+    completed_count: result.completed_count ?? 0,
+    exception_count: result.exception_count ?? 0,
+  };
 }
 
 /** Stamp the week verified without completing remaining open bays. */
@@ -749,7 +775,7 @@ export async function reportRotationBarriers(
       body: JSON.stringify(input),
     }
   );
-  invalidateStoreOpsListCaches();
+  await invalidateStoreOpsListCaches();
   return { exception_count: result.exception_count ?? input.incomplete.length };
 }
 

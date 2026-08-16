@@ -10,6 +10,7 @@ import {
   StoreOpsAuthError,
   type StoreOpsActor,
 } from "./auth";
+import { departmentCodesMatch, departmentIdsMatchingCode } from "./department-codes";
 import { resolveDepartmentIdByCode } from "./rotations";
 
 export {
@@ -30,13 +31,25 @@ export async function resolveScopedDepartmentId(
   }
 
   if (requested) {
-    const { data, error } = await supabase
+    const { data: byId, error } = await supabase
       .from("departments")
       .select("id, code")
       .eq("id", requested)
       .eq("store_id", storeId)
       .maybeSingle();
     if (error) throw new Error(error.message);
+    let data = byId;
+    if (!data) {
+      const { data: rows, error: listError } = await supabase
+        .from("departments")
+        .select("id, code")
+        .eq("store_id", storeId);
+      if (listError) throw new Error(listError.message);
+      data =
+        (rows ?? []).find((row) =>
+          departmentCodesMatch(String(row.code ?? ""), requested)
+        ) ?? null;
+    }
     if (!data || !actorAllowsDepartmentCode(actor, String(data.code ?? ""))) {
       throw new StoreOpsAuthError("Department is outside your assigned scopes", 403);
     }
@@ -69,4 +82,29 @@ export async function assertActorCanAccessDepartmentId(
     throw new StoreOpsAuthError("Department is outside your assigned scopes", 403);
   }
   await resolveScopedDepartmentId(supabase, actor, storeId, id);
+}
+
+/**
+ * Map a department UUID or Lowe's/hub code to every departments.id in that
+ * family for this store (flooring ≡ D23). Null requested → no filter.
+ */
+export async function resolveStoreLocationDepartmentIds(
+  supabase: SupabaseClient,
+  storeId: string,
+  requested: string | null | undefined
+): Promise<string[] | null> {
+  const needle = String(requested ?? "").trim();
+  if (!needle) return null;
+
+  const { data, error } = await supabase
+    .from("departments")
+    .select("id, code")
+    .eq("store_id", storeId);
+  if (error) throw new Error(error.message);
+  const rows = (data ?? []) as Array<{ id: string; code: string | null }>;
+  const ids = departmentIdsMatchingCode(
+    rows.map((row) => ({ id: String(row.id), code: String(row.code ?? "") })),
+    needle
+  );
+  return ids.length > 0 ? ids : [needle];
 }

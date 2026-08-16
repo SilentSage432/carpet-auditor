@@ -6,7 +6,7 @@ import {
   normalizeCategory,
   resolveApplianceCategoryPair,
 } from "./types";
-import { getStoreNumber } from "./store";
+import { getStoreNumber, sameStoreNumber, storeNumberQueryValues } from "./store";
 import { getSupabase } from "./supabase";
 import {
   enqueueSyncAction,
@@ -35,7 +35,7 @@ function writeAllLocal(records: CatalogItem[]): void {
 }
 
 function forStore(store = getStoreNumber()): CatalogItem[] {
-  return readAllLocal().filter((r) => r.store_number === store);
+  return readAllLocal().filter((r) => sameStoreNumber(r.store_number, store));
 }
 
 function mapRow(row: Record<string, unknown>): CatalogItem {
@@ -155,10 +155,11 @@ export async function fetchCatalog(): Promise<CatalogItem[]> {
   if (!supabase || shouldSaveOffline()) return local;
 
   try {
+    const keys = storeNumberQueryValues(store);
     const { data, error } = await supabase
       .from(TABLE)
       .select("*")
-      .eq("store_number", store)
+      .in("store_number", keys.length ? keys : [store])
       .order("sku", { ascending: true });
 
     if (error) throw error;

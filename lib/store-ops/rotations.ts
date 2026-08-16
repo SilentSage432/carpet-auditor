@@ -12,6 +12,7 @@ import {
   resolveWeeklyBayTarget,
 } from "./week";
 import { isMissingColumnError } from "./errors";
+import { departmentCodesMatch } from "./department-codes";
 
 function isStandardAisleLocation(loc: StoreLocation): boolean {
   return (loc.location_type ?? "STANDARD") !== "SHOWROOM_STACKOUT";
@@ -728,5 +729,14 @@ export async function resolveDepartmentIdByCode(
   }
   const { data, error } = await query.maybeSingle();
   if (error) throw new Error(error.message);
-  return data?.id ?? null;
+  if (data?.id) return data.id;
+
+  let list = supabase.from("departments").select("id, code");
+  if (storeId) list = list.eq("store_id", storeId);
+  const { data: rows, error: listError } = await list;
+  if (listError) throw new Error(listError.message);
+  const match = (rows ?? []).find((row) =>
+    departmentCodesMatch(String(row.code ?? ""), code)
+  );
+  return match?.id ? String(match.id) : null;
 }

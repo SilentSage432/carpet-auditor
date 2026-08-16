@@ -5,6 +5,7 @@
 
 import { getSupabase } from "@/lib/supabase";
 import { getStoreNumber, storeNumberQueryValues } from "@/lib/store";
+import { departmentCodeQueryValues } from "@/lib/store-ops/department-codes";
 import { subscribePostgresChanges } from "@/lib/store-ops/realtime";
 import { createTtlCache } from "@/lib/store-ops/ttl-cache";
 import {
@@ -162,11 +163,12 @@ export async function fetchSundayAssignments(
       const supabase = requireClient();
       const weekStarting = isoWeekToMondayDate(week);
       const keys = storeNumberQueryValues(store);
+      const deptKeys = departmentCodeQueryValues(department);
       const { data, error } = await supabase
         .from("sunday_bay_assignments")
         .select("*")
         .in("store_number", keys.length ? keys : [store])
-        .eq("department", department)
+        .in("department", deptKeys.length ? deptKeys : [department])
         .eq("week_starting", weekStarting)
         .neq("status", "cleared");
 
@@ -420,6 +422,7 @@ export function findFlooringDepartment(
   const list = active.length > 0 ? active : departments;
   return (
     list.find((d) => d.code.trim().toLowerCase() === "flooring") ??
+    list.find((d) => d.code.trim().toUpperCase() === "D23") ??
     list.find((d) => /flooring|home decor/i.test(d.name)) ??
     null
   );

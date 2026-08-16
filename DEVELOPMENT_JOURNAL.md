@@ -1,5 +1,26 @@
 # DeptSync Hub — Development Journal
 
+## 2026-08-16 — Read/write visibility audit
+
+### Found
+- **carpet_* RLS.** Policies were anon-only; Hub-bridge after PIN is authenticated, so cycle audits/catalog/remnants were invisible.
+- **JWT store/dept.** `jwt_matches_store` was exact string (`2587` ≠ `02587`). `jwt_matches_department_code` was exact (`flooring` ≠ `D23`). Client-written Sunday/downstock/shift rows failed RLS.
+- **Sunday CHECK.** Writers sent `CARRIED_OVER`; column only allowed lowercase pending|assigned|completed|cleared.
+- **SELECT filters.** weekly_rotations GET used a single department UUID; carpet/appliance reads used exact store_number.
+
+### Shipped
+- Department family on weekly-rotations GET; flooring/D23 aliases on Sunday/downstock/shift-task SELECTs; store aliases on carpet_* and appliance_scans.
+- Cache invalidate on showroom complete, week verify, and department target/active.
+- Apply `20260816_rls_read_write_parity.sql`.
+
+## 2026-08-16 — store_locations Map/Floor visibility (PENDING + RLS + cache)
+
+### Shipped
+- **Status.** Map/Floor `GET /api/store-locations` does not filter rotation `status`. New bays stay `PENDING` (available for Sunday draw, not an approval gate) and `is_active=true`. Visual Grid and Manage show a Pending chip instead of hiding them. There is no location status named `ACTIVE`.
+- **Department join.** Hub pin `flooring` matches live `departments.code` `flooring` or Lowe's `D23` (and the same family for D35/appliances, …). GET expands to every matching `department_id` in the store so Aisle 41 tags under UUID `afd0bf9b-…` render when the UI pin is D23 Flooring.
+- **RLS.** Apply `20260816_store_locations_read.sql` — `Allow read access for store locations` SELECT `USING (true)` for `anon` and `authenticated`. List API still uses the service role; this unblocks direct client reads.
+- **Cache.** `bulkGenerateLocations` awaits `invalidateStoreOpsListCaches()` (clears L1 TTL + IndexedDB) then notifies keep-alive Map/Floor to refetch so an empty snapshot cannot hide newly inserted bays.
+
 ## 2026-08-16 — Live Store Ops writes; no fake-success fallbacks
 
 ### Shipped

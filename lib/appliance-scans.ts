@@ -7,7 +7,7 @@
  */
 
 import { createDebouncedPersist } from "./debounced-persist";
-import { getStoreNumber } from "./store";
+import { getStoreNumber, sameStoreNumber, storeNumberQueryValues } from "./store";
 import { getSupabase } from "./supabase";
 import { enqueueSyncAction, isBrowserOnline } from "./sync-queue";
 import { uid } from "./uid";
@@ -88,7 +88,7 @@ function writeAllLocal(records: ApplianceScan[]): void {
 }
 
 function forStore(store = getStoreNumber()): ApplianceScan[] {
-  return readAllLocal().filter((r) => r.store_number === store);
+  return readAllLocal().filter((r) => sameStoreNumber(r.store_number, store));
 }
 
 export function getLocalApplianceScans(store = getStoreNumber()): ApplianceScan[] {
@@ -240,10 +240,11 @@ export async function fetchApplianceScans(): Promise<ApplianceScan[]> {
     const supabase = getSupabase();
     if (supabase) {
       try {
+        const keys = storeNumberQueryValues(store);
         const { data, error } = await supabase
           .from(TABLE)
           .select("*")
-          .eq("store_number", store)
+          .in("store_number", keys.length ? keys : [store])
           .order("scanned_at", { ascending: false });
         if (error) {
           console.error("[appliance_scans] client fetch error", error);
