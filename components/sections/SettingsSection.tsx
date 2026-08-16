@@ -87,7 +87,7 @@ export function SettingsSection({
   const [ping, setPing] = useState<ConnectionStatus>("idle");
   const [syncMsg, setSyncMsg] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
-  const [openSection, setOpenSection] = useState<SettingsAccordion>("device");
+  const [openSection, setOpenSection] = useState<SettingsAccordion>(null);
   const [cacheTick, setCacheTick] = useState(0);
   const [cacheMsg, setCacheMsg] = useState<string | null>(null);
   const [departments, setDepartments] = useState<Department[]>([]);
@@ -237,6 +237,10 @@ export function SettingsSection({
 
   return (
     <div className="space-y-4">
+      {masterSession && activeSpecialist ? (
+        <SundayScheduleCard specialist={activeSpecialist} />
+      ) : null}
+
       <ThemeSelector />
 
       <section className="space-y-3 rounded-2xl border border-slate-800 bg-slate-900/90 p-4">
@@ -288,7 +292,6 @@ export function SettingsSection({
           <p className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-amber-300">
             Store configuration
           </p>
-          <SundayScheduleCard specialist={activeSpecialist} />
           <Accordion
             id="store"
             title="Store number"

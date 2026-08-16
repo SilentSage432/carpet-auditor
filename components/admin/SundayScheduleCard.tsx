@@ -86,9 +86,9 @@ export function SundayScheduleCard({ specialist }: Props) {
           Sunday rotation schedule
         </p>
         <p className="mt-1 text-sm text-zinc-400">
-          Auto-stage the upcoming ISO week at local store time. The runner never
-          overwrites a week that is already staged — Master Admin Force Draw
-          can replace incomplete bays.
+          Settings &amp; Config · auto-stage the upcoming ISO week at local
+          store time. The scheduled runner never overwrites a week that is
+          already staged — Force Draw below can replace incomplete bays.
         </p>
       </div>
 
