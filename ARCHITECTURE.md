@@ -78,7 +78,7 @@ app/admin/exceptions/page.tsx     → Redirect → /dashboard
 app/settings/page.tsx             → Settings & Config (theme, targets, push, Master tools)
 app/api/push/*                    → VAPID public key, subscribe, manual dispatch
 app/api/cron/weekly-rotation      → Sunday automated rotation engine (CRON_SECRET; per-store schedule)
-vercel.json                       → Cron every 15 min `*/15 * * * *` (dispatch honors store local Sunday time)
+vercel.json                       → Cron Sunday `0 11 * * 0` (11:00 UTC ≈ 05:00 America/Denver; Hobby daily limit)
 app/api/stores/settings           → GET/PATCH Sunday auto-stage time, auto-run, timezone (Master PATCH)
 lib/store-ops/sunday-schedule.ts  → Store-owned Sunday timing knowledge (defaults 05:00 America/Denver)
 supabase/migrations/20260816_sunday_rotation_schedule.sql → stores.sunday_auto_generate / sunday_auto_stage_time / timezone

@@ -17,8 +17,8 @@ function authorizeCron(request: Request): boolean {
 
 /**
  * GET /api/cron/weekly-rotation
- * Vercel Cron — every 15 minutes. Per-store Sunday auto-stage (local time)
- * is owned by stores.sunday_auto_stage_time + timezone. Protected by CRON_SECRET.
+ * Vercel Cron — Sunday 11:00 UTC (Hobby: once per day). Per-store auto-stage
+ * still honors stores.sunday_auto_stage_time + timezone. Protected by CRON_SECRET.
  */
 export async function GET(request: Request) {
   try {

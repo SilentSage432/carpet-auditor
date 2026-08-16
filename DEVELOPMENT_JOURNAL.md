@@ -1,5 +1,13 @@
 # DeptSync Hub — Development Journal
 
+## 2026-08-16 — Hobby cron blocked Vercel deploys
+
+### Found
+- Git pushes still reached Vercel. `*/15 * * * *` in `vercel.json` exceeds Hobby’s once-per-day cron limit, so deploys failed with [cron usage/pricing](https://vercel.com/docs/cron-jobs/usage-and-pricing) and production stayed on `4fb0293`.
+
+### Shipped
+- Restored Sunday once-daily `0 11 * * 0` (11:00 UTC ≈ 05:00 America/Denver). Store auto-generate / local time / skip-if-staged still apply. Sub-daily polling needs Pro.
+
 ## 2026-08-16 — Sunday rotation schedule is store-configurable
 
 ### Found
@@ -8,7 +16,7 @@
 
 ### Shipped
 - **Store clock.** `stores.sunday_auto_generate` (default on), `sunday_auto_stage_time` (default 05:00), `timezone` (default America/Denver). Knowledge: `lib/store-ops/sunday-schedule.ts`. UI: Settings `SundayScheduleCard`. API: `GET|PATCH /api/stores/settings`. Apply `20260816_sunday_rotation_schedule.sql`.
-- **Dispatch.** Cron polls every 15 minutes. Per store: skip if auto-run off, not Sunday local, or before stage time. Skip if `weekly_rotations` already exist for the staging week. Sunday stages the upcoming Monday ISO week so Floor/checklist align after 05:00.
+- **Dispatch.** Vercel Cron Sunday 11:00 UTC. Per store: skip if auto-run off, not Sunday local, or before stage time. Skip if `weekly_rotations` already exist for the staging week. Sunday stages the upcoming Monday ISO week so Floor/checklist align after 05:00.
 - **Manual override.** Staging card shows on Sunday even with 0 bays. Master Recalculate / Force Draw send `force: true` and replace incomplete rows (completed bays stay). Specialist re-assignment stays unrestricted in the drawer.
 
 ## 2026-08-16 — Header store number always visible

@@ -204,7 +204,7 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 
 ## Weekly rotation cron
 - Migration: `supabase/migrations/20260809_weekly_rotation_cron.sql` (`weekly_bay_target`, Lowe's codes) + **`20260816_sunday_rotation_schedule.sql`** (`stores.sunday_auto_generate`, `sunday_auto_stage_time` default 05:00, `timezone` default America/Denver)
-- `vercel.json`: `*/15 * * * *` → `/api/cron/weekly-rotation` (poll). Dispatch is per-store: Sunday in `stores.timezone` at/after `sunday_auto_stage_time`, and only if auto-generate is on
+- `vercel.json`: Sunday `0 11 * * 0` (11:00 UTC ≈ 05:00 AM America/Denver) → `/api/cron/weekly-rotation`. Hobby forbids sub-daily cron (`*/15` fails the deploy). Dispatch still skips unless auto-generate is on, it is Sunday in `stores.timezone`, local time is at/after `sunday_auto_stage_time`, and the week is not already staged
 - On Sunday the runner stages the **upcoming** ISO week (Monday). It **skips** a department that already has `weekly_rotations` for that week — Master Admin Force Draw / Recalculate (`force: true`) replaces incomplete rows only
 - Env on Vercel: `CRON_SECRET` (Bearer token Vercel sends automatically)
 - Settings → Sunday rotation schedule (Master) + weekly bay target matrix (Supervisor + Master; blur autosave + Save All)
