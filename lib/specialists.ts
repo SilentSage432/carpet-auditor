@@ -9,7 +9,11 @@ import type {
   SpecialistRole,
   StoreSpecialist,
 } from "./types";
-import { departmentMeta, associateFloorTitleLabel } from "./types";
+import {
+  associateFloorTitleLabel,
+  departmentMeta,
+  parseDepartmentScope,
+} from "./types";
 import { getStoreNumber, normalizeStoreNumber } from "./store";
 import { getSupabase } from "./supabase";
 import { normalizePhoneE164 } from "./phone";
@@ -23,7 +27,7 @@ const ACTIVE_KEY = "carpet_active_specialist";
 const TABLE = "store_specialists";
 const rosterCache = createTtlCache<StoreSpecialist[]>(45_000);
 
-function invalidateRosterCache() {
+export function invalidateRosterCache() {
   rosterCache.invalidate();
 }
 
@@ -42,6 +46,8 @@ const SPECIALIST_LIST_SELECT = [
   "is_active",
   "status",
   "pin_updated_at",
+  "email",
+  "auth_user_id",
   "created_at",
 ].join(", ");
 
@@ -79,9 +85,9 @@ function normalizeOnboardingStatus(
   mustChangePin: boolean
 ): AssociateOnboardingStatus {
   const raw = String(row.status ?? "").trim().toLowerCase();
-  if (raw === "invited" || raw === "active" || raw === "suspended") {
-    return raw;
-  }
+  if (raw === "invited" || raw === "pending") return "invited";
+  if (raw === "active") return "active";
+  if (raw === "suspended") return "suspended";
   if (raw === "inactive") return "suspended";
   if (!isActive) return "suspended";
   if (mustChangePin) return "invited";
@@ -126,43 +132,8 @@ function normalizeRole(raw: unknown): SpecialistRole {
 }
 
 function normalizeDepartment(raw: unknown, role: SpecialistRole): DepartmentScope | null {
-  const value = String(raw ?? "")
-    .toLowerCase()
-    .trim()
-    .replace(/[\s-]+/g, "_");
-  if (
-    value === "lawn_and_garden" ||
-    value === "lawn" ||
-    value === "garden" ||
-    value === "outdoor"
-  ) {
-    return "lawn_garden";
-  }
-  if (value === "bldg_materials" || value === "lumber" || value === "building") {
-    return "building_materials";
-  }
-  if (value === "appliance") return "appliances";
-  if (value === "carpet") return "flooring";
-  if (value === "*") return "all";
-  if (
-    value === "flooring" ||
-    value === "appliances" ||
-    value === "plumbing" ||
-    value === "electrical" ||
-    value === "lawn_garden" ||
-    value === "inside_garden" ||
-    value === "outside_garden" ||
-    value === "paint" ||
-    value === "millwork" ||
-    value === "cabinets" ||
-    value === "building_materials" ||
-    value === "hardware" ||
-    value === "tools" ||
-    value === "all"
-  ) {
-    return value;
-  }
-  if (value === "d29" || value === "cabinet") return "cabinets";
+  const parsed = parseDepartmentScope(raw);
+  if (parsed) return parsed;
   if (role === "MasterAdmin") return "all";
   return null;
 }
@@ -180,7 +151,9 @@ export function mapRow(row: Record<string, unknown>): StoreSpecialist {
       ? null
       : String(usernameRaw).trim();
 
-  let assigned = normalizeDepartment(row.assigned_department, role);
+  let assigned =
+    normalizeDepartment(row.home_department, role) ??
+    normalizeDepartment(row.assigned_department, role);
   if (!assigned && role === "Supervisor") {
     const hint = `${row.name ?? ""} ${username ?? ""}`;
     if (/appliance/i.test(hint) || /amber/i.test(hint)) {
@@ -244,6 +217,16 @@ export function mapRow(row: Record<string, unknown>): StoreSpecialist {
       row.pin_updated_at == null || String(row.pin_updated_at).trim() === ""
         ? null
         : String(row.pin_updated_at),
+    auth_user_id: (() => {
+      const id = String(
+        row.auth_user_id ?? row.user_id ?? row.auth_id ?? ""
+      ).trim();
+      return id || null;
+    })(),
+    email: (() => {
+      const value = String(row.email ?? "").trim();
+      return value || null;
+    })(),
     created_at: String(row.created_at ?? new Date().toISOString()),
     accessible_departments: composeAccessibleDepartments(
       assigned,
@@ -714,7 +697,9 @@ async function loadSpecialists(store: string): Promise<StoreSpecialist[]> {
       error &&
       (isMissingColumnError(error, "accessible_departments") ||
         isMissingColumnError(error, "status") ||
-        isMissingColumnError(error, "pin_updated_at"))
+        isMissingColumnError(error, "pin_updated_at") ||
+        isMissingColumnError(error, "email") ||
+        isMissingColumnError(error, "auth_user_id"))
     ) {
       const retry = await supabase
         .from(TABLE)

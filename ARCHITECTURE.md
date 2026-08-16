@@ -88,6 +88,8 @@ lib/auth-token.ts                 → SHA-256 one-time tokens, PIN hash, verify-
 lib/invite.ts                     → SMS copy for invite/reset links
 lib/onboarding/roster-invite.ts   → Issue invite: persist hashes, status=invited, dispatch SMS
 lib/onboarding/create-roster-member.ts → Roster-only insert (status=active, no tokens) or compose invite
+lib/onboarding/claim-roster-auth.ts → Link auth.users.id onto existing store_specialists (no duplicate cards)
+lib/store-ops/roster-groups.ts → Dynamic home-department accordion groups + on-duty counts
 lib/onboarding/pin-reset.ts       → Self-service PIN reset token + SMS
 lib/onboarding/load-invite.ts     → Public token lookup by SHA-256 hash
 lib/onboarding/redeem-token.ts    → Consume token, hash PIN, mint Hub-bridge session
@@ -206,7 +208,7 @@ supabase/migrations/20260812_sunday_bay_assignments.sql → sunday specialist↔
 | Manager notes / Executive Floor Pad | `lib/store-ops/ai-note-extract.ts`, `manager-notes.ts`, `app/actions/manager-notes.ts`, `components/manager-notes/*` (opened from Floor `TacticalVoiceFloorPad`; `ai-note-summary` retired 410) |
 | Floor-walk Copilot / shift dispatch | `lib/store-ops/ai-walk-parse.ts` + `POST /api/copilot/parse-walk` + `lib/store-ops/shift-tasks.ts` (`TacticalVoiceFloorPad`) |
 | Bay freshness overlay | `lib/heatmap/bay-tracker.ts` + `BayFreshnessGrid` (composes last_serviced_at / last_completed_at / walk touches; not velocity or bay-health) |
-| Team roster (Master Admin) | `RosterTab` + `AssociateScheduleModal` + `lib/specialists.ts`; weekly matrix via `shift-status.ts` (`canManageShiftBoard`) |
+| Team roster (Master Admin) | `RosterTab` + `AssociateScheduleModal` + `lib/specialists.ts`; weekly matrix via `shift-status.ts` (`canManageShiftBoard`); grouping via `roster-groups.ts` |
 | Cross-department grants | `lib/department-access.ts` + `POST /api/admin/department-access` + Roster chips |
 | Working department pin | `lib/admin-department-context.ts` (Master full-store; multi-dept clamped to grants) |
 | Personal theme / density / contrast / sound / haptics | `lib/theme.ts` + `lib/ui/preferences-context.tsx` + `UserPreferencesDrawer` (all roles) |
@@ -228,7 +230,7 @@ supabase/migrations/20260812_sunday_bay_assignments.sql → sunday specialist↔
 | Focus / keyboard dismiss | `lib/focus-input.ts` (`blurActiveInput` — never auto-focus on tab switch) |
 | SIMS location stock | `lib/sims.ts`, `SimsLocationFinder` |
 | Specialists session / credentials | `lib/specialists.ts`, `SpecialistModal` |
-| Roster SMS/link invite + PIN setup | `lib/auth-token.ts` + `lib/onboarding/*` + `/auth/verify/[token]` (hashed token consume-on-entry; `pin_hash`; status invited→active). Roster add-member is roster-only unless “Send Mobile App Invite”. |
+| Roster SMS/link invite + PIN setup | `lib/auth-token.ts` + `lib/onboarding/*` + `/auth/verify/[token]` (hashed token consume-on-entry; `pin_hash`; status invited→active). Roster add-member is roster-only unless “Send Mobile App Invite”. Signup claims `store_specialists.auth_user_id` (`claim-roster-auth.ts` + `20260815_roster_auth_link.sql`). |
 | Zero-access auth wall / idle lock | `lib/auth-session.ts`, `components/auth/AuthWall.tsx`, `components/auth/AccessGate.tsx` (`/login`) |
 | Edge auth + stealth gate | `lib/auth-gate.ts` + `proxy.ts` + `POST /api/auth/gate` (HttpOnly cookie) |
 | Enterprise ingest contracts | `src/types/enterpriseIntegration.ts` (Zod schemas). Transport: `lib/enterprise-integration/ingest.ts`. Stubs: `POST /api/v1/topology/ingest`, `POST /api/v1/freight/stage`. Does not write Store Ops tables or change hub UI. |

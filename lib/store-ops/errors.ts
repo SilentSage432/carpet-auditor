@@ -60,6 +60,23 @@ export function isUniqueViolationError(error: unknown): boolean {
   );
 }
 
+export function isNotNullViolationError(
+  error: unknown,
+  column?: string
+): boolean {
+  const record = error as { code?: unknown; message?: unknown } | null;
+  const code = String(record?.code ?? "");
+  const msg = readableError(error, "").toLowerCase();
+  const isNn =
+    code === "23502" ||
+    msg.includes("not-null") ||
+    msg.includes("null value in column") ||
+    msg.includes("violates not-null");
+  if (!isNn) return false;
+  if (!column) return true;
+  return msg.includes(column.toLowerCase());
+}
+
 export function isMissingColumnError(
   error: unknown,
   column: string

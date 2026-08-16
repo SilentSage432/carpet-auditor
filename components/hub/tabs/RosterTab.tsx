@@ -11,8 +11,8 @@ import { DepartmentAccessChips } from "@/components/hub/DepartmentAccessChips";
 import { DepartmentPicker } from "@/components/hub/DepartmentPicker";
 import { DepartmentIcon, HubIcon } from "@/components/hub/NavIcons";
 import { TextField } from "@/components/ui/NumberField";
-import { adminWorkingDepartmentLabel } from "@/lib/admin-department-context";
 import { redistributeCallOutBays } from "@/lib/store-ops/call-out";
+import { composeRosterDepartmentGroups } from "@/lib/store-ops/roster-groups";
 import {
   accessibleDepartments,
   composeAccessibleDepartments,
@@ -30,8 +30,11 @@ import {
   dedupeRoster,
   deleteSpecialist,
   fetchSpecialists,
+  invalidateRosterCache,
+  mapRow,
 } from "@/lib/specialists";
 import { updateDepartmentAccess, inviteSupervisor, createRosterMember } from "@/lib/store-ops/client";
+import type { InviteSupervisorResult } from "@/lib/store-ops/client";
 import {
   composeShiftBoard,
   fetchShiftDaysRange,
@@ -51,6 +54,8 @@ import { toastError, toastSuccess, toastInfo } from "@/lib/toast";
 import {
   associateFloorTitle,
   departmentMeta,
+  departmentRosterHeading,
+  specialistHomeDepartment,
   type DepartmentScope,
   type OperationalDepartment,
   type SpecialistRole,
@@ -66,31 +71,33 @@ function rosterRoleLabel(member: StoreSpecialist): string {
 }
 
 function homeDepartment(member: StoreSpecialist): DepartmentScope {
-  const dept = member.assigned_department;
-  if (dept && dept !== "all") return dept;
-  return member.role === "MasterAdmin" ? "all" : "flooring";
+  return specialistHomeDepartment(member);
 }
 
-function departmentHeading(home: DepartmentScope): string {
-  if (home === "all") return "Full Store";
-  if (
-    home === "flooring" ||
-    home === "appliances" ||
-    home === "cabinets" ||
-    home === "millwork" ||
-    home === "paint"
-  ) {
-    return adminWorkingDepartmentLabel(home);
+function memberFromCreateResult(
+  result: InviteSupervisorResult,
+  storeNumber: string
+): StoreSpecialist | null {
+  if (result.specialist && typeof result.specialist === "object") {
+    return mapRow({
+      ...result.specialist,
+      store_number: result.specialist.store_number ?? storeNumber,
+    });
   }
-  return departmentMeta(home).label;
+  if (!result.specialist_id) return null;
+  return mapRow({
+    id: result.specialist_id,
+    store_number: storeNumber,
+    name: result.name,
+    role: "Associate",
+    username: result.username,
+    assigned_department: result.department,
+    phone_number: result.phone,
+    is_active: true,
+    status: result.status ?? "active",
+    created_at: new Date().toISOString(),
+  });
 }
-
-type DeptGroup = {
-  home: DepartmentScope;
-  heading: string;
-  members: StoreSpecialist[];
-  onDuty: number;
-};
 
 export function RosterTab({ specialist, storeNumber }: WorkflowTabProps) {
   const [roster, setRoster] = useState<StoreSpecialist[]>([]);
@@ -163,7 +170,7 @@ export function RosterTab({ specialist, storeNumber }: WorkflowTabProps) {
     [board]
   );
 
-  const groups = useMemo((): DeptGroup[] => {
+  const groups = useMemo(() => {
     const granted = new Set<DepartmentScope>(accessibleDepartments(specialist));
     const active = roster.filter((m) => {
       if (m.is_active === false) return false;
@@ -171,49 +178,10 @@ export function RosterTab({ specialist, storeNumber }: WorkflowTabProps) {
       const home = homeDepartment(m);
       return home !== "all" && granted.has(home);
     });
-    const buckets = new Map<DepartmentScope, StoreSpecialist[]>();
-    for (const member of active) {
-      const home = homeDepartment(member);
-      const list = buckets.get(home) ?? [];
-      list.push(member);
-      buckets.set(home, list);
-    }
-    const order: DepartmentScope[] = [
-      "flooring",
-      "cabinets",
-      "appliances",
-      "millwork",
-      "paint",
-      "plumbing",
-      "electrical",
-      "tools",
-      "building_materials",
-      "inside_garden",
-      "outside_garden",
-      "lawn_garden",
-      "hardware",
-      "all",
-    ];
-    return order
-      .filter((home) => buckets.has(home))
-      .map((home) => {
-        const members = (buckets.get(home) ?? []).sort((a, b) => {
-          const rank = (m: StoreSpecialist) =>
-            m.role === "MasterAdmin" ? 0 : m.role === "Supervisor" ? 1 : 2;
-          const d = rank(a) - rank(b);
-          if (d !== 0) return d;
-          return a.name.localeCompare(b.name);
-        });
-        return {
-          home,
-          heading: departmentHeading(home),
-          members,
-          onDuty: members.filter((m) => {
-            const day = dayById.get(String(m.id));
-            return day?.status === "ON_DUTY";
-          }).length,
-        };
-      });
+    return composeRosterDepartmentGroups(active, (m) => {
+      const day = dayById.get(String(m.id));
+      return day?.status === "ON_DUTY";
+    });
   }, [roster, dayById, specialist]);
 
   async function handleAccess(
@@ -638,7 +606,15 @@ export function RosterTab({ specialist, storeNumber }: WorkflowTabProps) {
           specialist={specialist}
           storeNumber={storeNumber}
           onClose={() => setAddOpen(false)}
-          onCreated={async () => {
+          onCreated={async (created) => {
+            if (created) {
+              setRoster((curr) => dedupeRoster([created, ...curr]));
+              setOpenDepts((prev) => ({
+                ...prev,
+                [homeDepartment(created)]: true,
+              }));
+            }
+            invalidateRosterCache();
             await reload();
           }}
         />
@@ -659,7 +635,7 @@ export function RosterTab({ specialist, storeNumber }: WorkflowTabProps) {
       {scheduleTarget ? (
         <AssociateScheduleModal
           member={scheduleTarget}
-          homeLabel={departmentHeading(homeDepartment(scheduleTarget))}
+          homeLabel={departmentRosterHeading(homeDepartment(scheduleTarget))}
           onClose={() => setScheduleTarget(null)}
           onSaved={() => void reload()}
         />
@@ -788,7 +764,7 @@ function AddTeamMemberSheet({
   specialist: StoreSpecialist;
   storeNumber: string;
   onClose: () => void;
-  onCreated: () => Promise<void>;
+  onCreated: (created: StoreSpecialist | null) => Promise<void>;
 }) {
   const [name, setName] = useState("");
   const [displayRole, setDisplayRole] = useState<
@@ -863,14 +839,14 @@ function AddTeamMemberSheet({
         if (result.sms && result.sms.ok !== true) {
           toastInfo(result.sms.reason);
         }
+        await onCreated(memberFromCreateResult(result, storeNumber));
       } else {
         const result = await createRosterMember(specialist, payload);
         toastSuccess(`${result.name} added to the roster`);
-        await onCreated();
+        await onCreated(memberFromCreateResult(result, storeNumber));
         onClose();
         return;
       }
-      await onCreated();
     } catch (err) {
       const message =
         err instanceof Error ? err.message : "Could not add team member";

@@ -1,13 +1,15 @@
 /**
- * Optional-column specialist patch persist — used by invite, PIN reset, and redeem.
- * Does not own token crypto or SMS.
+ * Optional-column specialist patch persist — used by invite, PIN reset, redeem, and roster create.
+ * Does not own token crypto or SMS. Auth identity columns are omitted when empty so
+ * roster-only inserts do not require an existing auth.users row.
  */
 
 import "server-only";
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { isMissingColumnError } from "@/lib/store-ops/errors";
+import { isMissingColumnError, isNotNullViolationError } from "@/lib/store-ops/errors";
 
+/** Columns that may be absent on older live schemas — dropped and retried. */
 export const OPTIONAL_SPECIALIST_COLUMNS = [
   "accessible_departments",
   "status",
@@ -15,12 +17,35 @@ export const OPTIONAL_SPECIALIST_COLUMNS = [
   "auth_token_expires_at",
   "pin_hash",
   "pin_updated_at",
+  "invite_token",
   "invite_token_hash",
+  "invite_token_expires_at",
   "invite_consumed_at",
   "must_change_pin",
+  "must_change_credentials",
   "temp_pin_hash",
   "phone_number",
+  "email",
+  "home_department",
+  "auth_user_id",
+  "user_id",
+  "auth_id",
 ] as const;
+
+const AUTH_IDENTITY_COLUMNS = ["auth_user_id", "user_id", "auth_id"] as const;
+
+function stripEmptyAuthIdentity(
+  patch: Record<string, unknown>
+): Record<string, unknown> {
+  const next: Record<string, unknown> = { ...patch };
+  for (const col of AUTH_IDENTITY_COLUMNS) {
+    const value = next[col];
+    if (value == null || String(value).trim() === "") {
+      delete next[col];
+    }
+  }
+  return next;
+}
 
 export async function persistSpecialistPatch(
   supabase: SupabaseClient,
@@ -28,8 +53,9 @@ export async function persistSpecialistPatch(
   patch: Record<string, unknown>,
   filter?: { id: string; storeNumber?: string }
 ): Promise<{ data: Record<string, unknown> | null; error: unknown }> {
-  let next: Record<string, unknown> = { ...patch };
-  for (let attempt = 0; attempt < OPTIONAL_SPECIALIST_COLUMNS.length + 1; attempt += 1) {
+  let next: Record<string, unknown> = stripEmptyAuthIdentity(patch);
+  const maxAttempts = OPTIONAL_SPECIALIST_COLUMNS.length + AUTH_IDENTITY_COLUMNS.length + 2;
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
     const result =
       mode === "update" && filter
         ? await (filter.storeNumber
@@ -60,11 +86,30 @@ export async function persistSpecialistPatch(
         isMissingColumnError(error, col) &&
         Object.prototype.hasOwnProperty.call(next, col)
     );
-    if (!missing) {
-      return { data: null, error };
+    if (missing) {
+      const { [missing]: _dropped, ...rest } = next;
+      next = rest;
+      continue;
     }
-    const { [missing]: _dropped, ...rest } = next;
-    next = rest;
+    const authCol = AUTH_IDENTITY_COLUMNS.find(
+      (col) =>
+        isNotNullViolationError(error, col) &&
+        Object.prototype.hasOwnProperty.call(next, col)
+    );
+    if (authCol) {
+      const { [authCol]: _dropped, ...rest } = next;
+      next = rest;
+      continue;
+    }
+    if (AUTH_IDENTITY_COLUMNS.some((col) => isNotNullViolationError(error, col))) {
+      return {
+        data: null,
+        error: new Error(
+          "Schema missing or out of date: apply supabase/migrations/20260815_roster_auth_link.sql so roster members can be saved without an Auth account."
+        ),
+      };
+    }
+    return { data: null, error };
   }
   return { data: null, error: new Error("Could not persist specialist patch") };
 }

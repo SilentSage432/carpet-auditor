@@ -23,7 +23,7 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 - **Daily shift board / call-out:** Roster groups by home department; department accordions start **collapsed**. `lib/store-ops/shift-status.ts` owns Sun–Sat clocks + `ABSENT_CALLOUT` (`associate_shift_days` + localStorage fallback). Cards show S–S dots, today's pill, and Edit Schedule → `AssociateScheduleModal` (presets Open/Mid/Close, per-day times). Call-out dialog composes `lib/store-ops/call-out.ts` → Sunday pool / proportional redistribute / carry-over loop. Apply `20260815_associate_shift_days.sql` + `20260815_carry_over_priority.sql`. Supervisors + Master toggle duty; Master-only add/delete team.
 - **Predictive Shift Copilot:** Floor banner under Shift Briefing (`PredictiveCopilotBanner`). Local patterns from `bay_service_logs` / Sunday assignments / downstock / locations — not Gemini. 1-tap Stage to Shift (`POST /api/rotations/assign`, Supervisor+) or Add to Downstock.
 - **Tactical Voice Hub:** Floor dock `TacticalVoiceFloorPad` (Master/DS). Web Speech + scratchpad → `POST /api/copilot/parse-walk` → dispatch via `lib/store-ops/shift-tasks.ts`. Bay freshness chip `BayFreshnessGrid` composes `lib/heatmap/bay-tracker.ts` (Fresh 0–2d / Warm 3–4d / Stale 5+d). Apply `20260815_shift_walk_tasks.sql`.
-- **Roster invite:** apply `20260815_unified_auth_token.sql` + `20260815_roster_app_access.sql`. Add Team Member is roster-only by default (name/role/dept; phone optional). Check **Send Mobile App Invite** to SMS `/auth/verify/[token]`. Cards show Roster Only / Invited / Active. Forgot PIN sends a 30-minute SMS link.
+- **Roster invite:** apply `20260815_unified_auth_token.sql` + `20260815_roster_app_access.sql` + `20260815_roster_auth_link.sql`. Add Team Member is roster-only by default (name/role/home department; no Auth user required). Check **Send Mobile App Invite** to SMS `/auth/verify/[token]`. Signup/invite claims the existing card (`store_specialists.auth_user_id`) instead of duplicating. Cards show Roster Only / Invited / Active. Forgot PIN sends a 30-minute SMS link.
 
 ## AI (`lib/ai/gemini.ts`)
 - Server-only Gemini Flash client (`@google/generative-ai` + `server-only`)
@@ -56,7 +56,7 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 - 3-tap stays wired to the **real** Master (`sandboxActor`) while previewing CSA
 
 ### Master Admin roster console
-- Canonical team UI is the **Roster** tab (`/roster`, `RosterTab`) — department accordions start collapsed (home `assigned_department`, roster count, on-duty today), weekly S–S dots + today's shift pill, `AssociateScheduleModal`, call-out toggle, name/role, and `accessible_departments` chips with optimistic save + Sonner toast
+- Canonical team UI is the **Roster** tab (`/roster`, `RosterTab`) — dynamic collapsible accordions for every home department with members (`D23 · Flooring`, `D35 · Appliances`, `D28 · Inside Garden`, …) plus `{count} roster · {onDutyCount} on-duty`, weekly S–S dots + today's shift pill, `AssociateScheduleModal`, call-out toggle, name/role, and `accessible_departments` chips with optimistic save + Sonner toast. Add Team Member invalidates the 45s roster cache and paints the new card immediately.
 - `/admin/supervisors` and `/admin/roles` redirect to `/roster`
 - Invite/reset lives on `/auth/verify/[token]`; Roster add-member is roster-only unless Send Mobile App Invite; dead `AdminRosterManager` was removed
 - Lightweight **Associate Roster** (`AssociateRosterPanel`) remains on the Sunday assignment drawer
@@ -233,7 +233,7 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 - Remnant forms live in Settings; `/department` redirects to Floor
 
 ## Supervisor Invite & Onboarding
-- Apply `20260810_supervisor_invite.sql`, `20260815_roster_invite_onboarding.sql`, **`20260815_unified_auth_token.sql`**, then **`20260815_roster_app_access.sql`** (backfill `pin_updated_at` so existing PINs show as app-Active)
+- Apply `20260810_supervisor_invite.sql`, `20260815_roster_invite_onboarding.sql`, **`20260815_unified_auth_token.sql`**, then **`20260815_roster_app_access.sql`** (backfill `pin_updated_at` so existing PINs show as app-Active), then **`20260815_roster_auth_link.sql`** (nullable `auth_user_id` / email claim so roster-only inserts and signup linking do not duplicate cards)
 - Master Admin: Roster → **Add Team Member** → Name, Role, Initial Department, optional Phone. **Send Mobile App Invite** is off by default (roster-only, `status=active`, no tokens). Checking it requires phone and SMS `/auth/verify/[token]`. Cards: Roster Only / Invited / Active. Roster-only rows have **Send App Invite**.
 - Self-service reset: AuthWall phone → `POST /api/auth/pin-reset/request` → same verify route (30m TTL)
 - Redemption consumes the token on GET (HttpOnly setup cookie), then hashes a 4–6 digit PIN and mints Hub-bridge Auth

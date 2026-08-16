@@ -3,6 +3,7 @@
  */
 
 import type { StoreSpecialist } from "@/lib/types";
+import { invalidateRosterCache } from "@/lib/specialists";
 import { getStoreNumber, normalizeStoreNumber } from "@/lib/store";
 import { actorFromSpecialist, storeOpsAuthHeadersAsync } from "./auth";
 import {
@@ -1029,6 +1030,7 @@ export type InviteSupervisorResult = {
   temporary_pin?: string;
   phone: string | null;
   status?: "invited" | "active";
+  specialist?: Record<string, unknown>;
   sms?:
     | { ok: true; sid: string }
     | { ok: false; skipped: true; reason: string }
@@ -1050,7 +1052,7 @@ export async function inviteSupervisor(
     test_mode?: boolean;
   }
 ): Promise<InviteSupervisorResult> {
-  return storeOpsFetch<InviteSupervisorResult>(
+  const result = await storeOpsFetch<InviteSupervisorResult>(
     "/api/admin/invite-supervisor",
     specialist,
     {
@@ -1059,6 +1061,8 @@ export async function inviteSupervisor(
       body: JSON.stringify(input),
     }
   );
+  invalidateRosterCache();
+  return result;
 }
 
 /** Add a roster member for scheduling without sending an app invite. */

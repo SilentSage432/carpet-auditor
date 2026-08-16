@@ -130,4 +130,15 @@ export async function linkAuthUserToSpecialistProfile(
   if (metaError) {
     throw new Error(metaError.message || "Could not update JWT app_metadata");
   }
+
+  const { claimRosterMemberForAuthUser } = await import(
+    "@/lib/onboarding/claim-roster-auth"
+  );
+  await claimRosterMemberForAuthUser({
+    supabase: admin,
+    authUserId: input.authUserId,
+    email: input.email ?? input.specialist.email ?? null,
+    specialistId: String(input.specialist.id),
+    phone: input.specialist.phone_number ?? null,
+  });
 }

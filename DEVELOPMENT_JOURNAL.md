@@ -1,5 +1,13 @@
 # DeptSync Hub — Development Journal
 
+## 2026-08-15 — Roster create, dynamic departments, auth claim
+
+### Shipped
+- **Nullable Auth link.** `store_specialists.auth_user_id` / `email` are optional. Live `user_id` / `auth_id` aliases drop NOT NULL so Add Team Member can insert name, role, home department, and today's on-duty shift without an `auth.users` row. Apply `20260815_roster_auth_link.sql`.
+- **Insert resilience.** `persistSpecialistPatch` omits empty auth identity columns, retries missing optional columns (including `invite_token`, `email`, `home_department`), and surfaces a migration hint on auth NOT NULL failures. Create invalidates the 45s roster SWR cache; Roster paints the new card immediately then re-fetches.
+- **Dynamic grouping.** `composeRosterDepartmentGroups` emits a collapsed accordion for every home department that has members. Headings use Lowe's codes (`D23 · Flooring`, `D28 · Inside Garden`). `parseDepartmentScope` maps D23/D28I/… so associates no longer collapse into Flooring.
+- **Auth claiming.** Signup / invite / Hub-bridge stamps `auth_user_id` on the matching roster row (email, invite token, specialist id, or phone) and promotes invited/pending → active. Never inserts a second roster card. `handle_new_user` composes the same claim.
+
 ## 2026-08-15 — Roster-only members vs app invite
 
 ### Shipped

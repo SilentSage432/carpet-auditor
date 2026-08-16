@@ -130,10 +130,11 @@
 - [x] Roster SMS/link invite onboarding — no manual PIN; hashed one-time `/auth/verify/[token]`; hashed 4–6 digit `pin_hash`; `status` invited→active (`20260815_unified_auth_token.sql`)
 - [x] Self-service PIN reset via SMS one-time token (`POST /api/auth/pin-reset/request`, consume-on-entry)
 - [x] Roster-only add-member (no SMS/token) vs optional Send Mobile App Invite; app-access badges + on-demand invite (`20260815_roster_app_access.sql`)
+- [x] Roster create without Auth (`auth_user_id` nullable), dynamic home-department accordions, and signup claim (`20260815_roster_auth_link.sql`)
 
 ## Next
 - [x] Apply Phase 1 JWT/RLS migration in Supabase + enable Custom Access Token Hook
-- [ ] Apply Phase 2 migrations (`20260812_manager_notes.sql`, `20260812_sunday_bay_assignments.sql`, `20260812_manager_notes_archive.sql`, `20260812_fix_manager_notes_rls.sql`, **`20260812_manager_notes_metadata.sql`**, **`enable_rls_flagged_tables.sql`**, **`20260813_p0_query_indexes.sql`**, **`20260814_downstock_queue.sql`**, **`20260814_cabinets_d29.sql`**, **`20260814_bay_velocity_heatmap.sql`**, **`20260814_multi_department_access.sql`**, **`20260815_associate_shift_days.sql`**, **`20260815_carry_over_priority.sql`**, **`20260815_custom_decay_days.sql`**, **`20260815_performance_indexes.sql`**, **`20260815_shift_walk_tasks.sql`**, **`20260815_roster_invite_onboarding.sql`**, **`20260815_unified_auth_token.sql`**, **`20260815_roster_app_access.sql`**) + Realtime on notes/assignments tables
+- [ ] Apply Phase 2 migrations (`20260812_manager_notes.sql`, `20260812_sunday_bay_assignments.sql`, `20260812_manager_notes_archive.sql`, `20260812_fix_manager_notes_rls.sql`, **`20260812_manager_notes_metadata.sql`**, **`enable_rls_flagged_tables.sql`**, **`20260813_p0_query_indexes.sql`**, **`20260814_downstock_queue.sql`**, **`20260814_cabinets_d29.sql`**, **`20260814_bay_velocity_heatmap.sql`**, **`20260814_multi_department_access.sql`**, **`20260815_associate_shift_days.sql`**, **`20260815_carry_over_priority.sql`**, **`20260815_custom_decay_days.sql`**, **`20260815_performance_indexes.sql`**, **`20260815_shift_walk_tasks.sql`**, **`20260815_roster_invite_onboarding.sql`**, **`20260815_unified_auth_token.sql`**, **`20260815_roster_app_access.sql`**, **`20260815_roster_auth_link.sql`**) + Realtime on notes/assignments tables
 - [ ] Confirm every Master Admin has `store_number` set so Hub bridge can link `profiles`
 - [ ] Additional Gemini product surfaces beyond current AI ops widgets (Slice 1 transport/auth/compact-then-narrate shipped)
 ## Non-goals

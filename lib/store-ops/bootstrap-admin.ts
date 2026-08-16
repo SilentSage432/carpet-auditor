@@ -150,6 +150,7 @@ async function ensureAuthUserLinked(
         name: HUB_MASTER_NAME,
         hub_bridge: true,
         bootstrap: true,
+        specialist_id: String(specialist.id),
       },
       app_metadata: {
         specialist_id: String(specialist.id),
@@ -185,6 +186,7 @@ async function ensureAuthUserLinked(
         name: HUB_MASTER_NAME,
         hub_bridge: true,
         bootstrap: true,
+        specialist_id: String(specialist.id),
       },
       app_metadata: {
         specialist_id: String(specialist.id),
@@ -209,6 +211,7 @@ async function ensureAuthUserLinked(
       name: HUB_MASTER_NAME,
       hub_bridge: true,
       bootstrap: true,
+      specialist_id: String(specialist.id),
     },
     app_metadata: {
       specialist_id: String(specialist.id),

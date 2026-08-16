@@ -216,6 +216,95 @@ export function isDepartmentScope(raw: unknown): raw is DepartmentScope {
   );
 }
 
+/** Lowe's department numbers used in roster accordion headings. */
+export const DEPARTMENT_LOWE_CODE: Record<DepartmentScope, string | null> = {
+  flooring: "D23",
+  appliances: "D35",
+  plumbing: "D26",
+  electrical: "D24",
+  lawn_garden: "D28",
+  inside_garden: "D28",
+  outside_garden: "D28O",
+  paint: "D24P",
+  millwork: "D30",
+  cabinets: "D29",
+  building_materials: "D21",
+  hardware: "D25",
+  tools: "D25",
+  all: null,
+};
+
+const DEPARTMENT_ALIASES: Record<string, DepartmentScope> = {
+  d23: "flooring",
+  carpet: "flooring",
+  flooring: "flooring",
+  d35: "appliances",
+  appliance: "appliances",
+  appliances: "appliances",
+  d26: "plumbing",
+  plumbing: "plumbing",
+  d24: "electrical",
+  d24e: "electrical",
+  electrical: "electrical",
+  lawn_and_garden: "lawn_garden",
+  lawn: "lawn_garden",
+  garden: "lawn_garden",
+  outdoor: "lawn_garden",
+  lawn_garden: "lawn_garden",
+  d28: "inside_garden",
+  d28i: "inside_garden",
+  inside_garden: "inside_garden",
+  insidegarden: "inside_garden",
+  d28o: "outside_garden",
+  outside_garden: "outside_garden",
+  d24p: "paint",
+  paint: "paint",
+  d30: "millwork",
+  millwork: "millwork",
+  d29: "cabinets",
+  cabinet: "cabinets",
+  cabinets: "cabinets",
+  bldg_materials: "building_materials",
+  lumber: "building_materials",
+  building: "building_materials",
+  building_materials: "building_materials",
+  d21: "building_materials",
+  hardware: "hardware",
+  d25: "tools",
+  tools: "tools",
+  "*": "all",
+  all: "all",
+  full_store: "all",
+};
+
+/** Map hub scopes, Lowe's codes (D23, D28I), and display names to DepartmentScope. */
+export function parseDepartmentScope(raw: unknown): DepartmentScope | null {
+  const value = String(raw ?? "")
+    .toLowerCase()
+    .trim()
+    .replace(/[\s-]+/g, "_");
+  if (!value) return null;
+  return DEPARTMENT_ALIASES[value] ?? (isDepartmentScope(value) ? value : null);
+}
+
+/** Roster accordion title: `D23 · Flooring`. */
+export function departmentRosterHeading(dept: DepartmentScope): string {
+  if (dept === "all") return "Full Store";
+  const code = DEPARTMENT_LOWE_CODE[dept];
+  const label = DEPARTMENT_META[dept]?.shortLabel ?? dept;
+  return code ? `${code} · ${label}` : label;
+}
+
+/** Home department for roster grouping — assigned_department is canonical. */
+export function specialistHomeDepartment(member: {
+  assigned_department?: DepartmentScope | null;
+  role?: SpecialistRole;
+}): DepartmentScope {
+  const dept = member.assigned_department;
+  if (dept && dept !== "all") return dept;
+  return member.role === "MasterAdmin" ? "all" : "flooring";
+}
+
 export function departmentMeta(id: DepartmentScope | null | undefined): DepartmentMeta {
   if (id && isDepartmentScope(id)) return DEPARTMENT_META[id];
   return DEPARTMENT_META.flooring;
@@ -563,6 +652,10 @@ export type StoreSpecialist = {
   status?: AssociateOnboardingStatus;
   /** Set when a PIN is created or rotated — roster lists use this (not pin_hash) for app-access. */
   pin_updated_at?: string | null;
+  /** Linked auth.users.id after invite/signup claim. Null for roster-only members. */
+  auth_user_id?: string | null;
+  /** Optional contact email used to claim an existing roster row on Auth signup. */
+  email?: string | null;
   /** Soft-delete flag — false means deactivated / removed from active roster. */
   is_active: boolean;
   created_at: string;

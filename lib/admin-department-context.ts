@@ -6,6 +6,7 @@
 
 import {
   DEPARTMENT_META,
+  departmentRosterHeading,
   isDepartmentScope,
   type DepartmentScope,
   type OperationalDepartment,
@@ -39,14 +40,7 @@ export type AdminWorkingDepartment = OperationalDepartment | "all";
 export function adminWorkingDepartmentLabel(
   dept: AdminWorkingDepartment
 ): string {
-  if (dept === "all") return "Full Store";
-  if (dept === "flooring") return "D23 · Flooring";
-  if (dept === "appliances") return "D35 · Appliances";
-  if (dept === "cabinets") return "D29 · Cabinets";
-  if (dept === "millwork") return "D30 · Millwork";
-  if (dept === "paint") return "D24P · Paint";
-  const meta = DEPARTMENT_META[dept];
-  return meta ? `${meta.shortLabel}` : dept;
+  return departmentRosterHeading(dept);
 }
 
 /** Compact header pill — department code only. */

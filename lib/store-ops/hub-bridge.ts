@@ -172,6 +172,7 @@ async function ensureAuthUserForSpecialist(
       username: specialist.username,
       name: specialist.name,
       hub_bridge: true,
+      specialist_id: String(specialist.id),
     },
     app_metadata: {
       specialist_id: String(specialist.id),

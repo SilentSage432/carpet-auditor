@@ -382,6 +382,16 @@ create unique index if not exists store_specialists_invite_token_hash_uidx
   on public.store_specialists (invite_token_hash)
   where invite_token_hash is not null;
 
+alter table public.store_specialists
+  add column if not exists auth_user_id uuid;
+
+alter table public.store_specialists
+  add column if not exists email text;
+
+create unique index if not exists store_specialists_auth_user_id_uidx
+  on public.store_specialists (auth_user_id)
+  where auth_user_id is not null;
+
 
 -- ---------------------------------------------------------------------------
 -- Appliance catalog + floor scans (separate ownership from carpet_*)
