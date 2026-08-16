@@ -19,7 +19,7 @@ import { TextField } from "@/components/ui/NumberField";
 import { redistributeCallOutBays } from "@/lib/store-ops/call-out";
 import { composeRosterDepartmentGroups } from "@/lib/store-ops/roster-groups";
 import {
-  accessibleDepartments,
+  canAccessDepartment,
   composeAccessibleDepartments,
 } from "@/lib/department-access";
 import {
@@ -183,14 +183,13 @@ export function RosterTab({ specialist, storeNumber }: WorkflowTabProps) {
   );
 
   const groups = useMemo(() => {
-    const granted = new Set<DepartmentScope>(accessibleDepartments(specialist));
-    const active = roster.filter((m) => {
+    const visible = roster.filter((m) => {
       if (m.is_active === false) return false;
       if (isMasterAdmin(specialist)) return true;
       const home = homeDepartment(m);
-      return home !== "all" && granted.has(home);
+      return home !== "all" && canAccessDepartment(specialist, home);
     });
-    return composeRosterDepartmentGroups(active, (m) => {
+    return composeRosterDepartmentGroups(visible, (m) => {
       const day = dayById.get(String(m.id));
       return day?.status === "ON_DUTY";
     });

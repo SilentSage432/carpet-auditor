@@ -90,7 +90,7 @@ lib/invite.ts                     → SMS copy for invite/reset links
 lib/onboarding/roster-invite.ts   → Issue invite: persist hashes, status=invited, dispatch SMS
 lib/onboarding/create-roster-member.ts → Roster-only insert (status=active, no tokens) or compose invite; HTTP: POST /api/roster/members
 lib/onboarding/claim-roster-auth.ts → Link auth.users.id onto existing store_specialists (no duplicate cards)
-lib/store-ops/roster-groups.ts → Dynamic home-department accordion groups + on-duty counts
+lib/store-ops/roster-groups.ts → Dynamic home-department accordion groups (`appliances`/`D35`/`D35 · Appliances` → same bucket) + on-duty counts
 lib/onboarding/pin-reset.ts       → Self-service PIN reset token + SMS
 lib/onboarding/load-invite.ts     → Public token lookup by SHA-256 hash
 lib/onboarding/redeem-token.ts    → Consume token, hash PIN, mint Hub-bridge session

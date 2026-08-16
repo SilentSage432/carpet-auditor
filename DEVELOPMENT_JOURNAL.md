@@ -1,5 +1,12 @@
 # DeptSync Hub — Development Journal
 
+## 2026-08-16 — Roster UI no longer drops live store_specialists rows
+
+### Shipped
+- **Store bind.** Accordion fetch keeps rows whose `store_number` is digit-equal to the hub session (`2587` = `02587`). Strict string equality was dropping the live roster after `.in(store_number, aliases)` succeeded.
+- **Department normalize.** `parseDepartmentScope` maps `appliances`, `D35`, `d35`, and `D35 · Appliances` to the same accordion. Grouping prefers `home_department`, then `assigned_department`.
+- **No invite/auth filter.** `fetchSpecialists` still SELECTs by store only — `invite_token` / `auth_user_id` null rows stay in the list. Database UUIDs are never treated as placeholder names, and distinct UUID cards are not collapsed by display name.
+
 ## 2026-08-15 — Unified roster create pipeline
 
 ### Shipped

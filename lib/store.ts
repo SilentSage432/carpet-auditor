@@ -33,6 +33,16 @@ export function sameStoreNumber(a: string | null | undefined, b: string | null |
   return Boolean(left && left === right);
 }
 
+/** True when a roster row belongs to the hub session store (`2587` matches `02587`). */
+export function belongsToStore(
+  memberStore: string | null | undefined,
+  store: string | null | undefined
+): boolean {
+  const target = normalizeStoreNumber(store ?? "");
+  if (!target) return true;
+  return sameStoreNumber(memberStore, target);
+}
+
 /** Values to use in `.in("store_number", …)` so padded JWT claims still match hub session. */
 export function storeNumberQueryValues(store: string): string[] {
   const n = normalizeStoreNumber(store);

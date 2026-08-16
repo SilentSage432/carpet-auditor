@@ -7,8 +7,8 @@
 
 import { toStoreOpsDepartmentCode } from "@/lib/store-ops/department-codes";
 import {
-  isDepartmentScope,
   OPERATIONAL_DEPARTMENTS,
+  parseDepartmentScope,
   type DepartmentScope,
   type OperationalDepartment,
   type StoreSpecialist,
@@ -38,8 +38,8 @@ export function parseAccessibleDepartments(
       .trim()
       .replace(/^"+|"+$/g, "");
     if (!token || token === "all") continue;
-    const scope = isDepartmentScope(token) ? token : token;
-    if (isOperationalDepartment(scope)) seen.add(scope);
+    const scope = parseDepartmentScope(token);
+    if (scope && isOperationalDepartment(scope)) seen.add(scope);
   }
   return OPERATIONAL_DEPARTMENTS.filter((dept) => seen.has(dept));
 }
@@ -88,7 +88,13 @@ export function canAccessDepartment(
   if (!member || !scope) return false;
   if (member.role === "MasterAdmin") return true;
   if (scope === "all") return false;
-  const needle = isOperationalDepartment(scope) ? scope : null;
+  const parsed = parseDepartmentScope(scope);
+  const needle =
+    parsed && isOperationalDepartment(parsed)
+      ? parsed
+      : isOperationalDepartment(scope)
+        ? scope
+        : null;
   if (!needle) return false;
   return accessibleDepartments(member).includes(needle);
 }

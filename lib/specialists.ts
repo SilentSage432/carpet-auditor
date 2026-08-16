@@ -13,7 +13,7 @@ import {
   departmentMeta,
   parseDepartmentScope,
 } from "./types";
-import { getStoreNumber, normalizeStoreNumber, storeNumberQueryValues } from "./store";
+import { getStoreNumber, normalizeStoreNumber, storeNumberQueryValues, belongsToStore } from "./store";
 import { getSupabase } from "./supabase";
 import { normalizePhoneE164 } from "./phone";
 import {
@@ -163,6 +163,8 @@ export function mapRow(row: Record<string, unknown>): StoreSpecialist {
     }
   }
   if (!assigned && role === "MasterAdmin") assigned = "all";
+  const homeDepartment =
+    normalizeDepartment(row.home_department, role) ?? assigned;
 
   const mustChange =
     row.must_change_credentials === true ||
@@ -198,6 +200,7 @@ export function mapRow(row: Record<string, unknown>): StoreSpecialist {
         : String(row.pin_hash).trim(),
     username,
     assigned_department: assigned,
+    home_department: homeDepartment,
     must_change_credentials: Boolean(mustChange),
     must_change_pin: Boolean(
       row.must_change_pin === true ||
@@ -237,6 +240,7 @@ export function mapRow(row: Record<string, unknown>): StoreSpecialist {
 }
 
 function isPlaceholder(member: StoreSpecialist): boolean {
+  if (isDatabaseUuid(member.id) && !isFallbackProfileId(member.id)) return false;
   const name = member.name.toLowerCase().trim();
   if (PLACEHOLDER_NAMES.has(name)) return true;
   if (member.id === "seed-alex" || member.id === "seed-dave") return true;
@@ -275,6 +279,9 @@ function isGenericFlooringSupervisorName(name: string): boolean {
 }
 
 function rosterKey(member: StoreSpecialist): string {
+  if (isDatabaseUuid(member.id) && !isFallbackProfileId(member.id)) {
+    return `id:${member.id.toLowerCase()}`;
+  }
   if (member.role === "MasterAdmin") {
     return `__master__:${member.store_number}`;
   }
@@ -344,7 +351,7 @@ function normalizeStoreRoster(
   roster: StoreSpecialist[],
   store = getStoreNumber()
 ): StoreSpecialist[] {
-  const scoped = roster.filter((m) => m.store_number === store);
+  const scoped = roster.filter((m) => belongsToStore(m.store_number, store));
   return dedupeRoster(
     scoped.filter((m) => !isPlaceholder(m) && !isHardcodedSeedProfile(m))
   );
@@ -413,14 +420,14 @@ function writeAllLocal(records: StoreSpecialist[]): void {
 
 function readLocal(store = getStoreNumber()): StoreSpecialist[] {
   return normalizeStoreRoster(
-    readAllLocal().filter((r) => r.store_number === store),
+    readAllLocal().filter((r) => belongsToStore(r.store_number, store)),
     store
   );
 }
 
 function writeLocal(records: StoreSpecialist[], store = getStoreNumber()): void {
   const others = readAllLocal().filter(
-    (r) => r.store_number !== store && !isHardcodedSeedProfile(r)
+    (r) => !belongsToStore(r.store_number, store) && !isHardcodedSeedProfile(r)
   );
   const scoped = normalizeStoreRoster(records, store);
   writeAllLocal([...others, ...scoped]);
@@ -543,8 +550,8 @@ export function getActiveSpecialist(): StoreSpecialist | null {
       return null;
     }
     const activeStore = getStoreNumber();
-    const memberStore = normalizeStoreNumber(String(member.store_number ?? ""));
-    if (activeStore && memberStore && memberStore !== activeStore) {
+    const memberStore = String(member.store_number ?? "");
+    if (activeStore && memberStore && !belongsToStore(memberStore, activeStore)) {
       return null;
     }
     return member;
@@ -735,8 +742,7 @@ async function loadSpecialists(store: string): Promise<StoreSpecialist[]> {
 
     if (error) throw error;
 
-    // Include roster-only members (auth_user_id IS NULL). Never filter those out.
-
+    // Store filter only (`2587` / `02587`). Do not require invite_token or auth_user_id.
     const remote = (data ?? [])
       .map((row) => {
         const mapped = mapRow({
@@ -773,7 +779,8 @@ async function loadSpecialists(store: string): Promise<StoreSpecialist[]> {
     );
     writeLocal(merged, store);
     return activeSpecialistsOnly(merged);
-  } catch {
+  } catch (err) {
+    console.error("[fetchSpecialists] store_specialists select failed", err);
     return activeSpecialistsOnly(local);
   }
 }
@@ -1337,7 +1344,7 @@ export function syncActiveSpecialistFromRoster(
     roster.find(
       (m) =>
         m.role === "MasterAdmin" &&
-        m.store_number === store &&
+        belongsToStore(m.store_number, store) &&
         !isFallbackProfileId(m.id)
     ) ?? roster.find((m) => m.role === "MasterAdmin" && !isFallbackProfileId(m.id));
 
@@ -1443,7 +1450,7 @@ function deactivateLocal(
   store = getStoreNumber()
 ): StoreSpecialist[] {
   const scoped = readAllLocal().filter(
-    (r) => r.store_number === store && !isHardcodedSeedProfile(r)
+    (r) => belongsToStore(r.store_number, store) && !isHardcodedSeedProfile(r)
   );
 
   // Hardcoded seed / fallback IDs: purge entirely (do not keep as tombstone).
@@ -1451,7 +1458,7 @@ function deactivateLocal(
     const next = scoped.filter((r) => !sameSpecialistIdentity(r, member));
     const normalized = normalizeStoreRoster(next, store);
     const others = readAllLocal().filter(
-      (r) => r.store_number !== store && !isHardcodedSeedProfile(r)
+      (r) => !belongsToStore(r.store_number, store) && !isHardcodedSeedProfile(r)
     );
     writeAllLocal([...others, ...normalized]);
     return normalized;
@@ -1475,7 +1482,7 @@ function deactivateLocal(
   }
   const normalized = normalizeStoreRoster(next, store);
   const others = readAllLocal().filter(
-    (r) => r.store_number !== store && !isHardcodedSeedProfile(r)
+    (r) => !belongsToStore(r.store_number, store) && !isHardcodedSeedProfile(r)
   );
   writeAllLocal([...others, ...normalized]);
   return normalized;

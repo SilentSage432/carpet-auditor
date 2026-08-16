@@ -277,14 +277,40 @@ const DEPARTMENT_ALIASES: Record<string, DepartmentScope> = {
   full_store: "all",
 };
 
-/** Map hub scopes, Lowe's codes (D23, D28I), and display names to DepartmentScope. */
-export function parseDepartmentScope(raw: unknown): DepartmentScope | null {
-  const value = String(raw ?? "")
+function departmentAliasKey(raw: string): string {
+  return raw
     .toLowerCase()
     .trim()
-    .replace(/[\s-]+/g, "_");
+    .replace(/[·•]/g, " ")
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+}
+
+/** Map hub scopes, Lowe's codes (D23, D28I), and display names to DepartmentScope. */
+export function parseDepartmentScope(raw: unknown): DepartmentScope | null {
+  const original = String(raw ?? "").trim();
+  if (!original) return null;
+  const value = departmentAliasKey(original);
   if (!value) return null;
-  return DEPARTMENT_ALIASES[value] ?? (isDepartmentScope(value) ? value : null);
+  if (DEPARTMENT_ALIASES[value]) return DEPARTMENT_ALIASES[value];
+  if (isDepartmentScope(value)) return value;
+
+  const codeMatch = original.toLowerCase().match(/\bd(\d+[a-z]?)\b/);
+  if (codeMatch) {
+    const codeKey = `d${codeMatch[1]}`;
+    if (DEPARTMENT_ALIASES[codeKey]) return DEPARTMENT_ALIASES[codeKey];
+  }
+
+  const tokens = value.split("_").filter(Boolean);
+  for (let i = 0; i < tokens.length; i += 1) {
+    const token = tokens[i];
+    if (DEPARTMENT_ALIASES[token]) return DEPARTMENT_ALIASES[token];
+    if (i + 1 < tokens.length) {
+      const pair = `${token}_${tokens[i + 1]}`;
+      if (DEPARTMENT_ALIASES[pair]) return DEPARTMENT_ALIASES[pair];
+    }
+  }
+  return null;
 }
 
 /** Roster accordion title: `D23 · Flooring`. */
@@ -297,12 +323,18 @@ export function departmentRosterHeading(dept: DepartmentScope): string {
 
 /** Home department for roster grouping — assigned_department is canonical. */
 export function specialistHomeDepartment(member: {
-  assigned_department?: DepartmentScope | null;
+  assigned_department?: DepartmentScope | string | null;
+  home_department?: DepartmentScope | string | null;
   role?: SpecialistRole;
 }): DepartmentScope {
-  const dept = member.assigned_department;
-  if (dept && dept !== "all") return dept;
-  return member.role === "MasterAdmin" ? "all" : "flooring";
+  const fromHome = parseDepartmentScope(member.home_department);
+  if (fromHome && fromHome !== "all") return fromHome;
+  const fromAssigned = parseDepartmentScope(member.assigned_department);
+  if (fromAssigned && fromAssigned !== "all") return fromAssigned;
+  if (fromHome === "all" || fromAssigned === "all" || member.role === "MasterAdmin") {
+    return "all";
+  }
+  return "flooring";
 }
 
 export function departmentMeta(id: DepartmentScope | null | undefined): DepartmentMeta {
@@ -633,6 +665,8 @@ export type StoreSpecialist = {
   username: string | null;
   /** Department workspace this profile may access. */
   assigned_department: DepartmentScope | null;
+  /** Optional Lowe's home department; grouping falls back to assigned_department. */
+  home_department?: DepartmentScope | null;
   /**
    * Primary assigned_department plus granted cross-department scopes.
    * Master Admin is implied full-store (not stored as `all` in this array).

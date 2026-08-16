@@ -133,6 +133,7 @@
 - [x] Roster create without Auth (`auth_user_id` nullable), dynamic home-department accordions, and signup claim (`20260815_roster_auth_link.sql`)
 - [x] Roster insert logging + authenticated RLS for `auth_user_id IS NULL` + store-number bind (`20260815_roster_insert_rls.sql`)
 - [x] Unified roster create pipeline — `POST /api/roster/members` writes `store_specialists`; SpecialistModal picker no longer inserts; invite-supervisor is SMS-only
+- [x] Roster accordion keeps store-aliased DB rows (`2587`/`02587`) and groups `appliances`/`D35` together; invite_token null members still render
 
 ## Next
 - [x] Apply Phase 1 JWT/RLS migration in Supabase + enable Custom Access Token Hook

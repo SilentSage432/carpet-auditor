@@ -1,6 +1,7 @@
 /**
  * Roster department grouping — composition owner.
- * Groups fetched members by home department (assigned_department).
+ * Groups fetched members by normalized home department
+ * (`appliances` / `D35` / `D35 · Appliances` → same accordion).
  * Presentation renders accordions; this module does not persist.
  */
 
