@@ -74,11 +74,17 @@ export function SundayScheduleCard({ specialist }: Props) {
   const enabled = settings?.sunday_auto_generate !== false;
 
   return (
-    <section className="space-y-3 rounded-2xl border border-slate-800 bg-slate-900/90 p-4">
+    <section
+      id="sunday-schedule"
+      className="space-y-3 rounded-2xl border border-amber-500/35 bg-slate-900/90 p-4"
+    >
       <div>
-        <h2 className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-accent">
-          Sunday rotation schedule
+        <h2 className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-amber-300">
+          Sunday auto-stage
         </h2>
+        <p className="mt-1 text-base font-semibold text-zinc-100">
+          Sunday rotation schedule
+        </p>
         <p className="mt-1 text-sm text-zinc-400">
           Auto-stage the upcoming ISO week at local store time. The runner never
           overwrites a week that is already staged — Master Admin Force Draw

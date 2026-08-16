@@ -171,8 +171,14 @@ export function SettingsSection({
         setTaxonomyOpen(true);
       } else if (hash === "remnants") {
         setOpenSection("remnants");
-      } else if (hash === "admin-tools") {
+      } else if (hash === "admin-tools" || hash === "sunday-schedule") {
         setOpenSection("store");
+        window.setTimeout(() => {
+          document.getElementById("sunday-schedule")?.scrollIntoView({
+            behavior: "smooth",
+            block: "start",
+          });
+        }, 50);
       }
     }
     applyHash();
@@ -273,10 +279,6 @@ export function SettingsSection({
         <WeeklyBayTargetCard specialist={activeSpecialist} />
       ) : null}
 
-      {masterSession && activeSpecialist ? (
-        <SundayScheduleCard specialist={activeSpecialist} />
-      ) : null}
-
       {(supervisorSession || masterSession) && (
         <PushNotificationsCard specialist={activeSpecialist} />
       )}
@@ -284,8 +286,9 @@ export function SettingsSection({
       {masterSession && activeSpecialist ? (
         <section className="space-y-2">
           <p className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-amber-300">
-            Floor architecture
+            Store configuration
           </p>
+          <SundayScheduleCard specialist={activeSpecialist} />
           <Accordion
             id="store"
             title="Store number"
