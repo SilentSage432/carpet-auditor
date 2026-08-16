@@ -1,13 +1,13 @@
 /**
  * Daily / weekly associate shift board — schedule, on-duty, and call-out.
  * Composes weekly-rotations ShiftRosterMember so Sunday balancer stays in sync.
- * Persists associate_shift_days (work_date + start/end + is_scheduled_today)
- * with localStorage fallback until the migration is applied.
+ * Persistence owner: associate_shift_days. localStorage caches successful live rows.
  * Does not own bay assignments.
  */
 
-import { getStoreNumber } from "@/lib/store";
+import { getStoreNumber, storeNumberQueryValues } from "@/lib/store";
 import { getSupabase } from "@/lib/supabase";
+import { liveWriteError } from "@/lib/store-ops/errors";
 import { isoWeekLabel } from "@/lib/store-ops/week";
 import {
   hoursBetween,
@@ -237,15 +237,17 @@ function writeLocal(
   window.localStorage.setItem(storageKey(date, store), JSON.stringify(map));
 }
 
-function isMissingRelation(error: unknown): boolean {
-  const msg = String(
-    (error as { message?: string } | null)?.message ?? error ?? ""
-  ).toLowerCase();
-  return (
-    msg.includes("does not exist") ||
-    msg.includes("schema cache") ||
-    msg.includes("could not find the table")
-  );
+function requireClient() {
+  const supabase = getSupabase();
+  if (!supabase) {
+    throw new Error("Database not configured — cannot read or write associate_shift_days");
+  }
+  return supabase;
+}
+
+function storeKeys(store: string): string[] {
+  const keys = storeNumberQueryValues(store);
+  return keys.length ? keys : [store];
 }
 
 function defaultDay(
@@ -298,32 +300,25 @@ export async function fetchShiftDays(
   date = localWorkDate(),
   store = getStoreNumber()
 ): Promise<Record<string, AssociateShiftDay>> {
-  const local = readLocal(date, store);
-  const supabase = getSupabase();
-  if (!supabase || !store) return local;
-  try {
-    const { data, error } = await supabase
-      .from("associate_shift_days")
-      .select(
-        "specialist_id, work_date, start_time, end_time, is_scheduled_today, is_call_out, status"
-      )
-      .eq("store_number", store)
-      .eq("work_date", date);
-    if (error) {
-      if (isMissingRelation(error)) return local;
-      throw new Error(error.message || "Could not load shift board");
-    }
-    const remote: Record<string, AssociateShiftDay> = { ...local };
-    for (const row of data ?? []) {
-      const next = normalizeDay(String(row.specialist_id), date, row);
-      if (next) remote[next.specialist_id] = next;
-    }
-    writeLocal(date, remote, store);
-    return remote;
-  } catch (err) {
-    if (isMissingRelation(err)) return local;
-    throw err;
+  if (!store) return {};
+  const supabase = requireClient();
+  const { data, error } = await supabase
+    .from("associate_shift_days")
+    .select(
+      "specialist_id, work_date, start_time, end_time, is_scheduled_today, is_call_out, status"
+    )
+    .in("store_number", storeKeys(store))
+    .eq("work_date", date);
+  if (error) {
+    throw liveWriteError(error, "associate_shift_days", "Could not load shift board");
   }
+  const remote: Record<string, AssociateShiftDay> = {};
+  for (const row of data ?? []) {
+    const next = normalizeDay(String(row.specialist_id), date, row);
+    if (next) remote[next.specialist_id] = next;
+  }
+  writeLocal(date, remote, store);
+  return remote;
 }
 
 export async function fetchShiftDaysRange(
@@ -339,48 +334,37 @@ export async function fetchShiftDaysRange(
   }
 
   const merged: Record<string, AssociateShiftDay> = {};
-  for (const date of span) {
-    for (const row of Object.values(readLocal(date, store))) {
-      merged[shiftRowKey(row.specialist_id, row.work_date)] = row;
-    }
-  }
 
-  const supabase = getSupabase();
-  if (!supabase || !store) return merged;
-  try {
-    const { data, error } = await supabase
-      .from("associate_shift_days")
-      .select(
-        "specialist_id, work_date, start_time, end_time, is_scheduled_today, is_call_out, status"
-      )
-      .eq("store_number", store)
-      .gte("work_date", startDate)
-      .lte("work_date", endDate);
-    if (error) {
-      if (isMissingRelation(error)) return merged;
-      throw new Error(error.message || "Could not load weekly schedule");
-    }
-    const byDate: Record<string, Record<string, AssociateShiftDay>> = {};
-    for (const date of span) {
-      byDate[date] = readLocal(date, store);
-    }
-    for (const row of data ?? []) {
-      const date = String(row.work_date ?? "");
-      const next = normalizeDay(String(row.specialist_id), date, row);
-      if (!next) continue;
-      merged[shiftRowKey(next.specialist_id, next.work_date)] = next;
-      const bucket = byDate[date] ?? {};
-      bucket[next.specialist_id] = next;
-      byDate[date] = bucket;
-    }
-    for (const [date, map] of Object.entries(byDate)) {
-      writeLocal(date, map, store);
-    }
-    return merged;
-  } catch (err) {
-    if (isMissingRelation(err)) return merged;
-    throw err;
+  const supabase = requireClient();
+  if (!store) return merged;
+  const { data, error } = await supabase
+    .from("associate_shift_days")
+    .select(
+      "specialist_id, work_date, start_time, end_time, is_scheduled_today, is_call_out, status"
+    )
+    .in("store_number", storeKeys(store))
+    .gte("work_date", startDate)
+    .lte("work_date", endDate);
+  if (error) {
+    throw liveWriteError(error, "associate_shift_days", "Could not load weekly schedule");
   }
+  const byDate: Record<string, Record<string, AssociateShiftDay>> = {};
+  for (const date of span) {
+    byDate[date] = {};
+  }
+  for (const row of data ?? []) {
+    const date = String(row.work_date ?? "");
+    const next = normalizeDay(String(row.specialist_id), date, row);
+    if (!next) continue;
+    merged[shiftRowKey(next.specialist_id, next.work_date)] = next;
+    const bucket = byDate[date] ?? {};
+    bucket[next.specialist_id] = next;
+    byDate[date] = bucket;
+  }
+  for (const [date, map] of Object.entries(byDate)) {
+    writeLocal(date, map, store);
+  }
+  return merged;
 }
 
 export async function upsertShiftDay(
@@ -412,35 +396,36 @@ export async function upsertShiftDay(
     status: "ON_DUTY",
   };
   merged.status = deriveStatus(merged);
+
+  if (!store) {
+    throw new Error("store_number is required to save a shift");
+  }
+  const supabase = requireClient();
+  const { error } = await supabase.from("associate_shift_days").upsert(
+    {
+      store_number: store,
+      specialist_id: merged.specialist_id,
+      work_date: date,
+      start_time: merged.start_time,
+      end_time: merged.end_time,
+      is_scheduled_today: merged.is_scheduled_today,
+      is_call_out: merged.is_call_out,
+      status: merged.status,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "store_number,specialist_id,work_date" }
+  );
+  if (error) {
+    throw liveWriteError(error, "associate_shift_days", "Could not save shift");
+  }
+
   current[merged.specialist_id] = merged;
   writeLocal(date, current, store);
 
   if (syncRoster) {
     syncShiftRosterMember(merged, week, store);
+    emitShift();
   }
-
-  const supabase = getSupabase();
-  if (supabase && store) {
-    const { error } = await supabase.from("associate_shift_days").upsert(
-      {
-        store_number: store,
-        specialist_id: merged.specialist_id,
-        work_date: date,
-        start_time: merged.start_time,
-        end_time: merged.end_time,
-        is_scheduled_today: merged.is_scheduled_today,
-        is_call_out: merged.is_call_out,
-        status: merged.status,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: "store_number,specialist_id,work_date" }
-    );
-    if (error && !isMissingRelation(error)) {
-      throw new Error(error.message || "Could not save shift");
-    }
-  }
-
-  if (syncRoster) emitShift();
   return merged;
 }
 

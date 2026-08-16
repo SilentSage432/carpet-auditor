@@ -23,7 +23,6 @@ import {
   setStoreNumber,
 } from "@/lib/store";
 import { fetchDepartmentsDetailed } from "@/lib/store-ops/client";
-import { fallbackDepartments } from "@/lib/store-ops/stores";
 import { findFlooringDepartment } from "@/lib/store-ops/sunday-audit";
 import {
   flushSyncQueue,
@@ -121,16 +120,15 @@ export function SettingsSection({
       storeNumber || getStoreNumber() || activeSpecialist.store_number || ""
     );
     if (!store) {
-      setDepartments(fallbackDepartments());
+      setDepartments([]);
       return;
     }
     try {
       const result = await fetchDepartmentsDetailed(activeSpecialist, store);
-      setDepartments(
-        result.items.length > 0 ? result.items : fallbackDepartments()
-      );
-    } catch {
-      setDepartments(fallbackDepartments());
+      setDepartments(result.items);
+    } catch (err) {
+      console.error("[Settings] live departments failed", err);
+      setDepartments([]);
     }
   }, [activeSpecialist, masterSession, storeNumber]);
 

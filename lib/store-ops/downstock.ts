@@ -1,11 +1,13 @@
 /**
  * Downstock / packdown queue — overhead pulls flagged from Zebra.
- * Persistence: downstock_queue (Supabase) with localStorage fallback.
+ * Persistence owner: downstock_queue (Supabase). localStorage is a cache of
+ * successful live rows only — never a write authority.
  * Assignment of pulls composes sunday-audit; this module only owns flags.
  */
 
-import { getStoreNumber } from "@/lib/store";
+import { getStoreNumber, storeNumberQueryValues } from "@/lib/store";
 import { getSupabase } from "@/lib/supabase";
+import { liveWriteError } from "@/lib/store-ops/errors";
 
 export const DOWNSTOCK_EVENT = "deptsync:downstock-queue";
 
@@ -85,15 +87,17 @@ function normalizeFlag(rotationId: string, raw: unknown): DownstockFlag | null {
   };
 }
 
-function isMissingRelation(error: unknown): boolean {
-  const msg = String(
-    (error as { message?: string } | null)?.message ?? error ?? ""
-  ).toLowerCase();
-  return (
-    msg.includes("does not exist") ||
-    msg.includes("schema cache") ||
-    msg.includes("could not find the table")
-  );
+function requireClient() {
+  const supabase = getSupabase();
+  if (!supabase) {
+    throw new Error("Database not configured — cannot read or write downstock_queue");
+  }
+  return supabase;
+}
+
+function storeKeys(store: string): string[] {
+  const keys = storeNumberQueryValues(store);
+  return keys.length ? keys : [store];
 }
 
 export function activeDownstockFlags(map: DownstockMap): DownstockMap {
@@ -109,40 +113,30 @@ export async function fetchDownstockQueue(
   storeNumber = getStoreNumber(),
   department = "flooring"
 ): Promise<DownstockMap> {
-  const local = readLocal(week, storeNumber);
   const store = String(storeNumber ?? "").trim();
-  if (!store || !week) return activeDownstockFlags(local);
+  if (!store || !week) return {};
 
-  const supabase = getSupabase();
-  if (!supabase) return activeDownstockFlags(local);
+  const supabase = requireClient();
+  const { data, error } = await supabase
+    .from("downstock_queue")
+    .select(
+      "rotation_id, location_id, note, flagged_by, flagged_at, resolved_at"
+    )
+    .in("store_number", storeKeys(store))
+    .eq("assigned_week", week)
+    .eq("department", department);
 
-  try {
-    const { data, error } = await supabase
-      .from("downstock_queue")
-      .select(
-        "rotation_id, location_id, note, flagged_by, flagged_at, resolved_at"
-      )
-      .eq("store_number", store)
-      .eq("assigned_week", week)
-      .eq("department", department);
-
-    if (error) {
-      if (isMissingRelation(error)) return activeDownstockFlags(local);
-      throw new Error(error.message || "Could not load downstock queue");
-    }
-
-    const remote: DownstockMap = {};
-    for (const row of data ?? []) {
-      const flag = normalizeFlag(String(row.rotation_id ?? ""), row);
-      if (flag) remote[flag.rotation_id] = flag;
-    }
-    const merged = { ...local, ...remote };
-    writeLocal(week, merged, store);
-    return activeDownstockFlags(merged);
-  } catch (err) {
-    if (isMissingRelation(err)) return activeDownstockFlags(local);
-    return activeDownstockFlags(local);
+  if (error) {
+    throw liveWriteError(error, "downstock_queue", "Could not load downstock queue");
   }
+
+  const remote: DownstockMap = {};
+  for (const row of data ?? []) {
+    const flag = normalizeFlag(String(row.rotation_id ?? ""), row);
+    if (flag) remote[flag.rotation_id] = flag;
+  }
+  writeLocal(week, remote, store);
+  return activeDownstockFlags(remote);
 }
 
 export async function flagForDownstock(input: {
@@ -171,31 +165,29 @@ export async function flagForDownstock(input: {
     resolved_at: null,
   };
 
+  const supabase = requireClient();
+  const { error } = await supabase.from("downstock_queue").upsert(
+    {
+      store_number: store,
+      department,
+      assigned_week: week,
+      rotation_id: rotationId,
+      location_id: flag.location_id || null,
+      note: flag.note,
+      flagged_by: flag.flagged_by || null,
+      flagged_at: flag.flagged_at,
+      resolved_at: null,
+      updated_at: flag.flagged_at,
+    },
+    { onConflict: "store_number,department,assigned_week,rotation_id" }
+  );
+  if (error) {
+    throw liveWriteError(error, "downstock_queue", "Could not flag downstock");
+  }
+
   const map = readLocal(week, store);
   map[rotationId] = flag;
   writeLocal(week, map, store);
-
-  const supabase = getSupabase();
-  if (supabase) {
-    const { error } = await supabase.from("downstock_queue").upsert(
-      {
-        store_number: store,
-        department,
-        assigned_week: week,
-        rotation_id: rotationId,
-        location_id: flag.location_id || null,
-        note: flag.note,
-        flagged_by: flag.flagged_by || null,
-        flagged_at: flag.flagged_at,
-        resolved_at: null,
-        updated_at: flag.flagged_at,
-      },
-      { onConflict: "store_number,department,assigned_week,rotation_id" }
-    );
-    if (error && !isMissingRelation(error)) {
-      throw new Error(error.message || "Could not flag downstock");
-    }
-  }
 
   emitDownstock();
   return flag;
@@ -211,33 +203,34 @@ export async function clearDownstockFlag(input: {
   const week = String(input.week ?? "").trim();
   const rotationId = String(input.rotationId ?? "").trim();
   const department = String(input.department ?? "flooring").trim() || "flooring";
-  if (!store || !week || !rotationId) return;
+  if (!store || !week || !rotationId) {
+    throw new Error("Week and bay are required to clear downstock");
+  }
+
+  const supabase = requireClient();
+  const resolvedAt = new Date().toISOString();
+  const { error } = await supabase
+    .from("downstock_queue")
+    .update({
+      resolved_at: resolvedAt,
+      updated_at: resolvedAt,
+    })
+    .in("store_number", storeKeys(store))
+    .eq("department", department)
+    .eq("assigned_week", week)
+    .eq("rotation_id", rotationId);
+  if (error) {
+    throw liveWriteError(error, "downstock_queue", "Could not clear downstock flag");
+  }
 
   const map = readLocal(week, store);
   const existing = map[rotationId];
   if (existing) {
     map[rotationId] = {
       ...existing,
-      resolved_at: new Date().toISOString(),
+      resolved_at: resolvedAt,
     };
     writeLocal(week, map, store);
-  }
-
-  const supabase = getSupabase();
-  if (supabase) {
-    const { error } = await supabase
-      .from("downstock_queue")
-      .update({
-        resolved_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      })
-      .eq("store_number", store)
-      .eq("department", department)
-      .eq("assigned_week", week)
-      .eq("rotation_id", rotationId);
-    if (error && !isMissingRelation(error)) {
-      throw new Error(error.message || "Could not clear downstock flag");
-    }
   }
 
   emitDownstock();

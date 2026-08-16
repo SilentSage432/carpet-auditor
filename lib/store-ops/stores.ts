@@ -4,7 +4,7 @@
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { normalizeStoreNumber } from "@/lib/store";
+import { normalizeStoreNumber, storeNumberQueryValues } from "@/lib/store";
 import {
   isInvalidUuidError,
   isMissingColumnError,
@@ -80,7 +80,8 @@ export async function resolveStoreByNumber(
     const { data: existing, error: existingError } = await supabase
       .from("stores")
       .select("*")
-      .eq("store_number", normalized)
+      .in("store_number", storeNumberQueryValues(normalized))
+      .limit(1)
       .maybeSingle();
 
     if (existingError) {

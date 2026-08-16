@@ -47,6 +47,10 @@ export function createTtlCache<T>(ttlMs: number) {
               entry = { key, at: Date.now(), data };
               return data;
             })
+            .catch((err) => {
+              console.error("[ttl-cache] background refresh failed", err);
+              return entry!.data;
+            })
             .finally(() => {
               inflight.delete(key);
             });

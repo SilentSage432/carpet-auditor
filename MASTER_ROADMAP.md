@@ -134,6 +134,7 @@
 - [x] Roster insert logging + authenticated RLS for `auth_user_id IS NULL` + store-number bind (`20260815_roster_insert_rls.sql`)
 - [x] Unified roster create pipeline — `POST /api/roster/members` writes `store_specialists`; SpecialistModal picker no longer inserts; invite-supervisor is SMS-only
 - [x] Roster accordion keeps store-aliased DB rows (`2587`/`02587`) and groups `appliances`/`D35` together; invite_token null members still render
+- [x] Store Ops live-first — downstock/shifts/walk tasks/weekly rotations throw on Supabase failure instead of local fake success
 
 ## Next
 - [x] Apply Phase 1 JWT/RLS migration in Supabase + enable Custom Access Token Hook

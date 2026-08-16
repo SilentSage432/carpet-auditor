@@ -90,17 +90,8 @@ export function MapTab({ specialist }: WorkflowTabProps) {
       const deptId = workingDepartmentId(member, depts.items);
       const [locs, weekData, exceptions] = await Promise.all([
         fetchStoreLocationsDetailed(member, deptId),
-        fetchThisWeekRotations(member, deptId).catch(() => ({
-          assigned_week: "",
-          rotations: [] as Array<{
-            location_id?: string;
-            is_completed?: boolean;
-            store_locations?: { id?: string } | null;
-          }>,
-        })),
-        fetchExceptionSummary(member).catch(() => ({
-          exceptions: [] as Array<{ bay_id: string }>,
-        })),
+        fetchThisWeekRotations(member, deptId),
+        fetchExceptionSummary(member),
       ]);
 
       const nextWeek = (weekData.rotations ?? [])

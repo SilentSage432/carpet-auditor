@@ -781,7 +781,7 @@ async function loadSpecialists(store: string): Promise<StoreSpecialist[]> {
     return activeSpecialistsOnly(merged);
   } catch (err) {
     console.error("[fetchSpecialists] store_specialists select failed", err);
-    return activeSpecialistsOnly(local);
+    throw err;
   }
 }
 

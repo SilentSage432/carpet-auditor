@@ -1,5 +1,12 @@
 # DeptSync Hub — Development Journal
 
+## 2026-08-16 — Live Store Ops writes; no fake-success fallbacks
+
+### Shipped
+- **Bay / rotation reads.** `GET /api/weekly-rotations` and `fetchThisWeekRotations` throw on failure instead of returning an empty week. Map/Floor keep last live snapshot rather than painting dummy bays.
+- **Downstock, shifts, walk tasks.** `downstock_queue`, `associate_shift_days`, and `shift_walk_tasks` write Supabase first; localStorage only caches a successful row. Missing tables surface a migration error instead of silent local success.
+- **Store bind.** `stores` lookup and Sunday/shift/downstock queries use store-number aliases (`2587` / `02587`). Settings/targets no longer inject `fallback:*` department IDs.
+
 ## 2026-08-16 — Roster UI no longer drops live store_specialists rows
 
 ### Shipped

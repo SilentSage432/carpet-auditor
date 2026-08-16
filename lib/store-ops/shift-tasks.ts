@@ -1,12 +1,13 @@
 /**
  * Shift-board walk tasks — dispatched floor-walk Copilot items.
- * Persistence: shift_walk_tasks (Supabase) with localStorage fallback.
+ * Persistence owner: shift_walk_tasks (Supabase). localStorage caches live rows.
  * Bay freshness is stamped via lib/heatmap/bay-tracker; this module owns tasks.
  * DOWNSTOCK compose downstock.ts when a weekly rotation can be matched.
  */
 
-import { getStoreNumber } from "@/lib/store";
+import { getStoreNumber, storeNumberQueryValues } from "@/lib/store";
 import { getSupabase } from "@/lib/supabase";
+import { liveWriteError } from "@/lib/store-ops/errors";
 import { isoWeekLabel } from "@/lib/store-ops/week";
 import {
   matchLocationForTag,
@@ -63,15 +64,12 @@ function emitShiftTasks() {
   window.dispatchEvent(new CustomEvent(SHIFT_TASKS_EVENT));
 }
 
-function isMissingRelation(error: unknown): boolean {
-  const msg = String(
-    (error as { message?: string } | null)?.message ?? error ?? ""
-  ).toLowerCase();
-  return (
-    msg.includes("does not exist") ||
-    msg.includes("schema cache") ||
-    msg.includes("could not find the table")
-  );
+function requireClient() {
+  const supabase = getSupabase();
+  if (!supabase) {
+    throw new Error("Database not configured — cannot read or write shift_walk_tasks");
+  }
+  return supabase;
 }
 
 function normalizeStatus(raw: unknown): ShiftWalkTaskStatus {
@@ -131,26 +129,12 @@ function writeLocal(
   window.localStorage.setItem(storageKey(week, store), JSON.stringify(rows));
 }
 
-function mergeTasks(local: ShiftWalkTask[], remote: ShiftWalkTask[]): ShiftWalkTask[] {
-  const map = new Map<string, ShiftWalkTask>();
-  for (const row of local) map.set(row.id, row);
-  for (const row of remote) {
-    const existing = map.get(row.id);
-    if (!existing) {
-      map.set(row.id, row);
-      continue;
-    }
-    const existingStamp = Date.parse(
-      existing.resolved_at || existing.dispatched_at || existing.created_at
-    );
-    const remoteStamp = Date.parse(
-      row.resolved_at || row.dispatched_at || row.created_at
-    );
-    map.set(row.id, remoteStamp >= existingStamp ? row : existing);
-  }
-  return [...map.values()].sort(
-    (a, b) => Date.parse(b.created_at) - Date.parse(a.created_at)
-  );
+function persistLocal(task: ShiftWalkTask): void {
+  const rows = readLocal(task.assigned_week, task.store_number);
+  const idx = rows.findIndex((row) => row.id === task.id);
+  if (idx >= 0) rows[idx] = task;
+  else rows.unshift(task);
+  writeLocal(task.assigned_week, rows, task.store_number);
 }
 
 export function subscribeShiftTasks(onChange: () => void): () => void {
@@ -170,37 +154,28 @@ export async function fetchShiftWalkTasks(
   department = "flooring"
 ): Promise<ShiftWalkTask[]> {
   const store = String(storeNumber ?? "").trim();
-  const local = readLocal(week, store);
-  if (!store || !week) return local;
+  if (!store || !week) return [];
 
-  const supabase = getSupabase();
-  if (!supabase) return local;
+  const supabase = requireClient();
+  const keys = storeNumberQueryValues(store);
+  const { data, error } = await supabase
+    .from("shift_walk_tasks")
+    .select(
+      "id, title, location_tag, category, priority, target_window, suggested_assignee, assignee_id, assignee_name, status, department, store_number, assigned_week, location_id, rotation_id, created_at, dispatched_at, resolved_at, source, transcript"
+    )
+    .in("store_number", keys.length ? keys : [store])
+    .eq("assigned_week", week)
+    .eq("department", department);
 
-  try {
-    const { data, error } = await supabase
-      .from("shift_walk_tasks")
-      .select(
-        "id, title, location_tag, category, priority, target_window, suggested_assignee, assignee_id, assignee_name, status, department, store_number, assigned_week, location_id, rotation_id, created_at, dispatched_at, resolved_at, source, transcript"
-      )
-      .eq("store_number", store)
-      .eq("assigned_week", week)
-      .eq("department", department);
-
-    if (error) {
-      if (isMissingRelation(error)) return local;
-      throw new Error(error.message || "Could not load shift walk tasks");
-    }
-
-    const remote = (data ?? [])
-      .map(normalizeTask)
-      .filter((row): row is ShiftWalkTask => Boolean(row));
-    const merged = mergeTasks(local, remote);
-    writeLocal(week, merged, store);
-    return merged;
-  } catch (err) {
-    if (isMissingRelation(err)) return local;
-    return local;
+  if (error) {
+    throw liveWriteError(error, "shift_walk_tasks", "Could not load shift walk tasks");
   }
+
+  const remote = (data ?? [])
+    .map(normalizeTask)
+    .filter((row): row is ShiftWalkTask => Boolean(row));
+  writeLocal(week, remote, store);
+  return remote;
 }
 
 export function parsedToDraftTask(
@@ -242,8 +217,7 @@ export function parsedToDraftTask(
 }
 
 async function upsertRemote(task: ShiftWalkTask): Promise<void> {
-  const supabase = getSupabase();
-  if (!supabase) return;
+  const supabase = requireClient();
   const { error } = await supabase.from("shift_walk_tasks").upsert(
     {
       id: task.id,
@@ -270,17 +244,9 @@ async function upsertRemote(task: ShiftWalkTask): Promise<void> {
     },
     { onConflict: "id" }
   );
-  if (error && !isMissingRelation(error)) {
-    throw new Error(error.message || "Could not sync shift walk task");
+  if (error) {
+    throw liveWriteError(error, "shift_walk_tasks", "Could not sync shift walk task");
   }
-}
-
-function persistLocal(task: ShiftWalkTask): void {
-  const rows = readLocal(task.assigned_week, task.store_number);
-  const idx = rows.findIndex((row) => row.id === task.id);
-  if (idx >= 0) rows[idx] = task;
-  else rows.unshift(task);
-  writeLocal(task.assigned_week, rows, task.store_number);
 }
 
 export function matchRotationForTag(
@@ -318,8 +284,8 @@ export async function dispatchShiftWalkTasks(input: {
       location_id: loc?.id ?? draft.location_id,
       rotation_id: rotation?.id ?? draft.rotation_id,
     };
-    persistLocal(task);
     await upsertRemote(task);
+    persistLocal(task);
     recordBayTouch({
       location_id: task.location_id,
       location_tag: task.location_tag,
@@ -331,19 +297,15 @@ export async function dispatchShiftWalkTasks(input: {
     });
 
     if (task.category === "DOWNSTOCK" && task.rotation_id && task.assigned_week) {
-      try {
-        await flagForDownstock({
-          week: task.assigned_week,
-          rotationId: task.rotation_id,
-          locationId: task.location_id ?? undefined,
-          note: task.title,
-          flaggedBy: input.flaggedBy,
-          department: task.department,
-          storeNumber: task.store_number,
-        });
-      } catch {
-        /* downstock compose is best-effort; task itself is already dispatched */
-      }
+      await flagForDownstock({
+        week: task.assigned_week,
+        rotationId: task.rotation_id,
+        locationId: task.location_id ?? undefined,
+        note: task.title,
+        flaggedBy: input.flaggedBy,
+        department: task.department,
+        storeNumber: task.store_number,
+      });
     }
 
     dispatched.push(task);

@@ -70,7 +70,7 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
     async (member: typeof specialist, opts?: { silent?: boolean }) => {
       if (!opts?.silent) setLoading(true);
       try {
-        const depts = await fetchDepartments(member).catch(() => []);
+        const depts = await fetchDepartments(member);
         const nextDeptId = workingDepartmentId(member, depts);
         const data = await fetchThisWeekRotations(member, nextDeptId);
         const nextWeek = data.assigned_week || "";
@@ -85,10 +85,8 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
           prev === nextFlooring ? prev : nextFlooring
         );
         setHealthKey((k) => k + 1);
-      } catch {
-        setWeek("");
-        setDeptId(null);
-        setRotations([]);
+      } catch (err) {
+        console.error("[FloorTab] live rotations failed", err);
       } finally {
         if (!opts?.silent) setLoading(false);
         else setLoading(false);

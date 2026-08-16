@@ -13,7 +13,6 @@ import {
   updateDepartmentWeeklyTarget,
 } from "@/lib/store-ops/client";
 import { readableError } from "@/lib/store-ops/errors";
-import { fallbackDepartments } from "@/lib/store-ops/stores";
 import { resolveWeeklyBayTarget } from "@/lib/store-ops/week";
 import type { Department } from "@/lib/store-ops/types";
 import { isMasterAdmin } from "@/lib/rbac";
@@ -45,10 +44,9 @@ export function DepartmentTargetsMatrix({ specialist }: Props) {
     if (!specialist || !canEdit) return;
     try {
       const list = await fetchDepartments(specialist);
-      const rows = list.length > 0 ? list : fallbackDepartments();
-      setDepartments(rows);
+      setDepartments(list);
       const nextDrafts: Record<string, string> = {};
-      for (const d of rows) {
+      for (const d of list) {
         nextDrafts[d.id] = String(
           resolveWeeklyBayTarget(d.weekly_bay_target ?? DEFAULT_TARGET)
         );
@@ -57,16 +55,9 @@ export function DepartmentTargetsMatrix({ specialist }: Props) {
       setError(null);
     } catch (err) {
       console.error("[DepartmentTargetsMatrix] load failed", err);
-      const rows = fallbackDepartments();
-      setDepartments(rows);
-      const nextDrafts: Record<string, string> = {};
-      for (const d of rows) {
-        nextDrafts[d.id] = String(
-          resolveWeeklyBayTarget(d.weekly_bay_target ?? DEFAULT_TARGET)
-        );
-      }
-      setDrafts(nextDrafts);
-      setError(null);
+      setDepartments([]);
+      setDrafts({});
+      setError(readableError(err, "Could not load live departments"));
     }
   }, [specialist, canEdit]);
 

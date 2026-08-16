@@ -546,29 +546,22 @@ export async function fetchThisWeekRotations(
   return rotationsCache.getSWR(
     storeOpsListCacheKey(specialist, `weekly-rotations:${qs}`),
     async () => {
-      try {
-        const data = await storeOpsFetch<{
-          assigned_week?: string | null;
-          rotations?: WeeklyRotationWithLocation[] | null;
-        }>("/api/weekly-rotations" + qs, specialist);
+      const data = await storeOpsFetch<{
+        assigned_week?: string | null;
+        rotations?: WeeklyRotationWithLocation[] | null;
+      }>("/api/weekly-rotations" + qs, specialist);
 
-        const week = String(data.assigned_week ?? "").trim();
-        const rotations = Array.isArray(data.rotations)
-          ? data.rotations.filter((r) => Boolean(r?.assigned_week))
-          : [];
+      const week = String(data.assigned_week ?? "").trim();
+      const rotations = Array.isArray(data.rotations)
+        ? data.rotations.filter((r) => Boolean(r?.assigned_week))
+        : [];
 
-        const result = {
-          assigned_week: week,
-          rotations,
-        };
-        rememberDurable("weekly_rotations", specialist, qs, result);
-        return result;
-      } catch {
-        return {
-          assigned_week: "",
-          rotations: [],
-        };
-      }
+      const result = {
+        assigned_week: week,
+        rotations,
+      };
+      rememberDurable("weekly_rotations", specialist, qs, result);
+      return result;
     }
   );
 }
@@ -652,13 +645,19 @@ export async function assignLocationsToWeek(
   locationIds: string[],
   departmentId?: string
 ): Promise<{ assigned_week: string; created: number }> {
-  return storeOpsFetch("/api/rotations/assign", specialist, {
-    method: "POST",
-    body: JSON.stringify({
-      location_ids: locationIds,
-      ...(departmentId ? { department_id: departmentId } : {}),
-    }),
-  });
+  const result = await storeOpsFetch<{ assigned_week: string; created: number }>(
+    "/api/rotations/assign",
+    specialist,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        location_ids: locationIds,
+        ...(departmentId ? { department_id: departmentId } : {}),
+      }),
+    }
+  );
+  invalidateStoreOpsListCaches();
+  return result;
 }
 
 export async function fetchShowroomLocations(
@@ -668,18 +667,14 @@ export async function fetchShowroomLocations(
   const qs = departmentId
     ? `?department_id=${encodeURIComponent(departmentId)}`
     : "";
-  try {
-    const data = await storeOpsFetch<{
-      locations?: StoreLocation[];
-      due?: StoreLocation[];
-    }>(`/api/showroom-locations${qs}`, specialist);
-    return {
-      locations: data.locations ?? [],
-      due: data.due ?? [],
-    };
-  } catch {
-    return { locations: [], due: [] };
-  }
+  const data = await storeOpsFetch<{
+    locations?: StoreLocation[];
+    due?: StoreLocation[];
+  }>(`/api/showroom-locations${qs}`, specialist);
+  return {
+    locations: data.locations ?? [],
+    due: data.due ?? [],
+  };
 }
 
 export async function completeShowroomLocation(
@@ -794,8 +789,7 @@ export async function fetchExceptionSummary(
   }>;
 }> {
   const qs = week ? `?week=${encodeURIComponent(week)}` : "";
-  try {
-    const data = await storeOpsFetch<{
+  const data = await storeOpsFetch<{
       assigned_week: string;
       summary: Array<{
         department_id: string;
@@ -833,14 +827,6 @@ export async function fetchExceptionSummary(
       summary: data.summary ?? [],
       exceptions: data.exceptions ?? [],
     };
-  } catch {
-    // Empty week / no log yet → 0/0 departments verified, 0 exception rows
-    return {
-      assigned_week: week ?? "",
-      summary: [],
-      exceptions: [],
-    };
-  }
 }
 
 export type StoreHealthSnapshotClient = {
@@ -893,42 +879,20 @@ export async function fetchStoreHealth(
   week?: string
 ): Promise<StoreHealthSnapshotClient> {
   const qs = week ? `?week=${encodeURIComponent(week)}` : "";
-  const empty: StoreHealthSnapshotClient = {
-    assigned_week: week ?? "",
-    store_id: null,
-    scope: "store",
-    department: null,
-    departments: [],
-    barriers: [],
-    bottleneck_summary: [],
-    totals: {
-      assigned: 0,
-      completed: 0,
-      open: 0,
-      exceptions: 0,
-      completion_pct: 0,
-    },
-    telemetry: null,
-    bay_health: null,
-  };
-  try {
-    return await healthCache.getSWR(
-      storeOpsListCacheKey(specialist, `store-health:${qs}`),
-      async () => {
-        const snapshot = await storeOpsFetch<StoreHealthSnapshotClient>(
-          `/api/store-health${qs}`,
-          specialist
-        );
-        rememberDurable("shift_briefings", specialist, week ?? "", {
-          snapshot,
-          briefing: localBriefingFromSnapshot(snapshot),
-        });
-        return snapshot;
-      }
-    );
-  } catch {
-    return empty;
-  }
+  return healthCache.getSWR(
+    storeOpsListCacheKey(specialist, `store-health:${qs}`),
+    async () => {
+      const snapshot = await storeOpsFetch<StoreHealthSnapshotClient>(
+        `/api/store-health${qs}`,
+        specialist
+      );
+      rememberDurable("shift_briefings", specialist, week ?? "", {
+        snapshot,
+        briefing: localBriefingFromSnapshot(snapshot),
+      });
+      return snapshot;
+    }
+  );
 }
 
 export type ShiftBriefingClient = {

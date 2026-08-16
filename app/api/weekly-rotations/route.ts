@@ -41,17 +41,8 @@ export async function GET(request: Request) {
     }
 
     let storeId: string | null = null;
-    try {
-      const store = await resolveStoreByNumber(supabase, actor.storeNumber);
-      storeId = store.id;
-    } catch {
-      // No store resolved yet — still return an empty week list
-      return NextResponse.json({
-        assigned_week: week,
-        store_id: null,
-        rotations: [],
-      });
-    }
+    const store = await resolveStoreByNumber(supabase, actor.storeNumber);
+    storeId = store.id;
 
     const url = new URL(request.url);
     const departmentIdParam = url.searchParams.get("department_id");
@@ -82,16 +73,15 @@ export async function GET(request: Request) {
       store_id: scopedStoreId,
       rotations,
     });
-  } catch (err) {
+    } catch (err) {
     if (err instanceof StoreOpsAuthError) {
       return NextResponse.json({ error: err.message }, { status: err.status });
     }
-    // Soft-fail: zero rotations for the week — UI renders empty state
-    return NextResponse.json({
-      assigned_week: isoWeekLabel(),
-      store_id: null,
-      rotations: [],
-    });
+    console.error("[weekly-rotations]", err);
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : "Could not load weekly rotations" },
+      { status: 500 }
+    );
   }
 }
 
@@ -111,6 +101,7 @@ async function fetchWeekRotations(
     { withStoreId: false, select: ROTATION_SELECT_NO_LAST },
   ];
 
+  let lastError: unknown = null;
   for (const attempt of attempts) {
     const { data, error } = await buildQuery(supabase, opts, attempt);
     if (!error) {
@@ -121,10 +112,12 @@ async function fetchWeekRotations(
           Boolean((row as { assigned_week?: string | null }).assigned_week)
       );
     }
+    lastError = error;
   }
 
-  // Schema / empty table — treat as no assignments this week
-  return [];
+  throw lastError instanceof Error
+    ? lastError
+    : new Error("Could not load weekly_rotations");
 }
 
 function buildQuery(

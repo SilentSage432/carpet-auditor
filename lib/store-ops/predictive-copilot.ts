@@ -154,7 +154,7 @@ export async function composePredictiveCopilot(input: {
   const locResult = await fetchStoreLocationsDetailed(
     input.specialist,
     departmentId ?? undefined
-  ).catch(() => ({ items: [] as StoreLocation[] }));
+  );
   const locations = locResult.items.filter(
     (loc) => loc.is_active !== false
   );
@@ -165,7 +165,7 @@ export async function composePredictiveCopilot(input: {
       .filter(Boolean)
   );
   const downstock: DownstockMap = week
-    ? await fetchDownstockQueue(week).catch(() => ({}))
+    ? await fetchDownstockQueue(week)
     : {};
   const downstockLocationIds = new Set(
     Object.values(downstock)
@@ -301,9 +301,9 @@ export async function composePredictiveCopilot(input: {
 
   if (week && departmentId) {
     const [roster, days, assignments] = await Promise.all([
-      fetchSpecialists().catch(() => [] as StoreSpecialist[]),
-      fetchShiftDays().catch(() => ({} as Record<string, AssociateShiftDay>)),
-      fetchSundayAssignments(week).catch(() => ({} as SundayAssignmentMap)),
+      fetchSpecialists(),
+      fetchShiftDays(),
+      fetchSundayAssignments(week),
     ]);
     const board = composeShiftBoard(roster, days, localWorkDate());
     const todayStart = new Date();

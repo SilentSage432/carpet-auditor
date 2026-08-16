@@ -4,7 +4,7 @@
  */
 
 import { getSupabase } from "@/lib/supabase";
-import { getStoreNumber } from "@/lib/store";
+import { getStoreNumber, storeNumberQueryValues } from "@/lib/store";
 import { subscribePostgresChanges } from "@/lib/store-ops/realtime";
 import { createTtlCache } from "@/lib/store-ops/ttl-cache";
 import {
@@ -161,10 +161,11 @@ export async function fetchSundayAssignments(
     async () => {
       const supabase = requireClient();
       const weekStarting = isoWeekToMondayDate(week);
+      const keys = storeNumberQueryValues(store);
       const { data, error } = await supabase
         .from("sunday_bay_assignments")
         .select("*")
-        .eq("store_number", store)
+        .in("store_number", keys.length ? keys : [store])
         .eq("department", department)
         .eq("week_starting", weekStarting)
         .neq("status", "cleared");

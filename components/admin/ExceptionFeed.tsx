@@ -32,8 +32,8 @@ export function ExceptionFeed({ specialist, refreshKey = 0 }: Props) {
       const data = await fetchExceptionSummary(specialist);
       setWeek(data.assigned_week || "");
       setRows(data.exceptions ?? []);
-    } catch {
-      setRows([]);
+    } catch (err) {
+      console.error("[ExceptionFeed] live exceptions failed", err);
     } finally {
       setLoading(false);
     }

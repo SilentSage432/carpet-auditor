@@ -77,6 +77,33 @@ export function isNotNullViolationError(
   return msg.includes(column.toLowerCase());
 }
 
+/** Missing table / relation — never treat as empty success. */
+export function isMissingRelationError(error: unknown): boolean {
+  const record = error as { code?: unknown; message?: unknown } | null;
+  const code = String(record?.code ?? "");
+  const msg = readableError(error, "").toLowerCase();
+  return (
+    code === "42P01" ||
+    code === "PGRST205" ||
+    msg.includes("does not exist") ||
+    msg.includes("schema cache") ||
+    msg.includes("could not find the table")
+  );
+}
+
+export function liveWriteError(
+  error: unknown,
+  table: string,
+  fallback: string
+): Error {
+  if (isMissingRelationError(error)) {
+    return new Error(
+      `${fallback} — ${table} is missing. Apply the matching Supabase migration.`
+    );
+  }
+  return new Error(readableError(error, fallback));
+}
+
 export function isMissingColumnError(
   error: unknown,
   column: string

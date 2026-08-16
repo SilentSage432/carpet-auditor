@@ -141,12 +141,18 @@ export function RosterTab({ specialist, storeNumber }: WorkflowTabProps) {
 
   const reload = useCallback(async () => {
     const weekEnd = weekDates[6] ?? today;
-    const [team, saved] = await Promise.all([
-      fetchSpecialists(storeNumber),
-      fetchShiftDaysRange(weekStart, weekEnd).catch(() => ({})),
-    ]);
-    setRoster(dedupeRoster(team));
-    setWeekRows(saved);
+    try {
+      const [team, saved] = await Promise.all([
+        fetchSpecialists(storeNumber),
+        fetchShiftDaysRange(weekStart, weekEnd),
+      ]);
+      setRoster(dedupeRoster(team));
+      setWeekRows(saved);
+    } catch (err) {
+      toastError(
+        err instanceof Error ? err.message : "Could not load live roster"
+      );
+    }
   }, [today, weekDates, weekStart, storeNumber]);
 
   useEffect(() => {
@@ -159,7 +165,11 @@ export function RosterTab({ specialist, storeNumber }: WorkflowTabProps) {
       const weekEnd = weekDates[6] ?? today;
       void fetchShiftDaysRange(weekStart, weekEnd)
         .then(setWeekRows)
-        .catch(() => undefined);
+        .catch((err) => {
+          toastError(
+            err instanceof Error ? err.message : "Could not load live schedule"
+          );
+        });
     }
     window.addEventListener(SHIFT_STATUS_EVENT, onShift);
     return () => {

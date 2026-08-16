@@ -106,12 +106,12 @@ components/admin/SundayAuditStagingCard.tsx → Glowing pending Sunday Flooring 
 components/admin/SundayAuditAssignmentModal.tsx → Assign specialists + shift-hour balancer
 lib/store-ops/weekly-rotations.ts → Proportional clustered bay assignment plan (hours / aisle-face / health risk)
 lib/store-ops/sunday-audit.ts → Persist specialist↔bay; apply balancer plan
-lib/store-ops/shift-status.ts → Weekly Sun–Sat schedule + on-duty / call-out (`associate_shift_days` + localStorage)
+lib/store-ops/shift-status.ts → Weekly Sun–Sat schedule + on-duty / call-out (`associate_shift_days`; localStorage caches live rows)
 lib/store-ops/call-out.ts → Rebalance absent bays (pool / auto / carry-over loop; composes sunday-audit)
 lib/store-ops/predictive-copilot.ts → Floor shift recommendations (logs + assignments + downstock; no Gemini)
 components/store-ops/PredictiveCopilotBanner.tsx → Dismissible Floor briefing under Shift Briefing
 components/store-ops/CarryOverPriorityBadge.tsx → Amber Geist Mono carry-over badge
-lib/store-ops/downstock.ts → Downstock/packdown flags (queue owner; assignment composes sunday-audit)
+lib/store-ops/downstock.ts → Downstock/packdown flags (`downstock_queue` live-first; assignment composes sunday-audit)
 lib/store-ops/map-readiness.ts → Store Map green/yellow/red readiness tones (composes bay-health stale + week)
 lib/store-ops/velocity.ts → IRP cadence tones, seed presets (14d/5d/lock), custom_decay_days, Sunday decay multiplier, async decay scores
 lib/store-ops/bay-service.ts → Persist bay_service_logs + stamp last_serviced_at + promote velocity
@@ -197,7 +197,7 @@ supabase/migrations/20260812_sunday_bay_assignments.sql → sunday specialist↔
 | Department weekly quotas | `DepartmentTargetsMatrix` (blur / Save All) + `PATCH /api/departments` + Settings |
 | Store Operations map + rotations | `lib/store-ops/*` + `/admin/store-map` + `/dashboard` (Visual Grid walk-only: `StoreLocationGrid` + `WalkTheFloorSheet`; Manage CRUD: `AisleBayManager` + `AddBaySheet` + `EditBayDrawer` + prune/batch; bulk velocity seed in Settings **and** Manage; floor checklist: `ZebraChecklist`; walk log: `bay-service.ts` + `POST /api/store-locations/service`; Sunday pick: carry-over prepend then `rotation.ts` velocity + `custom_decay_days`; department cron: Settings `DepartmentTargetsMatrix`) |
 | Sunday assignments | `lib/store-ops/sunday-audit.ts` (persist) + `SundayAuditAssignmentModal` |
-| Daily shift board | `lib/store-ops/shift-status.ts` (`associate_shift_days` week matrix + localStorage; mirrors weekly `ShiftRosterMember`) |
+| Daily shift board | `lib/store-ops/shift-status.ts` (`associate_shift_days` week matrix; throws on live write failure) |
 | Call-out bay rebalance | `lib/store-ops/call-out.ts` (pool / auto / carry-over loop; stamps `carried_over` + Sunday `CARRIED_OVER`; does not generate rotations) |
 | Predictive Shift Copilot | `lib/store-ops/predictive-copilot.ts` + `PredictiveCopilotBanner` (local patterns; 1-tap downstock / assign) |
 | Downstock / packdown queue | `lib/store-ops/downstock.ts` (flags) + Zebra Downstock tab on Floor (assign via sunday-audit) |

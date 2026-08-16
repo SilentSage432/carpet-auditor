@@ -47,13 +47,11 @@ export function SupervisorAuditSummaryModal({
       const [health, weekData, exceptions] = await Promise.all([
         fetchStoreHealth(specialist, assignedWeek),
         fetchThisWeekRotations(specialist),
-        fetchExceptionSummary(specialist, assignedWeek).catch(() => ({
-          exceptions: [] as Array<{ bay_id: string }>,
-        })),
+        fetchExceptionSummary(specialist, assignedWeek),
       ]);
       const week = assignedWeek || weekData.assigned_week || health.assigned_week;
       const assignments = week
-        ? await fetchSundayAssignments(week, getStoreNumber()).catch(() => ({}))
+        ? await fetchSundayAssignments(week, getStoreNumber())
         : {};
       const hours = week
         ? hoursBySpecialistId(readShiftRoster(week, getStoreNumber()))
