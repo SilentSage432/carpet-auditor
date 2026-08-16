@@ -1,5 +1,12 @@
 # DeptSync Hub — Development Journal
 
+## 2026-08-15 — Unified roster create pipeline
+
+### Shipped
+- **One write path.** Roster header **+ Add Team Member** (`RosterTab` → `AddTeamMemberSheet`) inserts through `POST /api/roster/members` → `createRosterMember` → `store_specialists`. Department accordions read the same table via `fetchSpecialists` (no `useRoster` / `team_members` / `roster_members`).
+- **Disconnected legacy create.** `SpecialistModal` is picker-only (no client `saveSpecialist` upsert with default PIN `1234`). `saveSpecialist` now updates existing UUID rows only. `POST /api/admin/invite-supervisor` is SMS invite / re-invite only.
+- **Instant accordion.** Verified UUID → `invalidateRosterCache` + optimistic append + `fetchSpecialists` refetch so the new member’s home-department accordion appears immediately.
+
 ## 2026-08-15 — Roster insert logging + RLS + store bind
 
 ### Shipped
@@ -35,7 +42,7 @@
 ## 2026-08-15 — Roster SMS/link invite + PIN setup
 
 ### Shipped
-- **Roster add-member** no longer accepts a manual PIN. Form is Name, Role, Initial Department, Phone. Master submits → `POST /api/admin/invite-supervisor`.
+- **Roster add-member** no longer accepts a manual PIN. Form is Name, Role, Initial Department, Phone. Master submits roster-only → `POST /api/roster/members`. Send Mobile App Invite → `POST /api/admin/invite-supervisor`.
 - **Onboarding service** (`lib/onboarding/roster-invite.ts`) generates a 6-digit temp PIN and a 256-bit one-time token, SHA-256-hashes the token before persist, sets `status=invited`, and dispatches SMS (`lib/onboarding/sms-dispatch.ts`: Twilio, else webhook stub / copyable `sms:` preview).
 - **Activation** is `/invite/[token]` (`InviteOnboardingView`). Legacy `/invite?token=` redirects. `GET/POST /api/invite/[token]` looks up `invite_token_hash`, verifies the temp PIN, consumes the token (`invite_consumed_at`), hashes the permanent 4–6 digit PIN, and sets `status=active`.
 - Apply `supabase/migrations/20260815_roster_invite_onboarding.sql` (`status`, `invite_token_hash`, `invite_consumed_at`). Hub-bridge refuses `invited` rows until the invite link is completed.

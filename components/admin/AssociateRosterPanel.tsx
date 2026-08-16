@@ -177,6 +177,7 @@ export function AssociateRosterPanel({
         department,
         role: "Associate",
         username: suggestUsername(trimmed, department),
+        store_number: specialist.store_number,
       });
       setName("");
       toastSuccess(`Added ${trimmed} to the roster`);

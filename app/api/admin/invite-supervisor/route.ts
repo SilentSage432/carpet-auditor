@@ -30,8 +30,9 @@ type InviteBody = {
 
 /**
  * POST /api/admin/invite-supervisor
- * Super Admin only. Creates a roster member (default: roster-only, no app token)
- * or issues a hashed one-time /auth/verify SMS invite when send_invite is true.
+ * Super Admin only. Issues a hashed one-time /auth/verify SMS invite
+ * (new member or re-invite of an existing roster row).
+ * Roster-only inserts (no SMS) use POST /api/roster/members.
  */
 export async function POST(request: Request) {
   try {
@@ -40,6 +41,15 @@ export async function POST(request: Request) {
     if (!supabase) return response;
 
     const body = (await request.json()) as InviteBody;
+    if (!body.send_invite && !body.specialist_id) {
+      return NextResponse.json(
+        {
+          error:
+            "Roster-only creates use POST /api/roster/members. This route issues SMS invites.",
+        },
+        { status: 400 }
+      );
+    }
     const origin =
       request.headers.get("origin") ||
       process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") ||

@@ -1,8 +1,8 @@
 "use client";
 
 /**
- * Invite activation — temp PIN → permanent 4–6 digit PIN → PWA → WebAuthn.
- * Token verification lives on GET/POST /api/invite/[token].
+ * @deprecated Unused. Invite activation UI lives on `/auth/verify/[token]`.
+ * Token verification lives on GET/POST /api/auth/verify/[token].
  */
 
 import { useRouter } from "next/navigation";

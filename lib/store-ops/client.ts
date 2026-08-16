@@ -1079,7 +1079,17 @@ export async function createRosterMember(
     store_number?: string;
   }
 ): Promise<InviteSupervisorResult> {
-  return inviteSupervisor(specialist, { ...input, send_invite: false });
+  const result = await storeOpsFetch<InviteSupervisorResult>(
+    "/api/roster/members",
+    specialist,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    }
+  );
+  invalidateRosterCache();
+  return result;
 }
 
 export type BayScanClientResult = import("./ai-bay-scan").BayScanResult & {

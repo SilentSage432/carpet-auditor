@@ -2,7 +2,12 @@
 
 /**
  * Roster tab — department-grouped team, shift board, and call-out rebalance.
- * Persistence: lib/specialists.ts + shift-status + sunday-audit (call-out).
+ *
+ * Pipeline: "+ Add Team Member" → AddTeamMemberSheet →
+ *   roster-only: POST /api/roster/members → createRosterMember → store_specialists
+ *   SMS invite:  POST /api/admin/invite-supervisor
+ * Accordions: fetchSpecialists(storeNumber) SELECTs store_specialists, then
+ *   composeRosterDepartmentGroups. On-duty counts come from associate_shift_days.
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react";

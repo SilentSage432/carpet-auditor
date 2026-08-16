@@ -1,22 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { TextField } from "@/components/ui/NumberField";
 import {
   dedupeRoster,
   fetchSpecialists,
-  getActiveSpecialist,
   isDefaultPin,
   roleBadge,
-  saveSpecialist,
 } from "@/lib/specialists";
-import { DepartmentPicker } from "@/components/hub/DepartmentPicker";
-import { DepartmentIcon, HubIcon } from "@/components/hub/NavIcons";
-import type {
-  DepartmentScope,
-  SpecialistRole,
-  StoreSpecialist,
-} from "@/lib/types";
+import { DepartmentIcon } from "@/components/hub/NavIcons";
+import type { StoreSpecialist } from "@/lib/types";
 
 type Props = {
   open: boolean;
@@ -25,15 +17,12 @@ type Props = {
   onSelect: (specialist: StoreSpecialist, meta?: { usedDefaultPin: boolean }) => void;
 };
 
+/**
+ * Session specialist picker. Does not create roster rows —
+ * Add Team Member lives on the Roster tab (store_specialists insert).
+ */
 export function SpecialistModal({ open, active, onClose, onSelect }: Props) {
   const [team, setTeam] = useState<StoreSpecialist[] | null>(null);
-  const [adding, setAdding] = useState(false);
-  const [newName, setNewName] = useState("");
-  const [newRole, setNewRole] = useState<SpecialistRole>("Associate");
-  const [newPin, setNewPin] = useState("");
-  const [newDepartment, setNewDepartment] = useState<DepartmentScope>("flooring");
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -57,50 +46,6 @@ export function SpecialistModal({ open, active, onClose, onSelect }: Props) {
     // Single session: no action-level PIN — workspace is already unlocked.
     onSelect(member, { usedDefaultPin: isDefaultPin(member) });
     onClose();
-  }
-
-  async function handleAdd() {
-    if (!newName.trim()) {
-      setError("Enter a team member name");
-      return;
-    }
-    if (newRole === "Supervisor" && !newPin.trim()) {
-      setError("Supervisor requires a PIN code");
-      return;
-    }
-    setSaving(true);
-    setError(null);
-    try {
-      const active = getActiveSpecialist();
-      const inheritedDept =
-        newRole === "Associate"
-          ? (active?.assigned_department === "appliances" ||
-            active?.assigned_department === "flooring"
-              ? active.assigned_department
-              : newDepartment)
-          : newRole === "MasterAdmin"
-            ? "all"
-            : newDepartment;
-
-      const { record } = await saveSpecialist({
-        name: newName.trim(),
-        role: newRole,
-        pin_code: newPin.trim() || null,
-        assigned_department: inheritedDept,
-        must_change_credentials: newRole === "Supervisor",
-      });
-      setTeam((prev) => dedupeRoster([record, ...(prev ?? [])]));
-      setNewName("");
-      setNewRole("Associate");
-      setNewPin("");
-      setNewDepartment("flooring");
-      setAdding(false);
-      requestSelect(record);
-    } catch {
-      setError("Could not add team member");
-    } finally {
-      setSaving(false);
-    }
   }
 
   return (
@@ -170,94 +115,9 @@ export function SpecialistModal({ open, active, onClose, onSelect }: Props) {
               </ul>
             )}
 
-            {adding ? (
-              <div className="mt-4 space-y-3 rounded-xl border border-zinc-800 bg-zinc-950/70 p-3">
-                <TextField
-                  label="Name"
-                  value={newName}
-                  onChange={setNewName}
-                  placeholder='e.g. Alex'
-                />
-                <fieldset>
-                  <legend className="mb-1.5 text-sm font-medium text-zinc-200">
-                    Role
-                  </legend>
-                  <div className="grid grid-cols-3 gap-1 rounded-xl border border-zinc-800 bg-zinc-950 p-1">
-                    {(
-                      [
-                        ["Associate", "user"],
-                        ["Supervisor", "shield"],
-                        ["MasterAdmin", "crown"],
-                      ] as const
-                    ).map(([value, icon]) => (
-                      <button
-                        key={value}
-                        type="button"
-                        onClick={() => setNewRole(value)}
-                        className={`flex min-h-12 items-center justify-center rounded-lg ${
-                          newRole === value
-                            ? "bg-accent text-accent-fg"
-                            : "text-zinc-400"
-                        }`}
-                        aria-label={value}
-                      >
-                        <HubIcon id={icon} className="h-4 w-4" />
-                      </button>
-                    ))}
-                  </div>
-                </fieldset>
-                {(newRole === "Supervisor" || newRole === "Associate") && (
-                  <DepartmentPicker
-                    value={newDepartment}
-                    onChange={setNewDepartment}
-                    label="Department"
-                  />
-                )}
-                <TextField
-                  label={
-                    newRole === "Supervisor" || newRole === "MasterAdmin"
-                      ? "PIN / Password (required)"
-                      : "PIN Code (optional)"
-                  }
-                  value={newPin}
-                  onChange={setNewPin}
-                  placeholder={
-                    newRole === "Supervisor" || newRole === "MasterAdmin"
-                      ? "e.g. 6-digit temp PIN"
-                      : "Optional"
-                  }
-                />
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setAdding(false)}
-                    className="flex min-h-12 items-center justify-center rounded-xl border border-zinc-700 text-sm font-semibold text-zinc-300"
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="button"
-                    disabled={saving}
-                    onClick={() => void handleAdd()}
-                    className="flex min-h-12 items-center justify-center btn-primary-glow rounded-xl text-sm disabled:opacity-40"
-                  >
-                    {saving ? "Saving…" : "Save"}
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <button
-                type="button"
-                onClick={() => setAdding(true)}
-                className="mt-4 flex min-h-12 w-full items-center justify-center rounded-xl border border-accent/40 text-sm font-semibold text-accent"
-              >
-                + Add Team Member
-              </button>
-            )}
-
-            {error && (
-              <p className="mt-2 text-center text-sm text-red-400">{error}</p>
-            )}
+            <p className="mt-4 text-center text-xs text-zinc-500">
+              Add team members from the Roster tab.
+            </p>
 
             <button
               type="button"

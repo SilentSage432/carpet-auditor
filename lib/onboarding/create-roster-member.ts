@@ -1,7 +1,8 @@
 /**
  * Roster-only member create — composition owner.
- * Inserts an associate for scheduling without app auth tokens or PIN.
- * Send-invite composes issueRosterInvite; this module does not mint tokens.
+ * Inserts an associate into `store_specialists` without app auth tokens or PIN.
+ * Canonical HTTP entry: POST /api/roster/members.
+ * Send-invite composes issueRosterInvite via POST /api/admin/invite-supervisor.
  */
 
 import "server-only";

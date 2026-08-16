@@ -56,7 +56,7 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 - 3-tap stays wired to the **real** Master (`sandboxActor`) while previewing CSA
 
 ### Master Admin roster console
-- Canonical team UI is the **Roster** tab (`/roster`, `RosterTab`) — dynamic collapsible accordions for every home department with members (`D23 · Flooring`, `D35 · Appliances`, `D28 · Inside Garden`, …) plus `{count} roster · {onDutyCount} on-duty`, weekly S–S dots + today's shift pill, `AssociateScheduleModal`, call-out toggle, name/role, and `accessible_departments` chips with optimistic save + Sonner toast. Add Team Member invalidates the 45s roster cache and paints the new card immediately.
+- Canonical team UI is the **Roster** tab (`/roster`, `RosterTab`) — dynamic collapsible accordions for every home department with members (`D23 · Flooring`, `D35 · Appliances`, `D28 · Inside Garden`, …) plus `{count} roster · {onDutyCount} on-duty`, weekly S–S dots + today's shift pill, `AssociateScheduleModal`, call-out toggle, name/role, and `accessible_departments` chips with optimistic save + Sonner toast. **+ Add Team Member** → `AddTeamMemberSheet` → `POST /api/roster/members` (roster-only) or `POST /api/admin/invite-supervisor` (SMS). Accordion query is `fetchSpecialists` on `store_specialists`. There is no `TeamRoster.tsx` / `useRoster` / `team_members` table. `SpecialistModal` is a session picker only.
 - `/admin/supervisors` and `/admin/roles` redirect to `/roster`
 - Invite/reset lives on `/auth/verify/[token]`; Roster add-member is roster-only unless Send Mobile App Invite; dead `AdminRosterManager` was removed
 - Lightweight **Associate Roster** (`AssociateRosterPanel`) remains on the Sunday assignment drawer
@@ -238,7 +238,7 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 - Self-service reset: AuthWall phone → `POST /api/auth/pin-reset/request` → same verify route (30m TTL)
 - Redemption consumes the token on GET (HttpOnly setup cookie), then hashes a 4–6 digit PIN and mints Hub-bridge Auth
 - Owners: `lib/auth-token.ts` (crypto), `lib/invite.ts` (SMS copy), `lib/onboarding/roster-invite.ts`, `lib/onboarding/pin-reset.ts`, `lib/onboarding/redeem-token.ts`
-- APIs: `POST /api/admin/invite-supervisor`, `POST /api/auth/pin-reset/request`, `GET /api/auth/verify/[token]`, `GET|POST /api/auth/verify`
+- APIs: `POST /api/roster/members` (canonical roster-only insert), `POST /api/admin/invite-supervisor` (SMS invite / re-invite), `POST /api/auth/pin-reset/request`, `GET /api/auth/verify/[token]`, `GET|POST /api/auth/verify`
 - Legacy `/invite/[token]` redirects to `/auth/verify/[token]`
 
 ## Associate floor role

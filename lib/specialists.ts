@@ -1,7 +1,6 @@
 import { composeAccessibleDepartments } from "./department-access";
 import { isMissingColumnError } from "./store-ops/errors";
 import { createTtlCache } from "@/lib/store-ops/ttl-cache";
-import { uid } from "./uid";
 import type {
   AppAccessStatus,
   AssociateOnboardingStatus,
@@ -39,6 +38,7 @@ const SPECIALIST_LIST_SELECT = [
   "role",
   "username",
   "assigned_department",
+  "home_department",
   "accessible_departments",
   "must_change_credentials",
   "must_change_pin",
@@ -578,6 +578,10 @@ function specialistPayload(record: StoreSpecialist): Record<string, unknown> {
   }
   if (record.assigned_department !== undefined) {
     payload.assigned_department = record.assigned_department;
+    payload.home_department =
+      record.assigned_department && record.assigned_department !== "all"
+        ? record.assigned_department
+        : null;
   }
   if (record.accessible_departments !== undefined) {
     payload.accessible_departments = composeAccessibleDepartments(
@@ -636,6 +640,10 @@ function buildSpecialistDbPatch(
   }
   if (patch.assigned_department !== undefined) {
     update.assigned_department = patch.assigned_department;
+    update.home_department =
+      patch.assigned_department && patch.assigned_department !== "all"
+        ? patch.assigned_department
+        : null;
   }
   if (patch.accessible_departments !== undefined) {
     update.accessible_departments = composeAccessibleDepartments(
@@ -671,6 +679,7 @@ export function isFallbackProfileId(id: string): boolean {
   );
 }
 
+/** Accordion query: SELECT from `store_specialists` for the bound store_number. */
 export async function fetchSpecialists(
   storeNumber?: string
 ): Promise<StoreSpecialist[]> {
@@ -707,7 +716,8 @@ async function loadSpecialists(store: string): Promise<StoreSpecialist[]> {
         isMissingColumnError(error, "status") ||
         isMissingColumnError(error, "pin_updated_at") ||
         isMissingColumnError(error, "email") ||
-        isMissingColumnError(error, "auth_user_id"))
+        isMissingColumnError(error, "auth_user_id") ||
+        isMissingColumnError(error, "home_department"))
     ) {
       let retryQuery = supabase
         .from(TABLE)
@@ -768,6 +778,10 @@ async function loadSpecialists(store: string): Promise<StoreSpecialist[]> {
   }
 }
 
+/**
+ * Patch an existing `store_specialists` row (scope, PIN, name).
+ * New members must go through POST /api/roster/members (`createRosterMember`).
+ */
 export async function saveSpecialist(input: {
   id?: string;
   store_number?: string;
@@ -779,6 +793,11 @@ export async function saveSpecialist(input: {
   accessible_departments?: StoreSpecialist["accessible_departments"];
   must_change_credentials?: boolean;
 }): Promise<{ record: StoreSpecialist; offline: boolean }> {
+  if (!input.id || isFallbackProfileId(input.id)) {
+    throw new Error(
+      "saveSpecialist updates existing roster rows only. Add team members from the Roster tab."
+    );
+  }
   invalidateRosterCache();
   const now = new Date().toISOString();
   const store = input.store_number ?? getStoreNumber();
@@ -801,8 +820,7 @@ export async function saveSpecialist(input: {
         ? "flooring"
         : null);
 
-  const id =
-    input.id && !isFallbackProfileId(input.id) ? input.id : uid();
+  const id = input.id;
 
   const record: StoreSpecialist = {
     id,
@@ -1141,6 +1159,10 @@ async function persistSpecialistFields(
     }
     if (nextLocal.assigned_department !== undefined) {
       insertRow.assigned_department = nextLocal.assigned_department;
+      insertRow.home_department =
+        nextLocal.assigned_department && nextLocal.assigned_department !== "all"
+          ? nextLocal.assigned_department
+          : null;
     }
 
     const { data, error } = await supabase!
@@ -1218,6 +1240,18 @@ async function persistSpecialistFields(
 
       if (error && isMissingColumnError(error, "accessible_departments")) {
         const { accessible_departments: _drop, ...rest } = payload;
+        payload = rest;
+        const retry = await supabase
+          .from(TABLE)
+          .update(payload)
+          .eq("id", targetId)
+          .select("*");
+        data = retry.data;
+        error = retry.error;
+      }
+
+      if (error && isMissingColumnError(error, "home_department")) {
+        const { home_department: _dropHome, ...rest } = payload;
         payload = rest;
         const retry = await supabase
           .from(TABLE)
