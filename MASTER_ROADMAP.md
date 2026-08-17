@@ -145,6 +145,7 @@
 - [x] Read/write visibility audit — INSERT vs SELECT contracts, RLS SELECT parity, store/dept UUID joins, mutation cache bust (`20260816_rls_read_write_parity.sql`)
 - [x] Roster Specialist vs CSA job options — `floor_title` on `store_specialists`, Add Team Member dropdown, accordion badges (`20260816_roster_floor_title.sql`)
 - [x] Header store number — compact `DeptSync · #2587` plus overflow marquee; D23 / account chips stay aligned
+- [x] Force Draw staged-week clear + mistaken `store_dept_week` unique drop (`20260818_drop_weekly_rotations_store_dept_week_uniq.sql`) + Admin Sandbox rotation reset (`POST /api/admin/rotations/reset`)
 - [x] Sunday auto-stage schedule — store timezone + 05:00 default, auto-run toggle, cron skip-if-staged, Master Force Draw overwrite (`20260816_sunday_rotation_schedule.sql`)
 - [x] Sunday Flooring draw pre-selects Flooring-tagged roster (`associateMatchesSundayDepartment`; other depts start off)
 - [x] RLS security lockdown — drop anon/open SELECT; authenticated store isolation; Realtime publication on sunday_bay_assignments / manager_notes / downstock_queue (`20260817_rls_security_lockdown.sql`)

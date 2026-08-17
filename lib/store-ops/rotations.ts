@@ -19,6 +19,8 @@ import {
   isMissingRelationError,
   isNotNullViolationError,
   isOnConflictMismatch,
+  isStoreDeptWeekUniqueViolation,
+  isUniqueViolationError,
   readableError,
 } from "./errors";
 import { departmentCodesMatch } from "./department-codes";
@@ -200,6 +202,47 @@ async function mergeWeeklyRotationsByLocationWeek(
  * Strips a column only when PostgREST reports it missing.
  * onConflict matches UNIQUE(location_id, assigned_week).
  */
+type UpsertWeeklyRotationsOptions = {
+  /** After a staged-week clear, prefer insert to avoid stale ON CONFLICT targets. */
+  insertAfterClear?: boolean;
+};
+
+async function deleteWeeklyRotationConflicts(
+  supabase: SupabaseClient,
+  row: Record<string, unknown>
+): Promise<void> {
+  const locationId = String(row.location_id ?? "").trim();
+  const week = String(row.assigned_week ?? "").trim();
+  if (locationId && week) {
+    const { error } = await supabase
+      .from("weekly_rotations")
+      .delete()
+      .eq("location_id", locationId)
+      .eq("assigned_week", week);
+    if (error) throw new Error(readableError(error, "Weekly rotation clear failed"));
+  }
+
+  const storeNumber = asStoreNumber(row.store_number);
+  const departmentId = String(row.department_id ?? "").trim();
+  const weekNumber = row.week_number;
+  if (
+    storeNumber &&
+    departmentId &&
+    weekNumber != null &&
+    Number.isFinite(Number(weekNumber))
+  ) {
+    const { error } = await supabase
+      .from("weekly_rotations")
+      .delete()
+      .eq("store_number", storeNumber)
+      .eq("department_id", departmentId)
+      .eq("week_number", Number(weekNumber));
+    if (error && !isMissingColumnError(error, "week_number")) {
+      throw new Error(readableError(error, "Weekly rotation clear failed"));
+    }
+  }
+}
+
 async function upsertWeeklyRotations(
   supabase: SupabaseClient,
   rows: Array<{
@@ -209,7 +252,8 @@ async function upsertWeeklyRotations(
     is_completed: boolean;
     store_id?: string;
     store_number?: string;
-  }>
+  }>,
+  options: UpsertWeeklyRotationsOptions = {}
 ): Promise<WeeklyRotation[]> {
   let payload: Record<string, unknown>[] = rows.map((row) => {
     const { year, week } = parseIsoWeekLabel(row.assigned_week);
@@ -231,16 +275,43 @@ async function upsertWeeklyRotations(
   let lastError: unknown = null;
 
   for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
-    const { data, error } = await supabase
-      .from("weekly_rotations")
-      .upsert(payload, { onConflict: WEEKLY_ROTATIONS_ON_CONFLICT })
-      .select("*");
+    const write = options.insertAfterClear
+      ? supabase.from("weekly_rotations").insert(payload).select("*")
+      : supabase
+          .from("weekly_rotations")
+          .upsert(payload, { onConflict: WEEKLY_ROTATIONS_ON_CONFLICT })
+          .select("*");
+
+    const { data, error } = await write;
 
     if (!error) {
       return (data ?? []) as WeeklyRotation[];
     }
 
     lastError = error;
+
+    if (
+      isUniqueViolationError(error) &&
+      (options.insertAfterClear || isStoreDeptWeekUniqueViolation(error))
+    ) {
+      for (const row of payload) {
+        await deleteWeeklyRotationConflicts(supabase, row);
+      }
+      const retry = await supabase
+        .from("weekly_rotations")
+        .insert(payload)
+        .select("*");
+      if (!retry.error) {
+        return (retry.data ?? []) as WeeklyRotation[];
+      }
+      lastError = retry.error;
+      if (isStoreDeptWeekUniqueViolation(retry.error)) {
+        throw new Error(
+          "Database has a mistaken UNIQUE(store_number, department_id, week_number) on weekly_rotations — apply migration 20260818_drop_weekly_rotations_store_dept_week_uniq.sql, then reload the PostgREST schema."
+        );
+      }
+    }
+
     const missing = OPTIONAL_WEEKLY_ROTATION_COLUMNS.find(
       (col) =>
         isMissingColumnError(error, col) &&
@@ -460,29 +531,67 @@ export async function countWeekRotations(
   return count ?? 0;
 }
 
+export type ResetStagedWeekOptions = {
+  store_number?: string | null;
+  /** When false (Force Draw), completed bays stay. Admin reset clears all staged rows. */
+  includeCompleted?: boolean;
+};
+
+export type ResetStagedWeekResult = {
+  deleted_rotations: number;
+  deleted_assignments: number;
+  reset_locations: number;
+  rotation_ids: string[];
+};
+
 /**
- * Drop incomplete rows for this ISO week so Master Admin can restage.
- * Completed bays stay. Matching sunday_bay_assignments are cleared.
+ * Remove staged weekly_rotations for a department + ISO week.
+ * Clears sunday_bay_assignments and returns affected bays to PENDING.
  */
-export async function replaceIncompleteWeekRotations(
+export async function resetStagedWeekRotations(
   supabase: SupabaseClient,
   departmentId: string,
-  weekLabel: string
-): Promise<number> {
-  const { data: rows, error } = await supabase
+  weekLabel: string,
+  options: ResetStagedWeekOptions = {}
+): Promise<ResetStagedWeekResult> {
+  let query = supabase
     .from("weekly_rotations")
     .select("id, location_id")
     .eq("department_id", departmentId)
-    .eq("assigned_week", weekLabel)
-    .eq("is_completed", false);
+    .eq("assigned_week", weekLabel);
 
+  const storeNumber = asStoreNumber(options.store_number);
+  if (storeNumber) {
+    query = query.eq("store_number", storeNumber);
+  }
+  if (options.includeCompleted !== true) {
+    query = query.eq("is_completed", false);
+  }
+
+  const { data: rows, error } = await query;
   if (error) throw new Error(error.message);
-  if (!rows?.length) return 0;
+  if (!rows?.length) {
+    return {
+      deleted_rotations: 0,
+      deleted_assignments: 0,
+      reset_locations: 0,
+      rotation_ids: [],
+    };
+  }
 
   const rotationIds = rows.map((row) => String(row.id));
   const locationIds = [
     ...new Set(rows.map((row) => String(row.location_id)).filter(Boolean)),
   ];
+
+  let deletedAssignments = 0;
+  const { count: assignmentCount, error: countError } = await supabase
+    .from("sunday_bay_assignments")
+    .select("id", { count: "exact", head: true })
+    .in("bay_id", rotationIds);
+  if (!countError) {
+    deletedAssignments = assignmentCount ?? 0;
+  }
 
   const { error: assignError } = await supabase
     .from("sunday_bay_assignments")
@@ -511,7 +620,31 @@ export async function replaceIncompleteWeekRotations(
     if (resetError) throw new Error(resetError.message);
   }
 
-  return rows.length;
+  return {
+    deleted_rotations: rows.length,
+    deleted_assignments: deletedAssignments,
+    reset_locations: locationIds.length,
+    rotation_ids: rotationIds,
+  };
+}
+
+/**
+ * Drop incomplete rows for this ISO week so Master Admin can restage.
+ * Completed bays stay. Matching sunday_bay_assignments are cleared.
+ */
+export async function replaceIncompleteWeekRotations(
+  supabase: SupabaseClient,
+  departmentId: string,
+  weekLabel: string,
+  storeNumber?: string | null
+): Promise<number> {
+  const result = await resetStagedWeekRotations(
+    supabase,
+    departmentId,
+    weekLabel,
+    { store_number: storeNumber, includeCompleted: false }
+  );
+  return result.deleted_rotations;
 }
 
 export async function generateWeeklyRotations(
@@ -541,12 +674,15 @@ export async function generateWeeklyRotations(
   }
 
   let replaced = 0;
+  let clearedForInsert = false;
   if (options.forceOverwrite && existingCount > 0) {
     replaced = await replaceIncompleteWeekRotations(
       supabase,
       departmentId,
-      weekLabel
+      weekLabel,
+      options.store_number
     );
+    clearedForInsert = replaced > 0;
   } else if (!options.forceOverwrite && existingCount > 0) {
     return {
       assigned_week: weekLabel,
@@ -605,7 +741,8 @@ export async function generateWeeklyRotations(
     cycleNumber,
     reset,
     pending,
-    carried
+    carried,
+    { insertAfterClear: clearedForInsert || options.forceOverwrite === true }
   );
 
   return replaced > 0 ? { ...generated, replaced } : generated;
@@ -685,7 +822,8 @@ async function finishGenerate(
   cycleNumber: number,
   reset: boolean,
   pending: StoreLocation[],
-  carried: StoreLocation[]
+  carried: StoreLocation[],
+  upsertOptions: UpsertWeeklyRotationsOptions = {}
 ): Promise<GenerateRotationsResult> {
   const pool: StoreLocation[] = [];
 
@@ -735,7 +873,7 @@ async function finishGenerate(
     is_completed: false,
   }));
 
-  const rotations = await upsertWeeklyRotations(supabase, rows);
+  const rotations = await upsertWeeklyRotations(supabase, rows, upsertOptions);
 
   const { data: locations, error: locError } = await supabase
     .from("store_locations")

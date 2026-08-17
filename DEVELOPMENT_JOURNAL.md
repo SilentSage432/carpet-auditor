@@ -1,5 +1,17 @@
 # DeptSync Hub — Development Journal
 
+## 2026-08-17 — Force Draw clears staged week; Admin Sandbox rotation reset
+
+### Found
+- Live DBs may carry `weekly_rotations_store_dept_week_uniq` on `(store_number, department_id, week_number)`, which allows only one bay per department per ISO week and breaks multi-bay Force Draw inserts.
+- Force Draw could hit duplicate-key errors when incomplete rows were not fully cleared before upsert.
+
+### Shipped
+- `resetStagedWeekRotations` in `lib/store-ops/rotations.ts` — deletes `weekly_rotations`, matching `sunday_bay_assignments`, and resets affected bays to `PENDING`. `replaceIncompleteWeekRotations` delegates to it (incomplete only). Force Draw uses insert-after-clear and retries on unique violations.
+- Migration `20260818_drop_weekly_rotations_store_dept_week_uniq.sql` drops the mistaken unique when present.
+- `POST /api/admin/rotations/reset` (Master Admin) + `resetStagedRotation` client helper; invalidates rotation cache on success.
+- Developer sandbox (3-tap DeptSync logo) **Danger zone / testing actions**: department + ISO week selectors, two-step **Clear staged rotation**.
+
 ## 2026-08-17 — Weekly rotation upsert fills week_number from assigned_week
 
 ### Found

@@ -60,6 +60,18 @@ export function isUniqueViolationError(error: unknown): boolean {
   );
 }
 
+/** Live DBs may carry a mistaken UNIQUE(store_number, department_id, week_number). */
+export function isStoreDeptWeekUniqueViolation(error: unknown): boolean {
+  if (!isUniqueViolationError(error)) return false;
+  const msg = readableError(error, "").toLowerCase();
+  return (
+    msg.includes("weekly_rotations_store_dept_week_uniq") ||
+    (msg.includes("store_number") &&
+      msg.includes("department_id") &&
+      msg.includes("week_number"))
+  );
+}
+
 export function isNotNullViolationError(
   error: unknown,
   column?: string

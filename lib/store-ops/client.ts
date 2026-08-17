@@ -696,6 +696,44 @@ export async function generateRotations(
   return result;
 }
 
+export type ResetStagedRotationResult = {
+  ok: boolean;
+  audit: {
+    store_number: string;
+    department_id: string;
+    department_name: string;
+    week_label: string;
+    include_completed: boolean;
+    deleted_rotations: number;
+    deleted_assignments: number;
+    reset_locations: number;
+    rotation_ids: string[];
+  };
+};
+
+/** Master Admin — clear staged weekly_rotations for a department + ISO week. */
+export async function resetStagedRotation(
+  specialist: StoreSpecialist,
+  departmentId: string,
+  weekLabel: string,
+  options?: { includeCompleted?: boolean }
+): Promise<ResetStagedRotationResult> {
+  const result = await storeOpsFetch<ResetStagedRotationResult>(
+    "/api/admin/rotations/reset",
+    specialist,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        department_id: departmentId,
+        week_label: weekLabel,
+        include_completed: options?.includeCompleted !== false,
+      }),
+    }
+  );
+  await invalidateStoreOpsListCaches();
+  return result;
+}
+
 export type StoreScheduleSettingsClient = {
   store_id: string;
   store_number: string;

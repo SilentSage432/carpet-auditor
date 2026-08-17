@@ -51,6 +51,7 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 ### Developer sandbox (Master Admin only)
 - 3 taps on the DeptSync logo within 800ms opens `DevSandboxDrawer` (`HubHeader` + `NavigationHub`)
 - Preview As Role: Master Admin | DS Supervisor | CSA Specialist; Simulate Department overlays chrome without changing JWT
+- **Danger zone / testing actions:** department + ISO week selectors (defaults to current staging week), two-step **Clear staged rotation** → `POST /api/admin/rotations/reset` (deletes `weekly_rotations` + `sunday_bay_assignments`, resets bays to PENDING, invalidates rotation cache)
 - State: `sessionStorage` `deptsync_dev_sandbox` + `deptsync:dev-sandbox` event (`lib/dev-sandbox.ts`). `composeViewSpecialist` keeps real `id` / name / store
 - Banner: `⚡ Simulating: [Role · Dept] — Tap to Exit` (`DevSandboxBanner`)
 - 3-tap stays wired to the **real** Master (`sandboxActor`) while previewing CSA
@@ -207,9 +208,9 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 ## Weekly rotation cron
 - Migration: `supabase/migrations/20260809_weekly_rotation_cron.sql` (`weekly_bay_target`, Lowe's codes) + **`20260816_sunday_rotation_schedule.sql`** (`stores.sunday_auto_generate`, `sunday_auto_stage_time` default 05:00, `timezone` default America/Denver)
 - `vercel.json`: Sunday `0 11 * * 0` (11:00 UTC ≈ 05:00 AM America/Denver) → `/api/cron/weekly-rotation`. Hobby forbids sub-daily cron (`*/15` fails the deploy). Dispatch still skips unless auto-generate is on, it is Sunday in `stores.timezone`, local time is at/after `sunday_auto_stage_time`, and the week is not already staged
-- On Sunday the runner stages the **upcoming** ISO week (Monday). It **skips** a department that already has `weekly_rotations` for that week — Master Admin Force Draw / Recalculate (`force: true`) replaces incomplete rows only
+- On Sunday the runner stages the **upcoming** ISO week (Monday). It **skips** a department that already has `weekly_rotations` for that week — Master Admin Force Draw / Recalculate (`force: true`) replaces incomplete rows via `resetStagedWeekRotations`, then inserts fresh bays (insert-after-clear + duplicate-key recovery)
 - Persist owner: `lib/store-ops/rotations.ts` (`upsertWeeklyRotations`). Payload includes `store_id` (UUID from `20260809_multi_store.sql`), `store_number` (JWT RLS from `20260812_jwt_rls_policies.sql`), and `week_number` + `year` parsed from `assigned_week` via `parseIsoWeekLabel` (`2026-W34` → week 34, year 2026 — never a hardcoded week). If PostgREST reports a missing column (PGRST204 / schema cache), that column is dropped and the upsert retries. A NOT NULL after a cache miss means Postgres has the column but the API cache is stale — reload schema (`NOTIFY pgrst, 'reload schema'`) rather than guessing the column set
-- Upsert `onConflict` is **`location_id,assigned_week`** — the table unique from `20260809_store_operations_rbac.sql`, re-asserted by **`20260817_weekly_rotations_location_week_unique.sql`**. Live DBs may also have NOT NULL `week_number`; that is a denormalized integer from `assigned_week`, not a second unique key. If the live unique is missing, persist merges by location+week instead of throwing a constraint mismatch
+- Upsert `onConflict` is **`location_id,assigned_week`** — the table unique from `20260809_store_operations_rbac.sql`, re-asserted by **`20260817_weekly_rotations_location_week_unique.sql`**. Apply **`20260818_drop_weekly_rotations_store_dept_week_uniq.sql`** if the live DB has a mistaken `UNIQUE(store_number, department_id, week_number)`. Admin reset: `POST /api/admin/rotations/reset`
 - Env on Vercel: `CRON_SECRET` (Bearer token Vercel sends automatically)
 - Settings → Sunday rotation schedule (Master) + weekly bay target matrix (Supervisor + Master; blur autosave + Save All)
 

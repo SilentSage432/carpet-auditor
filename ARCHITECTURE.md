@@ -41,7 +41,7 @@ components/hub/ScanActionDock.tsx → Cycle / department Log bar docked above Bo
 components/hub/StatusPills.tsx    → Lucide variance / aging / SIMS / clearance glyphs (stroke 1.75)
 components/hub/DeptSyncSplash.tsx → Boot / loading splash (pinned midnight + branded cyan/gold mark)
 components/hub/NavigationHub.tsx  → Cross-app Navigation Hub (composes HubHeader + BottomNav + sandbox banner/drawer)
-components/hub/DevSandboxDrawer.tsx → Preview-as-role + simulate department (Master Admin only)
+components/hub/DevSandboxDrawer.tsx → Preview-as-role + simulate department + danger-zone staged rotation reset (Master Admin only)
 lib/dev-sandbox.ts                → sessionStorage role/department overlay (does not own auth)
 lib/rbac.ts                       → HubViewRole + map console / associate chrome gates
 app/loading.tsx                   → Route-level splash
@@ -136,7 +136,7 @@ lib/store-ops/map-readiness.ts → Store Map green/yellow/red readiness tones (c
 lib/store-ops/velocity.ts → IRP cadence tones, seed presets (14d/5d/lock), custom_decay_days, Sunday decay multiplier, async decay scores
 lib/store-ops/bay-service.ts → Persist bay_service_logs + stamp last_serviced_at + promote velocity
 lib/store-ops/rotation.ts → Sunday draw: carry-over prepend then velocity-priority pick (composed by rotations.ts)
-lib/store-ops/rotations.ts → Weekly rotation engine persist. `weekly_rotations` upsert sends `store_id` + `store_number` + `week_number`/`year` parsed from `assigned_week` (`2026-W34` → 34 / 2026). `onConflict` is `location_id,assigned_week`. Strips a column only on PostgREST cache miss (PGRST204)
+lib/store-ops/rotations.ts → Weekly rotation engine persist. `resetStagedWeekRotations` clears staged week rows + Sunday assignments. Force Draw uses insert-after-clear and duplicate-key recovery. `weekly_rotations` upsert sends `store_id` + `store_number` + `week_number`/`year` parsed from `assigned_week` (`2026-W34` → 34 / 2026). `onConflict` is `location_id,assigned_week`. Strips a column only on PostgREST cache miss (PGRST204)
 lib/store-ops/audit-summary.ts → Supervisor weekly rollup composition (quota / associate / barriers)
 components/store-ops/SupervisorAuditSummaryModal.tsx → Personal weekly stats + copy
 lib/admin-department-context.ts       → Working department pin (localStorage + event; Floor/Map/Roster subscribe)
@@ -221,7 +221,7 @@ supabase/migrations/20260812_sunday_bay_assignments.sql → sunday specialist↔
 | Cross-app Navigation Hub | `lib/nav-hub.ts` + `NavigationHub` + `HubHeader` + `BottomNav` (Floor · Map · Roster · Settings only; Settings hashes for former Admin Tools) |
 | Department weekly quotas | `DepartmentTargetsMatrix` (blur / Save All) + `PATCH /api/departments` + Settings |
 | Store Operations map + rotations | `lib/store-ops/*` + `/admin/store-map` + `/dashboard` (visual navigator: `StoreLocationGrid` + `WalkTheFloorSheet`; topology CRUD in Settings: `AisleBayManager` + `AddBaySheet` + `EditBayDrawer` + prune/batch + bulk velocity seed; floor checklist: `ZebraChecklist`; walk log: `bay-service.ts` + `POST /api/store-locations/service`; Sunday pick: carry-over prepend then `rotation.ts` velocity + `custom_decay_days`; persist owner `rotations.ts` (`weekly_rotations` upsert `store_id` + `store_number`); department cron: Settings `DepartmentTargetsMatrix`; Sunday clock: `sunday-schedule.ts` + Settings `SundayScheduleCard`) |
-| Sunday schedule | `lib/store-ops/sunday-schedule.ts` (time / timezone / auto-run) + `stores` columns + `/api/cron/weekly-rotation` (skip if week already staged) + Master Force Draw overwrite |
+| Sunday schedule | `lib/store-ops/sunday-schedule.ts` (time / timezone / auto-run) + `stores` columns + `/api/cron/weekly-rotation` (skip if week already staged) + Master Force Draw overwrite + `/api/admin/rotations/reset` |
 | Sunday assignments | `lib/store-ops/sunday-audit.ts` (persist + department seed `associateMatchesSundayDepartment`) + `SundayAuditAssignmentModal` + `AssociateRosterPanel` |
 | Daily shift board | `lib/store-ops/shift-status.ts` (`associate_shift_days` week matrix; throws on live write failure) |
 | Call-out bay rebalance | `lib/store-ops/call-out.ts` (pool / auto / carry-over loop; stamps `carried_over` + Sunday `CARRIED_OVER`; does not generate rotations) |

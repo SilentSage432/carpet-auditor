@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { HubIcon } from "@/components/hub/NavIcons";
 import { DepartmentPicker } from "@/components/hub/DepartmentPicker";
 import {
@@ -10,7 +10,15 @@ import {
   type DevSandboxState,
 } from "@/lib/dev-sandbox";
 import { type HubViewRole } from "@/lib/rbac";
-import type { DepartmentScope } from "@/lib/types";
+import {
+  fetchDepartments,
+  fetchStoreScheduleSettings,
+  resetStagedRotation,
+} from "@/lib/store-ops/client";
+import { readableError } from "@/lib/store-ops/errors";
+import type { Department } from "@/lib/store-ops/types";
+import { playErrorTone, playSuccessTone } from "@/lib/ui/feedback";
+import type { DepartmentScope, StoreSpecialist } from "@/lib/types";
 
 const ROLES: HubViewRole[] = [
   "MASTER_ADMIN",
@@ -21,10 +29,19 @@ const ROLES: HubViewRole[] = [
 type Props = {
   open: boolean;
   sandbox: DevSandboxState;
+  specialist: StoreSpecialist | null;
   onClose: () => void;
 };
 
-export function DevSandboxDrawer({ open, sandbox, onClose }: Props) {
+export function DevSandboxDrawer({ open, sandbox, specialist, onClose }: Props) {
+  const [departments, setDepartments] = useState<Department[]>([]);
+  const [resetDeptId, setResetDeptId] = useState("");
+  const [resetWeek, setResetWeek] = useState("");
+  const [resetBusy, setResetBusy] = useState(false);
+  const [resetMsg, setResetMsg] = useState<string | null>(null);
+  const [resetError, setResetError] = useState<string | null>(null);
+  const [confirmReset, setConfirmReset] = useState(false);
+
   useEffect(() => {
     if (!open) return;
     document.body.style.overflow = "hidden";
@@ -32,6 +49,38 @@ export function DevSandboxDrawer({ open, sandbox, onClose }: Props) {
       document.body.style.overflow = "";
     };
   }, [open]);
+
+  useEffect(() => {
+    if (!open || !specialist) return;
+    let cancelled = false;
+    setResetMsg(null);
+    setResetError(null);
+    setConfirmReset(false);
+    void Promise.all([
+      fetchDepartments(specialist),
+      fetchStoreScheduleSettings(specialist),
+    ])
+      .then(([depts, schedule]) => {
+        if (cancelled) return;
+        const active = depts.filter((d) => d.is_active !== false);
+        setDepartments(active.length > 0 ? active : depts);
+        setResetWeek(schedule.staging_week);
+        setResetDeptId((current) => {
+          if (current && depts.some((d) => d.id === current)) return current;
+          return active[0]?.id ?? depts[0]?.id ?? "";
+        });
+      })
+      .catch((err) => {
+        if (!cancelled) {
+          setResetError(
+            readableError(err, "Could not load departments or staging week")
+          );
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, specialist]);
 
   if (!open) return null;
 
@@ -46,6 +95,47 @@ export function DevSandboxDrawer({ open, sandbox, onClose }: Props) {
           ? department
           : next.previewDepartment,
     });
+  }
+
+  async function handleClearStagedRotation() {
+    if (!specialist || !resetDeptId || !resetWeek) return;
+    if (!confirmReset) {
+      setConfirmReset(true);
+      setResetMsg(null);
+      setResetError(null);
+      return;
+    }
+    setResetBusy(true);
+    setResetMsg(null);
+    setResetError(null);
+    try {
+      const result = await resetStagedRotation(
+        specialist,
+        resetDeptId,
+        resetWeek,
+        { includeCompleted: true }
+      );
+      const audit = result.audit;
+      setResetMsg(
+        `Cleared ${audit.week_label}: ${audit.deleted_rotations} rotation${
+          audit.deleted_rotations === 1 ? "" : "s"
+        }, ${audit.deleted_assignments} assignment${
+          audit.deleted_assignments === 1 ? "" : "s"
+        }, ${audit.reset_locations} bay${
+          audit.reset_locations === 1 ? "" : "s"
+        } reset to PENDING.`
+      );
+      setConfirmReset(false);
+      playSuccessTone();
+    } catch (err) {
+      setResetError(
+        readableError(err, "Could not clear staged rotation for this week")
+      );
+      setConfirmReset(false);
+      playErrorTone();
+    } finally {
+      setResetBusy(false);
+    }
   }
 
   return (
@@ -155,6 +245,82 @@ export function DevSandboxDrawer({ open, sandbox, onClose }: Props) {
             Select a role to overlay the hub chrome.
           </p>
         )}
+
+        {specialist ? (
+          <section
+            className="mt-5 rounded-xl border border-rose-500/35 bg-rose-950/20 p-3"
+            aria-labelledby="dev-sandbox-danger-title"
+          >
+            <p
+              id="dev-sandbox-danger-title"
+              className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-rose-300"
+            >
+              Danger zone / testing actions
+            </p>
+            <p className="mt-1 text-xs text-zinc-400">
+              Deletes staged weekly rotations and Sunday bay assignments for the
+              selected week. Bays return to PENDING.
+            </p>
+            <div className="mt-3 space-y-2">
+              <label className="block text-sm">
+                <span className="mb-1 block text-xs font-medium text-zinc-300">
+                  Department
+                </span>
+                <select
+                  value={resetDeptId}
+                  onChange={(e) => {
+                    setResetDeptId(e.target.value);
+                    setConfirmReset(false);
+                  }}
+                  className="glass-input min-h-11 w-full text-sm font-semibold"
+                >
+                  {departments.map((d) => (
+                    <option key={d.id} value={d.id}>
+                      {d.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="block text-sm">
+                <span className="mb-1 block text-xs font-medium text-zinc-300">
+                  ISO week
+                </span>
+                <input
+                  type="text"
+                  value={resetWeek}
+                  onChange={(e) => {
+                    setResetWeek(e.target.value.trim());
+                    setConfirmReset(false);
+                  }}
+                  placeholder="2026-W34"
+                  className="glass-input min-h-11 w-full font-mono text-sm font-semibold"
+                />
+              </label>
+              <button
+                type="button"
+                disabled={resetBusy || !resetDeptId || !resetWeek}
+                onClick={handleClearStagedRotation}
+                className="flex min-h-11 w-full items-center justify-center rounded-xl border border-rose-400/50 bg-rose-600/90 text-sm font-bold text-white disabled:opacity-50"
+              >
+                {resetBusy
+                  ? "Clearing…"
+                  : confirmReset
+                    ? "Confirm clear staged rotation"
+                    : "Clear staged rotation"}
+              </button>
+            </div>
+            {resetMsg ? (
+              <p className="mt-2 text-xs text-emerald-200" role="status">
+                {resetMsg}
+              </p>
+            ) : null}
+            {resetError ? (
+              <p className="mt-2 text-xs font-medium text-rose-200" role="alert">
+                {resetError}
+              </p>
+            ) : null}
+          </section>
+        ) : null}
 
         <div className="mt-4 grid grid-cols-2 gap-2">
           <button

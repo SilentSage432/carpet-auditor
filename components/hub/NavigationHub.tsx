@@ -200,6 +200,7 @@ export function NavigationHub({
         <DevSandboxDrawer
           open={sandboxOpen}
           sandbox={sandbox}
+          specialist={sandboxActor ?? specialist}
           onClose={() => setSandboxOpen(false)}
         />
       ) : null}
