@@ -2,6 +2,12 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ApplianceAnomalyWidget } from "@/components/appliances/ApplianceAnomalyWidget";
+import { ApplianceAuditActionBar } from "@/components/appliances/ApplianceAuditActionBar";
+import {
+  ApplianceGroupCountSummary,
+  ApplianceUnitLocationBadge,
+  formatApplianceUnitDetail,
+} from "@/components/appliances/ApplianceShowroomBadge";
 import { ApplianceScannerModal } from "@/components/appliances/ApplianceScannerModal";
 import { ApplianceScanEditModal } from "@/components/appliances/ApplianceScanEditModal";
 import { ConfirmModal } from "@/components/hub/ConfirmModal";
@@ -28,8 +34,11 @@ import {
 } from "@/lib/specialty-tools";
 import {
   type ApplianceCatalogItem,
+  type ApplianceConditionTag,
+  type ApplianceLocationType,
   type ApplianceScan,
   type StoreSpecialist,
+  isApplianceShowroomDisplayScan,
 } from "@/lib/types";
 
 function formatTime(iso: string): string {
@@ -226,7 +235,8 @@ export function ApplianceAuditSection({
   async function handleSaveGroupEdit(input: {
     targetQuantity: number;
     location: string;
-    serials: string[];
+    location_type: ApplianceLocationType;
+    units: { serial: string; condition_tag: ApplianceConditionTag }[];
   }) {
     if (!editingGroup) return;
     setEditSaving(true);
@@ -237,7 +247,8 @@ export function ApplianceAuditSection({
         sub_category: editingGroup.sub_category,
         targetQuantity: input.targetQuantity,
         location: input.location,
-        serials: input.serials,
+        location_type: input.location_type,
+        units: input.units,
         scanned_by: scannedBy || activeSpecialist?.name || "",
         existingScans: editingGroup.scans,
       });
@@ -291,8 +302,23 @@ export function ApplianceAuditSection({
     URL.revokeObjectURL(url);
   }
 
+  const exportScans = shiftScans.length > 0 ? shiftScans : scans;
+
   return (
     <div className="space-y-4 overflow-x-hidden pb-4">
+      <ApplianceAuditActionBar
+        scans={exportScans}
+        csvOptions={{ descriptions: catalogDescriptions }}
+        disabled={!loaded}
+        onResetComplete={() => {
+          void fetchApplianceScans().then(setScans).catch(() => setScans([]));
+        }}
+        onRefresh={() => {
+          void fetchApplianceScans().then(setScans).catch(() => undefined);
+        }}
+        onStatus={(msg, tone = "ok") => flashStatus(msg, tone)}
+      />
+
       <ApplianceScanEditModal
         open={editingGroup != null}
         group={editingGroup}
@@ -560,10 +586,7 @@ export function ApplianceAuditSection({
                                     >
                                       <div className="flex flex-wrap items-center gap-2">
                                         <span className="font-mono text-base font-bold tracking-tight tabular-nums text-slate-50">
-                                          Item {group.item_number}{" "}
-                                          <span className="text-emerald-300">
-                                            | Qty: {group.quantity}
-                                          </span>
+                                          Item {group.item_number}
                                         </span>
                                         {group.hasOffline ? (
                                           <span className="rounded bg-orange-500/20 px-2 py-0.5 text-[10px] font-bold uppercase text-orange-300">
@@ -571,6 +594,24 @@ export function ApplianceAuditSection({
                                           </span>
                                         ) : null}
                                       </div>
+                                      <ApplianceGroupCountSummary
+                                        scans={group.scans}
+                                        className="mt-1"
+                                      />
+                                      {(() => {
+                                        const showroomScan = group.scans.find(
+                                          (s) => isApplianceShowroomDisplayScan(s)
+                                        );
+                                        if (!showroomScan) return null;
+                                        return (
+                                          <div className="mt-1.5 flex flex-wrap gap-1">
+                                            <ApplianceUnitLocationBadge
+                                              scan={showroomScan}
+                                              compact
+                                            />
+                                          </div>
+                                        );
+                                      })()}
                                       {group.description ? (
                                         <p className="truncate text-xs text-slate-400">
                                           {group.description}
@@ -619,7 +660,11 @@ export function ApplianceAuditSection({
                                           key={scan.id}
                                           className="flex gap-2 rounded-xl border border-slate-800/80 bg-slate-900/80 p-2.5"
                                         >
-                                          <div className="min-w-0 flex-1 space-y-0.5">
+                                          <div className="min-w-0 flex-1 space-y-1">
+                                            <ApplianceUnitLocationBadge
+                                              scan={scan}
+                                              compact
+                                            />
                                             {scan.serial_number ? (
                                               <p className="font-mono text-xs text-sky-300">
                                                 Serial {scan.serial_number}
@@ -629,6 +674,9 @@ export function ApplianceAuditSection({
                                                 No serial
                                               </p>
                                             )}
+                                            <p className="text-[11px] text-slate-400">
+                                              {formatApplianceUnitDetail(scan)}
+                                            </p>
                                             {scan.location ? (
                                               <p className="flex items-center gap-1 font-mono text-xs text-emerald-400/90">
                                                 <LocationStatusIcon className="h-3 w-3 shrink-0" />

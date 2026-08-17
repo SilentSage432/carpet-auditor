@@ -1,5 +1,18 @@
 # DeptSync Hub — Development Journal
 
+## 2026-08-17 — Appliance audit: granular edits, location mode, export & reset
+
+### Shipped
+- Migration `20260818_appliance_scans_location_condition.sql` — `location_type` (showroom/topstock) + `condition_tag` (NEW_BOXED, SHOWROOM_DISPLAY, SCRATCH_DENT, OPEN_BOX).
+- Migration `20260818_appliance_showroom_baseline.sql` — `is_showroom_baseline` for MST-locked display counts across weekly topstock resets.
+- Scanner modes: **Showroom Display** (defaults `showroom` + `SHOWROOM_DISPLAY`) vs **Boxed / Topstock**.
+- Audit list badges + `Total: N (X Showroom Display, Y Boxed Stock)` summaries; **Lock Showroom Baseline** + reset with preserve baseline.
+- `ApplianceScanEditModal` — quantity, per-unit serial + condition, location mode + bay tags.
+- `ApplianceScanForm` — top showroom/topstock toggle tags each scan payload.
+- `ApplianceAuditActionBar` — Share/Export CSV (`navigator.share` fallback), mailto summary, copy CSV, two-step reset via `DELETE ?scope=store`.
+- `lib/appliances/audit-export.ts` — audit CSV + email body formatting.
+- `POST /api/appliances/ai-anomaly` — reads location types; local heuristics flag count variance vs prior ledger, split showroom/topstock, condition mismatches.
+
 ## 2026-08-17 — Specialty Tools: appliance scanner & remnant calculator navigation
 
 ### Shipped

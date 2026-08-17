@@ -2,19 +2,39 @@
 
 import { useEffect, useState } from "react";
 import { NumberField, TextField } from "@/components/ui/NumberField";
-import { APPLIANCE_SIMS_SUGGESTIONS } from "@/lib/types";
 import type { AggregatedApplianceScan } from "@/lib/appliance-scans";
+import {
+  APPLIANCE_CONDITION_TAGS,
+  APPLIANCE_LOCATION_SUGGESTIONS,
+  APPLIANCE_SCAN_MODES,
+  APPLIANCE_SIMS_SUGGESTIONS,
+  defaultApplianceConditionForLocation,
+  formatApplianceConditionTag,
+  formatApplianceLocationType,
+  normalizeApplianceConditionTag,
+  normalizeApplianceLocationType,
+  type ApplianceConditionTag,
+  type ApplianceLocationType,
+} from "@/lib/types";
+
+export type ApplianceGroupEditSaveInput = {
+  targetQuantity: number;
+  location: string;
+  location_type: ApplianceLocationType;
+  units: { serial: string; condition_tag: ApplianceConditionTag }[];
+};
 
 type Props = {
   open: boolean;
   group: AggregatedApplianceScan | null;
   saving?: boolean;
   onClose: () => void;
-  onSave: (input: {
-    targetQuantity: number;
-    location: string;
-    serials: string[];
-  }) => void;
+  onSave: (input: ApplianceGroupEditSaveInput) => void;
+};
+
+type UnitRow = {
+  serial: string;
+  condition_tag: ApplianceConditionTag;
 };
 
 export function ApplianceScanEditModal({
@@ -26,52 +46,78 @@ export function ApplianceScanEditModal({
 }: Props) {
   const [quantity, setQuantity] = useState(1);
   const [location, setLocation] = useState("");
-  const [serials, setSerials] = useState<string[]>([]);
+  const [locationType, setLocationType] =
+    useState<ApplianceLocationType>("showroom");
+  const [units, setUnits] = useState<UnitRow[]>([]);
 
   useEffect(() => {
     if (!open || !group) return;
     const qty = Math.max(1, group.quantity);
     setQuantity(qty);
-    setLocation(group.locations[0] ?? group.scans[0]?.location ?? "");
+    const head = group.scans[0];
+    setLocationType(
+      normalizeApplianceLocationType(head?.location_type ?? "showroom")
+    );
+    setLocation(group.locations[0] ?? head?.location ?? "");
     const initial = group.scans
       .slice()
       .reverse()
-      .map((s) => s.serial_number);
-    while (initial.length < qty) initial.push("");
-    setSerials(initial.slice(0, qty));
+      .map((s) => ({
+        serial: s.serial_number,
+        condition_tag: normalizeApplianceConditionTag(s.condition_tag),
+      }));
+    while (initial.length < qty) {
+      initial.push({
+        serial: "",
+        condition_tag: defaultApplianceConditionForLocation(
+          normalizeApplianceLocationType(head?.location_type ?? "showroom")
+        ),
+      });
+    }
+    setUnits(initial.slice(0, qty));
   }, [open, group]);
 
   useEffect(() => {
-    setSerials((prev) => {
+    setUnits((prev) => {
       const next = [...prev];
-      while (next.length < quantity) next.push("");
+      while (next.length < quantity) {
+        next.push({
+          serial: "",
+          condition_tag: defaultApplianceConditionForLocation(locationType),
+        });
+      }
       return next.slice(0, Math.max(0, quantity));
     });
-  }, [quantity]);
+  }, [quantity, locationType]);
 
   if (!open || !group) return null;
+
+  const locationSuggestions = [
+    ...APPLIANCE_LOCATION_SUGGESTIONS[locationType],
+    ...APPLIANCE_SIMS_SUGGESTIONS,
+  ].filter((tag, index, all) => all.indexOf(tag) === index);
 
   function bump(delta: number) {
     setQuantity((q) => Math.max(0, q + delta));
   }
 
-  function updateSerial(index: number, value: string) {
-    setSerials((prev) => {
+  function updateUnit(
+    index: number,
+    patch: Partial<{ serial: string; condition_tag: ApplianceConditionTag }>
+  ) {
+    setUnits((prev) => {
       const next = [...prev];
-      next[index] = value;
+      next[index] = { ...next[index], ...patch };
       return next;
     });
-  }
-
-  function appendSerialSlot() {
-    setQuantity((q) => q + 1);
   }
 
   function submit() {
     onSave({
       targetQuantity: quantity,
       location: location.trim(),
-      serials,
+      location_type: locationType,
+      units,
     });
   }
 
@@ -141,15 +187,49 @@ export function ApplianceScanEditModal({
             </div>
           </div>
 
+          <div className="space-y-2">
+            <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
+              Location mode
+            </p>
+            <div className="grid grid-cols-2 gap-1.5">
+              {APPLIANCE_SCAN_MODES.map((mode) => {
+                const active = locationType === mode.id;
+                return (
+                  <button
+                    key={mode.id}
+                    type="button"
+                    onClick={() => setLocationType(mode.id)}
+                    disabled={saving}
+                    className={`flex min-h-11 items-center justify-center gap-1 rounded-xl border px-2 text-[11px] font-bold ${
+                      active
+                        ? "border-emerald-500/50 bg-emerald-950/50 text-emerald-200"
+                        : "border-zinc-700 bg-zinc-950 text-zinc-400"
+                    }`}
+                  >
+                    <span aria-hidden>{mode.emoji}</span>
+                    {mode.shortLabel}
+                  </button>
+                );
+              })}
+            </div>
+            <p className="text-[11px] text-zinc-500">
+              {formatApplianceLocationType(locationType)} — applies to all units
+            </p>
+          </div>
+
           <div className="space-y-1.5">
             <TextField
               label="Location / bay (applies to all units)"
               value={location}
               onChange={setLocation}
-              placeholder="e.g. Appliance Wall Bay 01"
+              placeholder={
+                locationType === "topstock"
+                  ? "e.g. Top Stock Bay 012"
+                  : "e.g. Showroom Floor"
+              }
             />
             <div className="flex flex-wrap gap-1.5">
-              {APPLIANCE_SIMS_SUGGESTIONS.map((tag) => (
+              {locationSuggestions.map((tag) => (
                 <button
                   key={tag}
                   type="button"
@@ -167,33 +247,54 @@ export function ApplianceScanEditModal({
           </div>
 
           <div className="space-y-2">
-            <div className="flex items-center justify-between gap-2">
-              <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
-                Serial numbers
-              </p>
-              <button
-                type="button"
-                onClick={appendSerialSlot}
-                disabled={saving}
-                className="rounded-lg border border-sky-500/40 px-2.5 py-1 text-[11px] font-semibold text-sky-300 disabled:opacity-40"
-              >
-                + Append serial
-              </button>
-            </div>
+            <p className="text-xs font-semibold uppercase tracking-wide text-zinc-400">
+              Unit details
+            </p>
             {quantity === 0 ? (
               <p className="rounded-xl border border-dashed border-zinc-700 px-3 py-3 text-center text-xs text-zinc-500">
                 Quantity 0 removes all units for this SKU.
               </p>
             ) : (
-              <ul className="space-y-2">
-                {serials.map((serial, index) => (
-                  <li key={`serial-${index}`}>
+              <ul className="space-y-3">
+                {units.map((unit, index) => (
+                  <li
+                    key={`unit-${index}`}
+                    className="rounded-xl border border-zinc-800 bg-zinc-950/60 p-3 space-y-2"
+                  >
+                    <p className="text-[11px] font-bold uppercase tracking-wide text-zinc-500">
+                      Unit {index + 1}
+                    </p>
                     <TextField
-                      label={`Unit ${index + 1} serial`}
-                      value={serial}
-                      onChange={(v) => updateSerial(index, v)}
+                      label="Serial #"
+                      value={unit.serial}
+                      onChange={(v) => updateUnit(index, { serial: v })}
                       placeholder="Optional serial #"
                     />
+                    <label className="block space-y-1.5">
+                      <span className="text-sm font-medium text-zinc-200">
+                        Condition
+                      </span>
+                      <select
+                        value={unit.condition_tag}
+                        onChange={(e) =>
+                          updateUnit(index, {
+                            condition_tag: normalizeApplianceConditionTag(
+                              e.target.value
+                            ),
+                          })
+                        }
+                        className="min-h-12 w-full rounded-xl border border-zinc-800 bg-zinc-950 px-3 text-base text-zinc-100"
+                      >
+                        {APPLIANCE_CONDITION_TAGS.map((tag) => (
+                          <option key={tag.id} value={tag.id}>
+                            {tag.label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <p className="text-[10px] text-zinc-500">
+                      {formatApplianceConditionTag(unit.condition_tag)}
+                    </p>
                   </li>
                 ))}
               </ul>

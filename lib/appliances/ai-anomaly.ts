@@ -5,6 +5,8 @@
 
 import { asGeminiSchema } from "@/lib/ai/gemini-schema";
 import type { ApplianceCatalogItem, ApplianceScan } from "@/lib/types";
+import { formatApplianceConditionTag, formatApplianceLocationType } from "@/lib/types";
+import { isApplianceScanToday } from "@/lib/appliance-scans";
 
 export type AnomalySeverity = "HIGH" | "MEDIUM" | "LOW";
 
@@ -212,14 +214,113 @@ export function normalizeApplianceAnomalies(raw: unknown): ApplianceAnomalyResul
 /** Deterministic fallback when Gemini is unavailable. */
 export function buildLocalApplianceAnomalies(
   scans: ApplianceScan[],
-  catalog: ApplianceCatalogItem[]
+  catalog: ApplianceCatalogItem[],
+  options: { historicalScans?: ApplianceScan[] } = {}
 ): ApplianceAnomalyResult {
   const anomalies: ApplianceAnomaly[] = [];
   const catalogByItem = new Map(
     catalog.map((c) => [c.item_number.trim().toLowerCase(), c] as const)
   );
+  const historical = options.historicalScans ?? [];
 
-  // Duplicate serials across distant locations
+  const currentScans = scans.filter((s) => isApplianceScanToday(s.scanned_at));
+  const priorScans = [
+    ...historical.filter((s) => !isApplianceScanToday(s.scanned_at)),
+    ...scans.filter((s) => !isApplianceScanToday(s.scanned_at)),
+  ];
+
+  function countBySku(rows: ApplianceScan[]): Map<string, number> {
+    const map = new Map<string, number>();
+    for (const row of rows) {
+      const key = row.item_number.trim().toLowerCase();
+      if (!key) continue;
+      map.set(key, (map.get(key) ?? 0) + 1);
+    }
+    return map;
+  }
+
+  const currentCounts = countBySku(currentScans.length > 0 ? currentScans : scans);
+  const priorCounts = countBySku(priorScans);
+
+  for (const [skuKey, currentQty] of currentCounts) {
+    const priorQty = priorCounts.get(skuKey) ?? 0;
+    if (priorQty <= 0 || currentQty === priorQty) continue;
+    const delta = currentQty - priorQty;
+    const itemNumber =
+      scans.find((s) => s.item_number.trim().toLowerCase() === skuKey)
+        ?.item_number ?? skuKey;
+    if (Math.abs(delta) >= 2 || (priorQty >= 2 && Math.abs(delta) / priorQty >= 0.5)) {
+      anomalies.push({
+        severity: delta < 0 ? "HIGH" : "MEDIUM",
+        sku: itemNumber,
+        title: delta < 0 ? "Count drop vs prior audit" : "Count spike vs prior audit",
+        description: `Current session: ${currentQty} unit(s). Prior ledger: ${priorQty}. Delta ${delta > 0 ? "+" : ""}${delta}.`,
+        action_suggested:
+          "Re-walk the appliance wall and reconcile showroom vs topstock tags before sign-off",
+      });
+    }
+  }
+
+  // Location type split — same SKU in showroom and topstock
+  const byItem = new Map<string, ApplianceScan[]>();
+  for (const scan of scans) {
+    const key = scan.item_number.trim().toLowerCase();
+    if (!key) continue;
+    const list = byItem.get(key) ?? [];
+    list.push(scan);
+    byItem.set(key, list);
+  }
+  for (const [skuKey, rows] of byItem) {
+    const locTypes = new Set(rows.map((r) => r.location_type));
+    if (locTypes.size < 2) continue;
+    const itemNumber = rows[0]?.item_number ?? skuKey;
+    const breakdown = [...locTypes]
+      .map((t) => {
+        const n = rows.filter((r) => r.location_type === t).length;
+        return `${formatApplianceLocationType(t)}: ${n}`;
+      })
+      .join(" · ");
+    anomalies.push({
+      severity: "MEDIUM",
+      sku: itemNumber,
+      title: "Split across showroom & topstock",
+      description: `${rows.length} unit(s) tagged in multiple location modes (${breakdown}).`,
+      action_suggested:
+        "Confirm units are not double-counted between selling floor and topstock",
+    });
+  }
+
+  // Condition vs location mode mismatches
+  for (const scan of scans.slice(0, 80)) {
+    if (
+      scan.location_type === "showroom" &&
+      scan.condition_tag === "NEW_BOXED"
+    ) {
+      anomalies.push({
+        severity: "LOW",
+        sku: scan.item_number,
+        title: "Boxed unit tagged showroom",
+        description: `Item ${scan.item_number} is NEW_BOXED but logged under ${formatApplianceLocationType(scan.location_type)}.`,
+        action_suggested:
+          "Switch to topstock mode or update condition to Showroom Display",
+      });
+    }
+    if (
+      scan.location_type === "topstock" &&
+      scan.condition_tag === "SHOWROOM_DISPLAY"
+    ) {
+      anomalies.push({
+        severity: "LOW",
+        sku: scan.item_number,
+        title: "Display condition in topstock",
+        description: `${scan.item_number} tagged ${formatApplianceConditionTag(scan.condition_tag)} in ${formatApplianceLocationType(scan.location_type)}.`,
+        action_suggested:
+          "Verify SIMS location — display models rarely stay in topstock",
+      });
+    }
+  }
+
+  // Duplicate serials across distant locations / location types
   const bySerial = new Map<string, ApplianceScan[]>();
   for (const scan of scans) {
     const serial = String(scan.serial_number ?? "").trim().toUpperCase();
@@ -235,11 +336,14 @@ export function buildLocalApplianceAnomalies(
       locations.slice(i + 1).some((b) => locationsSeemDistant(a, b))
     );
     if (distant || locations.length > 1) {
+      const locTypes = [
+        ...new Set(rows.map((r) => formatApplianceLocationType(r.location_type))),
+      ];
       anomalies.push({
         severity: "HIGH",
         sku: rows[0]?.item_number || "—",
         title: "Duplicate serial across locations",
-        description: `Serial ${serial} appears ${rows.length}× at: ${locations.join(" · ") || "unspecified locations"}.`,
+        description: `Serial ${serial} appears ${rows.length}× at: ${locations.join(" · ") || "unspecified locations"} (${locTypes.join(", ")}).`,
         action_suggested:
           "Verify physical unit, clear duplicate log rows, and confirm correct SIMS location",
       });

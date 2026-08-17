@@ -29,9 +29,13 @@ import { playErrorTone } from "@/lib/ui/feedback";
 import { getStoreNumber } from "@/lib/store";
 import { useFlushOnLeave } from "@/lib/use-flush-on-leave";
 import {
+  APPLIANCE_LOCATION_SUGGESTIONS,
+  APPLIANCE_SCAN_MODES,
   APPLIANCE_SIMS_SUGGESTIONS,
+  defaultApplianceConditionForLocation,
   isValidApplianceSubCategory,
   type ApplianceCatalogItem,
+  type ApplianceLocationType,
   type ApplianceScan,
   type StoreSpecialist,
 } from "@/lib/types";
@@ -77,12 +81,15 @@ export function ApplianceScanForm({
   const itemInputRef = useRef<HTMLInputElement>(null);
   const serialRef = useRef("");
   const locationRef = useRef("");
+  const locationTypeRef = useRef<ApplianceLocationType>("showroom");
   const savingRef = useRef(false);
 
   const [itemNumber, setItemNumber] = useState("");
   const [serialNumber, setSerialNumber] = useState("");
   const [description, setDescription] = useState("");
   const [location, setLocation] = useState("");
+  const [locationType, setLocationType] =
+    useState<ApplianceLocationType>("showroom");
   const [saving, setSaving] = useState(false);
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
   const [statusTone, setStatusTone] = useState<"ok" | "error">("ok");
@@ -93,7 +100,15 @@ export function ApplianceScanForm({
 
   serialRef.current = serialNumber;
   locationRef.current = location;
+  locationTypeRef.current = locationType;
   savingRef.current = saving;
+
+  const locationSuggestions = useMemo(() => {
+    return [
+      ...APPLIANCE_LOCATION_SUGGESTIONS[locationType],
+      ...APPLIANCE_SIMS_SUGGESTIONS,
+    ].filter((tag, index, all) => all.indexOf(tag) === index);
+  }, [locationType]);
 
   const catalogMatch = useMemo(
     () => findApplianceByItemOrUpc(catalog, itemNumber),
@@ -120,6 +135,7 @@ export function ApplianceScanForm({
     setItemNumber(draft.itemNumber);
     setSerialNumber(draft.serialNumber);
     setLocation(draft.location);
+    setLocationType(draft.locationType ?? "showroom");
     setDescription(draft.description);
     setDraftRestored(true);
   }, [draftRestored]);
@@ -137,9 +153,10 @@ export function ApplianceScanForm({
       itemNumber,
       serialNumber,
       location,
+      locationType,
       description,
     });
-  }, [draftRestored, itemNumber, serialNumber, location, description]);
+  }, [draftRestored, itemNumber, serialNumber, location, locationType, description]);
 
   const flushDraft = useCallback(() => {
     flushApplianceScanDraftSave();
@@ -180,6 +197,10 @@ export function ApplianceScanForm({
           item_number: item.item_number,
           serial_number: serialRef.current.trim(),
           location: locationRef.current.trim(),
+          location_type: locationTypeRef.current,
+          condition_tag: defaultApplianceConditionForLocation(
+            locationTypeRef.current
+          ),
           category: item.category,
           sub_category: String(item.sub_category ?? "").trim(),
           scanned_by: scannedBy || activeSpecialist?.name || "",
@@ -285,8 +306,29 @@ export function ApplianceScanForm({
       <div
         role="status"
         aria-live="polite"
-        className="sticky top-0 z-30 -mx-1 rounded-2xl border border-cyan-500/40 bg-zinc-900/90 px-4 py-3 shadow-lg shadow-black/30 backdrop-blur-xl"
+        className="sticky top-0 z-30 -mx-1 space-y-2 rounded-2xl border border-cyan-500/40 bg-zinc-900/90 px-3 py-3 shadow-lg shadow-black/30 backdrop-blur-xl"
       >
+        <div className="grid grid-cols-2 gap-1.5">
+          {APPLIANCE_SCAN_MODES.map((mode) => {
+            const active = locationType === mode.id;
+            return (
+              <button
+                key={mode.id}
+                type="button"
+                onClick={() => setLocationType(mode.id)}
+                disabled={saving}
+                className={`flex min-h-11 items-center justify-center gap-1 rounded-xl border px-2 text-[11px] font-bold transition ${
+                  active
+                    ? "border-cyan-400/50 bg-cyan-950/50 text-cyan-100"
+                    : "border-zinc-700 bg-zinc-950/70 text-zinc-400"
+                }`}
+              >
+                <span aria-hidden>{mode.emoji}</span>
+                {mode.label}
+              </button>
+            );
+          })}
+        </div>
         <p className="text-center font-mono text-sm font-semibold tabular-nums text-sky-100 sm:text-base">
           Session Total: {sessionTotal}{" "}
           {sessionTotal === 1 ? "item" : "items"} scanned
@@ -354,10 +396,14 @@ export function ApplianceScanForm({
             label="Location (sticky between scans)"
             value={location}
             onChange={setLocation}
-            placeholder="e.g. Appliance Wall Bay 01"
+            placeholder={
+              locationType === "topstock"
+                ? "e.g. Top Stock Bay 012"
+                : "e.g. Showroom Floor"
+            }
           />
           <div className="flex flex-wrap gap-1.5">
-            {APPLIANCE_SIMS_SUGGESTIONS.map((tag) => (
+            {locationSuggestions.map((tag) => (
               <button
                 key={tag}
                 type="button"

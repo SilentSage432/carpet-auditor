@@ -655,6 +655,124 @@ export const APPLIANCE_SIMS_SUGGESTIONS = [
   "Clearance Floor",
 ] as const;
 
+/** Showroom vs topstock tagging for appliance inventory audits. */
+export type ApplianceLocationType = "showroom" | "topstock";
+
+/** Fast scanner modes — maps to location_type + default condition. */
+export const APPLIANCE_SCAN_MODES: {
+  id: ApplianceLocationType;
+  label: string;
+  shortLabel: string;
+  emoji: string;
+}[] = [
+  {
+    id: "showroom",
+    label: "Showroom Display",
+    shortLabel: "Showroom Display",
+    emoji: "🏢",
+  },
+  {
+    id: "topstock",
+    label: "Boxed / Topstock",
+    shortLabel: "Boxed / Topstock",
+    emoji: "📦",
+  },
+];
+
+export const APPLIANCE_LOCATION_TYPES = APPLIANCE_SCAN_MODES;
+
+export const APPLIANCE_LOCATION_SUGGESTIONS: Record<
+  ApplianceLocationType,
+  readonly string[]
+> = {
+  showroom: ["Showroom Floor", "Appliance Wall Bay 01", "Clearance Floor"],
+  topstock: ["Top Stock Bay 012", "Receiving Holding", "Topstock Bay"],
+};
+
+/** Per-unit condition captured during appliance audits. */
+export type ApplianceConditionTag =
+  | "NEW_BOXED"
+  | "SHOWROOM_DISPLAY"
+  | "SCRATCH_DENT"
+  | "OPEN_BOX";
+
+export const APPLIANCE_CONDITION_TAGS: {
+  id: ApplianceConditionTag;
+  label: string;
+}[] = [
+  { id: "NEW_BOXED", label: "New / Boxed" },
+  { id: "SHOWROOM_DISPLAY", label: "Showroom Display" },
+  { id: "SCRATCH_DENT", label: "Scratch / Dent" },
+  { id: "OPEN_BOX", label: "Open Box" },
+];
+
+export function normalizeApplianceLocationType(
+  raw: unknown
+): ApplianceLocationType {
+  const v = String(raw ?? "")
+    .trim()
+    .toLowerCase();
+  if (v === "topstock" || v === "top_stock" || v === "storage" || v === "boxed") {
+    return "topstock";
+  }
+  if (v === "showroom" || v === "showroom_display") return "showroom";
+  return "showroom";
+}
+
+export function normalizeApplianceConditionTag(
+  raw: unknown
+): ApplianceConditionTag {
+  const v = String(raw ?? "")
+    .trim()
+    .toUpperCase();
+  if (
+    v === "NEW_BOXED" ||
+    v === "SHOWROOM_DISPLAY" ||
+    v === "SCRATCH_DENT" ||
+    v === "OPEN_BOX"
+  ) {
+    return v;
+  }
+  return "NEW_BOXED";
+}
+
+export function formatApplianceLocationType(type: ApplianceLocationType): string {
+  return (
+    APPLIANCE_SCAN_MODES.find((t) => t.id === type)?.label ??
+    (type === "topstock" ? "Boxed / Topstock" : "Showroom Display")
+  );
+}
+
+/** True when scan represents a floor display unit (not boxed backstock). */
+export function isApplianceShowroomDisplayScan(scan: {
+  location_type: ApplianceLocationType;
+  condition_tag: ApplianceConditionTag;
+}): boolean {
+  return (
+    scan.location_type === "showroom" ||
+    scan.condition_tag === "SHOWROOM_DISPLAY"
+  );
+}
+
+export function isApplianceBoxedStockScan(scan: {
+  location_type: ApplianceLocationType;
+  condition_tag: ApplianceConditionTag;
+}): boolean {
+  return !isApplianceShowroomDisplayScan(scan);
+}
+
+export function formatApplianceConditionTag(tag: ApplianceConditionTag): string {
+  return (
+    APPLIANCE_CONDITION_TAGS.find((t) => t.id === tag)?.label ?? tag.replace(/_/g, " ")
+  );
+}
+
+export function defaultApplianceConditionForLocation(
+  locationType: ApplianceLocationType
+): ApplianceConditionTag {
+  return locationType === "showroom" ? "SHOWROOM_DISPLAY" : "NEW_BOXED";
+}
+
 export type AuditMode = "roll" | "carton";
 
 /** Standard roll widths for Carpet & Sheet Vinyl. */
@@ -856,11 +974,15 @@ export type ApplianceScan = {
   item_number: string;
   serial_number: string;
   location: string;
+  location_type: ApplianceLocationType;
+  condition_tag: ApplianceConditionTag;
   category: ApplianceCategory;
   sub_category?: string;
   scanned_by: string;
   scanned_at: string;
   offline?: boolean;
+  /** Locked showroom baseline — survives weekly topstock reset. */
+  is_showroom_baseline?: boolean;
 };
 
 export type ApplianceScanInsert = Omit<

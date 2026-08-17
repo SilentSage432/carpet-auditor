@@ -29,6 +29,8 @@ export type SyncActionType =
   | "delete_specialist"
   | "delete_appliance_catalog"
   | "delete_appliance_scan"
+  | "clear_appliance_scans"
+  | "lock_appliance_showroom_baseline"
   | "STORE_OPS_COMPLETE_ROTATION"
   | "STORE_OPS_DOWNSTOCK_ADD"
   | "STORE_OPS_SUNDAY_ASSIGN";
@@ -583,6 +585,35 @@ async function replayAction(action: SyncAction): Promise<void> {
           .delete()
           .eq("id", entityId)
           .eq("store_number", action.store_number);
+        if (error) throw error;
+        return;
+      }
+      case "clear_appliance_scans": {
+        const preserve = Boolean(
+          (payload as { preserve_showroom_baseline?: boolean })
+            .preserve_showroom_baseline
+        );
+        let query = supabase
+          .from("appliance_scans")
+          .delete()
+          .eq("store_number", action.store_number);
+        if (preserve) {
+          query = query.eq("is_showroom_baseline", false);
+        }
+        const { error } = await query;
+        if (error) throw error;
+        return;
+      }
+      case "lock_appliance_showroom_baseline": {
+        await supabase
+          .from("appliance_scans")
+          .update({ is_showroom_baseline: false })
+          .eq("store_number", action.store_number);
+        const { error } = await supabase
+          .from("appliance_scans")
+          .update({ is_showroom_baseline: true })
+          .eq("store_number", action.store_number)
+          .eq("location_type", "showroom");
         if (error) throw error;
         return;
       }

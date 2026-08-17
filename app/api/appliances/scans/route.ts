@@ -110,6 +110,12 @@ export async function POST(request: Request) {
     const item_number = String(body.item_number ?? "").trim();
     const serial_number = String(body.serial_number ?? "").trim();
     const location = String(body.location ?? "").trim();
+    const location_type = String(body.location_type ?? "showroom")
+      .trim()
+      .toLowerCase();
+    const condition_tag = String(
+      body.condition_tag ?? "NEW_BOXED"
+    ).trim();
     const scanned_by = String(body.scanned_by ?? "").trim();
 
     const pair = resolveApplianceCategoryPair(
@@ -138,6 +144,8 @@ export async function POST(request: Request) {
       item_number,
       serial_number,
       location,
+      location_type,
+      condition_tag,
       category,
       sub_category,
       scanned_by,
@@ -183,7 +191,7 @@ export async function POST(request: Request) {
   }
 }
 
-/** PATCH /api/appliances/scans — update serial / location on an existing scan */
+/** PATCH /api/appliances/scans — update scan row or lock showroom baseline */
 export async function PATCH(request: Request) {
   try {
     const supabase = getSupabaseAdmin();
@@ -195,21 +203,55 @@ export async function PATCH(request: Request) {
     }
 
     const body = (await request.json()) as Record<string, unknown>;
-    const id = String(body.id ?? "").trim();
     const store = String(
       body.store_number ?? storeFromRequest(request)
     ).trim();
+    const storeKeys = storeNumberQueryValues(store);
+
+    if (body.action === "lock_showroom_baseline") {
+      await supabase
+        .from("appliance_scans")
+        .update({ is_showroom_baseline: false })
+        .in("store_number", storeKeys.length ? storeKeys : [store]);
+
+      const { data, error } = await supabase
+        .from("appliance_scans")
+        .update({ is_showroom_baseline: true })
+        .in("store_number", storeKeys.length ? storeKeys : [store])
+        .eq("location_type", "showroom")
+        .select("id");
+
+      if (error) {
+        console.error("[PATCH /api/appliances/scans] lock baseline failed", error);
+        throw new Error(error.message);
+      }
+
+      return NextResponse.json({
+        ok: true,
+        locked: data?.length ?? 0,
+      });
+    }
+
+    const id = String(body.id ?? "").trim();
 
     if (!id) {
       return NextResponse.json({ error: "id is required" }, { status: 400 });
     }
 
-    const updates: Record<string, string> = {};
+    const updates: Record<string, string | boolean> = {};
     if (body.serial_number !== undefined) {
       updates.serial_number = String(body.serial_number ?? "").trim();
     }
     if (body.location !== undefined) {
       updates.location = String(body.location ?? "").trim();
+    }
+    if (body.location_type !== undefined) {
+      updates.location_type = String(body.location_type ?? "showroom")
+        .trim()
+        .toLowerCase();
+    }
+    if (body.condition_tag !== undefined) {
+      updates.condition_tag = String(body.condition_tag ?? "NEW_BOXED").trim();
     }
     if (body.scanned_by !== undefined) {
       updates.scanned_by = String(body.scanned_by ?? "").trim();
@@ -253,7 +295,7 @@ export async function PATCH(request: Request) {
   }
 }
 
-/** DELETE /api/appliances/scans?id=&store_number= */
+/** DELETE /api/appliances/scans?id=&store_number= OR ?scope=store */
 export async function DELETE(request: Request) {
   try {
     const supabase = getSupabaseAdmin();
@@ -266,9 +308,51 @@ export async function DELETE(request: Request) {
 
     const url = new URL(request.url);
     const id = url.searchParams.get("id")?.trim();
+    const scope = url.searchParams.get("scope")?.trim();
     const store = storeFromRequest(request);
+    const storeKeys = storeNumberQueryValues(store);
+
+    const preserveBaseline =
+      url.searchParams.get("preserve_baseline") === "true";
+
+    if (scope === "store") {
+      let query = supabase
+        .from("appliance_scans")
+        .delete()
+        .in("store_number", storeKeys.length ? storeKeys : [store]);
+      if (preserveBaseline) {
+        query = query.eq("is_showroom_baseline", false);
+      }
+
+      const { data, error } = await query.select("id");
+
+      if (error) {
+        console.error("[DELETE /api/appliances/scans] bulk failed", error);
+        throw new Error(error.message);
+      }
+
+      let preserved = 0;
+      if (preserveBaseline) {
+        const { count } = await supabase
+          .from("appliance_scans")
+          .select("id", { count: "exact", head: true })
+          .in("store_number", storeKeys.length ? storeKeys : [store])
+          .eq("is_showroom_baseline", true);
+        preserved = count ?? 0;
+      }
+
+      return NextResponse.json({
+        ok: true,
+        deleted: data?.length ?? 0,
+        preserved,
+      });
+    }
+
     if (!id) {
-      return NextResponse.json({ error: "id is required" }, { status: 400 });
+      return NextResponse.json(
+        { error: "id is required unless scope=store" },
+        { status: 400 }
+      );
     }
 
     const { error } = await supabase
@@ -282,7 +366,7 @@ export async function DELETE(request: Request) {
       throw new Error(error.message);
     }
 
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true, deleted: 1 });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
     console.error("[DELETE /api/appliances/scans] error", message);

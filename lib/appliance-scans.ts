@@ -14,8 +14,12 @@ import { uid } from "./uid";
 import {
   isValidApplianceSubCategory,
   normalizeApplianceCategory,
+  normalizeApplianceConditionTag,
+  normalizeApplianceLocationType,
   resolveApplianceCategoryPair,
   type ApplianceCategory,
+  type ApplianceConditionTag,
+  type ApplianceLocationType,
   type ApplianceScan,
   type ApplianceScanInsert,
 } from "./types";
@@ -30,6 +34,7 @@ export type ApplianceScanDraft = {
   itemNumber: string;
   serialNumber: string;
   location: string;
+  locationType: ApplianceLocationType;
   description: string;
 };
 
@@ -112,6 +117,8 @@ export function mapApplianceScanRow(row: Record<string, unknown>): ApplianceScan
     item_number: String(row.item_number ?? row.sku ?? "").trim(),
     serial_number: String(row.serial_number ?? "").trim(),
     location: String(row.location ?? row.sims_location ?? "").trim(),
+    location_type: normalizeApplianceLocationType(row.location_type),
+    condition_tag: normalizeApplianceConditionTag(row.condition_tag),
     category: pair.category,
     sub_category: pair.sub_category || undefined,
     scanned_by: String(row.scanned_by ?? row.audited_by ?? "").trim(),
@@ -119,6 +126,7 @@ export function mapApplianceScanRow(row: Record<string, unknown>): ApplianceScan
       row.scanned_at ?? row.created_at ?? new Date().toISOString()
     ),
     offline: Boolean(row.offline),
+    is_showroom_baseline: Boolean(row.is_showroom_baseline),
   };
 }
 
@@ -149,6 +157,8 @@ export function buildApplianceScanPayload(
   sub_category: string;
   scanned_by: string;
   scanned_at: string;
+  location_type: string;
+  condition_tag: string;
   id?: string;
 } {
   const pair = resolveApplianceCategoryPair(
@@ -172,6 +182,8 @@ export function buildApplianceScanPayload(
     item_number: string;
     serial_number: string;
     location: string;
+    location_type: string;
+    condition_tag: string;
     category: string;
     sub_category: string;
     scanned_by: string;
@@ -182,6 +194,8 @@ export function buildApplianceScanPayload(
     item_number: String(input.item_number).trim(),
     serial_number: String(input.serial_number ?? "").trim(),
     location: String(input.location ?? "").trim(),
+    location_type: normalizeApplianceLocationType(input.location_type),
+    condition_tag: normalizeApplianceConditionTag(input.condition_tag),
     category,
     sub_category,
     scanned_by: String(input.scanned_by ?? "").trim(),
@@ -292,11 +306,14 @@ export async function saveApplianceScan(
       item_number: payload.item_number,
       serial_number: payload.serial_number,
       location: payload.location,
+      location_type: normalizeApplianceLocationType(payload.location_type),
+      condition_tag: normalizeApplianceConditionTag(payload.condition_tag),
       category: normalizeApplianceCategory(payload.category),
       sub_category: payload.sub_category || undefined,
       scanned_by: payload.scanned_by,
       scanned_at: payload.scanned_at,
       offline: true,
+      is_showroom_baseline: false,
     };
     upsertLocal(offlineRecord);
     enqueueSyncAction("upsert_appliance_scan", { ...payload, id: offlineRecord.id }, store);
@@ -365,6 +382,119 @@ export async function deleteApplianceScan(id: string): Promise<void> {
   }
 }
 
+/** Clear appliance scans for the active store (audit session reset). */
+export async function clearAllApplianceScans(
+  options: {
+    store?: string;
+    /** When true, locked showroom baseline rows are kept. */
+    preserveShowroomBaseline?: boolean;
+  } = {}
+): Promise<{ deleted: number; preserved: number }> {
+  const store = options.store ?? getStoreNumber();
+  const preserve = options.preserveShowroomBaseline ?? false;
+  const local = forStore(store);
+  const toDelete = preserve
+    ? local.filter((r) => !r.is_showroom_baseline)
+    : local;
+  const preserved = preserve
+    ? local.filter((r) => Boolean(r.is_showroom_baseline))
+    : [];
+
+  writeAllLocal([
+    ...readAllLocal().filter((r) => r.store_number !== store),
+    ...preserved,
+  ]);
+  clearApplianceScanDraft();
+
+  if (!isBrowserOnline()) {
+    enqueueSyncAction(
+      "clear_appliance_scans",
+      { store_number: store, preserve_showroom_baseline: preserve },
+      store
+    );
+    return { deleted: toDelete.length, preserved: preserved.length };
+  }
+
+  const qs = new URLSearchParams({
+    scope: "store",
+    store_number: store,
+  });
+  if (preserve) qs.set("preserve_baseline", "true");
+
+  const res = await fetch(`/api/appliances/scans?${qs.toString()}`, {
+    method: "DELETE",
+    headers: { "x-store-number": store },
+  });
+  const json = (await res.json().catch(() => ({}))) as {
+    deleted?: number;
+    preserved?: number;
+    error?: string;
+  };
+  if (!res.ok) {
+    throw new Error(json.error || `HTTP ${res.status}`);
+  }
+  return {
+    deleted: json.deleted ?? toDelete.length,
+    preserved: json.preserved ?? preserved.length,
+  };
+}
+
+/** Mark current showroom display scans as the locked MST baseline. */
+export async function lockApplianceShowroomBaseline(
+  store = getStoreNumber()
+): Promise<{ locked: number }> {
+  const local = forStore(store);
+  const showroomIds = new Set(
+    local
+      .filter((s) => s.location_type === "showroom")
+      .map((s) => s.id)
+  );
+  const nextLocal = local.map((s) =>
+    showroomIds.has(s.id)
+      ? { ...s, is_showroom_baseline: true }
+      : { ...s, is_showroom_baseline: false }
+  );
+  writeAllLocal([
+    ...readAllLocal().filter((r) => r.store_number !== store),
+    ...nextLocal,
+  ]);
+
+  if (!isBrowserOnline()) {
+    enqueueSyncAction(
+      "lock_appliance_showroom_baseline",
+      { store_number: store },
+      store
+    );
+    return { locked: showroomIds.size };
+  }
+
+  const res = await fetch("/api/appliances/scans", {
+    method: "PATCH",
+    headers: {
+      "Content-Type": "application/json",
+      "x-store-number": store,
+    },
+    body: JSON.stringify({
+      action: "lock_showroom_baseline",
+      store_number: store,
+    }),
+  });
+  const json = (await res.json().catch(() => ({}))) as {
+    locked?: number;
+    error?: string;
+  };
+  if (!res.ok) {
+    throw new Error(json.error || `HTTP ${res.status}`);
+  }
+  return { locked: json.locked ?? showroomIds.size };
+}
+
+export function countLockedShowroomBaseline(
+  scans: ApplianceScan[]
+): number {
+  return scans.filter((s) => Boolean(s.is_showroom_baseline)).length;
+}
+
 export function isApplianceScanToday(iso: string): boolean {
   const d = new Date(iso);
   const now = new Date();
@@ -392,14 +522,20 @@ export type ApplianceScanCsvOptions = {
   descriptions?: Record<string, string>;
 };
 
+export type ApplianceUnitEdit = {
+  serial: string;
+  condition_tag: ApplianceConditionTag;
+};
+
 export type ApplianceGroupEditInput = {
   item_number: string;
   category: ApplianceCategory | string;
   sub_category?: string;
   targetQuantity: number;
   location: string;
-  /** Serial slots aligned to quantity (pad/truncate as needed). */
-  serials: string[];
+  location_type: ApplianceLocationType;
+  /** Per-unit serial + condition (pad/truncate to quantity). */
+  units: ApplianceUnitEdit[];
   scanned_by: string;
   existingScans: ApplianceScan[];
 };
@@ -575,7 +711,13 @@ export async function updateApplianceScan(
   patch: Partial<
     Pick<
       ApplianceScan,
-      "serial_number" | "location" | "scanned_by" | "category" | "sub_category"
+      | "serial_number"
+      | "location"
+      | "location_type"
+      | "condition_tag"
+      | "scanned_by"
+      | "category"
+      | "sub_category"
     >
   >
 ): Promise<ApplianceScan> {
@@ -595,6 +737,14 @@ export async function updateApplianceScan(
       patch.location !== undefined
         ? String(patch.location).trim()
         : existing.location,
+    location_type:
+      patch.location_type !== undefined
+        ? normalizeApplianceLocationType(patch.location_type)
+        : existing.location_type,
+    condition_tag:
+      patch.condition_tag !== undefined
+        ? normalizeApplianceConditionTag(patch.condition_tag)
+        : existing.condition_tag,
     scanned_by:
       patch.scanned_by !== undefined
         ? String(patch.scanned_by).trim()
@@ -618,6 +768,8 @@ export async function updateApplianceScan(
         item_number: next.item_number,
         serial_number: next.serial_number,
         location: next.location,
+        location_type: next.location_type,
+        condition_tag: next.condition_tag,
         category: next.category,
         sub_category: next.sub_category ?? "",
         scanned_by: next.scanned_by,
@@ -639,6 +791,8 @@ export async function updateApplianceScan(
       store_number: store,
       serial_number: next.serial_number,
       location: next.location,
+      location_type: next.location_type,
+      condition_tag: next.condition_tag,
       scanned_by: next.scanned_by,
       category: next.category,
       sub_category: next.sub_category ?? "",
@@ -669,15 +823,20 @@ export async function applyApplianceGroupEdit(
 ): Promise<ApplianceScan[]> {
   const qty = Math.max(0, Math.floor(input.targetQuantity));
   const location = input.location.trim();
-  const serials = input.serials.map((s) => String(s ?? "").trim());
-  while (serials.length < qty) serials.push("");
-  serials.length = qty;
+  const location_type = normalizeApplianceLocationType(input.location_type);
+  const units = input.units.map((u) => ({
+    serial: String(u.serial ?? "").trim(),
+    condition_tag: normalizeApplianceConditionTag(u.condition_tag),
+  }));
+  while (units.length < qty) {
+    units.push({ serial: "", condition_tag: "NEW_BOXED" });
+  }
+  units.length = qty;
 
   const existing = [...input.existingScans].sort((a, b) =>
     a.scanned_at.localeCompare(b.scanned_at)
   );
 
-  // Drop newest first when reducing quantity.
   const keep = existing.slice(0, qty);
   const drop = existing.slice(qty);
 
@@ -688,14 +847,21 @@ export async function applyApplianceGroupEdit(
   const keptUpdated: ApplianceScan[] = [];
   for (let i = 0; i < keep.length; i++) {
     const scan = keep[i];
-    const serial = serials[i] ?? "";
-    if (scan.serial_number === serial && scan.location === location) {
+    const unit = units[i] ?? { serial: "", condition_tag: "NEW_BOXED" as const };
+    if (
+      scan.serial_number === unit.serial &&
+      scan.location === location &&
+      scan.location_type === location_type &&
+      scan.condition_tag === unit.condition_tag
+    ) {
       keptUpdated.push(scan);
       continue;
     }
     const updated = await updateApplianceScan(scan.id, {
-      serial_number: serial,
+      serial_number: unit.serial,
       location,
+      location_type,
+      condition_tag: unit.condition_tag,
     });
     keptUpdated.push(updated);
   }
@@ -703,10 +869,13 @@ export async function applyApplianceGroupEdit(
   const created: ApplianceScan[] = [];
   const category = normalizeApplianceCategory(input.category);
   for (let i = keep.length; i < qty; i++) {
+    const unit = units[i] ?? { serial: "", condition_tag: "NEW_BOXED" as const };
     const { record } = await saveApplianceScan({
       item_number: input.item_number,
-      serial_number: serials[i] ?? "",
+      serial_number: unit.serial,
       location,
+      location_type,
+      condition_tag: unit.condition_tag,
       category,
       sub_category: input.sub_category,
       scanned_by: input.scanned_by,
@@ -760,6 +929,8 @@ export function applianceScansToCsv(
     "Sub-Category",
     "Item #",
     "Serial #",
+    "Location Type",
+    "Condition",
     "Location",
     "Scanned By",
     "Scanned At",
@@ -777,6 +948,8 @@ export function applianceScansToCsv(
         s.sub_category ?? "",
         s.item_number,
         s.serial_number,
+        s.location_type,
+        s.condition_tag,
         s.location,
         s.scanned_by,
         s.scanned_at,

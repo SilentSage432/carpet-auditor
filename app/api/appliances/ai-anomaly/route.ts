@@ -25,7 +25,7 @@ import { supabaseAdminMissingMessage } from "@/lib/supabase/env";
 import type { ApplianceCatalogItem, ApplianceScan } from "@/lib/types";
 
 const SCAN_COLUMNS =
-  "id, store_number, item_number, serial_number, location, category, sub_category, scanned_by, scanned_at";
+  "id, store_number, item_number, serial_number, location, location_type, condition_tag, category, sub_category, scanned_by, scanned_at";
 const CATALOG_COLUMNS =
   "id, store_number, item_number, upc, description, category, sub_category, created_at, updated_at";
 
@@ -59,7 +59,7 @@ export async function POST(request: Request) {
           .select(SCAN_COLUMNS)
           .eq("store_number", store)
           .order("scanned_at", { ascending: false })
-          .limit(120),
+          .limit(240),
         supabase
           .from("appliance_catalog")
           .select(CATALOG_COLUMNS)
@@ -88,7 +88,9 @@ export async function POST(request: Request) {
       );
     }
 
-    const local = buildLocalApplianceAnomalies(scans, catalog);
+    const local = buildLocalApplianceAnomalies(scans, catalog, {
+      historicalScans: scans,
+    });
 
     if (!isGeminiConfigured()) {
       if (body.allow_local_fallback === false) {
