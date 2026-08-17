@@ -100,6 +100,15 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
   const [verifyBusy, setVerifyBusy] = useState(false);
   const [verifyMsg, setVerifyMsg] = useState<string | null>(null);
   const [bayScanOpen, setBayScanOpen] = useState(false);
+  const [bayAudits, setBayAudits] = useState<
+    Record<
+      string,
+      {
+        audit_log_id: string;
+        audit_verdict: "PASS" | "CONDITIONAL" | "FAIL";
+      }
+    >
+  >({});
   const [onDuty, setOnDuty] = useState<OnDutyWorkloadMember[]>([]);
   const [onDutyLoading, setOnDutyLoading] = useState(true);
   const [assignments, setAssignments] = useState<SundayAssignmentMap>({});
@@ -390,6 +399,7 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
               assignmentDepartment={assignmentDept}
               focusSpecialistId={focusAssociateId}
               onDutyMembers={onDuty}
+              externalAudits={bayAudits}
               hideChrome
             />
           )}
@@ -466,6 +476,23 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
         open={bayScanOpen}
         onClose={() => setBayScanOpen(false)}
         specialist={specialist}
+        auditContext={
+          deptId
+            ? {
+                department_id: deptId,
+              }
+            : undefined
+        }
+        onAuditValidated={(payload) => {
+          if (!payload.rotation_id) return;
+          setBayAudits((prev) => ({
+            ...prev,
+            [payload.rotation_id!]: {
+              audit_log_id: payload.audit_log_id,
+              audit_verdict: payload.audit_verdict,
+            },
+          }));
+        }}
       />
       {downstockOpen ? (
         <FlagDownstockSheet

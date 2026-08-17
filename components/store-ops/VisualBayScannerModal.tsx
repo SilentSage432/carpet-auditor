@@ -2,12 +2,13 @@
 
 /**
  * Visual Bay Scanner — immersive full-screen capture (Carb Buddy–style).
- * Presentation only. Analysis: POST /api/store-ops/ai-bay-scan.
+ * Presentation only. Analysis: POST /api/store-ops/ai-bay-scan or /api/ai/bay-audit/validate.
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   scanBayVisual,
+  validateBayAudit,
   type BayScanClientResult,
 } from "@/lib/store-ops/client";
 import type {
@@ -15,6 +16,7 @@ import type {
   BayIssueSeverity,
   BayScanMeta,
 } from "@/lib/store-ops/ai-bay-scan";
+import type { BayAuditVerdict } from "@/lib/ai/contracts/bay-audit";
 import { readableError } from "@/lib/store-ops/errors";
 import type { StoreSpecialist } from "@/lib/types";
 
@@ -24,6 +26,16 @@ type Props = {
   specialist: StoreSpecialist;
   /** Pre-fill aisle / bay / department when opened from a bay sheet. */
   meta?: BayScanMeta;
+  /** When set, persists audit to bay_audit_logs and invokes onAuditValidated. */
+  auditContext?: {
+    department_id: string;
+    rotation_id?: string;
+  };
+  onAuditValidated?: (payload: {
+    audit_log_id: string;
+    audit_verdict: BayAuditVerdict;
+    rotation_id?: string;
+  }) => void;
 };
 
 type Phase = "capture" | "analyzing" | "results";
@@ -197,6 +209,8 @@ export function VisualBayScannerModal({
   onClose,
   specialist,
   meta,
+  auditContext,
+  onAuditValidated,
 }: Props) {
   const [phase, setPhase] = useState<Phase>("capture");
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -304,19 +318,51 @@ export function VisualBayScannerModal({
       setResult(null);
       setPreviewUrl(previewUrl);
       try {
-        const scanned = await scanBayVisual(specialist, {
-          image: base64,
-          mime_type: mimeType,
-          ...resolvedMeta(),
-        });
-        setResult(scanned);
+        const scanMeta = resolvedMeta();
+        if (auditContext?.department_id) {
+          const audited = await validateBayAudit(specialist, {
+            image: base64,
+            mime_type: mimeType,
+            aisle: scanMeta.aisle,
+            bay: scanMeta.bay,
+            department_id: auditContext.department_id,
+            department_code: scanMeta.department_code,
+            rotation_id: auditContext.rotation_id,
+          });
+          const scanned: BayScanClientResult = {
+            carton_count_estimate: audited.carton_count_estimate,
+            pallet_count: audited.pallet_count,
+            cleanliness_score:
+              audited.verdict === "PASS"
+                ? "EXCELLENT"
+                : audited.verdict === "FAIL"
+                  ? "HAZARD"
+                  : "NEEDS_ATTENTION",
+            detected_issues: audited.detected_issues,
+            summary: `${audited.verdict}: ${audited.summary}`,
+            source: audited.source,
+          };
+          setResult(scanned);
+          onAuditValidated?.({
+            audit_log_id: audited.audit_log_id,
+            audit_verdict: audited.verdict,
+            rotation_id: auditContext.rotation_id,
+          });
+        } else {
+          const scanned = await scanBayVisual(specialist, {
+            image: base64,
+            mime_type: mimeType,
+            ...scanMeta,
+          });
+          setResult(scanned);
+        }
         setPhase("results");
       } catch (err) {
         setPhase("capture");
         setError(readableError(err, "Visual bay scan failed"));
       }
     },
-    [specialist, resolvedMeta]
+    [specialist, resolvedMeta, auditContext, onAuditValidated]
   );
 
   const onSnapLive = useCallback(async () => {

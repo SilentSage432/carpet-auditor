@@ -581,13 +581,46 @@ export async function fetchThisWeekRotations(
   );
 }
 
+export type CompleteRotationExtras = {
+  bay_id?: string;
+  notes?: string;
+  audit_verdict?: "PASS" | "CONDITIONAL" | "FAIL";
+  audit_log_id?: string;
+  supervisor_override?: boolean;
+};
+
+export class BayCompleteGatedError extends Error {
+  readonly gated = true;
+  readonly issues: Array<{
+    issue: string;
+    severity: string;
+    recommendation: string;
+  }>;
+  readonly audit_log_id?: string;
+
+  constructor(body: {
+    message?: string;
+    issues?: Array<{
+      issue: string;
+      severity: string;
+      recommendation: string;
+    }>;
+    audit_log_id?: string | null;
+  }) {
+    super(
+      body.message ??
+        "Bay audit failed — fix issues or request supervisor override"
+    );
+    this.name = "BayCompleteGatedError";
+    this.issues = body.issues ?? [];
+    this.audit_log_id = body.audit_log_id ?? undefined;
+  }
+}
+
 export async function completeRotation(
   specialist: StoreSpecialist,
   rotationId: string,
-  extras?: {
-    bay_id?: string;
-    notes?: string;
-  }
+  extras?: CompleteRotationExtras
 ): Promise<EnqueueOrExecuteResult> {
   const now = new Date().toISOString();
   const payload: Record<string, unknown> = {
@@ -601,6 +634,9 @@ export async function completeRotation(
     specialist_role: specialist.role,
     assigned_department: specialist.assigned_department,
     store_number: getStoreNumber() || specialist.store_number,
+    audit_verdict: extras?.audit_verdict,
+    audit_log_id: extras?.audit_log_id,
+    supervisor_override: extras?.supervisor_override === true,
   };
   return enqueueOrExecute(
     "STORE_OPS_COMPLETE_ROTATION",
@@ -653,11 +689,51 @@ export async function executeCompleteRotationLive(
   const rotationId = String(payload.rotation_id ?? payload.id ?? "").trim();
   if (!rotationId) throw new Error("rotation_id is required");
   const member = specialistFromSyncPayload(payload, specialist);
-  await storeOpsFetch("/api/rotations/complete", member, {
+  const actor = actorFromSpecialist(
+    member,
+    String(payload.store_number ?? getStoreNumber())
+  );
+  if (!actor) {
+    throw new Error("Store Operations access denied for this profile");
+  }
+  const authHeaders = await storeOpsAuthHeadersAsync(actor);
+  const res = await fetch("/api/rotations/complete", {
     method: "POST",
-    body: JSON.stringify({ rotation_id: rotationId }),
+    headers: {
+      ...authHeaders,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      rotation_id: rotationId,
+      ...(payload.audit_verdict
+        ? { audit_verdict: payload.audit_verdict }
+        : {}),
+      ...(payload.audit_log_id
+        ? { audit_log_id: payload.audit_log_id }
+        : {}),
+      ...(payload.supervisor_override === true
+        ? { supervisor_override: true }
+        : {}),
+    }),
     signal: mutationAbortSignal(),
   });
+  const body = (await res.json().catch(() => ({}))) as {
+    error?: string;
+    gated?: boolean;
+    issues?: Array<{
+      issue: string;
+      severity: string;
+      recommendation: string;
+    }>;
+    audit_log_id?: string | null;
+    message?: string;
+  };
+  if (res.status === 422 && body.gated) {
+    throw new BayCompleteGatedError(body);
+  }
+  if (!res.ok) {
+    throw new Error(readableError(body.error, `Request failed (${res.status})`));
+  }
   await invalidateStoreOpsListCaches();
   notifyStoreLocationsChanged();
 }
@@ -1277,6 +1353,84 @@ export async function createRosterMember(
 export type BayScanClientResult = import("./ai-bay-scan").BayScanResult & {
   source?: "gemini" | "local";
 };
+
+export type BayAuditValidateResult =
+  import("./ai-bay-audit").BayAuditVerdictResult & {
+    ok: boolean;
+    audit_log_id: string;
+    source?: "gemini" | "local";
+    latency_ms?: number;
+  };
+
+/** Multimodal bay audit → rubric verdict + persisted bay_audit_logs row. */
+export async function validateBayAudit(
+  specialist: StoreSpecialist,
+  input: {
+    image: string;
+    mime_type?: string;
+    aisle?: string;
+    bay?: number;
+    department_id: string;
+    department_code?: string;
+    rotation_id?: string;
+    bay_number?: string;
+    image_url?: string;
+    allow_local_fallback?: boolean;
+  }
+): Promise<BayAuditValidateResult> {
+  const rawBase64 = String(input.image ?? "")
+    .trim()
+    .replace(/^data:image\/[\w+.-]+;base64,/i, "");
+  return storeOpsFetch<BayAuditValidateResult>(
+    "/api/ai/bay-audit/validate",
+    specialist,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        ...input,
+        image: rawBase64,
+        mime_type: input.mime_type || "image/jpeg",
+      }),
+    }
+  );
+}
+
+export type SnagTriageClientResult = import("@/lib/ai/contracts/snag-triage").SnagTriageResult & {
+  ok: boolean;
+  source?: "gemini" | "local";
+  dispatch?: {
+    dispatched: boolean;
+    target: string;
+    record_id?: string;
+  } | null;
+};
+
+/** Parse associate snag report → severity, equipment, dispatch target. */
+export async function triageSnagReport(
+  specialist: StoreSpecialist,
+  input: {
+    text: string;
+    department_code?: string;
+    location_tag?: string;
+    store_number?: string;
+    dispatch?: boolean;
+    rotation_id?: string;
+    location_id?: string;
+    assigned_week?: string;
+    allow_local_fallback?: boolean;
+  }
+): Promise<SnagTriageClientResult> {
+  return storeOpsFetch<SnagTriageClientResult>(
+    "/api/ai/snag/triage",
+    specialist,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    }
+  );
+}
 
 /** Gemini multimodal bay photo → inventory / safety compliance JSON. */
 export async function scanBayVisual(

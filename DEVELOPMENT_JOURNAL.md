@@ -1,5 +1,14 @@
 # DeptSync Hub — Development Journal
 
+## 2026-08-17 — AI Operations Trio: audit persistence, snag triage, completion gate
+
+### Shipped
+- `bay_audit_logs` migration + RLS (`20260818_bay_audit_logs.sql`) — persists multimodal audit verdicts with rubric JSON.
+- `POST /api/ai/bay-audit/validate` — rubric scoring (planogram, tags, top-stock banding, aisle clearance) + log insert.
+- `POST /api/ai/snag/triage` — equipment-aware snag classification; optional dispatch to `downstock_queue`, `shift_walk_tasks`, or `rotation_exceptions`.
+- `POST /api/rotations/complete` — gates on `audit_verdict: FAIL` unless `supervisor_override`; `BayCompleteGatedError` in client.
+- `ZebraChecklist` supervisor override button; `VisualBayScannerModal` audit mode via `validateBayAudit`.
+
 ## 2026-08-17 — Force Draw clears staged week; Admin Sandbox rotation reset
 
 ### Found
