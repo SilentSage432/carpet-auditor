@@ -17,6 +17,7 @@ import {
   isMissingColumnError,
   isMissingRelationError,
   isNotNullViolationError,
+  isOnConflictMismatch,
   readableError,
 } from "./errors";
 import { departmentCodesMatch } from "./department-codes";
@@ -50,7 +51,8 @@ export type GenerateRotationsOptions = {
   store_number?: string | null;
 };
 
-const WEEKLY_ROTATION_ON_CONFLICT = "location_id,assigned_week" as const;
+/** Unique key on public.weekly_rotations — one bay per ISO week. Not week_number. */
+export const WEEKLY_ROTATIONS_ON_CONFLICT = "location_id,assigned_week" as const;
 const OPTIONAL_WEEKLY_ROTATION_STORE_COLUMNS = [
   "store_id",
   "store_number",
@@ -135,9 +137,63 @@ function schemaCacheStaleMessage(column: string): string {
 }
 
 /**
+ * Merge by location_id + assigned_week when the live table has no UNIQUE
+ * matching PostgREST ON CONFLICT (CREATE TABLE IF NOT EXISTS never added it).
+ */
+async function mergeWeeklyRotationsByLocationWeek(
+  supabase: SupabaseClient,
+  payload: Record<string, unknown>[]
+): Promise<WeeklyRotation[]> {
+  const results: WeeklyRotation[] = [];
+  for (const row of payload) {
+    const locationId = String(row.location_id ?? "").trim();
+    const week = String(row.assigned_week ?? "").trim();
+    if (!locationId || !week) {
+      throw new Error("Weekly rotation upsert failed: location_id and assigned_week are required");
+    }
+
+    const existing = await supabase
+      .from("weekly_rotations")
+      .select("id")
+      .eq("location_id", locationId)
+      .eq("assigned_week", week)
+      .order("created_at", { ascending: false })
+      .limit(1);
+
+    if (existing.error) {
+      throw new Error(
+        readableError(existing.error, "Weekly rotation upsert failed")
+      );
+    }
+
+    const existingId = String(
+      (Array.isArray(existing.data) ? existing.data[0] : existing.data)?.id ??
+        ""
+    ).trim();
+    const written = existingId
+      ? await supabase
+          .from("weekly_rotations")
+          .update(row)
+          .eq("id", existingId)
+          .select("*")
+          .single()
+      : await supabase.from("weekly_rotations").insert(row).select("*").single();
+
+    if (written.error || !written.data) {
+      throw new Error(
+        readableError(written.error, "Weekly rotation upsert failed")
+      );
+    }
+    results.push(written.data as WeeklyRotation);
+  }
+  return results;
+}
+
+/**
  * Persist weekly rotation rows. Sends store_id and store_number when known so
  * live schemas (UUID multi-store, JWT store_number RLS, or both) all accept
  * the upsert. Strips a store column only when PostgREST reports it missing.
+ * onConflict must match UNIQUE(location_id, assigned_week) — not week_number.
  */
 async function upsertWeeklyRotations(
   supabase: SupabaseClient,
@@ -169,7 +225,7 @@ async function upsertWeeklyRotations(
   for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
     const { data, error } = await supabase
       .from("weekly_rotations")
-      .upsert(payload, { onConflict: WEEKLY_ROTATION_ON_CONFLICT })
+      .upsert(payload, { onConflict: WEEKLY_ROTATIONS_ON_CONFLICT })
       .select("*");
 
     if (!error) {
@@ -197,6 +253,10 @@ async function upsertWeeklyRotations(
     );
     if (stale) {
       throw new Error(schemaCacheStaleMessage(stale));
+    }
+
+    if (isOnConflictMismatch(error)) {
+      return mergeWeeklyRotationsByLocationWeek(supabase, payload);
     }
     break;
   }

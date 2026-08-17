@@ -1,5 +1,14 @@
 # DeptSync Hub — Development Journal
 
+## 2026-08-17 — Weekly rotation upsert unique is location + ISO week
+
+### Found
+- PostgREST rejected `weekly_rotations` upsert: no UNIQUE matching `onConflict`. `CREATE TABLE IF NOT EXISTS` never added `(location_id, assigned_week)` on older tables. There is no `week_number` column.
+
+### Shipped
+- `supabase/migrations/20260817_weekly_rotations_location_week_unique.sql` dedupes, adds `weekly_rotations_location_id_assigned_week_key`, and `NOTIFY pgrst, 'reload schema'`.
+- Persist still uses `onConflict: location_id,assigned_week`. On mismatch it merges by that pair instead of inventing `store_number,department_id,week_number`.
+
 ## 2026-08-17 — Weekly rotation upsert matches live store columns
 
 ### Found

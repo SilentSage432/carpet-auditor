@@ -136,7 +136,7 @@ lib/store-ops/map-readiness.ts → Store Map green/yellow/red readiness tones (c
 lib/store-ops/velocity.ts → IRP cadence tones, seed presets (14d/5d/lock), custom_decay_days, Sunday decay multiplier, async decay scores
 lib/store-ops/bay-service.ts → Persist bay_service_logs + stamp last_serviced_at + promote velocity
 lib/store-ops/rotation.ts → Sunday draw: carry-over prepend then velocity-priority pick (composed by rotations.ts)
-lib/store-ops/rotations.ts → Weekly rotation engine persist. `weekly_rotations` upsert sends `store_id` + `store_number` (JWT RLS); strips a store column only on PostgREST cache miss (PGRST204)
+lib/store-ops/rotations.ts → Weekly rotation engine persist. `weekly_rotations` upsert sends `store_id` + `store_number`; `onConflict` is `location_id,assigned_week` (UNIQUE from `20260817_weekly_rotations_location_week_unique.sql`). Strips a store column only on PostgREST cache miss (PGRST204)
 lib/store-ops/audit-summary.ts → Supervisor weekly rollup composition (quota / associate / barriers)
 components/store-ops/SupervisorAuditSummaryModal.tsx → Personal weekly stats + copy
 lib/admin-department-context.ts       → Working department pin (localStorage + event; Floor/Map/Roster subscribe)
@@ -207,6 +207,7 @@ supabase/migrations/20260812_jwt_rls_policies.sql → JWT claims hook + store/de
 supabase/migrations/20260816_store_locations_read.sql → (superseded) open SELECT on store_locations
 supabase/migrations/20260816_rls_read_write_parity.sql → digit-equal jwt_matches_store, department aliases
 supabase/migrations/20260817_rls_security_lockdown.sql → Drop anon/open SELECT; authenticated store RLS; Realtime on sunday_bay_assignments / manager_notes / downstock_queue
+supabase/migrations/20260817_weekly_rotations_location_week_unique.sql → UNIQUE(location_id, assigned_week) for weekly_rotations upsert onConflict
 supabase/migrations/20260812_manager_notes.sql → durable manager_notes (store_number/department/author) + JWT RLS
 supabase/migrations/20260812_sunday_bay_assignments.sql → sunday specialist↔bay assignments + JWT RLS
 
