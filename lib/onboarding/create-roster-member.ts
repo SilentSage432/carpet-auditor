@@ -2,19 +2,15 @@
  * Roster-only member create — composition owner.
  * Inserts an associate into `store_specialists` without app auth tokens or PIN.
  * Canonical HTTP entry: POST /api/roster/members.
- * Send-invite composes issueRosterInvite via POST /api/admin/invite-supervisor.
+ * Device pairing is POST /api/roster/pair (QR, no SMS).
  */
 
 import "server-only";
 
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { composeAccessibleDepartments } from "@/lib/department-access";
 import { normalizePhoneE164 } from "@/lib/invite";
-import {
-  issueRosterInvite,
-  type IssueRosterInviteInput,
-  type IssueRosterInviteResult,
-  type RosterInviteRole,
-} from "@/lib/onboarding/roster-invite";
+import type { RosterInviteRole } from "@/lib/onboarding/roster-invite";
 import { persistSpecialistPatch } from "@/lib/onboarding/token-persist";
 import { suggestUsername } from "@/lib/rbac";
 import { normalizeStoreNumber, sameStoreNumber } from "@/lib/store";
@@ -32,8 +28,18 @@ import {
 const DEFAULT_SHIFT_START = "07:00";
 const DEFAULT_SHIFT_END = "15:30";
 
-export type CreateRosterMemberInput = IssueRosterInviteInput & {
-  /** When true, require phone and dispatch the hashed SMS invite. Default false. */
+export type CreateRosterMemberInput = {
+  supabase: SupabaseClient;
+  storeNumber: string;
+  origin?: string;
+  name?: string;
+  username?: string;
+  department?: string;
+  accessible_departments?: string[];
+  phone?: string | null;
+  role?: RosterInviteRole;
+  floor_title?: string | null;
+  /** Rejected — pairing is POST /api/roster/pair. */
   sendInvite?: boolean;
   email?: string | null;
   /** Persist today's shift as on-duty. Default true for floor associates. */
@@ -53,9 +59,7 @@ export type RosterOnlyCreateResult = {
   phone: string | null;
 };
 
-export type CreateRosterMemberResult =
-  | (IssueRosterInviteResult & { kind: "invite" })
-  | RosterOnlyCreateResult;
+export type CreateRosterMemberResult = RosterOnlyCreateResult;
 
 function localWorkDate(): string {
   const now = new Date();
@@ -68,9 +72,8 @@ function localWorkDate(): string {
 export async function createRosterMember(
   input: CreateRosterMemberInput
 ): Promise<CreateRosterMemberResult> {
-  if (input.sendInvite || input.specialistId) {
-    const issued = await issueRosterInvite(input);
-    return { kind: "invite", ...issued };
+  if (input.sendInvite) {
+    throw new Error("Device pairing uses POST /api/roster/pair");
   }
   return insertRosterOnlyMember(input);
 }

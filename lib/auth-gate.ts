@@ -124,12 +124,10 @@ export async function verifyHubGateToken(
 }
 
 export function isAuthGatePublicPath(pathname: string): boolean {
-  if (
-    pathname === "/login" ||
-    pathname === "/access-gate" ||
-    pathname === "/auth" ||
-    pathname.startsWith("/auth/")
-  ) {
+  if (pathname === "/login" || pathname === "/access-gate" || pathname === "/pair") {
+    return true;
+  }
+  if (pathname === "/auth" || pathname.startsWith("/auth/")) {
     return true;
   }
   if (pathname === "/invite" || pathname.startsWith("/invite/")) return true;

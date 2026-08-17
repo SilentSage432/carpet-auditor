@@ -232,6 +232,7 @@ export function DepartmentTargetsMatrix({ specialist }: Props) {
                         <DepartmentIcon
                           department={hubScopeFromDeptCode(dept.code)}
                           className="h-4 w-4 shrink-0 text-accent"
+                          strokeWidth={1.75}
                         />
                         {dept.name}
                       </p>

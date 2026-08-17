@@ -4,11 +4,13 @@
  * Specialist management sheet — presentation + action wiring.
  * Schedule persist: AssociateScheduleModal → associate_shift_days.
  * Grants persist: POST /api/admin/department-access → store_specialists.
+ * Pairing: POST /api/roster/pair → invite_token_hash (QR overlay).
  * PIN persist: adminResetSpecialistPin → store_specialists.
  */
 
 import { useEffect, useState } from "react";
-import { KeyRound, Send, Trash2, X } from "lucide-react";
+import { Clock, KeyRound, QrCode, RefreshCw, ShieldCheck, Trash2, X } from "lucide-react";
+import { QRCodeSVG } from "qrcode.react";
 import { AssociateScheduleModal } from "@/components/hub/AssociateScheduleModal";
 import { DepartmentAccessChips } from "@/components/hub/DepartmentAccessChips";
 import { AppAccessBadge, FloorTitleBadge } from "@/components/hub/SpecialistCard";
@@ -16,6 +18,7 @@ import { DepartmentIcon } from "@/components/hub/NavIcons";
 import { NumberField } from "@/components/ui/NumberField";
 import { composeAccessibleDepartments } from "@/lib/department-access";
 import { adminResetSpecialistPin, appAccessStatus } from "@/lib/specialists";
+import { issueRosterPairing } from "@/lib/store-ops/client";
 import { toastError, toastSuccess } from "@/lib/toast";
 import {
   departmentMeta,
@@ -28,6 +31,7 @@ import {
 const ICON_STROKE = 1.75;
 
 export function SpecialistEditSheet({
+  actor,
   member,
   busy,
   canShift,
@@ -35,10 +39,11 @@ export function SpecialistEditSheet({
   canManage,
   onClose,
   onAccessChange,
-  onInvite,
   onRemove,
   onScheduleSaved,
+  onPaired,
 }: {
+  actor: StoreSpecialist;
   member: StoreSpecialist;
   busy: boolean;
   canShift: boolean;
@@ -46,15 +51,21 @@ export function SpecialistEditSheet({
   canManage: boolean;
   onClose: () => void;
   onAccessChange: (next: OperationalDepartment[]) => void;
-  onInvite: () => void;
   onRemove: () => void;
   onScheduleSaved: () => void;
+  onPaired: () => void;
 }) {
   const [pinOpen, setPinOpen] = useState(false);
   const [newPin, setNewPin] = useState("");
   const [confirmPin, setConfirmPin] = useState("");
   const [pinSaving, setPinSaving] = useState(false);
   const [pinError, setPinError] = useState<string | null>(null);
+  const [pairOpen, setPairOpen] = useState(false);
+  const [pairUrl, setPairUrl] = useState<string | null>(null);
+  const [pairExpiresAt, setPairExpiresAt] = useState<string | null>(null);
+  const [pairBusy, setPairBusy] = useState(false);
+  const [pairError, setPairError] = useState<string | null>(null);
+  const [now, setNow] = useState(() => Date.now());
 
   const home = specialistHomeDepartment(member);
   const grantable =
@@ -62,10 +73,16 @@ export function SpecialistEditSheet({
     member.role !== "MasterAdmin" &&
     (canManage || member.role === "Associate");
   const access = appAccessStatus(member);
-  const showInvite = canManage && member.role !== "MasterAdmin" && access === "roster_only";
+  const showInvite =
+    canManage &&
+    member.role !== "MasterAdmin" &&
+    (access === "roster_only" || access === "invited");
   const showRemove = canManage && member.role !== "MasterAdmin";
   const showPin = canManage && member.role !== "MasterAdmin";
   const showSchedule = canShift && member.role !== "MasterAdmin";
+  const pairExpired = pairExpiresAt
+    ? Date.parse(pairExpiresAt) <= now
+    : false;
 
   useEffect(() => {
     document.body.style.overflow = "hidden";
@@ -73,6 +90,33 @@ export function SpecialistEditSheet({
       document.body.style.overflow = "";
     };
   }, []);
+
+  useEffect(() => {
+    if (!pairOpen || !pairExpiresAt) return;
+    const id = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(id);
+  }, [pairOpen, pairExpiresAt]);
+
+  async function handleIssuePair() {
+    setPairBusy(true);
+    setPairError(null);
+    try {
+      const issued = await issueRosterPairing(actor, member.id);
+      setPairUrl(issued.pair_url);
+      setPairExpiresAt(issued.expires_at);
+      setPairOpen(true);
+      setNow(Date.now());
+      toastSuccess(`Pairing QR ready for ${member.name}`);
+      onPaired();
+    } catch (err) {
+      const message =
+        err instanceof Error ? err.message : "Could not issue pairing QR";
+      setPairError(message);
+      toastError(message);
+    } finally {
+      setPairBusy(false);
+    }
+  }
 
   async function handleResetPin() {
     if (!/^\d{4}$/.test(newPin)) {
@@ -204,12 +248,12 @@ export function SpecialistEditSheet({
             {showInvite ? (
               <button
                 type="button"
-                disabled={busy}
-                onClick={onInvite}
-                className="flex min-h-11 w-full items-center justify-center gap-1.5 rounded-xl border border-cyan-500/40 bg-cyan-950/25 text-sm font-bold text-cyan-100"
+                disabled={busy || pairBusy}
+                onClick={() => void handleIssuePair()}
+                className="flex min-h-11 w-full items-center justify-center rounded-xl border border-cyan-500/40 bg-cyan-950/25 text-sm font-bold text-cyan-100"
               >
-                <Send className="h-4 w-4" strokeWidth={ICON_STROKE} aria-hidden />
-                Send App Invite
+                <QrCode className="w-4 h-4 mr-2" strokeWidth={ICON_STROKE} aria-hidden />
+                Pair Device via QR
               </button>
             ) : null}
 
@@ -272,6 +316,92 @@ export function SpecialistEditSheet({
           </section>
         ) : null}
       </div>
+
+      {pairOpen ? (
+        <div className="fixed inset-0 z-[90] flex items-end justify-center sm:items-center">
+          <button
+            type="button"
+            className="absolute inset-0 bg-black/70"
+            aria-label="Close pairing QR"
+            onClick={() => setPairOpen(false)}
+          />
+          <div
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="pair-qr-title"
+            className="glass-card theme-modal relative z-10 w-full max-w-sm !rounded-t-2xl p-4 sm:!rounded-2xl"
+          >
+            <div className="mb-3 flex items-start justify-between gap-2">
+              <div>
+                <p className="flex items-center gap-1.5 font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-accent">
+                  <ShieldCheck className="h-3.5 w-3.5" strokeWidth={ICON_STROKE} aria-hidden />
+                  Device pairing
+                </p>
+                <h3 id="pair-qr-title" className="mt-1 text-lg font-bold text-white">
+                  Pair {member.name}
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={() => setPairOpen(false)}
+                className="btn-icon-touch"
+                aria-label="Close"
+              >
+                <X className="h-5 w-5" strokeWidth={ICON_STROKE} aria-hidden />
+              </button>
+            </div>
+            {pairUrl && !pairExpired ? (
+              <div className="mx-auto w-fit rounded-2xl bg-white p-3">
+                <QRCodeSVG
+                  value={pairUrl}
+                  size={220}
+                  bgColor="#ffffff"
+                  fgColor="#090d16"
+                  level="M"
+                  aria-label="Pairing QR code"
+                />
+              </div>
+            ) : (
+              <p className="rounded-xl border border-amber-500/40 bg-amber-950/30 px-3 py-3 text-sm text-amber-100">
+                This QR expired. Generate a new code.
+              </p>
+            )}
+            <p className="mt-3 flex items-center justify-center gap-1.5 font-mono text-sm font-bold tabular-nums text-zinc-200">
+              <Clock className="h-4 w-4 text-accent" strokeWidth={ICON_STROKE} aria-hidden />
+              {pairExpired
+                ? "Expired"
+                : `Expires in ${formatPairCountdown(pairExpiresAt, now)}`}
+            </p>
+            {pairError ? (
+              <p className="mt-2 text-center text-sm font-semibold text-rose-300" role="alert">
+                {pairError}
+              </p>
+            ) : null}
+            <button
+              type="button"
+              disabled={pairBusy}
+              onClick={() => void handleIssuePair()}
+              className="mt-3 flex min-h-11 w-full items-center justify-center rounded-xl border border-zinc-700 text-sm font-bold"
+            >
+              <RefreshCw
+                className="w-4 h-4 mr-2"
+                strokeWidth={ICON_STROKE}
+                aria-hidden
+              />
+              {pairBusy ? "Generating…" : "Regenerate QR"}
+            </button>
+          </div>
+        </div>
+      ) : null}
     </div>
   );
+}
+
+function formatPairCountdown(expiresAt: string | null, now: number): string {
+  if (!expiresAt) return "00:00";
+  const remain = Math.max(0, Date.parse(expiresAt) - now);
+  const totalSec = Math.floor(remain / 1000);
+  const min = Math.floor(totalSec / 60);
+  const sec = totalSec % 60;
+  return `${String(min).padStart(2, "0")}:${String(sec).padStart(2, "0")}`;
 }

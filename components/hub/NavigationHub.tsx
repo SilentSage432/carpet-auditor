@@ -152,7 +152,7 @@ export function NavigationHub({
               </div>
               <div className="p-2">
                 <MenuAction
-                  label="🎨 Appearance & Preferences"
+                  label="Appearance & Preferences"
                   onClick={() => {
                     setUserOpen(false);
                     requestUserPreferencesDrawer();

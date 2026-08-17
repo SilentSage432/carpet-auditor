@@ -4,8 +4,8 @@
  * Roster tab — department-grouped team, shift board, and call-out rebalance.
  *
  * Pipeline: "+ Add Team Member" → AddTeamMemberSheet →
- *   roster-only: POST /api/roster/members → createRosterMember → store_specialists
- *   SMS invite:  POST /api/admin/invite-supervisor
+ *   POST /api/roster/members → createRosterMember → store_specialists (roster-only).
+ * Device pairing: SpecialistEditSheet → POST /api/roster/pair (10-minute QR).
  * Accordions: fetchSpecialists(storeNumber) SELECTs store_specialists, then
  *   composeRosterDepartmentGroups. On-duty counts come from associate_shift_days.
  */
@@ -38,7 +38,7 @@ import {
   isDatabaseUuid,
   mapRow,
 } from "@/lib/specialists";
-import { updateDepartmentAccess, inviteSupervisor, createRosterMember } from "@/lib/store-ops/client";
+import { updateDepartmentAccess, createRosterMember } from "@/lib/store-ops/client";
 import type { InviteSupervisorResult } from "@/lib/store-ops/client";
 import {
   composeShiftBoard,
@@ -54,7 +54,7 @@ import {
   upsertShiftDay,
   type AssociateShiftDay,
 } from "@/lib/store-ops/shift-status";
-import { toastError, toastSuccess, toastInfo } from "@/lib/toast";
+import { toastError, toastSuccess } from "@/lib/toast";
 import {
   ROSTER_JOB_GROUPS,
   ROSTER_JOB_OPTIONS,
@@ -65,7 +65,7 @@ import {
   type OperationalDepartment,
   type StoreSpecialist,
 } from "@/lib/types";
-import { normalizePhoneE164, formatPhoneDisplay } from "@/lib/phone";
+import { normalizePhoneE164 } from "@/lib/phone";
 import type { WorkflowTabProps } from "@/components/hub/tabs/tab-props";
 
 const ICON_STROKE = 1.75;
@@ -121,9 +121,6 @@ export function RosterTab({ specialist, storeNumber }: WorkflowTabProps) {
     null
   );
   const [callOutTarget, setCallOutTarget] = useState<StoreSpecialist | null>(
-    null
-  );
-  const [inviteTarget, setInviteTarget] = useState<StoreSpecialist | null>(
     null
   );
   const today = localWorkDate();
@@ -516,20 +513,9 @@ export function RosterTab({ specialist, storeNumber }: WorkflowTabProps) {
         />
       ) : null}
 
-      {inviteTarget ? (
-        <SendAppInviteSheet
-          specialist={specialist}
-          member={inviteTarget}
-          storeNumber={storeNumber}
-          onClose={() => setInviteTarget(null)}
-          onSent={async () => {
-            await reload();
-          }}
-        />
-      ) : null}
-
       {manageTarget ? (
         <SpecialistEditSheet
+          actor={specialist}
           member={manageTarget}
           busy={busyId === manageTarget.id}
           canShift={canShift}
@@ -537,15 +523,12 @@ export function RosterTab({ specialist, storeNumber }: WorkflowTabProps) {
           canManage={canManage}
           onClose={() => setManageTarget(null)}
           onAccessChange={(next) => void handleAccess(manageTarget, next)}
-          onInvite={() => {
-            setInviteTarget(manageTarget);
-            setManageTarget(null);
-          }}
           onRemove={() => {
             setDeleteTarget(manageTarget);
             setManageTarget(null);
           }}
           onScheduleSaved={() => void reload()}
+          onPaired={() => void reload()}
         />
       ) : null}
 
@@ -661,27 +644,11 @@ function AddTeamMemberSheet({
   const [jobOptionId, setJobOptionId] = useState("flooring_specialist");
   const [department, setDepartment] = useState<DepartmentScope>("flooring");
   const [phone, setPhone] = useState("");
-  const [sendInvite, setSendInvite] = useState(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [issued, setIssued] = useState<{
-    name: string;
-    invite_url: string;
-    sms_reason?: string;
-    sms_link: string;
-  } | null>(null);
 
   const jobOption = rosterJobOptionById(jobOptionId);
   const departmentLocked = Boolean(jobOption?.department);
-
-  async function copyText(label: string, value: string) {
-    try {
-      await navigator.clipboard.writeText(value);
-      toastSuccess(`Copied ${label}`);
-    } catch {
-      toastError(`Could not copy ${label}`);
-    }
-  }
 
   async function handleSave() {
     const trimmed = name.trim();
@@ -692,10 +659,6 @@ function AddTeamMemberSheet({
     }
     if (phone.trim() && !phoneE164) {
       setError("Enter a valid phone number");
-      return;
-    }
-    if (sendInvite && !phoneE164) {
-      setError("Phone number is required to send a mobile app invite");
       return;
     }
     setSaving(true);
@@ -715,40 +678,15 @@ function AddTeamMemberSheet({
           assigned === "all" ? "flooring" : (assigned as OperationalDepartment),
         ]),
       };
-      if (sendInvite) {
-        const result = await inviteSupervisor(specialist, {
-          ...payload,
-          send_invite: true,
-        });
-        const created = memberFromCreateResult(result, storeNumber);
-        if (!created) {
-          console.error("Roster Insert Failed:", result);
-          throw new Error("Roster save did not return a specialist row");
-        }
-        setIssued({
-          name: result.name,
-          invite_url: result.invite_url ?? "",
-          sms_reason:
-            result.sms && result.sms.ok === true ? undefined : result.sms?.reason,
-          sms_link: result.sms_preview?.sms_link ?? "",
-        });
-        toastSuccess(`Invited ${result.name} — status invited`);
-        if (result.sms && result.sms.ok !== true) {
-          toastInfo(result.sms.reason);
-        }
-        await onCreated(created);
-      } else {
-        const result = await createRosterMember(specialist, payload);
-        const created = memberFromCreateResult(result, storeNumber);
-        if (!created) {
-          console.error("Roster Insert Failed:", result);
-          throw new Error("Roster save did not return a specialist row");
-        }
-        toastSuccess(`${result.name} added to the roster`);
-        await onCreated(created);
-        onClose();
-        return;
+      const result = await createRosterMember(specialist, payload);
+      const created = memberFromCreateResult(result, storeNumber);
+      if (!created) {
+        console.error("Roster Insert Failed:", result);
+        throw new Error("Roster save did not return a specialist row");
       }
+      toastSuccess(`${result.name} added to the roster`);
+      await onCreated(created);
+      onClose();
     } catch (err) {
       const message =
         err instanceof Error ? err.message : "Could not add team member";
@@ -775,332 +713,96 @@ function AddTeamMemberSheet({
       >
         <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-zinc-600" />
         <h2 id="add-team-title" className="glass-title text-lg">
-          {issued ? "Invite sent" : "Add Team Member"}
+          Add Team Member
         </h2>
         <p className="mt-1 text-sm text-zinc-400">
-          {issued
-            ? "Share the one-time link. They set a 4–6 digit PIN at /auth/verify."
-            : "Name, role, and home department add them to the floor roster. App invite is optional."}
+          Name, role, and home department add them to the floor roster. Pair their
+          device later from the specialist sheet.
         </p>
 
-        {issued ? (
-          <div className="mt-4 space-y-3">
-            <p className="text-sm font-semibold text-white">
-              {issued.name} · store {storeNumber}
-            </p>
-            <p className="break-all font-mono text-[11px] text-zinc-300">
-              {issued.invite_url}
-            </p>
-            {issued.sms_reason ? (
-              <p className="text-xs text-amber-200">{issued.sms_reason}</p>
-            ) : (
-              <p className="text-xs text-emerald-200">
-                SMS dispatched to {formatPhoneDisplay(phone)}
-              </p>
-            )}
-            <button
-              type="button"
-              onClick={() => void copyText("invite link", issued.invite_url)}
-              className="flex min-h-11 items-center justify-center rounded-xl border border-zinc-700 text-xs font-semibold"
-            >
-              Copy invite link
-            </button>
-            <button
-              type="button"
-              onClick={() => void copyText("SMS text", issued.sms_link)}
-              className="flex min-h-11 w-full items-center justify-center rounded-xl border border-zinc-700 text-xs font-semibold"
-            >
-              Copy SMS link
-            </button>
-            <button
-              type="button"
-              onClick={onClose}
-              className="btn-primary-glow flex min-h-12 w-full items-center justify-center rounded-xl text-sm font-bold"
-            >
-              Done
-            </button>
-          </div>
-        ) : (
-          <>
-            <div className="mt-4 space-y-3">
-              <TextField
-                label="Name"
-                value={name}
-                onChange={setName}
-                placeholder="Name badge"
-              />
+        <div className="mt-4 space-y-3">
+          <TextField
+            label="Name"
+            value={name}
+            onChange={setName}
+            placeholder="Name badge"
+          />
 
-              <fieldset>
-                <legend className="mb-1.5 text-sm font-medium text-zinc-200">
-                  Role
-                </legend>
-                <select
-                  value={jobOptionId}
-                  onChange={(e) => {
-                    const nextId = e.target.value;
-                    setJobOptionId(nextId);
-                    const next = rosterJobOptionById(nextId);
-                    if (next?.department) setDepartment(next.department);
-                  }}
-                  className="glass-input min-h-12 w-full text-sm"
-                >
-                  {ROSTER_JOB_GROUPS.map((group) => (
-                    <optgroup key={group.id} label={group.label}>
-                      {ROSTER_JOB_OPTIONS.filter(
-                        (option) => option.group === group.id
-                      ).map((option) => (
-                        <option key={option.id} value={option.id}>
-                          {option.label}
-                        </option>
-                      ))}
-                    </optgroup>
+          <fieldset>
+            <legend className="mb-1.5 text-sm font-medium text-zinc-200">
+              Role
+            </legend>
+            <select
+              value={jobOptionId}
+              onChange={(e) => {
+                const nextId = e.target.value;
+                setJobOptionId(nextId);
+                const next = rosterJobOptionById(nextId);
+                if (next?.department) setDepartment(next.department);
+              }}
+              className="glass-input min-h-12 w-full text-sm"
+            >
+              {ROSTER_JOB_GROUPS.map((group) => (
+                <optgroup key={group.id} label={group.label}>
+                  {ROSTER_JOB_OPTIONS.filter(
+                    (option) => option.group === group.id
+                  ).map((option) => (
+                    <option key={option.id} value={option.id}>
+                      {option.label}
+                    </option>
                   ))}
-                </select>
-              </fieldset>
+                </optgroup>
+              ))}
+            </select>
+          </fieldset>
 
-              <DepartmentPicker
-                value={department}
-                onChange={setDepartment}
-                disabled={departmentLocked}
-                label="Home Department"
-                showFloorTitle={false}
-              />
+          <DepartmentPicker
+            value={department}
+            onChange={setDepartment}
+            disabled={departmentLocked}
+            label="Home Department"
+            showFloorTitle={false}
+          />
 
-              <label className="block space-y-1.5">
-                <span className="text-sm font-medium text-zinc-200">
-                  Phone Number{sendInvite ? "" : " (optional)"}
-                </span>
-                <input
-                  type="tel"
-                  inputMode="tel"
-                  autoComplete="tel"
-                  value={phone}
-                  onChange={(e) => setPhone(e.target.value)}
-                  placeholder="(555) 123-4567"
-                  className="glass-input min-h-12 w-full font-mono"
-                />
-              </label>
+          <label className="block space-y-1.5">
+            <span className="text-sm font-medium text-zinc-200">
+              Phone Number (optional)
+            </span>
+            <input
+              type="tel"
+              inputMode="tel"
+              autoComplete="tel"
+              value={phone}
+              onChange={(e) => setPhone(e.target.value)}
+              placeholder="(555) 123-4567"
+              className="glass-input min-h-12 w-full font-mono"
+            />
+          </label>
+        </div>
 
-              <label className="flex min-h-12 items-start gap-3 rounded-xl border border-zinc-700 px-3 py-2.5">
-                <input
-                  type="checkbox"
-                  checked={sendInvite}
-                  onChange={(e) => setSendInvite(e.target.checked)}
-                  className="mt-0.5 h-5 w-5 shrink-0 accent-cyan-500"
-                />
-                <span>
-                  <span className="block text-sm font-bold text-white">
-                    Send Mobile App Invite
-                  </span>
-                  <span className="text-[11px] leading-snug text-zinc-400">
-                    SMS a one-time link so they can set a PIN. Off by default —
-                    they are still available for schedules and rotations.
-                  </span>
-                </span>
-              </label>
-            </div>
+        {error ? (
+          <p className="mt-3 text-center text-sm font-semibold text-rose-300" role="alert">
+            {error}
+          </p>
+        ) : null}
 
-            {error ? (
-              <p className="mt-3 text-center text-sm font-semibold text-rose-300" role="alert">
-                {error}
-              </p>
-            ) : null}
-
-            <div className="mt-4 grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={onClose}
-                className="flex min-h-12 items-center justify-center rounded-xl border border-zinc-700 text-sm font-semibold"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                disabled={saving}
-                onClick={() => void handleSave()}
-                className="btn-primary-glow flex min-h-12 items-center justify-center rounded-xl text-sm font-bold disabled:opacity-40"
-              >
-                {saving
-                  ? sendInvite
-                    ? "Sending invite…"
-                    : "Adding…"
-                  : sendInvite
-                    ? "Send invite"
-                    : "Add to roster"}
-              </button>
-            </div>
-          </>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function SendAppInviteSheet({
-  specialist,
-  member,
-  storeNumber,
-  onClose,
-  onSent,
-}: {
-  specialist: StoreSpecialist;
-  member: StoreSpecialist;
-  storeNumber: string;
-  onClose: () => void;
-  onSent: () => Promise<void>;
-}) {
-  const [phone, setPhone] = useState(member.phone_number ?? "");
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [issued, setIssued] = useState<{
-    invite_url: string;
-    sms_reason?: string;
-    sms_link: string;
-  } | null>(null);
-
-  async function copyText(label: string, value: string) {
-    try {
-      await navigator.clipboard.writeText(value);
-      toastSuccess(`Copied ${label}`);
-    } catch {
-      toastError(`Could not copy ${label}`);
-    }
-  }
-
-  async function handleSend() {
-    const phoneE164 = normalizePhoneE164(phone);
-    if (!phoneE164) {
-      setError("Enter a valid phone number");
-      return;
-    }
-    setSaving(true);
-    setError(null);
-    try {
-      const result = await inviteSupervisor(specialist, {
-        specialist_id: member.id,
-        phone: phoneE164,
-        send_invite: true,
-      });
-      setIssued({
-        invite_url: result.invite_url ?? "",
-        sms_reason:
-          result.sms && result.sms.ok === true ? undefined : result.sms?.reason,
-        sms_link: result.sms_preview?.sms_link ?? "",
-      });
-      toastSuccess(`Invited ${member.name}`);
-      if (result.sms && result.sms.ok !== true) {
-        toastInfo(result.sms.reason);
-      }
-      await onSent();
-    } catch (err) {
-      const message =
-        err instanceof Error ? err.message : "Could not send invite";
-      setError(message);
-      toastError(message);
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  return (
-    <div className="glass-backdrop fixed inset-0 z-[80] flex flex-col justify-end">
-      <button
-        type="button"
-        aria-label="Close send app invite"
-        className="absolute inset-0"
-        onClick={onClose}
-      />
-      <div
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="send-invite-title"
-        className="glass-card theme-modal relative z-10 max-h-[88dvh] w-full overflow-y-auto !rounded-t-2xl !rounded-b-none border-t-2 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3"
-      >
-        <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-zinc-600" />
-        <h2 id="send-invite-title" className="glass-title text-lg">
-          {issued ? "Invite sent" : "Send App Invite"}
-        </h2>
-        <p className="mt-1 text-sm text-zinc-400">
-          {issued
-            ? `${member.name} can set a PIN at /auth/verify.`
-            : `SMS a one-time link to ${member.name}. They stay on the floor roster either way.`}
-        </p>
-
-        {issued ? (
-          <div className="mt-4 space-y-3">
-            <p className="break-all font-mono text-[11px] text-zinc-300">
-              {issued.invite_url}
-            </p>
-            {issued.sms_reason ? (
-              <p className="text-xs text-amber-200">{issued.sms_reason}</p>
-            ) : (
-              <p className="text-xs text-emerald-200">
-                SMS dispatched to {formatPhoneDisplay(phone)} · store{" "}
-                {storeNumber}
-              </p>
-            )}
-            <button
-              type="button"
-              onClick={() => void copyText("invite link", issued.invite_url)}
-              className="flex min-h-11 items-center justify-center rounded-xl border border-zinc-700 text-xs font-semibold"
-            >
-              Copy invite link
-            </button>
-            <button
-              type="button"
-              onClick={() => void copyText("SMS text", issued.sms_link)}
-              className="flex min-h-11 w-full items-center justify-center rounded-xl border border-zinc-700 text-xs font-semibold"
-            >
-              Copy SMS link
-            </button>
-            <button
-              type="button"
-              onClick={onClose}
-              className="btn-primary-glow flex min-h-12 w-full items-center justify-center rounded-xl text-sm font-bold"
-            >
-              Done
-            </button>
-          </div>
-        ) : (
-          <>
-            <label className="mt-4 block space-y-1.5">
-              <span className="text-sm font-medium text-zinc-200">
-                Phone Number
-              </span>
-              <input
-                type="tel"
-                inputMode="tel"
-                autoComplete="tel"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                placeholder="(555) 123-4567"
-                className="glass-input min-h-12 w-full font-mono"
-              />
-            </label>
-            {error ? (
-              <p className="mt-3 text-center text-sm font-semibold text-rose-300" role="alert">
-                {error}
-              </p>
-            ) : null}
-            <div className="mt-4 grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={onClose}
-                className="flex min-h-12 items-center justify-center rounded-xl border border-zinc-700 text-sm font-semibold"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                disabled={saving}
-                onClick={() => void handleSend()}
-                className="btn-primary-glow flex min-h-12 items-center justify-center rounded-xl text-sm font-bold disabled:opacity-40"
-              >
-                {saving ? "Sending…" : "Send invite"}
-              </button>
-            </div>
-          </>
-        )}
+        <div className="mt-4 grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={onClose}
+            className="flex min-h-12 items-center justify-center rounded-xl border border-zinc-700 text-sm font-semibold"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            disabled={saving}
+            onClick={() => void handleSave()}
+            className="btn-primary-glow flex min-h-12 items-center justify-center rounded-xl text-sm font-bold disabled:opacity-40"
+          >
+            {saving ? "Adding…" : "Add to roster"}
+          </button>
+        </div>
       </div>
     </div>
   );

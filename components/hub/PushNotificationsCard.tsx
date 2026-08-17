@@ -16,10 +16,10 @@ export function PushNotificationsCard({ specialist }: Props) {
   if (!canEnable) return null;
 
   return (
-    <section className="space-y-3 rounded-2xl border border-emerald-500/25 bg-slate-900/90 p-4">
-      <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-400">
+    <div className="space-y-3">
+      <h3 className="text-sm font-semibold uppercase tracking-wide text-slate-400">
         Phone rotation alerts
-      </h2>
+      </h3>
       <p className="text-sm text-slate-300">
         Get a Web Push on your personal phone when Master Admin drops a new weekly
         bay rotation for your department.
@@ -78,6 +78,6 @@ export function PushNotificationsCard({ specialist }: Props) {
           {push.error}
         </p>
       ) : null}
-    </section>
+    </div>
   );
 }

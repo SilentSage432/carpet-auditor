@@ -121,6 +121,7 @@ export async function completePinFromVerifySession(input: {
       invite_token: null,
       invite_token_hash: null,
       invite_token_expires_at: null,
+      invite_consumed_at: now,
     },
     { id: input.specialistId }
   );

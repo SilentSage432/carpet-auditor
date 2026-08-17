@@ -8,14 +8,14 @@ import {
 import { readableError } from "@/lib/store-ops/errors";
 import { requireSupabaseAdmin } from "@/lib/supabase/admin-response";
 
-type InviteBody = {
+type Body = {
   specialist_id?: string;
 };
 
 /**
- * POST /api/admin/invite-supervisor
- * Super Admin only. Issues a 10-minute QR pairing token for an existing roster row.
- * Roster-only inserts use POST /api/roster/members. New pairing uses POST /api/roster/pair.
+ * POST /api/roster/pair
+ * Master Admin issues a 10-minute QR pairing token for an existing roster row.
+ * Does not send SMS or require a phone number.
  */
 export async function POST(request: Request) {
   try {
@@ -23,17 +23,15 @@ export async function POST(request: Request) {
     const { supabase, response } = requireSupabaseAdmin();
     if (!supabase) return response;
 
-    const body = (await request.json()) as InviteBody;
+    const body = (await request.json().catch(() => ({}))) as Body;
     const specialistId = String(body.specialist_id ?? "").trim();
     if (!specialistId) {
       return NextResponse.json(
-        {
-          error:
-            "Roster-only creates use POST /api/roster/members. Pair a device with POST /api/roster/pair.",
-        },
+        { error: "specialist_id is required" },
         { status: 400 }
       );
     }
+
     const origin =
       request.headers.get("origin") ||
       process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, "") ||
@@ -48,13 +46,11 @@ export async function POST(request: Request) {
 
     return NextResponse.json({
       ok: true,
-      send_invite: false,
       specialist_id: issued.specialist_id,
       name: issued.name,
+      store_number: issued.store_number,
       pair_url: issued.pair_url,
-      invite_url: issued.pair_url,
-      invite_expires_at: issued.expires_at,
-      phone: null,
+      expires_at: issued.expires_at,
       status: "invited",
     });
   } catch (err) {
@@ -62,10 +58,20 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: err.message }, { status: err.status });
     }
     const message = err instanceof Error ? err.message : "";
-    if (message === "Roster member not found for this store") {
-      return NextResponse.json({ error: message }, { status: 404 });
+    if (message === "specialist_id is required") {
+      return NextResponse.json({ error: message }, { status: 400 });
     }
-    console.error("[invite-supervisor]", err);
+    if (
+      message === "Roster member not found for this store" ||
+      message === "This profile is suspended" ||
+      message === "Master Admin does not pair via QR"
+    ) {
+      return NextResponse.json(
+        { error: message },
+        { status: message.includes("not found") ? 404 : 400 }
+      );
+    }
+    console.error("[roster/pair]", err);
     return NextResponse.json(
       { error: readableError(err, "Could not issue pairing QR") },
       { status: 500 }

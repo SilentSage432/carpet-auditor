@@ -74,21 +74,14 @@ export function SundayScheduleCard({ specialist }: Props) {
   const enabled = settings?.sunday_auto_generate !== false;
 
   return (
-    <section
-      id="sunday-schedule"
-      className="space-y-3 rounded-2xl border border-amber-500/35 bg-slate-900/90 p-4"
-    >
+    <div id="sunday-schedule" className="space-y-3">
       <div>
-        <h2 className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-amber-300">
+        <h3 className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-amber-300">
           Sunday auto-stage
-        </h2>
-        <p className="mt-1 text-base font-semibold text-zinc-100">
-          Sunday rotation schedule
-        </p>
+        </h3>
         <p className="mt-1 text-sm text-zinc-400">
-          Settings &amp; Config · auto-stage the upcoming ISO week at local
-          store time. The scheduled runner never overwrites a week that is
-          already staged — Force Draw below can replace incomplete bays.
+          Auto-stage the upcoming ISO week at local store time. The scheduled
+          runner never overwrites a week that is already staged.
         </p>
       </div>
 
@@ -191,6 +184,6 @@ export function SundayScheduleCard({ specialist }: Props) {
           {error}
         </p>
       ) : null}
-    </section>
+    </div>
   );
 }

@@ -5,7 +5,7 @@
 > the scanning / auditing workflow for floor operators.
 >
 > Generated from the live codebase (`app/`, `components/`, `lib/types.ts`).
-> Last reviewed: 2026-08-15 (RBAC views + developer sandbox).
+> Last reviewed: 2026-08-17 (QR pairing + Settings four-card layout).
 
 ---
 
@@ -223,14 +223,12 @@ Stacked cards (~1.5–2 handheld screens):
 
 | Card | Contents |
 |------|----------|
-| **Appearance** | Opens shared `UserPreferencesDrawer` (theme, contrast, density, sound, haptics) |
-| **Store number / location** | Active `Lowe's #n`; numeric input (500ms debounce auto-save → full data reload) |
-| **Security & PIN** | Signed-in name; **⚙️ Change My PIN**; note for Associates about discrepancy PIN |
-| **Offline sync queue** | Pending count; **Replay queue now** |
-| **Supabase** | Configured? · URL · **Test connection** |
-| **Local storage** | Offline audit / catalog / remnant counts + in-memory loaded counts |
+| **Profile & Preferences** | Name, role badge, store #; Change PIN; Lucide Palette Appearance & Theme; Device & sync accordion; phone rotation alerts |
+| **Department Targets & Sunday Auto-Stage** | Sunday auto-stage (Master); weekly `/wk` quotas; Trigger Weekly Rotation Now |
+| **Store Topology & Bay Setup** | Collapsible `AisleBayManager` (add bay, bulk generate, delete) |
+| **Catalog & Remnants** | Collapsible taxonomies + remnant inventory / markdown |
 
-**Roster management** lives primarily in **SpecialistModal** (header), not as a Settings sub-page: add team member (name, Associate/Supervisor, optional/required PIN), select active specialist.
+**Roster management** lives on the **Roster** tab (`SpecialistCard` + `SpecialistEditSheet`), not Settings: add team member (name, role, home department, optional phone), pair devices via QR.
 
 Floor Pad is no longer a Settings tool. Master/DS open **Walk & Talk** from Floor **Shift Analytics** (`TacticalVoiceFloorPad` inside `ShiftAnalyticsDrawer`); Settings `#manager-notes` redirects to `/dashboard#floor-pad` (expands the drawer).
 
@@ -244,7 +242,7 @@ Floor Pad is no longer a Settings tool. Master/DS open **Walk & Talk** from Floo
 | **DevSandboxDrawer** | `hub/DevSandboxDrawer.tsx` | Logo 3-tap (Master) | Preview As Role + Simulate Department |
 | **WalkTheFloorSheet** | `WalkTheFloorSheet.tsx` | Map bay tap | Walk log + Snap Bay |
 | **AssociateScheduleModal** | `hub/AssociateScheduleModal.tsx` | Roster manage sheet (embedded) | Sun–Sat day strip + Open/Mid/Close + per-day times |
-| **SpecialistEditSheet** | `hub/SpecialistEditSheet.tsx` | Roster card / sliders | Schedule, cross-dept chips, invite, PIN, remove |
+| **SpecialistEditSheet** | `hub/SpecialistEditSheet.tsx` | Roster card / sliders | Schedule, cross-dept chips, Pair Device via QR, PIN, remove |
 | **AisleBayManager** | `admin/AisleBayManager.tsx` | Settings Store Topology | Add bay, bulk generate, batch delete |
 | **EditBayDrawer** | `admin/EditBayDrawer.tsx` | Settings Topology bay Edit | Hotspot / priority lock / 3–21 decay slider |
 | **BulkLocationGenerator** | `admin/BulkLocationGenerator.tsx` | Settings Store Topology | Aisle range + Default Velocity Tier seed |
@@ -273,6 +271,8 @@ Floor Pad is no longer a Settings tool. Master/DS open **Walk & Talk** from Floo
 60  Most modals (Specialist, Quick-Add, SIMS Finder, TextPrompt, Confirm, …)
 70  PinKeypadModal
 75  ChangePinModal, ApplyMarkdownModal
+80  Roster sheets (SpecialistEditSheet, Add Team Member)
+90  Pair Device QR overlay
 ```
 
 ### Specialist & PIN flow (layout)

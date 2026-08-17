@@ -1,5 +1,26 @@
 # DeptSync Hub — Development Journal
 
+## 2026-08-17 — Roster pairing is ephemeral QR, not SMS
+
+### Found
+- Add Team Member and Send App Invite required a phone number and SMS'd `/auth/verify/[token]`.
+- Phone was in the active roster invite path even when the associate was already on the floor roster.
+
+### Shipped
+- Crypto owner: `lib/auth/invite-token.ts` — HMAC payload `{ specialist_id, store_number, nonce, exp }`, 10-minute TTL. Persist SHA-256(nonce) on existing `invite_token_hash` / `invite_token_expires_at` (also mirrored to `auth_token_*` for lookup).
+- Compose owner: `lib/onboarding/qr-pair.ts`. Issue: `POST /api/roster/pair` (Master). Redeem: public `POST /api/auth/redeem-invite` (preview without burn; PIN + confirm burns hash, saves PIN, Hub JWT with `store_number`).
+- `SpecialistEditSheet` **Pair Device via QR** (`QrCode` / `ShieldCheck` / `Clock`, stroke 1.75) opens a high-contrast `qrcode.react` overlay with countdown and Regenerate QR. Add Team Member is roster-only; optional phone stays for contact / PIN-reset only.
+- Associate lands on `/pair?t=` then Floor (`/dashboard`). `lib/onboarding/roster-invite.ts` is unused by Roster UI (PIN-reset SMS still uses `/auth/verify`).
+
+## 2026-08-17 — Settings is four Lucide cards
+
+### Found
+- Settings stacked Sunday schedule, an emoji Appearance card, PIN, quotas, topology, store config, taxonomies, remnants, and Device & sync as separate surfaces.
+
+### Shipped
+- Four cards: Profile & Preferences (`UserCheck` / `Sliders`), Department Targets & Sunday Auto-Stage (`Calendar` / `Target`), Store Topology & Bay Setup (`Layers` / `PlusCircle`, still collapsed), Catalog & Remnants (`FolderTree` / `Scissors`).
+- Appearance is Lucide `Palette` → existing `UserPreferencesDrawer`. Force Draw is `RefreshCw` Trigger Weekly Rotation Now. No emoji in Settings chrome.
+
 ## 2026-08-17 — Roster compact rows; manage sheet owns schedule and grants
 
 ### Found
@@ -7,7 +28,7 @@
 
 ### Shipped
 - Compact `SpecialistCard` rows: name, Specialist/CSA/Supervisor badge, `07:00 – 15:30` (or Off / Call-out), On-Duty switch, Lucide `SlidersHorizontal` manage.
-- `SpecialistEditSheet` hosts Edit Schedule (`AssociateScheduleModal` embedded), cross-department chips (`POST /api/admin/department-access` → `store_specialists.accessible_departments`), Send App Invite, Change/Reset PIN, and Remove Specialist.
+- `SpecialistEditSheet` hosts Edit Schedule (`AssociateScheduleModal` embedded), cross-department chips (`POST /api/admin/department-access` → `store_specialists.accessible_departments`), Pair Device via QR, Change/Reset PIN, and Remove Specialist.
 - On-Duty still persists to `associate_shift_days` (not `is_active`) so toggling duty cannot hide the roster row. Optimistic weekRows + rollback on failure. Department headers keep `D23 · Flooring` with Lucide department glyphs (`DoorOpen` for Millwork) at stroke 1.75.
 
 ## 2026-08-17 — Map is a floor navigator; topology lives in Settings

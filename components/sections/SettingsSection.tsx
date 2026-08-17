@@ -3,9 +3,24 @@
 import dynamic from "next/dynamic";
 import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
-import { ChevronDown, ChevronRight, ChevronUp } from "lucide-react";
+import {
+  Calendar,
+  ChevronDown,
+  ChevronRight,
+  ChevronUp,
+  FolderTree,
+  Layers,
+  PlusCircle,
+  RefreshCw,
+  Scissors,
+  Sliders,
+  Target,
+  UserCheck,
+  type LucideIcon,
+} from "lucide-react";
 import { AisleBayManager } from "@/components/admin/AisleBayManager";
 import { PushNotificationsCard } from "@/components/hub/PushNotificationsCard";
+import { FloorTitleBadge } from "@/components/hub/SpecialistCard";
 import { WeeklyBayTargetCard } from "@/components/hub/WeeklyBayTargetCard";
 import { ThemeSelector } from "@/components/settings/ThemeSelector";
 import { SundayScheduleCard } from "@/components/admin/SundayScheduleCard";
@@ -76,12 +91,20 @@ type Props = {
 };
 
 type ConnectionStatus = "idle" | "checking" | "ok" | "fail";
-type SettingsAccordion = "device" | "store" | "bulk" | "remnants" | null;
+type SettingsAccordion =
+  | "device"
+  | "store"
+  | "bulk"
+  | "remnants"
+  | "taxonomies"
+  | null;
+
+const ICON_STROKE = 1.75;
 
 /**
- * Settings — floor-first. Themes, PIN, sync, targets, push.
- * Master Admin setup (topology, taxonomies, force rotation, store #) lives here
- * as accordions / modals — not a second menu. Floor Pad lives on Floor.
+ * Settings — four scannable cards. Themes, PIN, sync, targets, topology, catalog.
+ * Master Admin setup lives here as nested accordions / modals — not a second menu.
+ * Floor Pad lives on Floor.
  */
 export function SettingsSection({
   activeSpecialist,
@@ -197,6 +220,12 @@ export function SettingsSection({
         setOpenSection("bulk");
       } else if (hash === "weekly-rotation") {
         setForceOpen(true);
+        window.setTimeout(() => {
+          document.getElementById("settings-targets")?.scrollIntoView({
+            behavior: "smooth",
+            block: "start",
+          });
+        }, 50);
       } else if (
         hash === "manager-notes" ||
         hash === "s-pen-notes" ||
@@ -204,11 +233,11 @@ export function SettingsSection({
       ) {
         window.location.replace("/dashboard#floor-pad");
       } else if (hash === "taxonomies") {
+        setOpenSection("taxonomies");
         setTaxonomyOpen(true);
       } else if (hash === "remnants") {
         setOpenSection("remnants");
       } else if (hash === "admin-tools" || hash === "sunday-schedule") {
-        setOpenSection("store");
         window.setTimeout(() => {
           document.getElementById("sunday-schedule")?.scrollIntoView({
             behavior: "smooth",
@@ -273,61 +302,221 @@ export function SettingsSection({
 
   return (
     <div className="space-y-4">
-      {masterSession && activeSpecialist ? (
-        <SundayScheduleCard specialist={activeSpecialist} />
-      ) : null}
-
-      <ThemeSelector />
-
-      <section className="space-y-3 rounded-2xl border border-slate-800 bg-slate-900/90 p-4">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-400">
-          Security &amp; PIN
-        </h2>
-        {canChangePin ? (
+      <SettingsCard
+        title="Profile & Preferences"
+        subtitle="PIN, theme, device, and alerts"
+        icons={[UserCheck, Sliders]}
+      >
+        {canChangePin && activeSpecialist ? (
           <>
-            <p className="text-sm text-slate-300">
-              Signed in as{" "}
-              <span className="font-semibold text-emerald-400">
-                {activeSpecialist?.name}
-              </span>
-              {masterSession
-                ? " (Master Admin)"
-                : supervisorSession
-                  ? " (Department Supervisor)"
-                  : " (Floor Associate)"}
-              .
+            <div className="flex min-w-0 flex-wrap items-center gap-2">
+              <p className="truncate text-base font-semibold text-emerald-400">
+                {activeSpecialist.name}
+              </p>
+              <FloorTitleBadge member={activeSpecialist} />
+            </div>
+            <p className="font-mono text-xs text-slate-500">
+              Store {formatStoreLabel(storeNumber)}
             </p>
-            <p className="text-xs text-slate-500">
-              Store: {formatStoreLabel(storeNumber)}
-            </p>
-            <button
-              type="button"
-              onClick={onOpenChangePin}
-              className="flex min-h-12 w-full items-center justify-center rounded-xl border border-emerald-500/40 text-sm font-semibold text-emerald-300"
-            >
-              Change My PIN
-            </button>
+            <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+              <button
+                type="button"
+                onClick={onOpenChangePin}
+                className="flex min-h-12 w-full items-center justify-center rounded-xl border border-emerald-500/40 text-sm font-semibold text-emerald-300"
+              >
+                Change PIN
+              </button>
+              <ThemeSelector />
+            </div>
           </>
         ) : (
           <p className="text-sm text-amber-300/90">
             Select a profile first, then change your PIN from here or the header.
           </p>
         )}
-      </section>
+
+        <Accordion
+          title="Device & sync"
+          subtitle={
+            pending > 0
+              ? `${pending} pending offline action${pending === 1 ? "" : "s"}`
+              : "Queue clear · diagnostics"
+          }
+          open={openSection === "device"}
+          onToggle={() => toggleSection("device")}
+        >
+          <div className="space-y-4">
+            <div>
+              <p className="text-sm text-slate-300">
+                Pending actions:{" "}
+                <span className="font-mono font-semibold text-amber-300">
+                  {pending}
+                </span>
+              </p>
+              <button
+                type="button"
+                disabled={syncing || pending === 0}
+                onClick={() => void syncNow()}
+                className="mt-2 flex min-h-12 w-full items-center justify-center rounded-xl border border-emerald-500/40 text-sm font-semibold text-emerald-300 disabled:opacity-40"
+              >
+                {syncing ? "Syncing…" : "Replay queue now"}
+              </button>
+              {syncMsg ? (
+                <p className="mt-2 text-center text-sm font-semibold text-emerald-300">
+                  {syncMsg}
+                </p>
+              ) : null}
+            </div>
+
+            <div>
+              <p className="text-sm font-semibold text-slate-400">Connection</p>
+              {configured ? (
+                <p className="mt-1 break-all font-mono text-[10px] text-slate-500">
+                  {url}
+                </p>
+              ) : (
+                <p className="mt-1 text-sm text-slate-400">
+                  Supabase not configured (offline mode)
+                </p>
+              )}
+              <div className="mt-2 flex items-center gap-2">
+                <span
+                  className={`inline-block h-2.5 w-2.5 shrink-0 rounded-full ${
+                    ping === "ok"
+                      ? "bg-emerald-400"
+                      : ping === "fail"
+                        ? "bg-red-400"
+                        : ping === "checking"
+                          ? "bg-amber-400"
+                          : "bg-slate-600"
+                  }`}
+                  aria-hidden
+                />
+                <p
+                  className={`text-sm font-semibold ${
+                    ping === "ok"
+                      ? "text-emerald-300"
+                      : ping === "fail"
+                        ? "text-red-300"
+                        : "text-slate-300"
+                  }`}
+                >
+                  {ping === "checking"
+                    ? "Checking…"
+                    : ping === "ok"
+                      ? "Connected (Database Live)"
+                      : ping === "fail"
+                        ? "Offline / Unreachable"
+                        : configured
+                          ? "Not tested yet"
+                          : "Offline / Unreachable"}
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => void testConnection()}
+                disabled={!configured || ping === "checking"}
+                className="mt-2 flex min-h-12 w-full items-center justify-center rounded-xl border border-slate-700 bg-slate-950 text-sm font-semibold text-slate-100 disabled:opacity-40"
+              >
+                {ping === "checking" ? "Checking…" : "Test Connection"}
+              </button>
+            </div>
+
+            <div>
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-sm font-semibold text-slate-400">
+                  Local storage
+                </p>
+                <button
+                  type="button"
+                  onClick={clearLocalCache}
+                  className="rounded-lg border border-red-500/40 px-2.5 py-1.5 text-[11px] font-semibold text-red-300"
+                >
+                  Clear Local Cache
+                </button>
+              </div>
+              <ul className="mt-2 space-y-1.5 text-sm text-slate-300">
+                <li className="flex justify-between gap-3 rounded-lg bg-slate-950/70 px-3 py-2">
+                  <span>Appliance Audit Cache</span>
+                  <span className="font-mono text-emerald-400">
+                    {applianceAuditCache}
+                  </span>
+                </li>
+                <li className="flex justify-between gap-3 rounded-lg bg-slate-950/70 px-3 py-2">
+                  <span>Remnant Inventory Cache</span>
+                  <span className="font-mono text-emerald-400">
+                    {remnantInventoryCache}
+                  </span>
+                </li>
+                <li className="flex justify-between gap-3 rounded-lg bg-slate-950/70 px-3 py-2">
+                  <span>Pending Queue</span>
+                  <span className="font-mono text-amber-300">{pending}</span>
+                </li>
+              </ul>
+              {cacheMsg ? (
+                <p className="mt-2 text-center text-xs font-semibold text-emerald-300">
+                  {cacheMsg}
+                </p>
+              ) : null}
+            </div>
+          </div>
+        </Accordion>
+
+        {(supervisorSession || masterSession) && (
+          <PushNotificationsCard specialist={activeSpecialist} />
+        )}
+
+        {masterSession ? (
+          <Accordion
+            id="store"
+            title="Store number"
+            subtitle={formatStoreLabel(storeNumber)}
+            open={openSection === "store"}
+            onToggle={() => toggleSection("store")}
+          >
+            <StoreNumberPanel
+              storeNumber={storeNumber}
+              onStoreNumberChange={onStoreNumberChange}
+            />
+          </Accordion>
+        ) : null}
+      </SettingsCard>
 
       {(supervisorSession || masterSession) && activeSpecialist ? (
-        <WeeklyBayTargetCard specialist={activeSpecialist} />
+        <SettingsCard
+          id="settings-targets"
+          title="Department Targets & Sunday Auto-Stage"
+          subtitle="Weekly quotas and Sunday clock"
+          icons={[Calendar, Target]}
+        >
+          {masterSession ? (
+            <SundayScheduleCard specialist={activeSpecialist} />
+          ) : null}
+          <WeeklyBayTargetCard specialist={activeSpecialist} />
+          {masterSession ? (
+            <button
+              type="button"
+              onClick={() => setForceOpen(true)}
+              className="flex min-h-12 w-full items-center justify-center rounded-xl border border-slate-700 bg-slate-950 text-sm font-semibold text-slate-100"
+            >
+              <RefreshCw
+                className="w-4 h-4 mr-2"
+                strokeWidth={ICON_STROKE}
+                aria-hidden
+              />
+              Trigger Weekly Rotation Now
+            </button>
+          ) : null}
+        </SettingsCard>
       ) : null}
 
-      {(supervisorSession || masterSession) && (
-        <PushNotificationsCard specialist={activeSpecialist} />
-      )}
-
       {mapConsole && activeSpecialist ? (
-        <Accordion
+        <SettingsCard
           id="bulk-generate"
           title="Store Topology & Bay Setup"
           subtitle="Aisles, single bays, bulk generate"
+          icons={[Layers, PlusCircle]}
+          collapsible
           open={openSection === "bulk"}
           onToggle={() => toggleSection("bulk")}
         >
@@ -345,204 +534,58 @@ export function SettingsSection({
             })()}
             onChanged={() => void reloadDepts()}
           />
-        </Accordion>
+        </SettingsCard>
       ) : null}
 
-      {masterSession && activeSpecialist ? (
-        <section className="space-y-2">
-          <p className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-amber-300">
-            Store configuration
-          </p>
-          <Accordion
-            id="store"
-            title="Store number"
-            subtitle={formatStoreLabel(storeNumber)}
-            open={openSection === "store"}
-            onToggle={() => toggleSection("store")}
-          >
-            <StoreNumberPanel
-              storeNumber={storeNumber}
-              onStoreNumberChange={onStoreNumberChange}
-            />
-          </Accordion>
-          <button
-            type="button"
-            onClick={() => setTaxonomyOpen(true)}
-            className="flex min-h-12 w-full items-center justify-between rounded-2xl border border-slate-800 bg-slate-900/90 px-4 text-left"
-          >
-            <span>
-              <span className="block text-sm font-semibold text-slate-100">
-                Catalog taxonomies
-              </span>
-              <span className="block text-xs text-slate-500">
-                Folder trees per department
-              </span>
-            </span>
-            <ChevronRight className="h-4 w-4 text-slate-500" strokeWidth={1.75} aria-hidden />
-          </button>
-          <button
-            type="button"
-            onClick={() => setForceOpen(true)}
-            className="flex min-h-12 w-full items-center justify-between rounded-2xl border border-slate-800 bg-slate-900/90 px-4 text-left"
-          >
-            <span>
-              <span className="block text-sm font-semibold text-slate-100">
-                Trigger weekly rotation
-              </span>
-              <span className="block text-xs text-slate-500">
-                Master Admin overwrite of the staged week
-              </span>
-            </span>
-            <ChevronRight className="h-4 w-4 text-slate-500" strokeWidth={1.75} aria-hidden />
-          </button>
-        </section>
-      ) : null}
-
-      {showRemnants && activeSpecialist ? (
-        <Accordion
-          id="remnants"
-          title="Remnant inventory"
-          subtitle="Rack status and markdown"
-          open={openSection === "remnants"}
-          onToggle={() => toggleSection("remnants")}
+      {(masterSession || showRemnants) && activeSpecialist ? (
+        <SettingsCard
+          title="Catalog & Remnants"
+          subtitle="Taxonomies and remnant markdown"
+          icons={[FolderTree, Scissors]}
         >
-          <RemnantSection
-            catalog={catalog}
-            remnants={remnants}
-            onRemnantsChange={setRemnants}
-            loggedBy={activeSpecialist.name}
-            specialists={roster}
-            activeSpecialist={activeSpecialist}
-          />
-        </Accordion>
-      ) : null}
-
-      <Accordion
-        title="Device & sync"
-        subtitle={
-          pending > 0
-            ? `${pending} pending offline action${pending === 1 ? "" : "s"}`
-            : "Queue clear · diagnostics"
-        }
-        open={openSection === "device"}
-        onToggle={() => toggleSection("device")}
-      >
-        <div className="space-y-4">
-          <div>
-            <p className="text-sm text-slate-300">
-              Pending actions:{" "}
-              <span className="font-mono font-semibold text-amber-300">
-                {pending}
-              </span>
-            </p>
-            <button
-              type="button"
-              disabled={syncing || pending === 0}
-              onClick={() => void syncNow()}
-              className="mt-2 flex min-h-12 w-full items-center justify-center rounded-xl border border-emerald-500/40 text-sm font-semibold text-emerald-300 disabled:opacity-40"
+          {masterSession ? (
+            <Accordion
+              title="Catalog taxonomies"
+              subtitle="Folder trees per department"
+              open={openSection === "taxonomies"}
+              onToggle={() => toggleSection("taxonomies")}
             >
-              {syncing ? "Syncing…" : "Replay queue now"}
-            </button>
-            {syncMsg ? (
-              <p className="mt-2 text-center text-sm font-semibold text-emerald-300">
-                {syncMsg}
-              </p>
-            ) : null}
-          </div>
-
-          <div>
-            <p className="text-sm font-semibold text-slate-400">Connection</p>
-            {configured ? (
-              <p className="mt-1 break-all font-mono text-[10px] text-slate-500">
-                {url}
-              </p>
-            ) : (
-              <p className="mt-1 text-sm text-slate-400">
-                Supabase not configured (offline mode)
-              </p>
-            )}
-            <div className="mt-2 flex items-center gap-2">
-              <span
-                className={`inline-block h-2.5 w-2.5 shrink-0 rounded-full ${
-                  ping === "ok"
-                    ? "bg-emerald-400"
-                    : ping === "fail"
-                      ? "bg-red-400"
-                      : ping === "checking"
-                        ? "bg-amber-400"
-                        : "bg-slate-600"
-                }`}
-                aria-hidden
-              />
-              <p
-                className={`text-sm font-semibold ${
-                  ping === "ok"
-                    ? "text-emerald-300"
-                    : ping === "fail"
-                      ? "text-red-300"
-                      : "text-slate-300"
-                }`}
-              >
-                {ping === "checking"
-                  ? "Checking…"
-                  : ping === "ok"
-                    ? "Connected (Database Live)"
-                    : ping === "fail"
-                      ? "Offline / Unreachable"
-                      : configured
-                        ? "Not tested yet"
-                        : "Offline / Unreachable"}
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => void testConnection()}
-              disabled={!configured || ping === "checking"}
-              className="mt-2 flex min-h-12 w-full items-center justify-center rounded-xl border border-slate-700 bg-slate-950 text-sm font-semibold text-slate-100 disabled:opacity-40"
-            >
-              {ping === "checking" ? "Checking…" : "Test Connection"}
-            </button>
-          </div>
-
-          <div>
-            <div className="flex items-center justify-between gap-2">
-              <p className="text-sm font-semibold text-slate-400">
-                Local storage
-              </p>
               <button
                 type="button"
-                onClick={clearLocalCache}
-                className="rounded-lg border border-red-500/40 px-2.5 py-1.5 text-[11px] font-semibold text-red-300"
+                onClick={() => setTaxonomyOpen(true)}
+                className="flex min-h-12 w-full items-center justify-between rounded-xl border border-slate-700 bg-slate-950 px-4 text-left"
               >
-                Clear Local Cache
+                <span className="text-sm font-semibold text-slate-100">
+                  Open taxonomy manager
+                </span>
+                <ChevronRight
+                  className="h-4 w-4 text-slate-500"
+                  strokeWidth={ICON_STROKE}
+                  aria-hidden
+                />
               </button>
-            </div>
-            <ul className="mt-2 space-y-1.5 text-sm text-slate-300">
-              <li className="flex justify-between gap-3 rounded-lg bg-slate-950/70 px-3 py-2">
-                <span>Appliance Audit Cache</span>
-                <span className="font-mono text-emerald-400">
-                  {applianceAuditCache}
-                </span>
-              </li>
-              <li className="flex justify-between gap-3 rounded-lg bg-slate-950/70 px-3 py-2">
-                <span>Remnant Inventory Cache</span>
-                <span className="font-mono text-emerald-400">
-                  {remnantInventoryCache}
-                </span>
-              </li>
-              <li className="flex justify-between gap-3 rounded-lg bg-slate-950/70 px-3 py-2">
-                <span>Pending Queue</span>
-                <span className="font-mono text-amber-300">{pending}</span>
-              </li>
-            </ul>
-            {cacheMsg ? (
-              <p className="mt-2 text-center text-xs font-semibold text-emerald-300">
-                {cacheMsg}
-              </p>
-            ) : null}
-          </div>
-        </div>
-      </Accordion>
+            </Accordion>
+          ) : null}
+          {showRemnants ? (
+            <Accordion
+              id="remnants"
+              title="Remnant inventory"
+              subtitle="Rack status and markdown"
+              open={openSection === "remnants"}
+              onToggle={() => toggleSection("remnants")}
+            >
+              <RemnantSection
+                catalog={catalog}
+                remnants={remnants}
+                onRemnantsChange={setRemnants}
+                loggedBy={activeSpecialist.name}
+                specialists={roster}
+                activeSpecialist={activeSpecialist}
+              />
+            </Accordion>
+          ) : null}
+        </SettingsCard>
+      ) : null}
 
       {forceOpen && activeSpecialist ? (
         <ForceRotationModal
@@ -570,6 +613,91 @@ export function SettingsSection({
   );
 }
 
+function SettingsCard({
+  id,
+  title,
+  subtitle,
+  icons,
+  children,
+  collapsible = false,
+  open = true,
+  onToggle,
+}: {
+  id?: string;
+  title: string;
+  subtitle?: string;
+  icons: LucideIcon[];
+  children: ReactNode;
+  collapsible?: boolean;
+  open?: boolean;
+  onToggle?: () => void;
+}) {
+  const heading = (
+    <>
+      <span className="flex shrink-0 items-center gap-1 text-accent">
+        {icons.map((Icon) => (
+          <Icon
+            key={Icon.displayName ?? Icon.name}
+            className="h-4 w-4"
+            strokeWidth={ICON_STROKE}
+            aria-hidden
+          />
+        ))}
+      </span>
+      <span className="min-w-0 flex-1">
+        <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-200">
+          {title}
+        </h2>
+        {subtitle ? (
+          <p className="mt-0.5 text-xs text-slate-500">{subtitle}</p>
+        ) : null}
+      </span>
+      {collapsible ? (
+        open ? (
+          <ChevronUp
+            className="h-4 w-4 shrink-0 text-slate-400"
+            strokeWidth={ICON_STROKE}
+            aria-hidden
+          />
+        ) : (
+          <ChevronDown
+            className="h-4 w-4 shrink-0 text-slate-400"
+            strokeWidth={ICON_STROKE}
+            aria-hidden
+          />
+        )
+      ) : null}
+    </>
+  );
+
+  return (
+    <section
+      id={id}
+      className="overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/90"
+    >
+      {collapsible ? (
+        <button
+          type="button"
+          aria-expanded={open}
+          onClick={onToggle}
+          className="flex min-h-14 w-full items-center gap-3 px-4 py-3 text-left"
+        >
+          {heading}
+        </button>
+      ) : (
+        <div className="flex min-h-14 items-center gap-3 px-4 py-3">
+          {heading}
+        </div>
+      )}
+      {!collapsible || open ? (
+        <div className="space-y-4 border-t border-slate-800 px-4 pb-4 pt-3">
+          {children}
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
 function Accordion({
   id,
   title,
@@ -588,7 +716,7 @@ function Accordion({
   return (
     <section
       id={id}
-      className="overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/90"
+      className="overflow-hidden rounded-xl border border-slate-800 bg-slate-950/50"
     >
       <button
         type="button"

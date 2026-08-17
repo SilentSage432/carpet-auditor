@@ -98,8 +98,8 @@ function normalizeOnboardingStatus(
 
 /**
  * App access is independent of floor roster status.
- * Roster-only: active on the team, no PIN yet. Invited: SMS token pending.
- * Active: completed /auth/verify (pin_updated_at set).
+ * Roster-only: active on the team, no PIN yet. Invited: QR pairing token pending.
+ * Active: completed /pair PIN setup (pin_updated_at set).
  */
 export function appAccessStatus(member: StoreSpecialist): AppAccessStatus {
   if (member.status === "invited" || member.must_change_pin) return "invited";

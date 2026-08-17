@@ -277,6 +277,7 @@ export const SETTINGS_TOOL_HASHES = [
   "s-pen-notes",
   "floor-pad",
   "admin-tools",
+  "sunday-schedule",
   "taxonomies",
   "remnants",
 ] as const;

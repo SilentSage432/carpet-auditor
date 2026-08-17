@@ -1155,6 +1155,7 @@ export type InviteSupervisorResult = {
   sms_preview?: { body: string; sms_link: string };
 };
 
+/** @deprecated Prefer issueRosterPairing → POST /api/roster/pair. This path now issues a QR pair URL. */
 export async function inviteSupervisor(
   specialist: StoreSpecialist,
   input: {
@@ -1180,6 +1181,30 @@ export async function inviteSupervisor(
       body: JSON.stringify(input),
     }
   );
+  invalidateRosterCache();
+  return result;
+}
+
+/** Master Admin: mint a 10-minute QR pairing URL for an existing roster row. */
+export async function issueRosterPairing(
+  specialist: StoreSpecialist,
+  specialistId: string
+): Promise<{
+  pair_url: string;
+  expires_at: string;
+  specialist_id: string;
+  name: string;
+}> {
+  const result = await storeOpsFetch<{
+    pair_url: string;
+    expires_at: string;
+    specialist_id: string;
+    name: string;
+  }>("/api/roster/pair", specialist, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ specialist_id: specialistId }),
+  });
   invalidateRosterCache();
   return result;
 }

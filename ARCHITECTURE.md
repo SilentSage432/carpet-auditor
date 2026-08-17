@@ -3,6 +3,11 @@
 ```
 app/page.tsx                      → Authenticated specialty scan hub (`?section=`); unauthenticated `/` redirects to /login
 app/login/page.tsx                → Public AccessGate + AuthWall (no dashboard chrome)
+app/pair/page.tsx                 → QR pairing PIN setup (`/pair?t=`; public)
+app/api/auth/redeem-invite/route.ts → Preview / burn QR pairing token + mint Hub JWT
+app/api/roster/pair/route.ts      → Master issues 10-minute QR pairing URL
+lib/auth/invite-token.ts          → HMAC pairing payload `{ specialist_id, store_number, nonce, exp }`
+lib/onboarding/qr-pair.ts         → Issue / preview / redeem QR pairing (no SMS)
 app/access-gate/page.tsx          → Redirect → /login
 app/auth/page.tsx                 → Redirect → /login
 proxy.ts                          → Edge stealth + HTTP-only hub gate (Next 16 middleware)
@@ -24,7 +29,7 @@ lib/scan-feedback.ts              → Scan chime aliases that compose feedback.t
 utils/haptics.ts                  → hapticPulse alias → feedback.ts
 components/hub/UserPreferencesDrawer.tsx → All-role appearance / density / contrast / sound / haptics
 components/hub/UserPreferencesHost.tsx → Single drawer host (header + Settings event)
-components/settings/ThemeSelector.tsx → Settings entry that opens the shared drawer
+components/settings/ThemeSelector.tsx → Palette action that opens the shared appearance drawer
 app/globals.css                   → data-theme tokens + glass / nav / modal utilities bound to CSS variables
 app/manifest.ts                   → short_name DeptSync · Department & SIMS Audit Hub
 public/sw.js                      → Offline shell cache strategies
@@ -43,7 +48,7 @@ app/stock/page.tsx                → Redirect → /dashboard (Downstock lives o
 app/(workflow)/roster/page.tsx    → Team roster keep-alive tab
 components/hub/tabs/RosterTab.tsx → Department-grouped compact roster + call-out
 components/hub/SpecialistCard.tsx → Compact specialist row (duty switch + manage)
-components/hub/SpecialistEditSheet.tsx → Schedule, grants, invite, PIN, remove
+components/hub/SpecialistEditSheet.tsx → Schedule, grants, Pair Device via QR, PIN, remove
 app/api/roster/members/route.ts   → Canonical roster-only INSERT into store_specialists
 components/hub/AssociateScheduleModal.tsx → Sun–Sat shift matrix (composes shift-status.ts)
 components/hub/tabs/MapTab.tsx    → Visual floor navigator (Standard Map | Velocity Heatmap)
@@ -99,7 +104,7 @@ components/auth/InviteOnboardingView.tsx → Legacy invite presentation (unused;
 lib/auth-token.ts                 → SHA-256 one-time tokens, PIN hash, verify-session cookie
 lib/invite.ts                     → SMS copy for invite/reset links
 lib/onboarding/roster-invite.ts   → Issue invite: persist hashes, status=invited, dispatch SMS
-lib/onboarding/create-roster-member.ts → Roster-only insert (status=active, no tokens) or compose invite; HTTP: POST /api/roster/members
+lib/onboarding/create-roster-member.ts → Roster-only insert (status=active, no tokens); HTTP: POST /api/roster/members
 lib/onboarding/claim-roster-auth.ts → Link auth.users.id onto existing store_specialists (no duplicate cards)
 lib/store-ops/roster-groups.ts → Dynamic home-department accordion groups (`appliances`/`D35`/`D35 · Appliances` → same bucket) + on-duty counts
 lib/onboarding/pin-reset.ts       → Self-service PIN reset token + SMS
@@ -247,7 +252,7 @@ supabase/migrations/20260812_sunday_bay_assignments.sql → sunday specialist↔
 | Focus / keyboard dismiss | `lib/focus-input.ts` (`blurActiveInput` — never auto-focus on tab switch) |
 | SIMS location stock | `lib/sims.ts`, `SimsLocationFinder` |
 | Specialists session / credentials | `lib/specialists.ts`, `SpecialistModal` |
-| Roster SMS/link invite + PIN setup | `lib/auth-token.ts` + `lib/onboarding/*` + `/auth/verify/[token]`. Roster-only insert is `POST /api/roster/members`. SMS invite is `POST /api/admin/invite-supervisor`. Authenticated RLS: `20260815_roster_insert_rls.sql` (includes `auth_user_id IS NULL`). Signup claims `store_specialists.auth_user_id` (`claim-roster-auth.ts` + `20260815_roster_auth_link.sql`). `SpecialistModal` does not create members. |
+| Roster QR pairing + PIN setup | `lib/auth/invite-token.ts` + `lib/onboarding/qr-pair.ts` + `/pair?t=` + `POST /api/auth/redeem-invite`. Roster-only insert is `POST /api/roster/members`. Issue pairing is `POST /api/roster/pair` (Master). PIN-reset SMS remains `/auth/verify/[token]`. Authenticated RLS: `20260815_roster_insert_rls.sql` (includes `auth_user_id IS NULL`). Signup claims `store_specialists.auth_user_id` (`claim-roster-auth.ts` + `20260815_roster_auth_link.sql`). `SpecialistModal` does not create members. |
 | Zero-access auth wall / idle lock | `lib/auth-session.ts`, `components/auth/AuthWall.tsx`, `components/auth/AccessGate.tsx` (`/login`) |
 | Edge auth + stealth gate | `lib/auth-gate.ts` + `proxy.ts` + `POST /api/auth/gate` (HttpOnly cookie) |
 | Enterprise ingest contracts | `src/types/enterpriseIntegration.ts` (Zod schemas). Transport: `lib/enterprise-integration/ingest.ts`. Stubs: `POST /api/v1/topology/ingest`, `POST /api/v1/freight/stage`. Does not write Store Ops tables or change hub UI. |

@@ -24,7 +24,7 @@ type RosterMemberBody = {
  * POST /api/roster/members
  * Canonical roster-only insert into `store_specialists` (same table the
  * department accordions read). Does not mint invite tokens or Auth users.
- * SMS invites stay on POST /api/admin/invite-supervisor.
+ * Device pairing is POST /api/roster/pair (QR, no SMS).
  */
 export async function POST(request: Request) {
   try {

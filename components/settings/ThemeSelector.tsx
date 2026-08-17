@@ -5,25 +5,20 @@
  * Form lives in the drawer so CSAs get the same handheld controls from the header.
  */
 
+import { Palette } from "lucide-react";
 import { requestUserPreferencesDrawer } from "@/lib/ui/preferences-context";
+
+const ICON_STROKE = 1.75;
 
 export function ThemeSelector() {
   return (
-    <section className="glass-card space-y-3 p-3">
-      <div>
-        <p className="glass-subtitle text-accent">Appearance</p>
-        <h2 className="glass-title mt-0.5 text-base">Theme Engine</h2>
-        <p className="glass-muted mt-0.5 text-xs">
-          Personal theme, contrast, density, sound, and haptics on this device.
-        </p>
-      </div>
-      <button
-        type="button"
-        onClick={() => requestUserPreferencesDrawer()}
-        className="btn-primary-glow flex min-h-12 w-full items-center justify-center rounded-xl text-sm font-bold"
-      >
-        🎨 Appearance &amp; Preferences
-      </button>
-    </section>
+    <button
+      type="button"
+      onClick={() => requestUserPreferencesDrawer()}
+      className="flex min-h-12 w-full items-center justify-center rounded-xl border border-zinc-700 px-3 text-sm font-semibold text-zinc-100"
+    >
+      <Palette className="w-4 h-4 mr-2" strokeWidth={ICON_STROKE} aria-hidden />
+      Appearance &amp; Theme
+    </button>
   );
 }

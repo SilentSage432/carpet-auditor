@@ -122,19 +122,20 @@
 - [x] Map velocity/priority seeding (Bulk Generator presets + EditBayDrawer hotspot/lock/decay → Sunday `custom_decay_days`)
 - [x] Map Visual Grid walk-only (no Department Overview, no batch checkboxes; CRUD stays in Manage)
 - [x] Roster weekly schedule matrix (`AssociateScheduleModal` + collapsed department accordions)
-- [x] Roster compact specialist rows + `SpecialistEditSheet` (schedule / grants / invite / PIN / remove)
+- [x] Roster compact specialist rows + `SpecialistEditSheet` (schedule / grants / Pair Device via QR / PIN / remove)
 - [x] Role-based hub views (`MASTER_ADMIN` / `DEPARTMENT_SUPERVISOR` / `ASSOCIATE_CSA`) + Master-only 3-tap developer sandbox
 - [x] Theme / preferences / audio-haptics engine (`lib/ui/feedback.ts` + `UserPreferencesDrawer` for all roles)
+- [x] Settings four-card layout (Profile, Targets/Sunday, Topology, Catalog/Remnants) with Lucide-only chrome
 - [x] Instant-render Store Ops SWR (IndexedDB L2 + silent revalidate) + chunked Map DOM + async briefing decay + `20260815_performance_indexes.sql`
 - [x] Tactical Voice Hub on Floor (`TacticalVoiceFloorPad` + `POST /api/copilot/parse-walk` + `shift-tasks.ts` + `lib/heatmap/bay-tracker.ts`)
 - [x] URL stealth + HTTP-only auth gate (`robots.txt`, `X-Robots-Tag`, `proxy.ts`, `/login`)
 - [x] Enterprise ingest contracts (Zod) + stub `POST /api/v1/topology/ingest` and `POST /api/v1/freight/stage`
 - [x] Roster SMS/link invite onboarding — no manual PIN; hashed one-time `/auth/verify/[token]`; hashed 4–6 digit `pin_hash`; `status` invited→active (`20260815_unified_auth_token.sql`)
 - [x] Self-service PIN reset via SMS one-time token (`POST /api/auth/pin-reset/request`, consume-on-entry)
-- [x] Roster-only add-member (no SMS/token) vs optional Send Mobile App Invite; app-access badges + on-demand invite (`20260815_roster_app_access.sql`)
+- [x] Roster-only add-member (no SMS/token) vs on-demand QR pairing; app-access badges (`20260815_roster_app_access.sql`)
 - [x] Roster create without Auth (`auth_user_id` nullable), dynamic home-department accordions, and signup claim (`20260815_roster_auth_link.sql`)
 - [x] Roster insert logging + authenticated RLS for `auth_user_id IS NULL` + store-number bind (`20260815_roster_insert_rls.sql`)
-- [x] Unified roster create pipeline — `POST /api/roster/members` writes `store_specialists`; SpecialistModal picker no longer inserts; invite-supervisor is SMS-only
+- [x] Unified roster create pipeline — `POST /api/roster/members` writes `store_specialists`; SpecialistModal picker no longer inserts; pairing is `POST /api/roster/pair`
 - [x] Roster accordion keeps store-aliased DB rows (`2587`/`02587`) and groups `appliances`/`D35` together; invite_token null members still render
 - [x] Store Ops live-first — downstock/shifts/walk tasks/weekly rotations throw on Supabase failure instead of local fake success
 - [x] store_locations Map/Floor visibility — PENDING bays render (not filtered as ACTIVE), flooring/D23 UUID family join, IndexedDB bust on bulk add, open SELECT RLS (`20260816_store_locations_read.sql`)
@@ -147,6 +148,7 @@
 - [x] Store Ops offline queue — bay complete / downstock / Sunday assign via `enqueueOrExecute`; header `SyncStatusPill`; queue specialist stub includes `is_active`
 - [x] Canonical `computeDepartmentCompletionPct` + `flagPenalty` in `health.ts`; unified mobile scan dock (`max-w-lg` + safe-area); Lucide status pills
 - [x] Floor tab on-duty bay queue — `${dept} Rotation` header, Snap Bay / Flag Downstock, proportional grouping via `composeOnDutyBayWorkload`, analytics in `ShiftAnalyticsDrawer`
+- [x] Roster QR pairing — 10-minute signed tokens (`lib/auth/invite-token.ts`), `SpecialistEditSheet` QR overlay, `/pair` + `POST /api/auth/redeem-invite`
 
 ## Next
 - [x] Apply Phase 1 JWT/RLS migration in Supabase + enable Custom Access Token Hook
