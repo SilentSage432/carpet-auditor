@@ -23,6 +23,30 @@ export function isoTimestampInWeek(
   return isoWeekLabel(new Date(t)) === weekLabel;
 }
 
+/** Parse ISO week labels like `2026-W34` — year and week are owned by the label, never invented. */
+export function parseIsoWeekLabel(weekLabel: string): { year: number; week: number } {
+  const m = /^(\d{4})-W(\d{1,2})$/i.exec(String(weekLabel ?? "").trim());
+  if (!m) {
+    throw new Error(`Invalid ISO week label: ${weekLabel}`);
+  }
+  const year = Number(m[1]);
+  const week = Number(m[2]);
+  if (
+    !Number.isInteger(year) ||
+    !Number.isInteger(week) ||
+    week < 1 ||
+    week > 53
+  ) {
+    throw new Error(`Invalid ISO week label: ${weekLabel}`);
+  }
+  return { year, week };
+}
+
+/** Numeric ISO week (1–53) from `assigned_week`. */
+export function isoWeekNumber(weekLabel: string): number {
+  return parseIsoWeekLabel(weekLabel).week;
+}
+
 /** Return ISO week label for a Date (UTC-based ISO week-date). */
 export function isoWeekLabel(date: Date = new Date()): string {
   const target = new Date(
@@ -44,12 +68,7 @@ export function isoWeekLabel(date: Date = new Date()): string {
  * Used by sunday_bay_assignments.week_starting.
  */
 export function isoWeekToMondayDate(weekLabel: string): string {
-  const m = /^(\d{4})-W(\d{1,2})$/i.exec(String(weekLabel ?? "").trim());
-  if (!m) {
-    throw new Error(`Invalid ISO week label: ${weekLabel}`);
-  }
-  const year = Number(m[1]);
-  const week = Number(m[2]);
+  const { year, week } = parseIsoWeekLabel(weekLabel);
   const jan4 = new Date(Date.UTC(year, 0, 4));
   const day = jan4.getUTCDay() || 7;
   const mondayWeek1 = new Date(jan4);

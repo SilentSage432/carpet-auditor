@@ -136,7 +136,7 @@ lib/store-ops/map-readiness.ts → Store Map green/yellow/red readiness tones (c
 lib/store-ops/velocity.ts → IRP cadence tones, seed presets (14d/5d/lock), custom_decay_days, Sunday decay multiplier, async decay scores
 lib/store-ops/bay-service.ts → Persist bay_service_logs + stamp last_serviced_at + promote velocity
 lib/store-ops/rotation.ts → Sunday draw: carry-over prepend then velocity-priority pick (composed by rotations.ts)
-lib/store-ops/rotations.ts → Weekly rotation engine persist. `weekly_rotations` upsert sends `store_id` + `store_number`; `onConflict` is `location_id,assigned_week` (UNIQUE from `20260817_weekly_rotations_location_week_unique.sql`). Strips a store column only on PostgREST cache miss (PGRST204)
+lib/store-ops/rotations.ts → Weekly rotation engine persist. `weekly_rotations` upsert sends `store_id` + `store_number` + `week_number`/`year` parsed from `assigned_week` (`2026-W34` → 34 / 2026). `onConflict` is `location_id,assigned_week`. Strips a column only on PostgREST cache miss (PGRST204)
 lib/store-ops/audit-summary.ts → Supervisor weekly rollup composition (quota / associate / barriers)
 components/store-ops/SupervisorAuditSummaryModal.tsx → Personal weekly stats + copy
 lib/admin-department-context.ts       → Working department pin (localStorage + event; Floor/Map/Roster subscribe)

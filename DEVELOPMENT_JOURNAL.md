@@ -1,5 +1,14 @@
 # DeptSync Hub — Development Journal
 
+## 2026-08-17 — Weekly rotation upsert fills week_number from assigned_week
+
+### Found
+- Live `weekly_rotations.week_number` is NOT NULL. Force Draw omitted it, so Postgres rejected the insert.
+
+### Shipped
+- `parseIsoWeekLabel` in `lib/store-ops/week.ts` owns `2026-W34` → `{ year: 2026, week: 34 }`. Persist sends `week_number` and `year` with `assigned_week`. Invalid labels throw; week 34 is never invented as a default.
+- If PostgREST does not have `week_number` / `year`, those columns are stripped and the upsert retries.
+
 ## 2026-08-17 — Weekly rotation upsert unique is location + ISO week
 
 ### Found

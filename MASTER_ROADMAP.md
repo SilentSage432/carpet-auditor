@@ -43,6 +43,7 @@
 - [x] Weekly rotation engine API (`/api/rotations/generate` + cycle reset)
 - [x] Weekly rotation persist sends `store_id` + `store_number` and retries PostgREST schema-cache misses
 - [x] Weekly rotation upsert `onConflict` matches UNIQUE(`location_id`,`assigned_week`)
+- [x] Weekly rotation upsert sends `week_number` parsed from `assigned_week`
 - [x] Zebra supervisor rotation dashboard (`/dashboard`)
 - [x] Navigation Hub — role-aware hamburger, ops bottom tabs, Admin Tools slide-over
 - [x] Web Push subscriptions + dispatch on weekly rotation generate

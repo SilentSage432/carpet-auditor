@@ -10,6 +10,7 @@ import { listActiveStores } from "./stores";
 import { pickSundayCarryOverFirst, pickSundayVelocityPrioritized } from "./rotation";
 import {
   isoWeekLabel,
+  parseIsoWeekLabel,
   resolveWeeklyBayTarget,
 } from "./week";
 import {
@@ -51,11 +52,14 @@ export type GenerateRotationsOptions = {
   store_number?: string | null;
 };
 
-/** Unique key on public.weekly_rotations — one bay per ISO week. Not week_number. */
+/** Unique key on public.weekly_rotations — one bay per ISO week. */
 export const WEEKLY_ROTATIONS_ON_CONFLICT = "location_id,assigned_week" as const;
-const OPTIONAL_WEEKLY_ROTATION_STORE_COLUMNS = [
+/** Present on some live schemas; stripped only when PostgREST reports the column missing. */
+const OPTIONAL_WEEKLY_ROTATION_COLUMNS = [
   "store_id",
   "store_number",
+  "week_number",
+  "year",
 ] as const;
 
 type WeeklyRotationStoreScope = {
@@ -190,10 +194,11 @@ async function mergeWeeklyRotationsByLocationWeek(
 }
 
 /**
- * Persist weekly rotation rows. Sends store_id and store_number when known so
- * live schemas (UUID multi-store, JWT store_number RLS, or both) all accept
- * the upsert. Strips a store column only when PostgREST reports it missing.
- * onConflict must match UNIQUE(location_id, assigned_week) — not week_number.
+ * Persist weekly rotation rows. Sends store_id, store_number, week_number, and
+ * year when known. week_number / year are parsed from assigned_week (e.g.
+ * 2026-W34 → 34 / 2026) so NOT NULL week_number is never sent as null.
+ * Strips a column only when PostgREST reports it missing.
+ * onConflict matches UNIQUE(location_id, assigned_week).
  */
 async function upsertWeeklyRotations(
   supabase: SupabaseClient,
@@ -207,10 +212,13 @@ async function upsertWeeklyRotations(
   }>
 ): Promise<WeeklyRotation[]> {
   let payload: Record<string, unknown>[] = rows.map((row) => {
+    const { year, week } = parseIsoWeekLabel(row.assigned_week);
     const next: Record<string, unknown> = {
       department_id: row.department_id,
       location_id: row.location_id,
       assigned_week: row.assigned_week,
+      week_number: week,
+      year,
       is_completed: row.is_completed,
     };
     if (row.store_id) next.store_id = row.store_id;
@@ -219,7 +227,7 @@ async function upsertWeeklyRotations(
   });
 
   const stripped = new Set<string>();
-  const maxAttempts = OPTIONAL_WEEKLY_ROTATION_STORE_COLUMNS.length + 1;
+  const maxAttempts = OPTIONAL_WEEKLY_ROTATION_COLUMNS.length + 1;
   let lastError: unknown = null;
 
   for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
@@ -233,7 +241,7 @@ async function upsertWeeklyRotations(
     }
 
     lastError = error;
-    const missing = OPTIONAL_WEEKLY_ROTATION_STORE_COLUMNS.find(
+    const missing = OPTIONAL_WEEKLY_ROTATION_COLUMNS.find(
       (col) =>
         isMissingColumnError(error, col) &&
         payload.some((row) => Object.prototype.hasOwnProperty.call(row, col))
@@ -248,7 +256,7 @@ async function upsertWeeklyRotations(
       continue;
     }
 
-    const stale = OPTIONAL_WEEKLY_ROTATION_STORE_COLUMNS.find(
+    const stale = OPTIONAL_WEEKLY_ROTATION_COLUMNS.find(
       (col) => stripped.has(col) && isNotNullViolationError(error, col)
     );
     if (stale) {

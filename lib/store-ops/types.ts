@@ -96,6 +96,8 @@ export type WeeklyRotation = {
   department_id: string;
   location_id: string;
   assigned_week: string;
+  week_number?: number | null;
+  year?: number | null;
   is_completed: boolean;
   completed_at: string | null;
   created_at?: string;
