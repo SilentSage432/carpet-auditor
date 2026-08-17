@@ -27,7 +27,6 @@ type HubHeaderProps = {
   userRef: RefObject<HTMLDivElement | null>;
   onToggleUser: () => void;
   userMenu: ReactNode;
-  onPinnedNavigate?: (section: "audit" | "appliances" | "department") => void;
   onLogoTripleTap?: () => void;
 };
 
@@ -42,7 +41,6 @@ export function HubHeader({
   userRef,
   onToggleUser,
   userMenu,
-  onPinnedNavigate,
   onLogoTripleTap,
 }: HubHeaderProps) {
   const tapTimes = useRef<number[]>([]);
@@ -91,7 +89,6 @@ export function HubHeader({
         <AdminDepartmentSwitcher
           specialist={specialist}
           compact
-          onPinnedNavigate={onPinnedNavigate}
         />
 
         <SyncStatusPill storeNumber={storeNumber} />

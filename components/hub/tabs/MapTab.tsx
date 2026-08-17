@@ -1,14 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
-import { Camera } from "lucide-react";
+import { Camera, Layers, Zap } from "lucide-react";
 import { StoreLocationGrid } from "@/components/admin/StoreLocationGrid";
 import { isMasterAdmin, isSimplifiedAssociateView } from "@/lib/rbac";
 import {
-  ADMIN_DEPT_CONTEXT_EVENT,
   workingDepartmentId,
 } from "@/lib/admin-department-context";
+import { useWorkingDepartment } from "@/lib/use-working-department";
 import {
   fetchDepartmentsDetailed,
   fetchExceptionSummary,
@@ -52,11 +52,21 @@ export function MapTab({ specialist }: WorkflowTabProps) {
     Array<{ locationId: string; completed: boolean }>
   >([]);
   const [barrierLocationIds, setBarrierLocationIds] = useState<string[]>([]);
-  const [contextTick, setContextTick] = useState(0);
   const currentWeek = isoWeekLabel();
   const master = isMasterAdmin(specialist);
   const locatorOnly = isSimplifiedAssociateView(specialist);
   const heatmap = mapMode === "heatmap";
+  const working = useWorkingDepartment(specialist);
+  const activeDepartmentId = workingDepartmentId(specialist, departments);
+  const visibleDepartments = useMemo(() => {
+    if (working === "all" || !activeDepartmentId) return departments;
+    return departments.filter((dept) => dept.id === activeDepartmentId);
+  }, [departments, working, activeDepartmentId]);
+  const visibleLocations = useMemo(() => {
+    if (working === "all" || !activeDepartmentId) return locations;
+    const ids = new Set(visibleDepartments.map((dept) => dept.id));
+    return locations.filter((loc) => ids.has(loc.department_id));
+  }, [locations, working, activeDepartmentId, visibleDepartments]);
 
   const reload = useCallback(async (member: typeof specialist, silent = false) => {
     if (!silent) setLoading(true);
@@ -169,19 +179,17 @@ export function MapTab({ specialist }: WorkflowTabProps) {
     return () => {
       cancelled = true;
     };
-  }, [specialist, reload, contextTick]);
+  }, [specialist, reload, working]);
 
   useEffect(() => {
-    function onCtx() {
-      setContextTick((n) => n + 1);
+    function onLocations() {
+      void reload(specialist, true);
     }
-    window.addEventListener(ADMIN_DEPT_CONTEXT_EVENT, onCtx);
-    window.addEventListener(STORE_OPS_LOCATIONS_CHANGED_EVENT, onCtx);
+    window.addEventListener(STORE_OPS_LOCATIONS_CHANGED_EVENT, onLocations);
     return () => {
-      window.removeEventListener(ADMIN_DEPT_CONTEXT_EVENT, onCtx);
-      window.removeEventListener(STORE_OPS_LOCATIONS_CHANGED_EVENT, onCtx);
+      window.removeEventListener(STORE_OPS_LOCATIONS_CHANGED_EVENT, onLocations);
     };
-  }, []);
+  }, [reload, specialist]);
 
   return (
     <>
@@ -207,9 +215,10 @@ export function MapTab({ specialist }: WorkflowTabProps) {
               !heatmap ? "bg-accent/25 text-accent" : "text-zinc-400"
             }`}
           >
-            Standard Map
-          </button>
-          <button
+              <Layers className="mr-1.5 h-3.5 w-3.5" strokeWidth={ICON_STROKE} aria-hidden />
+              Standard Map
+            </button>
+            <button
             type="button"
             aria-pressed={heatmap}
             onClick={() => setMapMode("heatmap")}
@@ -217,6 +226,7 @@ export function MapTab({ specialist }: WorkflowTabProps) {
               heatmap ? "bg-accent/25 text-accent" : "text-zinc-400"
             }`}
           >
+              <Zap className="mr-1.5 h-3.5 w-3.5" strokeWidth={ICON_STROKE} aria-hidden />
             Velocity Heatmap
           </button>
         </div>
@@ -263,13 +273,13 @@ export function MapTab({ specialist }: WorkflowTabProps) {
         ) : null}
 
         <div className="space-y-3">
-          {loading && locations.length === 0 ? (
+          {loading && visibleLocations.length === 0 ? (
             <p className="text-sm text-zinc-400">Loading locations…</p>
           ) : (
             <StoreLocationGrid
               specialist={specialist}
-              departments={departments}
-              locations={locations}
+              departments={visibleDepartments}
+              locations={visibleLocations}
               assignedWeek={currentWeek}
               weekRotationLocations={weekRotationLocations}
               barrierLocationIds={barrierLocationIds}

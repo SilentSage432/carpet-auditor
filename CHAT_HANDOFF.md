@@ -70,7 +70,7 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 - Remnant inventory (`#remnants`) when RBAC allows; Device & sync for every Settings role
 - Personal **Appearance & Theme** (all roles, including CSA via header) — not store configuration
 - Department Supervisors never see Master-only setup controls
-- Master Admin header: **My Department Context** pin (Full Store / D23 Flooring / D35 Appliances / …) — filters Floor without dropping Master privileges
+- Master Admin header: **My Department Context** pin (All / D23 Flooring / D35 Appliances / …) — persists across Floor · Map · Roster · Settings and filters those tabs in place. Does not navigate to specialty `/?section=` scans.
 
 ### Sunday Flooring Cycle Audit
 - Staging card + assignment modal: open weekly Flooring bays → assign from on-duty roster; Auto-Assign All to Me; Stage/Draw 12 or **Recalculate** (Master Admin); **Shift balancer** (hours / start–end → proportional clustered zones)
@@ -176,7 +176,7 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
   - Floor (`/dashboard`) · Map (`/admin/store-map`) · Roster (`/roster`) · Settings (`/settings`)
   - Authenticated `/` without specialty `?section=` replaces to `/dashboard`. Hub `/?section=audit|appliances|department` is scan tools only. Remnants deep-link to `/settings#remnants`
 - `/manager-notes` redirects to `/dashboard#floor-pad` (Tactical Voice Hub on Floor)
-- `/dashboard` — one Floor layout for all roles: `${activeDept.name} Rotation` header, Snap Bay AI Audit + Flag Downstock, on-duty associate strip, Sunday staging (non-associates), proportional `ZebraChecklist` grouped by on-duty specialists. Shift velocity, store health, Walk & Talk, briefing, copilot, freshness, showroom, verify/rollup, and `ExceptionFeed` nest in collapsed `ShiftAnalyticsDrawer`. Specialty scan pills were removed from the Floor fold (Cycle / Appliances stay on `/?section=`).
+- `/dashboard` — one Floor layout for all roles: **Floor Rotation** when Full Store is pinned, otherwise `${activeDept.name} Rotation`; Snap Bay AI Audit + Flag Downstock sheet; on-duty strip filtered to the working department (`canAccessDepartment`); Full Store with >6 on-duty associates collapses to a Users summary sheet. Sunday staging (non-associates), proportional `ZebraChecklist` grouped by on-duty specialists. Shift velocity, store health, Walk & Talk, briefing, copilot, freshness, showroom, verify/rollup, and `ExceptionFeed` nest in collapsed `ShiftAnalyticsDrawer`. Specialty scan pills were removed from the Floor fold (Cycle / Appliances stay on `/?section=`).
 - `/stock` redirects to `/dashboard` (Downstock is a Zebra tab on Floor)
 - `/roster` — unified team list, PIN add, and department access chips (optimistic + toast)
 - `/admin/store-map` — Visual navigator chunks aisle/bay DOM (16 aisles / 24 bays) with memoized Lucide status glyphs + SVG heat strips; Sell/Top is display-only. Tap bay → **one** `WalkTheFloorSheet`. Bay CRUD is Settings **Store Topology & Bay Setup**.

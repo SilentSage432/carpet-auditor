@@ -5,7 +5,7 @@
 > the scanning / auditing workflow for floor operators.
 >
 > Generated from the live codebase (`app/`, `components/`, `lib/types.ts`).
-> Last reviewed: 2026-08-17 (QR pairing + pair PWA install + Settings four-card layout).
+> Last reviewed: 2026-08-17 (header department pin filters Floor/Map/Roster).
 
 ---
 
@@ -240,7 +240,8 @@ Floor Pad is no longer a Settings tool. Master/DS open **Walk & Talk** from Floo
 |-----------|------|---------|------------|
 | **UserPreferencesDrawer** | `hub/UserPreferencesDrawer.tsx` | Header profile + Settings Appearance | Theme, density, contrast, sound, haptics |
 | **DevSandboxDrawer** | `hub/DevSandboxDrawer.tsx` | Logo 3-tap (Master) | Preview As Role + Simulate Department |
-| **WalkTheFloorSheet** | `WalkTheFloorSheet.tsx` | Map bay tap | Walk log + Snap Bay |
+| **FlagDownstockSheet** | `store-ops/FlagDownstockSheet.tsx` | Floor header Flag Downstock | Aisle/bay search + Needs Top-stock Drop |
+| **On-duty person sheet** | `store-ops/OnDutyAssociateStrip.tsx` | Full Store, >6 on duty | Users summary → filter by person |
 | **AssociateScheduleModal** | `hub/AssociateScheduleModal.tsx` | Roster manage sheet (embedded) | Sun–Sat day strip + Open/Mid/Close + per-day times |
 | **SpecialistEditSheet** | `hub/SpecialistEditSheet.tsx` | Roster card / sliders | Schedule, cross-dept chips, Pair Device via QR, PIN, remove |
 | **Pair install card** | `app/pair/page.tsx` | After PIN on `/pair` (iOS / no prompt) | Download / Share / Continue to Floor |

@@ -66,6 +66,7 @@ import {
   type StoreSpecialist,
 } from "@/lib/types";
 import { normalizePhoneE164 } from "@/lib/phone";
+import { useWorkingDepartment } from "@/lib/use-working-department";
 import type { WorkflowTabProps } from "@/components/hub/tabs/tab-props";
 
 const ICON_STROKE = 1.75;
@@ -129,6 +130,7 @@ export function RosterTab({ specialist, storeNumber }: WorkflowTabProps) {
   const canManage = canManageTeamRoster(specialist);
   const canGrant = canGrantDepartmentAccess(specialist);
   const canShift = canManageShiftBoard(specialist);
+  const working = useWorkingDepartment(specialist);
 
   const reload = useCallback(async () => {
     const weekEnd = weekDates[6] ?? today;
@@ -199,6 +201,18 @@ export function RosterTab({ specialist, storeNumber }: WorkflowTabProps) {
       return day?.status === "ON_DUTY";
     });
   }, [roster, dayById, specialist]);
+
+  const displayGroups = useMemo(() => {
+    if (working === "all") return groups;
+    return groups.filter((group) => group.home === working);
+  }, [groups, working]);
+
+  useEffect(() => {
+    if (working === "all") return;
+    setOpenDepts((prev) =>
+      prev[working] === true ? prev : { ...prev, [working]: true }
+    );
+  }, [working]);
 
   async function handleAccess(
     member: StoreSpecialist,
@@ -399,18 +413,23 @@ export function RosterTab({ specialist, storeNumber }: WorkflowTabProps) {
 
       {loading ? (
         <p className="text-sm text-zinc-400">Loading roster…</p>
-      ) : groups.length === 0 ? (
+      ) : displayGroups.length === 0 ? (
         <p className="glass-card border-dashed px-4 py-8 text-center text-sm text-zinc-400">
-          No active team members on this store yet.
+          {working === "all"
+            ? "No active team members on this store yet."
+            : "No team members in this department."}
         </p>
       ) : (
         <ul className="space-y-2">
-          {groups.map((group) => {
+          {displayGroups.map((group) => {
             const open = openDepts[group.home] === true;
+            const highlighted = working !== "all" && group.home === working;
             return (
               <li
                 key={group.home}
-                className="glass-card overflow-hidden !rounded-xl !p-0"
+                className={`glass-card overflow-hidden !rounded-xl !p-0 ${
+                  highlighted ? "ring-1 ring-accent/50" : ""
+                }`}
               >
                 <button
                   type="button"

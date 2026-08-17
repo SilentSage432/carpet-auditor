@@ -1,7 +1,8 @@
 /**
  * Master Admin working-department context — session pin only.
  * Does not change RBAC privileges (Master Admin stays full-store).
- * Presentation / filters compose via workingDepartment(); specialists ownership unchanged.
+ * Presentation / filters compose via workingDepartment() and
+ * workingDepartmentId() (the active department pin). Specialists ownership unchanged.
  */
 
 import {

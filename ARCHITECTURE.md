@@ -75,8 +75,9 @@ lib/push/*                        → Web Push subscribe + VAPID dispatch for ro
 app/admin/store-map/page.tsx      → Map keep-alive tab (visual navigator; CRUD in Settings)
 app/admin/supervisors/page.tsx    → Redirect → /roster
 app/admin/roles/page.tsx          → Redirect → /roster
-components/hub/tabs/FloorTab.tsx → Floor rotation viewport (on-duty strip + bay queue; analytics drawer)
-components/store-ops/OnDutyAssociateStrip.tsx → Today's on-duty specialist pills (presentation)
+components/hub/tabs/FloorTab.tsx → Floor rotation viewport (Floor Rotation vs dept name; on-duty strip + bay queue)
+components/store-ops/OnDutyAssociateStrip.tsx → Department-scoped on-duty pills; storewide summary sheet when >6
+components/store-ops/FlagDownstockSheet.tsx → Aisle/bay search + Needs Top-stock Drop (composes flagForDownstock)
 components/store-ops/ShiftAnalyticsDrawer.tsx → Collapsed Floor accordion for velocity / health / Walk & Talk
 components/store-ops/ZebraChecklist.tsx → Floor bay checklist (optimistic complete, Quick Touch, downstock, Sunday handoff, on-duty grouping)
 components/store-ops/BayHealthScorecard.tsx → Compact bay health badge (presentation)
@@ -116,7 +117,8 @@ components/hub/AuditReportModal.tsx → Printable / emailable / clipboard audit 
 components/hub/*Modal.tsx         → Specialist / PIN / Markdown modals
 components/barcode/QuickAddCatalogModal.tsx → Scan-to-catalog Quick-Add
 components/catalog/SimsLocationFinder.tsx   → SIMS location stock drawer
-components/hub/AdminDepartmentSwitcher.tsx → Master Admin working-dept pin
+components/hub/AdminDepartmentSwitcher.tsx → Working-dept pin (All / D23 / D35 / …); stays on current tab
+lib/use-working-department.ts     → React subscription to the working-dept pin
 components/sections/CycleAuditScanForm.tsx → Flooring scan/input island (drafts + scanner; log stays in parent; `ScanActionDock`)
 components/sections/ApplianceScanForm.tsx → Appliance scan/input island (drafts + scanner; log stays in parent)
 components/admin/SundayAuditStagingCard.tsx → Glowing pending Sunday Flooring audit CTA (Sunday even if empty)
@@ -136,7 +138,7 @@ lib/store-ops/bay-service.ts → Persist bay_service_logs + stamp last_serviced_
 lib/store-ops/rotation.ts → Sunday draw: carry-over prepend then velocity-priority pick (composed by rotations.ts)
 lib/store-ops/audit-summary.ts → Supervisor weekly rollup composition (quota / associate / barriers)
 components/store-ops/SupervisorAuditSummaryModal.tsx → Personal weekly stats + copy
-lib/admin-department-context.ts       → Master Admin working department pin (local)
+lib/admin-department-context.ts       → Working department pin (localStorage + event; Floor/Map/Roster subscribe)
 lib/store-ops/bay-pattern.ts          → Odd / even bay range expansion (Bulk Generator; default odd)
 lib/store-ops/manager-notes.ts        → Manager notes Supabase CRUD + realtime + archive (JWT-scoped)
 lib/store-ops/ai-bay-scan.ts          → Visual bay scan prompt / schema / normalize / local fallback

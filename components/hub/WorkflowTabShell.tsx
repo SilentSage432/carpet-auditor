@@ -22,6 +22,7 @@ import {
   type WorkflowTabHref,
 } from "@/lib/nav-hub";
 import { useDevSandbox } from "@/lib/use-dev-sandbox";
+import { useWorkingDepartment } from "@/lib/use-working-department";
 import { setStoreNumber } from "@/lib/store";
 import {
   dedupeRoster,
@@ -71,6 +72,7 @@ export function WorkflowTabShell(props: WorkflowTabProps) {
   const [changePinOpen, setChangePinOpen] = useState(false);
   const { viewSpecialist } = useDevSandbox(member);
   const view = viewSpecialist ?? member;
+  const working = useWorkingDepartment(view);
   const allowedTabs = useMemo(
     () =>
       PRIMARY_WORKFLOW_TAB_HREFS.filter((href) =>
@@ -141,7 +143,7 @@ export function WorkflowTabShell(props: WorkflowTabProps) {
   return (
     <div className="flex min-h-dvh flex-col">
       <NavigationHub
-        title={workflowTabTitle(active, view)}
+        title={workflowTabTitle(active, view, working)}
         specialist={view}
         sandboxActor={member}
         storeNumber={storeNumber}

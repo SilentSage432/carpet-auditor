@@ -119,14 +119,16 @@ export function prefetchWorkflowTab(href: string): void {
 
 export function workflowTabTitle(
   href: WorkflowTabHref,
-  specialist?: StoreSpecialist | null
+  specialist?: StoreSpecialist | null,
+  working?: ReturnType<typeof workingDepartment>
 ): string {
   if (href === "/admin/store-map") return "Store Map";
   if (href === "/roster") return "Team Roster";
   if (href === "/settings") return "Settings & Config";
-  const working = specialist ? workingDepartment(specialist) : "flooring";
-  const dept = departmentMeta(working === "all" ? "flooring" : working);
-  return `${dept.shortLabel} Rotation`;
+  const scope =
+    working ?? (specialist ? workingDepartment(specialist) : "all");
+  if (scope === "all") return "Floor Rotation";
+  return `${departmentMeta(scope).shortLabel} Rotation`;
 }
 
 export type NavHubLink = {

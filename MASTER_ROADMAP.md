@@ -147,7 +147,8 @@
 - [x] RLS security lockdown — drop anon/open SELECT; authenticated store isolation; Realtime publication on sunday_bay_assignments / manager_notes / downstock_queue (`20260817_rls_security_lockdown.sql`)
 - [x] Store Ops offline queue — bay complete / downstock / Sunday assign via `enqueueOrExecute`; header `SyncStatusPill`; queue specialist stub includes `is_active`
 - [x] Canonical `computeDepartmentCompletionPct` + `flagPenalty` in `health.ts`; unified mobile scan dock (`max-w-lg` + safe-area); Lucide status pills
-- [x] Floor tab on-duty bay queue — `${dept} Rotation` header, Snap Bay / Flag Downstock, proportional grouping via `composeOnDutyBayWorkload`, analytics in `ShiftAnalyticsDrawer`
+- [x] Floor tab on-duty bay queue — Floor Rotation vs `${dept} Rotation`, Snap Bay / Flag Downstock sheet, department-scoped on-duty strip (storewide summary >6)
+- [x] Header department pin filters Floor, Map, and Roster in place (`useWorkingDepartment`; no specialty-scan hijack)
 - [x] Roster QR pairing — 10-minute signed tokens (`lib/auth/invite-token.ts`), `SpecialistEditSheet` QR overlay, `/pair` + `POST /api/auth/redeem-invite`
 - [x] Pair landing PWA install — standalone detect, deferred `beforeinstallprompt`, iOS Add to Home Screen card, then Floor (`/`)
 

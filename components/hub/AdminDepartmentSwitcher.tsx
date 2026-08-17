@@ -8,13 +8,13 @@
  */
 
 import { useEffect, useId, useRef, useState } from "react";
-import { DepartmentIcon, HubIcon } from "@/components/hub/NavIcons";
+import { Check, ChevronDown } from "lucide-react";
+import { DepartmentIcon } from "@/components/hub/NavIcons";
 import {
   ADMIN_DEPT_CONTEXT_EVENT,
   ADMIN_PINNABLE_DEPARTMENTS,
   adminWorkingDepartmentLabel,
   adminWorkingDepartmentPillLabel,
-  preferredHubSectionForWorkingDept,
   setAdminWorkingDepartment,
   workingDepartment,
   type AdminWorkingDepartment,
@@ -33,14 +33,13 @@ import {
 
 type Props = {
   specialist: StoreSpecialist | null;
-  /** Optional: jump hub to preferred section when pinning. */
-  onPinnedNavigate?: (section: "audit" | "appliances" | "department") => void;
   compact?: boolean;
 };
 
+const ICON_STROKE = 1.75;
+
 export function AdminDepartmentSwitcher({
   specialist,
-  onPinnedNavigate,
   compact = false,
 }: Props) {
   const [dept, setDept] = useState<AdminWorkingDepartment>("all");
@@ -87,6 +86,7 @@ export function AdminDepartmentSwitcher({
         <DepartmentIcon
           department={effectiveDepartment(specialist)}
           className="h-3.5 w-3.5 shrink-0 text-accent"
+          strokeWidth={ICON_STROKE}
         />
         <span className="truncate">{scoped.shortLabel}</span>
       </span>
@@ -105,8 +105,6 @@ export function AdminDepartmentSwitcher({
     const saved = setAdminWorkingDepartment(next);
     setDept(saved);
     setOpen(false);
-    const section = preferredHubSectionForWorkingDept(saved);
-    if (section) onPinnedNavigate?.(section);
   }
 
   const label = adminWorkingDepartmentLabel(dept);
@@ -128,11 +126,16 @@ export function AdminDepartmentSwitcher({
         <DepartmentIcon
           department={dept}
           className="h-3.5 w-3.5 shrink-0 text-accent"
+          strokeWidth={ICON_STROKE}
         />
         <span className="min-w-0 truncate font-mono text-[10px] font-bold uppercase tracking-wide text-accent">
           {pill}
         </span>
-        <HubIcon id="chevronDown" className="h-3.5 w-3.5 shrink-0 text-accent" />
+        <ChevronDown
+          className="h-3.5 w-3.5 shrink-0 text-accent"
+          strokeWidth={ICON_STROKE}
+          aria-hidden
+        />
       </button>
 
       {open ? (
@@ -160,8 +163,18 @@ export function AdminDepartmentSwitcher({
                     className={`h-4 w-4 shrink-0 ${
                       active ? "text-accent" : "text-cyan-300/80"
                     }`}
+                    strokeWidth={ICON_STROKE}
                   />
-                  {adminWorkingDepartmentLabel(opt)}
+                  <span className="min-w-0 flex-1">
+                    {adminWorkingDepartmentLabel(opt)}
+                  </span>
+                  {active ? (
+                    <Check
+                      className="h-4 w-4 shrink-0 text-accent"
+                      strokeWidth={ICON_STROKE}
+                      aria-hidden
+                    />
+                  ) : null}
                 </button>
               </li>
             );

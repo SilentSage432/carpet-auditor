@@ -1,5 +1,27 @@
 # DeptSync Hub — Development Journal
 
+## 2026-08-17 — Header department pin filters Floor, Map, and Roster in place
+
+### Found
+- Picking Appliances (or any dept) from the header jumped to `/?section=` specialty scans, so Floor/Map/Roster never received the pin.
+- Hub title still said Flooring Rotation for Full Store. Roster ignored the pin.
+
+### Shipped
+- Pin still owns `lib/admin-department-context.ts` (localStorage + event). `useWorkingDepartment` is the React subscription — not a second store. Header stays on the current workflow tab.
+- Floor / Map / Roster subscribe and filter: Floor Rotation vs `${dept} Rotation`; Map aisles for `workingDepartmentId`; Roster expands and highlights the matching accordion.
+
+## 2026-08-17 — Floor title, downstock sheet, department-scoped on-duty strip
+
+### Found
+- Full-store Floor titled itself **Flooring Rotation** because the header fell back to D23 when `deptId` was unset.
+- Flag Downstock bumped the first unflagged bay note instead of a real picker.
+- On Duty Today listed every on-duty associate in Full Store, so the pill strip scrolled sideways.
+
+### Shipped
+- Header is `${activeDept.name} Rotation` when a department is pinned, and **Floor Rotation** for All / Full Store.
+- Flag Downstock opens `FlagDownstockSheet`: aisle/bay search, Needs Top-stock Drop, persist via `flagForDownstock`. Bay-card Pull remains.
+- On-duty strip uses `canAccessDepartment` (home or `accessible_departments`). Full Store with more than 6 people collapses to `[ Users N Associates On Duty ]` and a person filter sheet.
+
 ## 2026-08-17 — Pair landing prompts standalone install before Floor
 
 ### Found

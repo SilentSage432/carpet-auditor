@@ -9,6 +9,7 @@ import { StoreHealthCard } from "@/components/StoreHealthCard";
 import { ShowroomQuickTouchCard } from "@/components/dashboard/ShowroomQuickTouchCard";
 import { TacticalVoiceFloorPad } from "@/components/dashboard/TacticalVoiceFloorPad";
 import { BayFreshnessGrid } from "@/components/dashboard/BayFreshnessGrid";
+import { FlagDownstockSheet } from "@/components/store-ops/FlagDownstockSheet";
 import { OnDutyAssociateStrip } from "@/components/store-ops/OnDutyAssociateStrip";
 import { ShiftAnalyticsDrawer } from "@/components/store-ops/ShiftAnalyticsDrawer";
 import { ZebraChecklist } from "@/components/store-ops/ZebraChecklist";
@@ -16,12 +17,11 @@ import { ShiftBriefingCard } from "@/components/store-ops/ShiftBriefingCard";
 import { PredictiveCopilotBanner } from "@/components/store-ops/PredictiveCopilotBanner";
 import { StoreHealthChart } from "@/components/store-ops/StoreHealthChart";
 import {
-  ADMIN_DEPT_CONTEXT_EVENT,
-  isFlooringWorkingContext,
-  workingDepartment,
   workingDepartmentId,
 } from "@/lib/admin-department-context";
+import { useWorkingDepartment } from "@/lib/use-working-department";
 import { isMasterAdmin, isSimplifiedAssociateView } from "@/lib/rbac";
+import { canAccessDepartment } from "@/lib/department-access";
 import { dedupeRoster, fetchSpecialists, isSupervisor } from "@/lib/specialists";
 import {
   fetchDepartments,
@@ -35,7 +35,6 @@ import {
 } from "@/lib/store-ops/client";
 import { fingerprintsEqual } from "@/lib/store-ops/cache";
 import {
-  associateMatchesSundayDepartment,
   fetchSundayAssignments,
   filterFlooringRotations,
   findFlooringDepartment,
@@ -56,7 +55,7 @@ import {
   type OnDutyWorkloadMember,
 } from "@/lib/store-ops/weekly-rotations";
 import { getStoreNumber } from "@/lib/store";
-import { departmentMeta } from "@/lib/types";
+import { departmentMeta, specialistHomeDepartment } from "@/lib/types";
 import type { Department, StoreLocation, WeeklyRotationWithLocation } from "@/lib/store-ops/types";
 import type { WorkflowTabProps } from "@/components/hub/tabs/tab-props";
 
@@ -97,7 +96,6 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
   const [flooringDeptId, setFlooringDeptId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [healthKey, setHealthKey] = useState(0);
-  const [contextTick, setContextTick] = useState(0);
   const [rollupOpen, setRollupOpen] = useState(false);
   const [verifyBusy, setVerifyBusy] = useState(false);
   const [verifyMsg, setVerifyMsg] = useState<string | null>(null);
@@ -108,13 +106,13 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
   const [pickedAssociateId, setPickedAssociateId] = useState<
     string | "all" | null
   >(null);
-  const [primeDownstockTick, setPrimeDownstockTick] = useState(0);
+  const [downstockOpen, setDownstockOpen] = useState(false);
 
-  const flooringFocus = isFlooringWorkingContext(specialist);
+  const working = useWorkingDepartment(specialist);
+  const flooringFocus = working === "flooring";
   const simplified = isSimplifiedAssociateView(specialist);
   const supervisor = isSupervisor(specialist);
   const master = isMasterAdmin(specialist);
-  const working = workingDepartment(specialist);
   const assignmentDept = working === "all" ? "flooring" : working;
   const completedCount = rotations.filter((r) => r.is_completed).length;
 
@@ -122,10 +120,12 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
     () => departments.find((dept) => dept.id === deptId) ?? null,
     [departments, deptId]
   );
-  const rotationTitle = `${
-    activeDept?.name?.trim() ||
-    departmentMeta(working === "all" ? "flooring" : working).shortLabel
-  } Rotation`;
+  const rotationTitle =
+    working === "all"
+      ? "Floor Rotation"
+      : `${
+          activeDept?.name?.trim() || departmentMeta(working).shortLabel
+        } Rotation`;
   const focusAssociateId =
     pickedAssociateId ?? (simplified ? String(specialist.id) : "all");
 
@@ -136,7 +136,7 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
       const team = dedupeRoster(await fetchSpecialists());
       const days = await fetchShiftDays(date, storeNumber || getStoreNumber());
       const board = composeShiftBoard(team, days, date);
-      const scope = workingDepartment(specialist);
+      const scope = working;
       const next: OnDutyWorkloadMember[] = [];
       for (const day of board) {
         if (!isOnDutyToday(day)) continue;
@@ -145,7 +145,8 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
         if (person.role === "MasterAdmin") continue;
         if (
           scope !== "all" &&
-          !associateMatchesSundayDepartment(person, scope)
+          specialistHomeDepartment(person) !== scope &&
+          !canAccessDepartment(person, scope)
         ) {
           continue;
         }
@@ -166,7 +167,7 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
     } finally {
       setOnDutyLoading(false);
     }
-  }, [specialist, storeNumber]);
+  }, [specialist, storeNumber, working]);
 
   const loadAssignments = useCallback(
     async (assignedWeek: string) => {
@@ -264,21 +265,16 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
     return () => {
       cancelled = true;
     };
-  }, [specialist, reload, contextTick]);
+  }, [specialist, reload, working]);
 
   useEffect(() => {
-    function onCtx() {
-      setContextTick((n) => n + 1);
-    }
     function onSunday() {
       void reload(specialist, { silent: true });
     }
-    window.addEventListener(ADMIN_DEPT_CONTEXT_EVENT, onCtx);
     window.addEventListener(SUNDAY_AUDIT_EVENT, onSunday);
     window.addEventListener(STORE_OPS_LOCATIONS_CHANGED_EVENT, onSunday);
     window.addEventListener(SHIFT_STATUS_EVENT, onSunday);
     return () => {
-      window.removeEventListener(ADMIN_DEPT_CONTEXT_EVENT, onCtx);
       window.removeEventListener(SUNDAY_AUDIT_EVENT, onSunday);
       window.removeEventListener(STORE_OPS_LOCATIONS_CHANGED_EVENT, onSunday);
       window.removeEventListener(SHIFT_STATUS_EVENT, onSunday);
@@ -351,7 +347,7 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
             </button>
             <button
               type="button"
-              onClick={() => setPrimeDownstockTick((n) => n + 1)}
+              onClick={() => setDownstockOpen(true)}
               className="flex min-h-11 items-center justify-center rounded-xl border border-cyan-500/40 bg-cyan-950/30 px-3 text-sm font-semibold text-cyan-100"
             >
               <Package className="w-4 h-4 mr-2" strokeWidth={ICON_STROKE} />
@@ -365,6 +361,7 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
           selectedId={focusAssociateId}
           onSelect={setPickedAssociateId}
           loading={onDutyLoading}
+          storewide={working === "all"}
         />
 
         {!simplified ? (
@@ -394,7 +391,6 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
               focusSpecialistId={focusAssociateId}
               onDutyMembers={onDuty}
               hideChrome
-              primeDownstockTick={primeDownstockTick}
             />
           )}
         </section>
@@ -471,6 +467,16 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
         onClose={() => setBayScanOpen(false)}
         specialist={specialist}
       />
+      {downstockOpen ? (
+        <FlagDownstockSheet
+          specialist={specialist}
+          week={week}
+          department={assignmentDept}
+          rotations={displayRotations}
+          onClose={() => setDownstockOpen(false)}
+          onFlagged={silentRefresh}
+        />
+      ) : null}
     </>
   );
 }

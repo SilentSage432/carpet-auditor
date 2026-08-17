@@ -4,7 +4,7 @@
  * Navigation Hub chrome — title, department pill, account/PIN, Floor/Map/Roster/Settings bar.
  */
 
-import { startTransition, useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { DevSandboxBanner } from "@/components/hub/DevSandboxBanner";
 import { DevSandboxDrawer } from "@/components/hub/DevSandboxDrawer";
@@ -110,11 +110,6 @@ export function NavigationHub({
         userMenuId={userMenuId}
         userRef={userRef}
         onToggleUser={() => setUserOpen((o) => !o)}
-        onPinnedNavigate={(section) => {
-          startTransition(() => {
-            router.push(`/?section=${section}`);
-          });
-        }}
         onLogoTripleTap={
           canOpen
             ? () => {

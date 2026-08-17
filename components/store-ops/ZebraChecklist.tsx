@@ -93,8 +93,6 @@ export type ZebraChecklistProps = {
   focusSpecialistId?: string | "all";
   /** Today's on-duty roster used to group unassigned bays in-place. */
   onDutyMembers?: OnDutyWorkloadMember[];
-  /** Bump to open Flag Downstock on the first unflagged open bay. */
-  primeDownstockTick?: number;
 };
 
 export function ZebraChecklist({
@@ -108,7 +106,6 @@ export function ZebraChecklist({
   assignmentDepartment = SUNDAY_DEPARTMENT,
   focusSpecialistId = "all",
   onDutyMembers,
-  primeDownstockTick = 0,
 }: ZebraChecklistProps) {
   const [error, setError] = useState<string | null>(null);
   const [doneOpen, setDoneOpen] = useState(false);
@@ -136,7 +133,6 @@ export function ZebraChecklist({
     () => new Set()
   );
   const [audits, setAudits] = useState<CarpetAudit[]>(() => getLocalAudits());
-  const [primedDownstockTick, setPrimedDownstockTick] = useState(0);
   const [, startTransition] = useTransition();
 
   const associateView = isAssociate(specialist);
@@ -369,18 +365,6 @@ export function ZebraChecklist({
       completed: completedCount,
     });
   }, [rotations, completedOverlay]);
-
-  if (primeDownstockTick !== primedDownstockTick) {
-    setPrimedDownstockTick(primeDownstockTick);
-    if (primeDownstockTick > 0) {
-      const candidate = open.find((row) => !downstock[row.id]);
-      if (candidate) {
-        setQueueFilter("all");
-        setDownstockNoteId(candidate.id);
-        setDownstockNote("");
-      }
-    }
-  }
 
   function handleCheck(rotationId: string) {
     setError(null);
