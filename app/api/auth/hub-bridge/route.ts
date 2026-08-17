@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { mintHubBridgeSession } from "@/lib/store-ops/hub-bridge";
 import { readableError } from "@/lib/store-ops/errors";
+import { toPublicSpecialist } from "@/lib/specialists";
 import { describeSupabaseEnv } from "@/lib/supabase/env";
 
 /**
@@ -52,6 +53,7 @@ export async function POST(request: Request) {
       specialist_id: result.specialist.id,
       role: result.specialist.role,
       store_number: result.specialist.store_number,
+      specialist: toPublicSpecialist(result.specialist),
       session: result.session,
     });
   } catch (err) {

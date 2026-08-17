@@ -187,8 +187,9 @@ supabase/migrations/20260810_store_locations_type_unique.sql → location unique
 supabase/migrations/20260811_alphanumeric_aisle.sql → store_locations.aisle INTEGER → TEXT (BW/RW/12/A1)
 supabase/migrations/20260811_manager_notes.sql → manager_notes (S Pen canvas + AI action items)
 supabase/migrations/20260812_jwt_rls_policies.sql → JWT claims hook + store/department RLS
-supabase/migrations/20260816_store_locations_read.sql → open SELECT on store_locations (anon + authenticated)
-supabase/migrations/20260816_rls_read_write_parity.sql → digit-equal jwt_matches_store, department aliases, authenticated carpet_* SELECT, open SELECT on Store Ops tables
+supabase/migrations/20260816_store_locations_read.sql → (superseded) open SELECT on store_locations
+supabase/migrations/20260816_rls_read_write_parity.sql → digit-equal jwt_matches_store, department aliases
+supabase/migrations/20260817_rls_security_lockdown.sql → Drop anon/open SELECT; authenticated store RLS; Realtime on sunday_bay_assignments / manager_notes / downstock_queue
 supabase/migrations/20260812_manager_notes.sql → durable manager_notes (store_number/department/author) + JWT RLS
 supabase/migrations/20260812_sunday_bay_assignments.sql → sunday specialist↔bay assignments + JWT RLS
 
@@ -222,8 +223,8 @@ supabase/migrations/20260812_sunday_bay_assignments.sql → sunday specialist↔
 | Personal theme / density / contrast / sound / haptics | `lib/theme.ts` + `lib/ui/preferences-context.tsx` + `UserPreferencesDrawer` (all roles) |
 | Audio & haptics playback | `lib/ui/feedback.ts` (`HapticsListener` taps; scan/bay/Sunday compose) |
 | Store context | `lib/store.ts` + `lib/store-ops/stores.ts` (registry + Sunday schedule columns) |
-| Offline sync queue | `lib/sync-queue.ts`, `lib/sync-conflict.ts`, `ConflictResolutionModal` |
-| Header network / pending queue | `lib/network.ts` + `HeaderNetworkStatus` (hook isolated from hub forms) |
+| Offline sync queue | `lib/sync-queue.ts` (`enqueueOrExecute` for Hub + Store Ops: complete rotation, downstock add, Sunday assign), `lib/sync-conflict.ts`, `ConflictResolutionModal` |
+| Header network / pending queue | `lib/network.ts` + `HeaderNetworkStatus` + `components/layout/SyncStatusPill.tsx` (hidden at 0) |
 | Shell caching | `public/sw.js` + `ServiceWorkerRegister` |
 | CLF / carton math | `lib/calc.ts` |
 | Number typing UX | `lib/number-input.ts` + `NumberField` |
@@ -243,7 +244,7 @@ supabase/migrations/20260812_sunday_bay_assignments.sql → sunday specialist↔
 | Edge auth + stealth gate | `lib/auth-gate.ts` + `proxy.ts` + `POST /api/auth/gate` (HttpOnly cookie) |
 | Enterprise ingest contracts | `src/types/enterpriseIntegration.ts` (Zod schemas). Transport: `lib/enterprise-integration/ingest.ts`. Stubs: `POST /api/v1/topology/ingest`, `POST /api/v1/freight/stage`. Does not write Store Ops tables or change hub UI. |
 | Store Ops Auth (JWT → profiles) | `lib/store-ops/auth.ts`, `lib/supabase/server.ts`, `lib/supabase/browser.ts`, `link-auth-profile.ts` |
-| JWT / RLS policies | `20260812_jwt_rls_policies.sql` + `20260814_multi_department_access.sql` (`jwt_matches_department_code` ORs `app_metadata.accessible_departments`) + `20260816_store_locations_read.sql` (open SELECT on `store_locations`; writes still JWT-isolated) |
+| JWT / RLS policies | `20260812_jwt_rls_policies.sql` + `20260814_multi_department_access.sql` (`jwt_matches_department_code` ORs `app_metadata.accessible_departments`) + **`20260817_rls_security_lockdown.sql`** (drop anon/open SELECT; authenticated store isolation). Supersedes `20260816_store_locations_read.sql` open reads. |
 | Phone SMS OTP recovery + profile link | `lib/phone-auth.ts`, `lib/phone.ts`, `POST /api/auth/phone-reset/*` |
 | Biometric / WebAuthn unlock | `lib/biometric-auth.ts`, `AuthWall` |
 | PIN change / default notice | `ChangePinModal` |
@@ -277,7 +278,9 @@ supabase/migrations/20260812_sunday_bay_assignments.sql → sunday specialist↔
 ## Offline
 
 Writes fall back to localStorage and enqueue into `carpet_hub_sync_queue`
-(with `transaction_id`, `optimistic_at`, exponential backoff).
+(with `transaction_id`, `optimistic_at`, exponential backoff). Store Ops bay
+complete, downstock flags, and Sunday assignments use the same queue via
+`enqueueOrExecute`.
 Mid-scan form drafts persist via `carpet_hub_audit_draft` / `carpet_hub_appliance_scan_draft` with a 300ms debounce and flush on submit / leave.
 `installSyncAutoFlush` replays on `online`, tab focus, and `visibilitychange`.
 Version mismatches / HTTP 409 pause for `ConflictResolutionModal` (keep local vs accept server).

@@ -17,7 +17,12 @@ import {
 } from "@/lib/auth-session";
 import { safeInternalNext } from "@/lib/auth-gate";
 import { syncHubGateCookie } from "@/lib/auth-gate-client";
-import { needsCredentialSetup, fetchSpecialists, dedupeRoster, syncActiveSpecialistFromRoster } from "@/lib/specialists";
+import {
+  needsCredentialSetup,
+  fetchSpecialists,
+  dedupeRoster,
+  syncActiveSpecialistFromRoster,
+} from "@/lib/specialists";
 import { getStoreNumber, setStoreNumber } from "@/lib/store";
 import { getSupabase } from "@/lib/supabase";
 import type { StoreSpecialist } from "@/lib/types";
@@ -43,19 +48,32 @@ export function AccessGate() {
   useEffect(() => {
     let cancelled = false;
     void (async () => {
-      const team = dedupeRoster(await fetchSpecialists());
-      if (cancelled) return;
-      setRoster(team);
-
       const session = readAuthSession();
       if (!session || isAuthSessionExpired(session)) {
+        if (cancelled) return;
+        // Anon cannot SELECT store_specialists — login uses Hub-bridge.
+        setRoster([]);
         setMember(null);
         setMode("login");
         return;
       }
 
+      const supabase = getSupabase();
+      const { data } = supabase
+        ? await supabase.auth.getSession()
+        : { data: { session: null } };
+      const hasJwt = Boolean(data.session?.access_token);
+
+      let team: StoreSpecialist[] = [];
+      if (hasJwt) {
+        team = dedupeRoster(await fetchSpecialists());
+      }
+      if (cancelled) return;
+      setRoster(team);
+
       const matched =
-        syncActiveSpecialistFromRoster(team) ?? session.specialist;
+        (hasJwt ? syncActiveSpecialistFromRoster(team) : null) ??
+        session.specialist;
       updateAuthSessionSpecialist(matched);
       setMember(matched);
 
@@ -64,11 +82,7 @@ export function AccessGate() {
         return;
       }
 
-      const supabase = getSupabase();
-      const { data } = supabase
-        ? await supabase.auth.getSession()
-        : { data: { session: null } };
-      if (!data.session?.access_token) {
+      if (!hasJwt) {
         setMode("unlock");
         return;
       }

@@ -16,6 +16,7 @@ export type HubBridgeClientResult =
       specialist_id: string;
       role?: string;
       store_number?: string | null;
+      specialist?: StoreSpecialist;
     }
   | { ok: false; error: string };
 
@@ -43,6 +44,7 @@ export async function establishHubBridgeSession(input: {
       specialist_id?: string;
       role?: string;
       store_number?: string | null;
+      specialist?: StoreSpecialist;
       session?: {
         access_token: string;
         refresh_token: string;
@@ -75,6 +77,7 @@ export async function establishHubBridgeSession(input: {
       specialist_id: String(body.specialist_id ?? input.specialist_id ?? ""),
       role: body.role,
       store_number: body.store_number,
+      specialist: body.specialist,
     };
   } catch (err) {
     return {

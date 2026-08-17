@@ -28,7 +28,10 @@ export type SyncActionType =
   | "delete_remnant"
   | "delete_specialist"
   | "delete_appliance_catalog"
-  | "delete_appliance_scan";
+  | "delete_appliance_scan"
+  | "STORE_OPS_COMPLETE_ROTATION"
+  | "STORE_OPS_DOWNSTOCK_ADD"
+  | "STORE_OPS_SUNDAY_ASSIGN";
 
 export type SyncAction = {
   id: string;
@@ -56,6 +59,8 @@ export type EnqueueSyncOptions = {
   baseUpdatedAt?: string | null;
   transactionId?: string;
 };
+
+export type EnqueueOrExecuteResult = "executed" | "queued";
 
 const LOCAL_KEYS: Record<string, string> = {
   carpet_audits: "carpet_audits_offline",
@@ -217,19 +222,52 @@ function isTransientError(err: unknown): boolean {
     err && typeof err === "object" && "status" in err
       ? Number((err as { status?: unknown }).status)
       : NaN;
+  const statusFromMessage = Number(
+    (/\((\d{3})\)/.exec(message) ?? [])[1] ?? NaN
+  );
+  const httpStatus =
+    Number.isFinite(status) && status > 0 ? status : statusFromMessage;
 
-  if (status === 409 || code === "409") return false;
-  if (status === 429 || status >= 500) return true;
+  if (httpStatus === 409 || code === "409") return false;
+  if (httpStatus === 429 || httpStatus === 408 || httpStatus >= 500) return true;
+  if (Number.isFinite(httpStatus) && httpStatus >= 400 && httpStatus < 500) {
+    return false;
+  }
   if (
-    /network|fetch|timeout|temporar|unavailable|ECONN|ETIMEDOUT|offline/i.test(
+    /network|fetch|timeout|temporar|unavailable|ECONN|ETIMEDOUT|offline|abort/i.test(
       message
     )
   ) {
     return true;
   }
-  // PostgREST / Postgres connection blips
   if (code === "PGRST301" || code === "57P01" || code === "08006") return true;
   return false;
+}
+
+function syncEntityKey(
+  type: SyncActionType,
+  payload: Record<string, unknown>
+): string | null {
+  const id = payload.id != null ? String(payload.id).trim() : "";
+  if (id) return id;
+  if (type === "STORE_OPS_COMPLETE_ROTATION") {
+    const rotationId = String(payload.rotation_id ?? "").trim();
+    return rotationId || null;
+  }
+  if (type === "STORE_OPS_DOWNSTOCK_ADD") {
+    const rotationId = String(payload.rotation_id ?? "").trim();
+    const locationId = String(payload.location_id ?? "").trim();
+    return rotationId || locationId || null;
+  }
+  if (type === "STORE_OPS_SUNDAY_ASSIGN") {
+    const assignmentId = String(
+      payload.assignment_id ?? payload.bay_id ?? ""
+    ).trim();
+    const week = String(payload.week ?? payload.week_starting ?? "").trim();
+    if (!assignmentId) return null;
+    return week ? `${week}:${assignmentId}` : assignmentId;
+  }
+  return null;
 }
 
 function isHttpConflict(err: unknown): boolean {
@@ -268,16 +306,16 @@ export function enqueueSyncAction(
     payload: { ...cleanPayload, store_number: storeNumber },
   };
 
+  const entityKey = syncEntityKey(type, payload);
   const existing = readQueue().filter((a) => {
-    // Collapse duplicate upserts for the same entity id — keep newest payload
+    const priorKey = syncEntityKey(a.type, a.payload);
     if (
       a.type === type &&
       a.store_number === storeNumber &&
-      a.payload.id != null &&
-      payload.id != null &&
-      String(a.payload.id) === String(payload.id)
+      entityKey &&
+      priorKey &&
+      priorKey === entityKey
     ) {
-      // Preserve transaction id + base version from earlier queue entry
       action.transaction_id = a.transaction_id || action.transaction_id;
       if (!action.base_updated_at && a.base_updated_at) {
         action.base_updated_at = a.base_updated_at;
@@ -289,6 +327,33 @@ export function enqueueSyncAction(
 
   writeQueue([...existing, action]);
   return action;
+}
+
+/**
+ * Run a live mutation, or enqueue it when offline / the request times out.
+ * Permanent validation errors (4xx except 408/429) are rethrown for UI rollback.
+ */
+export async function enqueueOrExecute(
+  type: SyncActionType,
+  payload: Record<string, unknown>,
+  execute: () => Promise<void>,
+  storeNumber = getStoreNumber(),
+  options?: EnqueueSyncOptions
+): Promise<EnqueueOrExecuteResult> {
+  if (shouldSaveOffline()) {
+    enqueueSyncAction(type, payload, storeNumber, options);
+    return "queued";
+  }
+  try {
+    await execute();
+    return "executed";
+  } catch (err) {
+    if (isTransientError(err) || !isBrowserOnline()) {
+      enqueueSyncAction(type, payload, storeNumber, options);
+      return "queued";
+    }
+    throw err;
+  }
 }
 
 function markLocalOnline(storageKey: string, id: string): void {
@@ -556,6 +621,27 @@ async function replayAction(action: SyncAction): Promise<void> {
           .eq("id", specialistId)
           .eq("store_number", action.store_number);
         if (error) throw error;
+        return;
+      }
+      case "STORE_OPS_COMPLETE_ROTATION": {
+        const { executeCompleteRotationLive } = await import(
+          "@/lib/store-ops/client"
+        );
+        await executeCompleteRotationLive(payload);
+        return;
+      }
+      case "STORE_OPS_DOWNSTOCK_ADD": {
+        const { executeDownstockAddLive } = await import(
+          "@/lib/store-ops/downstock"
+        );
+        await executeDownstockAddLive(payload);
+        return;
+      }
+      case "STORE_OPS_SUNDAY_ASSIGN": {
+        const { executeSundayAssignLive } = await import(
+          "@/lib/store-ops/sunday-audit"
+        );
+        await executeSundayAssignLive(payload);
         return;
       }
       default:

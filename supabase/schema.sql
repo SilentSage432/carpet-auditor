@@ -303,22 +303,8 @@ drop policy if exists "Allow anon all store_specialists" on public.store_special
 drop policy if exists "Allow delete and update for store_specialists" on public.store_specialists;
 
 -- Hub currently filters by store_number in the client (.eq).
--- Policies remain open for anon until per-store JWT claims are introduced.
-create policy "Allow anon all carpet_audits"
-  on public.carpet_audits for all to anon using (true) with check (true);
-
-create policy "Allow anon all carpet_catalog"
-  on public.carpet_catalog for all to anon using (true) with check (true);
-
-create policy "Allow anon all carpet_remnants"
-  on public.carpet_remnants for all to anon using (true) with check (true);
-
-create policy "Allow anon all store_specialists"
-  on public.store_specialists for all to anon using (true) with check (true);
-
--- Explicit update/delete coverage for soft-delete + hard-delete fallbacks
-create policy "Allow delete and update for store_specialists"
-  on public.store_specialists for all to anon using (true) with check (true);
+-- Anon FOR ALL policies are superseded by 20260817_rls_security_lockdown.sql.
+-- Do not re-open anon access here; apply JWT helpers then the lockdown migration.
 
 -- ---------------------------------------------------------------------------
 -- Store Operations (multi-dept map + weekly rotations + auth.users RBAC)
@@ -452,12 +438,8 @@ alter table public.appliance_catalog enable row level security;
 alter table public.appliance_scans enable row level security;
 
 drop policy if exists "anon_all_appliance_catalog" on public.appliance_catalog;
-create policy "anon_all_appliance_catalog"
-  on public.appliance_catalog for all to anon using (true) with check (true);
-
 drop policy if exists "anon_all_appliance_scans" on public.appliance_scans;
-create policy "anon_all_appliance_scans"
-  on public.appliance_scans for all to anon using (true) with check (true);
+-- Appliance RLS owned by 20260817_rls_security_lockdown.sql (authenticated + store).
 
 -- P0 list-path composite indexes (see supabase/migrations/20260813_p0_query_indexes.sql)
 create index if not exists carpet_audits_store_created_at_idx

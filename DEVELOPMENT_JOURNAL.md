@@ -1,5 +1,34 @@
 # DeptSync Hub — Development Journal
 
+## 2026-08-17 — Store Ops mutations join the offline sync queue
+
+### Found
+- Zebra bay complete, downstock flags, and Sunday assignments wrote live HTTP/Supabase only. Dead-zone scans queued Hub audits but dropped floor mutations.
+
+### Shipped
+- `enqueueOrExecute` on `lib/sync-queue.ts` for `STORE_OPS_COMPLETE_ROTATION`, `STORE_OPS_DOWNSTOCK_ADD`, `STORE_OPS_SUNDAY_ASSIGN`. Payloads keep live domain fields (`rotation_id`, `downstock_queue` week/dept, Sunday `bay_id` + ISO week). SKU/quantity aliases on downstock are empty — that table has no SKU column.
+- `completeRotation`, `flagForDownstock`, and `setSundayBayAssignment` use the pipeline. Optimistic Zebra UI rolls back only on permanent 4xx.
+- `SyncStatusPill` on the hub header — hidden at 0, amber pulse with pending count. Auto-flush on `online` was already owned by `installSyncAutoFlush`.
+
+## 2026-08-17 — jwt_row_matches_store(text, text)
+
+### Found
+- Live `bay_service_logs.store_id` is `text`, not `uuid`. `jwt_row_matches_store(null, store_id)` resolved as `(unknown, text)` and failed 42883.
+
+### Shipped
+- Helper is `(text, text)` with `::text` casts at every policy call site. Re-run `20260817_rls_security_lockdown.sql` (idempotent).
+
+## 2026-08-17 — RLS security lockdown (Hub + Store Ops)
+
+### Found
+- Anon `FOR ALL USING (true)` on `store_specialists`, carpet_*, and appliance_* exposed roster secrets and cross-store inventory to the public anon key.
+- `manager_notes` authenticated CRUD used `USING (true)`.
+- `20260816_store_locations_read.sql` + `20260816_rls_read_write_parity.sql` opened `SELECT USING (true)` on 13 tables (including map/rotation/shift).
+
+### Shipped
+- `supabase/migrations/20260817_rls_security_lockdown.sql`: drop anon/open policies; authenticated `jwt_matches_store` on Hub inventory; roster SELECT store-scoped, writes `jwt_is_roster_admin`; manager_notes store+department; Store Ops SELECT store-scoped (writes keep existing JWT FOR ALL). Secret columns revoked from client roles. Realtime publication: `sunday_bay_assignments`, `manager_notes`, `downstock_queue` (canonical names — `sunday_audit_assignments` / `department_downstock_items` do not exist).
+- Login no longer SELECTs the roster as anon. `POST /api/auth/hub-bridge` returns a sanitized specialist; AccessGate waits for Hub-bridge JWT before `fetchSpecialists`.
+
 ## 2026-08-16 — Sunday draw pre-selects Flooring-tagged associates
 
 ### Found

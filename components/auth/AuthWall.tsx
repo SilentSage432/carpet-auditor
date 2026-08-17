@@ -17,6 +17,7 @@ import {
 import { formatStoreLabel, getStoreNumber } from "@/lib/store";
 import {
   findSpecialistByLogin,
+  getActiveSpecialist,
   hasQuickPin,
   needsCredentialSetup,
   roleBadge,
@@ -165,7 +166,6 @@ function LoginForm({
         return;
       }
 
-      // Master PIN / recovery: bridge can auto-provision even when roster miss.
       const bridge = await establishHubBridgeSession({
         username: username.trim() || "master_admin",
         pin: password.trim(),
@@ -173,6 +173,7 @@ function LoginForm({
       });
       if (bridge.ok) {
         const recovered =
+          bridge.specialist ??
           roster.find((m) => String(m.id) === String(bridge.specialist_id)) ??
           null;
         if (recovered) {
@@ -197,7 +198,13 @@ function LoginForm({
     try {
       const specialistId = await authenticateWithBiometric();
       const match =
-        roster.find((m) => String(m.id) === String(specialistId)) ?? null;
+        roster.find((m) => String(m.id) === String(specialistId)) ??
+        (() => {
+          const active = getActiveSpecialist();
+          return active && String(active.id) === String(specialistId)
+            ? active
+            : null;
+        })();
       if (!match || match.is_active === false) {
         clearStoredBiometricCredential();
         setHasPasskey(false);
@@ -724,6 +731,7 @@ function UnlockForm({
       });
       if (bridge.ok) {
         const matched =
+          bridge.specialist ??
           roster.find((m) => String(m.id) === String(bridge.specialist_id)) ??
           member;
         setSecret("");

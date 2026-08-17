@@ -1,6 +1,7 @@
 /**
  * Proportional clustered assignment of this week's rotation bays.
  * Does not generate rotations (rotations.ts) or persist assignments (sunday-audit.ts).
+ * Persist goes through setSundayBayAssignment → enqueueOrExecute (STORE_OPS_SUNDAY_ASSIGN).
  * Composes aisle clustering + bay-health risk scores; presentation only renders.
  */
 

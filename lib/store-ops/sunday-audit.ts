@@ -24,6 +24,7 @@ import {
 } from "@/lib/types";
 import { workingDepartment } from "@/lib/admin-department-context";
 import type { ShiftRosterMember } from "@/lib/store-ops/weekly-rotations";
+import { enqueueOrExecute } from "@/lib/sync-queue";
 
 export const SUNDAY_AUDIT_EVENT = "deptsync:sunday-audit-assignments";
 export const SUNDAY_OPEN_EVENT = "deptsync:sunday-audit-open";
@@ -210,13 +211,50 @@ export async function setSundayBayAssignment(
   storeNumber = getStoreNumber(),
   department = SUNDAY_DEPARTMENT
 ): Promise<void> {
-  const supabase = requireClient();
   const store = String(storeNumber ?? "").trim();
   if (!store || !week || !bayId) return;
 
-  const weekStarting = isoWeekToMondayDate(week);
+  const weekParts = /^(\d{4})-W(\d{2})$/.exec(week.trim());
+  const payload: Record<string, unknown> = {
+    id: `${week}:${bayId}`,
+    assignment_id: bayId,
+    bay_id: bayId,
+    specialist_id: assignment?.specialist_id ?? "",
+    specialist_name: assignment?.specialist_name ?? "",
+    assigned_specialist_id: assignment?.assigned_specialist_id ?? null,
+    status: assignment ? assignment.status ?? "assigned" : "cleared",
+    week_number: weekParts ? Number(weekParts[2]) : null,
+    year: weekParts ? Number(weekParts[1]) : null,
+    week,
+    store_number: store,
+    department,
+    is_carried_over: assignment?.is_carried_over === true,
+    assigned_at: assignment?.assigned_at ?? new Date().toISOString(),
+  };
 
-  if (!assignment) {
+  await enqueueOrExecute("STORE_OPS_SUNDAY_ASSIGN", payload, () =>
+    executeSundayAssignLive(payload)
+  );
+  emitSundayEvent();
+}
+
+/** Live sunday_bay_assignments upsert — used by setSundayBayAssignment and queue replay. */
+export async function executeSundayAssignLive(
+  payload: Record<string, unknown>
+): Promise<void> {
+  const supabase = requireClient();
+  const store = String(payload.store_number ?? getStoreNumber()).trim();
+  const week = String(payload.week ?? "").trim();
+  const bayId = String(payload.bay_id ?? payload.assignment_id ?? "").trim();
+  const department =
+    String(payload.department ?? SUNDAY_DEPARTMENT).trim() || SUNDAY_DEPARTMENT;
+  if (!store || !week || !bayId) return;
+
+  const weekStarting = isoWeekToMondayDate(week);
+  const status = String(payload.status ?? "assigned").trim() || "assigned";
+  const specialistId = String(payload.specialist_id ?? "").trim();
+
+  if (status === "cleared" || !specialistId) {
     const { error } = await supabase.from("sunday_bay_assignments").upsert(
       {
         store_number: store,
@@ -238,36 +276,32 @@ export async function setSundayBayAssignment(
   }
 
   const profileId =
-    assignment.assigned_specialist_id ||
-    (await resolveProfileIdForRoster(assignment.specialist_id));
+    (payload.assigned_specialist_id
+      ? String(payload.assigned_specialist_id)
+      : "") || (await resolveProfileIdForRoster(specialistId));
 
-  const status =
-    String(assignment.status ?? "assigned").trim() || "assigned";
   const isCarried =
-    assignment.is_carried_over === true ||
-    status.toUpperCase() === "CARRIED_OVER";
+    payload.is_carried_over === true || status.toUpperCase() === "CARRIED_OVER";
 
-  const payload: Record<string, unknown> = {
+  const row: Record<string, unknown> = {
     store_number: store,
     department,
     week_starting: weekStarting,
     bay_id: bayId,
     assigned_specialist_id: profileId,
-    roster_specialist_id: assignment.specialist_id,
-    specialist_name: assignment.specialist_name,
+    roster_specialist_id: specialistId,
+    specialist_name: String(payload.specialist_name ?? ""),
     status,
     is_carried_over: isCarried,
     updated_at: new Date().toISOString(),
   };
 
-  const { error } = await supabase
-    .from("sunday_bay_assignments")
-    .upsert(payload, {
-      onConflict: "store_number,department,week_starting,bay_id",
-    });
+  const { error } = await supabase.from("sunday_bay_assignments").upsert(row, {
+    onConflict: "store_number,department,week_starting,bay_id",
+  });
 
   if (error) {
-    const fallback = { ...payload };
+    const fallback = { ...row };
     if (status === "CARRIED_OVER") fallback.status = "assigned";
     const retryStatus = await supabase.from("sunday_bay_assignments").upsert(
       fallback,

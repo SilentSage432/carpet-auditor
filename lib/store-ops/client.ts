@@ -5,6 +5,7 @@
 import type { StoreSpecialist } from "@/lib/types";
 import { invalidateRosterCache } from "@/lib/specialists";
 import { getStoreNumber, normalizeStoreNumber } from "@/lib/store";
+import { enqueueOrExecute, type EnqueueOrExecuteResult } from "@/lib/sync-queue";
 import { actorFromSpecialist, storeOpsAuthHeadersAsync } from "./auth";
 import {
   isStoreOpsAuthFailureMessage,
@@ -582,13 +583,82 @@ export async function fetchThisWeekRotations(
 
 export async function completeRotation(
   specialist: StoreSpecialist,
-  rotationId: string
+  rotationId: string,
+  extras?: {
+    bay_id?: string;
+    notes?: string;
+  }
+): Promise<EnqueueOrExecuteResult> {
+  const now = new Date().toISOString();
+  const payload: Record<string, unknown> = {
+    id: rotationId,
+    rotation_id: rotationId,
+    bay_id: extras?.bay_id ?? "",
+    completed_by: specialist.name,
+    completed_at: now,
+    notes: extras?.notes ?? "",
+    specialist_id: specialist.id,
+    specialist_role: specialist.role,
+    assigned_department: specialist.assigned_department,
+    store_number: getStoreNumber() || specialist.store_number,
+  };
+  return enqueueOrExecute(
+    "STORE_OPS_COMPLETE_ROTATION",
+    payload,
+    () => executeCompleteRotationLive(payload, specialist)
+  );
+}
+
+const STORE_OPS_FETCH_TIMEOUT_MS = 20_000;
+
+function mutationAbortSignal(): AbortSignal | undefined {
+  if (typeof AbortSignal === "undefined") return undefined;
+  if (typeof AbortSignal.timeout === "function") {
+    return AbortSignal.timeout(STORE_OPS_FETCH_TIMEOUT_MS);
+  }
+  return undefined;
+}
+
+function specialistFromSyncPayload(
+  payload: Record<string, unknown>,
+  fallback?: StoreSpecialist
+): StoreSpecialist {
+  if (fallback) return fallback;
+  const roleRaw = String(payload.specialist_role ?? "Associate");
+  const role =
+    roleRaw === "MasterAdmin" || roleRaw === "Supervisor"
+      ? roleRaw
+      : "Associate";
+  return {
+    id: String(payload.specialist_id ?? ""),
+    name: String(payload.completed_by ?? payload.specialist_name ?? ""),
+    role,
+    pin_code: null,
+    username: null,
+    assigned_department:
+      (payload.assigned_department as StoreSpecialist["assigned_department"]) ??
+      null,
+    must_change_credentials: false,
+    store_number: String(payload.store_number ?? getStoreNumber()),
+    created_at: new Date().toISOString(),
+  };
+}
+
+/** Live POST /api/rotations/complete — used by completeRotation and queue replay. */
+export async function executeCompleteRotationLive(
+  payload: Record<string, unknown>,
+  specialist?: StoreSpecialist
 ): Promise<void> {
-  await storeOpsFetch("/api/rotations/complete", specialist, {
+  const rotationId = String(payload.rotation_id ?? payload.id ?? "").trim();
+  if (!rotationId) throw new Error("rotation_id is required");
+  const member = specialistFromSyncPayload(payload, specialist);
+  await storeOpsFetch("/api/rotations/complete", member, {
     method: "POST",
     body: JSON.stringify({ rotation_id: rotationId }),
+    signal: mutationAbortSignal(),
   });
   await invalidateStoreOpsListCaches();
+  notifyStoreLocationsChanged();
 }
 
 export async function generateRotations(

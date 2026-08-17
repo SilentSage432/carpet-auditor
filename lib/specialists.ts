@@ -245,6 +245,15 @@ export function mapRow(row: Record<string, unknown>): StoreSpecialist {
   };
 }
 
+/** Strip PIN / hash fields before sending a roster row to the browser. */
+export function toPublicSpecialist(member: StoreSpecialist): StoreSpecialist {
+  return {
+    ...member,
+    pin_code: null,
+    pin_hash: null,
+  };
+}
+
 function isPlaceholder(member: StoreSpecialist): boolean {
   if (isDatabaseUuid(member.id) && !isFallbackProfileId(member.id)) return false;
   const name = member.name.toLowerCase().trim();

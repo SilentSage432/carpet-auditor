@@ -9,6 +9,7 @@ import { getStoreNumber, storeNumberQueryValues } from "@/lib/store";
 import { departmentCodeQueryValues } from "@/lib/store-ops/department-codes";
 import { getSupabase } from "@/lib/supabase";
 import { liveWriteError } from "@/lib/store-ops/errors";
+import { enqueueOrExecute } from "@/lib/sync-queue";
 
 export const DOWNSTOCK_EVENT = "deptsync:downstock-queue";
 
@@ -171,19 +172,74 @@ export async function flagForDownstock(input: {
     resolved_at: null,
   };
 
+  const map = readLocal(week, store);
+  map[rotationId] = flag;
+  writeLocal(week, map, store);
+  emitDownstock();
+
+  const payload: Record<string, unknown> = {
+    id: rotationId,
+    store_id: store,
+    store_number: store,
+    department_id: department,
+    department,
+    location_id: flag.location_id,
+    sku: "",
+    description: flag.note,
+    quantity: 1,
+    rotation_id: rotationId,
+    week,
+    assigned_week: week,
+    note: flag.note,
+    flagged_by: flag.flagged_by,
+    flagged_at: flag.flagged_at,
+  };
+
+  try {
+    await enqueueOrExecute("STORE_OPS_DOWNSTOCK_ADD", payload, () =>
+      executeDownstockAddLive(payload)
+    );
+  } catch (err) {
+    const next = readLocal(week, store);
+    delete next[rotationId];
+    writeLocal(week, next, store);
+    emitDownstock();
+    throw err;
+  }
+
+  return flag;
+}
+
+/** Live downstock_queue upsert — used by flagForDownstock and queue replay. */
+export async function executeDownstockAddLive(
+  payload: Record<string, unknown>
+): Promise<void> {
+  const store = String(
+    payload.store_number ?? payload.store_id ?? getStoreNumber()
+  ).trim();
+  const week = String(payload.assigned_week ?? payload.week ?? "").trim();
+  const rotationId = String(payload.rotation_id ?? payload.id ?? "").trim();
+  const department =
+    String(payload.department ?? payload.department_id ?? "flooring").trim() ||
+    "flooring";
+  if (!store || !week || !rotationId) {
+    throw new Error("Week and bay are required to flag downstock");
+  }
+
   const supabase = requireClient();
+  const flaggedAt = String(payload.flagged_at ?? new Date().toISOString());
   const { error } = await supabase.from("downstock_queue").upsert(
     {
       store_number: store,
       department,
       assigned_week: week,
       rotation_id: rotationId,
-      location_id: flag.location_id || null,
-      note: flag.note,
-      flagged_by: flag.flagged_by || null,
-      flagged_at: flag.flagged_at,
+      location_id: String(payload.location_id ?? "").trim() || null,
+      note: String(payload.note ?? payload.description ?? "").trim(),
+      flagged_by: String(payload.flagged_by ?? "").trim() || null,
+      flagged_at: flaggedAt,
       resolved_at: null,
-      updated_at: flag.flagged_at,
+      updated_at: flaggedAt,
     },
     { onConflict: "store_number,department,assigned_week,rotation_id" }
   );
@@ -191,12 +247,20 @@ export async function flagForDownstock(input: {
     throw liveWriteError(error, "downstock_queue", "Could not flag downstock");
   }
 
-  const map = readLocal(week, store);
-  map[rotationId] = flag;
-  writeLocal(week, map, store);
-
+  const flag = normalizeFlag(rotationId, {
+    rotation_id: rotationId,
+    location_id: payload.location_id,
+    note: payload.note ?? payload.description,
+    flagged_by: payload.flagged_by,
+    flagged_at: flaggedAt,
+    resolved_at: null,
+  });
+  if (flag) {
+    const map = readLocal(week, store);
+    map[rotationId] = flag;
+    writeLocal(week, map, store);
+  }
   emitDownstock();
-  return flag;
 }
 
 export async function clearDownstockFlag(input: {

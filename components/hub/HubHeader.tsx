@@ -10,6 +10,7 @@ import { useEffect, useRef, useState } from "react";
 import { AdminDepartmentSwitcher } from "@/components/hub/AdminDepartmentSwitcher";
 import { DeptSyncBadge } from "@/components/hub/DeptSyncBadge";
 import { HeaderNetworkStatus } from "@/components/hub/HeaderNetworkStatus";
+import { SyncStatusPill } from "@/components/layout/SyncStatusPill";
 import { formatStoreHeaderTag, formatStoreLabel } from "@/lib/store";
 import type { StoreSpecialist } from "@/lib/types";
 
@@ -92,6 +93,8 @@ export function HubHeader({
           compact
           onPinnedNavigate={onPinnedNavigate}
         />
+
+        <SyncStatusPill storeNumber={storeNumber} />
 
         <div className="relative shrink-0" ref={userRef}>
           <button

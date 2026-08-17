@@ -121,7 +121,7 @@ export function ZebraChecklist({
       const map = await fetchSundayAssignments(assignedWeek, getStoreNumber());
       setAssignments(map);
     } catch {
-      setAssignments({});
+      /* Keep last known assignments when the floor is offline. */
     }
   }, [assignedWeek]);
 
@@ -143,7 +143,7 @@ export function ZebraChecklist({
       );
       setDownstock(map);
     } catch {
-      setDownstock({});
+      /* Keep last known downstock flags when the floor is offline. */
     }
   }, [assignedWeek, downstockDept]);
 
@@ -332,8 +332,10 @@ export function ZebraChecklist({
     playSuccessTone();
     startTransition(async () => {
       try {
-        await completeRotation(specialist, rotationId);
-        onRefresh();
+        const outcome = await completeRotation(specialist, rotationId, {
+          bay_id: locationId,
+        });
+        if (outcome === "executed") onRefresh();
       } catch (err) {
         setCompletedOverlay((prev) => {
           const next = new Set(prev);
@@ -394,12 +396,21 @@ export function ZebraChecklist({
       rotation.location_id || rotation.store_locations?.id || "";
     setDownstockBusy(true);
     setError(null);
+    const optimistic: DownstockFlag = {
+      rotation_id: rotation.id,
+      location_id: locationId,
+      note: downstockNoteId === rotation.id ? downstockNote : "",
+      flagged_by: specialist.name,
+      flagged_at: new Date().toISOString(),
+      resolved_at: null,
+    };
+    setDownstock((prev) => ({ ...prev, [rotation.id]: optimistic }));
     try {
       const flag = await flagForDownstock({
         week: assignedWeek,
         rotationId: rotation.id,
         locationId,
-        note: downstockNoteId === rotation.id ? downstockNote : "",
+        note: optimistic.note,
         flaggedBy: specialist.name,
         department: downstockDept,
       });
@@ -409,6 +420,11 @@ export function ZebraChecklist({
       hapticPulse("medium");
       playSuccessTone();
     } catch (err) {
+      setDownstock((prev) => {
+        const next = { ...prev };
+        delete next[rotation.id];
+        return next;
+      });
       setError(err instanceof Error ? err.message : "Could not flag downstock");
     } finally {
       setDownstockBusy(false);
@@ -445,6 +461,16 @@ export function ZebraChecklist({
     const member = shiftRoster.find((row) => row.specialist_id === specialistId);
     if (!member || !assignedWeek) return;
     setError(null);
+    const previous = assignments[rotationId];
+    setAssignments((prev) => ({
+      ...prev,
+      [rotationId]: {
+        specialist_id: member.specialist_id,
+        specialist_name: member.specialist_name,
+        assigned_at: new Date().toISOString(),
+        status: "assigned",
+      },
+    }));
     try {
       await setSundayBayAssignment(assignedWeek, rotationId, {
         specialist_id: member.specialist_id,
@@ -454,6 +480,12 @@ export function ZebraChecklist({
       });
       await loadAssignments();
     } catch (err) {
+      setAssignments((prev) => {
+        const next = { ...prev };
+        if (previous) next[rotationId] = previous;
+        else delete next[rotationId];
+        return next;
+      });
       setError(err instanceof Error ? err.message : "Could not assign pull");
     }
   }
