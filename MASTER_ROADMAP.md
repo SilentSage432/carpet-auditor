@@ -149,6 +149,7 @@
 - [x] Canonical `computeDepartmentCompletionPct` + `flagPenalty` in `health.ts`; unified mobile scan dock (`max-w-lg` + safe-area); Lucide status pills
 - [x] Floor tab on-duty bay queue — `${dept} Rotation` header, Snap Bay / Flag Downstock, proportional grouping via `composeOnDutyBayWorkload`, analytics in `ShiftAnalyticsDrawer`
 - [x] Roster QR pairing — 10-minute signed tokens (`lib/auth/invite-token.ts`), `SpecialistEditSheet` QR overlay, `/pair` + `POST /api/auth/redeem-invite`
+- [x] Pair landing PWA install — standalone detect, deferred `beforeinstallprompt`, iOS Add to Home Screen card, then Floor (`/`)
 
 ## Next
 - [x] Apply Phase 1 JWT/RLS migration in Supabase + enable Custom Access Token Hook

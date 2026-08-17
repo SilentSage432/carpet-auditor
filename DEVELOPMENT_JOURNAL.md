@@ -1,5 +1,14 @@
 # DeptSync Hub — Development Journal
 
+## 2026-08-17 — Pair landing prompts standalone install before Floor
+
+### Found
+- `/pair` signed in and sent associates to `/dashboard` in the browser chrome, so the first Hub session stayed a tab instead of fullscreen PWA.
+
+### Shipped
+- After PIN redeem, `/pair` composes `lib/pwa-install.ts`: standalone (`display-mode: standalone` / iOS `navigator.standalone`) goes to `/`; captured `beforeinstallprompt` calls `prompt()` then `/`; iOS / blocked prompt shows Lucide `Download` / `Share` / `CheckCircle2` Add to Home Screen card, then Continue to Floor (`/`).
+- Manifest already has `"display": "standalone"`, `"start_url": "/"`, and 192/512 icons (`public/manifest.json` + `app/manifest.ts`). No second install-event owner.
+
 ## 2026-08-17 — Roster pairing is ephemeral QR, not SMS
 
 ### Found
@@ -10,7 +19,7 @@
 - Crypto owner: `lib/auth/invite-token.ts` — HMAC payload `{ specialist_id, store_number, nonce, exp }`, 10-minute TTL. Persist SHA-256(nonce) on existing `invite_token_hash` / `invite_token_expires_at` (also mirrored to `auth_token_*` for lookup).
 - Compose owner: `lib/onboarding/qr-pair.ts`. Issue: `POST /api/roster/pair` (Master). Redeem: public `POST /api/auth/redeem-invite` (preview without burn; PIN + confirm burns hash, saves PIN, Hub JWT with `store_number`).
 - `SpecialistEditSheet` **Pair Device via QR** (`QrCode` / `ShieldCheck` / `Clock`, stroke 1.75) opens a high-contrast `qrcode.react` overlay with countdown and Regenerate QR. Add Team Member is roster-only; optional phone stays for contact / PIN-reset only.
-- Associate lands on `/pair?t=` then Floor (`/dashboard`). `lib/onboarding/roster-invite.ts` is unused by Roster UI (PIN-reset SMS still uses `/auth/verify`).
+- Associate lands on `/pair?t=` then standalone install (or Add to Home Screen card) then Floor (`/`). `lib/onboarding/roster-invite.ts` is unused by Roster UI (PIN-reset SMS still uses `/auth/verify`).
 
 ## 2026-08-17 — Settings is four Lucide cards
 

@@ -3,7 +3,7 @@
  * Does not invent installability — only surfaces the browser event when fired.
  */
 
-type BeforeInstallPromptEvent = Event & {
+export type BeforeInstallPromptEvent = Event & {
   prompt: () => Promise<void>;
   userChoice: Promise<{ outcome: "accepted" | "dismissed"; platform: string }>;
 };
@@ -18,7 +18,7 @@ function isInstallEvent(e: Event): e is BeforeInstallPromptEvent {
   );
 }
 
-/** Call once from app root (client) so invite / settings can prompt later. */
+/** Call once from app root (client) so pair / invite / settings can prompt later. */
 export function initPwaInstallCapture(): void {
   if (typeof window === "undefined" || listening) return;
   listening = true;
@@ -33,6 +33,10 @@ export function initPwaInstallCapture(): void {
 
 export function canPromptPwaInstall(): boolean {
   return deferred != null;
+}
+
+export function getDeferredPwaInstall(): BeforeInstallPromptEvent | null {
+  return deferred;
 }
 
 export function isStandaloneDisplay(): boolean {

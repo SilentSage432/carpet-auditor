@@ -5,7 +5,7 @@
 > the scanning / auditing workflow for floor operators.
 >
 > Generated from the live codebase (`app/`, `components/`, `lib/types.ts`).
-> Last reviewed: 2026-08-17 (QR pairing + Settings four-card layout).
+> Last reviewed: 2026-08-17 (QR pairing + pair PWA install + Settings four-card layout).
 
 ---
 
@@ -243,6 +243,7 @@ Floor Pad is no longer a Settings tool. Master/DS open **Walk & Talk** from Floo
 | **WalkTheFloorSheet** | `WalkTheFloorSheet.tsx` | Map bay tap | Walk log + Snap Bay |
 | **AssociateScheduleModal** | `hub/AssociateScheduleModal.tsx` | Roster manage sheet (embedded) | Sun–Sat day strip + Open/Mid/Close + per-day times |
 | **SpecialistEditSheet** | `hub/SpecialistEditSheet.tsx` | Roster card / sliders | Schedule, cross-dept chips, Pair Device via QR, PIN, remove |
+| **Pair install card** | `app/pair/page.tsx` | After PIN on `/pair` (iOS / no prompt) | Download / Share / Continue to Floor |
 | **AisleBayManager** | `admin/AisleBayManager.tsx` | Settings Store Topology | Add bay, bulk generate, batch delete |
 | **EditBayDrawer** | `admin/EditBayDrawer.tsx` | Settings Topology bay Edit | Hotspot / priority lock / 3–21 decay slider |
 | **BulkLocationGenerator** | `admin/BulkLocationGenerator.tsx` | Settings Store Topology | Aisle range + Default Velocity Tier seed |
@@ -334,6 +335,7 @@ flowchart TD
 ```
 app/layout.tsx
 app/page.tsx
+app/pair/page.tsx
 app/manifest.ts
 app/globals.css
 components/hub/HubChrome.tsx          AssociateSpecialtySwitcher only

@@ -3,7 +3,8 @@
 ```
 app/page.tsx                      → Authenticated specialty scan hub (`?section=`); unauthenticated `/` redirects to /login
 app/login/page.tsx                → Public AccessGate + AuthWall (no dashboard chrome)
-app/pair/page.tsx                 → QR pairing PIN setup (`/pair?t=`; public)
+app/pair/page.tsx                 → QR pairing PIN setup + PWA standalone prompt (`/pair?t=`; public)
+lib/pwa-install.ts                → beforeinstallprompt capture + standalone display detection
 app/api/auth/redeem-invite/route.ts → Preview / burn QR pairing token + mint Hub JWT
 app/api/roster/pair/route.ts      → Master issues 10-minute QR pairing URL
 lib/auth/invite-token.ts          → HMAC pairing payload `{ specialist_id, store_number, nonce, exp }`
@@ -252,7 +253,7 @@ supabase/migrations/20260812_sunday_bay_assignments.sql → sunday specialist↔
 | Focus / keyboard dismiss | `lib/focus-input.ts` (`blurActiveInput` — never auto-focus on tab switch) |
 | SIMS location stock | `lib/sims.ts`, `SimsLocationFinder` |
 | Specialists session / credentials | `lib/specialists.ts`, `SpecialistModal` |
-| Roster QR pairing + PIN setup | `lib/auth/invite-token.ts` + `lib/onboarding/qr-pair.ts` + `/pair?t=` + `POST /api/auth/redeem-invite`. Roster-only insert is `POST /api/roster/members`. Issue pairing is `POST /api/roster/pair` (Master). PIN-reset SMS remains `/auth/verify/[token]`. Authenticated RLS: `20260815_roster_insert_rls.sql` (includes `auth_user_id IS NULL`). Signup claims `store_specialists.auth_user_id` (`claim-roster-auth.ts` + `20260815_roster_auth_link.sql`). `SpecialistModal` does not create members. |
+| Roster QR pairing + PIN setup | `lib/auth/invite-token.ts` + `lib/onboarding/qr-pair.ts` + `/pair?t=` + `POST /api/auth/redeem-invite`. After PIN, `lib/pwa-install.ts` prompts standalone then `/`. Roster-only insert is `POST /api/roster/members`. Issue pairing is `POST /api/roster/pair` (Master). PIN-reset SMS remains `/auth/verify/[token]`. Authenticated RLS: `20260815_roster_insert_rls.sql` (includes `auth_user_id IS NULL`). Signup claims `store_specialists.auth_user_id` (`claim-roster-auth.ts` + `20260815_roster_auth_link.sql`). `SpecialistModal` does not create members. |
 | Zero-access auth wall / idle lock | `lib/auth-session.ts`, `components/auth/AuthWall.tsx`, `components/auth/AccessGate.tsx` (`/login`) |
 | Edge auth + stealth gate | `lib/auth-gate.ts` + `proxy.ts` + `POST /api/auth/gate` (HttpOnly cookie) |
 | Enterprise ingest contracts | `src/types/enterpriseIntegration.ts` (Zod schemas). Transport: `lib/enterprise-integration/ingest.ts`. Stubs: `POST /api/v1/topology/ingest`, `POST /api/v1/freight/stage`. Does not write Store Ops tables or change hub UI. |

@@ -2,21 +2,30 @@
 
 /**
  * QR pairing redemption — /pair?t=
- * Validates the signed token, collects PIN, burns the invite hash, signs into Floor.
+ * Validates the signed token, collects PIN, burns the invite hash, then
+ * prompts standalone install before opening Floor.
  */
 
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Clock, ShieldCheck } from "lucide-react";
+import { CheckCircle2, Clock, Download, Share, ShieldCheck } from "lucide-react";
 import { DeptSyncBadge } from "@/components/hub/DeptSyncBadge";
 import { NumberField } from "@/components/ui/NumberField";
 import { startAuthSession } from "@/lib/auth-session";
+import {
+  getDeferredPwaInstall,
+  initPwaInstallCapture,
+  isStandaloneDisplay,
+  promptPwaInstall,
+  type BeforeInstallPromptEvent,
+} from "@/lib/pwa-install";
 import { setActiveSpecialist } from "@/lib/specialists";
 import { setStoreNumber } from "@/lib/store";
 import { getSupabase } from "@/lib/supabase";
 import type { StoreSpecialist } from "@/lib/types";
 
 const ICON_STROKE = 1.75;
+const FLOOR_HREF = "/";
 
 type Preview = {
   specialist_id: string;
@@ -45,12 +54,32 @@ function PairBody() {
   const search = useSearchParams();
   const token = String(search.get("t") ?? "").trim();
 
-  const [step, setStep] = useState<"load" | "pin" | "error">("load");
+  const [step, setStep] = useState<"load" | "pin" | "install" | "error">("load");
   const [preview, setPreview] = useState<Preview | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pin, setPin] = useState("");
   const [confirmPin, setConfirmPin] = useState("");
   const [busy, setBusy] = useState(false);
+  const [deferredPrompt, setDeferredPrompt] =
+    useState<BeforeInstallPromptEvent | null>(null);
+
+  useEffect(() => {
+    initPwaInstallCapture();
+    setDeferredPrompt(getDeferredPwaInstall());
+
+    const onBeforeInstall = (e: Event) => {
+      e.preventDefault();
+      const next = e as BeforeInstallPromptEvent;
+      if (typeof next.prompt === "function") setDeferredPrompt(next);
+    };
+    const onInstalled = () => setDeferredPrompt(null);
+    window.addEventListener("beforeinstallprompt", onBeforeInstall);
+    window.addEventListener("appinstalled", onInstalled);
+    return () => {
+      window.removeEventListener("beforeinstallprompt", onBeforeInstall);
+      window.removeEventListener("appinstalled", onInstalled);
+    };
+  }, []);
 
   useEffect(() => {
     if (!token) {
@@ -90,6 +119,42 @@ function PairBody() {
     };
   }, [token]);
 
+  function goToFloor() {
+    router.replace(FLOOR_HREF);
+  }
+
+  async function finishAfterPairing() {
+    const standalone =
+      window.matchMedia("(display-mode: standalone)").matches ||
+      Boolean(
+        (window.navigator as Navigator & { standalone?: boolean }).standalone
+      ) ||
+      isStandaloneDisplay();
+
+    if (standalone) {
+      goToFloor();
+      return;
+    }
+
+    if (deferredPrompt || getDeferredPwaInstall()) {
+      try {
+        const outcome = await promptPwaInstall();
+        if (outcome === "unavailable" && deferredPrompt) {
+          await deferredPrompt.prompt();
+          await deferredPrompt.userChoice;
+        }
+        setDeferredPrompt(null);
+        goToFloor();
+        return;
+      } catch {
+        setStep("install");
+        return;
+      }
+    }
+
+    setStep("install");
+  }
+
   async function handleSavePin() {
     if (pin !== confirmPin) {
       setError("PINs do not match");
@@ -128,7 +193,7 @@ function PairBody() {
           refresh_token: json.session.refresh_token,
         });
       }
-      router.replace("/dashboard");
+      await finishAfterPairing();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not save PIN");
     } finally {
@@ -197,6 +262,41 @@ function PairBody() {
             {busy ? "Saving…" : "Save PIN & open Floor"}
           </button>
         </form>
+      ) : null}
+
+      {step === "install" ? (
+        <div className="space-y-4">
+          <Download
+            className="w-8 h-8 text-cyan-400"
+            strokeWidth={ICON_STROKE}
+            aria-hidden
+          />
+          <h2 className="text-lg font-bold text-white">
+            Add to Home Screen for Fullscreen Mode
+          </h2>
+          <p className="text-sm leading-relaxed text-slate-300">
+            Tap the{" "}
+            <Share
+              className="mx-0.5 inline h-4 w-4 text-cyan-400 align-text-bottom"
+              strokeWidth={ICON_STROKE}
+              aria-hidden
+            />{" "}
+            Share icon and select &apos;Add to Home Screen&apos; to launch
+            DeptSync without the browser bar.
+          </p>
+          <button
+            type="button"
+            onClick={goToFloor}
+            className="btn-primary-glow flex min-h-12 w-full items-center justify-center rounded-xl text-sm font-bold"
+          >
+            <CheckCircle2
+              className="w-4 h-4 mr-2"
+              strokeWidth={ICON_STROKE}
+              aria-hidden
+            />
+            Continue to Floor
+          </button>
+        </div>
       ) : null}
     </PairShell>
   );
