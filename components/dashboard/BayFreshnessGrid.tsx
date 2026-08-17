@@ -83,11 +83,12 @@ export function BayFreshnessGrid({ locations, refreshKey }: Props) {
           className={`h-4 w-4 shrink-0 ${
             summary.staleCount > 0 ? "text-rose-400" : "text-emerald-400"
           }`}
+          strokeWidth={1.75}
         />
         <span className="min-w-0 flex-1 text-[12px] font-semibold leading-snug text-zinc-100">
           {summary.headline}
         </span>
-        <Layers className="h-4 w-4 shrink-0 text-zinc-500" />
+        <Layers className="h-4 w-4 shrink-0 text-zinc-500" strokeWidth={1.75} />
       </button>
 
       <div className="flex gap-2 border-t border-zinc-800/80 px-3 py-1.5">

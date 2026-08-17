@@ -6,7 +6,7 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
-import { HubIcon } from "@/components/hub/NavIcons";
+import { Sparkles, X } from "lucide-react";
 import {
   applyCopilotAction,
   composePredictiveCopilot,
@@ -150,7 +150,7 @@ export function PredictiveCopilotBanner({
           className="btn-icon-touch text-zinc-400"
           aria-label="Dismiss copilot for today"
         >
-          <HubIcon id="close" className="h-4 w-4" />
+          <X className="h-4 w-4" strokeWidth={1.75} aria-hidden />
         </button>
       </div>
       <ul className="space-y-2">
@@ -169,7 +169,7 @@ export function PredictiveCopilotBanner({
               onClick={() => void run(rec)}
               className="btn-primary-glow mt-2 inline-flex min-h-10 items-center gap-1.5 rounded-xl px-3 text-xs font-bold disabled:opacity-40"
             >
-              <HubIcon id="zap" className="h-3.5 w-3.5" />
+              <Sparkles className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden />
               {busyId === rec.id ? "Applying…" : rec.actionLabel}
             </button>
           </li>

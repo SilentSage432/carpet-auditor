@@ -9,6 +9,15 @@
 
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react";
 import Link from "next/link";
+import {
+  ChevronDown,
+  ChevronUp,
+  Clock,
+  Construction,
+  Flag,
+  FlagOff,
+  Hand,
+} from "lucide-react";
 import { AuditLocationModeToggle } from "@/components/store-ops/AuditLocationModeToggle";
 import { BarrierReasonChips } from "@/components/store-ops/BarrierReasonChips";
 import { BayHealthScorecard } from "@/components/store-ops/BayHealthScorecard";
@@ -36,10 +45,17 @@ import {
   setSundayBayAssignment,
   subscribeSundayBayAssignments,
   SUNDAY_AUDIT_EVENT,
+  SUNDAY_DEPARTMENT,
   type SundayAssignmentMap,
   type SundayBayAssignment,
 } from "@/lib/store-ops/sunday-audit";
-import { hoursBySpecialistId, readShiftRoster, type ShiftRosterMember } from "@/lib/store-ops/weekly-rotations";
+import {
+  composeOnDutyBayWorkload,
+  hoursBySpecialistId,
+  readShiftRoster,
+  type OnDutyWorkloadMember,
+  type ShiftRosterMember,
+} from "@/lib/store-ops/weekly-rotations";
 import { forecastWeeklyPace } from "@/lib/store-ops/week";
 import { getStoreNumber } from "@/lib/store";
 import { fetchAudits, getLocalAudits } from "@/lib/storage";
@@ -52,8 +68,9 @@ import {
 import type { CarpetAudit, StoreSpecialist } from "@/lib/types";
 import { playErrorTone, playSuccessTone } from "@/lib/ui/feedback";
 import { hapticPulse } from "@/utils/haptics";
-import { HubIcon } from "@/components/hub/NavIcons";
 import { recordBayTouch } from "@/lib/heatmap/bay-tracker";
+
+const ICON_STROKE = 1.75;
 
 type TypeFilter = StoreLocationType | "all";
 type AssociateFilter = "all" | "mine" | string;
@@ -68,6 +85,16 @@ export type ZebraChecklistProps = {
   lockedQueue?: QueueFilter;
   /** Hide pace / health chrome when composed into Stock. */
   compact?: boolean;
+  /** Hide week banner, health, and associate chips (Floor owns those). */
+  hideChrome?: boolean;
+  /** sunday_bay_assignments department key (flooring / appliances / …). */
+  assignmentDepartment?: string;
+  /** Filter to one on-duty specialist, or all. */
+  focusSpecialistId?: string | "all";
+  /** Today's on-duty roster used to group unassigned bays in-place. */
+  onDutyMembers?: OnDutyWorkloadMember[];
+  /** Bump to open Flag Downstock on the first unflagged open bay. */
+  primeDownstockTick?: number;
 };
 
 export function ZebraChecklist({
@@ -77,6 +104,11 @@ export function ZebraChecklist({
   onRefresh,
   lockedQueue,
   compact = false,
+  hideChrome = false,
+  assignmentDepartment = SUNDAY_DEPARTMENT,
+  focusSpecialistId = "all",
+  onDutyMembers,
+  primeDownstockTick = 0,
 }: ZebraChecklistProps) {
   const [error, setError] = useState<string | null>(null);
   const [doneOpen, setDoneOpen] = useState(false);
@@ -104,6 +136,7 @@ export function ZebraChecklist({
     () => new Set()
   );
   const [audits, setAudits] = useState<CarpetAudit[]>(() => getLocalAudits());
+  const [primedDownstockTick, setPrimedDownstockTick] = useState(0);
   const [, startTransition] = useTransition();
 
   const associateView = isAssociate(specialist);
@@ -118,12 +151,16 @@ export function ZebraChecklist({
       return;
     }
     try {
-      const map = await fetchSundayAssignments(assignedWeek, getStoreNumber());
+      const map = await fetchSundayAssignments(
+        assignedWeek,
+        getStoreNumber(),
+        assignmentDepartment
+      );
       setAssignments(map);
     } catch {
       /* Keep last known assignments when the floor is offline. */
     }
-  }, [assignedWeek]);
+  }, [assignedWeek, assignmentDepartment]);
 
   const downstockDept = useMemo(() => {
     const dept = effectiveDepartment(specialist);
@@ -246,6 +283,22 @@ export function ZebraChecklist({
     [open, assignments, specialist]
   );
 
+  const workload = useMemo(
+    () =>
+      composeOnDutyBayWorkload({
+        bays: open.map((row) => ({
+          rotationId: row.id,
+          aisle: row.store_locations?.aisle ?? "",
+          bay: row.store_locations?.bay ?? 0,
+          type: row.store_locations?.type,
+          riskScore: 0,
+        })),
+        assignments,
+        onDuty: onDutyMembers ?? [],
+      }),
+    [open, assignments, onDutyMembers]
+  );
+
   const associateOptions = useMemo(() => {
     const seen = new Map<string, string>();
     for (const assignment of Object.values(assignments)) {
@@ -265,16 +318,31 @@ export function ZebraChecklist({
           ...partition.assignedToOthers,
         ]
       : open;
-    if (associateFilter === "all") return base;
-    if (associateFilter === "mine") {
-      return base.filter((r) =>
-        isSundayAssignmentForSpecialist(assignments[r.id], specialist)
+    const focus = hideChrome ? focusSpecialistId : associateFilter;
+    if (focus === "all") return base;
+    if (focus === "mine") {
+      const mineId = String(specialist.id);
+      return base.filter(
+        (r) =>
+          isSundayAssignmentForSpecialist(assignments[r.id], specialist) ||
+          workload.assigneeByRotationId[r.id] === mineId
       );
     }
     return base.filter(
-      (r) => assignments[r.id]?.specialist_id === associateFilter
+      (r) =>
+        assignments[r.id]?.specialist_id === focus ||
+        workload.assigneeByRotationId[r.id] === focus
     );
-  }, [open, partition, associateFilter, assignments, specialist]);
+  }, [
+    open,
+    partition,
+    associateFilter,
+    assignments,
+    specialist,
+    hideChrome,
+    focusSpecialistId,
+    workload,
+  ]);
 
   const downstockOpen = useMemo(
     () => orderedOpen.filter((r) => Boolean(downstock[r.id])),
@@ -301,6 +369,18 @@ export function ZebraChecklist({
       completed: completedCount,
     });
   }, [rotations, completedOverlay]);
+
+  if (primeDownstockTick !== primedDownstockTick) {
+    setPrimedDownstockTick(primeDownstockTick);
+    if (primeDownstockTick > 0) {
+      const candidate = open.find((row) => !downstock[row.id]);
+      if (candidate) {
+        setQueueFilter("all");
+        setDownstockNoteId(candidate.id);
+        setDownstockNote("");
+      }
+    }
+  }
 
   function handleCheck(rotationId: string) {
     setError(null);
@@ -472,12 +552,18 @@ export function ZebraChecklist({
       },
     }));
     try {
-      await setSundayBayAssignment(assignedWeek, rotationId, {
-        specialist_id: member.specialist_id,
-        specialist_name: member.specialist_name,
-        assigned_at: new Date().toISOString(),
-        status: "assigned",
-      });
+      await setSundayBayAssignment(
+        assignedWeek,
+        rotationId,
+        {
+          specialist_id: member.specialist_id,
+          specialist_name: member.specialist_name,
+          assigned_at: new Date().toISOString(),
+          status: "assigned",
+        },
+        getStoreNumber(),
+        assignmentDepartment
+      );
       await loadAssignments();
     } catch (err) {
       setAssignments((prev) => {
@@ -490,9 +576,77 @@ export function ZebraChecklist({
     }
   }
 
+  const rotationById = useMemo(() => {
+    const map = new Map(queueOpen.map((row) => [row.id, row]));
+    return map;
+  }, [queueOpen]);
+
+  const groupedQueue =
+    hideChrome &&
+    queueFilter !== "downstock" &&
+    focusSpecialistId === "all" &&
+    (onDutyMembers?.length ?? 0) > 0;
+
+  const leftoverOpen = groupedQueue
+    ? queueOpen.filter((row) => {
+        const grouped = workload.groups.some((group) =>
+          group.rotationIds.includes(row.id)
+        );
+        return !grouped && !workload.unassignedIds.includes(row.id);
+      })
+    : [];
+
+  function renderBayRow(rotation: WeeklyRotationWithLocation) {
+    return (
+      <ZebraBayRow
+        key={rotation.id}
+        rotation={rotation}
+        assignmentLabel={assignmentCaption(
+          assignments[rotation.id],
+          specialist,
+          shiftHours
+        )}
+        assignment={assignments[rotation.id] ?? null}
+        assignedToMe={isSundayAssignmentForSpecialist(
+          assignments[rotation.id],
+          specialist
+        )}
+        pulsing={pulseId === rotation.id}
+        flagged={flaggedIds.has(rotation.id)}
+        downstock={downstock[rotation.id] ?? null}
+        downstockNoteOpen={downstockNoteId === rotation.id}
+        downstockNote={downstockNote}
+        downstockBusy={downstockBusy}
+        assignOptions={queueFilter === "downstock" ? shiftRoster : []}
+        barrierOpen={barrierId === rotation.id}
+        barrierBusy={barrierBusy}
+        onToggleBarrier={() =>
+          setBarrierId((id) => (id === rotation.id ? null : rotation.id))
+        }
+        onToggleDownstock={() => {
+          if (downstock[rotation.id]) {
+            void resolveDownstock(rotation.id);
+            return;
+          }
+          setDownstockNoteId((id) =>
+            id === rotation.id ? null : rotation.id
+          );
+          setDownstockNote("");
+        }}
+        onDownstockNoteChange={setDownstockNote}
+        onFlagDownstock={() => void submitDownstock(rotation)}
+        onAssign={(specialistId) =>
+          void assignDownstockPull(rotation.id, specialistId)
+        }
+        onComplete={() => handleCheck(rotation.id)}
+        onBarrier={(reason) => void handleBarrier(rotation, reason)}
+      />
+    );
+  }
+
   return (
     <div className="theme-density-stack space-y-2">
-      {!compact ? (
+      {!compact && !hideChrome ? (
         <div className="theme-accent-surface flex items-center gap-2 rounded-xl border px-3 py-2">
           <div className="min-w-0 flex-1">
             <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.16em] text-accent">
@@ -521,7 +675,7 @@ export function ZebraChecklist({
             }`}
             title={weeklyPace.label}
           >
-            <HubIcon id="clock" className="h-3.5 w-3.5" />
+            <Clock className="h-3.5 w-3.5" strokeWidth={ICON_STROKE} aria-hidden />
             {weeklyPace.tone === "ahead"
               ? "Ahead"
               : weeklyPace.tone === "behind"
@@ -532,9 +686,9 @@ export function ZebraChecklist({
         </div>
       ) : null}
 
-      {!compact && !associateView ? <BayHealthScorecard card={bayHealth} /> : null}
+      {!compact && !hideChrome && !associateView ? <BayHealthScorecard card={bayHealth} /> : null}
 
-      {!lockedQueue ? (
+      {!lockedQueue && !hideChrome ? (
       <div
         role="tablist"
         aria-label="Bay checklist"
@@ -577,7 +731,7 @@ export function ZebraChecklist({
         legend="Selling vs Topstock"
       />
 
-      {associateOptions.length > 0 && !associateView ? (
+      {associateOptions.length > 0 && !associateView && !hideChrome ? (
         <div className="flex gap-1.5 overflow-x-auto pb-0.5 no-scrollbar">
           {(
             [
@@ -638,7 +792,7 @@ export function ZebraChecklist({
         </div>
       ) : null}
 
-      {partition.hasPersonalQueue && queueFilter !== "downstock" ? (
+      {partition.hasPersonalQueue && queueFilter !== "downstock" && !hideChrome ? (
         <p className="font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-cyan-300">
           Your Sunday bays first · live handoff
         </p>
@@ -650,55 +804,56 @@ export function ZebraChecklist({
         </p>
       ) : null}
 
-      <ul className="divide-y divide-slate-800 overflow-hidden rounded-xl border border-slate-700 bg-slate-900/90">
-        {queueOpen.map((rotation) => (
-          <ZebraBayRow
-            key={rotation.id}
-            rotation={rotation}
-            assignmentLabel={assignmentCaption(
-              assignments[rotation.id],
-              specialist,
-              shiftHours
-            )}
-            assignment={assignments[rotation.id] ?? null}
-            assignedToMe={isSundayAssignmentForSpecialist(
-              assignments[rotation.id],
-              specialist
-            )}
-            pulsing={pulseId === rotation.id}
-            flagged={flaggedIds.has(rotation.id)}
-            downstock={downstock[rotation.id] ?? null}
-            downstockNoteOpen={downstockNoteId === rotation.id}
-            downstockNote={downstockNote}
-            downstockBusy={downstockBusy}
-            assignOptions={
-              queueFilter === "downstock" ? shiftRoster : []
-            }
-            barrierOpen={barrierId === rotation.id}
-            barrierBusy={barrierBusy}
-            onToggleBarrier={() =>
-              setBarrierId((id) => (id === rotation.id ? null : rotation.id))
-            }
-            onToggleDownstock={() => {
-              if (downstock[rotation.id]) {
-                void resolveDownstock(rotation.id);
-                return;
-              }
-              setDownstockNoteId((id) =>
-                id === rotation.id ? null : rotation.id
-              );
-              setDownstockNote("");
-            }}
-            onDownstockNoteChange={setDownstockNote}
-            onFlagDownstock={() => void submitDownstock(rotation)}
-            onAssign={(specialistId) =>
-              void assignDownstockPull(rotation.id, specialistId)
-            }
-            onComplete={() => handleCheck(rotation.id)}
-            onBarrier={(reason) => void handleBarrier(rotation, reason)}
-          />
-        ))}
-      </ul>
+      {groupedQueue ? (
+        <div className="space-y-2">
+          {workload.groups.map((group) => {
+            const rows = group.rotationIds
+              .map((id) => rotationById.get(id))
+              .filter((row): row is WeeklyRotationWithLocation => Boolean(row));
+            if (rows.length === 0) return null;
+            return (
+              <section key={group.specialist_id}>
+                <p className="mb-1 font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500">
+                  {group.specialist_name.split(" · ")[0]} · {rows.length}{" "}
+                  {rows.length === 1 ? "bay" : "bays"}
+                </p>
+                <ul className="divide-y divide-slate-800 overflow-hidden rounded-xl border border-slate-700 bg-slate-900/90">
+                  {rows.map((rotation) => renderBayRow(rotation))}
+                </ul>
+              </section>
+            );
+          })}
+          {workload.unassignedIds.length > 0 ? (
+            <section>
+              <p className="mb-1 font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500">
+                Unassigned · {workload.unassignedIds.length}{" "}
+                {workload.unassignedIds.length === 1 ? "bay" : "bays"}
+              </p>
+              <ul className="divide-y divide-slate-800 overflow-hidden rounded-xl border border-slate-700 bg-slate-900/90">
+                {workload.unassignedIds.map((id) => {
+                  const rotation = rotationById.get(id);
+                  return rotation ? renderBayRow(rotation) : null;
+                })}
+              </ul>
+            </section>
+          ) : null}
+          {leftoverOpen.length > 0 ? (
+            <section>
+              <p className="mb-1 font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500">
+                Other assignments · {leftoverOpen.length}{" "}
+                {leftoverOpen.length === 1 ? "bay" : "bays"}
+              </p>
+              <ul className="divide-y divide-slate-800 overflow-hidden rounded-xl border border-slate-700 bg-slate-900/90">
+                {leftoverOpen.map((rotation) => renderBayRow(rotation))}
+              </ul>
+            </section>
+          ) : null}
+        </div>
+      ) : (
+        <ul className="divide-y divide-slate-800 overflow-hidden rounded-xl border border-slate-700 bg-slate-900/90">
+          {queueOpen.map((rotation) => renderBayRow(rotation))}
+        </ul>
+      )}
 
       {done.length > 0 ? (
         <div className="overflow-hidden rounded-xl border border-slate-800 bg-slate-950/50">
@@ -709,10 +864,11 @@ export function ZebraChecklist({
             className="flex min-h-11 w-full items-center justify-between px-3 text-left font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500"
           >
             Completed ({done.length}) · cool-down locked
-            <HubIcon
-              id={doneOpen ? "chevronUp" : "chevronDown"}
-              className="h-4 w-4"
-            />
+            {doneOpen ? (
+              <ChevronUp className="h-4 w-4" strokeWidth={ICON_STROKE} aria-hidden />
+            ) : (
+              <ChevronDown className="h-4 w-4" strokeWidth={ICON_STROKE} aria-hidden />
+            )}
           </button>
           {doneOpen ? (
             <ul className="divide-y divide-slate-800 border-t border-slate-800 opacity-60">
@@ -889,7 +1045,7 @@ function ZebraBayRow({
             aria-label={`Quick Touch facing check: ${label}`}
             title="Quick Touch"
           >
-            <HubIcon id="touch" className="h-4 w-4" />
+            <Hand className="h-4 w-4" strokeWidth={ICON_STROKE} aria-hidden />
             <span className="hidden min-[380px]:inline">Touch</span>
           </button>
           <button
@@ -908,7 +1064,11 @@ function ZebraBayRow({
             }
             title={downstock ? "Clear pull" : "Flag for Downstock"}
           >
-            <HubIcon id={downstock ? "flagOff" : "flag"} className="h-4 w-4" />
+            {downstock ? (
+              <FlagOff className="h-4 w-4" strokeWidth={ICON_STROKE} aria-hidden />
+            ) : (
+              <Flag className="h-4 w-4" strokeWidth={ICON_STROKE} aria-hidden />
+            )}
             <span className="hidden min-[380px]:inline">
               {downstock ? "Clear" : "Pull"}
             </span>
@@ -920,7 +1080,7 @@ function ZebraBayRow({
             aria-label={`Log barrier: ${label}`}
             title="Barrier"
           >
-            <HubIcon id="barrier" className="h-4 w-4" />
+            <Construction className="h-4 w-4" strokeWidth={ICON_STROKE} aria-hidden />
             <span className="hidden min-[420px]:inline">Barrier</span>
           </button>
         </div>

@@ -145,8 +145,34 @@ export function formatShiftPill(
   return `${a} - ${b}`;
 }
 
+/** Compact floor pill clock: "7a", "3:30p". */
+export function formatCompactClock(
+  raw: string | null | undefined
+): string | null {
+  const norm = normalizeClock(raw);
+  if (!norm) return null;
+  const [hStr, mStr] = norm.split(":");
+  let hour = Number(hStr);
+  const minute = Number(mStr);
+  if (!Number.isFinite(hour) || !Number.isFinite(minute)) return null;
+  const suffix = hour >= 12 ? "p" : "a";
+  hour = hour % 12;
+  if (hour === 0) hour = 12;
+  return minute === 0 ? `${hour}${suffix}` : `${hour}:${String(minute).padStart(2, "0")}${suffix}`;
+}
+
+/** Compact range for on-duty pills: "7a–3:30p". */
+export function formatCompactShiftRange(
+  start: string | null | undefined,
+  end: string | null | undefined
+): string {
+  const a = formatCompactClock(start) || formatCompactClock(DEFAULT_START) || "7a";
+  const b = formatCompactClock(end) || formatCompactClock(DEFAULT_END) || "3:30p";
+  return `${a}–${b}`;
+}
+
 export function normalizeClock(raw: string | null | undefined): string | null {
-  const m = /^(\d{1,2}):(\d{2})$/.exec(String(raw ?? "").trim());
+  const m = /^(\d{1,2}):(\d{2})(?::\d{2})?/.exec(String(raw ?? "").trim());
   if (!m) return null;
   const h = Number(m[1]);
   const min = Number(m[2]);

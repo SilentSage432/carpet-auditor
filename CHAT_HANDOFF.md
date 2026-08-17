@@ -21,8 +21,8 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 - **IRP velocity heatmap:** Map toggle `[ Standard Map | Velocity Heatmap ]` lives on Visual Grid. Map also has `[ Visual Grid | Manage Aisles & Bays ]`. Visual Grid is walk-only (`StoreLocationGrid`: cadence dots, bay tags, Sell/Top, **Pending** chip when rotation status is `PENDING`, tap → `WalkTheFloorSheet`). Manage is `AisleBayManager` (aisle accordions, Add Single Bay, Bulk Generator with velocity seed, batch delete, duplicate prune, `EditBayDrawer` hotspot/lock/decay). `GET /api/store-locations` never filters by status; PENDING means available for Sunday draw. Department pin `flooring`/`D23` resolves to the live `departments.id` family before querying locations. Apply `20260814_bay_velocity_heatmap.sql` + `20260815_custom_decay_days.sql` + **`20260817_rls_security_lockdown.sql`** (authenticated store-scoped SELECT on `store_locations`; open anon reads removed).
 - **Multi-department access:** `accessible_departments` on roster + profiles. Header switcher when more than one granted dept. Supervisors grant extras from the **Roster** tab chips. Apply `20260814_multi_department_access.sql`.
 - **Daily shift board / call-out:** Roster groups by home department; department accordions start **collapsed**. `lib/store-ops/shift-status.ts` writes `associate_shift_days` first (localStorage is cache only). Cards show S–S dots, today's pill, and Edit Schedule → `AssociateScheduleModal` (presets Open/Mid/Close, per-day times). Call-out dialog composes `lib/store-ops/call-out.ts` → Sunday pool / proportional redistribute / carry-over loop. Apply `20260815_associate_shift_days.sql` + `20260815_carry_over_priority.sql`. Supervisors + Master toggle duty; Master-only add/delete team.
-- **Predictive Shift Copilot:** Floor banner under Shift Briefing (`PredictiveCopilotBanner`). Local patterns from `bay_service_logs` / Sunday assignments / downstock / locations — not Gemini. 1-tap Stage to Shift (`POST /api/rotations/assign`, Supervisor+) or Add to Downstock.
-- **Tactical Voice Hub:** Floor dock `TacticalVoiceFloorPad` (Master/DS). Web Speech + scratchpad → `POST /api/copilot/parse-walk` → dispatch via `lib/store-ops/shift-tasks.ts`. Bay freshness chip `BayFreshnessGrid` composes `lib/heatmap/bay-tracker.ts` from live `store_locations` (not only this week's rotations) so newly mapped aisles appear immediately. Apply `20260815_shift_walk_tasks.sql`.
+- **Predictive Shift Copilot:** Floor `ShiftAnalyticsDrawer` (`PredictiveCopilotBanner`). Local patterns from `bay_service_logs` / Sunday assignments / downstock / locations — not Gemini. 1-tap Stage to Shift (`POST /api/rotations/assign`, Supervisor+) or Add to Downstock.
+- **Tactical Voice Hub:** Walk & Talk lives in Floor `ShiftAnalyticsDrawer` (`TacticalVoiceFloorPad`). Web Speech + scratchpad → `POST /api/copilot/parse-walk` → dispatch via `lib/store-ops/shift-tasks.ts`. Bay freshness chip `BayFreshnessGrid` composes `lib/heatmap/bay-tracker.ts` from live `store_locations` (not only this week's rotations). `#floor-pad` expands the drawer. Apply `20260815_shift_walk_tasks.sql`.
 - **Roster invite:** apply `20260815_unified_auth_token.sql` + `20260815_roster_app_access.sql` + `20260815_roster_auth_link.sql` + `20260815_roster_insert_rls.sql` + **`20260816_roster_floor_title.sql`**. Add Team Member is roster-only by default (name/role/home department; no Auth user required). Check **Send Mobile App Invite** to SMS `/auth/verify/[token]`. Signup/invite claims the existing card (`store_specialists.auth_user_id`) instead of duplicating. Cards show Roster Only / Invited / Active plus Specialist / CSA / Supervisor. Forgot PIN sends a 30-minute SMS link. Apply **`20260817_rls_security_lockdown.sql`** so Hub inventory, roster, manager notes, and Store Ops reads require authenticated `jwt_matches_store` (anon/open SELECT removed). Login does not SELECT the roster as anon — `POST /api/auth/hub-bridge` returns a sanitized specialist.
 
 ## AI (`lib/ai/gemini.ts`)
@@ -35,7 +35,7 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 - **AI Pre-Flight (Bulk Generator):** `POST /api/store-locations/ai-parse` + `lib/store-ops/ai-parse.ts` normalize to `{ locations, corrections_made }`; input capped at 24k chars; UI tab confirms via existing bulk upsert
 - **Flooring AI Insights:** `POST /api/flooring/ai-insights` (Store Ops JWT) — server-fetches remnants/audits, runs aging/variance locally, sends a compact findings packet to Gemini (compact-then-narrate). `FlooringAIInsightBanner` does not POST tables.
 - **Zebra Shift Briefing:** On-load uses `buildLocalShiftBriefing` from `GET /api/store-health` only (no Gemini). Manual refresh may POST `/api/store-health/ai-summary`; 429/quota/RPC errors fall back silently to the local brief. Raw GoogleGenerativeAI JSON is never shown.
-- **Audit Velocity Chart:** `lib/store-ops/telemetry.ts` + `StoreHealthChart` on `/dashboard` (06:00–22:00 curve vs linear target; Overall / D23 / D35 pills)
+- **Audit Velocity Chart:** `lib/store-ops/telemetry.ts` + `StoreHealthChart` inside Floor `ShiftAnalyticsDrawer` (06:00–22:00 curve vs linear target; Overall / D23 / D35 pills)
 - **Appliance Anomaly Detection:** `POST /api/appliances/ai-anomaly` (Store Ops JWT) — server-fetches scans/catalog, local heuristics first, Gemini narrates the packet
 - **Catalog Taxonomies:** `lib/catalog/taxonomies.ts` + `POST /api/catalog/ai-taxonomy` (supervisor/admin JWT) + Settings `TaxonomyManagerModal`; known-folder packet + registry merge
 - **AI Visual Bay Scan:** `POST /api/store-ops/ai-bay-scan` + `lib/store-ops/ai-bay-scan.ts` + `VisualBayScannerModal` — 720p JPEG q=0.70 / 960px; route cap ~1.5MB; `responseSchema` + 512 output tokens
@@ -66,7 +66,7 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 ### Settings tools (Master Admin / Supervisor)
 - Former Admin Tools live in **Settings** (`SettingsSection`) as accordions and modals — not a second menu
 - Master: store number, Sunday auto-stage time + auto-run (`SundayScheduleCard`), Bulk Generator (`#bulk-generate`), Taxonomies (`#taxonomies`), Force Rotation (`#weekly-rotation`)
-- Supervisor + Master: weekly targets matrix. Floor Pad lives on Floor (`TacticalVoiceFloorPad`); Settings `#manager-notes` redirects to `/dashboard#floor-pad`
+- Supervisor + Master: weekly targets matrix. Floor Pad lives in Floor `ShiftAnalyticsDrawer` (`TacticalVoiceFloorPad`); Settings `#manager-notes` redirects to `/dashboard#floor-pad`
 - Remnant inventory (`#remnants`) when RBAC allows; Device & sync for every role
 - Personal **🎨 Appearance & Preferences** (all roles, including CSA via header) — not store configuration
 - Department Supervisors never see Master-only setup controls
@@ -176,7 +176,7 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
   - Floor (`/dashboard`) · Map (`/admin/store-map`) · Roster (`/roster`) · Settings (`/settings`)
   - Authenticated `/` without specialty `?section=` replaces to `/dashboard`. Hub `/?section=audit|appliances|department` is scan tools only. Remnants deep-link to `/settings#remnants`
 - `/manager-notes` redirects to `/dashboard#floor-pad` (Tactical Voice Hub on Floor)
-- `/dashboard` — one Floor layout for all roles: Sunday staging (non-associates), scan chips, health/rollup, showroom, **Verify completed bays**, `ZebraChecklist` (Rotation / Downstock + Barrier chips), `ExceptionFeed`
+- `/dashboard` — one Floor layout for all roles: `${activeDept.name} Rotation` header, Snap Bay AI Audit + Flag Downstock, on-duty associate strip, Sunday staging (non-associates), proportional `ZebraChecklist` grouped by on-duty specialists. Shift velocity, store health, Walk & Talk, briefing, copilot, freshness, showroom, verify/rollup, and `ExceptionFeed` nest in collapsed `ShiftAnalyticsDrawer`. Specialty scan pills were removed from the Floor fold (Cycle / Appliances stay on `/?section=`).
 - `/stock` redirects to `/dashboard` (Downstock is a Zebra tab on Floor)
 - `/roster` — unified team list, PIN add, and department access chips (optimistic + toast)
 - `/admin/store-map` — Visual Grid chunks aisle/bay DOM (16 aisles / 24 bays) with memoized cadence dots + SVG heat strips; Sell/Top is an overlay (no full map reload). Manage Aisles & Bays starts collapsed and chunks the same way. Tap bay → **one** `WalkTheFloorSheet`.
@@ -213,7 +213,7 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 
 ## End-of-week verification
 - Migration: `supabase/migrations/20260809_rotation_verification.sql`
-- Floor tab **Verify completed bays** signs off completed work without completing remaining open bays (`verifyAllCompletedBays`)
+- Floor **Verify completed bays** (Shift Analytics drawer) signs off completed work without completing remaining open bays (`verifyAllCompletedBays`)
 - `/verify-rotation` and `/admin/exceptions` redirect to `/dashboard`; the Floor `ExceptionFeed` is the live barrier list
 - Mid-week floor barriers: `POST /api/rotations/exceptions` (does **not** stamp `last_verified_week`) — Zebra row **Barrier** → tap reason
 - APIs: `POST /api/rotations/verify`, `GET|POST /api/rotations/exceptions`

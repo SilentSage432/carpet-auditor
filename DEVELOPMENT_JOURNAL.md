@@ -1,5 +1,18 @@
 # DeptSync Hub — Development Journal
 
+## 2026-08-17 — Floor tab on-duty bay queue
+
+### Found
+- Floor stacked briefing, velocity, health, Walk & Talk, scan pills, and the bay list in one viewport.
+- Specialty scan chips (`Flooring Scan` / `Appliances Scan`) duplicated specialty-hub entry on the Floor fold.
+- Sunday staging headlines embedded a lightning emoji.
+
+### Shipped
+- Floor primary viewport is `${activeDept.name} Rotation`, Snap Bay / Flag Downstock, today's on-duty pills (`store_specialists` + `associate_shift_days`), and a proportional bay queue.
+- `composeOnDutyBayWorkload` groups staged `weekly_rotations` onto on-duty associates (persisted `sunday_bay_assignments` win; unassigned bays are display-only via `planProportionalBayAssignments` — no duplicate rows).
+- Shift velocity, store health, Walk & Talk, briefing, copilot, freshness, showroom, exceptions, and verify/rollup nest in collapsed `ShiftAnalyticsDrawer`.
+- Floor Lucide icons use `strokeWidth={1.75}`; Sunday headline strings no longer embed emoji.
+
 ## 2026-08-17 — Queue specialist stub includes `is_active`
 
 ### Found

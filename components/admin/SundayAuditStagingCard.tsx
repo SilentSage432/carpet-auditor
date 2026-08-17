@@ -7,7 +7,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { SundayAuditAssignmentModal } from "@/components/admin/SundayAuditAssignmentModal";
-import { HubIcon } from "@/components/hub/NavIcons";
+import { ChevronRight, Zap } from "lucide-react";
 import { fetchDepartments, fetchThisWeekRotations } from "@/lib/store-ops/client";
 import {
   buildSundayStagedBays,
@@ -133,9 +133,10 @@ export function SundayAuditStagingCard({
           className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_80%_60%_at_20%_-20%,rgba(16,185,129,0.35),transparent_55%)]"
           aria-hidden
         />
-        <HubIcon
-          id="zap"
+        <Zap
           className="relative h-5 w-5 shrink-0 text-accent"
+          strokeWidth={1.75}
+          aria-hidden
         />
         <div className="relative min-w-0 flex-1">
           <p className="glass-subtitle text-accent">
@@ -150,9 +151,10 @@ export function SundayAuditStagingCard({
             Assign Specialists / CSAs · 4h / 6h / 8h · clustered balance
           </p>
         </div>
-        <HubIcon
-          id="chevronRight"
+        <ChevronRight
           className="relative h-5 w-5 shrink-0 self-center text-accent"
+          strokeWidth={1.75}
+          aria-hidden
         />
       </button>
       ) : null}

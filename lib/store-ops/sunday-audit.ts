@@ -693,11 +693,11 @@ export function sundayStagingHeadline(input: {
 }): string {
   const week = input.week || isoWeekLabel();
   if (input.pendingAssignmentCount > 0) {
-    return `⚡ Sunday Cycle Audit Staged (${input.pendingAssignmentCount} Bay${
+    return `Sunday Cycle Audit Staged (${input.pendingAssignmentCount} Bay${
       input.pendingAssignmentCount === 1 ? "" : "s"
     } Pending Assignment)`;
   }
-  return `⚡ Sunday Cycle Audit · ${input.openCount} Flooring Bay${
+  return `Sunday Cycle Audit · ${input.openCount} Flooring Bay${
     input.openCount === 1 ? "" : "s"
   } Open · Week ${week}`;
 }

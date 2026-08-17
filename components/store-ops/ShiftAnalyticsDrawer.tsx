@@ -1,0 +1,76 @@
+"use client";
+
+/**
+ * Collapsed Floor analytics accordion — presentation chrome only.
+ * Shift velocity, store health, and Walk & Talk nest here so the primary
+ * Floor viewport stays on-duty bay distribution.
+ */
+
+import { useEffect, useId, useState, type ReactNode } from "react";
+import { Activity, ChevronDown, ChevronUp } from "lucide-react";
+
+const FLOOR_PAD_HASHES = new Set(["floor-pad", "manager-notes", "s-pen-notes"]);
+const ICON_STROKE = 1.75;
+
+type Props = {
+  children: ReactNode;
+};
+
+export function ShiftAnalyticsDrawer({ children }: Props) {
+  const panelId = useId();
+  const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    function applyHash() {
+      const hash = window.location.hash.replace(/^#/, "");
+      if (FLOOR_PAD_HASHES.has(hash)) setOpen(true);
+    }
+    applyHash();
+    window.addEventListener("hashchange", applyHash);
+    return () => window.removeEventListener("hashchange", applyHash);
+  }, []);
+
+  return (
+    <section className="mb-3 overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-950/70">
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-controls={panelId}
+        onClick={() => setOpen((prev) => !prev)}
+        className="flex min-h-11 w-full items-center gap-2 px-3 py-2 text-left"
+      >
+        <Activity
+          className="h-4 w-4 shrink-0 text-zinc-400"
+          strokeWidth={ICON_STROKE}
+          aria-hidden
+        />
+        <span className="min-w-0 flex-1">
+          <span className="block text-sm font-semibold text-zinc-100">
+            Shift Analytics
+          </span>
+          <span className="block font-mono text-[10px] uppercase tracking-[0.14em] text-zinc-500">
+            Velocity · health · Walk &amp; Talk
+          </span>
+        </span>
+        {open ? (
+          <ChevronUp
+            className="h-4 w-4 shrink-0 text-zinc-500"
+            strokeWidth={ICON_STROKE}
+            aria-hidden
+          />
+        ) : (
+          <ChevronDown
+            className="h-4 w-4 shrink-0 text-zinc-500"
+            strokeWidth={ICON_STROKE}
+            aria-hidden
+          />
+        )}
+      </button>
+      {open ? (
+        <div id={panelId} className="border-t border-zinc-800 px-3 py-3">
+          {children}
+        </div>
+      ) : null}
+    </section>
+  );
+}

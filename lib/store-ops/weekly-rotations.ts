@@ -66,9 +66,9 @@ function storageKey(week: string, store = getStoreNumber()): string {
   return `${SHIFT_ROSTER_PREFIX}:${store}:${week}`;
 }
 
-/** Parse "08:00" / "8:00" / "16:30" → minutes from midnight, or null. */
+/** Parse "08:00" / "8:00" / "16:30" / "07:00:00" → minutes from midnight, or null. */
 export function parseClockMinutes(raw: string | undefined): number | null {
-  const m = /^(\d{1,2}):(\d{2})$/.exec(String(raw ?? "").trim());
+  const m = /^(\d{1,2}):(\d{2})(?::\d{2})?/.exec(String(raw ?? "").trim());
   if (!m) return null;
   const h = Number(m[1]);
   const min = Number(m[2]);
@@ -223,7 +223,7 @@ export function proportionalQuotas(
   }
   const raw = hours.map((h) => (Math.max(0, h) / total) * n);
   const floors = raw.map((x) => Math.floor(x));
-  let leftover = n - floors.reduce((sum, x) => sum + x, 0);
+  const leftover = n - floors.reduce((sum, x) => sum + x, 0);
   const order = raw
     .map((x, i) => ({ i, frac: x - Math.floor(x), hours: hours[i] ?? 0 }))
     .sort((a, b) => {
@@ -355,4 +355,88 @@ export function planProportionalBayAssignments(
   });
 
   return { total_hours: totalHours, items, loads };
+}
+
+export type OnDutyWorkloadMember = {
+  specialist_id: string;
+  specialist_name: string;
+  hours: number;
+  start?: string | null;
+  end?: string | null;
+};
+
+export type OnDutyWorkloadGroup = OnDutyWorkloadMember & {
+  rotationIds: string[];
+  /** Display-only ids from proportional plan — not persisted. */
+  plannedRotationIds: string[];
+};
+
+export type OnDutyBayWorkload = {
+  groups: OnDutyWorkloadGroup[];
+  unassignedIds: string[];
+  /** rotation id → on-duty specialist id (persisted assignment, else plan). */
+  assigneeByRotationId: Record<string, string>;
+};
+
+/**
+ * Group this week's open bays onto today's on-duty associates.
+ * Persisted sunday_bay_assignments win. Unassigned bays are clustered with
+ * planProportionalBayAssignments for display only — does not write rows.
+ */
+export function composeOnDutyBayWorkload(input: {
+  bays: RotationBayRef[];
+  assignments: Record<string, { specialist_id?: string | null } | null | undefined>;
+  onDuty: OnDutyWorkloadMember[];
+}): OnDutyBayWorkload {
+  const groups: OnDutyWorkloadGroup[] = input.onDuty.map((member) => ({
+    ...member,
+    rotationIds: [],
+    plannedRotationIds: [],
+  }));
+  const byId = new Map(groups.map((row) => [row.specialist_id, row]));
+  const assigneeByRotationId: Record<string, string> = {};
+  const unassigned: RotationBayRef[] = [];
+
+  for (const bay of input.bays) {
+    const assignedId = String(
+      input.assignments[bay.rotationId]?.specialist_id ?? ""
+    ).trim();
+    if (!assignedId) {
+      unassigned.push(bay);
+      continue;
+    }
+    assigneeByRotationId[bay.rotationId] = assignedId;
+    const group = byId.get(assignedId);
+    if (group) group.rotationIds.push(bay.rotationId);
+  }
+
+  if (unassigned.length > 0 && groups.length > 0) {
+    const plan = planProportionalBayAssignments(
+      unassigned,
+      groups.map((member) => ({
+        specialist_id: member.specialist_id,
+        specialist_name: member.specialist_name,
+        active: true,
+        hours: member.hours,
+        start: member.start ?? undefined,
+        end: member.end ?? undefined,
+      }))
+    );
+    for (const item of plan.items) {
+      const group = byId.get(item.specialist_id);
+      if (!group) continue;
+      group.rotationIds.push(item.rotationId);
+      group.plannedRotationIds.push(item.rotationId);
+      assigneeByRotationId[item.rotationId] = item.specialist_id;
+    }
+  }
+
+  const planned = new Set(
+    groups.flatMap((group) => group.plannedRotationIds)
+  );
+  const unassignedIds = unassigned
+    .map((bay) => bay.rotationId)
+    .filter((id) => !planned.has(id) && !assigneeByRotationId[id]);
+
+  return { groups, unassignedIds, assigneeByRotationId };
 }

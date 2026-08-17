@@ -484,18 +484,18 @@ export function TacticalVoiceFloorPad({
               <span />
               <span />
             </span>
-            <MicOff className="w-4 h-4 shrink-0 text-rose-300" />
+            <MicOff className="w-4 h-4 shrink-0 text-rose-300" strokeWidth={1.75} />
             <span className="min-w-0 flex-1 truncate text-[13px] font-semibold text-rose-100">
               Listening to floor walk...
             </span>
           </>
         ) : (
           <>
-            <Mic className="w-4 h-4 shrink-0 text-emerald-400" />
+            <Mic className="w-4 h-4 shrink-0 text-emerald-400" strokeWidth={1.75} />
             <span className="min-w-0 flex-1 truncate text-[13px] font-semibold text-zinc-100">
               Walk &amp; Talk Floor Pad
             </span>
-            <Sparkles className="w-4 h-4 shrink-0 text-emerald-300/80" />
+            <Sparkles className="w-4 h-4 shrink-0 text-emerald-300/80" strokeWidth={1.75} />
           </>
         )}
       </button>
@@ -560,12 +560,12 @@ export function TacticalVoiceFloorPad({
                         <span />
                         <span />
                       </span>
-                      <MicOff className="w-4 h-4" />
+                      <MicOff className="w-4 h-4" strokeWidth={1.75} />
                       Stop
                     </>
                   ) : (
                     <>
-                      <Mic className="w-4 h-4 text-emerald-400" />
+                      <Mic className="w-4 h-4 text-emerald-400" strokeWidth={1.75} />
                       {speechSupported ? "Capture walk" : "Mic unavailable"}
                     </>
                   )}
@@ -576,14 +576,14 @@ export function TacticalVoiceFloorPad({
                   onClick={() => void runParse(transcript)}
                   className="inline-flex min-h-11 flex-1 items-center justify-center gap-2 rounded-xl border border-cyan-500/40 bg-cyan-950/40 text-sm font-semibold text-cyan-100 disabled:opacity-40"
                 >
-                  <Sparkles className="w-4 h-4" />
+                  <Sparkles className="w-4 h-4" strokeWidth={1.75} />
                   {busy ? "Structuring…" : "Copilot Structure"}
                 </button>
               </div>
 
               {!speechSupported ? (
                 <p className="flex items-start gap-2 rounded-lg border border-amber-500/35 bg-amber-950/30 px-2.5 py-2 text-[12px] text-amber-100">
-                  <AlertTriangle className="mt-0.5 w-4 h-4 shrink-0" />
+                  <AlertTriangle className="mt-0.5 w-4 h-4 shrink-0" strokeWidth={1.75} />
                   Speech recognition is unsupported here. Type the walk in the
                   scratchpad, then tap Copilot Structure.
                 </p>
@@ -605,7 +605,7 @@ export function TacticalVoiceFloorPad({
 
               {error ? (
                 <p className="flex items-start gap-2 rounded-lg border border-rose-500/40 bg-rose-950/40 px-2.5 py-2 text-xs text-rose-200">
-                  <AlertTriangle className="mt-0.5 w-4 h-4 shrink-0" />
+                  <AlertTriangle className="mt-0.5 w-4 h-4 shrink-0" strokeWidth={1.75} />
                   {error}
                 </p>
               ) : null}
@@ -629,6 +629,7 @@ export function TacticalVoiceFloorPad({
                                 ? "text-amber-400"
                                 : "text-zinc-500"
                           }`}
+                          strokeWidth={1.75}
                         />
                         <div className="min-w-0 flex-1">
                           <p className="text-sm font-semibold leading-snug text-zinc-50">
@@ -651,9 +652,9 @@ export function TacticalVoiceFloorPad({
                           )}`}
                         >
                           {card.priority === "P1_CRITICAL" ? (
-                            <AlertTriangle className="w-4 h-4" />
+                            <AlertTriangle className="w-4 h-4" strokeWidth={1.75} />
                           ) : (
-                            <CheckCircle2 className="w-4 h-4" />
+                            <CheckCircle2 className="w-4 h-4" strokeWidth={1.75} />
                           )}
                           {card.priority.replace("_", " ")}
                         </button>
@@ -662,11 +663,11 @@ export function TacticalVoiceFloorPad({
                           onClick={() => cycleAssignee(card.id)}
                           className="inline-flex min-h-8 items-center gap-1 rounded-lg border border-zinc-600 bg-zinc-900 px-2 text-[11px] font-semibold text-zinc-200"
                         >
-                          <UserCheck className="w-4 h-4 text-emerald-300" />
+                          <UserCheck className="w-4 h-4 text-emerald-300" strokeWidth={1.75} />
                           {card.assignee_name || "Unassigned"}
                         </button>
                         <span className="inline-flex min-h-8 items-center gap-1 rounded-lg border border-zinc-700 px-2 text-[11px] text-zinc-400">
-                          <Clock className="w-4 h-4" />
+                          <Clock className="w-4 h-4" strokeWidth={1.75} />
                           {card.target_window.replaceAll("_", " ")}
                         </span>
                       </div>
@@ -681,7 +682,7 @@ export function TacticalVoiceFloorPad({
                 onClick={() => void dispatchAll()}
                 className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-emerald-400/50 bg-emerald-600 text-sm font-bold text-white shadow-[0_0_22px_-8px_rgba(16,185,129,0.8)] disabled:opacity-40"
               >
-                <Send className="w-4 h-4" />
+                <Send className="w-4 h-4" strokeWidth={1.75} />
                 {dispatching
                   ? "Dispatching…"
                   : `Dispatch All to Shift Board${
@@ -700,7 +701,7 @@ export function TacticalVoiceFloorPad({
                 onClick={() => setFullPadOpen(true)}
                 className="flex min-h-10 w-full items-center justify-center gap-2 rounded-xl border border-zinc-700 text-[12px] font-semibold text-zinc-300"
               >
-                <Sparkles className="w-4 h-4 text-cyan-300" />
+                <Sparkles className="w-4 h-4 text-cyan-300" strokeWidth={1.75} />
                 Open full Floor Pad notes
               </button>
             </div>

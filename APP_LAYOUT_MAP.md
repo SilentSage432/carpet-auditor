@@ -232,7 +232,7 @@ Stacked cards (~1.5–2 handheld screens):
 
 **Roster management** lives primarily in **SpecialistModal** (header), not as a Settings sub-page: add team member (name, Associate/Supervisor, optional/required PIN), select active specialist.
 
-Floor Pad is no longer a Settings tool. Master/DS open **Walk & Talk** from the Floor dock (`TacticalVoiceFloorPad`); Settings `#manager-notes` redirects to `/dashboard#floor-pad`.
+Floor Pad is no longer a Settings tool. Master/DS open **Walk & Talk** from Floor **Shift Analytics** (`TacticalVoiceFloorPad` inside `ShiftAnalyticsDrawer`); Settings `#manager-notes` redirects to `/dashboard#floor-pad` (expands the drawer).
 
 ---
 
@@ -256,8 +256,8 @@ Floor Pad is no longer a Settings tool. Master/DS open **Walk & Talk** from the 
 | **SimsLocationFinder** | `SimsLocationFinder.tsx` | Catalog CTA + Audit 📍 SIMS Stock | Search drawer / dialog |
 | **ApplyMarkdownModal** | `ApplyMarkdownModal.tsx` | Remnant markdown CTA | % Off / Fixed $ + preview |
 | **Quick-AddCatalogModal** | `QuickAddCatalogModal.tsx` | Cycle Audit / scan flows | Link unlinked barcode → catalog (supersedes retired MarryBarcodeModal) |
-| **VisualBayScannerModal** | `store-ops/VisualBayScannerModal.tsx` | Store Map CTA / bay sheet / Cycle Audit **Snap Bay** chip | Camera or upload → Gemini scan beam → results drawer (z-90) |
-| **TacticalVoiceFloorPad** | `dashboard/TacticalVoiceFloorPad.tsx` | Floor Walk & Talk dock | Listening pill + bottom sheet voice/scratchpad + Copilot cards (z-80) |
+| **VisualBayScannerModal** | `store-ops/VisualBayScannerModal.tsx` | Floor header **Snap Bay AI Audit** / Store Map CTA / bay sheet / Cycle Audit | Camera or upload → Gemini scan beam → results drawer (z-90) |
+| **TacticalVoiceFloorPad** | `dashboard/TacticalVoiceFloorPad.tsx` | Floor Shift Analytics → Walk & Talk | Listening pill + bottom sheet voice/scratchpad + Copilot cards (z-80) |
 | **ExecutiveFloorPad** | `manager-notes/ExecutiveFloorPad.tsx` | Floor Pad sheet “full notes” / `#floor-pad` | Full-screen TipTap Floor Pad + Gemini Copilot + archive (z-80) |
 | Pin / Sync toasts | `app/page.tsx` | PIN save / online flush | Fixed top status pills |
 

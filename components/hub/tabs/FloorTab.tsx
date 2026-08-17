@@ -2,12 +2,15 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
+import { Camera, Package } from "lucide-react";
 import { SundayAuditStagingCard } from "@/components/admin/SundayAuditStagingCard";
 import { ExceptionFeed } from "@/components/admin/ExceptionFeed";
 import { StoreHealthCard } from "@/components/StoreHealthCard";
 import { ShowroomQuickTouchCard } from "@/components/dashboard/ShowroomQuickTouchCard";
 import { TacticalVoiceFloorPad } from "@/components/dashboard/TacticalVoiceFloorPad";
 import { BayFreshnessGrid } from "@/components/dashboard/BayFreshnessGrid";
+import { OnDutyAssociateStrip } from "@/components/store-ops/OnDutyAssociateStrip";
+import { ShiftAnalyticsDrawer } from "@/components/store-ops/ShiftAnalyticsDrawer";
 import { ZebraChecklist } from "@/components/store-ops/ZebraChecklist";
 import { ShiftBriefingCard } from "@/components/store-ops/ShiftBriefingCard";
 import { PredictiveCopilotBanner } from "@/components/store-ops/PredictiveCopilotBanner";
@@ -15,14 +18,11 @@ import { StoreHealthChart } from "@/components/store-ops/StoreHealthChart";
 import {
   ADMIN_DEPT_CONTEXT_EVENT,
   isFlooringWorkingContext,
+  workingDepartment,
   workingDepartmentId,
 } from "@/lib/admin-department-context";
-import {
-  isMasterAdmin,
-  isSimplifiedAssociateView,
-  visibleFloorAuditTabs,
-} from "@/lib/rbac";
-import { isSupervisor } from "@/lib/specialists";
+import { isMasterAdmin, isSimplifiedAssociateView } from "@/lib/rbac";
+import { dedupeRoster, fetchSpecialists, isSupervisor } from "@/lib/specialists";
 import {
   fetchDepartments,
   fetchStoreLocationsDetailed,
@@ -35,13 +35,32 @@ import {
 } from "@/lib/store-ops/client";
 import { fingerprintsEqual } from "@/lib/store-ops/cache";
 import {
+  associateMatchesSundayDepartment,
+  fetchSundayAssignments,
   filterFlooringRotations,
   findFlooringDepartment,
   SUNDAY_AUDIT_EVENT,
+  type SundayAssignmentMap,
 } from "@/lib/store-ops/sunday-audit";
-import type { StoreLocation, WeeklyRotationWithLocation } from "@/lib/store-ops/types";
+import {
+  composeShiftBoard,
+  fetchShiftDays,
+  isOnDutyToday,
+  localWorkDate,
+  SHIFT_STATUS_EVENT,
+} from "@/lib/store-ops/shift-status";
+import {
+  composeOnDutyBayWorkload,
+  DEFAULT_SHIFT_HOURS,
+  hoursBetween,
+  type OnDutyWorkloadMember,
+} from "@/lib/store-ops/weekly-rotations";
+import { getStoreNumber } from "@/lib/store";
+import { departmentMeta } from "@/lib/types";
+import type { Department, StoreLocation, WeeklyRotationWithLocation } from "@/lib/store-ops/types";
 import type { WorkflowTabProps } from "@/components/hub/tabs/tab-props";
-import Link from "next/link";
+
+const ICON_STROKE = 1.75;
 
 const SupervisorAuditSummaryModal = dynamic(
   () =>
@@ -51,9 +70,28 @@ const SupervisorAuditSummaryModal = dynamic(
   { ssr: false }
 );
 
+const VisualBayScannerModal = dynamic(
+  () =>
+    import("@/components/store-ops/VisualBayScannerModal").then(
+      (mod) => mod.VisualBayScannerModal
+    ),
+  { ssr: false }
+);
+
+function rotationBayRef(rotation: WeeklyRotationWithLocation) {
+  return {
+    rotationId: rotation.id,
+    aisle: rotation.store_locations?.aisle ?? "",
+    bay: rotation.store_locations?.bay ?? 0,
+    type: rotation.store_locations?.type,
+    riskScore: 0,
+  };
+}
+
 export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
   const [week, setWeek] = useState("");
   const [deptId, setDeptId] = useState<string | null>(null);
+  const [departments, setDepartments] = useState<Department[]>([]);
   const [rotations, setRotations] = useState<WeeklyRotationWithLocation[]>([]);
   const [mappedLocations, setMappedLocations] = useState<StoreLocation[]>([]);
   const [flooringDeptId, setFlooringDeptId] = useState<string | null>(null);
@@ -63,12 +101,92 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
   const [rollupOpen, setRollupOpen] = useState(false);
   const [verifyBusy, setVerifyBusy] = useState(false);
   const [verifyMsg, setVerifyMsg] = useState<string | null>(null);
+  const [bayScanOpen, setBayScanOpen] = useState(false);
+  const [onDuty, setOnDuty] = useState<OnDutyWorkloadMember[]>([]);
+  const [onDutyLoading, setOnDutyLoading] = useState(true);
+  const [assignments, setAssignments] = useState<SundayAssignmentMap>({});
+  const [pickedAssociateId, setPickedAssociateId] = useState<
+    string | "all" | null
+  >(null);
+  const [primeDownstockTick, setPrimeDownstockTick] = useState(0);
+
   const flooringFocus = isFlooringWorkingContext(specialist);
   const simplified = isSimplifiedAssociateView(specialist);
   const supervisor = isSupervisor(specialist);
   const master = isMasterAdmin(specialist);
-  const scanTabs = simplified ? [] : visibleFloorAuditTabs(specialist);
+  const working = workingDepartment(specialist);
+  const assignmentDept = working === "all" ? "flooring" : working;
   const completedCount = rotations.filter((r) => r.is_completed).length;
+
+  const activeDept = useMemo(
+    () => departments.find((dept) => dept.id === deptId) ?? null,
+    [departments, deptId]
+  );
+  const rotationTitle = `${
+    activeDept?.name?.trim() ||
+    departmentMeta(working === "all" ? "flooring" : working).shortLabel
+  } Rotation`;
+  const focusAssociateId =
+    pickedAssociateId ?? (simplified ? String(specialist.id) : "all");
+
+  const loadOnDuty = useCallback(async () => {
+    setOnDutyLoading(true);
+    try {
+      const date = localWorkDate();
+      const team = dedupeRoster(await fetchSpecialists());
+      const days = await fetchShiftDays(date, storeNumber || getStoreNumber());
+      const board = composeShiftBoard(team, days, date);
+      const scope = workingDepartment(specialist);
+      const next: OnDutyWorkloadMember[] = [];
+      for (const day of board) {
+        if (!isOnDutyToday(day)) continue;
+        const person = team.find((row) => String(row.id) === day.specialist_id);
+        if (!person || person.is_active === false) continue;
+        if (person.role === "MasterAdmin") continue;
+        if (
+          scope !== "all" &&
+          !associateMatchesSundayDepartment(person, scope)
+        ) {
+          continue;
+        }
+        next.push({
+          specialist_id: String(person.id),
+          specialist_name: person.name,
+          hours:
+            hoursBetween(day.start_time ?? undefined, day.end_time ?? undefined) ??
+            DEFAULT_SHIFT_HOURS,
+          start: day.start_time,
+          end: day.end_time,
+        });
+      }
+      setOnDuty(next);
+    } catch (err) {
+      console.error("[FloorTab] on-duty specialists failed", err);
+      setOnDuty([]);
+    } finally {
+      setOnDutyLoading(false);
+    }
+  }, [specialist, storeNumber]);
+
+  const loadAssignments = useCallback(
+    async (assignedWeek: string) => {
+      if (!assignedWeek) {
+        setAssignments({});
+        return;
+      }
+      try {
+        const map = await fetchSundayAssignments(
+          assignedWeek,
+          getStoreNumber(),
+          assignmentDept
+        );
+        setAssignments((prev) => (fingerprintsEqual(prev, map) ? prev : map));
+      } catch {
+        /* Keep last known assignments when the floor is offline. */
+      }
+    },
+    [assignmentDept]
+  );
 
   const reload = useCallback(
     async (member: typeof specialist, opts?: { silent?: boolean }) => {
@@ -83,6 +201,7 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
         const nextWeek = data.assigned_week || "";
         const nextRotations = data.rotations ?? [];
         const nextFlooring = findFlooringDepartment(depts)?.id ?? null;
+        setDepartments((prev) => (fingerprintsEqual(prev, depts) ? prev : depts));
         setWeek((prev) => (prev === nextWeek ? prev : nextWeek));
         setDeptId((prev) => (prev === (nextDeptId ?? null) ? prev : nextDeptId ?? null));
         setRotations((prev) =>
@@ -95,14 +214,15 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
           prev === nextFlooring ? prev : nextFlooring
         );
         setHealthKey((k) => k + 1);
+        void loadOnDuty();
+        if (nextWeek) void loadAssignments(nextWeek);
       } catch (err) {
         console.error("[FloorTab] live rotations failed", err);
       } finally {
-        if (!opts?.silent) setLoading(false);
-        else setLoading(false);
+        setLoading(false);
       }
     },
-    []
+    [loadOnDuty, loadAssignments]
   );
 
   const silentRefresh = useCallback(() => {
@@ -117,6 +237,7 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
       const deptItems = cachedDepts?.items ?? [];
       const nextDeptId = workingDepartmentId(specialist, deptItems);
       if (deptItems.length) {
+        setDepartments(deptItems);
         setDeptId(nextDeptId ?? null);
         setFlooringDeptId(findFlooringDepartment(deptItems)?.id ?? null);
       }
@@ -155,10 +276,12 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
     window.addEventListener(ADMIN_DEPT_CONTEXT_EVENT, onCtx);
     window.addEventListener(SUNDAY_AUDIT_EVENT, onSunday);
     window.addEventListener(STORE_OPS_LOCATIONS_CHANGED_EVENT, onSunday);
+    window.addEventListener(SHIFT_STATUS_EVENT, onSunday);
     return () => {
       window.removeEventListener(ADMIN_DEPT_CONTEXT_EVENT, onCtx);
       window.removeEventListener(SUNDAY_AUDIT_EVENT, onSunday);
       window.removeEventListener(STORE_OPS_LOCATIONS_CHANGED_EVENT, onSunday);
+      window.removeEventListener(SHIFT_STATUS_EVENT, onSunday);
     };
   }, [reload, specialist]);
 
@@ -173,6 +296,18 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
       .map((row) => row.store_locations)
       .filter((loc): loc is NonNullable<typeof loc> => Boolean(loc));
   }, [mappedLocations, displayRotations]);
+
+  const workload = useMemo(
+    () =>
+      composeOnDutyBayWorkload({
+        bays: displayRotations
+          .filter((row) => !row.is_completed)
+          .map(rotationBayRef),
+        assignments,
+        onDuty,
+      }),
+    [displayRotations, assignments, onDuty]
+  );
 
   async function signOffCompleted() {
     if (!deptId || !week) return;
@@ -201,19 +336,35 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
   return (
     <>
       <main className="hub-main">
-        {!simplified ? (
-          <TacticalVoiceFloorPad
-            specialist={specialist}
-            storeNumber={storeNumber}
-            week={week}
-            rotations={displayRotations}
-            departmentId={deptId}
-          />
-        ) : null}
+        <header className="mb-3">
+          <h1 className="text-lg font-bold tracking-tight text-zinc-50">
+            {rotationTitle}
+          </h1>
+          <div className="mt-2 grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => setBayScanOpen(true)}
+              className="btn-primary-glow flex min-h-11 items-center justify-center rounded-xl px-3 text-sm font-semibold"
+            >
+              <Camera className="w-4 h-4 mr-2" strokeWidth={ICON_STROKE} />
+              Snap Bay AI Audit
+            </button>
+            <button
+              type="button"
+              onClick={() => setPrimeDownstockTick((n) => n + 1)}
+              className="flex min-h-11 items-center justify-center rounded-xl border border-cyan-500/40 bg-cyan-950/30 px-3 text-sm font-semibold text-cyan-100"
+            >
+              <Package className="w-4 h-4 mr-2" strokeWidth={ICON_STROKE} />
+              Flag Downstock
+            </button>
+          </div>
+        </header>
 
-        <BayFreshnessGrid
-          locations={freshnessLocations}
-          refreshKey={healthKey}
+        <OnDutyAssociateStrip
+          groups={workload.groups}
+          selectedId={focusAssociateId}
+          onSelect={setPickedAssociateId}
+          loading={onDutyLoading}
         />
 
         {!simplified ? (
@@ -224,80 +375,13 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
           />
         ) : null}
 
-        {scanTabs.length > 0 ? (
-          <div className="mb-3 flex gap-1.5 overflow-x-auto pb-0.5 no-scrollbar">
-            {scanTabs.map((tab) => (
-              <Link
-                key={tab.id}
-                href={`/?section=${tab.id}`}
-                className="chip-filter shrink-0 rounded-full border border-zinc-700/80 bg-zinc-950/60 text-zinc-200"
-              >
-                {tab.label} scan
-              </Link>
-            ))}
-          </div>
-        ) : null}
-
-        {!simplified ? (
-          <>
-            <ShiftBriefingCard specialist={specialist} refreshKey={healthKey} />
-            <PredictiveCopilotBanner
-              specialist={specialist}
-              week={week}
-              rotations={displayRotations}
-              departmentId={deptId}
-              refreshKey={healthKey}
-              onApplied={silentRefresh}
-            />
-            <StoreHealthChart specialist={specialist} refreshKey={healthKey} />
-            <StoreHealthCard specialist={specialist} refreshKey={healthKey} />
-          </>
-        ) : (
-          <ShiftBriefingCard specialist={specialist} refreshKey={healthKey} />
-        )}
-
-        {supervisor && !simplified ? (
-          <button
-            type="button"
-            onClick={() => setRollupOpen(true)}
-            className="mb-3 flex min-h-11 w-full items-center justify-center rounded-xl border border-emerald-500/40 bg-emerald-950/30 px-3 text-sm font-bold text-emerald-100"
-          >
-            Weekly audit rollup
-          </button>
-        ) : null}
-
-        {!simplified ? (
-          <ShowroomQuickTouchCard
-            specialist={specialist}
-            refreshKey={healthKey}
-            onTouched={() => setHealthKey((k) => k + 1)}
-          />
-        ) : null}
-
         {verifyMsg ? (
           <p className="mb-3 rounded-xl border border-emerald-500/40 bg-emerald-950/40 px-3 py-2 text-sm text-emerald-200">
             {verifyMsg}
           </p>
         ) : null}
 
-        {!simplified && completedCount > 0 ? (
-          <button
-            type="button"
-            disabled={verifyBusy || !deptId}
-            onClick={() => void signOffCompleted()}
-            className="mb-3 flex min-h-11 w-full items-center justify-center rounded-xl border border-emerald-500/40 bg-emerald-950/25 px-3 text-sm font-bold text-emerald-100 disabled:opacity-40"
-          >
-            {verifyBusy
-              ? "Signing off…"
-              : `Verify completed bays (${completedCount})`}
-          </button>
-        ) : null}
-
         <section className="mb-3">
-          <p className="glass-subtitle mb-1.5 text-emerald-400">
-            {simplified ? "Your assigned bays" : "This week's bays"}
-            {flooringFocus && !simplified ? " · Flooring" : ""}
-          </p>
           {loading && displayRotations.length === 0 ? (
             <p className="text-sm text-zinc-400">Loading this week&apos;s bays…</p>
           ) : (
@@ -306,13 +390,74 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
               assignedWeek={week}
               rotations={displayRotations}
               onRefresh={silentRefresh}
+              assignmentDepartment={assignmentDept}
+              focusSpecialistId={focusAssociateId}
+              onDutyMembers={onDuty}
+              hideChrome
+              primeDownstockTick={primeDownstockTick}
             />
           )}
         </section>
 
-        {!simplified ? (
-          <ExceptionFeed specialist={specialist} refreshKey={healthKey} />
-        ) : null}
+        <ShiftAnalyticsDrawer>
+          {!simplified ? (
+            <TacticalVoiceFloorPad
+              specialist={specialist}
+              storeNumber={storeNumber}
+              week={week}
+              rotations={displayRotations}
+              departmentId={deptId}
+            />
+          ) : null}
+          <BayFreshnessGrid
+            locations={freshnessLocations}
+            refreshKey={healthKey}
+          />
+          <ShiftBriefingCard specialist={specialist} refreshKey={healthKey} />
+          {!simplified ? (
+            <>
+              <PredictiveCopilotBanner
+                specialist={specialist}
+                week={week}
+                rotations={displayRotations}
+                departmentId={deptId}
+                refreshKey={healthKey}
+                onApplied={silentRefresh}
+              />
+              <StoreHealthChart specialist={specialist} refreshKey={healthKey} />
+              <StoreHealthCard specialist={specialist} refreshKey={healthKey} />
+              <ShowroomQuickTouchCard
+                specialist={specialist}
+                refreshKey={healthKey}
+                onTouched={() => setHealthKey((k) => k + 1)}
+              />
+            </>
+          ) : null}
+          {supervisor && !simplified ? (
+            <button
+              type="button"
+              onClick={() => setRollupOpen(true)}
+              className="mb-3 flex min-h-11 w-full items-center justify-center rounded-xl border border-emerald-500/40 bg-emerald-950/30 px-3 text-sm font-bold text-emerald-100"
+            >
+              Weekly audit rollup
+            </button>
+          ) : null}
+          {!simplified && completedCount > 0 ? (
+            <button
+              type="button"
+              disabled={verifyBusy || !deptId}
+              onClick={() => void signOffCompleted()}
+              className="mb-3 flex min-h-11 w-full items-center justify-center rounded-xl border border-emerald-500/40 bg-emerald-950/25 px-3 text-sm font-bold text-emerald-100 disabled:opacity-40"
+            >
+              {verifyBusy
+                ? "Signing off…"
+                : `Verify completed bays (${completedCount})`}
+            </button>
+          ) : null}
+          {!simplified ? (
+            <ExceptionFeed specialist={specialist} refreshKey={healthKey} />
+          ) : null}
+        </ShiftAnalyticsDrawer>
       </main>
 
       <SupervisorAuditSummaryModal
@@ -320,6 +465,11 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
         specialist={specialist}
         assignedWeek={week}
         onClose={() => setRollupOpen(false)}
+      />
+      <VisualBayScannerModal
+        open={bayScanOpen}
+        onClose={() => setBayScanOpen(false)}
+        specialist={specialist}
       />
     </>
   );

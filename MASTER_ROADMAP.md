@@ -144,6 +144,7 @@
 - [x] RLS security lockdown — drop anon/open SELECT; authenticated store isolation; Realtime publication on sunday_bay_assignments / manager_notes / downstock_queue (`20260817_rls_security_lockdown.sql`)
 - [x] Store Ops offline queue — bay complete / downstock / Sunday assign via `enqueueOrExecute`; header `SyncStatusPill`; queue specialist stub includes `is_active`
 - [x] Canonical `computeDepartmentCompletionPct` + `flagPenalty` in `health.ts`; unified mobile scan dock (`max-w-lg` + safe-area); Lucide status pills
+- [x] Floor tab on-duty bay queue — `${dept} Rotation` header, Snap Bay / Flag Downstock, proportional grouping via `composeOnDutyBayWorkload`, analytics in `ShiftAnalyticsDrawer`
 
 ## Next
 - [x] Apply Phase 1 JWT/RLS migration in Supabase + enable Custom Access Token Hook

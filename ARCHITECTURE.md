@@ -67,7 +67,10 @@ lib/push/*                        → Web Push subscribe + VAPID dispatch for ro
 app/admin/store-map/page.tsx      → Map keep-alive tab (Visual Grid walk + Manage Aisles & Bays)
 app/admin/supervisors/page.tsx    → Redirect → /roster
 app/admin/roles/page.tsx          → Redirect → /roster
-components/store-ops/ZebraChecklist.tsx → Floor bay checklist (optimistic complete, Quick Touch, downstock, Sunday handoff)
+components/hub/tabs/FloorTab.tsx → Floor rotation viewport (on-duty strip + bay queue; analytics drawer)
+components/store-ops/OnDutyAssociateStrip.tsx → Today's on-duty specialist pills (presentation)
+components/store-ops/ShiftAnalyticsDrawer.tsx → Collapsed Floor accordion for velocity / health / Walk & Talk
+components/store-ops/ZebraChecklist.tsx → Floor bay checklist (optimistic complete, Quick Touch, downstock, Sunday handoff, on-duty grouping)
 components/store-ops/BayHealthScorecard.tsx → Compact bay health badge (presentation)
 lib/store-ops/bay-health.ts       → Aging / SIMS / topstock discrepancy diagnostics (compose only; `flagPenalty` from health.ts)
 lib/store-ops/health.ts           → Store health snapshot + canonical completion % + bay flag penalty weights
@@ -111,7 +114,7 @@ components/sections/ApplianceScanForm.tsx → Appliance scan/input island (draft
 components/admin/SundayAuditStagingCard.tsx → Glowing pending Sunday Flooring audit CTA (Sunday even if empty)
 components/admin/SundayAuditAssignmentModal.tsx → Assign specialists + shift-hour balancer; Master Recalculate
 components/admin/SundayScheduleCard.tsx → Settings Sunday auto-stage time + auto-run toggle
-lib/store-ops/weekly-rotations.ts → Proportional clustered bay assignment plan (hours / aisle-face / health risk)
+lib/store-ops/weekly-rotations.ts → Proportional clustered bay assignment plan + on-duty display grouping (`composeOnDutyBayWorkload`; does not persist)
 lib/store-ops/sunday-audit.ts → Persist specialist↔bay; apply balancer plan
 lib/store-ops/shift-status.ts → Weekly Sun–Sat schedule + on-duty / call-out (`associate_shift_days`; localStorage caches live rows)
 lib/store-ops/call-out.ts → Rebalance absent bays (pool / auto / carry-over loop; composes sunday-audit)
@@ -134,7 +137,7 @@ lib/store-ops/ai-walk-parse.ts        → Floor-walk Copilot structured task par
 app/api/copilot/parse-walk/route.ts   → POST walk transcript → structured tasks (Supervisor+)
 lib/store-ops/shift-tasks.ts          → Dispatched walk tasks (shift_walk_tasks + localStorage)
 lib/heatmap/bay-tracker.ts            → Behavior-driven bay freshness (Fresh/Warm/Stale overlay)
-components/dashboard/TacticalVoiceFloorPad.tsx → Floor Walk & Talk dock + bottom sheet
+components/dashboard/TacticalVoiceFloorPad.tsx → Walk & Talk sheet (hosted in Floor ShiftAnalyticsDrawer)
 components/dashboard/BayFreshnessGrid.tsx → Compact heatmap chip on Floor
 app/actions/manager-notes.ts          → Server Action extractTasksAndTag (Bearer token auth)
 components/manager-notes/*            → Executive Floor Pad (TipTap rich text + Copilot + archive)
