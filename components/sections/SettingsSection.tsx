@@ -33,6 +33,7 @@ import { usePendingSyncCount } from "@/lib/network";
 import { selectOnFocus } from "@/lib/number-input";
 import { canAccessSection, canManageMapConsole, isMasterAdmin } from "@/lib/rbac";
 import { clearLocalRemnants, countLocalRemnants, fetchRemnants } from "@/lib/remnants";
+import { requestRemnantCalculator } from "@/lib/specialty-tools";
 import { dedupeRoster, fetchSpecialists, isSupervisor } from "@/lib/specialists";
 import {
   formatStoreLabel,
@@ -237,6 +238,9 @@ export function SettingsSection({
         setTaxonomyOpen(true);
       } else if (hash === "remnants") {
         setOpenSection("remnants");
+      } else if (hash === "remnants-calculator") {
+        setOpenSection("remnants");
+        window.setTimeout(() => requestRemnantCalculator(), 100);
       } else if (hash === "admin-tools" || hash === "sunday-schedule") {
         window.setTimeout(() => {
           document.getElementById("sunday-schedule")?.scrollIntoView({

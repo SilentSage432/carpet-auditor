@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
+import { useRouter } from "next/navigation";
 import { Camera, Package } from "lucide-react";
 import { SundayAuditStagingCard } from "@/components/admin/SundayAuditStagingCard";
 import { ExceptionFeed } from "@/components/admin/ExceptionFeed";
@@ -20,7 +21,11 @@ import {
   workingDepartmentId,
 } from "@/lib/admin-department-context";
 import { useWorkingDepartment } from "@/lib/use-working-department";
-import { isMasterAdmin, isSimplifiedAssociateView } from "@/lib/rbac";
+import { isMasterAdmin, isSimplifiedAssociateView, canAccessSection } from "@/lib/rbac";
+import {
+  APPLIANCE_SCANNER_HASH,
+  REMNANT_CALCULATOR_HASH,
+} from "@/lib/specialty-tools";
 import { canAccessDepartment } from "@/lib/department-access";
 import { dedupeRoster, fetchSpecialists, isSupervisor } from "@/lib/specialists";
 import {
@@ -88,6 +93,7 @@ function rotationBayRef(rotation: WeeklyRotationWithLocation) {
 }
 
 export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
+  const router = useRouter();
   const [week, setWeek] = useState("");
   const [deptId, setDeptId] = useState<string | null>(null);
   const [departments, setDepartments] = useState<Department[]>([]);
@@ -124,6 +130,12 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
   const master = isMasterAdmin(specialist);
   const assignmentDept = working === "all" ? "flooring" : working;
   const completedCount = rotations.filter((r) => r.is_completed).length;
+  const showApplianceScanner =
+    (working === "appliances" || working === "all") &&
+    canAccessSection(specialist, "appliances");
+  const showRemnantCalculator =
+    (working === "flooring" || working === "all") &&
+    canAccessSection(specialist, "remnants");
 
   const activeDept = useMemo(
     () => departments.find((dept) => dept.id === deptId) ?? null,
@@ -363,6 +375,34 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
               Flag Downstock
             </button>
           </div>
+          {showApplianceScanner || showRemnantCalculator ? (
+            <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
+              {showApplianceScanner ? (
+                <button
+                  type="button"
+                  onClick={() =>
+                    router.push(`/?section=appliances#${APPLIANCE_SCANNER_HASH}`)
+                  }
+                  className="flex min-h-11 items-center justify-center gap-2 rounded-xl border border-sky-500/40 bg-sky-950/30 px-3 text-sm font-semibold text-sky-100"
+                >
+                  <span aria-hidden>📷</span>
+                  Scan &amp; Count Appliances
+                </button>
+              ) : null}
+              {showRemnantCalculator ? (
+                <button
+                  type="button"
+                  onClick={() =>
+                    router.push(`/?section=audit#${REMNANT_CALCULATOR_HASH}`)
+                  }
+                  className="flex min-h-11 items-center justify-center gap-2 rounded-xl border border-emerald-500/40 bg-emerald-950/30 px-3 text-sm font-semibold text-emerald-100"
+                >
+                  <span aria-hidden>📐</span>
+                  Carpet Remnant Calculator
+                </button>
+              ) : null}
+            </div>
+          ) : null}
         </header>
 
         <OnDutyAssociateStrip

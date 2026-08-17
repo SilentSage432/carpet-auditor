@@ -1,5 +1,15 @@
 # DeptSync Hub — Development Journal
 
+## 2026-08-17 — Specialty Tools: appliance scanner & remnant calculator navigation
+
+### Shipped
+- `lib/specialty-tools.ts` — registry (`SPECIALTY_TOOLS`, `visibleSpecialtyTools`, open events + `#scan` / `#remnants-calculator` hashes).
+- `ApplianceScannerModal` wraps `ApplianceScanForm` — continuous UPC scan stays open between logs; `focusOnMount` keeps wedge/camera input on the SKU field.
+- `RemnantCalculatorModal` — shared roll length / sq yd / price-tag calculator (used by `RemnantSection` and `CycleAuditSection`).
+- **Appliances** (`ApplianceAuditSection`): prominent **Scan & Count Appliances** CTA; Floor tab shortcut when working dept is appliances.
+- **Flooring** (`CycleAuditSection` + `RemnantSection`): **Carpet Remnant Calculator** beside Remnant Intelligence / Snap Bay; Floor tab shortcut when working dept is flooring.
+- **Global:** Specialty Tools panel on specialty hub (`/`), user menu section in `NavigationHub`, Settings `#remnants-calculator` deep link.
+
 ## 2026-08-17 — AI Operations Trio: audit persistence, snag triage, completion gate
 
 ### Shipped

@@ -2,11 +2,11 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { ApplianceAnomalyWidget } from "@/components/appliances/ApplianceAnomalyWidget";
+import { ApplianceScannerModal } from "@/components/appliances/ApplianceScannerModal";
 import { ApplianceScanEditModal } from "@/components/appliances/ApplianceScanEditModal";
 import { ConfirmModal } from "@/components/hub/ConfirmModal";
 import { DepartmentIcon } from "@/components/hub/NavIcons";
 import { LocationStatusIcon } from "@/components/hub/StatusPills";
-import { ApplianceScanForm } from "@/components/sections/ApplianceScanForm";
 import {
   aggregateApplianceScans,
   applianceCategoryEmoji,
@@ -22,6 +22,10 @@ import {
   type AggregatedApplianceScan,
   type ApplianceScanLogFilterId,
 } from "@/lib/appliance-scans";
+import {
+  APPLIANCE_SCANNER_OPEN_EVENT,
+  isApplianceScannerHash,
+} from "@/lib/specialty-tools";
 import {
   type ApplianceCatalogItem,
   type ApplianceScan,
@@ -78,6 +82,7 @@ export function ApplianceAuditSection({
   const [editSaving, setEditSaving] = useState(false);
   const [pendingDeleteGroup, setPendingDeleteGroup] =
     useState<AggregatedApplianceScan | null>(null);
+  const [scannerOpen, setScannerOpen] = useState(false);
 
   const catalogDescriptions = useMemo(() => {
     const map: Record<string, string> = {};
@@ -150,6 +155,25 @@ export function ApplianceAuditSection({
     });
     return () => {
       cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    function openScanner() {
+      setScannerOpen(true);
+    }
+    function applyHash() {
+      if (isApplianceScannerHash(window.location.hash)) {
+        openScanner();
+      }
+    }
+    window.addEventListener(APPLIANCE_SCANNER_OPEN_EVENT, openScanner);
+    window.addEventListener("hashchange", applyHash);
+    applyHash();
+    return () => {
+      window.removeEventListener(APPLIANCE_SCANNER_OPEN_EVENT, openScanner);
+      window.removeEventListener("hashchange", applyHash);
     };
   }, []);
 
@@ -289,12 +313,23 @@ export function ApplianceAuditSection({
         onConfirm={() => void confirmDeleteGroup()}
       />
 
-      <ApplianceScanForm
+      <button
+        type="button"
+        onClick={() => setScannerOpen(true)}
+        className="btn-primary-glow flex min-h-12 w-full items-center justify-center gap-2 rounded-xl px-4 text-sm font-bold"
+      >
+        <span aria-hidden>📷</span>
+        Scan &amp; Count Appliances
+      </button>
+
+      <ApplianceScannerModal
+        open={scannerOpen}
+        onClose={() => setScannerOpen(false)}
         catalog={catalog}
         onCatalogChange={onCatalogChange}
         scannedBy={scannedBy}
         activeSpecialist={activeSpecialist}
-        scannerEnabled={scannerEnabled}
+        scannerEnabled={scannerEnabled && scannerOpen}
         onLogged={handleLogged}
       />
 

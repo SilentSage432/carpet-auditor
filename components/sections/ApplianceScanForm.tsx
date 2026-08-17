@@ -60,6 +60,8 @@ type Props = {
   scannedBy: string;
   activeSpecialist: StoreSpecialist | null;
   scannerEnabled?: boolean;
+  /** Focus SKU field when mounted (scanner modal open). */
+  focusOnMount?: boolean;
   onLogged: (record: ApplianceScan, offline: boolean) => void;
 };
 
@@ -69,6 +71,7 @@ export function ApplianceScanForm({
   scannedBy,
   activeSpecialist,
   scannerEnabled = true,
+  focusOnMount = false,
   onLogged,
 }: Props) {
   const itemInputRef = useRef<HTMLInputElement>(null);
@@ -146,6 +149,11 @@ export function ApplianceScanForm({
   useEffect(() => {
     if (!scannerEnabled) flushApplianceScanDraftSave();
   }, [scannerEnabled]);
+
+  useEffect(() => {
+    if (!focusOnMount || !scannerEnabled) return;
+    window.setTimeout(() => itemInputRef.current?.focus(), 50);
+  }, [focusOnMount, scannerEnabled]);
 
   const clearForNextScan = useCallback(() => {
     setItemNumber("");

@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { FlooringAIInsightBanner } from "@/components/flooring/FlooringAIInsightBanner";
+import { RemnantCalculatorModal } from "@/components/flooring/RemnantCalculatorModal";
 import { SundayAuditStagingCard } from "@/components/admin/SundayAuditStagingCard";
 import { CycleAuditScanForm } from "@/components/sections/CycleAuditScanForm";
 import { HubIcon } from "@/components/hub/NavIcons";
@@ -59,6 +60,10 @@ import {
 } from "@/lib/variance";
 
 import { formatAuditLocationBadge } from "@/lib/store-ops/audit-location-mode";
+import {
+  REMNANT_CALCULATOR_OPEN_EVENT,
+  isRemnantCalculatorHash,
+} from "@/lib/specialty-tools";
 
 function formatTime(iso: string): string {
   return new Date(iso).toLocaleString(undefined, {
@@ -104,6 +109,7 @@ export function CycleAuditSection({
   const [markdownTarget, setMarkdownTarget] = useState<Remnant | null>(null);
   const [simsFinderOpen, setSimsFinderOpen] = useState(false);
   const [bayScanOpen, setBayScanOpen] = useState(false);
+  const [remnantCalcOpen, setRemnantCalcOpen] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [undoToast, setUndoToast] = useState<{
     id: string;
@@ -178,6 +184,25 @@ export function CycleAuditSection({
     })();
     return () => {
       cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    function openCalculator() {
+      setRemnantCalcOpen(true);
+    }
+    function applyHash() {
+      if (isRemnantCalculatorHash(window.location.hash)) {
+        openCalculator();
+      }
+    }
+    window.addEventListener(REMNANT_CALCULATOR_OPEN_EVENT, openCalculator);
+    window.addEventListener("hashchange", applyHash);
+    applyHash();
+    return () => {
+      window.removeEventListener(REMNANT_CALCULATOR_OPEN_EVENT, openCalculator);
+      window.removeEventListener("hashchange", applyHash);
     };
   }, []);
 
@@ -316,7 +341,17 @@ export function CycleAuditSection({
         }}
       />
 
-      <div className="flex items-start gap-1.5">
+      <RemnantCalculatorModal
+        open={remnantCalcOpen}
+        onClose={() => setRemnantCalcOpen(false)}
+        catalog={catalog}
+        remnants={remnants}
+        onRemnantsChange={onRemnantsChange}
+        loggedBy={auditedBy || activeSpecialist?.name || ""}
+        onSaved={(msg) => setStatusMsg(msg)}
+      />
+
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start">
         <div className="min-w-0 flex-1">
           <FlooringAIInsightBanner
             remnants={remnants}
@@ -328,16 +363,26 @@ export function CycleAuditSection({
             compact
           />
         </div>
-        {activeSpecialist ? (
+        <div className="flex shrink-0 gap-2">
           <button
             type="button"
-            onClick={() => setBayScanOpen(true)}
-            className="flex min-h-11 shrink-0 items-center gap-1.5 rounded-xl border border-accent/40 bg-zinc-950/70 px-3 font-mono text-[11px] font-bold uppercase tracking-wide text-accent"
+            onClick={() => setRemnantCalcOpen(true)}
+            className="flex min-h-11 flex-1 items-center justify-center gap-1.5 rounded-xl border border-emerald-500/40 bg-emerald-950/30 px-3 text-[11px] font-bold uppercase tracking-wide text-emerald-200 sm:flex-none"
           >
-            <HubIcon id="camera" className="h-4 w-4" />
-            Snap Bay
+            <span aria-hidden>📐</span>
+            Carpet Remnant Calculator
           </button>
-        ) : null}
+          {activeSpecialist ? (
+            <button
+              type="button"
+              onClick={() => setBayScanOpen(true)}
+              className="flex min-h-11 shrink-0 items-center gap-1.5 rounded-xl border border-accent/40 bg-zinc-950/70 px-3 font-mono text-[11px] font-bold uppercase tracking-wide text-accent"
+            >
+              <HubIcon id="camera" className="h-4 w-4" />
+              Snap Bay
+            </button>
+          ) : null}
+        </div>
       </div>
 
       {activeSpecialist && bayScanOpen ? (

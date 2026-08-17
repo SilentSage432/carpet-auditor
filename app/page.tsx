@@ -5,6 +5,7 @@ import { startTransition, useCallback, useEffect, useState, type ReactNode } fro
 import { useRouter } from "next/navigation";
 import { ChangePinModal } from "@/components/hub/ChangePinModal";
 import { AssociateSpecialtySwitcher } from "@/components/hub/HubChrome";
+import { SpecialtyToolsPanel } from "@/components/hub/SpecialtyToolsPanel";
 import { SpecialistModal } from "@/components/hub/SpecialistModal";
 import {
   clearAuthSession,
@@ -544,6 +545,7 @@ export default function DeptSyncHubPage() {
                 specialist={viewMember}
               />
             ) : null}
+            <SpecialtyToolsPanel specialist={viewMember} />
             {visitedSections.has("audit") &&
               canAccessSection(viewMember, "audit") && (
                 <HubPane show={activeSection === "audit"}>

@@ -282,6 +282,7 @@ export const SETTINGS_TOOL_HASHES = [
   "sunday-schedule",
   "taxonomies",
   "remnants",
+  "remnants-calculator",
 ] as const;
 
 export function isSettingsToolHash(hash: string): boolean {
