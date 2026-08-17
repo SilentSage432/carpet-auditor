@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import { AddBaySheet } from "@/components/admin/AddBaySheet";
 import { EditBayDrawer } from "@/components/admin/EditBayDrawer";
-import { HubIcon } from "@/components/hub/NavIcons";
+import { ChevronDown, ChevronUp, Lock, Pencil, Plus, Sparkles, Trash2, X } from "lucide-react";
 import { compareAisles } from "@/lib/store-ops/aisle";
 import { deleteStoreLocations } from "@/lib/store-ops/client";
 import {
@@ -96,8 +96,8 @@ function aisleTitle(aisle: string): string {
 }
 
 /**
- * Manage Aisles & Bays — CRUD console for the active department map.
- * Visual walk/heatmap stays in StoreLocationGrid.
+ * Manage Aisles & Bays — CRUD console hosted in Settings Store Topology.
+ * Visual walk/heatmap stays in StoreLocationGrid on Map.
  */
 export function AisleBayManager({
   specialist,
@@ -269,14 +269,15 @@ export function AisleBayManager({
             }}
             className="btn-primary-glow flex min-h-11 items-center justify-center rounded-xl px-3 text-sm font-bold"
           >
-            + Add Single Bay
+            <Plus className="h-4 w-4 mr-1.5" strokeWidth={1.75} aria-hidden />
+            Add Single Bay
           </button>
           <button
             type="button"
             onClick={() => setBulkOpen(true)}
             className="flex min-h-11 items-center justify-center gap-1.5 rounded-xl border border-amber-500/40 bg-amber-950/30 px-3 text-sm font-bold text-amber-100"
           >
-            <HubIcon id="zap" className="h-4 w-4" />
+            <Sparkles className="h-4 w-4" strokeWidth={1.75} aria-hidden />
             Bulk Generator
           </button>
         </div>
@@ -366,10 +367,11 @@ export function AisleBayManager({
                       tag{group.tagCount === 1 ? "" : "s"}
                     </span>
                   </span>
-                  <HubIcon
-                    id={open ? "chevronUp" : "chevronDown"}
-                    className="h-4 w-4 text-zinc-400"
-                  />
+                  {open ? (
+                    <ChevronUp className="h-4 w-4 text-zinc-400" strokeWidth={1.75} aria-hidden />
+                  ) : (
+                    <ChevronDown className="h-4 w-4 text-zinc-400" strokeWidth={1.75} aria-hidden />
+                  )}
                 </button>
                 {open ? (
                   <ul className="space-y-1.5 border-t border-zinc-800/80 px-2 py-2">
@@ -419,7 +421,7 @@ export function AisleBayManager({
                                 {pair.selling?.priority_override ||
                                 pair.topstock?.priority_override ? (
                                   <span className="inline-flex items-center gap-0.5 rounded-full border border-amber-500/40 bg-amber-950/40 px-2 py-0.5 font-mono text-[10px] font-bold tracking-tight text-amber-100">
-                                    <HubIcon id="lock" className="h-3 w-3" />
+                                    <Lock className="h-3 w-3" strokeWidth={1.75} aria-hidden />
                                     LOCK
                                   </span>
                                 ) : null}
@@ -442,7 +444,7 @@ export function AisleBayManager({
                                 onClick={() => setEditFaces(faces)}
                                 className="flex min-h-10 items-center justify-center gap-1 rounded-xl border border-zinc-700 text-xs font-bold"
                               >
-                                <HubIcon id="edit" className="h-3.5 w-3.5" />
+                                <Pencil className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden />
                                 Edit
                               </button>
                               <button
@@ -450,7 +452,7 @@ export function AisleBayManager({
                                 onClick={() => setDeleteFaces(faces)}
                                 className="flex min-h-10 items-center justify-center gap-1 rounded-xl border border-rose-500/40 text-xs font-bold text-rose-200"
                               >
-                                <HubIcon id="trash" className="h-3.5 w-3.5" />
+                                <Trash2 className="h-3.5 w-3.5" strokeWidth={1.75} aria-hidden />
                                 Delete
                               </button>
                             </div>
@@ -537,7 +539,7 @@ export function AisleBayManager({
                 className="btn-icon-touch"
                 aria-label="Close"
               >
-                <HubIcon id="close" className="h-5 w-5" />
+                <X className="h-5 w-5" strokeWidth={1.75} aria-hidden />
               </button>
             </div>
             <BulkLocationGenerator

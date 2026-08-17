@@ -2,20 +2,11 @@
 
 import { useCallback, useEffect, useState } from "react";
 import dynamic from "next/dynamic";
-import Link from "next/link";
+import { Camera } from "lucide-react";
 import { StoreLocationGrid } from "@/components/admin/StoreLocationGrid";
-import { AisleBayManager } from "@/components/admin/AisleBayManager";
-import { HubIcon } from "@/components/hub/NavIcons";
-import {
-  canManageMapConsole,
-  canMutateStoreMap,
-  isMasterAdmin,
-  isSimplifiedAssociateView,
-} from "@/lib/rbac";
+import { isMasterAdmin, isSimplifiedAssociateView } from "@/lib/rbac";
 import {
   ADMIN_DEPT_CONTEXT_EVENT,
-  adminWorkingDepartmentLabel,
-  workingDepartment,
   workingDepartmentId,
 } from "@/lib/admin-department-context";
 import {
@@ -39,6 +30,8 @@ import type { Department, StoreLocation } from "@/lib/store-ops/types";
 import { isoWeekLabel } from "@/lib/store-ops/week";
 import type { WorkflowTabProps } from "@/components/hub/tabs/tab-props";
 
+const ICON_STROKE = 1.75;
+
 const VisualBayScannerModal = dynamic(
   () =>
     import("@/components/store-ops/VisualBayScannerModal").then(
@@ -54,7 +47,7 @@ export function MapTab({ specialist }: WorkflowTabProps) {
   const [error, setError] = useState<string | null>(null);
   const [authRequired, setAuthRequired] = useState(false);
   const [bayScanOpen, setBayScanOpen] = useState(false);
-  const [mapSurface, setMapSurface] = useState<"visual" | "manage">("visual");
+  const [mapMode, setMapMode] = useState<"standard" | "heatmap">("standard");
   const [weekRotationLocations, setWeekRotationLocations] = useState<
     Array<{ locationId: string; completed: boolean }>
   >([]);
@@ -62,16 +55,8 @@ export function MapTab({ specialist }: WorkflowTabProps) {
   const [contextTick, setContextTick] = useState(0);
   const currentWeek = isoWeekLabel();
   const master = isMasterAdmin(specialist);
-  const mapConsole = canManageMapConsole(specialist);
-  const mutateMap = canMutateStoreMap(specialist);
   const locatorOnly = isSimplifiedAssociateView(specialist);
-  const contextLabel = (() => {
-    const scope = workingDepartment(specialist);
-    if (scope === "all") return "Full Store";
-    return adminWorkingDepartmentLabel(
-      scope as Parameters<typeof adminWorkingDepartmentLabel>[0]
-    );
-  })();
+  const heatmap = mapMode === "heatmap";
 
   const reload = useCallback(async (member: typeof specialist, silent = false) => {
     if (!silent) setLoading(true);
@@ -198,72 +183,51 @@ export function MapTab({ specialist }: WorkflowTabProps) {
     };
   }, []);
 
-  useEffect(() => {
-    if (!mapConsole) setMapSurface("visual");
-  }, [mapConsole]);
-
   return (
     <>
       <main className="hub-main">
         <p className="mb-2 font-mono text-[11px] text-zinc-400">
-          {locatorOnly ? (
-            <>Bay locator · week {currentWeek}</>
-          ) : master ? (
-            <>
-              Week {currentWeek}
-              {" · "}
-              <Link
-                href="/settings#bulk-generate"
-                className="font-semibold text-amber-300 underline-offset-2 hover:underline"
-              >
-                Bulk generate in Settings
-              </Link>
-            </>
-          ) : (
-            <>This week&apos;s bay map</>
-          )}
+          {locatorOnly
+            ? `Bay locator · week ${currentWeek}`
+            : master
+              ? `Week ${currentWeek}`
+              : "This week's bay map"}
         </p>
 
-        {mapConsole ? (
         <div
           className="mb-3 inline-flex h-11 w-full items-center rounded-full border border-zinc-700/80 bg-zinc-950/70 p-0.5"
           role="group"
-          aria-label="Map surface"
+          aria-label="Map view mode"
         >
           <button
             type="button"
-            aria-pressed={mapSurface === "visual"}
-            onClick={() => setMapSurface("visual")}
+            aria-pressed={!heatmap}
+            onClick={() => setMapMode("standard")}
             className={`inline-flex h-10 flex-1 items-center justify-center rounded-full px-3 font-mono text-[11px] font-bold ${
-              mapSurface === "visual"
-                ? "bg-accent/25 text-accent"
-                : "text-zinc-400"
+              !heatmap ? "bg-accent/25 text-accent" : "text-zinc-400"
             }`}
           >
-            Visual Grid
+            Standard Map
           </button>
           <button
             type="button"
-            aria-pressed={mapSurface === "manage"}
-            onClick={() => setMapSurface("manage")}
+            aria-pressed={heatmap}
+            onClick={() => setMapMode("heatmap")}
             className={`inline-flex h-10 flex-1 items-center justify-center rounded-full px-3 font-mono text-[11px] font-bold ${
-              mapSurface === "manage"
-                ? "bg-accent/25 text-accent"
-                : "text-zinc-400"
+              heatmap ? "bg-accent/25 text-accent" : "text-zinc-400"
             }`}
           >
-            Manage Aisles & Bays
+            Velocity Heatmap
           </button>
         </div>
-        ) : null}
 
-        {mapSurface === "visual" && !locatorOnly ? (
+        {!locatorOnly ? (
           <button
             type="button"
             onClick={() => setBayScanOpen(true)}
-            className="btn-primary-glow mb-3 flex min-h-11 w-full items-center justify-center gap-2 rounded-xl px-4 text-sm"
+            className="btn-primary-glow mb-3 flex min-h-11 w-full items-center justify-center rounded-xl px-4 text-sm"
           >
-            <HubIcon id="camera" className="h-4 w-4" />
+            <Camera className="w-4 h-4 mr-2" strokeWidth={ICON_STROKE} />
             Snap Bay AI Audit
           </button>
         ) : null}
@@ -301,15 +265,6 @@ export function MapTab({ specialist }: WorkflowTabProps) {
         <div className="space-y-3">
           {loading && locations.length === 0 ? (
             <p className="text-sm text-zinc-400">Loading locations…</p>
-          ) : mapSurface === "manage" && mapConsole ? (
-            <AisleBayManager
-              specialist={specialist}
-              departments={departments}
-              locations={locations}
-              canMutate={mutateMap}
-              contextLabel={contextLabel}
-              onChanged={() => void reload(specialist)}
-            />
           ) : (
             <StoreLocationGrid
               specialist={specialist}
@@ -318,11 +273,8 @@ export function MapTab({ specialist }: WorkflowTabProps) {
               assignedWeek={currentWeek}
               weekRotationLocations={weekRotationLocations}
               barrierLocationIds={barrierLocationIds}
-              canMutate={mutateMap}
+              heatmap={heatmap}
               onChanged={() => void reload(specialist)}
-              onRequestManage={
-                mapConsole ? () => setMapSurface("manage") : undefined
-              }
             />
           )}
         </div>

@@ -115,6 +115,7 @@
 - [x] Chrome consolidation — remove hamburger / More / Admin Tools; Settings owns bulk/taxonomies/force/targets; Floor owns verify+exceptions; dead Catalog/AdminRoster/StockTab pruned
 - [x] Geist + Geist Mono typography (`next/font/google`) + compact bay tags (`formatBayTag`) with `font-mono tracking-tight`
 - [x] Map Manage Aisles & Bays console (`AisleBayManager` + `AddBaySheet` + `EditBayDrawer`; Visual Grid unchanged)
+- [x] Map visual navigator only — Standard | Heatmap + Snap Bay; topology CRUD hosted in Settings Store Topology
 - [x] Roster department grouping + daily shift board + call-out redistribute (`shift-status.ts` + `call-out.ts`)
 - [x] Call-out carry-over priority loop (`carried_over` prepend on Sunday draw + Floor/Sunday badge)
 - [x] Predictive Shift Copilot on Floor (`predictive-copilot.ts` + `PredictiveCopilotBanner`)

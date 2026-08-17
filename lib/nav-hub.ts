@@ -270,6 +270,8 @@ export function isNavHubPathActive(
 export const SETTINGS_TOOL_HASHES = [
   "bulk-generate",
   "map-management",
+  "topology",
+  "bay-setup",
   "weekly-rotation",
   "manager-notes",
   "s-pen-notes",

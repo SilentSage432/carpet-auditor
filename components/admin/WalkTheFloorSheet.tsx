@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
-import { HubIcon } from "@/components/hub/NavIcons";
+import { Camera, X } from "lucide-react";
 import { assignLocationsToWeek, logBayService } from "@/lib/store-ops/client";
 import { toastError, toastSuccess } from "@/lib/toast";
 import { hapticSuccess, playErrorTone, playSuccessTone } from "@/lib/ui/feedback";
@@ -207,7 +207,7 @@ export function WalkTheFloorSheet({
             className="btn-icon-touch"
             aria-label="Close"
           >
-            <HubIcon id="close" className="h-5 w-5" />
+            <X className="h-5 w-5" strokeWidth={1.75} aria-hidden />
           </button>
         </div>
 
@@ -259,7 +259,7 @@ export function WalkTheFloorSheet({
                 onClick={() => setBayScanOpen(true)}
                 className="btn-primary-glow flex min-h-12 w-full items-center justify-center gap-2 rounded-xl px-4 text-sm"
               >
-                <HubIcon id="camera" className="h-4 w-4" />
+                <Camera className="w-4 h-4 mr-2" strokeWidth={1.75} />
                 Snap Bay AI Audit
               </button>
             </div>

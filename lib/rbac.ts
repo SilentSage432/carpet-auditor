@@ -113,7 +113,7 @@ export function isSimplifiedAssociateView(
   return hubViewRole(member) === "ASSOCIATE_CSA";
 }
 
-/** Master + DS may open Manage Aisles & Bays and edit priorities. */
+/** Master + DS may open Store Topology in Settings and edit bay priorities. */
 export function canManageMapConsole(
   member: StoreSpecialist | null | undefined
 ): boolean {

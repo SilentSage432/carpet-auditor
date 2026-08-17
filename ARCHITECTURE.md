@@ -44,8 +44,8 @@ app/(workflow)/roster/page.tsx    → Team roster keep-alive tab
 components/hub/tabs/RosterTab.tsx → Department-grouped roster (collapsed) + weekly schedule + call-out
 app/api/roster/members/route.ts   → Canonical roster-only INSERT into store_specialists
 components/hub/AssociateScheduleModal.tsx → Sun–Sat shift matrix (composes shift-status.ts)
-components/hub/tabs/MapTab.tsx    → Visual Grid (walk) | Manage Aisles & Bays (CRUD)
-components/admin/AisleBayManager.tsx → Map manage console (aisle accordions, batch, prune, bulk)
+components/hub/tabs/MapTab.tsx    → Visual floor navigator (Standard Map | Velocity Heatmap)
+components/admin/AisleBayManager.tsx → Settings Store Topology (aisle CRUD, batch, prune, bulk)
 components/admin/AddBaySheet.tsx  → Single-bay Selling+Topstock sheet (Manage console)
 components/admin/EditBayDrawer.tsx → Aisle / bay / department / priority patch
 components/admin/ExceptionFeed.tsx → Floor barrier feed (composes exception summary)
@@ -64,7 +64,7 @@ utils/haptics.ts                  → navigator.vibrate wrapper (light/medium/su
 components/hub/SessionGate.tsx    → Auth gate for Store Ops route pages
 lib/nav-hub.ts                    → Floor / Map / Roster / Settings routes + Settings tool hashes
 lib/push/*                        → Web Push subscribe + VAPID dispatch for rotation alerts
-app/admin/store-map/page.tsx      → Map keep-alive tab (Visual Grid walk + Manage Aisles & Bays)
+app/admin/store-map/page.tsx      → Map keep-alive tab (visual navigator; CRUD in Settings)
 app/admin/supervisors/page.tsx    → Redirect → /roster
 app/admin/roles/page.tsx          → Redirect → /roster
 components/hub/tabs/FloorTab.tsx → Floor rotation viewport (on-duty strip + bay queue; analytics drawer)
@@ -183,7 +183,7 @@ lib/calc.ts                       → CLF + carton sq ft + remnant sq ft / sq yd
 lib/catalog.ts / remnants.ts / storage.ts / specialists.ts → Domain persistence
 lib/supabase.ts                   → Client factory
 lib/store-ops/*                   → Store Operations domain (rotations, bulk map, auth bridge)
-app/admin/store-map/page.tsx      → Map keep-alive tab (Visual Grid walk + Manage Aisles & Bays)
+app/admin/store-map/page.tsx      → Map keep-alive tab (visual navigator; CRUD in Settings)
 app/api/rotations/*               → Generate + complete + verify; POST /api/rotations/exceptions mid-week barriers
 app/api/store-locations*          → List / patch / bulk location APIs (GET list is column-pruned for Store Map); POST /api/store-locations/service walk-the-floor log
 supabase/schema.sql               → Tables + multi-category + SIMS + store_number + RBAC columns + RLS
@@ -208,7 +208,7 @@ supabase/migrations/20260812_sunday_bay_assignments.sql → sunday specialist↔
 | Developer sandbox (UI preview) | `lib/dev-sandbox.ts` + `useDevSandbox` + `DevSandboxDrawer` / `DevSandboxBanner` (session overlay; JWT unchanged) |
 | Cross-app Navigation Hub | `lib/nav-hub.ts` + `NavigationHub` + `HubHeader` + `BottomNav` (Floor · Map · Roster · Settings only; Settings hashes for former Admin Tools) |
 | Department weekly quotas | `DepartmentTargetsMatrix` (blur / Save All) + `PATCH /api/departments` + Settings |
-| Store Operations map + rotations | `lib/store-ops/*` + `/admin/store-map` + `/dashboard` (Visual Grid walk-only: `StoreLocationGrid` + `WalkTheFloorSheet`; Manage CRUD: `AisleBayManager` + `AddBaySheet` + `EditBayDrawer` + prune/batch; bulk velocity seed in Settings **and** Manage; floor checklist: `ZebraChecklist`; walk log: `bay-service.ts` + `POST /api/store-locations/service`; Sunday pick: carry-over prepend then `rotation.ts` velocity + `custom_decay_days`; department cron: Settings `DepartmentTargetsMatrix`; Sunday clock: `sunday-schedule.ts` + Settings `SundayScheduleCard`) |
+| Store Operations map + rotations | `lib/store-ops/*` + `/admin/store-map` + `/dashboard` (visual navigator: `StoreLocationGrid` + `WalkTheFloorSheet`; topology CRUD in Settings: `AisleBayManager` + `AddBaySheet` + `EditBayDrawer` + prune/batch + bulk velocity seed; floor checklist: `ZebraChecklist`; walk log: `bay-service.ts` + `POST /api/store-locations/service`; Sunday pick: carry-over prepend then `rotation.ts` velocity + `custom_decay_days`; department cron: Settings `DepartmentTargetsMatrix`; Sunday clock: `sunday-schedule.ts` + Settings `SundayScheduleCard`) |
 | Sunday schedule | `lib/store-ops/sunday-schedule.ts` (time / timezone / auto-run) + `stores` columns + `/api/cron/weekly-rotation` (skip if week already staged) + Master Force Draw overwrite |
 | Sunday assignments | `lib/store-ops/sunday-audit.ts` (persist + department seed `associateMatchesSundayDepartment`) + `SundayAuditAssignmentModal` + `AssociateRosterPanel` |
 | Daily shift board | `lib/store-ops/shift-status.ts` (`associate_shift_days` week matrix; throws on live write failure) |

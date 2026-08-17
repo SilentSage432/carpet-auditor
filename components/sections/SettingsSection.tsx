@@ -3,6 +3,8 @@
 import dynamic from "next/dynamic";
 import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { ChevronDown, ChevronRight, ChevronUp } from "lucide-react";
+import { AisleBayManager } from "@/components/admin/AisleBayManager";
 import { PushNotificationsCard } from "@/components/hub/PushNotificationsCard";
 import { WeeklyBayTargetCard } from "@/components/hub/WeeklyBayTargetCard";
 import { ThemeSelector } from "@/components/settings/ThemeSelector";
@@ -14,7 +16,7 @@ import {
 import { fetchCatalog } from "@/lib/catalog";
 import { usePendingSyncCount } from "@/lib/network";
 import { selectOnFocus } from "@/lib/number-input";
-import { canAccessSection, isMasterAdmin } from "@/lib/rbac";
+import { canAccessSection, canManageMapConsole, isMasterAdmin } from "@/lib/rbac";
 import { clearLocalRemnants, countLocalRemnants, fetchRemnants } from "@/lib/remnants";
 import { dedupeRoster, fetchSpecialists, isSupervisor } from "@/lib/specialists";
 import {
@@ -23,8 +25,18 @@ import {
   normalizeStoreNumber,
   setStoreNumber,
 } from "@/lib/store";
-import { fetchDepartmentsDetailed } from "@/lib/store-ops/client";
+import {
+  fetchDepartmentsDetailed,
+  fetchStoreLocationsDetailed,
+  STORE_OPS_LOCATIONS_CHANGED_EVENT,
+} from "@/lib/store-ops/client";
 import { findFlooringDepartment } from "@/lib/store-ops/sunday-audit";
+import {
+  ADMIN_DEPT_CONTEXT_EVENT,
+  adminWorkingDepartmentLabel,
+  workingDepartment,
+  workingDepartmentId,
+} from "@/lib/admin-department-context";
 import {
   flushSyncQueue,
   isBrowserOnline,
@@ -32,15 +44,8 @@ import {
 } from "@/lib/sync-queue";
 import { isSupabaseConfigured, getSupabase } from "@/lib/supabase";
 import type { CatalogItem, Remnant, StoreSpecialist } from "@/lib/types";
-import type { Department } from "@/lib/store-ops/types";
+import type { Department, StoreLocation } from "@/lib/store-ops/types";
 
-const BulkLocationGenerator = dynamic(
-  () =>
-    import("@/components/admin/BulkLocationGenerator").then(
-      (mod) => mod.BulkLocationGenerator
-    ),
-  { ssr: false }
-);
 const ForceRotationModal = dynamic(
   () =>
     import("@/components/admin/ForceRotationModal").then(
@@ -75,7 +80,7 @@ type SettingsAccordion = "device" | "store" | "bulk" | "remnants" | null;
 
 /**
  * Settings — floor-first. Themes, PIN, sync, targets, push.
- * Master Admin setup (bulk, taxonomies, force rotation, store #) lives here
+ * Master Admin setup (topology, taxonomies, force rotation, store #) lives here
  * as accordions / modals — not a second menu. Floor Pad lives on Floor.
  */
 export function SettingsSection({
@@ -91,6 +96,7 @@ export function SettingsSection({
   const [cacheTick, setCacheTick] = useState(0);
   const [cacheMsg, setCacheMsg] = useState<string | null>(null);
   const [departments, setDepartments] = useState<Department[]>([]);
+  const [locations, setLocations] = useState<StoreLocation[]>([]);
   const [forceOpen, setForceOpen] = useState(false);
   const [taxonomyOpen, setTaxonomyOpen] = useState(false);
   const [catalog, setCatalog] = useState<CatalogItem[]>([]);
@@ -101,6 +107,7 @@ export function SettingsSection({
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
   const supervisorSession = isSupervisor(activeSpecialist);
   const masterSession = isMasterAdmin(activeSpecialist);
+  const mapConsole = canManageMapConsole(activeSpecialist);
   const canChangePin = Boolean(activeSpecialist);
   const pending = usePendingSyncCount(storeNumber);
   const showRemnants =
@@ -116,25 +123,49 @@ export function SettingsSection({
   }, []);
 
   const reloadDepts = useCallback(async () => {
-    if (!activeSpecialist || !masterSession) return;
+    if (!activeSpecialist || (!masterSession && !mapConsole)) return;
     const store = normalizeStoreNumber(
       storeNumber || getStoreNumber() || activeSpecialist.store_number || ""
     );
     if (!store) {
       setDepartments([]);
+      setLocations([]);
       return;
     }
     try {
       const result = await fetchDepartmentsDetailed(activeSpecialist, store);
       setDepartments(result.items);
+      if (mapConsole) {
+        const deptId = workingDepartmentId(activeSpecialist, result.items);
+        const locs = await fetchStoreLocationsDetailed(
+          activeSpecialist,
+          deptId
+        );
+        setLocations(locs.items);
+      } else {
+        setLocations([]);
+      }
     } catch (err) {
       console.error("[Settings] live departments failed", err);
       setDepartments([]);
+      setLocations([]);
     }
-  }, [activeSpecialist, masterSession, storeNumber]);
+  }, [activeSpecialist, masterSession, mapConsole, storeNumber]);
 
   useEffect(() => {
     void reloadDepts();
+  }, [reloadDepts]);
+
+  useEffect(() => {
+    function onMap() {
+      void reloadDepts();
+    }
+    window.addEventListener(ADMIN_DEPT_CONTEXT_EVENT, onMap);
+    window.addEventListener(STORE_OPS_LOCATIONS_CHANGED_EVENT, onMap);
+    return () => {
+      window.removeEventListener(ADMIN_DEPT_CONTEXT_EVENT, onMap);
+      window.removeEventListener(STORE_OPS_LOCATIONS_CHANGED_EVENT, onMap);
+    };
   }, [reloadDepts]);
 
   useEffect(() => {
@@ -157,7 +188,12 @@ export function SettingsSection({
     if (typeof window === "undefined") return;
     function applyHash() {
       const hash = window.location.hash.replace(/^#/, "");
-      if (hash === "bulk-generate" || hash === "map-management") {
+      if (
+        hash === "bulk-generate" ||
+        hash === "map-management" ||
+        hash === "topology" ||
+        hash === "bay-setup"
+      ) {
         setOpenSection("bulk");
       } else if (hash === "weekly-rotation") {
         setForceOpen(true);
@@ -287,6 +323,31 @@ export function SettingsSection({
         <PushNotificationsCard specialist={activeSpecialist} />
       )}
 
+      {mapConsole && activeSpecialist ? (
+        <Accordion
+          id="bulk-generate"
+          title="Store Topology & Bay Setup"
+          subtitle="Aisles, single bays, bulk generate"
+          open={openSection === "bulk"}
+          onToggle={() => toggleSection("bulk")}
+        >
+          <AisleBayManager
+            specialist={activeSpecialist}
+            departments={departments}
+            locations={locations}
+            canMutate
+            contextLabel={(() => {
+              const scope = workingDepartment(activeSpecialist);
+              if (scope === "all") return "Full Store";
+              return adminWorkingDepartmentLabel(
+                scope as Parameters<typeof adminWorkingDepartmentLabel>[0]
+              );
+            })()}
+            onChanged={() => void reloadDepts()}
+          />
+        </Accordion>
+      ) : null}
+
       {masterSession && activeSpecialist ? (
         <section className="space-y-2">
           <p className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-amber-300">
@@ -304,23 +365,6 @@ export function SettingsSection({
               onStoreNumberChange={onStoreNumberChange}
             />
           </Accordion>
-          <Accordion
-            id="bulk-generate"
-            title="Bulk Generator"
-            subtitle="Aisle / bay tags"
-            open={openSection === "bulk"}
-            onToggle={() => toggleSection("bulk")}
-          >
-            {departments.length === 0 ? (
-              <p className="text-sm text-slate-400">Loading departments…</p>
-            ) : (
-              <BulkLocationGenerator
-                specialist={activeSpecialist}
-                departments={departments}
-                onGenerated={() => void reloadDepts()}
-              />
-            )}
-          </Accordion>
           <button
             type="button"
             onClick={() => setTaxonomyOpen(true)}
@@ -334,7 +378,7 @@ export function SettingsSection({
                 Folder trees per department
               </span>
             </span>
-            <span className="text-slate-500">→</span>
+            <ChevronRight className="h-4 w-4 text-slate-500" strokeWidth={1.75} aria-hidden />
           </button>
           <button
             type="button"
@@ -349,7 +393,7 @@ export function SettingsSection({
                 Master Admin overwrite of the staged week
               </span>
             </span>
-            <span className="text-slate-500">→</span>
+            <ChevronRight className="h-4 w-4 text-slate-500" strokeWidth={1.75} aria-hidden />
           </button>
         </section>
       ) : null}
@@ -560,9 +604,11 @@ function Accordion({
             <p className="mt-0.5 text-xs text-slate-500">{subtitle}</p>
           ) : null}
         </div>
-        <span aria-hidden className="font-mono text-slate-400">
-          {open ? "▲" : "▼"}
-        </span>
+        {open ? (
+          <ChevronUp className="h-4 w-4 shrink-0 text-slate-400" strokeWidth={1.75} aria-hidden />
+        ) : (
+          <ChevronDown className="h-4 w-4 shrink-0 text-slate-400" strokeWidth={1.75} aria-hidden />
+        )}
       </button>
       {open ? (
         <div className="border-t border-slate-800 px-4 pb-4 pt-3">{children}</div>

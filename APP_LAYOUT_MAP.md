@@ -79,7 +79,7 @@ Master Admin: compact department **dropdown pill** in the header. Close glyphs a
 | Tab | Route | Meaning |
 |-----|-------|---------|
 | Floor / My Shift | `/dashboard` | Master/DS: full floor. CSA: assigned bays, packdown, shift goals |
-| Map | `/admin/store-map` | Visual Grid (walk / heatmap). Manage Aisles & Bays for Master/DS only |
+| Map | `/admin/store-map` | Visual navigator (walk / heatmap). Bay CRUD in Settings Topology for Master/DS |
 | Roster | `/roster` | Hidden from CSA. DS sees assigned departments; Master sees full store |
 | Settings | `/settings` | Hidden from CSA. Master tools + DS targets |
 
@@ -242,10 +242,11 @@ Floor Pad is no longer a Settings tool. Master/DS open **Walk & Talk** from Floo
 |-----------|------|---------|------------|
 | **UserPreferencesDrawer** | `hub/UserPreferencesDrawer.tsx` | Header profile + Settings Appearance | Theme, density, contrast, sound, haptics |
 | **DevSandboxDrawer** | `hub/DevSandboxDrawer.tsx` | Logo 3-tap (Master) | Preview As Role + Simulate Department |
-| **WalkTheFloorSheet** | `WalkTheFloorSheet.tsx` | Visual Grid bay tap | Walk log + Snap Bay + pin |
+| **WalkTheFloorSheet** | `WalkTheFloorSheet.tsx` | Map bay tap | Walk log + Snap Bay |
 | **AssociateScheduleModal** | `hub/AssociateScheduleModal.tsx` | Roster Edit Schedule | Sun–Sat day strip + Open/Mid/Close + per-day times |
-| **EditBayDrawer** | `admin/EditBayDrawer.tsx` | Map Manage bay Edit | Hotspot / priority lock / 3–21 decay slider |
-| **BulkLocationGenerator** | `admin/BulkLocationGenerator.tsx` | Map Manage + Settings | Aisle range + Default Velocity Tier seed |
+| **AisleBayManager** | `admin/AisleBayManager.tsx` | Settings Store Topology | Add bay, bulk generate, batch delete |
+| **EditBayDrawer** | `admin/EditBayDrawer.tsx` | Settings Topology bay Edit | Hotspot / priority lock / 3–21 decay slider |
+| **BulkLocationGenerator** | `admin/BulkLocationGenerator.tsx` | Settings Store Topology | Aisle range + Default Velocity Tier seed |
 | **TextPromptModal** | `TextPromptModal.tsx` | Reserve remnant; Link barcode | Bottom sheet input |
 | **ConfirmModal** | `ConfirmModal.tsx` | Delete remnant | Confirm / cancel sheet |
 | **SpecialistModal** | `SpecialistModal.tsx` | Header chip; auto if no specialist | Bottom sheet / dialog; roster + Add Team Member |

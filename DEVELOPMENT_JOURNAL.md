@@ -1,5 +1,15 @@
 # DeptSync Hub — Development Journal
 
+## 2026-08-17 — Map is a floor navigator; topology lives in Settings
+
+### Found
+- Map stacked Visual Grid | Manage Aisles & Bays, so walk/heatmap competed with CRUD, bulk generate, and batch delete.
+- Settings already hosted a second Bulk Generator accordion, duplicating the Map manage console.
+
+### Shipped
+- Map is Standard Map | Velocity Heatmap plus Snap Bay. Aisle accordions show `X Bays · Y Complete / Z Stale` with Lucide `CheckCircle2` / `Clock` / `AlertTriangle` (stroke 1.75). Tap still opens `WalkTheFloorSheet`.
+- `AisleBayManager` (Add Single Bay, Bulk Generator, Delete Selected) moved to Settings **Store Topology & Bay Setup** (`#bulk-generate` / `#topology`). One definition; Map no longer mounts it.
+
 ## 2026-08-17 — Floor tab on-duty bay queue
 
 ### Found
