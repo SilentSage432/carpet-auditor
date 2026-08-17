@@ -41,6 +41,7 @@
 - [x] Store Operations schema (departments / profiles / store_locations / weekly_rotations + RLS)
 - [x] Super Admin Store Map bulk generator (`/admin/store-map`)
 - [x] Weekly rotation engine API (`/api/rotations/generate` + cycle reset)
+- [x] Weekly rotation persist sends `store_id` + `store_number` and retries PostgREST schema-cache misses
 - [x] Zebra supervisor rotation dashboard (`/dashboard`)
 - [x] Navigation Hub — role-aware hamburger, ops bottom tabs, Admin Tools slide-over
 - [x] Web Push subscriptions + dispatch on weekly rotation generate

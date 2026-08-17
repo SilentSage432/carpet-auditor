@@ -1,5 +1,14 @@
 # DeptSync Hub — Development Journal
 
+## 2026-08-17 — Weekly rotation upsert matches live store columns
+
+### Found
+- Force Draw / Sunday cron upserted `weekly_rotations` with `store_id` only. Live tables may have `store_id` (multi-store UUID), `store_number` (JWT RLS), or both. PostgREST PGRST204 ("schema cache") threw on the unknown column.
+
+### Shipped
+- Persist stays in `lib/store-ops/rotations.ts` (`upsertWeeklyRotations`). Rows send both store identifiers when known; missing-column errors strip that field and retry. NOT NULL after a cache miss surfaces a reload-schema message instead of a raw PostgREST dump.
+- Cron and Force Draw pass the already-resolved store identity so the engine does not depend on a single department column.
+
 ## 2026-08-17 — Header department pin filters Floor, Map, and Roster in place
 
 ### Found

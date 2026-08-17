@@ -35,6 +35,7 @@ export type VelocityTier = "standard" | "high" | "critical_hotspot";
 export type Department = {
   id: string;
   store_id: string;
+  store_number?: string | null;
   name: string;
   code: string;
   weekly_bay_target: number;
@@ -47,6 +48,7 @@ export type Department = {
 export type StoreLocation = {
   id: string;
   store_id: string;
+  store_number?: string | null;
   department_id: string;
   /** Alphanumeric aisle code (BW, RW, 12, A1) — stored as TEXT. */
   aisle: string;
@@ -90,6 +92,7 @@ export type BayServiceLog = {
 export type WeeklyRotation = {
   id: string;
   store_id: string;
+  store_number?: string | null;
   department_id: string;
   location_id: string;
   assigned_week: string;

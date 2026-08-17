@@ -79,7 +79,8 @@ export async function POST(request: Request) {
       supabase,
       departmentId,
       locationIds,
-      sundayStagingWeekLabel(new Date(), store.timezone)
+      sundayStagingWeekLabel(new Date(), store.timezone),
+      { store_id: store.id, store_number: store.store_number }
     );
 
     return NextResponse.json({

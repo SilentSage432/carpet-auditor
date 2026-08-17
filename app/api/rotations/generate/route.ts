@@ -100,7 +100,12 @@ export async function POST(request: Request) {
       departmentId,
       countOverride,
       weekLabel,
-      { forceOverwrite, skipIfExists: !forceOverwrite }
+      {
+        forceOverwrite,
+        skipIfExists: !forceOverwrite,
+        store_id: store.id,
+        store_number: store.store_number,
+      }
     );
 
     if (result.skipped) {

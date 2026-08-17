@@ -4,6 +4,7 @@
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { normalizeStoreNumber, storeNumberQueryValues } from "@/lib/store";
 import type { Department, StoreLocation, WeeklyRotation } from "./types";
 import { listActiveStores } from "./stores";
 import { pickSundayCarryOverFirst, pickSundayVelocityPrioritized } from "./rotation";
@@ -11,7 +12,13 @@ import {
   isoWeekLabel,
   resolveWeeklyBayTarget,
 } from "./week";
-import { isMissingColumnError, isMissingRelationError } from "./errors";
+import {
+  isInvalidUuidError,
+  isMissingColumnError,
+  isMissingRelationError,
+  isNotNullViolationError,
+  readableError,
+} from "./errors";
 import { departmentCodesMatch } from "./department-codes";
 import { evaluateSundayAutoRun } from "./sunday-schedule";
 
@@ -38,7 +45,164 @@ export type GenerateRotationsOptions = {
   skipIfExists?: boolean;
   /** Master Admin explicit replace of incomplete rows for this week. */
   forceOverwrite?: boolean;
+  /** Active store identity when the caller already resolved it (cron / Force Draw). */
+  store_id?: string | null;
+  store_number?: string | null;
 };
+
+const WEEKLY_ROTATION_ON_CONFLICT = "location_id,assigned_week" as const;
+const OPTIONAL_WEEKLY_ROTATION_STORE_COLUMNS = [
+  "store_id",
+  "store_number",
+] as const;
+
+type WeeklyRotationStoreScope = {
+  store_id?: string;
+  store_number?: string;
+};
+
+type StoreScopeHint = {
+  store_id?: string | null;
+  store_number?: string | null;
+};
+
+function asStoreId(value: unknown): string | undefined {
+  const id = String(value ?? "").trim();
+  return id || undefined;
+}
+
+function asStoreNumber(value: unknown): string | undefined {
+  const n = normalizeStoreNumber(String(value ?? ""));
+  return n || undefined;
+}
+
+function locationStoreNumber(loc: StoreLocation): string | undefined {
+  return asStoreNumber(loc.store_number);
+}
+
+async function resolveWeeklyRotationStoreScope(
+  supabase: SupabaseClient,
+  hints: StoreScopeHint[]
+): Promise<WeeklyRotationStoreScope> {
+  let store_id: string | undefined;
+  let store_number: string | undefined;
+  for (const hint of hints) {
+    store_id = store_id ?? asStoreId(hint.store_id);
+    store_number = store_number ?? asStoreNumber(hint.store_number);
+  }
+
+  if (store_id && !store_number) {
+    const { data, error } = await supabase
+      .from("stores")
+      .select("id, store_number")
+      .eq("id", store_id)
+      .maybeSingle();
+    if (error && isInvalidUuidError(error)) {
+      store_number = asStoreNumber(store_id) ?? store_number;
+      store_id = undefined;
+    } else if (!error && data) {
+      store_number = asStoreNumber(data.store_number) ?? store_number;
+    }
+  }
+
+  if (store_number && !store_id) {
+    const values = storeNumberQueryValues(store_number);
+    if (values.length > 0) {
+      const { data } = await supabase
+        .from("stores")
+        .select("id, store_number")
+        .in("store_number", values)
+        .limit(1)
+        .maybeSingle();
+      if (data?.id) store_id = asStoreId(data.id);
+    }
+  }
+
+  if (!store_id && !store_number) {
+    throw new Error(
+      "Department is missing store_id and store_number — cannot stage weekly rotations"
+    );
+  }
+
+  return {
+    ...(store_id ? { store_id } : {}),
+    ...(store_number ? { store_number } : {}),
+  };
+}
+
+function schemaCacheStaleMessage(column: string): string {
+  return `Schema missing or out of date: weekly_rotations.${column} exists in Postgres but is not in the PostgREST schema cache. Apply the latest Supabase migrations, then reload the API schema (Dashboard → Settings → API → Reload schema, or NOTIFY pgrst, 'reload schema').`;
+}
+
+/**
+ * Persist weekly rotation rows. Sends store_id and store_number when known so
+ * live schemas (UUID multi-store, JWT store_number RLS, or both) all accept
+ * the upsert. Strips a store column only when PostgREST reports it missing.
+ */
+async function upsertWeeklyRotations(
+  supabase: SupabaseClient,
+  rows: Array<{
+    department_id: string;
+    location_id: string;
+    assigned_week: string;
+    is_completed: boolean;
+    store_id?: string;
+    store_number?: string;
+  }>
+): Promise<WeeklyRotation[]> {
+  let payload: Record<string, unknown>[] = rows.map((row) => {
+    const next: Record<string, unknown> = {
+      department_id: row.department_id,
+      location_id: row.location_id,
+      assigned_week: row.assigned_week,
+      is_completed: row.is_completed,
+    };
+    if (row.store_id) next.store_id = row.store_id;
+    if (row.store_number) next.store_number = row.store_number;
+    return next;
+  });
+
+  const stripped = new Set<string>();
+  const maxAttempts = OPTIONAL_WEEKLY_ROTATION_STORE_COLUMNS.length + 1;
+  let lastError: unknown = null;
+
+  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
+    const { data, error } = await supabase
+      .from("weekly_rotations")
+      .upsert(payload, { onConflict: WEEKLY_ROTATION_ON_CONFLICT })
+      .select("*");
+
+    if (!error) {
+      return (data ?? []) as WeeklyRotation[];
+    }
+
+    lastError = error;
+    const missing = OPTIONAL_WEEKLY_ROTATION_STORE_COLUMNS.find(
+      (col) =>
+        isMissingColumnError(error, col) &&
+        payload.some((row) => Object.prototype.hasOwnProperty.call(row, col))
+    );
+    if (missing) {
+      stripped.add(missing);
+      payload = payload.map((row) => {
+        const next = { ...row };
+        delete next[missing];
+        return next;
+      });
+      continue;
+    }
+
+    const stale = OPTIONAL_WEEKLY_ROTATION_STORE_COLUMNS.find(
+      (col) => stripped.has(col) && isNotNullViolationError(error, col)
+    );
+    if (stale) {
+      throw new Error(schemaCacheStaleMessage(stale));
+    }
+    break;
+  }
+
+  throw new Error(readableError(lastError, "Weekly rotation upsert failed"));
+}
 
 export { resolveWeeklyBayTarget };
 
@@ -332,14 +496,22 @@ export async function generateWeeklyRotations(
 
   const { data: department, error: departmentError } = await supabase
     .from("departments")
-    .select("id, store_id, weekly_bay_target")
+    .select("*")
     .eq("id", departmentId)
     .maybeSingle();
 
   if (departmentError) throw new Error(departmentError.message);
-  if (!department?.store_id) {
-    throw new Error("Department is missing store_id");
+  if (!department) {
+    throw new Error("Department not found");
   }
+
+  const storeScope = await resolveWeeklyRotationStoreScope(supabase, [
+    { store_id: options.store_id, store_number: options.store_number },
+    {
+      store_id: department.store_id,
+      store_number: department.store_number,
+    },
+  ]);
 
   const dbTarget = resolveWeeklyBayTarget(department.weekly_bay_target);
   const override =
@@ -358,7 +530,7 @@ export async function generateWeeklyRotations(
   const generated = await finishGenerate(
     supabase,
     departmentId,
-    department,
+    storeScope,
     weekLabel,
     drawCount,
     dbTarget,
@@ -438,7 +610,7 @@ async function clearCarryOverFlags(
 async function finishGenerate(
   supabase: SupabaseClient,
   departmentId: string,
-  department: { id: string; store_id: string; weekly_bay_target?: unknown },
+  storeScope: WeeklyRotationStoreScope,
   weekLabel: string,
   drawCount: number,
   dbTarget: number,
@@ -486,23 +658,16 @@ async function finishGenerate(
   await clearCarryOverFlags(supabase, ids);
 
   const rows = selected.map((loc) => ({
-    store_id: loc.store_id || department.store_id,
+    ...storeScope,
+    store_id: loc.store_id || storeScope.store_id,
+    store_number: locationStoreNumber(loc) || storeScope.store_number,
     department_id: departmentId,
     location_id: loc.id,
     assigned_week: weekLabel,
     is_completed: false,
   }));
 
-  const { data: rotations, error: insertError } = await supabase
-    .from("weekly_rotations")
-    .upsert(rows, { onConflict: "location_id,assigned_week" })
-    .select("*");
-
-  if (insertError) {
-    throw new Error(
-      `Weekly rotation upsert failed: ${insertError.message}`
-    );
-  }
+  const rotations = await upsertWeeklyRotations(supabase, rows);
 
   const { data: locations, error: locError } = await supabase
     .from("store_locations")
@@ -529,7 +694,8 @@ export async function assignLocationsToCurrentWeek(
   supabase: SupabaseClient,
   departmentId: string,
   locationIds: string[],
-  weekLabel: string = isoWeekLabel()
+  weekLabel: string = isoWeekLabel(),
+  storeHint?: StoreScopeHint
 ): Promise<{
   assigned_week: string;
   rotations: WeeklyRotation[];
@@ -542,17 +708,25 @@ export async function assignLocationsToCurrentWeek(
 
   const { data: department, error: departmentError } = await supabase
     .from("departments")
-    .select("id, store_id, is_active")
+    .select("*")
     .eq("id", departmentId)
     .maybeSingle();
 
   if (departmentError) throw new Error(departmentError.message);
-  if (!department?.store_id) {
-    throw new Error("Department is missing store_id");
+  if (!department) {
+    throw new Error("Department not found");
   }
   if (department.is_active === false) {
     throw new Error("Department is paused — activate it before assigning bays");
   }
+
+  const storeScope = await resolveWeeklyRotationStoreScope(supabase, [
+    storeHint ?? {},
+    {
+      store_id: department.store_id,
+      store_number: department.store_number,
+    },
+  ]);
 
   const { data: locs, error: locError } = await supabase
     .from("store_locations")
@@ -592,21 +766,16 @@ export async function assignLocationsToCurrentWeek(
   await clearCarryOverFlags(supabase, ids);
 
   const rows = locations.map((loc) => ({
-    store_id: loc.store_id || department.store_id,
+    ...storeScope,
+    store_id: loc.store_id || storeScope.store_id,
+    store_number: locationStoreNumber(loc) || storeScope.store_number,
     department_id: departmentId,
     location_id: loc.id,
     assigned_week: weekLabel,
     is_completed: false,
   }));
 
-  const { data: rotations, error: insertError } = await supabase
-    .from("weekly_rotations")
-    .upsert(rows, { onConflict: "location_id,assigned_week" })
-    .select("*");
-
-  if (insertError) {
-    throw new Error(`Weekly rotation upsert failed: ${insertError.message}`);
-  }
+  const rotations = await upsertWeeklyRotations(supabase, rows);
 
   const { data: refreshed, error: refreshError } = await supabase
     .from("store_locations")
@@ -759,7 +928,11 @@ export async function runWeeklyRotationForAllDepartments(
           dept.id,
           null,
           targetWeek,
-          { skipIfExists: true }
+          {
+            skipIfExists: true,
+            store_id: store.id,
+            store_number: store.store_number,
+          }
         );
 
         results.push({
