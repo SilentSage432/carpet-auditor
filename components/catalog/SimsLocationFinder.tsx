@@ -2,6 +2,8 @@
 
 import { useMemo, useState } from "react";
 import { TextField } from "@/components/ui/NumberField";
+import { HubIcon } from "@/components/hub/NavIcons";
+import { LocationStatusIcon } from "@/components/hub/StatusPills";
 import { formatClf, formatSqFt } from "@/lib/calc";
 import { findSimsLocations } from "@/lib/sims";
 import type { CarpetAudit, CatalogItem, LocationType } from "@/lib/types";
@@ -46,9 +48,10 @@ export function SimsLocationFinder({ open, onClose, catalog, audits }: Props) {
             <div>
               <h2
                 id="sims-finder-title"
-                className="text-lg font-bold text-white"
+                className="flex items-center gap-2 text-lg font-bold text-white"
               >
-                📍 SIMS Location Finder
+                <LocationStatusIcon className="h-5 w-5" />
+                SIMS Location Finder
               </h2>
               <p className="mt-1 text-sm text-zinc-400">
                 Search SKU, barcode, category, or SIMS tag (Bay 012, Laundry…)
@@ -60,7 +63,7 @@ export function SimsLocationFinder({ open, onClose, catalog, audits }: Props) {
               className="flex min-h-[44px] min-w-[44px] shrink-0 items-center justify-center rounded-xl border border-zinc-700 text-zinc-300"
               aria-label="Close"
             >
-              ✕
+              <HubIcon id="close" className="h-4 w-4" />
             </button>
           </div>
           <div className="mt-3">

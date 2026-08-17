@@ -471,6 +471,39 @@ body {
   box-shadow: 0 -8px 32px -12px var(--shadow);
 }
 
+/*
+ * Unified mobile bottom dock: nav + scan action + undo toast share one stack.
+ * Nav min-h-16 (4rem) + .pb-safe (max(0.75rem, safe-area)).
+ */
+:root {
+  --hub-bottom-nav-min-height: 4rem;
+  --hub-scan-action-height: 4.75rem;
+  --hub-dock-safe-bottom: max(0.75rem, env(safe-area-inset-bottom, 0px));
+  --hub-bottom-nav-stack: calc(
+    var(--hub-bottom-nav-min-height) + var(--hub-dock-safe-bottom)
+  );
+}
+
+.hub-bottom-nav {
+  @apply fixed bottom-0 left-0 right-0 z-30 mx-auto w-full max-w-lg;
+}
+
+.hub-scan-dock {
+  @apply fixed left-0 right-0 z-20 mx-auto w-full max-w-lg;
+  bottom: var(--hub-bottom-nav-stack);
+}
+
+.hub-toast-dock {
+  @apply fixed left-0 right-0 z-40 mx-auto w-full max-w-lg px-3;
+  bottom: calc(var(--hub-bottom-nav-stack) + var(--hub-scan-action-height));
+}
+
+.hub-scan-dock-pad {
+  padding-bottom: calc(
+    var(--hub-bottom-nav-stack) + var(--hub-scan-action-height) + 0.75rem
+  );
+}
+
 .theme-modal {
   border-color: color-mix(in srgb, var(--accent) 28%, transparent);
   box-shadow: 0 0 50px -12px var(--glow-accent);

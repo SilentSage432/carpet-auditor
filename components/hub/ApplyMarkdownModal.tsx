@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { NumberField, TextField } from "@/components/ui/NumberField";
+import { ClearanceStatusIcon } from "@/components/hub/StatusPills";
 import {
   clearanceBadgeLabel,
   computeMarkdown,
@@ -147,8 +148,9 @@ export function ApplyMarkdownModal({
         aria-labelledby="markdown-title"
         className="relative z-[76] max-h-[90dvh] w-full max-w-md overflow-y-auto glass-card theme-modal rounded-t-2xl !rounded-b-none p-4 sm:!rounded-2xl"
       >
-        <h2 id="markdown-title" className="text-lg font-bold text-white">
-          🏷️ Apply Manager Markdown
+        <h2 id="markdown-title" className="flex items-center gap-2 text-lg font-bold text-white">
+          <ClearanceStatusIcon className="h-5 w-5" />
+          Apply Manager Markdown
         </h2>
         <p className="mt-1 text-sm text-zinc-400">
           {remnant.tag_number} · {remnant.carpet_name || remnant.sku}
@@ -250,7 +252,9 @@ export function ApplyMarkdownModal({
             </div>
 
             {preview ? (
-              <p className="mt-3 rounded-xl border border-red-500/40 bg-red-950/40 px-3 py-2 text-sm font-semibold text-red-200">
+              <p className="mt-3 flex items-start gap-2 rounded-xl border border-red-500/40 bg-red-950/40 px-3 py-2 text-sm font-semibold text-red-200">
+                <ClearanceStatusIcon className="mt-0.5 h-4 w-4 shrink-0" />
+                <span>
                 {clearanceBadgeLabel({
                   markdown_price: preview.markdown_price,
                   markdown_percent: preview.markdown_percent,
@@ -260,6 +264,7 @@ export function ApplyMarkdownModal({
                     "Supervisor",
                   estimated_value: preview.estimated_value,
                 }) ?? `Clearance ${formatMoney(preview.markdown_price)}`}
+                </span>
               </p>
             ) : null}
 

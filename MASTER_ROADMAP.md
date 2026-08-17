@@ -142,7 +142,8 @@
 - [x] Sunday auto-stage schedule — store timezone + 05:00 default, auto-run toggle, cron skip-if-staged, Master Force Draw overwrite (`20260816_sunday_rotation_schedule.sql`)
 - [x] Sunday Flooring draw pre-selects Flooring-tagged roster (`associateMatchesSundayDepartment`; other depts start off)
 - [x] RLS security lockdown — drop anon/open SELECT; authenticated store isolation; Realtime publication on sunday_bay_assignments / manager_notes / downstock_queue (`20260817_rls_security_lockdown.sql`)
-- [x] Store Ops offline queue — bay complete / downstock / Sunday assign via `enqueueOrExecute`; header `SyncStatusPill`
+- [x] Store Ops offline queue — bay complete / downstock / Sunday assign via `enqueueOrExecute`; header `SyncStatusPill`; queue specialist stub includes `is_active`
+- [x] Canonical `computeDepartmentCompletionPct` + `flagPenalty` in `health.ts`; unified mobile scan dock (`max-w-lg` + safe-area); Lucide status pills
 
 ## Next
 - [x] Apply Phase 1 JWT/RLS migration in Supabase + enable Custom Access Token Hook

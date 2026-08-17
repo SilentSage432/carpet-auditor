@@ -30,7 +30,9 @@ app/manifest.ts                   → short_name DeptSync · Department & SIMS A
 public/sw.js                      → Offline shell cache strategies
 components/hub/HubChrome.tsx      → AssociateSpecialtySwitcher (in-page scan tabs only)
 components/hub/HubHeader.tsx      → Sticky hub header (`DeptSync · #2587`, D23 pill, account/PIN; overflow marquee; 3-tap logo → sandbox)
-components/hub/BottomNav.tsx      → Floor · Map · Roster · Settings (2-col for CSA My Shift + Map)
+components/hub/BottomNav.tsx      → Floor · Map · Roster · Settings (2-col for CSA My Shift + Map; `.hub-bottom-nav`)
+components/hub/ScanActionDock.tsx → Cycle / department Log bar docked above BottomNav
+components/hub/StatusPills.tsx    → Lucide variance / aging / SIMS / clearance glyphs (stroke 1.75)
 components/hub/DeptSyncSplash.tsx → Boot / loading splash (pinned midnight + branded cyan/gold mark)
 components/hub/NavigationHub.tsx  → Cross-app Navigation Hub (composes HubHeader + BottomNav + sandbox banner/drawer)
 components/hub/DevSandboxDrawer.tsx → Preview-as-role + simulate department (Master Admin only)
@@ -54,7 +56,7 @@ components/hub/WeeklyBayTargetCard.tsx → Re-export of DepartmentTargetsMatrix 
 components/hub/NavIcons.tsx       → Canonical Lucide HubIcon / NavIcon / DepartmentIcon (stroke 2, currentColor)
 components/hub/DepartmentPicker.tsx → Lucide department listbox (roster / admin selectors)
 lib/store-ops/realtime.ts         → Shared postgres_changes channel per logical name (bind-before-subscribe)
-app/globals.css                   → Theme tokens + glass / hub-main / chip-filter / btn-quick-touch
+app/globals.css                   → Theme tokens + glass / hub-main / hub-scan-dock / chip-filter / btn-quick-touch
 components/hub/HapticsListener.tsx → Delegated vibrate pulses for taps / toggles / tabs
 components/hub/OfflineNetworkBanner.tsx → Offline toast + installSyncAutoFlush callbacks
 components/offline/ConflictResolutionModal.tsx → Local vs Server sync conflict chooser
@@ -67,7 +69,8 @@ app/admin/supervisors/page.tsx    → Redirect → /roster
 app/admin/roles/page.tsx          → Redirect → /roster
 components/store-ops/ZebraChecklist.tsx → Floor bay checklist (optimistic complete, Quick Touch, downstock, Sunday handoff)
 components/store-ops/BayHealthScorecard.tsx → Compact bay health badge (presentation)
-lib/store-ops/bay-health.ts       → Aging / SIMS / topstock discrepancy diagnostics (compose only)
+lib/store-ops/bay-health.ts       → Aging / SIMS / topstock discrepancy diagnostics (compose only; `flagPenalty` from health.ts)
+lib/store-ops/health.ts           → Store health snapshot + canonical completion % + bay flag penalty weights
 components/store-ops/AuditLocationModeToggle.tsx → SELLING vs TOPSTOCK audit-mode control
 components/store-ops/BarrierReasonChips.tsx → One-tap barrier reasons
 lib/store-ops/audit-location-mode.ts → Canonical SELLING/TOPSTOCK ↔ hub sales_floor/top_stock
@@ -103,7 +106,7 @@ components/hub/*Modal.tsx         → Specialist / PIN / Markdown modals
 components/barcode/QuickAddCatalogModal.tsx → Scan-to-catalog Quick-Add
 components/catalog/SimsLocationFinder.tsx   → SIMS location stock drawer
 components/hub/AdminDepartmentSwitcher.tsx → Master Admin working-dept pin
-components/sections/CycleAuditScanForm.tsx → Flooring scan/input island (drafts + scanner; log stays in parent)
+components/sections/CycleAuditScanForm.tsx → Flooring scan/input island (drafts + scanner; log stays in parent; `ScanActionDock`)
 components/sections/ApplianceScanForm.tsx → Appliance scan/input island (drafts + scanner; log stays in parent)
 components/admin/SundayAuditStagingCard.tsx → Glowing pending Sunday Flooring audit CTA (Sunday even if empty)
 components/admin/SundayAuditAssignmentModal.tsx → Assign specialists + shift-hour balancer; Master Recalculate
@@ -209,9 +212,8 @@ supabase/migrations/20260812_sunday_bay_assignments.sql → sunday specialist↔
 | Call-out bay rebalance | `lib/store-ops/call-out.ts` (pool / auto / carry-over loop; stamps `carried_over` + Sunday `CARRIED_OVER`; does not generate rotations) |
 | Predictive Shift Copilot | `lib/store-ops/predictive-copilot.ts` + `PredictiveCopilotBanner` (local patterns; 1-tap downstock / assign) |
 | Downstock / packdown queue | `lib/store-ops/downstock.ts` (flags) + Zebra Downstock tab on Floor (assign via sunday-audit) |
-| Supervisor weekly rollup | `lib/store-ops/audit-summary.ts` + `SupervisorAuditSummaryModal` |
-| Shift workload balancer | `lib/store-ops/weekly-rotations.ts` (pure plan: hours, clusters, health-risk priority) |
-| Bay health / floor discrepancies | `lib/store-ops/bay-health.ts` + `BayHealthScorecard` (composes location cycle age + hub audits / SIMS / variance) |
+| Shift workload balancer | `lib/store-ops/weekly-rotations.ts` (pure plan: hours, clusters, health-risk via `flagPenalty` from health.ts) |
+| Bay health / floor discrepancies | `lib/store-ops/bay-health.ts` + `BayHealthScorecard` (diagnoses flags; scoring weights owned by `health.ts`) |
 | Selling vs Topstock audit mode | `lib/store-ops/audit-location-mode.ts` + `AuditLocationModeToggle` (Cycle/Department forms + Zebra filter) |
 | Rotation verification / barriers | `lib/store-ops/verification.ts` + Floor **Verify completed bays** + `ExceptionFeed` + `POST /api/rotations/exceptions` |
 | Manager notes / Executive Floor Pad | `lib/store-ops/ai-note-extract.ts`, `manager-notes.ts`, `app/actions/manager-notes.ts`, `components/manager-notes/*` (opened from Floor `TacticalVoiceFloorPad`; `ai-note-summary` retired 410) |
@@ -229,7 +231,8 @@ supabase/migrations/20260812_sunday_bay_assignments.sql → sunday specialist↔
 | CLF / carton math | `lib/calc.ts` |
 | Number typing UX | `lib/number-input.ts` + `NumberField` |
 | Catalog knowledge | `lib/catalog.ts` |
-| Store health scorecard | `lib/store-ops/health.ts`, `StoreHealthCard` |
+| Store health scorecard | `lib/store-ops/health.ts` (`computeDepartmentCompletionPct`, `flagPenalty`), `StoreHealthCard` |
+| Supervisor weekly rollup | `lib/store-ops/audit-summary.ts` (composes `computeDepartmentCompletionPct`) + `SupervisorAuditSummaryModal` |
 | Shift audit velocity telemetry | `lib/store-ops/telemetry.ts`, `StoreHealthChart` |
 | Zebra shift briefing | `lib/store-ops/shift-briefing.ts`, `ShiftBriefingCard` (composes health snapshot + `bay_health`) |
 | Visual bay scan | `lib/store-ops/ai-bay-scan.ts`, `VisualBayScannerModal` (720p stream; JPEG q=0.70 / 960px) |
@@ -249,8 +252,8 @@ supabase/migrations/20260812_sunday_bay_assignments.sql → sunday specialist↔
 | Biometric / WebAuthn unlock | `lib/biometric-auth.ts`, `AuthWall` |
 | PIN change / default notice | `ChangePinModal` |
 | Manager markdown | `lib/markdown.ts`, `ApplyMarkdownModal` |
-| Variance | `lib/variance.ts` |
-| Remnant aging | `lib/aging.ts` (markdown 30/60/90 + floor-ops Fresh/Watch/Critical rack bands) |
+| Variance | `lib/variance.ts` (labels/classes; glyphs in `StatusPills`) |
+| Remnant aging | `lib/aging.ts` (markdown 30/60/90 + floor-ops Fresh/Watch/Critical rack bands; glyphs in `StatusPills`) |
 | Remnant inventory | `lib/remnants.ts` (`remnantRackAlert` composes rack badges / markdown chip) |
 | Audit log + draft | `lib/storage.ts` + `lib/debounced-persist.ts` (300ms) + `CycleAuditScanForm` |
 | Audit report export / print / email | `lib/audit-report.ts`, `AuditReportModal` |

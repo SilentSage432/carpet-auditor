@@ -109,7 +109,6 @@ export function SupervisorAuditSummaryModal({
 
   if (!open) return null;
 
-  const quotaDenom = Math.max(1, rollup?.quota ?? 1);
   const pct = rollup?.completion_pct ?? 0;
 
   return (
@@ -171,7 +170,7 @@ export function SupervisorAuditSummaryModal({
                 <div
                   className="h-full rounded-full bg-emerald-500"
                   style={{
-                    width: `${Math.min(100, Math.round((rollup.completed / quotaDenom) * 100))}%`,
+                    width: `${Math.min(100, pct)}%`,
                   }}
                 />
               </div>

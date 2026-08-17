@@ -2,11 +2,13 @@
  * Proportional clustered assignment of this week's rotation bays.
  * Does not generate rotations (rotations.ts) or persist assignments (sunday-audit.ts).
  * Persist goes through setSundayBayAssignment → enqueueOrExecute (STORE_OPS_SUNDAY_ASSIGN).
- * Composes aisle clustering + bay-health risk scores; presentation only renders.
+ * Composes aisle clustering + bay-health risk scores (`flagPenalty` from health.ts);
+ * presentation only renders.
  */
 
 import { compareAisles, normalizeAisle } from "./aisle";
 import type { BayHealthFinding } from "./bay-health";
+import { flagPenalty } from "./health";
 import { getStoreNumber } from "@/lib/store";
 import type { StoreSpecialist } from "@/lib/types";
 
@@ -109,14 +111,7 @@ export function riskScoreFromFinding(
   finding: BayHealthFinding | undefined
 ): number {
   if (!finding) return 0;
-  let score = 0;
-  for (const flag of finding.flags) {
-    if (flag === "never_audited") score += 28;
-    else if (flag === "stale") score += 18;
-    else if (flag === "topstock_uninventoried") score += 16;
-    else score += 12;
-  }
-  return score;
+  return finding.flags.reduce((sum, flag) => sum + flagPenalty(flag), 0);
 }
 
 export function defaultShiftRoster(

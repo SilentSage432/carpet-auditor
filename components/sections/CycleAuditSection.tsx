@@ -6,6 +6,7 @@ import { FlooringAIInsightBanner } from "@/components/flooring/FlooringAIInsight
 import { SundayAuditStagingCard } from "@/components/admin/SundayAuditStagingCard";
 import { CycleAuditScanForm } from "@/components/sections/CycleAuditScanForm";
 import { HubIcon } from "@/components/hub/NavIcons";
+import { VarianceStatusIcon } from "@/components/hub/StatusPills";
 import { ApplyMarkdownModal } from "@/components/hub/ApplyMarkdownModal";
 
 const SimsLocationFinder = dynamic(
@@ -351,7 +352,7 @@ export function CycleAuditSection({
       {undoToast ? (
         <div
           role="status"
-          className="fixed bottom-32 left-3 right-3 z-40 mx-auto flex max-w-md items-center gap-2 rounded-2xl border border-emerald-500/40 bg-zinc-900/90 px-3 py-3 shadow-2xl shadow-black/40 backdrop-blur-xl"
+          className="hub-toast-dock flex items-center gap-2 rounded-2xl border border-emerald-500/40 bg-zinc-900/90 px-3 py-3 shadow-2xl shadow-black/40 backdrop-blur-xl"
         >
           <p className="min-w-0 flex-1 truncate text-sm font-medium text-slate-100">
             {undoToast.label}
@@ -359,9 +360,10 @@ export function CycleAuditSection({
           <button
             type="button"
             onClick={() => void handleUndoLast()}
-            className="flex h-11 shrink-0 items-center justify-center rounded-xl border border-amber-400/50 bg-amber-950/50 px-3 text-sm font-bold text-amber-200 active:scale-95"
+            className="flex h-11 shrink-0 items-center justify-center gap-1.5 rounded-xl border border-amber-400/50 bg-amber-950/50 px-3 text-sm font-bold text-amber-200 active:scale-95"
           >
-            ↩️ Undo
+            <HubIcon id="undo" className="h-4 w-4" strokeWidth={1.75} />
+            Undo
           </button>
         </div>
       ) : null}
@@ -594,7 +596,7 @@ export function CycleAuditSection({
                     </span>
                     {kind !== "none" ? (
                       <span
-                        className={`ml-2 align-middle ${
+                        className={`ml-2 inline-flex items-center gap-1 align-middle ${
                           kind === "match"
                             ? "glass-pill-emerald"
                             : kind === "shortage"
@@ -602,6 +604,7 @@ export function CycleAuditSection({
                               : "glass-pill-amber"
                         }`}
                       >
+                        <VarianceStatusIcon kind={kind} className="h-3 w-3" />
                         {varianceLabel(kind)}
                       </span>
                     ) : null}

@@ -4,6 +4,10 @@ import { useMemo, useState } from "react";
 import { ApplyMarkdownModal } from "@/components/hub/ApplyMarkdownModal";
 import { ConfirmModal } from "@/components/hub/ConfirmModal";
 import { TextPromptModal } from "@/components/hub/TextPromptModal";
+import {
+  AgingStatusIcon,
+  ClearanceStatusIcon,
+} from "@/components/hub/StatusPills";
 import { FlooringAIInsightBanner } from "@/components/flooring/FlooringAIInsightBanner";
 import { findCatalogBySkuOrBarcode } from "@/lib/catalog";
 import { agingBadge, daysOld } from "@/lib/aging";
@@ -605,10 +609,17 @@ function RemnantRow({
             ) : null}
           </div>
           <p
-            className={`mt-1 text-[10px] font-semibold ${ageBadge.className.includes("text-") ? "" : "text-slate-400"}`}
+            className={`mt-1 inline-flex flex-wrap items-center gap-1 text-[10px] font-semibold ${ageBadge.className}`}
           >
+            <AgingStatusIcon tier={ageBadge.tier} className="h-3 w-3" />
             {ageBadge.label}
-            {clearance ? ` · ${clearance}` : ""}
+            {clearance ? (
+              <>
+                <span aria-hidden>·</span>
+                <ClearanceStatusIcon className="h-3 w-3" />
+                {clearance}
+              </>
+            ) : null}
           </p>
         </div>
         <div className="relative shrink-0">

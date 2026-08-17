@@ -15,8 +15,8 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 - **Native shell:** haptics via `utils/haptics.ts` + `HapticsListener`; offline toast `OfflineNetworkBanner` + `ConflictResolutionModal`; sync auto-flush on online/visibility/focus; PWA/TWA splash theme `#090d16`; `app/loading.tsx` + `DeptSyncSplash` (pinned midnight + branded mark)
 - **Theme engine:** `lib/theme.ts` owns presets + prefs (`deptsync_theme_prefs`). `data-theme` on `<html>`: `midnight` (Cyber-Dark, default) · `cobalt` (Midnight Sapphire) · `emerald` (Industrial Emerald) · `solar` (Solar Daylight) · legacy `amber` / `obsidian`. Toggles: `data-contrast=high`, `data-density=compact`, plus `soundEnabled` / `hapticsEnabled`. Personal UI: header + Settings **🎨 Appearance & Preferences** (`UserPreferencesDrawer`). Store config stays in Settings. CSS tokens in `app/globals.css`; glass utilities / nav / primary buttons bind to `--accent`, `--background`, `--border`, `--glow-accent`.
 - **Audio & haptics:** `lib/ui/feedback.ts` (Web Audio + `navigator.vibrate`). Scan chimes compose via `lib/scan-feedback.ts`; tap pulses via `HapticsListener`.
-- **Obsidian-glass UI:** utilities in `app/globals.css` (`.glass-card`, `.glass-panel`, `.theme-accent-surface`, `.theme-nav-active`, `.theme-modal`, `.btn-primary-glow`, `.btn-quick-touch`, `.chip-filter`, `.hub-main`). Canonical Lucide SVG set (`HubIcon` / `NavIcon`, stroke 2, `currentColor`).
-- **Handheld chrome:** sticky header `pt-safe` + compact `min-h-12`; workflow tabs `min-h-16` — Master/DS: Floor · Map · Roster · Settings; CSA/Specialist: **My Shift** + **Store Map** only. No hamburger, More sheet, or Admin Tools drawer. Store Ops pages use `.hub-main` so bays / badges / timers clear the fold.
+- **Obsidian-glass UI:** utilities in `app/globals.css` (`.glass-card`, `.glass-panel`, `.theme-accent-surface`, `.theme-nav-active`, `.theme-modal`, `.btn-primary-glow`, `.btn-quick-touch`, `.chip-filter`, `.hub-main`, `.hub-scan-dock`). Canonical Lucide SVG set (`HubIcon` / `NavIcon` stroke 2; variance / aging / bay status pills stroke 1.75 via `StatusPills`).
+- **Handheld chrome:** sticky header `pt-safe` + compact `min-h-12`; workflow tabs `min-h-16` — Master/DS: Floor · Map · Roster · Settings; CSA/Specialist: **My Shift** + **Store Map** only. Scan Log bars use `ScanActionDock` (`.hub-scan-dock`, `max-w-lg`, stacked on `--hub-bottom-nav-stack` with `env(safe-area-inset-bottom)`). Specialty hub content is `max-w-lg` + `.hub-scan-dock-pad`. Undo toast uses `.hub-toast-dock` so it never covers Log. Sonner stays top-center under the header. No hamburger, More sheet, or Admin Tools drawer. Store Ops pages use `.hub-main` so bays / badges / timers clear the fold.
 - **Keep-alive tabs:** Floor / Map / Roster / Settings mount in `WorkflowTabShell` (`app/(workflow)/layout.tsx`) so switches are `hidden` only (0ms). Departments / map / roster use 45s in-memory SWR plus IndexedDB L2 (`lib/store-ops/cache.ts`) so Map/Floor paint the last **successful live** `store_locations` / `weekly_rotations` fetch in <20ms, then revalidate. Failed network reads no longer render as an empty week. **Bulk add bays** awaits IndexedDB+TTL clear (`invalidateStoreOpsListCaches`) and dispatches `deptsync:store-locations-changed` so keep-alive Map/Floor replace an empty snapshot immediately. Realtime channels are refcounted per logical name.
 - **IRP velocity heatmap:** Map toggle `[ Standard Map | Velocity Heatmap ]` lives on Visual Grid. Map also has `[ Visual Grid | Manage Aisles & Bays ]`. Visual Grid is walk-only (`StoreLocationGrid`: cadence dots, bay tags, Sell/Top, **Pending** chip when rotation status is `PENDING`, tap → `WalkTheFloorSheet`). Manage is `AisleBayManager` (aisle accordions, Add Single Bay, Bulk Generator with velocity seed, batch delete, duplicate prune, `EditBayDrawer` hotspot/lock/decay). `GET /api/store-locations` never filters by status; PENDING means available for Sunday draw. Department pin `flooring`/`D23` resolves to the live `departments.id` family before querying locations. Apply `20260814_bay_velocity_heatmap.sql` + `20260815_custom_decay_days.sql` + **`20260817_rls_security_lockdown.sql`** (authenticated store-scoped SELECT on `store_locations`; open anon reads removed).
 - **Multi-department access:** `accessible_departments` on roster + profiles. Header switcher when more than one granted dept. Supervisors grant extras from the **Roster** tab chips. Apply `20260814_multi_department_access.sql`.
@@ -115,7 +115,7 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 - Seeds: no hardcoded roster injection — use Add Team Member (roster-only) or Send Mobile App Invite (`status=invited` until `/auth/verify/[token]`)
 - Primary: fixed bottom workflow tabs — **Floor · Map · Roster · Settings** only
 - Header: DeptSync brand + store # · section title · department dropdown pill · account/PIN chip
-- Cycle Audit / Appliances: hardware-scan ready without soft keyboard; sticky Log docked above bottom nav
+- Cycle Audit / Appliances: hardware-scan ready without soft keyboard; Log docked in `ScanActionDock` above BottomNav (`max-w-lg`, safe-area stack)
 
 ## Store Ops auth transport
 - Client: `storeOpsAuthHeadersAsync` → `Authorization: Bearer` from Hub-bridge or phone Auth session
@@ -141,7 +141,7 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 ## Offline & PWA
 - Service worker `public/sw.js`; sync queue `carpet_hub_sync_queue` (`lib/sync-queue.ts`)
 - Queue actions carry `transaction_id`, `optimistic_at`, retry backoff (`next_retry_at`), optional `base_updated_at`
-- Store Ops floor writes (`STORE_OPS_COMPLETE_ROTATION`, `STORE_OPS_DOWNSTOCK_ADD`, `STORE_OPS_SUNDAY_ASSIGN`) use `enqueueOrExecute` — live first, queue on offline / timeout. `weekly-rotations.ts` still only plans; persist is `sunday-audit.ts`.
+- Store Ops floor writes (`STORE_OPS_COMPLETE_ROTATION`, `STORE_OPS_DOWNSTOCK_ADD`, `STORE_OPS_SUNDAY_ASSIGN`) use `enqueueOrExecute` — live first, queue on offline / timeout. Queue replay builds a synthetic specialist via `specialistFromSyncPayload` (`is_active: true`). `weekly-rotations.ts` still only plans; persist is `sunday-audit.ts`.
 - IndexedDB SWR (`lib/store-ops/cache.ts`) owns durable `store_locations` / `weekly_rotations` / `shift_briefings`; `ttl-cache.ts` remains L1. Writes call `invalidateStoreOpsListCaches()` which clears both.
 - `installSyncAutoFlush` — flush on `online`, `visibilitychange` (visible), and `focus`
 - Version/409 conflicts → `ConflictResolutionModal` (Keep Local force-overwrite vs Accept Server)
@@ -159,7 +159,7 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 - `weekly_rotations`: `onConflict: location_id,assigned_week`
 
 ## Remnants / markdown
-- Aging badges; 60+ or elevated role → Apply Manager Markdown
+- Aging badges (Lucide, not emoji); 60+ or elevated role → Apply Manager Markdown
 - Floor-ops rack bands (Fresh <14d / Watch 14–30d / Critical >30d) via `lib/aging.ts` `classifyRackAging` + `lib/remnants.ts` `remnantRackAlert`; critical rolls show a Suggest markdown chip (markdown math stays in `lib/markdown.ts`)
 
 ## Audit Report Export
@@ -181,7 +181,7 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 - `/roster` — unified team list, PIN add, and department access chips (optimistic + toast)
 - `/admin/store-map` — Visual Grid chunks aisle/bay DOM (16 aisles / 24 bays) with memoized cadence dots + SVG heat strips; Sell/Top is an overlay (no full map reload). Manage Aisles & Bays starts collapsed and chunks the same way. Tap bay → **one** `WalkTheFloorSheet`.
 - Sunday staging card opens the assignment modal with **Shift balancer** (hours → proportional clustered zones). Plan owner: `lib/store-ops/weekly-rotations.ts`; persist: `sunday-audit.ts`. Drawer seed: Flooring/D23 only (`associateMatchesSundayDepartment`); Master may toggle other depts.
-- `GET /api/store-health` — weekly pace + bottleneck aggregation + compact `bay_health` for DS / Super Admin
+- `GET /api/store-health` — weekly pace + bottleneck aggregation + compact `bay_health` for DS / Super Admin. Completion % is `computeDepartmentCompletionPct` in `health.ts` (rollup composes the same helper). Bay flag penalties (28/18/16/12) live in `health.ts`; `bay-health.ts` and `weekly-rotations.ts` import `flagPenalty`.
 - `POST /api/store-ops/ai-bay-scan` — multimodal bay photo → carton/pallet estimates, cleanliness score, detected issues (Store Ops actor)
 - `POST /api/store-ops/ai-note-summary` — **410 Gone**; Floor Pad Copilot `extractTasksAndTag` is canonical
 - APIs under `/api/rotations/*`, `/api/store-locations*`, `/api/departments`, `/api/weekly-rotations`

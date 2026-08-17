@@ -7,6 +7,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { QuickAddCatalogModal } from "@/components/barcode/QuickAddCatalogModal";
+import { ScanActionDock } from "@/components/hub/ScanActionDock";
+import { LocationStatusIcon, VarianceStatusIcon } from "@/components/hub/StatusPills";
 import { NumberField, TextField } from "@/components/ui/NumberField";
 import {
   resolveScan,
@@ -531,9 +533,10 @@ export function CycleAuditScanForm({
             <button
               type="button"
               onClick={onOpenSimsFinder}
-              className="flex h-12 shrink-0 items-center justify-center rounded-xl border border-emerald-500/40 bg-emerald-950/40 px-3 text-xs font-semibold text-emerald-300 active:scale-95"
+              className="flex h-12 shrink-0 items-center justify-center gap-1.5 rounded-xl border border-emerald-500/40 bg-emerald-950/40 px-3 text-xs font-semibold text-emerald-300 active:scale-95"
             >
-              📍 SIMS Stock
+              <LocationStatusIcon className="h-3.5 w-3.5" />
+              SIMS Stock
             </button>
           </div>
           {auditMode === "roll" ? (
@@ -638,12 +641,12 @@ export function CycleAuditScanForm({
         />
         {liveVariance != null && (
           <div
-            className={`rounded-xl border px-3 py-3 text-center text-sm font-semibold backdrop-blur-sm ${varianceBadgeClass(liveVarianceKind)}`}
+            className={`flex flex-col items-center rounded-xl border px-3 py-3 text-center text-sm font-semibold backdrop-blur-sm ${varianceBadgeClass(liveVarianceKind)}`}
           >
-            {liveVarianceKind === "match" && "🟢 "}
-            {liveVarianceKind === "shortage" && "🔴 "}
-            {liveVarianceKind === "overage" && "🟡 "}
-            {varianceLabel(liveVarianceKind)}: {formatVariance(liveVariance)}
+            <span className="inline-flex items-center gap-1.5">
+              <VarianceStatusIcon kind={liveVarianceKind} />
+              {varianceLabel(liveVarianceKind)}: {formatVariance(liveVariance)}
+            </span>
             <span className="mt-1 block text-xs font-normal opacity-80">
               Physical{" "}
               {auditMode === "roll"
@@ -668,7 +671,7 @@ export function CycleAuditScanForm({
         )}
       </form>
 
-      <div className="fixed bottom-16 left-0 right-0 z-20 mx-auto w-full max-w-md border-t border-slate-800/80 bg-slate-950/90 p-3 backdrop-blur-md">
+      <ScanActionDock className="border-t border-slate-800/80 bg-slate-950/90 p-3 backdrop-blur-md">
         <button
           type="submit"
           form="cycle-audit-form"
@@ -681,7 +684,7 @@ export function CycleAuditScanForm({
               ? "Log Roll & Reset"
               : "Log Units & Reset"}
         </button>
-      </div>
+      </ScanActionDock>
     </div>
   );
 }

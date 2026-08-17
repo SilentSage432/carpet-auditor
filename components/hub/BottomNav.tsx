@@ -27,7 +27,7 @@ export function BottomNav({
   return (
     <nav
       aria-label="Primary workflow"
-      className="theme-bottom-nav fixed bottom-0 left-0 right-0 z-30 mx-auto max-w-lg pb-safe backdrop-blur-md"
+      className="theme-bottom-nav hub-bottom-nav pb-safe backdrop-blur-md"
     >
       <div
         className={`grid ${primaryLinks.length <= 2 ? "grid-cols-2" : "grid-cols-4"}`}

@@ -4,7 +4,10 @@
  * Does not persist, recommend, or invent who tapped complete.
  */
 
-import type { StoreHealthSnapshot } from "./health";
+import {
+  computeDepartmentCompletionPct,
+  type StoreHealthSnapshot,
+} from "./health";
 import type { SundayAssignmentMap } from "./sunday-audit";
 import type { WeeklyRotationWithLocation } from "./types";
 
@@ -29,11 +32,6 @@ export type WeeklyAuditRollup = {
   open_barriers: number;
   resolved_barriers: number;
 };
-
-function completionPct(completed: number, denom: number): number {
-  if (denom <= 0) return 0;
-  return Math.round((completed / denom) * 100);
-}
 
 /**
  * Attribute completions to the Sunday assignee when present.
@@ -119,7 +117,7 @@ export function composeWeeklyAuditRollup(input: {
     assigned,
     completed,
     remaining,
-    completion_pct: completionPct(completed, quota || assigned),
+    completion_pct: computeDepartmentCompletionPct(completed, quota || assigned),
     associates,
     unassigned: { assigned: unassignedAssigned, completed: unassignedCompleted },
     open_barriers,

@@ -16,6 +16,8 @@ import { SimsLocationFinder } from "@/components/catalog/SimsLocationFinder";
 import { NumberField, TextField } from "@/components/ui/NumberField";
 import { AuditReportModal } from "@/components/hub/AuditReportModal";
 import { DepartmentIcon } from "@/components/hub/NavIcons";
+import { ScanActionDock } from "@/components/hub/ScanActionDock";
+import { LocationStatusIcon } from "@/components/hub/StatusPills";
 import { resolveScan, sanitizeBarcodeScan } from "@/lib/barcode";
 import { findCatalogBySkuOrBarcode } from "@/lib/catalog";
 import {
@@ -476,9 +478,10 @@ export function DepartmentAuditSection({
             <button
               type="button"
               onClick={() => setSimsFinderOpen(true)}
-              className="text-xs font-semibold text-emerald-400"
+              className="inline-flex items-center gap-1 text-xs font-semibold text-emerald-400"
             >
-              📍 SIMS Stock
+              <LocationStatusIcon className="h-3.5 w-3.5" />
+              SIMS Stock
             </button>
           </div>
           <TextField
@@ -541,7 +544,7 @@ export function DepartmentAuditSection({
         </div>
       </form>
 
-      <div className="fixed bottom-16 left-0 right-0 z-20 mx-auto max-w-md px-4 pb-2">
+      <ScanActionDock className="px-4 pb-2">
         <div className="grid grid-cols-[1fr_auto] gap-2">
           <button
             type="button"
@@ -559,7 +562,7 @@ export function DepartmentAuditSection({
             Reset
           </button>
         </div>
-      </div>
+      </ScanActionDock>
 
       <section className={`${cardClass} space-y-2 pb-24`}>
         <h3 className="glass-subtitle">

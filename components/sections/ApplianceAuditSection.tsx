@@ -5,6 +5,7 @@ import { ApplianceAnomalyWidget } from "@/components/appliances/ApplianceAnomaly
 import { ApplianceScanEditModal } from "@/components/appliances/ApplianceScanEditModal";
 import { ConfirmModal } from "@/components/hub/ConfirmModal";
 import { DepartmentIcon } from "@/components/hub/NavIcons";
+import { LocationStatusIcon } from "@/components/hub/StatusPills";
 import { ApplianceScanForm } from "@/components/sections/ApplianceScanForm";
 import {
   aggregateApplianceScans,
@@ -541,8 +542,9 @@ export function ApplianceAuditSection({
                                         </p>
                                       ) : null}
                                       {group.locations.length > 0 ? (
-                                        <p className="font-mono text-xs text-emerald-400/90">
-                                          📍 {group.locations.join(" · ")}
+                                        <p className="flex items-center gap-1 font-mono text-xs text-emerald-400/90">
+                                          <LocationStatusIcon className="h-3 w-3 shrink-0" />
+                                          {group.locations.join(" · ")}
                                         </p>
                                       ) : null}
                                       <p className="text-[11px] font-medium text-slate-500">
@@ -593,8 +595,9 @@ export function ApplianceAuditSection({
                                               </p>
                                             )}
                                             {scan.location ? (
-                                              <p className="font-mono text-xs text-emerald-400/90">
-                                                📍 {scan.location}
+                                              <p className="flex items-center gap-1 font-mono text-xs text-emerald-400/90">
+                                                <LocationStatusIcon className="h-3 w-3 shrink-0" />
+                                                {scan.location}
                                               </p>
                                             ) : null}
                                             <time

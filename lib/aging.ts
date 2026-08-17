@@ -26,6 +26,7 @@ export function agingBand(days: number): AgingBand {
 /**
  * Floor-ops remnant rack velocity (orthogonal to markdown 30/60/90 bands).
  * Fresh <14d · Watch 14–30d · Critical >30d.
+ * Status glyphs are presentation (`AgingStatusIcon`); this returns label + class only.
  */
 export type RackAgingAlert = "fresh" | "watch" | "critical";
 
@@ -77,21 +78,21 @@ export function agingBadge(days: number): {
       tier,
       label:
         band === "90+"
-          ? `🔴 ${days}d — 90+ day clearance / Manager Markdown`
-          : `🔴 ${days}d — Needs Clearance Discount / Manager Markdown`,
+          ? `${days}d — 90+ day clearance / Manager Markdown`
+          : `${days}d — Needs Clearance Discount / Manager Markdown`,
       className: "bg-red-500/20 text-red-300 border-red-500/40",
     };
   }
   if (tier === "promote") {
     return {
       tier,
-      label: `🟡 ${days}d — Promote on sales floor`,
+      label: `${days}d — Promote on sales floor`,
       className: "bg-amber-500/20 text-amber-300 border-amber-500/40",
     };
   }
   return {
     tier,
-    label: `🟢 ${days}d — New`,
+    label: `${days}d — New`,
     className: "bg-emerald-500/20 text-emerald-300 border-emerald-500/30",
   };
 }

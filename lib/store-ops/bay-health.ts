@@ -1,10 +1,13 @@
 /**
  * Floor discrepancy & bay health diagnostics.
  * Composes store_locations cycle timestamps + hub audit rows (SIMS / variance).
- * Does not own persistence, scoring UI, or recommendations.
+ * Does not own persistence, scoring weights, scoring UI, or recommendations.
+ * Flag penalty weights live in health.ts (`flagPenalty`) so Sunday risk and
+ * bay finding scores cannot drift.
  */
 
 import { isDiscrepancy } from "@/lib/variance";
+import { flagPenalty } from "./health";
 import type { CarpetAudit } from "@/lib/types";
 import type {
   StoreLocationType,
@@ -132,13 +135,6 @@ export function parseSimsAisleBay(
     return { aisle: compact[1], bay: Number(compact[2]) };
   }
   return null;
-}
-
-function flagPenalty(flag: BayHealthFlag): number {
-  if (flag === "never_audited") return 28;
-  if (flag === "stale") return 18;
-  if (flag === "topstock_uninventoried") return 16;
-  return 12;
 }
 
 function findingScore(flags: BayHealthFlag[]): number {

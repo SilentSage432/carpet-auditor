@@ -639,6 +639,7 @@ function specialistFromSyncPayload(
       (payload.assigned_department as StoreSpecialist["assigned_department"]) ??
       null,
     must_change_credentials: false,
+    is_active: true,
     store_number: String(payload.store_number ?? getStoreNumber()),
     created_at: new Date().toISOString(),
   };

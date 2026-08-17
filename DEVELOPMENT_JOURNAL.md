@@ -1,5 +1,25 @@
 # DeptSync Hub — Development Journal
 
+## 2026-08-17 — Queue specialist stub includes `is_active`
+
+### Found
+- `specialistFromSyncPayload` in `lib/store-ops/client.ts` built a synthetic `StoreSpecialist` without required `is_active`, which failed `tsc` / `next build`.
+
+### Shipped
+- Stub returns `is_active: true` (queue replay is an active floor actor). `npm run build` compiles with zero type errors.
+
+## 2026-08-17 — Health math + mobile dock polish
+
+### Found
+- `completionPct` was copied in `health.ts` and `audit-summary.ts`. Bay flag penalties (28/18/16/12) were duplicated in `bay-health.ts` and `weekly-rotations.ts`.
+- Cycle/department Log bars used `fixed bottom-16 max-w-md` while BottomNav is `max-w-lg` + safe-area, so the stack jumped and the undo toast sat on the primary action.
+- Variance, aging, SIMS, and clearance pills still used OS emoji.
+
+### Shipped
+- `computeDepartmentCompletionPct` and `flagPenalty` / `BAY_HEALTH_FLAG_PENALTY` live in `lib/store-ops/health.ts`. Audit rollup, bay finding scores, and Sunday risk compose them. `health.ts` dynamically imports `bay-health.ts` so scoring is not a circular owner.
+- `.hub-bottom-nav` / `.hub-scan-dock` / `.hub-toast-dock` share `--hub-bottom-nav-stack` + `env(safe-area-inset-bottom)`. Specialty hub is `max-w-lg`. Sonner stays top-center under the header.
+- Status glyphs: `StatusPills` + HubIcon (`mapPin`, `circleCheck`, `circleAlert`, `tag`, `undo`) at stroke 1.75. Knowledge labels in `aging.ts` / `markdown.ts` no longer embed emoji.
+
 ## 2026-08-17 — Store Ops mutations join the offline sync queue
 
 ### Found

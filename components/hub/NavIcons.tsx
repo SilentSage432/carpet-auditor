@@ -1,7 +1,7 @@
 /**
  * Canonical Lucide vector icons for Navigation Hub + department-sync chrome.
  * Presentation only — route ownership stays in lib/nav-hub / lib/rbac.
- * Stroke weight is 2 everywhere so nav, status, and action glyphs match.
+ * Stroke weight is 2 for nav chrome. Variance / aging / bay status pills pass 1.75.
  * Color is currentColor — parent chrome (theme-nav-active / text-accent) owns the theme.
  */
 
@@ -16,6 +16,8 @@ import {
   ChevronDown,
   ChevronRight,
   ChevronUp,
+  CircleAlert,
+  CircleCheck,
   ClipboardList,
   Clock,
   Construction,
@@ -33,6 +35,7 @@ import {
   Lock,
   LogOut,
   Map,
+  MapPin,
   MoreHorizontal,
   MoreVertical,
   NotebookPen,
@@ -42,8 +45,10 @@ import {
   RefreshCw,
   Settings,
   ShieldCheck,
+  Tag,
   Trash2,
   Trees,
+  Undo2,
   User,
   Users,
   Wifi,
@@ -97,7 +102,12 @@ export type HubIconId =
   | "moreVertical"
   | "edit"
   | "trash"
-  | "calendar";
+  | "calendar"
+  | "mapPin"
+  | "undo"
+  | "tag"
+  | "circleCheck"
+  | "circleAlert";
 
 const HUB_ICON_MAP: Record<HubIconId, LucideIcon> = {
   map: Map,
@@ -136,6 +146,11 @@ const HUB_ICON_MAP: Record<HubIconId, LucideIcon> = {
   crown: Crown,
   user: User,
   logOut: LogOut,
+  mapPin: MapPin,
+  undo: Undo2,
+  tag: Tag,
+  circleCheck: CircleCheck,
+  circleAlert: CircleAlert,
 };
 
 const DEFAULT_STROKE = 2;

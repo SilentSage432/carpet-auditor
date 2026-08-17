@@ -1,15 +1,13 @@
 /**
  * Store Health Scorecard — weekly pace + bottleneck aggregation.
+ * Owns `computeDepartmentCompletionPct` and bay-health `flagPenalty` weights.
  * Composes weekly_rotations + rotation_exceptions for the current ISO week.
  * Shift velocity telemetry is composed via lib/store-ops/telemetry (does not own chart UI).
+ * Bay diagnosis stays in bay-health.ts (dynamic import to avoid a cycle).
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import {
-  compactBayHealthForPrompt,
-  diagnoseBayHealth,
-  type BayHealthBriefingContext,
-} from "./bay-health";
+import type { BayHealthBriefingContext } from "./bay-health";
 import { resolveDepartmentIdByCode } from "./rotations";
 import {
   buildStoreAuditTelemetry,
@@ -68,9 +66,35 @@ export type StoreHealthSnapshot = {
   bay_health: BayHealthBriefingContext | null;
 };
 
-function completionPct(completed: number, assigned: number): number {
-  if (assigned <= 0) return 0;
-  return Math.round((completed / assigned) * 100);
+/**
+ * Canonical completion percent for department / store health and supervisor rollup.
+ * `targetCount` is assigned bays on the scorecard, or quota||assigned on the weekly rollup.
+ */
+export function computeDepartmentCompletionPct(
+  completedCount: number,
+  targetCount: number
+): number {
+  if (targetCount <= 0) return 0;
+  return Math.round((completedCount / targetCount) * 100);
+}
+
+/** Bay-health flag weights — diagnosis stays in bay-health.ts; scoring must not drift. */
+export const BAY_HEALTH_FLAG_PENALTY = {
+  never_audited: 28,
+  stale: 18,
+  topstock_uninventoried: 16,
+  sims_mismatch: 12,
+} as const;
+
+export type BayHealthFlagPenaltyKey = keyof typeof BAY_HEALTH_FLAG_PENALTY;
+
+export function flagPenalty(flag: string): number {
+  if (flag === "never_audited") return BAY_HEALTH_FLAG_PENALTY.never_audited;
+  if (flag === "stale") return BAY_HEALTH_FLAG_PENALTY.stale;
+  if (flag === "topstock_uninventoried") {
+    return BAY_HEALTH_FLAG_PENALTY.topstock_uninventoried;
+  }
+  return BAY_HEALTH_FLAG_PENALTY.sims_mismatch;
 }
 
 function bucketReason(reason: string): string {
@@ -144,9 +168,7 @@ export async function buildStoreHealthSnapshot(
       completion_pct: 0,
     },
     telemetry: null,
-    bay_health: compactBayHealthForPrompt(
-      diagnoseBayHealth({ rotations: [] })
-    ),
+    bay_health: await emptyBayHealthBriefing(),
   };
 
   if (deptIds.length === 0) return empty;
@@ -219,12 +241,19 @@ export async function enrichSnapshotBayHealth(
   return { ...snapshot, bay_health };
 }
 
+async function emptyBayHealthBriefing(): Promise<BayHealthBriefingContext> {
+  const { compactBayHealthForPrompt, diagnoseBayHealth } = await import(
+    "./bay-health"
+  );
+  return compactBayHealthForPrompt(diagnoseBayHealth({ rotations: [] }));
+}
+
 async function loadBayHealthBriefingContext(
   supabase: SupabaseClient,
   opts: { storeId: string; week: string; departmentIds: string[] }
 ): Promise<BayHealthBriefingContext | null> {
   if (!opts.week || opts.departmentIds.length === 0) {
-    return compactBayHealthForPrompt(diagnoseBayHealth({ rotations: [] }));
+    return emptyBayHealthBriefing();
   }
 
   const rows = await loadBayHealthRotations(supabase, opts);
@@ -239,6 +268,9 @@ async function loadBayHealthBriefingContext(
     store_locations: nestLocation(row.store_locations, row.department_id, opts.storeId),
   }));
 
+  const { compactBayHealthForPrompt, diagnoseBayHealth } = await import(
+    "./bay-health"
+  );
   return compactBayHealthForPrompt(diagnoseBayHealth({ rotations }));
 }
 
@@ -360,7 +392,7 @@ function composeSnapshot(
       completed,
       open,
       exception_count,
-      completion_pct: completionPct(completed, assigned),
+      completion_pct: computeDepartmentCompletionPct(completed, assigned),
     };
   });
 
@@ -419,7 +451,7 @@ function composeSnapshot(
       completed,
       open,
       exceptions,
-      completion_pct: completionPct(completed, assigned),
+      completion_pct: computeDepartmentCompletionPct(completed, assigned),
     },
     telemetry,
     bay_health: null,

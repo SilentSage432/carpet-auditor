@@ -536,7 +536,7 @@ export default function DeptSyncHubPage() {
 
       {authenticated ? (
         <>
-          <div className="mx-auto w-full max-w-md flex-1 overflow-x-hidden px-3 py-2 pb-28">
+          <div className="mx-auto w-full max-w-lg flex-1 overflow-x-hidden px-3 py-2 hub-scan-dock-pad">
             {!isSimplifiedAssociateView(viewMember) ? (
               <AssociateSpecialtySwitcher
                 active={activeSection}

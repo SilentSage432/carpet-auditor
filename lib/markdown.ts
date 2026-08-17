@@ -1,4 +1,4 @@
-/** Manager markdown math — presentation consumes these results. */
+/** Manager markdown math — presentation consumes these results (Lucide tag, not emoji). */
 
 export type MarkdownInput =
   | { mode: "percent"; estimatedValue: number; percent: number }
@@ -61,5 +61,5 @@ export function clearanceBadgeLabel(input: {
   } else {
     parts.push(`by ${by}`);
   }
-  return `🏷️ ${formatMoney(input.markdown_price)} Clearance (${parts.join(" · ")})`;
+  return `${formatMoney(input.markdown_price)} Clearance (${parts.join(" · ")})`;
 }
