@@ -122,6 +122,7 @@
 - [x] Map velocity/priority seeding (Bulk Generator presets + EditBayDrawer hotspot/lock/decay → Sunday `custom_decay_days`)
 - [x] Map Visual Grid walk-only (no Department Overview, no batch checkboxes; CRUD stays in Manage)
 - [x] Roster weekly schedule matrix (`AssociateScheduleModal` + collapsed department accordions)
+- [x] Roster compact specialist rows + `SpecialistEditSheet` (schedule / grants / invite / PIN / remove)
 - [x] Role-based hub views (`MASTER_ADMIN` / `DEPARTMENT_SUPERVISOR` / `ASSOCIATE_CSA`) + Master-only 3-tap developer sandbox
 - [x] Theme / preferences / audio-haptics engine (`lib/ui/feedback.ts` + `UserPreferencesDrawer` for all roles)
 - [x] Instant-render Store Ops SWR (IndexedDB L2 + silent revalidate) + chunked Map DOM + async briefing decay + `20260815_performance_indexes.sql`

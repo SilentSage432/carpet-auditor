@@ -11,10 +11,11 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { AssociateScheduleModal } from "@/components/hub/AssociateScheduleModal";
-import { DepartmentAccessChips } from "@/components/hub/DepartmentAccessChips";
+import { ChevronDown, ChevronUp, Plus } from "lucide-react";
 import { DepartmentPicker } from "@/components/hub/DepartmentPicker";
-import { DepartmentIcon, HubIcon } from "@/components/hub/NavIcons";
+import { DepartmentIcon } from "@/components/hub/NavIcons";
+import { SpecialistCard } from "@/components/hub/SpecialistCard";
+import { SpecialistEditSheet } from "@/components/hub/SpecialistEditSheet";
 import { TextField } from "@/components/ui/NumberField";
 import { redistributeCallOutBays } from "@/lib/store-ops/call-out";
 import { composeRosterDepartmentGroups } from "@/lib/store-ops/roster-groups";
@@ -30,8 +31,6 @@ import {
   suggestUsername,
 } from "@/lib/rbac";
 import {
-  appAccessLabel,
-  appAccessStatus,
   dedupeRoster,
   deleteSpecialist,
   fetchSpecialists,
@@ -43,25 +42,20 @@ import { updateDepartmentAccess, inviteSupervisor, createRosterMember } from "@/
 import type { InviteSupervisorResult } from "@/lib/store-ops/client";
 import {
   composeShiftBoard,
+  DEFAULT_SHIFT_END,
+  DEFAULT_SHIFT_START,
   fetchShiftDaysRange,
-  isScheduledShiftDay,
   localWorkDate,
   retailWeekDates,
   retailWeekStart,
-  RETAIL_WEEKDAY_SHORT,
   SHIFT_STATUS_EVENT,
   shiftRowKey,
   sliceShiftDaysForDate,
-  todayShiftCaption,
   upsertShiftDay,
   type AssociateShiftDay,
 } from "@/lib/store-ops/shift-status";
 import { toastError, toastSuccess, toastInfo } from "@/lib/toast";
 import {
-  departmentMeta,
-  departmentRosterHeading,
-  rosterFloorBadgeLabel,
-  rosterJobTitleLabel,
   ROSTER_JOB_GROUPS,
   ROSTER_JOB_OPTIONS,
   resolveRosterJobSave,
@@ -74,9 +68,7 @@ import {
 import { normalizePhoneE164, formatPhoneDisplay } from "@/lib/phone";
 import type { WorkflowTabProps } from "@/components/hub/tabs/tab-props";
 
-function rosterRoleLabel(member: StoreSpecialist): string {
-  return rosterJobTitleLabel(member);
-}
+const ICON_STROKE = 1.75;
 
 function homeDepartment(member: StoreSpecialist): DepartmentScope {
   return specialistHomeDepartment(member);
@@ -125,7 +117,7 @@ export function RosterTab({ specialist, storeNumber }: WorkflowTabProps) {
     null
   );
   const [openDepts, setOpenDepts] = useState<Record<string, boolean>>({});
-  const [scheduleTarget, setScheduleTarget] = useState<StoreSpecialist | null>(
+  const [manageTarget, setManageTarget] = useState<StoreSpecialist | null>(
     null
   );
   const [callOutTarget, setCallOutTarget] = useState<StoreSpecialist | null>(
@@ -148,8 +140,12 @@ export function RosterTab({ specialist, storeNumber }: WorkflowTabProps) {
         fetchSpecialists(storeNumber),
         fetchShiftDaysRange(weekStart, weekEnd),
       ]);
-      setRoster(dedupeRoster(team));
+      const nextRoster = dedupeRoster(team);
+      setRoster(nextRoster);
       setWeekRows(saved);
+      setManageTarget((curr) =>
+        curr ? nextRoster.find((row) => row.id === curr.id) ?? null : curr
+      );
     } catch (err) {
       toastError(
         err instanceof Error ? err.message : "Could not load live roster"
@@ -222,17 +218,43 @@ export function RosterTab({ specialist, storeNumber }: WorkflowTabProps) {
           : row
       )
     );
-    toastSuccess(`Updated permissions for ${member.name}`);
+    setManageTarget((curr) =>
+      curr && curr.id === member.id
+        ? { ...curr, accessible_departments: composed }
+        : curr
+    );
     setBusyId(member.id);
     try {
-      await updateDepartmentAccess(specialist, {
+      const result = await updateDepartmentAccess(specialist, {
         specialist_id: member.id,
         assigned_department: assigned,
         accessible_departments: composed,
       });
+      const persisted = composeAccessibleDepartments(
+        assigned,
+        result.accessible_departments as OperationalDepartment[]
+      );
+      setRoster((curr) =>
+        curr.map((row) =>
+          row.id === member.id
+            ? { ...row, accessible_departments: persisted }
+            : row
+        )
+      );
+      setManageTarget((curr) =>
+        curr && curr.id === member.id
+          ? { ...curr, accessible_departments: persisted }
+          : curr
+      );
+      toastSuccess(`Updated permissions for ${member.name}`);
       await reload();
     } catch (err) {
       setRoster(previous);
+      setManageTarget((curr) =>
+        curr && curr.id === member.id
+          ? previous.find((row) => row.id === member.id) ?? curr
+          : curr
+      );
       toastError(
         err instanceof Error
           ? err.message
@@ -268,6 +290,20 @@ export function RosterTab({ specialist, storeNumber }: WorkflowTabProps) {
 
   async function markCallOut(absent: StoreSpecialist, nextCallOut: boolean) {
     if (!nextCallOut) {
+      const previous = weekRows;
+      const optimistic: AssociateShiftDay = {
+        specialist_id: String(absent.id),
+        work_date: today,
+        start_time: dayById.get(String(absent.id))?.start_time ?? DEFAULT_SHIFT_START,
+        end_time: dayById.get(String(absent.id))?.end_time ?? DEFAULT_SHIFT_END,
+        is_scheduled_today: true,
+        is_call_out: false,
+        status: "ON_DUTY",
+      };
+      setWeekRows((curr) => ({
+        ...curr,
+        [shiftRowKey(optimistic.specialist_id, today)]: optimistic,
+      }));
       setBusyId(absent.id);
       try {
         const next = await upsertShiftDay({
@@ -281,6 +317,7 @@ export function RosterTab({ specialist, storeNumber }: WorkflowTabProps) {
         }));
         toastSuccess(`${absent.name} is on-duty`);
       } catch (err) {
+        setWeekRows(previous);
         toastError(
           err instanceof Error ? err.message : "Could not update duty status"
         );
@@ -355,9 +392,10 @@ export function RosterTab({ specialist, storeNumber }: WorkflowTabProps) {
           <button
             type="button"
             onClick={() => setAddOpen(true)}
-            className="btn-primary-glow shrink-0 rounded-xl px-3 text-sm font-bold"
+            className="btn-primary-glow inline-flex shrink-0 items-center gap-1.5 rounded-xl px-3 text-sm font-bold"
           >
-            + Add Team Member
+            <Plus className="h-4 w-4" strokeWidth={ICON_STROKE} aria-hidden />
+            Add Team Member
           </button>
         ) : null}
       </div>
@@ -392,6 +430,7 @@ export function RosterTab({ specialist, storeNumber }: WorkflowTabProps) {
                     <DepartmentIcon
                       department={group.home}
                       className="h-4 w-4 shrink-0 text-accent"
+                      strokeWidth={ICON_STROKE}
                     />
                     <span>
                       <span className="block truncate text-sm font-bold text-white">
@@ -402,209 +441,41 @@ export function RosterTab({ specialist, storeNumber }: WorkflowTabProps) {
                       </span>
                     </span>
                   </span>
-                  <HubIcon
-                    id={open ? "chevronUp" : "chevronDown"}
-                    className="h-4 w-4 text-zinc-400"
-                  />
+                  {open ? (
+                    <ChevronUp
+                      className="h-4 w-4 text-zinc-400"
+                      strokeWidth={ICON_STROKE}
+                      aria-hidden
+                    />
+                  ) : (
+                    <ChevronDown
+                      className="h-4 w-4 text-zinc-400"
+                      strokeWidth={ICON_STROKE}
+                      aria-hidden
+                    />
+                  )}
                 </button>
                 {open ? (
                   <ul className="space-y-2 border-t border-zinc-800/80 px-2 py-2">
                     {group.members.map((member) => {
-                      const home = homeDepartment(member);
                       const day = dayById.get(String(member.id));
-                      const grantable =
-                        canGrant &&
-                        member.role !== "MasterAdmin" &&
-                        (canManage || member.role === "Associate");
-                      const calledOut = day?.is_call_out === true;
-                      const access = appAccessStatus(member);
+                      const onDuty = day?.status === "ON_DUTY";
+                      const canManageCard =
+                        canShift || canGrant || canManage;
                       return (
-                        <li
+                        <SpecialistCard
                           key={member.id}
-                          className="rounded-xl border border-zinc-800 bg-zinc-950/50 p-3"
-                        >
-                          <div className="flex items-start justify-between gap-2">
-                            <div className="min-w-0">
-                              <p className="truncate text-sm font-bold text-white">
-                                {member.name}
-                                <FloorTitleBadge member={member} />
-                                <AppAccessBadge member={member} />
-                              </p>
-                              <p className="mt-0.5 flex items-center gap-1.5 font-mono text-[10px] font-bold uppercase tracking-wider text-accent">
-                                {member.role === "MasterAdmin" ? (
-                                  <HubIcon id="crown" className="h-3.5 w-3.5" />
-                                ) : member.role === "Supervisor" ? (
-                                  <HubIcon id="shield" className="h-3.5 w-3.5" />
-                                ) : (
-                                  <HubIcon id="user" className="h-3.5 w-3.5" />
-                                )}
-                                {rosterRoleLabel(member)}
-                              </p>
-                            </div>
-                            {canManage && member.role !== "MasterAdmin" ? (
-                              <button
-                                type="button"
-                                disabled={busyId === member.id}
-                                onClick={() => setDeleteTarget(member)}
-                                className="btn-icon-touch text-rose-300"
-                                aria-label={`Remove ${member.name}`}
-                              >
-                                <HubIcon id="trash" className="h-4 w-4" />
-                              </button>
-                            ) : null}
-                          </div>
-
-                          {member.role !== "MasterAdmin" ? (
-                            <div className="mt-2 space-y-2">
-                              <div
-                                className="flex items-center justify-between gap-1"
-                                aria-label={`${member.name} weekly schedule`}
-                              >
-                                {weekDates.map((date, index) => {
-                                  const saved =
-                                    weekRows[
-                                      shiftRowKey(String(member.id), date)
-                                    ];
-                                  const on =
-                                    date === today
-                                      ? isScheduledShiftDay(saved ?? day)
-                                      : isScheduledShiftDay(saved);
-                                  return (
-                                    <span
-                                      key={date}
-                                      className="flex flex-1 flex-col items-center gap-1"
-                                    >
-                                      <span className="font-mono text-[9px] font-bold uppercase tracking-wide text-zinc-500">
-                                        {RETAIL_WEEKDAY_SHORT[index]}
-                                      </span>
-                                      <span
-                                        className={`h-2 w-2 rounded-full ${
-                                          on ? "bg-emerald-400" : "bg-zinc-600"
-                                        }`}
-                                        title={
-                                          on
-                                            ? `${RETAIL_WEEKDAY_SHORT[index]} scheduled`
-                                            : `${RETAIL_WEEKDAY_SHORT[index]} off`
-                                        }
-                                      />
-                                    </span>
-                                  );
-                                })}
-                              </div>
-                              <div className="flex flex-wrap items-center gap-1.5">
-                                <span
-                                  className={`inline-flex min-h-8 items-center rounded-full border px-2.5 font-mono text-[11px] font-bold tracking-tight ${
-                                    calledOut
-                                      ? "border-rose-500/40 bg-rose-950/40 text-rose-100"
-                                      : isScheduledShiftDay(day)
-                                        ? "border-emerald-500/35 bg-emerald-950/30 text-emerald-100"
-                                        : "border-zinc-700 bg-zinc-900 text-zinc-300"
-                                  }`}
-                                >
-                                  {todayShiftCaption(day)}
-                                </span>
-                                {canShift ? (
-                                  <button
-                                    type="button"
-                                    onClick={() => setScheduleTarget(member)}
-                                    className="inline-flex min-h-8 items-center gap-1 rounded-full border border-zinc-700 px-2.5 text-[11px] font-bold"
-                                  >
-                                    <HubIcon
-                                      id="calendar"
-                                      className="h-3.5 w-3.5"
-                                    />
-                                    Edit Schedule
-                                  </button>
-                                ) : null}
-                              </div>
-                            </div>
-                          ) : null}
-
-                          {canShift && member.role !== "MasterAdmin" ? (
-                            <button
-                              type="button"
-                              role="switch"
-                              aria-checked={calledOut}
-                              disabled={busyId === member.id}
-                              onClick={() =>
-                                void markCallOut(member, !calledOut)
-                              }
-                              className={`mt-2 flex min-h-11 w-full items-center justify-between rounded-xl border px-3 text-sm font-bold ${
-                                calledOut
-                                  ? "border-rose-500/45 bg-rose-950/40 text-rose-100"
-                                  : "border-emerald-500/35 bg-emerald-950/25 text-emerald-100"
-                              }`}
-                            >
-                              <span className="inline-flex items-center gap-1.5">
-                                <HubIcon id="zap" className="h-4 w-4" />
-                                {calledOut ? "Call-Out" : "On-Duty"}
-                              </span>
-                              <span
-                                className={`relative h-7 w-12 shrink-0 rounded-full ${
-                                  calledOut ? "bg-rose-500" : "bg-emerald-500"
-                                }`}
-                              >
-                                <span
-                                  className={`absolute top-0.5 h-6 w-6 rounded-full bg-white transition ${
-                                    calledOut ? "left-[1.35rem]" : "left-0.5"
-                                  }`}
-                                />
-                              </span>
-                            </button>
-                          ) : null}
-
-                          {canManage &&
-                          member.role !== "MasterAdmin" &&
-                          access === "roster_only" ? (
-                            <button
-                              type="button"
-                              disabled={busyId === member.id}
-                              onClick={() => setInviteTarget(member)}
-                              className="mt-2 flex min-h-11 w-full items-center justify-center gap-1.5 rounded-xl border border-cyan-500/40 bg-cyan-950/25 text-sm font-bold text-cyan-100"
-                            >
-                              <HubIcon id="users" className="h-4 w-4" />
-                              Send App Invite
-                            </button>
-                          ) : null}
-
-                          {member.role === "MasterAdmin" ? (
-                            <p className="mt-2 text-[11px] text-zinc-500">
-                              Full-store access — chips are not required.
-                            </p>
-                          ) : grantable ? (
-                            <div className="mt-3">
-                              <DepartmentAccessChips
-                                primary={home === "all" ? "flooring" : home}
-                                value={composeAccessibleDepartments(
-                                  home,
-                                  member.accessible_departments
-                                )}
-                                disabled={busyId === member.id}
-                                onChange={(next) =>
-                                  void handleAccess(member, next)
-                                }
-                              />
-                            </div>
-                          ) : (
-                            <div className="mt-2 flex flex-wrap gap-1">
-                              {composeAccessibleDepartments(
-                                home,
-                                member.accessible_departments
-                              ).map((dept) => (
-                                <span
-                                  key={dept}
-                                  className="inline-flex min-h-8 items-center gap-1 rounded-full border border-zinc-700 bg-zinc-900 px-2 font-mono text-[10px] font-bold uppercase tracking-wide text-zinc-300"
-                                >
-                                  <DepartmentIcon
-                                    department={dept}
-                                    className="h-3.5 w-3.5"
-                                  />
-                                  {departmentMeta(dept).shortLabel}
-                                </span>
-                              ))}
-                            </div>
-                          )}
-                        </li>
+                          member={member}
+                          day={day}
+                          busy={busyId === member.id}
+                          canShift={canShift}
+                          canManageCard={canManageCard}
+                          onDuty={onDuty}
+                          onToggleDuty={() =>
+                            void markCallOut(member, onDuty)
+                          }
+                          onManage={() => setManageTarget(member)}
+                        />
                       );
                     })}
                   </ul>
@@ -619,9 +490,10 @@ export function RosterTab({ specialist, storeNumber }: WorkflowTabProps) {
         <button
           type="button"
           onClick={() => setAddOpen(true)}
-          className="btn-primary-glow mt-4 flex min-h-12 w-full items-center justify-center rounded-xl text-sm font-bold"
+          className="btn-primary-glow mt-4 flex min-h-12 w-full items-center justify-center gap-1.5 rounded-xl text-sm font-bold"
         >
-          + Add Team Member
+          <Plus className="h-4 w-4" strokeWidth={ICON_STROKE} aria-hidden />
+          Add Team Member
         </button>
       ) : null}
 
@@ -656,12 +528,24 @@ export function RosterTab({ specialist, storeNumber }: WorkflowTabProps) {
         />
       ) : null}
 
-      {scheduleTarget ? (
-        <AssociateScheduleModal
-          member={scheduleTarget}
-          homeLabel={departmentRosterHeading(homeDepartment(scheduleTarget))}
-          onClose={() => setScheduleTarget(null)}
-          onSaved={() => void reload()}
+      {manageTarget ? (
+        <SpecialistEditSheet
+          member={manageTarget}
+          busy={busyId === manageTarget.id}
+          canShift={canShift}
+          canGrant={canGrant}
+          canManage={canManage}
+          onClose={() => setManageTarget(null)}
+          onAccessChange={(next) => void handleAccess(manageTarget, next)}
+          onInvite={() => {
+            setInviteTarget(manageTarget);
+            setManageTarget(null);
+          }}
+          onRemove={() => {
+            setDeleteTarget(manageTarget);
+            setManageTarget(null);
+          }}
+          onScheduleSaved={() => void reload()}
         />
       ) : null}
 
@@ -759,42 +643,6 @@ export function RosterTab({ specialist, storeNumber }: WorkflowTabProps) {
         </div>
       ) : null}
     </main>
-  );
-}
-
-function AppAccessBadge({ member }: { member: StoreSpecialist }) {
-  const access = appAccessStatus(member);
-  const tone =
-    access === "invited"
-      ? "border-amber-500/40 bg-amber-950/40 text-amber-100"
-      : access === "active"
-        ? "border-emerald-500/40 bg-emerald-950/40 text-emerald-100"
-        : "border-zinc-600 bg-zinc-900 text-zinc-300";
-  return (
-    <span
-      className={`ml-2 inline-flex rounded-full border px-2 py-0.5 font-mono text-[9px] font-bold uppercase tracking-wide ${tone}`}
-    >
-      {appAccessLabel(access)}
-    </span>
-  );
-}
-
-function FloorTitleBadge({ member }: { member: StoreSpecialist }) {
-  const label = rosterFloorBadgeLabel(member);
-  const tone =
-    label === "Supervisor" || label === "Master"
-      ? "border-amber-400/40 bg-amber-500/15 text-amber-200"
-      : label === "CSA"
-        ? "border-cyan-400/40 bg-cyan-500/15 text-cyan-200"
-        : label === "Specialist"
-          ? "border-violet-400/40 bg-violet-500/15 text-violet-200"
-          : "border-zinc-500/40 bg-zinc-500/15 text-zinc-300";
-  return (
-    <span
-      className={`ml-2 inline-flex rounded-full border px-2 py-0.5 font-mono text-[9px] font-bold uppercase tracking-wide ${tone}`}
-    >
-      {label}
-    </span>
   );
 }
 

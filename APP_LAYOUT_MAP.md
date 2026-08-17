@@ -243,7 +243,8 @@ Floor Pad is no longer a Settings tool. Master/DS open **Walk & Talk** from Floo
 | **UserPreferencesDrawer** | `hub/UserPreferencesDrawer.tsx` | Header profile + Settings Appearance | Theme, density, contrast, sound, haptics |
 | **DevSandboxDrawer** | `hub/DevSandboxDrawer.tsx` | Logo 3-tap (Master) | Preview As Role + Simulate Department |
 | **WalkTheFloorSheet** | `WalkTheFloorSheet.tsx` | Map bay tap | Walk log + Snap Bay |
-| **AssociateScheduleModal** | `hub/AssociateScheduleModal.tsx` | Roster Edit Schedule | Sun–Sat day strip + Open/Mid/Close + per-day times |
+| **AssociateScheduleModal** | `hub/AssociateScheduleModal.tsx` | Roster manage sheet (embedded) | Sun–Sat day strip + Open/Mid/Close + per-day times |
+| **SpecialistEditSheet** | `hub/SpecialistEditSheet.tsx` | Roster card / sliders | Schedule, cross-dept chips, invite, PIN, remove |
 | **AisleBayManager** | `admin/AisleBayManager.tsx` | Settings Store Topology | Add bay, bulk generate, batch delete |
 | **EditBayDrawer** | `admin/EditBayDrawer.tsx` | Settings Topology bay Edit | Hotspot / priority lock / 3–21 decay slider |
 | **BulkLocationGenerator** | `admin/BulkLocationGenerator.tsx` | Settings Store Topology | Aisle range + Default Velocity Tier seed |

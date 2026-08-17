@@ -145,6 +145,16 @@ export function formatShiftPill(
   return `${a} - ${b}`;
 }
 
+/** Roster compact row clock: "07:00 – 15:30". */
+export function formatShiftClockRange(
+  start: string | null | undefined,
+  end: string | null | undefined
+): string {
+  const a = normalizeClock(start) || DEFAULT_START;
+  const b = normalizeClock(end) || DEFAULT_END;
+  return `${a} – ${b}`;
+}
+
 /** Compact floor pill clock: "7a", "3:30p". */
 export function formatCompactClock(
   raw: string | null | undefined

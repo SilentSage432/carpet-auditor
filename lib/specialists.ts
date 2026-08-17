@@ -972,6 +972,91 @@ export async function updateSpecialistPin(
   }
 }
 
+/**
+ * Master Admin force-reset of another roster PIN.
+ * Does not swap the signed-in session unless the target is the active specialist.
+ */
+export async function adminResetSpecialistPin(
+  member: StoreSpecialist,
+  newPin: string
+): Promise<{ record: StoreSpecialist; offline: boolean }> {
+  const pin = newPin.trim();
+  if (!/^\d{4}$/.test(pin)) {
+    throw new Error("PIN must be exactly 4 digits");
+  }
+
+  const store = member.store_number || getStoreNumber();
+  const nextLocal: StoreSpecialist = {
+    ...member,
+    pin_code: pin,
+    must_change_credentials: false,
+    store_number: store,
+  };
+
+  function applySession(record: StoreSpecialist) {
+    upsertLocal(record);
+    const active = getActiveSpecialist();
+    if (active && String(active.id) === String(member.id)) {
+      setActiveSpecialist(record);
+    }
+  }
+
+  if (shouldSaveOffline()) {
+    const offlineRecord: StoreSpecialist = { ...nextLocal, offline: true };
+    applySession(offlineRecord);
+    enqueueSyncAction(
+      "upsert_specialist",
+      specialistPayload(offlineRecord),
+      store
+    );
+    return { record: offlineRecord, offline: true };
+  }
+
+  try {
+    const { getSupabaseAccessToken } = await import("@/lib/supabase/client");
+    const token = await getSupabaseAccessToken();
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+    };
+    if (token) headers.Authorization = `Bearer ${token}`;
+
+    const res = await fetch("/api/auth/reset-pin", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({
+        specialist_id: member.id,
+        username: member.username,
+        store_number: store || undefined,
+        new_pin: pin,
+        admin_reset: true,
+      }),
+    });
+
+    const body = (await res.json().catch(() => ({}))) as {
+      error?: string;
+      specialist?: Record<string, unknown>;
+    };
+
+    if (!res.ok || !body.specialist) {
+      throw new Error(
+        body.error || `Could not reset PIN for ${member.name} (${res.status})`
+      );
+    }
+
+    const saved = mapRow({
+      ...body.specialist,
+      pin_code: body.specialist.pin_code ?? body.specialist.pin ?? pin,
+      offline: false,
+    });
+    applySession(saved);
+    return { record: saved, offline: false };
+  } catch (err) {
+    console.error("Failed to admin-reset PIN:", err);
+    if (err instanceof Error && err.message.trim()) throw err;
+    throw new Error(`Could not reset PIN for ${member.name}. Please try again.`);
+  }
+}
+
 /** First-login / supervisor credential customization (username + password + optional phone). */
 export async function updateSpecialistCredentials(
   member: StoreSpecialist,

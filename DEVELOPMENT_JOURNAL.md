@@ -1,5 +1,15 @@
 # DeptSync Hub — Development Journal
 
+## 2026-08-17 — Roster compact rows; manage sheet owns schedule and grants
+
+### Found
+- Roster cards stacked weekly S–S dots, inline Edit Schedule, a full-width On-Duty switch, Send App Invite, and the 11-department access grid on every accordion row.
+
+### Shipped
+- Compact `SpecialistCard` rows: name, Specialist/CSA/Supervisor badge, `07:00 – 15:30` (or Off / Call-out), On-Duty switch, Lucide `SlidersHorizontal` manage.
+- `SpecialistEditSheet` hosts Edit Schedule (`AssociateScheduleModal` embedded), cross-department chips (`POST /api/admin/department-access` → `store_specialists.accessible_departments`), Send App Invite, Change/Reset PIN, and Remove Specialist.
+- On-Duty still persists to `associate_shift_days` (not `is_active`) so toggling duty cannot hide the roster row. Optimistic weekRows + rollback on failure. Department headers keep `D23 · Flooring` with Lucide department glyphs (`DoorOpen` for Millwork) at stroke 1.75.
+
 ## 2026-08-17 — Map is a floor navigator; topology lives in Settings
 
 ### Found

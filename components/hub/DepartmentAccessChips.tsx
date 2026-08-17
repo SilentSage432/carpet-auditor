@@ -76,6 +76,7 @@ export function DepartmentAccessChips({
               <DepartmentIcon
                 department={dept}
                 className="h-3.5 w-3.5 shrink-0"
+                strokeWidth={1.75}
               />
               {meta.shortLabel}
               {locked ? " · home" : ""}

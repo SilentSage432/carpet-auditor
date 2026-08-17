@@ -41,7 +41,9 @@ lib/rbac.ts                       → HubViewRole + map console / associate chro
 app/loading.tsx                   → Route-level splash
 app/stock/page.tsx                → Redirect → /dashboard (Downstock lives on Floor)
 app/(workflow)/roster/page.tsx    → Team roster keep-alive tab
-components/hub/tabs/RosterTab.tsx → Department-grouped roster (collapsed) + weekly schedule + call-out
+components/hub/tabs/RosterTab.tsx → Department-grouped compact roster + call-out
+components/hub/SpecialistCard.tsx → Compact specialist row (duty switch + manage)
+components/hub/SpecialistEditSheet.tsx → Schedule, grants, invite, PIN, remove
 app/api/roster/members/route.ts   → Canonical roster-only INSERT into store_specialists
 components/hub/AssociateScheduleModal.tsx → Sun–Sat shift matrix (composes shift-status.ts)
 components/hub/tabs/MapTab.tsx    → Visual floor navigator (Standard Map | Velocity Heatmap)
@@ -164,7 +166,7 @@ supabase/migrations/20260815_custom_decay_days.sql → store_locations.custom_de
 supabase/migrations/20260815_shift_walk_tasks.sql → shift_walk_tasks (floor-walk Copilot dispatch)
 app/admin/roles/page.tsx          → Redirect → /roster
 app/api/admin/department-access/route.ts → Instant accessible_departments upsert + JWT app_metadata
-components/hub/DepartmentAccessChips.tsx → Roster multi-select department grants
+components/hub/DepartmentAccessChips.tsx → SpecialistEditSheet multi-select department grants
 components/hub/AdminDepartmentSwitcher.tsx → Header pill when accessible_departments.length > 1
 lib/auth-session.ts               → Auth session token + inactivity lock
 lib/biometric-auth.ts             → WebAuthn fingerprint / Face ID register + assert
@@ -222,8 +224,8 @@ supabase/migrations/20260812_sunday_bay_assignments.sql → sunday specialist↔
 | Manager notes / Executive Floor Pad | `lib/store-ops/ai-note-extract.ts`, `manager-notes.ts`, `app/actions/manager-notes.ts`, `components/manager-notes/*` (opened from Floor `TacticalVoiceFloorPad`; `ai-note-summary` retired 410) |
 | Floor-walk Copilot / shift dispatch | `lib/store-ops/ai-walk-parse.ts` + `POST /api/copilot/parse-walk` + `lib/store-ops/shift-tasks.ts` (`TacticalVoiceFloorPad`) |
 | Bay freshness overlay | `lib/heatmap/bay-tracker.ts` + `BayFreshnessGrid` (composes last_serviced_at / last_completed_at / walk touches; not velocity or bay-health) |
-| Team roster (Master Admin) | `RosterTab` + `AddTeamMemberSheet` → `POST /api/roster/members` → `store_specialists`; accordion read via `fetchSpecialists`; grouping via `roster-groups.ts` (home dept, Specialist and CSA together); weekly matrix via `shift-status.ts` (`canManageShiftBoard`). Job options / `floor_title` owned by `lib/types.ts`. |
-| Cross-department grants | `lib/department-access.ts` + `POST /api/admin/department-access` + Roster chips |
+| Team roster (Master Admin) | `RosterTab` + `SpecialistCard` + `SpecialistEditSheet` + `AddTeamMemberSheet` → `POST /api/roster/members` → `store_specialists`; accordion read via `fetchSpecialists`; grouping via `roster-groups.ts` (home dept, Specialist and CSA together); weekly matrix via `shift-status.ts` (`canManageShiftBoard`). Job options / `floor_title` owned by `lib/types.ts`. |
+| Cross-department grants | `lib/department-access.ts` + `POST /api/admin/department-access` + Roster `SpecialistEditSheet` chips |
 | Working department pin | `lib/admin-department-context.ts` (Master full-store; multi-dept clamped to grants) |
 | Personal theme / density / contrast / sound / haptics | `lib/theme.ts` + `lib/ui/preferences-context.tsx` + `UserPreferencesDrawer` (all roles) |
 | Audio & haptics playback | `lib/ui/feedback.ts` (`HapticsListener` taps; scan/bay/Sunday compose) |
