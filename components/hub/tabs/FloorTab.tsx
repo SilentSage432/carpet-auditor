@@ -130,6 +130,12 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
   const master = isMasterAdmin(specialist);
   const assignmentDept = working === "all" ? "flooring" : working;
   const completedCount = rotations.filter((r) => r.is_completed).length;
+  const pendingVerifyCount = rotations.filter(
+    (r) =>
+      r.is_completed &&
+      String(r.verification_status ?? "").toUpperCase() ===
+        "PENDING_VERIFICATION"
+  ).length;
   const showApplianceScanner =
     (working === "appliances" || working === "all") &&
     canAccessSection(specialist, "appliances");
@@ -253,6 +259,9 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
 
   useEffect(() => {
     let cancelled = false;
+    setRotations([]);
+    setMappedLocations([]);
+    setLoading(true);
     async function boot() {
       const cachedDepts = await peekCachedDepartments(specialist);
       if (cancelled) return;
@@ -303,9 +312,13 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
   }, [reload, specialist]);
 
   const displayRotations = useMemo(() => {
-    if (!flooringFocus || !flooringDeptId) return rotations;
-    return filterFlooringRotations(rotations, flooringDeptId);
-  }, [rotations, flooringFocus, flooringDeptId]);
+    const scoped =
+      working !== "all" && deptId
+        ? rotations.filter((row) => row.department_id === deptId)
+        : rotations;
+    if (!flooringFocus || !flooringDeptId) return scoped;
+    return filterFlooringRotations(scoped, flooringDeptId);
+  }, [rotations, flooringFocus, flooringDeptId, working, deptId]);
 
   const freshnessLocations = useMemo(() => {
     if (mappedLocations.length > 0) return mappedLocations;
@@ -432,6 +445,7 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
             <p className="text-sm text-zinc-400">Loading this week&apos;s bays…</p>
           ) : (
             <ZebraChecklist
+              key={working}
               specialist={specialist}
               assignedWeek={week}
               rotations={displayRotations}
@@ -486,6 +500,7 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
               className="mb-3 flex min-h-11 w-full items-center justify-center rounded-xl border border-emerald-500/40 bg-emerald-950/30 px-3 text-sm font-bold text-emerald-100"
             >
               Weekly audit rollup
+              {pendingVerifyCount > 0 ? ` (${pendingVerifyCount})` : ""}
             </button>
           ) : null}
           {!simplified && completedCount > 0 ? (
@@ -510,7 +525,9 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
         open={rollupOpen}
         specialist={specialist}
         assignedWeek={week}
+        departmentId={deptId}
         onClose={() => setRollupOpen(false)}
+        onReviewed={silentRefresh}
       />
       <VisualBayScannerModal
         open={bayScanOpen}

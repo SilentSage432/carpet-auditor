@@ -83,3 +83,29 @@ export async function fetchBayAuditLog(
   if (error) throw new Error(error.message);
   return (data as BayAuditLogRow | null) ?? null;
 }
+
+export async function fetchLatestBayAuditLogsByRotationIds(
+  supabase: SupabaseClient,
+  rotationIds: string[]
+): Promise<Map<string, BayAuditLogRow>> {
+  const ids = [...new Set(rotationIds.map((id) => id.trim()).filter(Boolean))];
+  const byRotation = new Map<string, BayAuditLogRow>();
+  if (ids.length === 0) return byRotation;
+
+  const { data, error } = await supabase
+    .from("bay_audit_logs")
+    .select("*")
+    .in("rotation_id", ids)
+    .order("created_at", { ascending: false });
+
+  if (error) throw new Error(error.message);
+
+  for (const row of data ?? []) {
+    const rotationId = String(
+      (row as BayAuditLogRow).rotation_id ?? ""
+    ).trim();
+    if (!rotationId || byRotation.has(rotationId)) continue;
+    byRotation.set(rotationId, row as BayAuditLogRow);
+  }
+  return byRotation;
+}

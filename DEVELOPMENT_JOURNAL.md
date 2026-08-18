@@ -1,5 +1,20 @@
 # DeptSync Hub — Development Journal
 
+## 2026-08-17 — Department pin reactivity + DS verification queue
+
+### Shipped
+- Header pin (`useWorkingDepartment`) uses `useSyncExternalStore` so Floor/Map/Settings update in the same tick. Pin no longer wipes IndexedDB. Floor/Map reset lists on pin change, then peek the target department cache.
+- Specialty `?section=` updates React state synchronously with `replaceState`; `popstate` keeps the scan pane aligned. Generic department audit follows a generic pin.
+- Week-item review lives on `weekly_rotations.verification_status` (`20260818_weekly_rotation_verification.sql`): `PENDING` → `PENDING_VERIFICATION` → `VERIFIED_COMPLETE`. Location `COMPLETED` waits for DS verify. Associates submit via `POST /api/rotations/complete`; DS/Master auto-verify.
+- Floor **Weekly audit rollup** is the DS queue: Verify & Pass, Send Back with Note, Verify All & Close Out Week. Owner: `lib/store-ops/rotation-review.ts`.
+
+## 2026-08-17 — Trigger Weekly Rotation: multi-department batch draw
+
+### Shipped
+- `ForceRotationModal` — checkbox popover with Select All / Clear All and summary pill (`All Departments (N)` / `X Departments Selected`).
+- `generateRotationsBatch` in `lib/store-ops/client.ts` — posts `{ department_ids, bay_count, force_overwrite }`, invalidates rotation cache once per batch.
+- `POST /api/rotations/generate` — batch path runs draws in parallel, aggregates `{ success_count, failed_count, staged_bays }`, dispatches push per successful department. Single-department body unchanged for Flooring Stage/Draw 12.
+
 ## 2026-08-17 — Appliance audit: granular edits, location mode, export & reset
 
 ### Shipped

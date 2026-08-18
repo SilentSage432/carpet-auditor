@@ -24,7 +24,6 @@ import {
   hasMultipleDepartmentAccess,
 } from "@/lib/department-access";
 import { effectiveDepartment, isMasterAdmin } from "@/lib/rbac";
-import { invalidateStoreOpsListCaches } from "@/lib/store-ops/client";
 import {
   departmentMeta,
   type OperationalDepartment,
@@ -101,7 +100,6 @@ export function AdminDepartmentSwitcher({
     if (!master && next !== "all" && !granted.includes(next as OperationalDepartment)) {
       return;
     }
-    invalidateStoreOpsListCaches();
     const saved = setAdminWorkingDepartment(next);
     setDept(saved);
     setOpen(false);

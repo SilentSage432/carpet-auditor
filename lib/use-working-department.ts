@@ -6,32 +6,28 @@
  * This hook does not store a second copy of department knowledge.
  */
 
-import { useEffect, useState } from "react";
+import { useCallback, useSyncExternalStore } from "react";
 import {
   ADMIN_DEPT_CONTEXT_EVENT,
   workingDepartment,
 } from "@/lib/admin-department-context";
 import type { DepartmentScope, StoreSpecialist } from "@/lib/types";
 
+function subscribeDeptPin(onStoreChange: () => void) {
+  window.addEventListener(ADMIN_DEPT_CONTEXT_EVENT, onStoreChange);
+  window.addEventListener("storage", onStoreChange);
+  return () => {
+    window.removeEventListener(ADMIN_DEPT_CONTEXT_EVENT, onStoreChange);
+    window.removeEventListener("storage", onStoreChange);
+  };
+}
+
 export function useWorkingDepartment(
   member: StoreSpecialist | null | undefined
 ): DepartmentScope {
-  const [scope, setScope] = useState<DepartmentScope>(() =>
-    workingDepartment(member)
+  const getSnapshot = useCallback(
+    () => workingDepartment(member),
+    [member]
   );
-
-  useEffect(() => {
-    function sync() {
-      setScope(workingDepartment(member));
-    }
-    sync();
-    window.addEventListener(ADMIN_DEPT_CONTEXT_EVENT, sync);
-    window.addEventListener("storage", sync);
-    return () => {
-      window.removeEventListener(ADMIN_DEPT_CONTEXT_EVENT, sync);
-      window.removeEventListener("storage", sync);
-    };
-  }, [member]);
-
-  return scope;
+  return useSyncExternalStore(subscribeDeptPin, getSnapshot, getSnapshot);
 }

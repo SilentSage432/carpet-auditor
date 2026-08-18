@@ -72,9 +72,41 @@ export async function verifyWeeklyRotations(
     if (!rotation.is_completed) {
       const { error: rotError } = await supabase
         .from("weekly_rotations")
-        .update({ is_completed: true, completed_at: now })
+        .update({
+          is_completed: true,
+          completed_at: now,
+          verification_status: "VERIFIED_COMPLETE",
+          verified_at: now,
+          verified_by: input.reportedBy ?? null,
+        })
         .eq("id", rotationId);
-      if (rotError) throw new Error(rotError.message);
+      if (rotError) {
+        const missing =
+          /verification_status|verified_at|verified_by/i.test(
+            rotError.message
+          );
+        if (!missing) throw new Error(rotError.message);
+        const retry = await supabase
+          .from("weekly_rotations")
+          .update({ is_completed: true, completed_at: now })
+          .eq("id", rotationId);
+        if (retry.error) throw new Error(retry.error.message);
+      }
+    } else {
+      const { error: stampError } = await supabase
+        .from("weekly_rotations")
+        .update({
+          verification_status: "VERIFIED_COMPLETE",
+          verified_at: now,
+          verified_by: input.reportedBy ?? null,
+        })
+        .eq("id", rotationId);
+      if (
+        stampError &&
+        !/verification_status|verified_at|verified_by/i.test(stampError.message)
+      ) {
+        throw new Error(stampError.message);
+      }
     }
 
     const { error: locError } = await supabase

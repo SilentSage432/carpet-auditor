@@ -11,6 +11,8 @@ import { getSupabaseAdmin } from "@/lib/store-ops/supabase-admin";
 import { sundayStagingWeekLabel } from "@/lib/store-ops/sunday-schedule";
 import { supabaseAdminMissingMessage } from "@/lib/supabase/env";
 
+const ROTATION_SELECT_VERIFY =
+  "id, department_id, location_id, assigned_week, is_completed, completed_at, created_at, verification_status, completed_by, verified_by, verified_at, review_note, store_locations(id, aisle, bay, type, last_completed_at, last_serviced_at, status, cycle_number)";
 const ROTATION_SELECT =
   "id, department_id, location_id, assigned_week, is_completed, completed_at, created_at, store_locations(id, aisle, bay, type, last_completed_at, last_serviced_at, status, cycle_number)";
 const ROTATION_SELECT_NO_LAST =
@@ -98,8 +100,10 @@ async function fetchWeekRotations(
 ): Promise<unknown[]> {
   // Prefer store-scoped query; fall back if store_id column is missing.
   const attempts: Array<{ withStoreId: boolean; select: string }> = [
+    { withStoreId: true, select: ROTATION_SELECT_VERIFY },
     { withStoreId: true, select: ROTATION_SELECT },
     { withStoreId: true, select: ROTATION_SELECT_NO_LAST },
+    { withStoreId: false, select: ROTATION_SELECT_VERIFY },
     { withStoreId: false, select: ROTATION_SELECT },
     { withStoreId: false, select: ROTATION_SELECT_NO_LAST },
   ];

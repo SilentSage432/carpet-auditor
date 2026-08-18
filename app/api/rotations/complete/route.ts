@@ -127,7 +127,13 @@ export async function POST(request: Request) {
     const result = await completeWeeklyRotation(
       supabase,
       rotationId,
-      expectedDepartmentId
+      expectedDepartmentId,
+      {
+        autoVerify:
+          actor.role === "super_admin" ||
+          actor.role === "department_supervisor",
+        actorId: actor.specialistId || null,
+      }
     );
 
     return NextResponse.json({

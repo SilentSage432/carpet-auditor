@@ -62,6 +62,7 @@ import { getStoreNumber } from "@/lib/store";
 import { fetchAudits, getLocalAudits } from "@/lib/storage";
 import {
   formatBayTag,
+  resolveVerificationStatus,
   type ExceptionReason,
   type StoreLocationType,
   type WeeklyRotationWithLocation,
@@ -937,7 +938,7 @@ export function ZebraChecklist({
             onClick={() => setDoneOpen((o) => !o)}
             className="flex min-h-11 w-full items-center justify-between px-3 text-left font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-slate-500"
           >
-            Completed ({done.length}) · cool-down locked
+            Completed ({done.length}) · associate done / DS verified
             {doneOpen ? (
               <ChevronUp className="h-4 w-4" strokeWidth={ICON_STROKE} aria-hidden />
             ) : (
@@ -968,6 +969,16 @@ export function ZebraChecklist({
                       {label}
                     </span>
                     <CarryOverPriorityBadge location={loc} />
+                    {resolveVerificationStatus(rotation) ===
+                    "PENDING_VERIFICATION" ? (
+                      <span className="shrink-0 rounded-full border border-amber-400/40 bg-amber-950/40 px-2 font-mono text-[10px] font-bold uppercase tracking-wide text-amber-200">
+                        Awaiting DS
+                      </span>
+                    ) : (
+                      <span className="shrink-0 rounded-full border border-emerald-400/30 bg-emerald-950/30 px-2 font-mono text-[10px] font-bold uppercase tracking-wide text-emerald-200">
+                        Verified
+                      </span>
+                    )}
                     <span className="shrink-0 font-mono text-[10px] tracking-tight tabular-nums text-slate-500">
                       {formatTouchTime(rotation.completed_at)}
                     </span>
@@ -1105,6 +1116,11 @@ function ZebraBayRow({
                 </span>
               ) : null}
             </span>
+            {rotation.review_note ? (
+              <span className="mt-1 block text-xs text-amber-200">
+                Send back: {rotation.review_note}
+              </span>
+            ) : null}
           </span>
         </label>
         <div className="flex shrink-0 items-center gap-1">

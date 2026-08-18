@@ -89,6 +89,15 @@ export type BayServiceLog = {
   created_at: string;
 };
 
+/**
+ * Week-item DS review — owned by weekly_rotations, not store_locations.status.
+ * PENDING = staged · PENDING_VERIFICATION = associate submitted · VERIFIED_COMPLETE = DS closed.
+ */
+export type RotationVerificationStatus =
+  | "PENDING"
+  | "PENDING_VERIFICATION"
+  | "VERIFIED_COMPLETE";
+
 export type WeeklyRotation = {
   id: string;
   store_id: string;
@@ -100,8 +109,30 @@ export type WeeklyRotation = {
   year?: number | null;
   is_completed: boolean;
   completed_at: string | null;
+  verification_status?: RotationVerificationStatus | null;
+  completed_by?: string | null;
+  verified_by?: string | null;
+  verified_at?: string | null;
+  review_note?: string | null;
   created_at?: string;
 };
+
+export function resolveVerificationStatus(
+  row:
+    | Pick<WeeklyRotation, "verification_status" | "is_completed">
+    | null
+    | undefined
+): RotationVerificationStatus {
+  const raw = String(row?.verification_status ?? "").toUpperCase();
+  if (
+    raw === "PENDING" ||
+    raw === "PENDING_VERIFICATION" ||
+    raw === "VERIFIED_COMPLETE"
+  ) {
+    return raw;
+  }
+  return row?.is_completed ? "VERIFIED_COMPLETE" : "PENDING";
+}
 
 export type WeeklyRotationWithLocation = WeeklyRotation & {
   store_locations: StoreLocation | null;

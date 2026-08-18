@@ -50,9 +50,9 @@ import { findFlooringDepartment } from "@/lib/store-ops/sunday-audit";
 import {
   ADMIN_DEPT_CONTEXT_EVENT,
   adminWorkingDepartmentLabel,
-  workingDepartment,
   workingDepartmentId,
 } from "@/lib/admin-department-context";
+import { useWorkingDepartment } from "@/lib/use-working-department";
 import {
   flushSyncQueue,
   isBrowserOnline,
@@ -132,6 +132,7 @@ export function SettingsSection({
   const supervisorSession = isSupervisor(activeSpecialist);
   const masterSession = isMasterAdmin(activeSpecialist);
   const mapConsole = canManageMapConsole(activeSpecialist);
+  const working = useWorkingDepartment(activeSpecialist);
   const canChangePin = Boolean(activeSpecialist);
   const pending = usePendingSyncCount(storeNumber);
   const showRemnants =
@@ -529,13 +530,11 @@ export function SettingsSection({
             departments={departments}
             locations={locations}
             canMutate
-            contextLabel={(() => {
-              const scope = workingDepartment(activeSpecialist);
-              if (scope === "all") return "Full Store";
-              return adminWorkingDepartmentLabel(
-                scope as Parameters<typeof adminWorkingDepartmentLabel>[0]
-              );
-            })()}
+            contextLabel={
+              working === "all"
+                ? "Full Store"
+                : adminWorkingDepartmentLabel(working)
+            }
             onChanged={() => void reloadDepts()}
           />
         </SettingsCard>

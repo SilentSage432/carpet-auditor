@@ -1,7 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { generateRotations, fetchStoreScheduleSettings } from "@/lib/store-ops/client";
+import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  generateRotationsBatch,
+  fetchStoreScheduleSettings,
+} from "@/lib/store-ops/client";
 import { readableError } from "@/lib/store-ops/errors";
 import { playErrorTone, playSuccessTone } from "@/lib/ui/feedback";
 import type { Department } from "@/lib/store-ops/types";
@@ -17,6 +20,14 @@ type Props = {
   onForced: () => void;
 };
 
+function formatSelectionSummary(selectedCount: number, totalCount: number): string {
+  if (selectedCount === 0) return "No departments selected";
+  if (selectedCount === totalCount) {
+    return `All Departments (${totalCount})`;
+  }
+  return `${selectedCount} Department${selectedCount === 1 ? "" : "s"} Selected`;
+}
+
 /**
  * Manual override for the weekly rotation engine.
  * Opened from Super Admin "Trigger Weekly Rotation".
@@ -29,16 +40,36 @@ export function ForceRotationModal({
   initialDepartmentId,
   onForced,
 }: Props) {
-  const [genDept, setGenDept] = useState(initialDepartmentId || "");
+  const [selectedDeptIds, setSelectedDeptIds] = useState<Set<string>>(
+    () => new Set()
+  );
+  const [deptPickerOpen, setDeptPickerOpen] = useState(false);
+  const pickerRef = useRef<HTMLDivElement>(null);
   const [genCount, setGenCount] = useState("10");
   const [genBusy, setGenBusy] = useState(false);
   const [genMsg, setGenMsg] = useState<string | null>(null);
   const [genError, setGenError] = useState<string | null>(null);
   const [cronLine, setCronLine] = useState("Loading schedule…");
 
+  const activeDepartments = useMemo(
+    () => departments.filter((d) => d.is_active !== false),
+    [departments]
+  );
+  const deptOptions =
+    activeDepartments.length > 0 ? activeDepartments : departments;
+
+  const selectedCount = selectedDeptIds.size;
+  const selectionSummary = formatSelectionSummary(selectedCount, deptOptions.length);
+
   useEffect(() => {
     if (!open) return;
-    setGenDept((current) => current || initialDepartmentId || departments[0]?.id || "");
+    const defaultIds = deptOptions.map((d) => d.id);
+    if (initialDepartmentId && defaultIds.includes(initialDepartmentId)) {
+      setSelectedDeptIds(new Set([initialDepartmentId]));
+    } else {
+      setSelectedDeptIds(new Set(defaultIds));
+    }
+    setDeptPickerOpen(false);
     setGenMsg(null);
     setGenError(null);
     let cancelled = false;
@@ -58,44 +89,96 @@ export function ForceRotationModal({
     return () => {
       cancelled = true;
     };
-  }, [open, initialDepartmentId, departments, specialist]);
+  }, [open, initialDepartmentId, deptOptions, specialist]);
 
   useEffect(() => {
     if (!open) return;
     function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
+      if (e.key === "Escape") {
+        if (deptPickerOpen) {
+          setDeptPickerOpen(false);
+          return;
+        }
+        onClose();
+      }
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [open, onClose]);
+  }, [open, onClose, deptPickerOpen]);
+
+  useEffect(() => {
+    if (!deptPickerOpen) return;
+    function onPointerDown(e: MouseEvent) {
+      if (!pickerRef.current?.contains(e.target as Node)) {
+        setDeptPickerOpen(false);
+      }
+    }
+    window.addEventListener("mousedown", onPointerDown);
+    return () => window.removeEventListener("mousedown", onPointerDown);
+  }, [deptPickerOpen]);
 
   if (!open) return null;
 
-  const activeDepartments = departments.filter((d) => d.is_active !== false);
-  const deptOptions =
-    activeDepartments.length > 0 ? activeDepartments : departments;
+  function toggleDepartment(id: string) {
+    setSelectedDeptIds((current) => {
+      const next = new Set(current);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function selectAllDepartments() {
+    setSelectedDeptIds(new Set(deptOptions.map((d) => d.id)));
+  }
+
+  function clearAllDepartments() {
+    setSelectedDeptIds(new Set());
+  }
 
   async function handleForceDraw() {
-    if (!genDept) return;
+    if (selectedDeptIds.size === 0) return;
     setGenBusy(true);
     setGenMsg(null);
     setGenError(null);
     try {
-      const result = await generateRotations(
+      const result = await generateRotationsBatch(
         specialist,
-        genDept,
+        Array.from(selectedDeptIds),
         Number(genCount),
         { force: true }
       );
-      setGenMsg(
-        result.skipped
-          ? result.reason || "Week already staged."
-          : `Week ${result.assigned_week}: assigned ${result.created} bay${
-              result.created === 1 ? "" : "s"
-            }${result.replaced ? ` (replaced ${result.replaced} incomplete)` : ""}${
-              result.cycle_reset ? " (new cycle started)" : ""
-            }.`
-      );
+
+      if (result.success_count === 0) {
+        const firstFailure = result.failures?.[0]?.error;
+        setGenError(
+          firstFailure ||
+            readableError(
+              null,
+              "Force draw failed — map PENDING bays first, then retry"
+            )
+        );
+        playErrorTone();
+        return;
+      }
+
+      const deptLabel =
+        result.success_count === 1 ? "department" : "departments";
+      let message = `Successfully staged ${result.staged_bays} bay${
+        result.staged_bays === 1 ? "" : "s"
+      } across ${result.success_count} ${deptLabel}.`;
+
+      if (result.failed_count > 0) {
+        message += ` ${result.failed_count} department${
+          result.failed_count === 1 ? "" : "s"
+        } could not be staged.`;
+      }
+
+      if (result.assigned_week) {
+        message = `Week ${result.assigned_week}: ${message}`;
+      }
+
+      setGenMsg(message);
       onForced();
       playSuccessTone();
     } catch (err) {
@@ -156,21 +239,72 @@ export function ForceRotationModal({
         </p>
 
         <div className="mt-4 space-y-3">
-          <label className="block text-sm">
-            <span className="glass-label mb-1 block">Department</span>
-            <select
-              value={genDept}
-              onChange={(e) => setGenDept(e.target.value)}
-              className="glass-input min-h-[44px] text-sm font-semibold"
+          <div ref={pickerRef} className="relative block text-sm">
+            <span className="glass-label mb-1 block">Departments</span>
+            <button
+              type="button"
+              aria-expanded={deptPickerOpen}
+              aria-haspopup="listbox"
+              onClick={() => setDeptPickerOpen((open) => !open)}
+              className="glass-input flex min-h-[44px] w-full items-center justify-between gap-2 px-3 text-left text-sm font-semibold"
             >
-              {deptOptions.map((d) => (
-                <option key={d.id} value={d.id}>
-                  {d.name}
-                  {d.is_active === false ? " (paused)" : ""}
-                </option>
-              ))}
-            </select>
-          </label>
+              <span className="inline-flex min-h-7 items-center rounded-full border border-amber-400/40 bg-amber-950/40 px-2.5 font-mono text-[11px] font-bold tracking-tight text-amber-100">
+                {selectionSummary}
+              </span>
+              <span className="text-zinc-400" aria-hidden>
+                {deptPickerOpen ? "▴" : "▾"}
+              </span>
+            </button>
+
+            {deptPickerOpen ? (
+              <div
+                role="listbox"
+                aria-multiselectable="true"
+                aria-label="Select departments"
+                className="absolute left-0 right-0 z-[82] mt-2 max-h-64 overflow-y-auto rounded-xl border border-zinc-700 bg-zinc-950/95 p-2 shadow-2xl shadow-black/50 backdrop-blur-md"
+              >
+                <div className="mb-2 flex gap-2 border-b border-zinc-800 pb-2">
+                  <button
+                    type="button"
+                    onClick={selectAllDepartments}
+                    className="flex min-h-9 flex-1 items-center justify-center rounded-lg border border-zinc-700 px-2 text-xs font-semibold text-zinc-200"
+                  >
+                    Select All
+                  </button>
+                  <button
+                    type="button"
+                    onClick={clearAllDepartments}
+                    className="flex min-h-9 flex-1 items-center justify-center rounded-lg border border-zinc-700 px-2 text-xs font-semibold text-zinc-200"
+                  >
+                    Clear All
+                  </button>
+                </div>
+
+                <ul className="space-y-1">
+                  {deptOptions.map((d) => {
+                    const checked = selectedDeptIds.has(d.id);
+                    return (
+                      <li key={d.id}>
+                        <label className="flex min-h-11 cursor-pointer items-center gap-3 rounded-lg px-2 hover:bg-zinc-900/80">
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={() => toggleDepartment(d.id)}
+                            className="h-4 w-4 rounded border-zinc-600 bg-zinc-900 text-amber-500"
+                          />
+                          <span className="text-sm font-medium text-zinc-100">
+                            {d.name}
+                            {d.is_active === false ? " (paused)" : ""}
+                          </span>
+                        </label>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
+            ) : null}
+          </div>
+
           <label className="block text-sm">
             <span className="glass-label mb-1 block">Bay count</span>
             <input
@@ -183,7 +317,7 @@ export function ForceRotationModal({
           </label>
           <button
             type="button"
-            disabled={genBusy || !genDept}
+            disabled={genBusy || selectedDeptIds.size === 0}
             onClick={handleForceDraw}
             className="flex min-h-[44px] w-full items-center justify-center rounded-xl border border-amber-400/50 bg-amber-500/90 px-4 text-base font-bold text-zinc-950 shadow-lg shadow-amber-950/40 disabled:opacity-50"
           >

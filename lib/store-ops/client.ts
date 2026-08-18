@@ -772,6 +772,41 @@ export async function generateRotations(
   return result;
 }
 
+export type GenerateRotationsBatchResult = {
+  success_count: number;
+  failed_count: number;
+  staged_bays: number;
+  assigned_week?: string;
+  failures?: Array<{ department_id: string; error: string }>;
+};
+
+export async function generateRotationsBatch(
+  specialist: StoreSpecialist,
+  departmentIds: string[],
+  bayCount: number,
+  options?: { force?: boolean }
+): Promise<GenerateRotationsBatchResult> {
+  const uniqueIds = [...new Set(departmentIds.map((id) => id.trim()).filter(Boolean))];
+  if (uniqueIds.length === 0) {
+    throw new Error("Select at least one department");
+  }
+
+  const result = await storeOpsFetch<GenerateRotationsBatchResult>(
+    "/api/rotations/generate",
+    specialist,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        department_ids: uniqueIds,
+        bay_count: bayCount,
+        force_overwrite: options?.force === true,
+      }),
+    }
+  );
+  await invalidateStoreOpsListCaches();
+  return result;
+}
+
 export type ResetStagedRotationResult = {
   ok: boolean;
   audit: {
@@ -993,6 +1028,100 @@ export async function verifyAllCompletedBays(
     completed_rotation_ids: [],
     incomplete: [],
   });
+}
+
+export type VerificationQueueItem = {
+  rotation_id: string;
+  department_id: string;
+  location_id: string;
+  aisle: string;
+  bay: number;
+  type: string | null;
+  completed_at: string | null;
+  completed_by: string | null;
+  associate_name: string | null;
+  review_note: string | null;
+  assigned_week: string;
+  audit: {
+    id: string;
+    verdict: string;
+    image_url: string | null;
+    created_at: string;
+  } | null;
+};
+
+export async function fetchVerificationQueue(
+  specialist: StoreSpecialist,
+  input?: { department_id?: string; assigned_week?: string }
+): Promise<{ assigned_week: string; pending_count: number; items: VerificationQueueItem[] }> {
+  const qs = new URLSearchParams();
+  if (input?.department_id) qs.set("department_id", input.department_id);
+  if (input?.assigned_week) qs.set("assigned_week", input.assigned_week);
+  const suffix = qs.toString() ? `?${qs.toString()}` : "";
+  return storeOpsFetch<{
+    assigned_week: string;
+    pending_count: number;
+    items: VerificationQueueItem[];
+  }>(`/api/rotations/verify${suffix}`, specialist);
+}
+
+export async function verifyPendingBay(
+  specialist: StoreSpecialist,
+  rotationId: string,
+  departmentId?: string
+): Promise<void> {
+  await storeOpsFetch("/api/rotations/verify", specialist, {
+    method: "POST",
+    body: JSON.stringify({
+      review_action: "verify",
+      rotation_id: rotationId,
+      ...(departmentId ? { department_id: departmentId } : {}),
+    }),
+  });
+  await invalidateStoreOpsListCaches();
+  notifyStoreLocationsChanged();
+}
+
+export async function sendBackPendingBay(
+  specialist: StoreSpecialist,
+  rotationId: string,
+  note: string,
+  departmentId?: string
+): Promise<void> {
+  await storeOpsFetch("/api/rotations/verify", specialist, {
+    method: "POST",
+    body: JSON.stringify({
+      review_action: "send_back",
+      rotation_id: rotationId,
+      note,
+      ...(departmentId ? { department_id: departmentId } : {}),
+    }),
+  });
+  await invalidateStoreOpsListCaches();
+  notifyStoreLocationsChanged();
+}
+
+export async function verifyAllPendingBays(
+  specialist: StoreSpecialist,
+  input: { department_id?: string; assigned_week?: string }
+): Promise<{ verified_count: number; assigned_week?: string }> {
+  const result = await storeOpsFetch<{
+    verified_count?: number;
+    assigned_week?: string;
+  }>("/api/rotations/verify", specialist, {
+    method: "POST",
+    body: JSON.stringify({
+      review_action: "verify_all",
+      department_id: input.department_id,
+      assigned_week: input.assigned_week,
+    }),
+  });
+  await invalidateStoreOpsListCaches();
+  notifyStoreLocationsChanged();
+  return {
+    verified_count: result.verified_count ?? 0,
+    assigned_week: result.assigned_week,
+  };
 }
 
 export async function reportRotationBarriers(

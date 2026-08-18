@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { startTransition, useCallback, useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { ChangePinModal } from "@/components/hub/ChangePinModal";
 import { AssociateSpecialtySwitcher } from "@/components/hub/HubChrome";
@@ -47,6 +47,7 @@ import type { AuthWallMode } from "@/components/auth/AuthWall";
 import { DeptSyncSplash } from "@/components/hub/DeptSyncSplash";
 import { shouldStayOnSpecialtyHub } from "@/lib/nav-hub";
 import { useDevSandbox } from "@/lib/use-dev-sandbox";
+import { useWorkingDepartment } from "@/lib/use-working-department";
 
 function HubBootFallback() {
   return <DeptSyncSplash message="Loading DeptSync secure session…" />;
@@ -149,6 +150,7 @@ export default function DeptSyncHubPage() {
   );
   const { viewSpecialist } = useDevSandbox(specialist);
   const viewMember = viewSpecialist ?? specialist;
+  const working = useWorkingDepartment(viewMember);
 
   const unlockWorkspace = useCallback((member: StoreSpecialist) => {
     setSpecialist(member);
@@ -417,18 +419,17 @@ export default function DeptSyncHubPage() {
       url.searchParams.set("section", next);
       window.history.replaceState({}, "", url.pathname + url.search);
     }
-    startTransition(() => {
-      setSection(next);
-      setVisitedSections((prev) => {
-        if (prev.has(next)) return prev;
-        const copy = new Set(prev);
-        copy.add(next);
-        return copy;
-      });
+    setSection(next);
+    setVisitedSections((prev) => {
+      if (prev.has(next)) return prev;
+      const copy = new Set(prev);
+      copy.add(next);
+      return copy;
     });
   }
 
-  const dept = effectiveDepartment(viewMember);
+  const deptHome = effectiveDepartment(viewMember);
+  const dept = isGenericDepartment(working) ? working : deptHome;
   const authenticated = gate === "ready" && specialist != null;
   const activeSection =
     section === "catalog" ? "appliances" : section;
@@ -437,6 +438,25 @@ export default function DeptSyncHubPage() {
     if (gate !== "ready") return;
     void loadInventoryForSection(activeSection);
   }, [gate, activeSection, storeNumber, loadInventoryForSection]);
+
+  useEffect(() => {
+    function onPopState() {
+      const next = parseHubSectionParam(
+        new URLSearchParams(window.location.search).get("section")
+      );
+      if (!next || !shouldStayOnSpecialtyHub(next)) return;
+      const resolved = next === "catalog" ? "appliances" : next;
+      setSection(resolved);
+      setVisitedSections((prev) => {
+        if (prev.has(resolved)) return prev;
+        const copy = new Set(prev);
+        copy.add(resolved);
+        return copy;
+      });
+    }
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []);
 
   useEffect(() => {
     if (gate !== "ready") return;
@@ -578,6 +598,7 @@ export default function DeptSyncHubPage() {
               isGenericDepartment(dept) && (
                 <HubPane show={activeSection === "department"}>
                   <DepartmentAuditSection
+                    key={dept}
                     department={dept}
                     catalog={catalog}
                     onCatalogChange={setCatalog}

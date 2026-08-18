@@ -6,6 +6,8 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { normalizeStoreNumber, storeNumberQueryValues } from "@/lib/store";
 import type { Department, StoreLocation, WeeklyRotation } from "./types";
+import { resolveVerificationStatus } from "./types";
+import { verifyPendingRotation } from "./rotation-review";
 import { listActiveStores } from "./stores";
 import { pickSundayCarryOverFirst, pickSundayVelocityPrioritized } from "./rotation";
 import {
@@ -1166,10 +1168,17 @@ export async function runWeeklyRotationForAllDepartments(
   return results;
 }
 
+export type CompleteWeeklyRotationOptions = {
+  /** DS / Master Admin skip the verification queue and close the week item. */
+  autoVerify?: boolean;
+  actorId?: string | null;
+};
+
 export async function completeWeeklyRotation(
   supabase: SupabaseClient,
   rotationId: string,
-  expectedDepartmentId?: string | null
+  expectedDepartmentId?: string | null,
+  options: CompleteWeeklyRotationOptions = {}
 ): Promise<{ rotation: WeeklyRotation; location: StoreLocation }> {
   const { data: rotation, error: fetchError } = await supabase
     .from("weekly_rotations")
@@ -1188,6 +1197,22 @@ export async function completeWeeklyRotation(
   }
 
   if (rotation.is_completed) {
+    if (
+      options.autoVerify &&
+      resolveVerificationStatus(rotation as WeeklyRotation) ===
+        "PENDING_VERIFICATION"
+    ) {
+      const closed = await verifyPendingRotation(
+        supabase,
+        rotationId,
+        options.actorId,
+        expectedDepartmentId
+      );
+      return {
+        rotation: closed.rotation,
+        location: closed.location as StoreLocation,
+      };
+    }
     const { data: location } = await supabase
       .from("store_locations")
       .select("*")
@@ -1200,15 +1225,60 @@ export async function completeWeeklyRotation(
   }
 
   const now = new Date().toISOString();
+  const autoVerify = options.autoVerify === true;
+  const reviewPatch: Record<string, unknown> = {
+    is_completed: true,
+    completed_at: now,
+    completed_by: options.actorId ?? null,
+    verification_status: autoVerify
+      ? "VERIFIED_COMPLETE"
+      : "PENDING_VERIFICATION",
+    verified_by: autoVerify ? options.actorId ?? null : null,
+    verified_at: autoVerify ? now : null,
+    review_note: null,
+  };
 
-  const { data: updatedRotation, error: rotError } = await supabase
+  const first = await supabase
     .from("weekly_rotations")
-    .update({ is_completed: true, completed_at: now })
+    .update(reviewPatch)
     .eq("id", rotationId)
     .select("*")
     .single();
 
-  if (rotError) throw new Error(rotError.message);
+  let updatedRotation: WeeklyRotation;
+  if (first.error) {
+    const missingReview =
+      isMissingColumnError(first.error, "verification_status") ||
+      isMissingColumnError(first.error, "completed_by") ||
+      isMissingColumnError(first.error, "verified_by") ||
+      isMissingColumnError(first.error, "verified_at") ||
+      isMissingColumnError(first.error, "review_note");
+    if (!missingReview) throw new Error(first.error.message);
+    const retry = await supabase
+      .from("weekly_rotations")
+      .update({ is_completed: true, completed_at: now })
+      .eq("id", rotationId)
+      .select("*")
+      .single();
+    if (retry.error) throw new Error(retry.error.message);
+    updatedRotation = retry.data as WeeklyRotation;
+  } else {
+    updatedRotation = first.data as WeeklyRotation;
+  }
+
+  const closeLocation =
+    autoVerify || resolveVerificationStatus(updatedRotation) !== "PENDING_VERIFICATION";
+  if (!closeLocation) {
+    const { data: location } = await supabase
+      .from("store_locations")
+      .select("*")
+      .eq("id", rotation.location_id)
+      .maybeSingle();
+    return {
+      rotation: updatedRotation,
+      location: location as StoreLocation,
+    };
+  }
 
   let { data: location, error: locError } = await supabase
     .from("store_locations")
@@ -1240,7 +1310,7 @@ export async function completeWeeklyRotation(
   if (locError) throw new Error(locError.message);
 
   return {
-    rotation: updatedRotation as WeeklyRotation,
+    rotation: updatedRotation,
     location: location as StoreLocation,
   };
 }

@@ -142,6 +142,9 @@ export function MapTab({ specialist }: WorkflowTabProps) {
 
   useEffect(() => {
     let cancelled = false;
+    setLocations([]);
+    setWeekRotationLocations([]);
+    setLoading(true);
     async function boot() {
       const cachedDepts = await peekCachedDepartments(specialist);
       if (cancelled) return;
