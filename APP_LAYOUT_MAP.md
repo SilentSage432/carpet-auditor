@@ -5,7 +5,7 @@
 > the scanning / auditing workflow for floor operators.
 >
 > Generated from the live codebase (`app/`, `components/`, `lib/types.ts`).
-> Last reviewed: 2026-08-17 (header department pin filters Floor/Map/Roster).
+> Last reviewed: 2026-08-17 (bay workflow profiles route Floor SIMS checklists).
 
 ---
 

@@ -31,6 +31,7 @@ import {
 import {
   APPLIANCE_SCANNER_OPEN_EVENT,
   isApplianceScannerHash,
+  type ApplianceScannerLocationContext,
 } from "@/lib/specialty-tools";
 import {
   type ApplianceCatalogItem,
@@ -92,6 +93,8 @@ export function ApplianceAuditSection({
   const [pendingDeleteGroup, setPendingDeleteGroup] =
     useState<AggregatedApplianceScan | null>(null);
   const [scannerOpen, setScannerOpen] = useState(false);
+  const [bayLocation, setBayLocation] =
+    useState<ApplianceScannerLocationContext | null>(null);
 
   const catalogDescriptions = useMemo(() => {
     const map: Record<string, string> = {};
@@ -169,7 +172,14 @@ export function ApplianceAuditSection({
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    function openScanner() {
+    function openScanner(event?: Event) {
+      const detail = (event as CustomEvent<ApplianceScannerLocationContext | null>)
+        ?.detail;
+      if (detail && typeof detail === "object" && detail.location_id) {
+        setBayLocation(detail);
+      } else {
+        setBayLocation(null);
+      }
       setScannerOpen(true);
     }
     function applyHash() {
@@ -341,7 +351,10 @@ export function ApplianceAuditSection({
 
       <button
         type="button"
-        onClick={() => setScannerOpen(true)}
+        onClick={() => {
+          setBayLocation(null);
+          setScannerOpen(true);
+        }}
         className="btn-primary-glow flex min-h-12 w-full items-center justify-center gap-2 rounded-xl px-4 text-sm font-bold"
       >
         <span aria-hidden>📷</span>
@@ -350,12 +363,16 @@ export function ApplianceAuditSection({
 
       <ApplianceScannerModal
         open={scannerOpen}
-        onClose={() => setScannerOpen(false)}
+        onClose={() => {
+          setScannerOpen(false);
+          setBayLocation(null);
+        }}
         catalog={catalog}
         onCatalogChange={onCatalogChange}
         scannedBy={scannedBy}
         activeSpecialist={activeSpecialist}
         scannerEnabled={scannerEnabled && scannerOpen}
+        bayLocation={bayLocation}
         onLogged={handleLogged}
       />
 

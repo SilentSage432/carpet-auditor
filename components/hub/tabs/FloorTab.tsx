@@ -17,6 +17,8 @@ import { ZebraChecklist } from "@/components/store-ops/ZebraChecklist";
 import { ShiftBriefingCard } from "@/components/store-ops/ShiftBriefingCard";
 import { PredictiveCopilotBanner } from "@/components/store-ops/PredictiveCopilotBanner";
 import { StoreHealthChart } from "@/components/store-ops/StoreHealthChart";
+import { fetchApplianceCatalog } from "@/lib/appliance-catalog";
+import { fetchApplianceScans } from "@/lib/appliance-scans";
 import {
   workingDepartmentId,
 } from "@/lib/admin-department-context";
@@ -24,7 +26,9 @@ import { useWorkingDepartment } from "@/lib/use-working-department";
 import { isMasterAdmin, isSimplifiedAssociateView, canAccessSection } from "@/lib/rbac";
 import {
   APPLIANCE_SCANNER_HASH,
+  APPLIANCE_SCANNER_OPEN_EVENT,
   REMNANT_CALCULATOR_HASH,
+  type ApplianceScannerLocationContext,
 } from "@/lib/specialty-tools";
 import { canAccessDepartment } from "@/lib/department-access";
 import { dedupeRoster, fetchSpecialists, isSupervisor } from "@/lib/specialists";
@@ -60,8 +64,18 @@ import {
   type OnDutyWorkloadMember,
 } from "@/lib/store-ops/weekly-rotations";
 import { getStoreNumber } from "@/lib/store";
-import { departmentMeta, specialistHomeDepartment } from "@/lib/types";
-import type { Department, StoreLocation, WeeklyRotationWithLocation } from "@/lib/store-ops/types";
+import {
+  departmentMeta,
+  specialistHomeDepartment,
+  type ApplianceCatalogItem,
+  type ApplianceScan,
+} from "@/lib/types";
+import {
+  isApplianceSimsWorkflow,
+  type Department,
+  type StoreLocation,
+  type WeeklyRotationWithLocation,
+} from "@/lib/store-ops/types";
 import type { WorkflowTabProps } from "@/components/hub/tabs/tab-props";
 
 const ICON_STROKE = 1.75;
@@ -78,6 +92,14 @@ const VisualBayScannerModal = dynamic(
   () =>
     import("@/components/store-ops/VisualBayScannerModal").then(
       (mod) => mod.VisualBayScannerModal
+    ),
+  { ssr: false }
+);
+
+const ApplianceScannerModal = dynamic(
+  () =>
+    import("@/components/appliances/ApplianceScannerModal").then(
+      (mod) => mod.ApplianceScannerModal
     ),
   { ssr: false }
 );
@@ -122,6 +144,13 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
     string | "all" | null
   >(null);
   const [downstockOpen, setDownstockOpen] = useState(false);
+  const [applianceCatalog, setApplianceCatalog] = useState<
+    ApplianceCatalogItem[]
+  >([]);
+  const [applianceScans, setApplianceScans] = useState<ApplianceScan[]>([]);
+  const [simsScannerOpen, setSimsScannerOpen] = useState(false);
+  const [simsBayLocation, setSimsBayLocation] =
+    useState<ApplianceScannerLocationContext | null>(null);
 
   const working = useWorkingDepartment(specialist);
   const flooringFocus = working === "flooring";
@@ -320,6 +349,49 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
     return filterFlooringRotations(scoped, flooringDeptId);
   }, [rotations, flooringFocus, flooringDeptId, working, deptId]);
 
+  const hasSimsBays = useMemo(
+    () =>
+      displayRotations.some((row) =>
+        isApplianceSimsWorkflow(row.store_locations)
+      ),
+    [displayRotations]
+  );
+
+  const loadApplianceLedger = useCallback(async () => {
+    try {
+      const [catalog, scans] = await Promise.all([
+        fetchApplianceCatalog(),
+        fetchApplianceScans(),
+      ]);
+      setApplianceCatalog(catalog);
+      setApplianceScans(scans);
+    } catch (err) {
+      console.error("[FloorTab] appliance SIMS ledger failed", err);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!hasSimsBays) return;
+    void loadApplianceLedger();
+  }, [hasSimsBays, loadApplianceLedger, healthKey]);
+
+  useEffect(() => {
+    function onOpen(event: Event) {
+      const detail = (event as CustomEvent<ApplianceScannerLocationContext | null>)
+        .detail;
+      if (detail && typeof detail === "object" && detail.location_id) {
+        setSimsBayLocation(detail);
+      } else {
+        setSimsBayLocation(null);
+      }
+      setSimsScannerOpen(true);
+    }
+    window.addEventListener(APPLIANCE_SCANNER_OPEN_EVENT, onOpen);
+    return () => {
+      window.removeEventListener(APPLIANCE_SCANNER_OPEN_EVENT, onOpen);
+    };
+  }, []);
+
   const freshnessLocations = useMemo(() => {
     if (mappedLocations.length > 0) return mappedLocations;
     return displayRotations
@@ -455,6 +527,8 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
               onDutyMembers={onDuty}
               externalAudits={bayAudits}
               hideChrome
+              simsScans={applianceScans}
+              simsCatalog={applianceCatalog}
             />
           )}
         </section>
@@ -561,6 +635,28 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
           onFlagged={silentRefresh}
         />
       ) : null}
+      <ApplianceScannerModal
+        open={simsScannerOpen}
+        onClose={() => {
+          setSimsScannerOpen(false);
+          setSimsBayLocation(null);
+        }}
+        catalog={applianceCatalog}
+        onCatalogChange={setApplianceCatalog}
+        scannedBy={specialist.name}
+        activeSpecialist={specialist}
+        scannerEnabled={simsScannerOpen}
+        bayLocation={simsBayLocation}
+        onLogged={(record) => {
+          setApplianceScans((prev) => [
+            record,
+            ...prev.filter((row) => row.id !== record.id),
+          ]);
+          void fetchApplianceScans()
+            .then(setApplianceScans)
+            .catch(() => undefined);
+        }}
+      />
     </>
   );
 }

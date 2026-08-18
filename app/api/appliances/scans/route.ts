@@ -139,7 +139,7 @@ export async function POST(request: Request) {
     }
 
     // Match public.appliance_scans columns exactly — omit id so DB generates uuid.
-    const payload: Record<string, string> = {
+    const payload: Record<string, string | number> = {
       store_number: store,
       item_number,
       serial_number,
@@ -156,14 +156,36 @@ export async function POST(request: Request) {
     if (body.id) {
       payload.id = String(body.id);
     }
+    const locationId = String(body.location_id ?? "").trim();
+    if (locationId) payload.location_id = locationId;
+    const aisle = String(body.aisle ?? "").trim();
+    if (aisle) payload.aisle = aisle;
+    const bayNumber = Number(body.bay_number);
+    if (Number.isFinite(bayNumber)) payload.bay_number = Math.floor(bayNumber);
 
     console.log("[POST /api/appliances/scans] insert", payload);
 
-    const { data, error } = await supabase
+    const first = await supabase
       .from("appliance_scans")
       .insert(payload)
       .select("*")
       .single();
+
+    let data = first.data;
+    let error = first.error;
+    if (error) {
+      const stripped = { ...payload };
+      delete stripped.location_id;
+      delete stripped.aisle;
+      delete stripped.bay_number;
+      const retry = await supabase
+        .from("appliance_scans")
+        .insert(stripped)
+        .select("*")
+        .single();
+      data = retry.data;
+      error = retry.error;
+    }
 
     if (error) {
       console.error("[POST /api/appliances/scans] insert failed", error);

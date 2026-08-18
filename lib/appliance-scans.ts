@@ -127,6 +127,12 @@ export function mapApplianceScanRow(row: Record<string, unknown>): ApplianceScan
     ),
     offline: Boolean(row.offline),
     is_showroom_baseline: Boolean(row.is_showroom_baseline),
+    location_id: row.location_id ? String(row.location_id) : null,
+    aisle: row.aisle != null ? String(row.aisle) : null,
+    bay_number:
+      row.bay_number == null || row.bay_number === ""
+        ? null
+        : Math.floor(Number(row.bay_number)),
   };
 }
 
@@ -188,6 +194,9 @@ export function buildApplianceScanPayload(
     sub_category: string;
     scanned_by: string;
     scanned_at: string;
+    location_id?: string;
+    aisle?: string;
+    bay_number?: number;
     id?: string;
   } = {
     store_number: store,
@@ -205,6 +214,12 @@ export function buildApplianceScanPayload(
   if (input.id) {
     payload.id = input.id;
   }
+  const locationId = String(input.location_id ?? "").trim();
+  if (locationId) payload.location_id = locationId;
+  const aisle = String(input.aisle ?? "").trim();
+  if (aisle) payload.aisle = aisle;
+  const bayNumber = Number(input.bay_number);
+  if (Number.isFinite(bayNumber)) payload.bay_number = Math.floor(bayNumber);
 
   return payload;
 }

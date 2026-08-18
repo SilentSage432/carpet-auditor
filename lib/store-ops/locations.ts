@@ -12,9 +12,11 @@ import { isMissingColumnError, readableError } from "./errors";
 import type {
   BayNumberingPattern,
   BulkGenerateInput,
+  LocationWorkflowType,
   StoreLocation,
   StoreLocationType,
 } from "./types";
+import { parseLocationWorkflowType } from "./types";
 import {
   parseCustomDecayDays,
   parseVelocitySeedPreset,
@@ -166,6 +168,7 @@ export function buildBulkLocationRows(
   velocity_tier: "standard" | "high" | "critical_hotspot";
   priority_override: boolean;
   custom_decay_days: number;
+  workflow_type: LocationWorkflowType;
 }> {
   const { store_id, department_id, start_bay, end_bay, types } = input;
   const aisle = normalizeAisle(input.aisle);
@@ -204,6 +207,7 @@ export function buildBulkLocationRows(
       : seed.priority_override;
   const custom_decay_days =
     parseCustomDecayDays(input.custom_decay_days) ?? seed.custom_decay_days;
+  const workflow_type = parseLocationWorkflowType(input.workflow_type);
 
   const rows: Array<{
     store_id: string;
@@ -217,6 +221,7 @@ export function buildBulkLocationRows(
     velocity_tier: "standard" | "high" | "critical_hotspot";
     priority_override: boolean;
     custom_decay_days: number;
+    workflow_type: LocationWorkflowType;
   }> = [];
 
   for (const bay of bays) {
@@ -233,6 +238,7 @@ export function buildBulkLocationRows(
         velocity_tier,
         priority_override,
         custom_decay_days,
+        workflow_type,
       });
     }
   }
@@ -244,36 +250,61 @@ export async function bulkInsertLocations(
   input: BulkGenerateInput & { store_id: string }
 ): Promise<StoreLocation[]> {
   try {
-    const payload = buildBulkLocationRows(input);
-    const { data, error } = await supabase
-      .from("store_locations")
-      .upsert(payload, { onConflict: STORE_LOCATIONS_ON_CONFLICT })
-      .select("*");
+    let payload: Array<Record<string, unknown>> = buildBulkLocationRows(input);
+    const optional = ["workflow_type", "custom_decay_days"] as const;
+    let lastError: unknown = null;
 
-    if (error && isMissingColumnError(error, "custom_decay_days")) {
-      const fallback = payload.map((row) => {
-        const next = { ...row } as Record<string, unknown>;
-        delete next.custom_decay_days;
+    for (let attempt = 0; attempt <= optional.length; attempt += 1) {
+      const { data, error } = await supabase
+        .from("store_locations")
+        .upsert(payload, { onConflict: STORE_LOCATIONS_ON_CONFLICT })
+        .select("*");
+      if (!error) {
+        return (data ?? []) as StoreLocation[];
+      }
+      lastError = error;
+      const missing = optional.find((column) =>
+        isMissingColumnError(error, column)
+      );
+      if (!missing) {
+        throw new Error(readableError(error, "Bulk location upsert failed"));
+      }
+      payload = payload.map((row) => {
+        const next = { ...row };
+        delete next[missing];
         return next;
       });
-      const retry = await supabase
-        .from("store_locations")
-        .upsert(fallback, { onConflict: STORE_LOCATIONS_ON_CONFLICT })
-        .select("*");
-      if (retry.error) {
-        throw new Error(
-          readableError(retry.error, "Bulk location upsert failed")
-        );
-      }
-      return (retry.data ?? []) as StoreLocation[];
     }
 
-    if (error) {
-      throw new Error(readableError(error, "Bulk location upsert failed"));
-    }
-    return (data ?? []) as StoreLocation[];
+    throw new Error(
+      readableError(lastError, "Bulk location upsert failed")
+    );
   } catch (error) {
     if (error instanceof Error) throw error;
     throw new Error(readableError(error, "Bulk location upsert failed"));
   }
+}
+
+export async function updateDepartmentWorkflowType(
+  supabase: SupabaseClient,
+  input: {
+    storeId: string;
+    departmentId: string;
+    workflowType: LocationWorkflowType;
+  }
+): Promise<number> {
+  const { data, error } = await supabase
+    .from("store_locations")
+    .update({
+      workflow_type: input.workflowType,
+      updated_at: new Date().toISOString(),
+    })
+    .eq("store_id", input.storeId)
+    .eq("department_id", input.departmentId)
+    .select("id");
+
+  if (error) {
+    throw new Error(readableError(error, "Could not tag department workflow"));
+  }
+  return data?.length ?? 0;
 }

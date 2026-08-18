@@ -14,10 +14,12 @@ import {
   resolveStoreLocationDepartmentIds,
 } from "@/lib/store-ops/department-scope";
 import { isMissingColumnError } from "@/lib/store-ops/errors";
+import { updateDepartmentWorkflowType } from "@/lib/store-ops/locations";
 import { getSupabaseAdmin } from "@/lib/store-ops/supabase-admin";
 import { resolveStoreByNumber } from "@/lib/store-ops/stores";
 import { supabaseAdminMissingMessage } from "@/lib/supabase/env";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { parseLocationWorkflowType } from "@/lib/store-ops/types";
 import {
   parseCustomDecayDays,
   parseVelocityTier,
@@ -45,6 +47,7 @@ const STORE_LOCATION_LIST_COLUMNS = [
   "is_active",
   "cycle_number",
   "audit_frequency_days",
+  "workflow_type",
 ] as const;
 
 const OPTIONAL_LIST_COLUMNS = [
@@ -56,6 +59,7 @@ const OPTIONAL_LIST_COLUMNS = [
   "last_carried_over_at",
   "custom_decay_days",
   "department_code",
+  "workflow_type",
 ] as const;
 
 function listSelect(omit: readonly string[]): string {
@@ -85,6 +89,7 @@ function normalizeStoreLocationRow(row: Record<string, unknown>) {
         : Math.floor(Number(row.custom_decay_days)),
     department_code:
       row.department_code == null ? null : String(row.department_code),
+    workflow_type: parseLocationWorkflowType(row.workflow_type),
   };
 }
 
@@ -225,7 +230,47 @@ export async function PATCH(request: Request) {
       last_carried_over_at?: string | null;
       velocity_tier?: string;
       custom_decay_days?: number | null;
+      workflow_type?: string;
+      apply_to_department?: boolean;
     };
+
+    if (body.apply_to_department === true) {
+      requireSuperAdmin(actor);
+      const departmentId = String(body.department_id ?? "").trim();
+      if (!departmentId) {
+        return NextResponse.json(
+          { error: "department_id is required to tag a department workflow" },
+          { status: 400 }
+        );
+      }
+      const { data: dept, error: deptError } = await supabase
+        .from("departments")
+        .select("id")
+        .eq("id", departmentId)
+        .eq("store_id", store.id)
+        .maybeSingle();
+      if (deptError) {
+        return NextResponse.json({ error: deptError.message }, { status: 500 });
+      }
+      if (!dept) {
+        return NextResponse.json(
+          { error: "Department not found for this store" },
+          { status: 404 }
+        );
+      }
+      const workflowType = parseLocationWorkflowType(body.workflow_type);
+      const updated = await updateDepartmentWorkflowType(supabase, {
+        storeId: store.id,
+        departmentId,
+        workflowType,
+      });
+      return NextResponse.json({
+        ok: true,
+        updated,
+        workflow_type: workflowType,
+        department_id: departmentId,
+      });
+    }
 
     if (!body.id) {
       return NextResponse.json({ error: "id is required" }, { status: 400 });
@@ -253,7 +298,8 @@ export async function PATCH(request: Request) {
       body.type !== undefined ||
       body.department_id !== undefined ||
       body.velocity_tier !== undefined ||
-      body.custom_decay_days !== undefined;
+      body.custom_decay_days !== undefined ||
+      body.workflow_type !== undefined;
 
     if (actor.role === "department_supervisor") {
       try {
@@ -359,6 +405,9 @@ export async function PATCH(request: Request) {
           }
           patch.custom_decay_days = days;
         }
+      }
+      if (body.workflow_type !== undefined) {
+        patch.workflow_type = parseLocationWorkflowType(body.workflow_type);
       }
       if (body.department_id !== undefined) {
         const nextDeptId = String(body.department_id).trim();

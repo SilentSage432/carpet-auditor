@@ -17,6 +17,31 @@ export type BayNumberingPattern = "odd" | "even";
 /** Zone kind — orthogonal to Selling/Topstock `type`. */
 export type StoreLocationKind = "STANDARD" | "SHOWROOM_STACKOUT";
 
+/** Bay execution profile — orthogonal to face type and zone kind. */
+export const LOCATION_WORKFLOW_TYPES = [
+  "STANDARD_MERCH",
+  "APPLIANCE_SIMS_AUDIT",
+  "BULK_PALLET_AUDIT",
+] as const;
+
+export type LocationWorkflowType = (typeof LOCATION_WORKFLOW_TYPES)[number];
+
+export function parseLocationWorkflowType(raw: unknown): LocationWorkflowType {
+  const value = String(raw ?? "")
+    .trim()
+    .toUpperCase();
+  if (value === "APPLIANCE_SIMS_AUDIT" || value === "BULK_PALLET_AUDIT") {
+    return value;
+  }
+  return "STANDARD_MERCH";
+}
+
+export function locationWorkflowLabel(type: LocationWorkflowType): string {
+  if (type === "APPLIANCE_SIMS_AUDIT") return "Appliance SIMS / Placard";
+  if (type === "BULK_PALLET_AUDIT") return "Bulk pallet";
+  return "Standard merch";
+}
+
 export type RotationStatus =
   | "PENDING"
   | "ASSIGNED"
@@ -56,6 +81,8 @@ export type StoreLocation = {
   type: StoreLocationType;
   /** STANDARD aisle rotation vs SHOWROOM_STACKOUT rapid-touch zone. */
   location_type?: StoreLocationKind;
+  /** Execution checklist: merch rotation vs appliance SIMS vs pallet. */
+  workflow_type?: LocationWorkflowType;
   audit_frequency_days?: number;
   manual_priority_count?: number;
   status: RotationStatus;
@@ -138,6 +165,12 @@ export type WeeklyRotationWithLocation = WeeklyRotation & {
   store_locations: StoreLocation | null;
 };
 
+export function isApplianceSimsWorkflow(
+  loc?: Pick<StoreLocation, "workflow_type"> | null
+): boolean {
+  return parseLocationWorkflowType(loc?.workflow_type) === "APPLIANCE_SIMS_AUDIT";
+}
+
 export type ExceptionReason =
   | "Blocked Bay"
   | "Unpalletized Top-Stock"
@@ -175,6 +208,7 @@ export type BulkGenerateInput = {
   velocity_tier?: VelocityTier;
   priority_override?: boolean;
   custom_decay_days?: number;
+  workflow_type?: LocationWorkflowType;
 };
 
 /** Compact bay tag for tabular mono display — `A14-B06`, `BW-B12`. */

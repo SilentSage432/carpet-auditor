@@ -30,6 +30,7 @@ import type {
   BayServiceLog,
   BulkGenerateInput,
   Department,
+  LocationWorkflowType,
   StoreLocation,
   VelocityTier,
   WeeklyRotationWithLocation,
@@ -437,6 +438,7 @@ export async function patchStoreLocation(
       | "last_carried_over_at"
       | "velocity_tier"
       | "custom_decay_days"
+      | "workflow_type"
     >
   >
 ): Promise<StoreLocation> {
@@ -451,6 +453,31 @@ export async function patchStoreLocation(
   );
   await invalidateStoreOpsListCaches();
   return data.location;
+}
+
+export async function applyDepartmentWorkflowType(
+  specialist: StoreSpecialist,
+  departmentId: string,
+  workflowType: LocationWorkflowType
+): Promise<{ updated: number; workflow_type: LocationWorkflowType }> {
+  const data = await storeOpsFetch<{
+    updated?: number;
+    workflow_type?: LocationWorkflowType;
+  }>("/api/store-locations", specialist, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      apply_to_department: true,
+      department_id: departmentId,
+      workflow_type: workflowType,
+    }),
+  });
+  await invalidateStoreOpsListCaches();
+  notifyStoreLocationsChanged();
+  return {
+    updated: data.updated ?? 0,
+    workflow_type: data.workflow_type ?? workflowType,
+  };
 }
 
 export async function deleteStoreLocations(

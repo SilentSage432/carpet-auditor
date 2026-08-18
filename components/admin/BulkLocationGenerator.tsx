@@ -12,12 +12,19 @@ import {
   DEFAULT_BAY_PATTERN,
   expandBayNumbers,
 } from "@/lib/store-ops/bay-pattern";
+import { departmentCodesMatch } from "@/lib/store-ops/department-codes";
 import { locationIdsInBayRange } from "@/lib/store-ops/locations";
 import type {
   BayNumberingPattern,
   Department,
+  LocationWorkflowType,
   StoreLocation,
   StoreLocationType,
+} from "@/lib/store-ops/types";
+import {
+  LOCATION_WORKFLOW_TYPES,
+  locationWorkflowLabel,
+  parseLocationWorkflowType,
 } from "@/lib/store-ops/types";
 import type { StoreSpecialist } from "@/lib/types";
 import {
@@ -28,6 +35,7 @@ import {
 } from "@/lib/store-ops/velocity";
 import {
   aiParseLocations,
+  applyDepartmentWorkflowType,
   bulkGenerateLocations,
   deleteStoreLocations,
   fetchStoreLocationsDetailed,
@@ -73,6 +81,8 @@ export function BulkLocationGenerator({
     useState<BayNumberingPattern>(DEFAULT_BAY_PATTERN);
   const [velocitySeed, setVelocitySeed] =
     useState<VelocitySeedPreset>("standard");
+  const [workflowType, setWorkflowType] =
+    useState<LocationWorkflowType>("STANDARD_MERCH");
   const [mapLocations, setMapLocations] = useState<StoreLocation[]>([]);
   const [cleanupEntireAisle, setCleanupEntireAisle] = useState(false);
   const [cleanupConfirm, setCleanupConfirm] = useState(false);
@@ -90,6 +100,15 @@ export function BulkLocationGenerator({
     () => departments.find((d) => d.id === departmentId) ?? null,
     [departments, departmentId]
   );
+
+  useEffect(() => {
+    const code = selectedDepartment?.code ?? "";
+    setWorkflowType(
+      departmentCodesMatch(code, "appliances")
+        ? "APPLIANCE_SIMS_AUDIT"
+        : "STANDARD_MERCH"
+    );
+  }, [departmentId, selectedDepartment?.code]);
 
   useEffect(() => {
     if (tab !== "cleanup") return;
@@ -145,6 +164,32 @@ export function BulkLocationGenerator({
     cleanupEntireAisle,
   ]);
 
+  async function handleApplyDepartmentWorkflow() {
+    if (!departmentId) return;
+    setBusy(true);
+    setError(null);
+    setMessage(null);
+    try {
+      const result = await applyDepartmentWorkflowType(
+        specialist,
+        departmentId,
+        workflowType
+      );
+      setMessage(
+        `Tagged ${result.updated} mapped bay${
+          result.updated === 1 ? "" : "s"
+        } in ${selectedDepartment?.name ?? "this department"} as ${locationWorkflowLabel(
+          workflowType
+        )}.`
+      );
+      onGenerated();
+    } catch (err) {
+      setError(bulkAuthFriendlyError(err, "Could not tag department workflow"));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   const bayPreview = useMemo(() => {
     try {
       return expandBayNumbers(
@@ -181,6 +226,7 @@ export function BulkLocationGenerator({
         types,
         bay_pattern: bayPattern,
         velocity_seed: parseVelocitySeedPreset(velocitySeed),
+        workflow_type: workflowType,
       });
 
       const expected = bayPreview.length * types.length;
@@ -239,6 +285,7 @@ export function BulkLocationGenerator({
             types: row.types,
             bay_pattern: row.bay_pattern ?? DEFAULT_BAY_PATTERN,
             velocity_seed: parseVelocitySeedPreset(velocitySeed),
+            workflow_type: workflowType,
           });
           created += result.created;
         } catch (err) {
@@ -329,6 +376,7 @@ export function BulkLocationGenerator({
             end_bay: row.end_bay,
             types: typesFromAiLocationMode(row.type),
             velocity_seed: parseVelocitySeedPreset(velocitySeed),
+            workflow_type: workflowType,
           });
           created += result.created;
         } catch (err) {
@@ -647,6 +695,49 @@ export function BulkLocationGenerator({
                 );
               })}
             </div>
+          </fieldset>
+
+          <fieldset className="mt-4">
+            <legend className="mb-2 text-sm text-zinc-300">Bay workflow</legend>
+            <p className="mb-2 text-xs text-zinc-500">
+              Tags generated bays with the Floor checklist they should run.
+              Appliances defaults to SIMS / placard audit.
+            </p>
+            <div className="space-y-2">
+              {LOCATION_WORKFLOW_TYPES.map((value) => {
+                const selected = workflowType === value;
+                return (
+                  <label
+                    key={value}
+                    className={`flex min-h-12 cursor-pointer items-center gap-2 rounded-xl border px-3 text-sm transition ${
+                      selected
+                        ? "border-cyan-500/50 bg-cyan-950/40 text-cyan-100 ring-1 ring-cyan-500/30"
+                        : "border-zinc-800/80 bg-zinc-950/50 text-zinc-100"
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="bulk-workflow-type"
+                      checked={selected}
+                      onChange={() =>
+                        setWorkflowType(parseLocationWorkflowType(value))
+                      }
+                      className="h-5 w-5 accent-cyan-500"
+                    />
+                    {locationWorkflowLabel(value)}
+                  </label>
+                );
+              })}
+            </div>
+            <button
+              type="button"
+              disabled={busy || !departmentId}
+              onClick={() => void handleApplyDepartmentWorkflow()}
+              className="mt-3 flex min-h-11 w-full items-center justify-center rounded-xl border border-cyan-500/40 bg-cyan-950/30 px-3 text-sm font-semibold text-cyan-100 disabled:opacity-50"
+            >
+              Apply {locationWorkflowLabel(workflowType)} to all mapped bays in{" "}
+              {selectedDepartment?.name ?? "this department"}
+            </button>
           </fieldset>
 
           <button

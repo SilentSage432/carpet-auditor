@@ -79,8 +79,10 @@ components/hub/tabs/FloorTab.tsx → Floor rotation viewport (Floor Rotation vs 
 components/store-ops/OnDutyAssociateStrip.tsx → Department-scoped on-duty pills; storewide summary sheet when >6
 components/store-ops/FlagDownstockSheet.tsx → Aisle/bay search + Needs Top-stock Drop (composes flagForDownstock)
 components/store-ops/ShiftAnalyticsDrawer.tsx → Collapsed Floor accordion for velocity / health / Walk & Talk
-components/store-ops/ZebraChecklist.tsx → Floor bay checklist (optimistic complete, Quick Touch, downstock, Sunday handoff, on-duty grouping)
+components/store-ops/ZebraChecklist.tsx → Floor bay checklist (optimistic complete, Quick Touch, downstock, Sunday handoff, on-duty grouping; routes APPLIANCE_SIMS_AUDIT to ApplianceSimsChecklist)
+components/store-ops/ApplianceSimsChecklist.tsx → SIMS/placard steps; Complete still uses completeRotation
 components/store-ops/BayHealthScorecard.tsx → Compact bay health badge (presentation)
+lib/appliances/sims-reconciliation.ts → Empty-bay / unknown-SKU / missing-serial flags from scans + catalog (no invented on-hands)
 lib/store-ops/bay-health.ts       → Aging / SIMS / topstock discrepancy diagnostics (compose only; `flagPenalty` from health.ts)
 lib/store-ops/health.ts           → Store health snapshot + canonical completion % + bay flag penalty weights
 components/store-ops/AuditLocationModeToggle.tsx → SELLING vs TOPSTOCK audit-mode control
@@ -207,7 +209,9 @@ supabase/migrations/20260812_jwt_rls_policies.sql → JWT claims hook + store/de
 supabase/migrations/20260816_store_locations_read.sql → (superseded) open SELECT on store_locations
 supabase/migrations/20260816_rls_read_write_parity.sql → digit-equal jwt_matches_store, department aliases
 supabase/migrations/20260817_rls_security_lockdown.sql → Drop anon/open SELECT; authenticated store RLS; Realtime on sunday_bay_assignments / manager_notes / downstock_queue
-supabase/migrations/20260817_weekly_rotations_location_week_unique.sql → UNIQUE(location_id, assigned_week) for weekly_rotations upsert onConflict
+supabase/migrations/20260818_weekly_rotation_verification.sql → weekly_rotations.verification_status (associate submit → DS verify)
+supabase/migrations/20260818_store_location_workflow_type.sql → store_locations.workflow_type (STANDARD_MERCH | APPLIANCE_SIMS_AUDIT | BULK_PALLET_AUDIT)
+supabase/migrations/20260818_appliance_scans_bay_location.sql → appliance_scans.location_id / aisle / bay_number
 supabase/migrations/20260812_manager_notes.sql → durable manager_notes (store_number/department/author) + JWT RLS
 supabase/migrations/20260812_sunday_bay_assignments.sql → sunday specialist↔bay assignments + JWT RLS
 
@@ -220,7 +224,8 @@ supabase/migrations/20260812_sunday_bay_assignments.sql → sunday specialist↔
 | Developer sandbox (UI preview) | `lib/dev-sandbox.ts` + `useDevSandbox` + `DevSandboxDrawer` / `DevSandboxBanner` (session overlay; JWT unchanged) |
 | Cross-app Navigation Hub | `lib/nav-hub.ts` + `NavigationHub` + `HubHeader` + `BottomNav` (Floor · Map · Roster · Settings only; Settings hashes for former Admin Tools) |
 | Department weekly quotas | `DepartmentTargetsMatrix` (blur / Save All) + `PATCH /api/departments` + Settings |
-| Store Operations map + rotations | `lib/store-ops/*` + `/admin/store-map` + `/dashboard` (visual navigator: `StoreLocationGrid` + `WalkTheFloorSheet`; topology CRUD in Settings: `AisleBayManager` + `AddBaySheet` + `EditBayDrawer` + prune/batch + bulk velocity seed; floor checklist: `ZebraChecklist`; walk log: `bay-service.ts` + `POST /api/store-locations/service`; Sunday pick: carry-over prepend then `rotation.ts` velocity + `custom_decay_days`; persist owner `rotations.ts` (`weekly_rotations` upsert `store_id` + `store_number`); department cron: Settings `DepartmentTargetsMatrix`; Sunday clock: `sunday-schedule.ts` + Settings `SundayScheduleCard`) |
+| Store Operations map + rotations | `lib/store-ops/*` + `/admin/store-map` + `/dashboard` (visual navigator: `StoreLocationGrid` + `WalkTheFloorSheet`; topology CRUD in Settings: `AisleBayManager` + `AddBaySheet` + `EditBayDrawer` + prune/batch + bulk velocity seed + `workflow_type`; floor checklist: `ZebraChecklist` / `ApplianceSimsChecklist`; walk log: `bay-service.ts` + `POST /api/store-locations/service`; Sunday pick: carry-over prepend then `rotation.ts` velocity + `custom_decay_days`; persist owner `rotations.ts` (`weekly_rotations` upsert `store_id` + `store_number`); department cron: Settings `DepartmentTargetsMatrix`; Sunday clock: `sunday-schedule.ts` + Settings `SundayScheduleCard`) |
+| Bay workflow profiles | `store_locations.workflow_type` (`lib/store-ops/types.ts`) + Bulk Generator / Edit Bay. Floor routes SIMS bays; scans stay in `lib/appliance-scans.ts`; recon in `lib/appliances/sims-reconciliation.ts` |
 | Sunday schedule | `lib/store-ops/sunday-schedule.ts` (time / timezone / auto-run) + `stores` columns + `/api/cron/weekly-rotation` (skip if week already staged) + Master Force Draw overwrite + `/api/admin/rotations/reset` |
 | Sunday assignments | `lib/store-ops/sunday-audit.ts` (persist + department seed `associateMatchesSundayDepartment`) + `SundayAuditAssignmentModal` + `AssociateRosterPanel` |
 | Daily shift board | `lib/store-ops/shift-status.ts` (`associate_shift_days` week matrix; throws on live write failure) |
@@ -283,6 +288,7 @@ supabase/migrations/20260812_sunday_bay_assignments.sql → sunday specialist↔
    - CSV: SUMMARY (counts/locations) + RAW DETAIL audit trail
    - Continuous mode: barcode detect → immediate `POST /api/appliances/scans`; session total counter; new items pause on Quick-Add then auto-log
    - Scan form is `ApplianceScanForm` (isolated from the accordion log)
+   - SIMS bay workflow stamps `location_id` / aisle / bay when opened from Floor
    - APIs: `/api/appliances/catalog`, `/api/appliances/scans` (`GET|POST|PATCH|DELETE`)
 3. **Universal / Appliance Catalog** — removed from bottom nav; SKU linking remains via Quick-Add / scan flows (`carpet_catalog` / `appliance_catalog`). `/catalog` redirects to `/appliances`.
 4. **Remnant Rack** — Settings accordion (`#remnants`) when RBAC allows

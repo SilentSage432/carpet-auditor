@@ -8,6 +8,7 @@
 import { useEffect } from "react";
 import { ApplianceScanForm } from "@/components/sections/ApplianceScanForm";
 import type { ApplianceCatalogItem, ApplianceScan, StoreSpecialist } from "@/lib/types";
+import type { ApplianceScannerLocationContext } from "@/lib/specialty-tools";
 
 type Props = {
   open: boolean;
@@ -17,6 +18,7 @@ type Props = {
   scannedBy: string;
   activeSpecialist: StoreSpecialist | null;
   scannerEnabled?: boolean;
+  bayLocation?: ApplianceScannerLocationContext | null;
   onLogged: (record: ApplianceScan, offline: boolean) => void;
 };
 
@@ -28,6 +30,7 @@ export function ApplianceScannerModal({
   scannedBy,
   activeSpecialist,
   scannerEnabled = true,
+  bayLocation = null,
   onLogged,
 }: Props) {
   useEffect(() => {
@@ -59,6 +62,7 @@ export function ApplianceScannerModal({
         <div className="mb-3 flex items-center justify-between gap-2 px-1">
           <h2 className="font-mono text-xs font-bold uppercase tracking-wide text-cyan-200">
             Scan &amp; Count Appliances
+            {bayLocation ? ` · ${bayLocation.location_tag}` : ""}
           </h2>
           <button
             type="button"
@@ -75,6 +79,7 @@ export function ApplianceScannerModal({
           activeSpecialist={activeSpecialist}
           scannerEnabled={scannerEnabled}
           focusOnMount
+          bayLocation={bayLocation}
           onLogged={onLogged}
         />
       </div>

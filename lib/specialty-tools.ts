@@ -60,10 +60,24 @@ export function specialtyToolHref(toolId: SpecialtyToolId): string {
   return tool?.href ?? "/";
 }
 
+export type ApplianceScannerLocationContext = {
+  location_id: string;
+  aisle: string;
+  bay: number;
+  location_tag: string;
+  location_type?: "showroom" | "topstock";
+};
+
 /** Open appliance scanner on the specialty hub (in-page modal). */
-export function requestApplianceScanner() {
+export function requestApplianceScanner(
+  context?: ApplianceScannerLocationContext
+) {
   if (typeof window === "undefined") return;
-  window.dispatchEvent(new CustomEvent(APPLIANCE_SCANNER_OPEN_EVENT));
+  window.dispatchEvent(
+    new CustomEvent(APPLIANCE_SCANNER_OPEN_EVENT, {
+      detail: context ?? null,
+    })
+  );
 }
 
 /** Open remnant calculator — Settings accordion or in-page modal on flooring scan. */

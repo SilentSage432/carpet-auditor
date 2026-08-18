@@ -1,5 +1,13 @@
 # DeptSync Hub — Development Journal
 
+## 2026-08-17 — Bay workflow profiles + Appliance SIMS / placard checklist
+
+### Shipped
+- Topology owns `store_locations.workflow_type` (`STANDARD_MERCH` | `APPLIANCE_SIMS_AUDIT` | `BULK_PALLET_AUDIT`). Migration `20260818_store_location_workflow_type.sql`. Not on `departments`.
+- Bulk Generator tags new bays; Appliances/D35 defaults to SIMS. Master can apply a workflow to every mapped bay in a department. Edit Bay + Add Bay honor the same enum.
+- Floor `ZebraChecklist` routes `APPLIANCE_SIMS_AUDIT` to `ApplianceSimsChecklist` (placards → continuous scanner → catalog/serial flags → placard confirm → Complete & Submit). Completions still use `completeRotation`. `BULK_PALLET_AUDIT` keeps the standard Quick Touch row.
+- Scanner opened from a SIMS bay stamps `appliance_scans.location_id` / `aisle` / `bay_number` (`20260818_appliance_scans_bay_location.sql`). Live carton badge is presentation-only; recon is `lib/appliances/sims-reconciliation.ts` (empty bay / unknown SKU / missing serial — no invented on-hands).
+
 ## 2026-08-17 — Department pin reactivity + DS verification queue
 
 ### Shipped

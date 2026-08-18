@@ -177,7 +177,7 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
   - Floor (`/dashboard`) · Map (`/admin/store-map`) · Roster (`/roster`) · Settings (`/settings`)
   - Authenticated `/` without specialty `?section=` replaces to `/dashboard`. Hub `/?section=audit|appliances|department` is scan tools only. Remnants deep-link to `/settings#remnants`
 - `/manager-notes` redirects to `/dashboard#floor-pad` (Tactical Voice Hub on Floor)
-- `/dashboard` — one Floor layout for all roles: **Floor Rotation** when Full Store is pinned, otherwise `${activeDept.name} Rotation`; Snap Bay AI Audit + Flag Downstock sheet; on-duty strip filtered to the working department (`canAccessDepartment`); Full Store with >6 on-duty associates collapses to a Users summary sheet. Sunday staging (non-associates), proportional `ZebraChecklist` grouped by on-duty specialists. Shift velocity, store health, Walk & Talk, briefing, copilot, freshness, showroom, verify/rollup, and `ExceptionFeed` nest in collapsed `ShiftAnalyticsDrawer`. Specialty scan pills were removed from the Floor fold (Cycle / Appliances stay on `/?section=`).
+- `/dashboard` — one Floor layout for all roles: **Floor Rotation** when Full Store is pinned, otherwise `${activeDept.name} Rotation`; Snap Bay AI Audit + Flag Downstock sheet; on-duty strip filtered to the working department (`canAccessDepartment`); Full Store with >6 on-duty associates collapses to a Users summary sheet. Sunday staging (non-associates), proportional `ZebraChecklist` grouped by on-duty specialists. `store_locations.workflow_type` routes Floor execution: `STANDARD_MERCH` / `BULK_PALLET_AUDIT` = Quick Touch row; `APPLIANCE_SIMS_AUDIT` = `ApplianceSimsChecklist` (scanner stays on Floor with bay `location_id`). Shift velocity, store health, Walk & Talk, briefing, copilot, freshness, showroom, verify/rollup, and `ExceptionFeed` nest in collapsed `ShiftAnalyticsDrawer`. Specialty scan pills remain on the Floor header when the pin allows; Cycle / Appliances also stay on `/?section=`.
 - `/stock` redirects to `/dashboard` (Downstock is a Zebra tab on Floor)
 - `/roster` — unified team list, PIN add, and department access chips (optimistic + toast)
 - `/admin/store-map` — Visual navigator chunks aisle/bay DOM (16 aisles / 24 bays) with memoized Lucide status glyphs + SVG heat strips; Sell/Top is display-only. Tap bay → **one** `WalkTheFloorSheet`. Bay CRUD is Settings **Store Topology & Bay Setup**.
@@ -226,6 +226,11 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 - Canonical Store Ops type `SELLING` | `TOPSTOCK` (`lib/store-ops/audit-location-mode.ts`); hub audits still persist `sales_floor` / `top_stock`
 - Cycle Audit / Department Audit / Zebra filter share `AuditLocationModeToggle` — SELLING = lower floor, TOPSTOCK = overheads/racking
 - Discrepancy flags, log rows, and audit reports include the mode; Cycle/Department forms keep the mode across logs (not reset)
+
+## Bay workflow profiles
+- Owner: `store_locations.workflow_type` (`lib/store-ops/types.ts`). Apply **`20260818_store_location_workflow_type.sql`** + **`20260818_appliance_scans_bay_location.sql`**.
+- Settings Bulk Generator + Edit Bay tag `STANDARD_MERCH` | `APPLIANCE_SIMS_AUDIT` | `BULK_PALLET_AUDIT`. Appliances/D35 generate as SIMS. Super Admin **Apply … to all mapped bays** is `PATCH /api/store-locations` `{ apply_to_department, department_id, workflow_type }`.
+- Floor routes SIMS bays to a 4-step placard/scan checklist; Complete still hits `POST /api/rotations/complete`. Scanner context is `requestApplianceScanner({ location_id, aisle, bay })` — `lib/appliance-scans.ts` remains scan owner. Recon composes catalog + scans only (`lib/appliances/sims-reconciliation.ts`).
 
 ## Store number (dynamic)
 - Owner: `lib/store.ts` — localStorage `carpet_hub_store_number`; **no hardcoded `1234`/`1852`**

@@ -39,6 +39,7 @@ import {
   type ApplianceScan,
   type StoreSpecialist,
 } from "@/lib/types";
+import type { ApplianceScannerLocationContext } from "@/lib/specialty-tools";
 
 function BarcodeIcon({ className }: { className?: string }) {
   return (
@@ -66,6 +67,8 @@ type Props = {
   scannerEnabled?: boolean;
   /** Focus SKU field when mounted (scanner modal open). */
   focusOnMount?: boolean;
+  /** When opened from a mapped SIMS bay, lock location and attach location_id. */
+  bayLocation?: ApplianceScannerLocationContext | null;
   onLogged: (record: ApplianceScan, offline: boolean) => void;
 };
 
@@ -76,6 +79,7 @@ export function ApplianceScanForm({
   activeSpecialist,
   scannerEnabled = true,
   focusOnMount = false,
+  bayLocation = null,
   onLogged,
 }: Props) {
   const itemInputRef = useRef<HTMLInputElement>(null);
@@ -141,6 +145,14 @@ export function ApplianceScanForm({
   }, [draftRestored]);
 
   useEffect(() => {
+    if (!bayLocation) return;
+    setLocation(bayLocation.location_tag);
+    if (bayLocation.location_type) {
+      setLocationType(bayLocation.location_type);
+    }
+  }, [bayLocation]);
+
+  useEffect(() => {
     if (!draftRestored) return;
     const hasContent =
       itemNumber || serialNumber || location || description;
@@ -204,6 +216,9 @@ export function ApplianceScanForm({
           category: item.category,
           sub_category: String(item.sub_category ?? "").trim(),
           scanned_by: scannedBy || activeSpecialist?.name || "",
+          location_id: bayLocation?.location_id,
+          aisle: bayLocation?.aisle,
+          bay_number: bayLocation?.bay,
         });
 
         setSessionTotal((n) => n + 1);
@@ -227,7 +242,7 @@ export function ApplianceScanForm({
         setSaving(false);
       }
     },
-    [activeSpecialist?.name, clearForNextScan, flashStatus, onLogged, scannedBy]
+    [activeSpecialist?.name, bayLocation, clearForNextScan, flashStatus, onLogged, scannedBy]
   );
 
   function handleItemChange(raw: string) {
@@ -392,32 +407,40 @@ export function ApplianceScanForm({
         ) : null}
 
         <div className="space-y-1.5">
-          <TextField
-            label="Location (sticky between scans)"
-            value={location}
-            onChange={setLocation}
-            placeholder={
-              locationType === "topstock"
-                ? "e.g. Top Stock Bay 012"
-                : "e.g. Showroom Floor"
-            }
-          />
-          <div className="flex flex-wrap gap-1.5">
-            {locationSuggestions.map((tag) => (
-              <button
-                key={tag}
-                type="button"
-                onClick={() => setLocation(tag)}
-                className={`rounded-lg border px-2.5 py-1.5 text-[11px] font-semibold transition ${
-                  location === tag
-                    ? "border-emerald-500/50 bg-emerald-950/50 text-emerald-300"
-                    : "border-slate-700 bg-slate-950 text-slate-400 active:bg-slate-800"
-                }`}
-              >
-                {tag}
-              </button>
-            ))}
-          </div>
+          {bayLocation ? (
+            <p className="rounded-xl border border-cyan-500/40 bg-cyan-950/30 px-3 py-2 font-mono text-sm font-semibold text-cyan-100">
+              Mapped bay {bayLocation.location_tag}
+            </p>
+          ) : (
+            <>
+              <TextField
+                label="Location (sticky between scans)"
+                value={location}
+                onChange={setLocation}
+                placeholder={
+                  locationType === "topstock"
+                    ? "e.g. Top Stock Bay 012"
+                    : "e.g. Showroom Floor"
+                }
+              />
+              <div className="flex flex-wrap gap-1.5">
+                {locationSuggestions.map((tag) => (
+                  <button
+                    key={tag}
+                    type="button"
+                    onClick={() => setLocation(tag)}
+                    className={`rounded-lg border px-2.5 py-1.5 text-[11px] font-semibold transition ${
+                      location === tag
+                        ? "border-emerald-500/50 bg-emerald-950/50 text-emerald-300"
+                        : "border-slate-700 bg-slate-950 text-slate-400 active:bg-slate-800"
+                    }`}
+                  >
+                    {tag}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
         </div>
 
         {scannedBy || activeSpecialist ? (

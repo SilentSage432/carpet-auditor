@@ -18,10 +18,13 @@ import {
   FlagOff,
   Hand,
 } from "lucide-react";
+import { ApplianceSimsChecklist } from "@/components/store-ops/ApplianceSimsChecklist";
 import { AuditLocationModeToggle } from "@/components/store-ops/AuditLocationModeToggle";
 import { BarrierReasonChips } from "@/components/store-ops/BarrierReasonChips";
 import { BayHealthScorecard } from "@/components/store-ops/BayHealthScorecard";
 import { CarryOverPriorityBadge } from "@/components/store-ops/CarryOverPriorityBadge";
+import { scansForMappedBay } from "@/lib/appliances/sims-reconciliation";
+import { requestApplianceScanner } from "@/lib/specialty-tools";
 import { formatAuditLocationBadge } from "@/lib/store-ops/audit-location-mode";
 import { diagnoseBayHealth } from "@/lib/store-ops/bay-health";
 import {
@@ -62,12 +65,18 @@ import { getStoreNumber } from "@/lib/store";
 import { fetchAudits, getLocalAudits } from "@/lib/storage";
 import {
   formatBayTag,
+  isApplianceSimsWorkflow,
   resolveVerificationStatus,
   type ExceptionReason,
   type StoreLocationType,
   type WeeklyRotationWithLocation,
 } from "@/lib/store-ops/types";
-import type { CarpetAudit, StoreSpecialist } from "@/lib/types";
+import type {
+  ApplianceCatalogItem,
+  ApplianceScan,
+  CarpetAudit,
+  StoreSpecialist,
+} from "@/lib/types";
 import { playErrorTone, playSuccessTone } from "@/lib/ui/feedback";
 import { hapticPulse } from "@/utils/haptics";
 import { recordBayTouch } from "@/lib/heatmap/bay-tracker";
@@ -103,6 +112,9 @@ export type ZebraChecklistProps = {
       audit_verdict: "PASS" | "CONDITIONAL" | "FAIL";
     }
   >;
+  /** Floor-hosted appliance scans for SIMS bay live counts. */
+  simsScans?: ApplianceScan[];
+  simsCatalog?: ApplianceCatalogItem[];
 };
 
 export function ZebraChecklist({
@@ -117,6 +129,8 @@ export function ZebraChecklist({
   focusSpecialistId = "all",
   onDutyMembers,
   externalAudits,
+  simsScans = [],
+  simsCatalog = [],
 }: ZebraChecklistProps) {
   const [error, setError] = useState<string | null>(null);
   const [doneOpen, setDoneOpen] = useState(false);
@@ -154,7 +168,7 @@ export function ZebraChecklist({
     >
   >({});
   const [gatedRotationId, setGatedRotationId] = useState<string | null>(null);
-  const [, startTransition] = useTransition();
+  const [isPending, startTransition] = useTransition();
 
   const associateView = isAssociate(specialist);
 
@@ -660,6 +674,32 @@ export function ZebraChecklist({
     : [];
 
   function renderBayRow(rotation: WeeklyRotationWithLocation) {
+    if (isApplianceSimsWorkflow(rotation.store_locations)) {
+      const loc = rotation.store_locations;
+      const bayScans = scansForMappedBay(simsScans, rotation);
+      return (
+        <ApplianceSimsChecklist
+          key={rotation.id}
+          rotation={rotation}
+          scanCount={bayScans.length}
+          scans={bayScans}
+          catalog={simsCatalog}
+          busy={isPending}
+          onScanBay={() => {
+            if (!loc) return;
+            requestApplianceScanner({
+              location_id: loc.id,
+              aisle: loc.aisle,
+              bay: loc.bay,
+              location_tag: formatBayTag(loc),
+              location_type:
+                loc.type === "TOPSTOCK" ? "topstock" : "showroom",
+            });
+          }}
+          onComplete={() => handleCheck(rotation.id)}
+        />
+      );
+    }
     return (
       <ZebraBayRow
         key={rotation.id}

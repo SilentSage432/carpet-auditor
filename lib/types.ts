@@ -983,6 +983,10 @@ export type ApplianceScan = {
   offline?: boolean;
   /** Locked showroom baseline — survives weekly topstock reset. */
   is_showroom_baseline?: boolean;
+  /** Mapped bay when scanned from an APPLIANCE_SIMS_AUDIT rotation. */
+  location_id?: string | null;
+  aisle?: string | null;
+  bay_number?: number | null;
 };
 
 export type ApplianceScanInsert = Omit<

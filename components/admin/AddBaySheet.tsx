@@ -8,6 +8,7 @@ import {
 } from "@/lib/store-ops/aisle";
 import { bulkGenerateLocations } from "@/lib/store-ops/client";
 import type { Department } from "@/lib/store-ops/types";
+import { departmentCodesMatch } from "@/lib/store-ops/department-codes";
 import type { StoreSpecialist } from "@/lib/types";
 import { toastError, toastSuccess } from "@/lib/toast";
 
@@ -60,6 +61,7 @@ export function AddBaySheet({
     setBusy(true);
     setError(null);
     try {
+      const dept = departments.find((row) => row.id === departmentId);
       await bulkGenerateLocations(specialist, {
         department_id: departmentId,
         aisle: aisleCode,
@@ -67,6 +69,9 @@ export function AddBaySheet({
         end_bay: bayNumber,
         types: ["SELLING", "TOPSTOCK"],
         bay_pattern: bayNumber % 2 === 0 ? "even" : "odd",
+        workflow_type: departmentCodesMatch(dept?.code, "appliances")
+          ? "APPLIANCE_SIMS_AUDIT"
+          : "STANDARD_MERCH",
       });
       toastSuccess(`Added Aisle ${aisleCode} Bay ${bayNumber}`);
       onChanged();
