@@ -4,13 +4,12 @@ import dynamic from "next/dynamic";
 import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import {
-  Calendar,
+  Camera,
   ChevronDown,
   ChevronRight,
   ChevronUp,
-  FolderTree,
   Layers,
-  PlusCircle,
+  NotebookPen,
   RefreshCw,
   Scissors,
   Sliders,
@@ -34,7 +33,10 @@ import { usePendingSyncCount, useSyncQueueSummary } from "@/lib/network";
 import { selectOnFocus } from "@/lib/number-input";
 import { canAccessSection, canManageMapConsole, isMasterAdmin } from "@/lib/rbac";
 import { clearLocalRemnants, countLocalRemnants, fetchRemnants } from "@/lib/remnants";
-import { requestRemnantCalculator } from "@/lib/specialty-tools";
+import {
+  requestApplianceScanner,
+  requestRemnantCalculator,
+} from "@/lib/specialty-tools";
 import { dedupeRoster, fetchSpecialists, isSupervisor } from "@/lib/specialists";
 import {
   formatStoreLabel,
@@ -307,11 +309,152 @@ export function SettingsSection({
     setOpenSection((current) => (current === id ? null : id));
   }
 
+  const showApplianceScanner = canAccessSection(activeSpecialist, "appliances");
+  const showRemnantTools = canAccessSection(activeSpecialist, "remnants");
+  const showFloorPad = supervisorSession || masterSession;
+
   return (
     <div className="space-y-4">
+      <header className="px-0.5">
+        <h1 className="text-lg font-bold tracking-tight text-zinc-50">More</h1>
+        <p className="mt-0.5 text-sm text-zinc-500">
+          Floor utilities, store admin, and device diagnostics
+        </p>
+      </header>
+
       <SettingsCard
-        title="Profile & Preferences"
-        subtitle="PIN, theme, device, and alerts"
+        title="Floor Utilities"
+        subtitle="Scan tools, remnants, and executive floor pad"
+        icons={[Camera, Scissors]}
+      >
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+          {showApplianceScanner ? (
+            <button
+              type="button"
+              onClick={() => requestApplianceScanner()}
+              className="flex min-h-12 items-center justify-center gap-2 rounded-xl border border-sky-500/40 bg-sky-950/30 px-3 text-sm font-semibold text-sky-100"
+            >
+              Scan &amp; Count Appliances
+            </button>
+          ) : null}
+          {showRemnantTools ? (
+            <button
+              type="button"
+              onClick={() => requestRemnantCalculator()}
+              className="flex min-h-12 items-center justify-center gap-2 rounded-xl border border-emerald-500/40 bg-emerald-950/30 px-3 text-sm font-semibold text-emerald-100"
+            >
+              Carpet Remnant Calculator
+            </button>
+          ) : null}
+          {showFloorPad ? (
+            <a
+              href="/dashboard#floor-pad"
+              className="flex min-h-12 items-center justify-center gap-2 rounded-xl border border-violet-500/40 bg-violet-950/30 px-3 text-sm font-semibold text-violet-100 sm:col-span-2"
+            >
+              <NotebookPen className="h-4 w-4" strokeWidth={ICON_STROKE} aria-hidden />
+              Executive Floor Pad
+            </a>
+          ) : null}
+        </div>
+        {showRemnants ? (
+          <Accordion
+            id="remnants"
+            title="Remnant inventory"
+            subtitle="Rack status and markdown"
+            open={openSection === "remnants"}
+            onToggle={() => toggleSection("remnants")}
+          >
+            <RemnantSection
+              catalog={catalog}
+              remnants={remnants}
+              onRemnantsChange={setRemnants}
+              loggedBy={activeSpecialist!.name}
+              specialists={roster}
+              activeSpecialist={activeSpecialist}
+            />
+          </Accordion>
+        ) : null}
+      </SettingsCard>
+
+      {(supervisorSession || masterSession) && activeSpecialist ? (
+        <SettingsCard
+          title="Store Management"
+          subtitle="Topology, quotas, and Sunday auto-stage"
+          icons={[Layers, Target]}
+        >
+          {mapConsole ? (
+            <Accordion
+              id="bulk-generate"
+              title="Store Topology & Bulk Bay Generator"
+              subtitle="Aisles, single bays, bulk generate"
+              open={openSection === "bulk"}
+              onToggle={() => toggleSection("bulk")}
+            >
+              <AisleBayManager
+                specialist={activeSpecialist}
+                departments={departments}
+                locations={locations}
+                canMutate
+                contextLabel={
+                  working === "all"
+                    ? "Full Store"
+                    : adminWorkingDepartmentLabel(working)
+                }
+                onChanged={() => void reloadDepts()}
+              />
+            </Accordion>
+          ) : null}
+
+          <div id="settings-targets" className="space-y-4">
+            <WeeklyBayTargetCard specialist={activeSpecialist} />
+            {masterSession ? (
+              <>
+                <SundayScheduleCard specialist={activeSpecialist} />
+                <button
+                  type="button"
+                  onClick={() => setForceOpen(true)}
+                  className="flex min-h-12 w-full items-center justify-center rounded-xl border border-slate-700 bg-slate-950 text-sm font-semibold text-slate-100"
+                >
+                  <RefreshCw
+                    className="w-4 h-4 mr-2"
+                    strokeWidth={ICON_STROKE}
+                    aria-hidden
+                  />
+                  Trigger Weekly Rotation Now
+                </button>
+              </>
+            ) : null}
+          </div>
+
+          {masterSession ? (
+            <Accordion
+              title="Catalog taxonomies"
+              subtitle="Folder trees per department"
+              open={openSection === "taxonomies"}
+              onToggle={() => toggleSection("taxonomies")}
+            >
+              <button
+                type="button"
+                onClick={() => setTaxonomyOpen(true)}
+                className="flex min-h-12 w-full items-center justify-between rounded-xl border border-slate-700 bg-slate-950 px-4 text-left"
+              >
+                <span className="text-sm font-semibold text-slate-100">
+                  Open taxonomy manager
+                </span>
+                <ChevronRight
+                  className="h-4 w-4 text-slate-500"
+                  strokeWidth={ICON_STROKE}
+                  aria-hidden
+                />
+              </button>
+            </Accordion>
+          ) : null}
+        </SettingsCard>
+      ) : null}
+
+      <SettingsCard
+        title="Device & Diagnostics"
+        subtitle="Profile, sync queue, offline matrix, alerts"
         icons={[UserCheck, Sliders]}
       >
         {canChangePin && activeSpecialist ? (
@@ -502,109 +645,6 @@ export function SettingsSection({
           </Accordion>
         ) : null}
       </SettingsCard>
-
-      {(supervisorSession || masterSession) && activeSpecialist ? (
-        <SettingsCard
-          id="settings-targets"
-          title="Department Targets & Sunday Auto-Stage"
-          subtitle="Weekly quotas and Sunday clock"
-          icons={[Calendar, Target]}
-        >
-          {masterSession ? (
-            <SundayScheduleCard specialist={activeSpecialist} />
-          ) : null}
-          <WeeklyBayTargetCard specialist={activeSpecialist} />
-          {masterSession ? (
-            <button
-              type="button"
-              onClick={() => setForceOpen(true)}
-              className="flex min-h-12 w-full items-center justify-center rounded-xl border border-slate-700 bg-slate-950 text-sm font-semibold text-slate-100"
-            >
-              <RefreshCw
-                className="w-4 h-4 mr-2"
-                strokeWidth={ICON_STROKE}
-                aria-hidden
-              />
-              Trigger Weekly Rotation Now
-            </button>
-          ) : null}
-        </SettingsCard>
-      ) : null}
-
-      {mapConsole && activeSpecialist ? (
-        <SettingsCard
-          id="bulk-generate"
-          title="Store Topology & Bay Setup"
-          subtitle="Aisles, single bays, bulk generate"
-          icons={[Layers, PlusCircle]}
-          collapsible
-          open={openSection === "bulk"}
-          onToggle={() => toggleSection("bulk")}
-        >
-          <AisleBayManager
-            specialist={activeSpecialist}
-            departments={departments}
-            locations={locations}
-            canMutate
-            contextLabel={
-              working === "all"
-                ? "Full Store"
-                : adminWorkingDepartmentLabel(working)
-            }
-            onChanged={() => void reloadDepts()}
-          />
-        </SettingsCard>
-      ) : null}
-
-      {(masterSession || showRemnants) && activeSpecialist ? (
-        <SettingsCard
-          title="Catalog & Remnants"
-          subtitle="Taxonomies and remnant markdown"
-          icons={[FolderTree, Scissors]}
-        >
-          {masterSession ? (
-            <Accordion
-              title="Catalog taxonomies"
-              subtitle="Folder trees per department"
-              open={openSection === "taxonomies"}
-              onToggle={() => toggleSection("taxonomies")}
-            >
-              <button
-                type="button"
-                onClick={() => setTaxonomyOpen(true)}
-                className="flex min-h-12 w-full items-center justify-between rounded-xl border border-slate-700 bg-slate-950 px-4 text-left"
-              >
-                <span className="text-sm font-semibold text-slate-100">
-                  Open taxonomy manager
-                </span>
-                <ChevronRight
-                  className="h-4 w-4 text-slate-500"
-                  strokeWidth={ICON_STROKE}
-                  aria-hidden
-                />
-              </button>
-            </Accordion>
-          ) : null}
-          {showRemnants ? (
-            <Accordion
-              id="remnants"
-              title="Remnant inventory"
-              subtitle="Rack status and markdown"
-              open={openSection === "remnants"}
-              onToggle={() => toggleSection("remnants")}
-            >
-              <RemnantSection
-                catalog={catalog}
-                remnants={remnants}
-                onRemnantsChange={setRemnants}
-                loggedBy={activeSpecialist.name}
-                specialists={roster}
-                activeSpecialist={activeSpecialist}
-              />
-            </Accordion>
-          ) : null}
-        </SettingsCard>
-      ) : null}
 
       {forceOpen && activeSpecialist ? (
         <ForceRotationModal

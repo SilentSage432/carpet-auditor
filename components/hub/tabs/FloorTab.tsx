@@ -2,8 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
-import { useRouter } from "next/navigation";
-import { Camera, Package } from "lucide-react";
+import Link from "next/link";
+import { ChevronRight, Layers, Users, Zap } from "lucide-react";
 import { SundayAuditStagingCard } from "@/components/admin/SundayAuditStagingCard";
 import { ExceptionFeed } from "@/components/admin/ExceptionFeed";
 import { StoreHealthCard } from "@/components/StoreHealthCard";
@@ -13,7 +13,7 @@ import { BayFreshnessGrid } from "@/components/dashboard/BayFreshnessGrid";
 import { FlagDownstockSheet } from "@/components/store-ops/FlagDownstockSheet";
 import { OnDutyAssociateStrip } from "@/components/store-ops/OnDutyAssociateStrip";
 import { ShiftAnalyticsDrawer } from "@/components/store-ops/ShiftAnalyticsDrawer";
-import { ZebraChecklist } from "@/components/store-ops/ZebraChecklist";
+import { ZebraChecklist, type FloorBayFilter } from "@/components/store-ops/ZebraChecklist";
 import { ShiftBriefingCard } from "@/components/store-ops/ShiftBriefingCard";
 import { PredictiveCopilotBanner } from "@/components/store-ops/PredictiveCopilotBanner";
 import { StoreHealthChart } from "@/components/store-ops/StoreHealthChart";
@@ -23,11 +23,9 @@ import {
   workingDepartmentId,
 } from "@/lib/admin-department-context";
 import { useWorkingDepartment } from "@/lib/use-working-department";
-import { isMasterAdmin, isSimplifiedAssociateView, canAccessSection } from "@/lib/rbac";
+import { isMasterAdmin, isSimplifiedAssociateView } from "@/lib/rbac";
 import {
-  APPLIANCE_SCANNER_HASH,
   APPLIANCE_SCANNER_OPEN_EVENT,
-  REMNANT_CALCULATOR_HASH,
   type ApplianceScannerLocationContext,
 } from "@/lib/specialty-tools";
 import { canAccessDepartment } from "@/lib/department-access";
@@ -44,9 +42,12 @@ import {
 } from "@/lib/store-ops/client";
 import { fingerprintsEqual } from "@/lib/store-ops/cache";
 import {
+  buildSundayStagedBays,
   fetchSundayAssignments,
   filterFlooringRotations,
   findFlooringDepartment,
+  pendingSundayAssignmentCount,
+  requestSundayAuditDrawer,
   SUNDAY_AUDIT_EVENT,
   type SundayAssignmentMap,
 } from "@/lib/store-ops/sunday-audit";
@@ -114,8 +115,14 @@ function rotationBayRef(rotation: WeeklyRotationWithLocation) {
   };
 }
 
+const FLOOR_FILTERS: Array<{ id: FloorBayFilter; label: string }> = [
+  { id: "all", label: "All Bays" },
+  { id: "mine", label: "My Bays" },
+  { id: "attention", label: "Needs Attention" },
+  { id: "completed", label: "Completed" },
+];
+
 export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
-  const router = useRouter();
   const [week, setWeek] = useState("");
   const [deptId, setDeptId] = useState<string | null>(null);
   const [departments, setDepartments] = useState<Department[]>([]);
@@ -151,6 +158,8 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
   const [simsScannerOpen, setSimsScannerOpen] = useState(false);
   const [simsBayLocation, setSimsBayLocation] =
     useState<ApplianceScannerLocationContext | null>(null);
+  const [floorBayFilter, setFloorBayFilter] = useState<FloorBayFilter>("all");
+  const [rosterSheetOpen, setRosterSheetOpen] = useState(false);
 
   const working = useWorkingDepartment(specialist);
   const flooringFocus = working === "flooring";
@@ -165,12 +174,6 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
       String(r.verification_status ?? "").toUpperCase() ===
         "PENDING_VERIFICATION"
   ).length;
-  const showApplianceScanner =
-    (working === "appliances" || working === "all") &&
-    canAccessSection(specialist, "appliances");
-  const showRemnantCalculator =
-    (working === "flooring" || working === "all") &&
-    canAccessSection(specialist, "remnants");
 
   const activeDept = useMemo(
     () => departments.find((dept) => dept.id === deptId) ?? null,
@@ -349,6 +352,21 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
     return filterFlooringRotations(scoped, flooringDeptId);
   }, [rotations, flooringFocus, flooringDeptId, working, deptId]);
 
+  const openBayCount = displayRotations.filter((r) => !r.is_completed).length;
+
+  const sundayPending = useMemo(() => {
+    const bays = buildSundayStagedBays(displayRotations, assignments);
+    return pendingSundayAssignmentCount(bays);
+  }, [displayRotations, assignments]);
+
+  const showSundayRail =
+    !simplified && (flooringFocus || master || supervisor);
+
+  const effectiveFocus = useMemo(() => {
+    if (floorBayFilter === "mine") return String(specialist.id);
+    return focusAssociateId;
+  }, [floorBayFilter, specialist.id, focusAssociateId]);
+
   const hasSimsBays = useMemo(
     () =>
       displayRotations.some((row) =>
@@ -442,53 +460,151 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
           <h1 className="text-lg font-bold tracking-tight text-zinc-50">
             {rotationTitle}
           </h1>
-          <div className="mt-2 grid grid-cols-2 gap-2">
+          <p className="mt-0.5 text-xs text-zinc-500">
+            {openBayCount} open · {completedCount} complete
+            {week ? ` · week ${week}` : ""}
+          </p>
+        </header>
+
+        <section className="overflow-hidden rounded-2xl border border-zinc-800/90 bg-zinc-950/70 shadow-[0_12px_40px_-20px_rgba(0,0,0,0.75)]">
+          <div className="grid grid-cols-2 gap-2 border-b border-zinc-800/80 p-3">
+            {showSundayRail ? (
+              <button
+                type="button"
+                onClick={() => requestSundayAuditDrawer()}
+                className="flex min-h-12 items-center gap-2 rounded-xl border border-emerald-500/35 bg-emerald-950/25 px-2.5 text-left transition active:scale-[0.99]"
+              >
+                <Zap
+                  className="h-4 w-4 shrink-0 text-emerald-300"
+                  strokeWidth={ICON_STROKE}
+                  aria-hidden
+                />
+                <span className="min-w-0 flex-1">
+                  <span className="block font-mono text-[9px] font-bold uppercase tracking-wide text-emerald-400/90">
+                    Pending Cycle Audits
+                  </span>
+                  <span className="block truncate text-xs font-bold text-emerald-50">
+                    {sundayPending > 0
+                      ? `${sundayPending} need assignment`
+                      : "Tap to stage bays"}
+                  </span>
+                </span>
+                <ChevronRight
+                  className="h-4 w-4 shrink-0 text-emerald-400/80"
+                  strokeWidth={ICON_STROKE}
+                  aria-hidden
+                />
+              </button>
+            ) : (
+              <div className="flex min-h-12 items-center rounded-xl border border-dashed border-zinc-800 px-2.5 text-xs text-zinc-500">
+                Cycle audits available in Flooring view
+              </div>
+            )}
             <button
               type="button"
-              onClick={() => setBayScanOpen(true)}
-              className="btn-primary-glow flex min-h-11 items-center justify-center rounded-xl px-3 text-sm font-semibold"
+              onClick={() => setRosterSheetOpen(true)}
+              className="flex min-h-12 items-center gap-2 rounded-xl border border-cyan-500/35 bg-cyan-950/25 px-2.5 text-left transition active:scale-[0.99]"
             >
-              <Camera className="w-4 h-4 mr-2" strokeWidth={ICON_STROKE} />
-              Snap Bay AI Audit
-            </button>
-            <button
-              type="button"
-              onClick={() => setDownstockOpen(true)}
-              className="flex min-h-11 items-center justify-center rounded-xl border border-cyan-500/40 bg-cyan-950/30 px-3 text-sm font-semibold text-cyan-100"
-            >
-              <Package className="w-4 h-4 mr-2" strokeWidth={ICON_STROKE} />
-              Flag Downstock
+              <Users
+                className="h-4 w-4 shrink-0 text-cyan-300"
+                strokeWidth={ICON_STROKE}
+                aria-hidden
+              />
+              <span className="min-w-0 flex-1">
+                <span className="block font-mono text-[9px] font-bold uppercase tracking-wide text-cyan-400/90">
+                  Associates On Duty
+                </span>
+                <span className="block truncate text-xs font-bold text-cyan-50">
+                  {onDutyLoading
+                    ? "Loading…"
+                    : `${workload.groups.length} on shift`}
+                </span>
+              </span>
+              <ChevronRight
+                className="h-4 w-4 shrink-0 text-cyan-400/80"
+                strokeWidth={ICON_STROKE}
+                aria-hidden
+              />
             </button>
           </div>
-          {showApplianceScanner || showRemnantCalculator ? (
-            <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-2">
-              {showApplianceScanner ? (
-                <button
-                  type="button"
-                  onClick={() =>
-                    router.push(`/?section=appliances#${APPLIANCE_SCANNER_HASH}`)
-                  }
-                  className="flex min-h-11 items-center justify-center gap-2 rounded-xl border border-sky-500/40 bg-sky-950/30 px-3 text-sm font-semibold text-sky-100"
-                >
-                  <span aria-hidden>📷</span>
-                  Scan &amp; Count Appliances
-                </button>
-              ) : null}
-              {showRemnantCalculator ? (
-                <button
-                  type="button"
-                  onClick={() =>
-                    router.push(`/?section=audit#${REMNANT_CALCULATOR_HASH}`)
-                  }
-                  className="flex min-h-11 items-center justify-center gap-2 rounded-xl border border-emerald-500/40 bg-emerald-950/30 px-3 text-sm font-semibold text-emerald-100"
-                >
-                  <span aria-hidden>📐</span>
-                  Carpet Remnant Calculator
-                </button>
-              ) : null}
+
+          {supervisor && !simplified ? (
+            <div className="flex flex-wrap gap-2 border-b border-zinc-800/80 px-3 py-2">
+              <button
+                type="button"
+                onClick={() => requestSundayAuditDrawer()}
+                className="inline-flex min-h-12 items-center gap-1.5 rounded-full border border-emerald-500/40 bg-emerald-950/30 px-3 text-xs font-bold text-emerald-100"
+              >
+                <Zap className="h-3.5 w-3.5" strokeWidth={ICON_STROKE} aria-hidden />
+                Stage Weekly Rotation
+              </button>
+              <Link
+                href="/settings#topology"
+                className="inline-flex min-h-12 items-center gap-1.5 rounded-full border border-zinc-700 bg-zinc-900/80 px-3 text-xs font-bold text-zinc-200"
+              >
+                <Layers className="h-3.5 w-3.5" strokeWidth={ICON_STROKE} aria-hidden />
+                Store Topology / Bay Setup
+              </Link>
             </div>
           ) : null}
-        </header>
+
+          <div className="border-b border-zinc-800/80 px-3 py-2">
+            <div
+              role="tablist"
+              aria-label="Bay filters"
+              className="flex gap-1.5 overflow-x-auto pb-0.5 no-scrollbar"
+            >
+              {FLOOR_FILTERS.map((filter) => {
+                const active = floorBayFilter === filter.id;
+                const badge =
+                  filter.id === "completed"
+                    ? completedCount
+                    : filter.id === "attention"
+                      ? pendingVerifyCount
+                      : null;
+                return (
+                  <button
+                    key={filter.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={active}
+                    onClick={() => setFloorBayFilter(filter.id)}
+                    className={`chip-filter shrink-0 rounded-full px-3 ${
+                      active
+                        ? "border-cyan-400/55 bg-cyan-950/45 text-cyan-100 shadow-[0_0_12px_-4px_rgba(34,211,238,0.55)]"
+                        : "border-zinc-700 text-zinc-300"
+                    }`}
+                  >
+                    {filter.label}
+                    {badge && badge > 0 ? ` (${badge})` : ""}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div className="p-3">
+            {loading && displayRotations.length === 0 ? (
+              <p className="text-sm text-zinc-400">Loading this week&apos;s bays…</p>
+            ) : (
+              <ZebraChecklist
+                key={`${working}-${floorBayFilter}`}
+                specialist={specialist}
+                assignedWeek={week}
+                rotations={displayRotations}
+                onRefresh={silentRefresh}
+                assignmentDepartment={assignmentDept}
+                focusSpecialistId={effectiveFocus}
+                onDutyMembers={onDuty}
+                externalAudits={bayAudits}
+                hideChrome
+                floorBayFilter={floorBayFilter}
+                simsScans={applianceScans}
+                simsCatalog={applianceCatalog}
+              />
+            )}
+          </div>
+        </section>
 
         <OnDutyAssociateStrip
           groups={workload.groups}
@@ -496,6 +612,9 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
           onSelect={setPickedAssociateId}
           loading={onDutyLoading}
           storewide={working === "all"}
+          hideStrip
+          sheetOpen={rosterSheetOpen}
+          onSheetOpenChange={setRosterSheetOpen}
         />
 
         {!simplified ? (
@@ -503,37 +622,35 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
             specialist={specialist}
             refreshKey={healthKey}
             forceShow={flooringFocus || master}
+            variant="modal-only"
           />
         ) : null}
 
         {verifyMsg ? (
-          <p className="mb-3 rounded-xl border border-emerald-500/40 bg-emerald-950/40 px-3 py-2 text-sm text-emerald-200">
+          <p className="mb-3 mt-3 rounded-xl border border-emerald-500/40 bg-emerald-950/40 px-3 py-2 text-sm text-emerald-200">
             {verifyMsg}
           </p>
         ) : null}
 
-        <section className="mb-3">
-          {loading && displayRotations.length === 0 ? (
-            <p className="text-sm text-zinc-400">Loading this week&apos;s bays…</p>
-          ) : (
-            <ZebraChecklist
-              key={working}
-              specialist={specialist}
-              assignedWeek={week}
-              rotations={displayRotations}
-              onRefresh={silentRefresh}
-              assignmentDepartment={assignmentDept}
-              focusSpecialistId={focusAssociateId}
-              onDutyMembers={onDuty}
-              externalAudits={bayAudits}
-              hideChrome
-              simsScans={applianceScans}
-              simsCatalog={applianceCatalog}
-            />
-          )}
-        </section>
-
         <ShiftAnalyticsDrawer>
+          {!simplified ? (
+            <div className="mb-3 grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setBayScanOpen(true)}
+                className="flex min-h-12 items-center justify-center rounded-xl border border-emerald-500/40 bg-emerald-950/25 px-3 text-sm font-semibold text-emerald-100"
+              >
+                Snap Bay AI Audit
+              </button>
+              <button
+                type="button"
+                onClick={() => setDownstockOpen(true)}
+                className="flex min-h-12 items-center justify-center rounded-xl border border-cyan-500/40 bg-cyan-950/30 px-3 text-sm font-semibold text-cyan-100"
+              >
+                Flag Downstock
+              </button>
+            </div>
+          ) : null}
           {!simplified ? (
             <TacticalVoiceFloorPad
               specialist={specialist}

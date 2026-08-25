@@ -466,17 +466,17 @@ body {
 }
 
 .theme-bottom-nav {
-  border-top: 1px solid var(--border);
-  background: color-mix(in srgb, var(--surface) 95%, transparent);
-  box-shadow: 0 -8px 32px -12px var(--shadow);
+  border: none;
+  background: transparent;
+  box-shadow: none;
 }
 
 /*
- * Unified mobile bottom dock: nav + scan action + undo toast share one stack.
- * Nav min-h-16 (4rem) + .pb-safe (max(0.75rem, safe-area)).
+ * Unified mobile bottom dock: floating pill nav + scan action + undo toast.
+ * Pill touch targets are min-h-12 (48px) + outer padding.
  */
 :root {
-  --hub-bottom-nav-min-height: 4rem;
+  --hub-bottom-nav-min-height: 3.75rem;
   --hub-scan-action-height: 4.75rem;
   --hub-dock-safe-bottom: max(0.75rem, env(safe-area-inset-bottom, 0px));
   --hub-bottom-nav-stack: calc(
@@ -485,7 +485,11 @@ body {
 }
 
 .hub-bottom-nav {
-  @apply fixed bottom-0 left-0 right-0 z-30 mx-auto w-full max-w-lg;
+  @apply fixed bottom-0 left-0 right-0 z-30 flex justify-center px-4;
+}
+
+.hub-bottom-pill {
+  width: min(100%, 22rem);
 }
 
 .hub-scan-dock {
@@ -552,15 +556,15 @@ body {
   padding-bottom: 0.25rem;
 }
 
-/* Filter chips — 44px hit area, dense label (set radius per surface) */
+/* Filter chips — 48px hit area, dense label (set radius per surface) */
 .chip-filter {
-  @apply inline-flex min-h-11 shrink-0 items-center justify-center border px-3 text-[10px] font-bold uppercase tracking-wide
+  @apply inline-flex min-h-12 shrink-0 items-center justify-center border px-3 text-[10px] font-bold uppercase tracking-wide
     transition active:scale-[0.98] disabled:opacity-40;
 }
 
-/* Quick Touch / bay action — 44px min, compact width */
+/* Quick Touch / bay action — 48px min, compact width */
 .btn-quick-touch {
-  @apply inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center gap-1 rounded-xl border px-2 text-[10px] font-bold uppercase tracking-wide
+  @apply inline-flex min-h-12 min-w-12 shrink-0 items-center justify-center gap-1 rounded-xl border px-2 text-[10px] font-bold uppercase tracking-wide
     transition active:scale-[0.98] disabled:opacity-40;
 }
 

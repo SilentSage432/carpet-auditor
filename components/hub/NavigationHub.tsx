@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Navigation Hub chrome — title, department pill, account/PIN, Floor/Map/Roster/Settings bar.
+ * Navigation Hub chrome — title, department pill, account/PIN, Floor/Map/Roster/More bar.
  */
 
 import { useEffect, useId, useMemo, useRef, useState } from "react";

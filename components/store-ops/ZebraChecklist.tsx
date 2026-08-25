@@ -87,6 +87,8 @@ type TypeFilter = StoreLocationType | "all";
 type AssociateFilter = "all" | "mine" | string;
 type QueueFilter = "all" | "downstock";
 
+export type FloorBayFilter = "all" | "mine" | "attention" | "completed";
+
 export type ZebraChecklistProps = {
   specialist: StoreSpecialist;
   assignedWeek: string;
@@ -115,6 +117,8 @@ export type ZebraChecklistProps = {
   /** Floor-hosted appliance scans for SIMS bay live counts. */
   simsScans?: ApplianceScan[];
   simsCatalog?: ApplianceCatalogItem[];
+  /** Parent-owned floor filter (Floor tab scaffold). */
+  floorBayFilter?: FloorBayFilter;
 };
 
 export function ZebraChecklist({
@@ -131,6 +135,7 @@ export function ZebraChecklist({
   externalAudits,
   simsScans = [],
   simsCatalog = [],
+  floorBayFilter = "all",
 }: ZebraChecklistProps) {
   const [error, setError] = useState<string | null>(null);
   const [doneOpen, setDoneOpen] = useState(false);
@@ -375,6 +380,10 @@ export function ZebraChecklist({
     workload,
   ]);
 
+  useEffect(() => {
+    setDoneOpen(floorBayFilter === "completed");
+  }, [floorBayFilter]);
+
   const downstockOpen = useMemo(
     () => orderedOpen.filter((r) => Boolean(downstock[r.id])),
     [orderedOpen, downstock]
@@ -390,6 +399,19 @@ export function ZebraChecklist({
     () => new Set(bayHealth.findings.map((f) => f.rotationId)),
     [bayHealth]
   );
+
+  const displayQueue = useMemo(() => {
+    if (floorBayFilter === "attention") {
+      return queueOpen.filter(
+        (row) =>
+          flaggedIds.has(row.id) ||
+          Boolean(downstock[row.id]) ||
+          Boolean(row.review_note?.trim()) ||
+          resolveVerificationStatus(row) === "PENDING_VERIFICATION"
+      );
+    }
+    return queueOpen;
+  }, [floorBayFilter, queueOpen, flaggedIds, downstock]);
 
   const weeklyPace = useMemo(() => {
     const completedCount = rotations.filter(
@@ -654,9 +676,9 @@ export function ZebraChecklist({
   }
 
   const rotationById = useMemo(() => {
-    const map = new Map(queueOpen.map((row) => [row.id, row]));
+    const map = new Map(displayQueue.map((row) => [row.id, row]));
     return map;
-  }, [queueOpen]);
+  }, [displayQueue]);
 
   const groupedQueue =
     hideChrome &&
@@ -665,7 +687,7 @@ export function ZebraChecklist({
     (onDutyMembers?.length ?? 0) > 0;
 
   const leftoverOpen = groupedQueue
-    ? queueOpen.filter((row) => {
+    ? displayQueue.filter((row) => {
         const grouped = workload.groups.some((group) =>
           group.rotationIds.includes(row.id)
         );
@@ -827,12 +849,14 @@ export function ZebraChecklist({
       </div>
       ) : null}
 
+      {!hideChrome ? (
       <AuditLocationModeToggle
         value={typeFilter}
         onChange={setTypeFilter}
         includeAll
         legend="Selling vs Topstock"
       />
+      ) : null}
 
       {associateOptions.length > 0 && !associateView && !hideChrome ? (
         <div className="flex gap-1.5 overflow-x-auto pb-0.5 no-scrollbar">
@@ -919,7 +943,16 @@ export function ZebraChecklist({
         </p>
       ) : null}
 
-      {groupedQueue ? (
+      {floorBayFilter === "attention" &&
+      queueFilter !== "downstock" &&
+      displayQueue.length === 0 ? (
+        <p className="rounded-xl border border-dashed border-amber-500/35 bg-amber-950/20 px-4 py-3 text-center text-sm text-amber-100">
+          No bays need attention right now — great work.
+        </p>
+      ) : null}
+
+      {floorBayFilter !== "completed" ? (
+        groupedQueue ? (
         <div className="space-y-2">
           {workload.groups.map((group) => {
             const rows = group.rotationIds
@@ -966,9 +999,10 @@ export function ZebraChecklist({
         </div>
       ) : (
         <ul className="divide-y divide-slate-800 overflow-hidden rounded-xl border border-slate-700 bg-slate-900/90">
-          {queueOpen.map((rotation) => renderBayRow(rotation))}
+          {displayQueue.map((rotation) => renderBayRow(rotation))}
         </ul>
-      )}
+      )
+      ) : null}
 
       {done.length > 0 ? (
         <div className="overflow-hidden rounded-xl border border-slate-800 bg-slate-950/50">

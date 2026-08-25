@@ -34,12 +34,15 @@ type Props = {
   refreshKey?: number | string;
   /** Force show even when working context isn't flooring (e.g. Cycle Audit tab). */
   forceShow?: boolean;
+  /** When modal-only, skip the prominent card (Floor top rail owns the trigger). */
+  variant?: "prominent" | "modal-only";
 };
 
 export function SundayAuditStagingCard({
   specialist,
   refreshKey,
   forceShow = false,
+  variant = "prominent",
 }: Props) {
   const [openCount, setOpenCount] = useState(0);
   const [pending, setPending] = useState(0);
@@ -115,11 +118,11 @@ export function SundayAuditStagingCard({
     week,
   });
 
-  if (!showCard && !modalOpen) return null;
+  if (!showCard && !modalOpen && variant === "prominent") return null;
 
   return (
     <>
-      {showCard ? (
+      {showCard && variant === "prominent" ? (
       <button
         type="button"
         onClick={(e) => {

@@ -419,10 +419,12 @@ Public paths: `lib/auth-gate.ts` `isAuthGatePublicPath()` — login, pair, verif
 
 ### Phase 3: Screen redesigns & touch-optimized floor views
 
+- [x] Floating pill bottom navigation (`components/hub/BottomNav.tsx`) — Floor · Map · Roster · More
+- [x] Central Floor workspace container with top rail, supervisor bar, and filter chips (`components/hub/tabs/FloorTab.tsx`)
+- [x] More tab reorganized into Floor Utilities / Store Management / Device & Diagnostics (`components/sections/SettingsSection.tsx`)
+- [x] 48px bay completion touch targets (`.btn-quick-touch` min-h-12)
 - [ ] Remnant card density reduction (noted in `APP_LAYOUT_MAP.md` D.3)
-- [ ] Optional supervisor filter placement near shift log header
-- [ ] Continued handheld target sizing (44px min — `.btn-quick-touch`, `.chip-filter`)
-- [ ] *(Add specific redesign tickets here as scoped)*
+- [ ] Continued handheld target sizing audit across legacy surfaces
 
 ### Phase 4: Schema parity, type generation & CI smoke testing
 
@@ -469,4 +471,4 @@ Public paths: `lib/auth-gate.ts` `isAuthGatePublicPath()` — login, pair, verif
 
 ---
 
-*Last updated: 2026-08-25 (Phase 1 complete — quarantine UI, vitest harness, offline capability matrix)*
+*Last updated: 2026-08-25 (Phase 3 UI scaffold — floating pill nav, Floor container, More hub)*

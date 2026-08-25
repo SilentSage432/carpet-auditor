@@ -124,7 +124,7 @@ export function workflowTabTitle(
 ): string {
   if (href === "/admin/store-map") return "Store Map";
   if (href === "/roster") return "Team Roster";
-  if (href === "/settings") return "Settings & Config";
+  if (href === "/settings") return "More";
   const scope =
     working ?? (specialist ? workingDepartment(specialist) : "all");
   if (scope === "all") return "Floor Rotation";
@@ -179,14 +179,14 @@ const PRIMARY_LINKS: NavHubLink[] = [
   },
   {
     href: "/settings",
-    label: "Settings",
-    shortLabel: "Settings",
-    icon: "settings",
-    description: "Themes, store config, and floor tools",
+    label: "More",
+    shortLabel: "More",
+    icon: "more",
+    description: "Floor utilities, store admin, and device diagnostics",
   },
 ];
 
-/** Primary bottom-bar links — Floor · Map · Roster · Settings, filtered by role. */
+/** Primary bottom-bar links — Floor · Map · Roster · More, filtered by role. */
 export function navRoleLinks(
   member: StoreSpecialist | null | undefined
 ): NavHubLink[] {

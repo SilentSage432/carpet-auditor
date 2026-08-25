@@ -21,6 +21,10 @@ type Props = {
   loading?: boolean;
   /** Full-store pin — collapse the strip when the roster is long. */
   storewide?: boolean;
+  /** Hide inline pills — use with controlled sheet (Floor top rail). */
+  hideStrip?: boolean;
+  sheetOpen?: boolean;
+  onSheetOpenChange?: (open: boolean) => void;
 };
 
 function givenName(name: string): string {
@@ -34,8 +38,13 @@ export function OnDutyAssociateStrip({
   onSelect,
   loading = false,
   storewide = false,
+  hideStrip = false,
+  sheetOpen: sheetOpenProp,
+  onSheetOpenChange,
 }: Props) {
-  const [sheetOpen, setSheetOpen] = useState(false);
+  const [sheetOpenInternal, setSheetOpenInternal] = useState(false);
+  const sheetOpen = sheetOpenProp ?? sheetOpenInternal;
+  const setSheetOpen = onSheetOpenChange ?? setSheetOpenInternal;
   const totalBays = groups.reduce((sum, group) => sum + group.rotationIds.length, 0);
   const compact = storewide && groups.length > STOREWIDE_PILL_LIMIT;
 
@@ -53,50 +62,54 @@ export function OnDutyAssociateStrip({
   }
 
   return (
-    <section className="mb-3" aria-label="On-duty associates">
-      <p className="mb-1.5 font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500">
-        On duty today
-      </p>
-      {loading && groups.length === 0 ? (
-        <p className="text-sm text-zinc-400">Loading today&apos;s specialists…</p>
-      ) : groups.length === 0 ? (
-        <p className="flex min-h-11 items-center gap-2 rounded-xl border border-dashed border-zinc-700 px-3 text-sm text-zinc-400">
-          <Clock className="h-4 w-4 shrink-0" strokeWidth={ICON_STROKE} aria-hidden />
-          No associates on duty for this department today
-        </p>
-      ) : compact ? (
-        <button
-          type="button"
-          onClick={() => setSheetOpen(true)}
-          className="flex min-h-11 w-full items-center justify-center rounded-xl border border-cyan-500/40 bg-cyan-950/25 px-3 text-sm font-bold text-cyan-100"
-        >
-          <Users className="w-4 h-4 mr-2" strokeWidth={ICON_STROKE} aria-hidden />
-          {groups.length} Associates On Duty
-        </button>
-      ) : (
-        <div className="flex gap-1.5 overflow-x-auto pb-0.5 no-scrollbar">
-          <button
-            type="button"
-            onClick={() => onSelect("all")}
-            className={`chip-filter inline-flex shrink-0 items-center gap-1.5 rounded-full ${
-              selectedId === "all"
-                ? "border-cyan-400/55 bg-cyan-950/45 text-cyan-100"
-                : "border-slate-700 text-slate-300"
-            }`}
-          >
-            <Users className="h-3.5 w-3.5" strokeWidth={ICON_STROKE} aria-hidden />
-            All · {totalBays} {totalBays === 1 ? "Bay" : "Bays"}
-          </button>
-          {groups.map((group) => (
-            <AssociatePill
-              key={group.specialist_id}
-              group={group}
-              selected={selectedId === group.specialist_id}
-              onSelect={() => onSelect(group.specialist_id)}
-            />
-          ))}
-        </div>
-      )}
+    <>
+      {!hideStrip ? (
+        <section className="mb-3" aria-label="On-duty associates">
+          <p className="mb-1.5 font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500">
+            On duty today
+          </p>
+          {loading && groups.length === 0 ? (
+            <p className="text-sm text-zinc-400">Loading today&apos;s specialists…</p>
+          ) : groups.length === 0 ? (
+            <p className="flex min-h-11 items-center gap-2 rounded-xl border border-dashed border-zinc-700 px-3 text-sm text-zinc-400">
+              <Clock className="h-4 w-4 shrink-0" strokeWidth={ICON_STROKE} aria-hidden />
+              No associates on duty for this department today
+            </p>
+          ) : compact ? (
+            <button
+              type="button"
+              onClick={() => setSheetOpen(true)}
+              className="flex min-h-11 w-full items-center justify-center rounded-xl border border-cyan-500/40 bg-cyan-950/25 px-3 text-sm font-bold text-cyan-100"
+            >
+              <Users className="w-4 h-4 mr-2" strokeWidth={ICON_STROKE} aria-hidden />
+              {groups.length} Associates On Duty
+            </button>
+          ) : (
+            <div className="flex gap-1.5 overflow-x-auto pb-0.5 no-scrollbar">
+              <button
+                type="button"
+                onClick={() => onSelect("all")}
+                className={`chip-filter inline-flex shrink-0 items-center gap-1.5 rounded-full ${
+                  selectedId === "all"
+                    ? "border-cyan-400/55 bg-cyan-950/45 text-cyan-100"
+                    : "border-slate-700 text-slate-300"
+                }`}
+              >
+                <Users className="h-3.5 w-3.5" strokeWidth={ICON_STROKE} aria-hidden />
+                All · {totalBays} {totalBays === 1 ? "Bay" : "Bays"}
+              </button>
+              {groups.map((group) => (
+                <AssociatePill
+                  key={group.specialist_id}
+                  group={group}
+                  selected={selectedId === group.specialist_id}
+                  onSelect={() => onSelect(group.specialist_id)}
+                />
+              ))}
+            </div>
+          )}
+        </section>
+      ) : null}
 
       {sheetOpen ? (
         <div className="glass-backdrop fixed inset-0 z-[80] flex flex-col justify-end">
@@ -194,7 +207,7 @@ export function OnDutyAssociateStrip({
           </div>
         </div>
       ) : null}
-    </section>
+    </>
   );
 }
 
