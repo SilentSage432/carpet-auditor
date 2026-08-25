@@ -96,10 +96,10 @@ Placeholder detection: `lib/supabase/env.ts` rejects obvious placeholder URLs/ke
 ### npm scripts
 
 ```json
-"dev" | "build" | "start" | "lint" | "typecheck"
+"dev" | "build" | "start" | "lint" | "typecheck" | "test"
 ```
 
-**No test runner configured.** Zero `*.test.*` / `*.spec.*` files in repo.
+**Test runner:** Vitest (`vitest.config.ts`) — `lib/sync-queue.test.ts` covers quarantine engine (7 cases). Run `npm test`.
 
 ### Primary documentation map
 
@@ -248,7 +248,7 @@ Browser request
 3. **Topology CRUD online-only** — cannot bulk-add bays offline; queued rotation complete may reference locations that exist only if previously synced.
 4. **No multi-device queue merge** — sync queue is device-local; LWW at flush time only.
 5. **Hand-written TS types** — schema drift risk without generated Supabase types.
-6. **Quarantine UI not yet wired** — core engine in `lib/sync-queue.ts`; Settings panel pending Part 2.
+6. ~~**Quarantine UI not yet wired**~~ — `SyncQueuePanel` in Settings Device & sync accordion.
 
 ---
 
@@ -294,7 +294,7 @@ Browser request
 | Enterprise topology ingest | **Stub** — validates, does not write | `app/api/v1/topology/ingest/route.ts` |
 | Enterprise freight stage | **Stub** — validates, does not queue | `app/api/v1/freight/stage/route.ts` |
 | Automated test suite | **Missing** | No vitest/jest/playwright in `package.json` |
-| Sync queue quarantine | **Missing** — 4xx retries forever | `lib/sync-queue.ts` |
+| Sync queue quarantine | **Resolved (Phase 1)** | `lib/sync-queue.ts`, `components/settings/SyncQueuePanel.tsx` |
 | Generated DB types | **Missing** | No `database.types.ts` |
 | Catalog standalone page | **Redirect** | `app/catalog/page.tsx` → `/appliances` |
 | `InviteOnboardingView` | **Orphaned** | `components/auth/InviteOnboardingView.tsx` |
@@ -366,7 +366,7 @@ Public paths: `lib/auth-gate.ts` `isAuthGatePublicPath()` — login, pair, verif
 
 | ID | Issue | Location | Impact |
 |----|-------|----------|--------|
-| P0-1 | **Zero automated test coverage** | `package.json` — no test script | Regressions undetected; no CI gate |
+| P0-1 | **Sync queue test coverage** | `lib/sync-queue.test.ts`, `npm test` | **Partial** — queue engine covered; broader CI smoke tests remain Phase 4 |
 | P0-2 | **Shift walk tasks fail hard offline** | `lib/store-ops/shift-tasks.ts` `requireClient()` | Supervisors lose Copilot dispatch on dead zones |
 | P0-3 | **Associate schedule / call-out online-only** | `lib/store-ops/shift-status.ts` | Call-out rebalancing unavailable offline |
 
@@ -374,8 +374,8 @@ Public paths: `lib/auth-gate.ts` `isAuthGatePublicPath()` — login, pair, verif
 
 | ID | Issue | Location | Impact |
 |----|-------|----------|--------|
-| P1-1 | **No sync queue quarantine** | `lib/sync-queue.ts` | **Partial (Part 1)** — quarantine engine + helpers; Settings UI in Part 2 |
-| P1-2 | **`carpet_audits` missing `updated_at`** | `supabase/migrations/20260825_carpet_audits_updated_at.sql` | **Resolved** — migration + TS + storage parity |
+| P1-1 | **No sync queue quarantine** | `lib/sync-queue.ts`, Settings panel | **Resolved** |
+| P1-2 | **`carpet_audits` missing `updated_at`** | `20260825_carpet_audits_updated_at.sql` | **Resolved** |
 | P1-3 | **Hand-written TS types** | `lib/types.ts`, `lib/store-ops/types.ts` | No `database.types.ts`; drift risk |
 | P1-4 | **Enterprise ingest stubs** | `/api/v1/topology/ingest`, `/api/v1/freight/stage` | External systems cannot feed data |
 
@@ -402,13 +402,13 @@ Public paths: `lib/auth-gate.ts` `isAuthGatePublicPath()` — login, pair, verif
 
 > Check boxes as phases complete. Link PRs/commits inline when closing items.
 
-### Phase 1: Critical sync hardening & quarantine handling
+### Phase 1: Critical sync hardening & quarantine handling ✅
 
-- [x] Add `updated_at` column to `carpet_audits` (migration + TS types + sync conflict parity) — **Part 1 done 2026-08-25**
-- [x] Implement sync queue **quarantine** after N permanent failures (4xx) — **core engine Part 1**
-- [ ] Add queue item inspection UI (pending count exists; expose per-action `last_error` / `attempts`) — **Part 2**
-- [ ] Document offline capability matrix in Settings (what works offline vs not) — **Part 2**
-- [ ] Evaluate heartbeat / fetch probe beyond `navigator.onLine`
+- [x] Add `updated_at` column to `carpet_audits` (migration + TS types + sync conflict parity)
+- [x] Implement sync queue **quarantine** after N permanent failures (4xx) with supervisor surfacing in Settings
+- [x] Add queue item inspection UI (`components/settings/SyncQueuePanel.tsx`)
+- [x] Document offline capability matrix in Settings (`lib/offline-capability.ts`)
+- [ ] Evaluate heartbeat / fetch probe beyond `navigator.onLine` (deferred)
 
 ### Phase 2: Offline resilience for supervisor shift workflows
 
@@ -428,7 +428,7 @@ Public paths: `lib/auth-gate.ts` `isAuthGatePublicPath()` — login, pair, verif
 
 - [ ] Run `supabase gen types` → commit `database.types.ts` (or equivalent)
 - [ ] Align `lib/types.ts` / `lib/store-ops/types.ts` with generated types
-- [ ] Add vitest or playwright smoke suite: auth gate, sync queue replay, rotation complete API
+- [ ] Add vitest or playwright smoke suite: auth gate, sync queue replay, rotation complete API — **sync queue unit tests done** (`lib/sync-queue.test.ts`)
 - [ ] CI pipeline: `typecheck` + `build` + smoke tests on PR
 - [ ] Wire enterprise ingest stubs to real `store_locations` / `downstock_queue` persistence (when product ready)
 
@@ -469,4 +469,4 @@ Public paths: `lib/auth-gate.ts` `isAuthGatePublicPath()` — login, pair, verif
 
 ---
 
-*Last updated: 2026-08-25 (Phase 1 Part 1 — audit updated_at + sync quarantine core) — regenerate sections 3–6 after any migration, sync-queue change, or route addition.*
+*Last updated: 2026-08-25 (Phase 1 complete — quarantine UI, vitest harness, offline capability matrix)*

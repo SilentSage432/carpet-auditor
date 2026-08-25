@@ -6,7 +6,7 @@
  */
 
 import { useEffect, useState } from "react";
-import { usePendingSyncCount } from "@/lib/network";
+import { usePendingSyncCount, useQuarantinedSyncCount } from "@/lib/network";
 import { getStoreNumber } from "@/lib/store";
 import {
   installSyncAutoFlush,
@@ -17,7 +17,8 @@ import { hapticPulse } from "@/utils/haptics";
 
 type BannerState =
   | { kind: "hidden" }
-  | { kind: "offline"; pending: number }
+  | { kind: "offline"; pending: number; quarantined: number }
+  | { kind: "attention"; pending: number; quarantined: number }
   | { kind: "flushing" }
   | { kind: "synced"; count: number };
 
@@ -25,6 +26,7 @@ export function OfflineNetworkBanner() {
   const storeNumber =
     typeof window !== "undefined" ? getStoreNumber() : "";
   const pending = usePendingSyncCount(storeNumber);
+  const quarantined = useQuarantinedSyncCount(storeNumber);
   const [state, setState] = useState<BannerState>({ kind: "hidden" });
 
   useEffect(() => {
@@ -32,6 +34,15 @@ export function OfflineNetworkBanner() {
       setState({
         kind: "offline",
         pending,
+        quarantined,
+      });
+    }
+
+    function showAttention() {
+      setState({
+        kind: "attention",
+        pending,
+        quarantined,
       });
     }
 
@@ -48,7 +59,12 @@ export function OfflineNetworkBanner() {
         if (synced > 0) {
           hapticPulse("success");
           setState({ kind: "synced", count: synced });
-          window.setTimeout(() => setState({ kind: "hidden" }), 2800);
+          window.setTimeout(() => {
+            if (quarantined > 0) showAttention();
+            else setState({ kind: "hidden" });
+          }, 2800);
+        } else if (quarantined > 0) {
+          showAttention();
         } else {
           setState({ kind: "hidden" });
         }
@@ -60,7 +76,11 @@ export function OfflineNetworkBanner() {
     }
 
     function onQueueChanged() {
-      if (!isBrowserOnline()) showOffline();
+      if (!isBrowserOnline()) {
+        showOffline();
+        return;
+      }
+      if (quarantined > 0) showAttention();
     }
 
     window.addEventListener("offline", onOffline);
@@ -68,6 +88,8 @@ export function OfflineNetworkBanner() {
 
     if (!isBrowserOnline()) {
       showOffline();
+    } else if (quarantined > 0) {
+      showAttention();
     }
 
     return () => {
@@ -79,21 +101,36 @@ export function OfflineNetworkBanner() {
   }, [storeNumber]);
 
   useEffect(() => {
-    if (state.kind !== "offline") return;
-    setState({ kind: "offline", pending });
-  }, [pending, state.kind]);
+    if (state.kind === "offline" || state.kind === "attention") {
+      setState({ kind: state.kind, pending, quarantined });
+    }
+    if (
+      state.kind === "hidden" &&
+      isBrowserOnline() &&
+      quarantined > 0
+    ) {
+      setState({ kind: "attention", pending, quarantined });
+    }
+  }, [pending, quarantined, state.kind]);
 
   if (state.kind === "hidden") return null;
 
   const synced = state.kind === "synced";
+  const attention = state.kind === "attention";
   const label =
     state.kind === "offline"
-      ? state.pending > 0
-        ? `Offline Mode — Queuing Sync (${state.pending})`
-        : "Offline Mode — Queuing Sync"
-      : state.kind === "flushing"
-        ? "Reconnected — flushing queue…"
-        : `Synced ${state.count} queued action${state.count === 1 ? "" : "s"}`;
+      ? state.quarantined > 0
+        ? `Offline — ${state.pending} queued · ${state.quarantined} need supervisor`
+        : state.pending > 0
+          ? `Offline Mode — Queuing Sync (${state.pending})`
+          : "Offline Mode — Queuing Sync"
+      : state.kind === "attention"
+        ? state.pending > 0
+          ? `${state.quarantined} blocked · ${state.pending} still pending — open Settings`
+          : `${state.quarantined} sync item${state.quarantined === 1 ? "" : "s"} need supervisor attention`
+        : state.kind === "flushing"
+          ? "Reconnected — flushing queue…"
+          : `Synced ${state.count} queued action${state.count === 1 ? "" : "s"}`;
 
   return (
     <div
@@ -105,7 +142,9 @@ export function OfflineNetworkBanner() {
         className={`pointer-events-auto max-w-lg rounded-xl border px-3 py-2 text-center text-xs font-semibold shadow-lg backdrop-blur-md ${
           synced
             ? "border-emerald-500/40 bg-emerald-950/90 text-emerald-100 shadow-emerald-950/40"
-            : "border-amber-500/40 bg-amber-950/90 text-amber-100 shadow-amber-950/40"
+            : attention
+              ? "border-red-500/40 bg-red-950/90 text-red-100 shadow-red-950/40"
+              : "border-amber-500/40 bg-amber-950/90 text-amber-100 shadow-amber-950/40"
         }`}
       >
         <span

@@ -23,13 +23,14 @@ import { PushNotificationsCard } from "@/components/hub/PushNotificationsCard";
 import { FloorTitleBadge } from "@/components/hub/SpecialistCard";
 import { WeeklyBayTargetCard } from "@/components/hub/WeeklyBayTargetCard";
 import { ThemeSelector } from "@/components/settings/ThemeSelector";
+import { SyncQueuePanel } from "@/components/settings/SyncQueuePanel";
 import { SundayScheduleCard } from "@/components/admin/SundayScheduleCard";
 import {
   clearLocalApplianceScans,
   countLocalApplianceScans,
 } from "@/lib/appliance-scans";
 import { fetchCatalog } from "@/lib/catalog";
-import { usePendingSyncCount } from "@/lib/network";
+import { usePendingSyncCount, useSyncQueueSummary } from "@/lib/network";
 import { selectOnFocus } from "@/lib/number-input";
 import { canAccessSection, canManageMapConsole, isMasterAdmin } from "@/lib/rbac";
 import { clearLocalRemnants, countLocalRemnants, fetchRemnants } from "@/lib/remnants";
@@ -135,6 +136,7 @@ export function SettingsSection({
   const working = useWorkingDepartment(activeSpecialist);
   const canChangePin = Boolean(activeSpecialist);
   const pending = usePendingSyncCount(storeNumber);
+  const syncSummary = useSyncQueueSummary(storeNumber);
   const showRemnants =
     Boolean(activeSpecialist) && canAccessSection(activeSpecialist, "remnants");
   const pathname = usePathname();
@@ -343,17 +345,25 @@ export function SettingsSection({
         <Accordion
           title="Device & sync"
           subtitle={
-            pending > 0
-              ? `${pending} pending offline action${pending === 1 ? "" : "s"}`
-              : "Queue clear · diagnostics"
+            syncSummary.quarantined > 0
+              ? `${syncSummary.quarantined} blocked · ${syncSummary.pending} pending`
+              : pending > 0
+                ? `${pending} pending offline action${pending === 1 ? "" : "s"}`
+                : "Queue clear · diagnostics"
           }
           open={openSection === "device"}
           onToggle={() => toggleSection("device")}
         >
           <div className="space-y-4">
-            <div>
-              <p className="text-sm text-slate-300">
-                Pending actions:{" "}
+            <SyncQueuePanel
+              specialist={activeSpecialist}
+              storeNumber={storeNumber}
+            />
+
+            <div className="border-t border-slate-800 pt-4">
+              <p className="text-sm font-semibold text-slate-400">Manual replay</p>
+              <p className="mt-1 text-sm text-slate-300">
+                Actionable pending:{" "}
                 <span className="font-mono font-semibold text-amber-300">
                   {pending}
                 </span>
@@ -454,8 +464,14 @@ export function SettingsSection({
                   </span>
                 </li>
                 <li className="flex justify-between gap-3 rounded-lg bg-slate-950/70 px-3 py-2">
-                  <span>Pending Queue</span>
+                  <span>Pending queue</span>
                   <span className="font-mono text-amber-300">{pending}</span>
+                </li>
+                <li className="flex justify-between gap-3 rounded-lg bg-slate-950/70 px-3 py-2">
+                  <span>Blocked (quarantined)</span>
+                  <span className="font-mono text-red-300">
+                    {syncSummary.quarantined}
+                  </span>
                 </li>
               </ul>
               {cacheMsg ? (
