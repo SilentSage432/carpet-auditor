@@ -1074,6 +1074,7 @@ export type CarpetAudit = {
   variance_clf: number | null;
   audited_by: string;
   created_at: string;
+  updated_at: string;
   offline?: boolean;
 };
 
@@ -1082,10 +1083,11 @@ export type FlooringAudit = CarpetAudit;
 
 export type CarpetAuditInsert = Omit<
   CarpetAudit,
-  "id" | "created_at" | "offline" | "store_number" | "sub_category"
+  "id" | "created_at" | "updated_at" | "offline" | "store_number" | "sub_category"
 > & {
   id?: string;
   created_at?: string;
+  updated_at?: string;
   store_number?: string;
   sub_category?: string;
 };

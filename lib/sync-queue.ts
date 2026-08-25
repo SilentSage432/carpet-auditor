@@ -35,6 +35,13 @@ export type SyncActionType =
   | "STORE_OPS_DOWNSTOCK_ADD"
   | "STORE_OPS_SUNDAY_ASSIGN";
 
+export type SyncActionStatus = "pending" | "quarantined";
+
+export type SyncFailureReason =
+  | "deterministic_4xx"
+  | "max_retries_exceeded"
+  | "unknown";
+
 export type SyncAction = {
   id: string;
   /** Stable transaction UUID for this queued write (survives retries). */
@@ -52,6 +59,10 @@ export type SyncAction = {
   last_error?: string | null;
   /** After "Keep My Local Version" — skip version check on replay. */
   force_overwrite?: boolean;
+  /** Pending items replay on flush; quarantined items require supervisor action. */
+  status?: SyncActionStatus;
+  quarantined_at?: string | null;
+  failure_reason?: SyncFailureReason | null;
   store_number: string;
   type: SyncActionType;
   payload: Record<string, unknown>;
@@ -75,6 +86,8 @@ const LOCAL_KEYS: Record<string, string> = {
 
 const MAX_BACKOFF_MS = 5 * 60_000;
 const BASE_BACKOFF_MS = 2_000;
+/** Transient replay failures quarantine after this many attempts. */
+export const QUARANTINE_THRESHOLD = 3;
 
 let flushing = false;
 let autoFlushInstalled = false;
@@ -111,6 +124,25 @@ const UPSERT_CONFLICT_CONFIG: Partial<
   upsert_appliance_scan: { table: "appliance_scans" },
 };
 
+function normalizeStatus(raw: unknown): SyncActionStatus {
+  return raw === "quarantined" ? "quarantined" : "pending";
+}
+
+function normalizeFailureReason(raw: unknown): SyncFailureReason | null {
+  if (
+    raw === "deterministic_4xx" ||
+    raw === "max_retries_exceeded" ||
+    raw === "unknown"
+  ) {
+    return raw;
+  }
+  return null;
+}
+
+function isPendingAction(action: SyncAction): boolean {
+  return action.status !== "quarantined";
+}
+
 function notifyQueueChanged(): void {
   if (typeof window === "undefined") return;
   window.dispatchEvent(new CustomEvent(SYNC_QUEUE_CHANGED_EVENT));
@@ -137,6 +169,10 @@ function normalizeAction(raw: unknown): SyncAction | null {
       row.next_retry_at == null ? null : String(row.next_retry_at),
     last_error: row.last_error == null ? null : String(row.last_error),
     force_overwrite: Boolean(row.force_overwrite),
+    status: normalizeStatus(row.status),
+    quarantined_at:
+      row.quarantined_at == null ? null : String(row.quarantined_at),
+    failure_reason: normalizeFailureReason(row.failure_reason),
     store_number: String(row.store_number),
     type: row.type as SyncActionType,
     payload:
@@ -188,8 +224,72 @@ export function getSyncQueue(): SyncAction[] {
   return readQueue();
 }
 
+/** Actionable items still eligible for automatic replay. */
+export function getPendingSync(storeNumber = getStoreNumber()): SyncAction[] {
+  return readQueue().filter(
+    (a) => a.store_number === storeNumber && isPendingAction(a)
+  );
+}
+
+/** Items removed from automatic replay — require retry or discard. */
+export function getQuarantinedSync(storeNumber = getStoreNumber()): SyncAction[] {
+  return readQueue().filter(
+    (a) => a.store_number === storeNumber && a.status === "quarantined"
+  );
+}
+
 export function countPendingSync(storeNumber = getStoreNumber()): number {
-  return readQueue().filter((a) => a.store_number === storeNumber).length;
+  return getPendingSync(storeNumber).length;
+}
+
+export function countQuarantinedSync(storeNumber = getStoreNumber()): number {
+  return getQuarantinedSync(storeNumber).length;
+}
+
+export type SyncQueueSummary = {
+  pending: number;
+  quarantined: number;
+};
+
+export function getSyncQueueSummary(
+  storeNumber = getStoreNumber()
+): SyncQueueSummary {
+  return {
+    pending: countPendingSync(storeNumber),
+    quarantined: countQuarantinedSync(storeNumber),
+  };
+}
+
+/**
+ * Re-queue a quarantined action for automatic replay.
+ * Resets attempts and clears quarantine metadata.
+ */
+export function retryQuarantinedAction(id: string): void {
+  const queue = readQueue();
+  const idx = queue.findIndex((a) => a.id === id && a.status === "quarantined");
+  if (idx < 0) return;
+
+  const action = queue[idx];
+  queue[idx] = {
+    ...action,
+    status: "pending",
+    attempts: 0,
+    next_retry_at: null,
+    last_error: null,
+    quarantined_at: null,
+    failure_reason: null,
+    force_overwrite: false,
+  };
+  writeQueue(queue);
+
+  if (isBrowserOnline() && getSupabase()) {
+    void flushSyncQueue(action.store_number);
+  }
+}
+
+/** Permanently drop a quarantined queue item. */
+export function discardQuarantinedAction(id: string): void {
+  writeQueue(readQueue().filter((a) => !(a.id === id && a.status === "quarantined")));
 }
 
 export function isBrowserOnline(): boolean {
@@ -244,6 +344,80 @@ function isTransientError(err: unknown): boolean {
   }
   if (code === "PGRST301" || code === "57P01" || code === "08006") return true;
   return false;
+}
+
+function errorMessage(err: unknown): string {
+  if (err instanceof Error) return err.message;
+  if (
+    typeof err === "object" &&
+    err &&
+    "message" in err &&
+    typeof (err as { message: unknown }).message === "string"
+  ) {
+    return (err as { message: string }).message;
+  }
+  return "Sync failed";
+}
+
+function classifyFailureReason(err: unknown): SyncFailureReason {
+  if (isSyncConflictError(err)) return "unknown";
+  if (isTransientError(err)) return "max_retries_exceeded";
+  const status =
+    err && typeof err === "object" && "status" in err
+      ? Number((err as { status?: unknown }).status)
+      : NaN;
+  const statusFromMessage = Number(
+    (/\((\d{3})\)/.exec(errorMessage(err)) ?? [])[1] ?? NaN
+  );
+  const httpStatus =
+    Number.isFinite(status) && status > 0 ? status : statusFromMessage;
+  if (
+    Number.isFinite(httpStatus) &&
+    httpStatus >= 400 &&
+    httpStatus < 500 &&
+    httpStatus !== 408 &&
+    httpStatus !== 429
+  ) {
+    return "deterministic_4xx";
+  }
+  return "unknown";
+}
+
+function quarantineAction(
+  action: SyncAction,
+  err: unknown,
+  reason: SyncFailureReason
+): SyncAction {
+  return {
+    ...action,
+    status: "quarantined",
+    quarantined_at: new Date().toISOString(),
+    failure_reason: reason,
+    last_error: errorMessage(err),
+    next_retry_at: null,
+    force_overwrite: false,
+  };
+}
+
+function handleReplayFailure(
+  action: SyncAction,
+  err: unknown
+): SyncAction {
+  if (isDeterministicNonTransientError(err)) {
+    return quarantineAction(action, err, classifyFailureReason(err));
+  }
+
+  const retried = scheduleRetry(action, err);
+  if (retried.attempts >= QUARANTINE_THRESHOLD) {
+    return quarantineAction(retried, err, "max_retries_exceeded");
+  }
+  return retried;
+}
+
+/** Permanent client/auth/validation failures — quarantine immediately. */
+function isDeterministicNonTransientError(err: unknown): boolean {
+  if (isSyncConflictError(err)) return false;
+  return !isTransientError(err);
 }
 
 function syncEntityKey(
@@ -303,6 +477,9 @@ export function enqueueSyncAction(
     next_retry_at: null,
     last_error: null,
     force_overwrite: false,
+    status: "pending",
+    quarantined_at: null,
+    failure_reason: null,
     store_number: storeNumber,
     type,
     payload: { ...cleanPayload, store_number: storeNumber },
@@ -700,18 +877,13 @@ function scheduleRetry(action: SyncAction, err: unknown): SyncAction {
   const delay = backoffMs(attempts);
   return {
     ...action,
+    status: "pending",
     attempts,
     next_retry_at: new Date(Date.now() + delay).toISOString(),
-    last_error:
-      err instanceof Error
-        ? err.message
-        : typeof err === "object" &&
-            err &&
-            "message" in err &&
-            typeof (err as { message: unknown }).message === "string"
-          ? (err as { message: string }).message
-          : "Sync failed",
+    last_error: errorMessage(err),
     force_overwrite: false,
+    quarantined_at: null,
+    failure_reason: null,
   };
 }
 
@@ -733,16 +905,18 @@ export async function flushSyncQueue(
   try {
     const snapshot = readQueue();
     const now = Date.now();
-    const pending = snapshot.filter((a) => a.store_number === storeNumber);
     const otherStores = snapshot.filter((a) => a.store_number !== storeNumber);
+    const forStore = snapshot.filter((a) => a.store_number === storeNumber);
+    const heldQuarantined = forStore.filter((a) => a.status === "quarantined");
+    const pending = forStore.filter(isPendingAction);
 
     if (pending.length === 0) {
-      writeQueue(otherStores);
       return 0;
     }
 
     const deferred: SyncAction[] = [];
     const failed: SyncAction[] = [];
+    const newlyQuarantined: SyncAction[] = [];
 
     for (const action of pending) {
       const retryAt = action.next_retry_at
@@ -781,7 +955,12 @@ export async function flushSyncQueue(
                 action.id,
                 retryErr
               );
-              failed.push(scheduleRetry(action, retryErr));
+              const outcome = handleReplayFailure(action, retryErr);
+              if (outcome.status === "quarantined") {
+                newlyQuarantined.push(outcome);
+              } else {
+                failed.push(outcome);
+              }
             }
           } else {
             // Accept server — drop local queue item and mirror server into local cache
@@ -804,16 +983,22 @@ export async function flushSyncQueue(
           err
         );
 
-        if (isTransientError(err)) {
-          failed.push(scheduleRetry(action, err));
+        const outcome = handleReplayFailure(action, err);
+        if (outcome.status === "quarantined") {
+          newlyQuarantined.push(outcome);
         } else {
-          // Non-transient: still keep with backoff so it doesn't vanish silently
-          failed.push(scheduleRetry(action, err));
+          failed.push(outcome);
         }
       }
     }
 
-    writeQueue([...otherStores, ...deferred, ...failed]);
+    writeQueue([
+      ...otherStores,
+      ...heldQuarantined,
+      ...newlyQuarantined,
+      ...deferred,
+      ...failed,
+    ]);
     scheduleRetryFlush([...deferred, ...failed]);
 
     if (failed.length === 0 && deferred.length === 0) {

@@ -2,7 +2,7 @@
  * Offline sync conflict events — presentation listens; sync-queue owns resolution flow.
  */
 
-import type { SyncAction } from "@/lib/sync-queue";
+import type { SyncAction, SyncFailureReason } from "@/lib/sync-queue";
 
 export const SYNC_CONFLICT_EVENT = "deptsync:sync-conflict";
 
@@ -70,6 +70,22 @@ export function syncActionLabel(type: SyncAction["type"]): string {
       return "Delete appliance scan";
     default:
       return "Queued edit";
+  }
+}
+
+/** Human-readable quarantine failure reason for Settings / diagnostics. */
+export function syncFailureReasonLabel(
+  reason: SyncFailureReason | null | undefined
+): string {
+  switch (reason) {
+    case "deterministic_4xx":
+      return "Rejected by server (validation or permission)";
+    case "max_retries_exceeded":
+      return "Failed after repeated retries";
+    case "unknown":
+      return "Unknown sync failure";
+    default:
+      return "Sync blocked";
   }
 }
 

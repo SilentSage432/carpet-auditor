@@ -168,6 +168,9 @@ function mapRow(row: Record<string, unknown>): CarpetAudit {
       varianceClf != null && Number.isFinite(varianceClf) ? varianceClf : null,
     audited_by: String(row.audited_by ?? ""),
     created_at: String(row.created_at ?? new Date().toISOString()),
+    updated_at: String(
+      row.updated_at ?? row.created_at ?? new Date().toISOString()
+    ),
     offline: Boolean(row.offline),
   };
 }
@@ -194,6 +197,7 @@ function auditPayload(record: CarpetAudit) {
     variance_clf: record.variance_clf,
     audited_by: record.audited_by,
     created_at: record.created_at,
+    updated_at: record.updated_at,
   };
 }
 
@@ -226,7 +230,8 @@ export async function fetchAudits(): Promise<CarpetAudit[]> {
     const offlineOnly = local.filter((r) => r.offline && !remoteIds.has(r.id));
 
     return [...offlineOnly, ...remote].sort(
-      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
+      (a, b) =>
+        new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime()
     );
   } catch {
     return local;
@@ -261,15 +266,22 @@ export async function saveAudit(input: CarpetAuditInsert): Promise<{
     variance_clf: input.variance_clf ?? null,
     audited_by: input.audited_by ?? "",
     created_at: input.created_at ?? now,
+    updated_at: input.updated_at ?? now,
     offline: false,
   };
 
   const supabase = getSupabase();
+  const syncOptions = { baseUpdatedAt: record.updated_at };
 
   if (!supabase || shouldSaveOffline()) {
     const offlineRecord = { ...record, offline: true };
     upsertLocal(offlineRecord);
-    enqueueSyncAction("upsert_audit", auditPayload(offlineRecord), store);
+    enqueueSyncAction(
+      "upsert_audit",
+      auditPayload(offlineRecord),
+      store,
+      syncOptions
+    );
     return { record: offlineRecord, offline: true };
   }
 
@@ -288,7 +300,12 @@ export async function saveAudit(input: CarpetAuditInsert): Promise<{
   } catch {
     const offlineRecord = { ...record, offline: true };
     upsertLocal(offlineRecord);
-    enqueueSyncAction("upsert_audit", auditPayload(offlineRecord), store);
+    enqueueSyncAction(
+      "upsert_audit",
+      auditPayload(offlineRecord),
+      store,
+      syncOptions
+    );
     return { record: offlineRecord, offline: true };
   }
 }
@@ -322,6 +339,7 @@ export function auditsToCsv(audits: CarpetAudit[]): string {
   const header = [
     "store_number",
     "created_at",
+    "updated_at",
     "sku",
     "carpet_name",
     "category",
@@ -349,6 +367,7 @@ export function auditsToCsv(audits: CarpetAudit[]): string {
     [
       a.store_number,
       a.created_at,
+      a.updated_at,
       a.sku,
       a.carpet_name,
       a.category,

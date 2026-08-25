@@ -16,7 +16,8 @@ create table if not exists public.carpet_audits (
   system_clf numeric(12, 4),
   variance_clf numeric(12, 4),
   audited_by text not null default '',
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
 );
 
 alter table public.carpet_audits add column if not exists system_clf numeric(12, 4);
@@ -27,6 +28,8 @@ create index if not exists carpet_audits_created_at_idx
   on public.carpet_audits (created_at desc);
 create index if not exists carpet_audits_audited_by_idx
   on public.carpet_audits (audited_by);
+create index if not exists carpet_audits_store_updated_at_idx
+  on public.carpet_audits (store_number, updated_at desc);
 
 -- Master wall catalog
 create table if not exists public.carpet_catalog (
