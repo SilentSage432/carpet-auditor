@@ -492,6 +492,30 @@ body {
   width: min(100%, 22rem);
 }
 
+.hub-nav-active-pill {
+  transition: transform 200ms ease-out;
+  will-change: transform;
+}
+
+/* Keep-alive workflow tabs — opacity fade; visibility delayed on exit */
+.hub-tab-panel {
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity 200ms ease-out,
+    visibility 0ms linear 200ms;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+.hub-tab-panel[data-active="true"] {
+  opacity: 1;
+  visibility: visible;
+  transition:
+    opacity 200ms ease-out,
+    visibility 0ms linear 0ms;
+}
+
 .hub-scan-dock {
   @apply fixed left-0 right-0 z-20 mx-auto w-full max-w-lg;
   bottom: var(--hub-bottom-nav-stack);

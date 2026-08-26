@@ -143,7 +143,7 @@ Event bus: `carpet-sync-queue-changed` — header/Settings must listen.
 
 ### State management
 
-- **Keep-alive shell:** `app/(workflow)/layout.tsx` → `WorkflowTabShell` mounts Floor / Map / Roster / Settings with `hidden` toggling (0ms tab switch).
+- **Keep-alive shell:** `app/(workflow)/layout.tsx` → `WorkflowTabShell` mounts Floor / Map / Roster / More with opacity/visibility transitions (static mounts, no remount flash). Bottom nav uses a sliding active pill (`hub-nav-active-pill`).
 - **Working department pin:** `lib/use-working-department.ts` + `lib/admin-department-context.ts` — `useSyncExternalStore`; pin change does **not** wipe IndexedDB.
 - **Custom events:** `deptsync:*` namespace (store-locations-changed, downstock, shift-tasks, sync-conflict, etc.).
 - **No external state libraries** — no Redux, Zustand, Jotai, Recoil in `lib/`.
@@ -420,6 +420,7 @@ Public paths: `lib/auth-gate.ts` `isAuthGatePublicPath()` — login, pair, verif
 ### Phase 3: Screen redesigns & touch-optimized floor views
 
 - [x] Floating pill bottom navigation (`components/hub/BottomNav.tsx`) — Floor · Map · Roster · More
+- [x] Sliding active pill indicator + fluid keep-alive tab transitions (opacity/visibility, no remount flicker)
 - [x] Central Floor workspace container with top rail, supervisor bar, and filter chips (`components/hub/tabs/FloorTab.tsx`)
 - [x] More tab reorganized into Floor Utilities / Store Management / Device & Diagnostics (`components/sections/SettingsSection.tsx`)
 - [x] 48px bay completion touch targets (`.btn-quick-touch` min-h-12)
@@ -471,4 +472,4 @@ Public paths: `lib/auth-gate.ts` `isAuthGatePublicPath()` — login, pair, verif
 
 ---
 
-*Last updated: 2026-08-25 (Phase 3 UI scaffold — floating pill nav, Floor container, More hub)*
+*Last updated: 2026-08-26 (Phase 3 polish — fluid tab transitions + sliding nav pill)*

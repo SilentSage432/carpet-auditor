@@ -154,7 +154,7 @@ export function RosterTab({ specialist, storeNumber }: WorkflowTabProps) {
 
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
+    // Keep painted roster; never blank the list when returning to this tab.
     void reload().finally(() => {
       if (!cancelled) setLoading(false);
     });

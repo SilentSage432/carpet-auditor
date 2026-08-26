@@ -1,17 +1,19 @@
 "use client";
 
 /**
- * Keep-alive shell for Floor / Map / Roster / Settings.
- * Primary tabs mount immediately so switches only toggle `hidden` (0ms).
+ * Keep-alive shell for Floor / Map / Roster / More.
+ * All primary tabs stay mounted; switches use opacity/visibility (no remount).
  * URL still updates via BottomNav Links.
  */
 
-import dynamic from "next/dynamic";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { ChangePinModal } from "@/components/hub/ChangePinModal";
 import { NavigationHub } from "@/components/hub/NavigationHub";
 import { FloorTab } from "@/components/hub/tabs/FloorTab";
+import { MapTab } from "@/components/hub/tabs/MapTab";
+import { RosterTab } from "@/components/hub/tabs/RosterTab";
+import { SettingsTab } from "@/components/hub/tabs/SettingsTab";
 import type { WorkflowTabProps } from "@/components/hub/tabs/tab-props";
 import { updateAuthSessionSpecialist } from "@/lib/auth-session";
 import {
@@ -31,20 +33,6 @@ import {
 } from "@/lib/specialists";
 import type { StoreSpecialist } from "@/lib/types";
 
-const MapTab = dynamic(
-  () => import("@/components/hub/tabs/MapTab").then((mod) => mod.MapTab),
-  { ssr: false }
-);
-const RosterTab = dynamic(
-  () => import("@/components/hub/tabs/RosterTab").then((mod) => mod.RosterTab),
-  { ssr: false }
-);
-const SettingsTab = dynamic(
-  () =>
-    import("@/components/hub/tabs/SettingsTab").then((mod) => mod.SettingsTab),
-  { ssr: false }
-);
-
 function KeepAlivePanel({
   active,
   children,
@@ -54,9 +42,14 @@ function KeepAlivePanel({
 }) {
   return (
     <div
-      hidden={!active}
+      data-active={active ? "true" : "false"}
       aria-hidden={!active}
-      className={active ? "min-h-0 flex-1 overflow-y-auto" : undefined}
+      inert={!active}
+      className={`hub-tab-panel min-h-0 overflow-y-auto overscroll-y-contain ${
+        active
+          ? "relative z-10 flex-1"
+          : "pointer-events-none absolute inset-0 z-0"
+      }`}
     >
       {children}
     </div>
@@ -99,6 +92,20 @@ export function WorkflowTabShell(props: WorkflowTabProps) {
       return next;
     });
   }, [active, view]);
+
+  useEffect(() => {
+    setVisited((prev) => {
+      let changed = false;
+      const next = new Set(prev);
+      for (const href of allowedTabs) {
+        if (!next.has(href)) {
+          next.add(href);
+          changed = true;
+        }
+      }
+      return changed ? next : prev;
+    });
+  }, [allowedTabs]);
 
   useEffect(() => {
     setStore(props.storeNumber);
@@ -157,24 +164,26 @@ export function WorkflowTabShell(props: WorkflowTabProps) {
         onClose={() => setChangePinOpen(false)}
         onUpdated={handleUpdated}
       />
-      <KeepAlivePanel active={active === "/dashboard"}>
-        <FloorTab {...tabProps} />
-      </KeepAlivePanel>
-      {visited.has("/admin/store-map") ? (
-        <KeepAlivePanel active={active === "/admin/store-map"}>
-          <MapTab {...tabProps} />
+      <div className="relative flex min-h-0 flex-1 flex-col">
+        <KeepAlivePanel active={active === "/dashboard"}>
+          <FloorTab {...tabProps} />
         </KeepAlivePanel>
-      ) : null}
-      {visited.has("/roster") && canAccessWorkflowTab(view, "/roster") ? (
-        <KeepAlivePanel active={active === "/roster"}>
-          <RosterTab {...tabProps} />
-        </KeepAlivePanel>
-      ) : null}
-      {visited.has("/settings") && canAccessWorkflowTab(view, "/settings") ? (
-        <KeepAlivePanel active={active === "/settings"}>
-          <SettingsTab {...tabProps} />
-        </KeepAlivePanel>
-      ) : null}
+        {visited.has("/admin/store-map") ? (
+          <KeepAlivePanel active={active === "/admin/store-map"}>
+            <MapTab {...tabProps} />
+          </KeepAlivePanel>
+        ) : null}
+        {visited.has("/roster") && canAccessWorkflowTab(view, "/roster") ? (
+          <KeepAlivePanel active={active === "/roster"}>
+            <RosterTab {...tabProps} />
+          </KeepAlivePanel>
+        ) : null}
+        {visited.has("/settings") && canAccessWorkflowTab(view, "/settings") ? (
+          <KeepAlivePanel active={active === "/settings"}>
+            <SettingsTab {...tabProps} />
+          </KeepAlivePanel>
+        ) : null}
+      </div>
     </div>
   );
 }

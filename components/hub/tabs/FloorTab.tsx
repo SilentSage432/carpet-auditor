@@ -291,9 +291,6 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
 
   useEffect(() => {
     let cancelled = false;
-    setRotations([]);
-    setMappedLocations([]);
-    setLoading(true);
     async function boot() {
       const cachedDepts = await peekCachedDepartments(specialist);
       if (cancelled) return;
@@ -315,12 +312,19 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
       if (cancelled) return;
       if (cachedWeek) {
         setWeek(cachedWeek.assigned_week || "");
-        setRotations(cachedWeek.rotations ?? []);
+        setRotations((prev) =>
+          fingerprintsEqual(prev, cachedWeek.rotations ?? [])
+            ? prev
+            : (cachedWeek.rotations ?? [])
+        );
         setLoading(false);
       }
       if (cachedLocs?.items.length) {
-        setMappedLocations(cachedLocs.items);
+        setMappedLocations((prev) =>
+          fingerprintsEqual(prev, cachedLocs.items) ? prev : cachedLocs.items
+        );
       }
+      // Keep painted rows visible; never flash a blank skeleton on tab return.
       if (!cancelled) void reload(specialist, { silent: true });
     }
     void boot();

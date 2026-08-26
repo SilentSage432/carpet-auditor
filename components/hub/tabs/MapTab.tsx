@@ -142,14 +142,13 @@ export function MapTab({ specialist }: WorkflowTabProps) {
 
   useEffect(() => {
     let cancelled = false;
-    setLocations([]);
-    setWeekRotationLocations([]);
-    setLoading(true);
     async function boot() {
       const cachedDepts = await peekCachedDepartments(specialist);
       if (cancelled) return;
       if (cachedDepts?.items.length) {
-        setDepartments(cachedDepts.items);
+        setDepartments((prev) =>
+          fingerprintsEqual(prev, cachedDepts.items) ? prev : cachedDepts.items
+        );
         const deptId = workingDepartmentId(specialist, cachedDepts.items);
         const [cachedLocs, cachedWeek] = await Promise.all([
           peekCachedStoreLocations(specialist, deptId),
@@ -157,25 +156,29 @@ export function MapTab({ specialist }: WorkflowTabProps) {
         ]);
         if (cancelled) return;
         if (cachedLocs?.items.length) {
-          setLocations(cachedLocs.items);
+          setLocations((prev) =>
+            fingerprintsEqual(prev, cachedLocs.items) ? prev : cachedLocs.items
+          );
           setAuthRequired(
             Boolean(cachedDepts.authRequired || cachedLocs.authRequired)
           );
           setLoading(false);
         }
         if (cachedWeek) {
-          setWeekRotationLocations(
-            (cachedWeek.rotations ?? [])
-              .map((row) => ({
-                locationId: String(
-                  row.location_id || row.store_locations?.id || ""
-                ),
-                completed: Boolean(row.is_completed),
-              }))
-              .filter((row) => row.locationId)
+          const nextWeek = (cachedWeek.rotations ?? [])
+            .map((row) => ({
+              locationId: String(
+                row.location_id || row.store_locations?.id || ""
+              ),
+              completed: Boolean(row.is_completed),
+            }))
+            .filter((row) => row.locationId);
+          setWeekRotationLocations((prev) =>
+            fingerprintsEqual(prev, nextWeek) ? prev : nextWeek
           );
         }
       }
+      // Keep painted map visible; revalidate in the background without a spinner.
       if (!cancelled) void reload(specialist, true);
     }
     void boot();
