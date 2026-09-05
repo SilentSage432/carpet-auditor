@@ -37,6 +37,8 @@ npm run lint
 
 ## Docs
 
+- [DEPTSYNC_CONSTITUTION.md](./DEPTSYNC_CONSTITUTION.md) — governing product & architecture laws
+- [DEPT_SYNC_STATE.md](./DEPT_SYNC_STATE.md) — current implementation truth
 - [ARCHITECTURE.md](./ARCHITECTURE.md)
 - [CHAT_HANDOFF.md](./CHAT_HANDOFF.md)
 - [DEVELOPMENT_JOURNAL.md](./DEVELOPMENT_JOURNAL.md)

@@ -1,7 +1,7 @@
 # DEPT_SYNC_STATE.md
 
-> **Canonical living memory for DeptSync** (`carpet-auditor` repository).  
-> Single source of truth for architecture, parity, routes, and operational status.  
+> **Canonical living memory for DeptSync implementation state** (`carpet-auditor` repository).  
+> Single source of truth for architecture, parity, routes, and operational status **beneath** `DEPTSYNC_CONSTITUTION.md` (governing laws).  
 > Ground-truth audit baseline: **2026-08-25**. Update this file whenever schema, sync behavior, or route structure changes.
 
 ---
@@ -109,10 +109,11 @@ Canonical env comments live in `.env.example`. Placeholder detection: `lib/supab
 
 | File | Role |
 |------|------|
+| `DEPTSYNC_CONSTITUTION.md` | **Governing laws** — purpose, authority, anti-drift (outranks this file on principle) |
 | `ARCHITECTURE.md` | Module ownership index |
 | `APP_LAYOUT_MAP.md` | UI layout & z-index |
 | `MASTER_ROADMAP.md` | Historical completion checklist |
-| `DEPT_SYNC_STATE.md` | **This file — canonical state** |
+| `DEPT_SYNC_STATE.md` | **This file — canonical implementation state** |
 | `AGENTS.md` | Next.js 16 agent rules |
 
 ---
@@ -529,4 +530,4 @@ Operational configuration only — do **not** hardcode store numbers, PINs, or t
 
 ---
 
-*Last updated: 2026-09-04 (Two-DS pilot polish — store identity, remnant live area, Sunday clarity, Floor readiness line)*
+*Last updated: 2026-09-04 (Constitution established — doc map under `DEPTSYNC_CONSTITUTION.md`; prior: Two-DS pilot polish)*

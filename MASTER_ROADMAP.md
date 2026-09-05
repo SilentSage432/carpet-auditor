@@ -104,6 +104,7 @@
 - [x] Layout / nav / iconography polish — thumb-zone bottom tabs, compact hub-main, unified Lucide HubIcon (stroke 2), 44px Quick Touch / filter chips
 - [x] Mobile shell scroll contract — fixed `h-dvh` hub shell; keep-alive tab panels own vertical scroll; workspace pad clears fixed bottom nav + safe area (2026-09-04)
 - [x] Information hierarchy tranche — Floor Topology demoted; verification strip; empty-week Stage plan; Map Snap Bay below navigator; light operate/configure copy (2026-09-04)
+- [x] DeptSync Constitution — `DEPTSYNC_CONSTITUTION.md` governing laws (docs-only; baseline `d6d5806`; 2026-09-04)
 - [x] Theme engine — five dark tactical presets + high-contrast / compact density, CSS variables, Settings Appearance selector
 - [x] Phase 1 UX/UI consolidation — floating splash mark, department dropdown pill, Floor/Map/Stock/Settings workflow tabs, Store Map dual-pill + kebab rows
 - [x] Phase 2 UX/UI consolidation — Roll Measurement Pad, Admin Tools 2-col grid, department targets matrix

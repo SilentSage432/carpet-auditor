@@ -1,5 +1,14 @@
 # DeptSync Hub — Development Journal
 
+## 2026-09-04 — DeptSync Constitution established
+
+### Shipped (documentation only)
+- Added root `DEPTSYNC_CONSTITUTION.md` — governing laws for purpose, human/data/intelligence authority, rotation/verification, UI hierarchy, security, offline intent, and anti-drift evidence tests.
+- Baseline pinned to `main` @ `d6d580617a0b8f78abe48c888613a6d8b6b527e8`.
+- No application, schema, auth, or rotation behavior changes.
+- Cross-refs: `DEPT_SYNC_STATE.md` doc map, `README.md` Docs list.
+- Constitutional debt recorded (derived completion vs verification; partial offline; shared roster/auth storage) — not fixed in this tranche.
+
 ## 2026-09-04 — Information hierarchy (Floor / Map operate vs configure)
 
 ### Shipped
