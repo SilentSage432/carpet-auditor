@@ -99,6 +99,8 @@ vercel.json                       → Cron Sunday `0 11 * * 0` (11:00 UTC ≈ 05
 app/api/stores/settings           → GET/PATCH Sunday auto-stage time, auto-run, timezone (Master PATCH)
 lib/store-ops/sunday-schedule.ts  → Store-owned Sunday timing knowledge (defaults 05:00 America/Denver)
 lib/store-ops/operational-context.ts → FS-002 declared seasons/events + department relevance (Master-declared path)
+lib/store-ops/floor-operational-context.ts → FS-002B Floor presentation composition (fiscal + season/event + dept relevance)
+components/store-ops/FloorOperationalContextStrip.tsx → Floor header strip (Supervisor+; non-blocking)
 app/api/operational-contexts/route.ts → GET Supervisor+ resolve/list
 app/api/admin/operational-contexts/* → Master CRUD + relevance
 components/admin/OperationalContextCard.tsx → More→Settings Master manager
@@ -241,6 +243,7 @@ supabase/migrations/20260812_sunday_bay_assignments.sql → sunday specialist↔
 | Sunday schedule | `lib/store-ops/sunday-schedule.ts` (time / timezone / auto-run) + `stores` columns + `/api/cron/weekly-rotation` (skip if week already staged) + Master Force Draw overwrite + `/api/admin/rotations/reset` |
 | Fiscal calendar (FS-001 / FS-001A min) | `lib/store-ops/fiscal-calendar.ts` + `fiscal_years`/`fiscal_weeks` + `GET /api/fiscal-calendar` + Master `GET /api/admin/fiscal-calendar/coverage` — ISO rotation unchanged; FY2026 seeded; coverage derived on read |
 | Operational seasons/events (FS-002) | `operational-context.ts` + tables + Master Settings — declared Gregorian contexts + dept relevance; no SI / location priority |
+| Floor context strip (FS-002B) | `floor-operational-context.ts` + `FloorOperationalContextStrip` — fiscal + active season/event + current dept relevance; empty valid; no rotation effect |
 | Sunday assignments | `lib/store-ops/sunday-audit.ts` (persist + department seed `associateMatchesSundayDepartment`) + `SundayAuditAssignmentModal` + `AssociateRosterPanel` |
 | Daily shift board | `lib/store-ops/shift-status.ts` (`associate_shift_days` week matrix; throws on live write failure) |
 | Call-out bay rebalance | `lib/store-ops/call-out.ts` (pool / auto / carry-over loop; stamps `carried_over` + Sunday `CARRIED_OVER`; does not generate rotations) |

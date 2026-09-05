@@ -9,7 +9,7 @@
 - [x] FS-001A minimum — Fiscal calendar coverage monitoring (derived coverage + Master Settings signal + Master-only coverage API). No automated discovery, no promote API, no new persistence, no cron/push.
 - [ ] FS-001A follow-ups (deferred) — future-year discovery when production-reliable acquisition exists; Master promote/import API; source-change review UI; optional push
 - [x] FS-002 foundation — Operational seasons/events (`operational_contexts` + department relevance); Master-declared; Gregorian resolve; no company seed / recurrence / location priority / SI
-- [ ] FS-002B — Floor fiscal + season context surface
+- [x] FS-002B — Floor fiscal + season context surface (presentation composition; empty context valid; no SI / location priority / rotation effect)
 - [ ] FS-003 Department + location seasonal relevance
 - [ ] SI-001 / SI-002 Seasonal signal contract + Day-1 deterministic pressure
 - [ ] Public holiday seed artifact (`PUBLIC_CALENDAR`) — evidence-gated

@@ -10,6 +10,7 @@ import { ShowroomQuickTouchCard } from "@/components/dashboard/ShowroomQuickTouc
 import { TacticalVoiceFloorPad } from "@/components/dashboard/TacticalVoiceFloorPad";
 import { BayFreshnessGrid } from "@/components/dashboard/BayFreshnessGrid";
 import { FlagDownstockSheet } from "@/components/store-ops/FlagDownstockSheet";
+import { FloorOperationalContextStrip } from "@/components/store-ops/FloorOperationalContextStrip";
 import { OnDutyAssociateStrip } from "@/components/store-ops/OnDutyAssociateStrip";
 import { ShiftAnalyticsDrawer } from "@/components/store-ops/ShiftAnalyticsDrawer";
 import { ZebraChecklist, type FloorBayFilter } from "@/components/store-ops/ZebraChecklist";
@@ -507,6 +508,18 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
           >
             {readinessLine}
           </p>
+          <FloorOperationalContextStrip
+            specialist={specialist}
+            workingDepartment={working}
+            departmentCode={activeDept?.code ?? null}
+            departmentLabel={
+              activeDept?.name?.trim() ||
+              (working !== "all"
+                ? departmentMeta(working).shortLabel
+                : null)
+            }
+            refreshKey={healthKey}
+          />
         </header>
 
         <section className="overflow-hidden rounded-2xl border border-zinc-800/90 bg-zinc-950/70 shadow-[0_12px_40px_-20px_rgba(0,0,0,0.75)]">

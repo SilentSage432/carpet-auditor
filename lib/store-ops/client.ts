@@ -1661,6 +1661,43 @@ export async function fetchFiscalCoverage(
   );
 }
 
+/** FS-001 / Floor — Supervisor+ fiscal resolve (additive context only). */
+export type FiscalCalendarClient =
+  | {
+      status: "ok";
+      fiscal_year: number;
+      fiscal_week: number;
+      fiscal_period: number;
+      fiscal_quarter: number;
+      week_start_date: string;
+      week_end_date: string;
+      fiscal_year_id: string;
+      fiscal_week_id: string;
+      source_type: "COMPANY_PUBLISHED" | "MASTER_ADMIN_DECLARED";
+      source_reference: string | null;
+      source_year: number | null;
+      operational_date: string;
+      store_timezone?: string;
+      iso_rotation_unaffected?: boolean;
+    }
+  | {
+      status: "calendar_unavailable";
+      operational_date?: string;
+      reason?: string;
+      iso_rotation_unaffected?: boolean;
+    };
+
+export async function fetchFiscalCalendar(
+  specialist: StoreSpecialist,
+  date?: string
+): Promise<FiscalCalendarClient> {
+  const qs = date ? `?date=${encodeURIComponent(date)}` : "";
+  return storeOpsFetch<FiscalCalendarClient>(
+    `/api/fiscal-calendar${qs}`,
+    specialist
+  );
+}
+
 /** FS-002 operational context (seasons / events). */
 export type OperationalContextClient = {
   id: string;
@@ -1693,6 +1730,56 @@ export async function fetchOperationalContextsList(
 }> {
   return storeOpsFetch(
     "/api/operational-contexts?mode=list",
+    specialist
+  );
+}
+
+/** FS-002B Floor resolve — active seasons/events for a date + optional dept. */
+export type OperationalContextsResolveClient = {
+  operational_date: string;
+  store_id: string | null;
+  department_code: string | null;
+  active_seasons: Array<{
+    id: string;
+    kind: "SEASON" | "EVENT";
+    title: string;
+    start_date: string;
+    end_date: string;
+    source_type: string;
+    source_reference: string | null;
+    source_year: number | null;
+    store_id: string | null;
+    concept_key: string | null;
+    department_relevance: "NONE" | "LOW" | "MEDIUM" | "HIGH" | null;
+  }>;
+  active_events: Array<{
+    id: string;
+    kind: "SEASON" | "EVENT";
+    title: string;
+    start_date: string;
+    end_date: string;
+    source_type: string;
+    source_reference: string | null;
+    source_year: number | null;
+    store_id: string | null;
+    concept_key: string | null;
+    department_relevance: "NONE" | "LOW" | "MEDIUM" | "HIGH" | null;
+  }>;
+  store_timezone?: string;
+  schema_unavailable?: boolean;
+};
+
+export async function fetchOperationalContextsResolve(
+  specialist: StoreSpecialist,
+  options?: { date?: string; department_code?: string | null }
+): Promise<OperationalContextsResolveClient> {
+  const params = new URLSearchParams({ mode: "resolve" });
+  if (options?.date) params.set("date", options.date);
+  if (options?.department_code) {
+    params.set("department_code", options.department_code);
+  }
+  return storeOpsFetch(
+    `/api/operational-contexts?${params.toString()}`,
     specialist
   );
 }

@@ -1,5 +1,23 @@
 # DeptSync Hub — Development Journal
 
+## 2026-09-05 — FS-002B Floor fiscal + seasonal context surface
+
+### Shipped
+- Presentation composition `lib/store-ops/floor-operational-context.ts` + tests — fiscal label, season/event compact labels, department relevance (UNSET/NONE omitted on Floor).
+- Client helpers: `fetchFiscalCalendar`, `fetchOperationalContextsResolve` in `lib/store-ops/client.ts`.
+- `FloorOperationalContextStrip` under Floor readiness line (`FloorTab`). Supervisor+ non-blocking dual read; failures omit strip; empty contexts → fiscal alone.
+- No schema/migration/seeds. No rotation/priority/Map/SI coupling. No Floor edit controls.
+
+### Decisions
+- Explicit `NONE` relevance omitted on Floor (noise); Master Settings retains it.
+- Offline context cache deferred — omit strip when unavailable.
+- Detail disclosure deferred (density).
+
+### Status
+- **FS-002B FLOOR CONTEXT SURFACE LIVE**.
+- Completion-attempt first natural lifecycle still pending.
+- Next: **FS-003** location-level seasonal relevance / overlays.
+
 ## 2026-09-05 — FS-002 operational seasons & events foundation
 
 ### Shipped

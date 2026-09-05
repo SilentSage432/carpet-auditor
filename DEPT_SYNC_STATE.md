@@ -297,6 +297,7 @@ Until applied, production Hub falls back to localStorage for catalog/remnants; r
 | Fiscal calendar (FS-001) | `fiscal_years` / `fiscal_weeks` + `fiscal-calendar.ts` + `GET /api/fiscal-calendar` | Schema **LIVE**; **FY2026 COMPANY_PUBLISHED seeded**; ISO `assigned_week` unchanged; seasons/events/pressure deferred |
 | Fiscal calendar coverage (FS-001A min) | `computeFiscalCoverage` + `GET /api/admin/fiscal-calendar/coverage` + Settings `FiscalCoverageCard` | Derived on read; Master-only signal; **no** discovery/promote/cron/push/persistence |
 | Operational seasons/events (FS-002) | `operational_contexts` + relevance + `operational-context.ts` + APIs + Settings card | Master-declared foundation LIVE; empty seed valid; no SI / location priority |
+| Floor fiscal/season strip (FS-002B) | `floor-operational-context.ts` + `FloorOperationalContextStrip` on Floor | Fiscal + active context + current dept relevance; empty OK; non-blocking |
 | Auth & hub gate | `proxy.ts`, `lib/auth-gate.ts`, `AccessGate`, `AuthWall` | Cookie + JWT + RLS |
 | Roster / PIN / invite / QR pair | `lib/specialists.ts`, `app/pair/page.tsx`, `app/auth/verify/[token]`, `/api/roster/*` | End-to-end onboarding |
 | Floor bay rotations (Zebra) | `ZebraChecklist.tsx`, `completeRotation()`, `/api/rotations/complete` | Optimistic UI + offline queue |
