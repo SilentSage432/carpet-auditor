@@ -1,5 +1,20 @@
 # DeptSync Hub — Development Journal
 
+## 2026-09-04 — Canonical Layer-1 rotation metrics (A-1)
+
+### Shipped
+- Added `lib/store-ops/rotation-metrics.ts` (`weekly-rotation-metrics-v1`) as the sole owner of staged / reported / pending verification / verified / open / target deficit / verification lag.
+- Floor week headline + readiness appendix use verified vs awaiting review — never ambiguous “complete.”
+- Store health + weekly audit rollup `completion_pct` / quota deficit key off **verified** complete; reported remains labeled separately.
+- Map week overlay paints green only for `VERIFIED_COMPLETE` (not `is_completed` alone). Freshness still uses `last_completed_at` (set on DS verify).
+- Tests: Cases A–F in `rotation-metrics.test.ts` + updated `floor-readiness.test.ts`.
+- No schema/migrations; no Force Draw / Sunday / mutation changes.
+
+### Validation
+- `npm test` · `npm run typecheck` · `npm run build` pass.
+- Lint baseline unchanged (108 problems).
+- Fixtures: `tmp/layer1-metrics-validation/` (do not commit).
+
 ## 2026-09-04 — DeptSync Constitution established
 
 ### Shipped (documentation only)

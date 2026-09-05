@@ -1,6 +1,7 @@
 # DeptSync Hub — Master Roadmap
 
 ## Done
+- [x] Canonical Layer-1 rotation metrics (`weekly-rotation-metrics-v1`) — Art VI A-1: reported ≠ verified on Floor / health / rollup / Map week overlay
 - [x] Carpet Hub shell with sticky header + slide-over nav
 - [x] Number input sanitize + barcode Marry workflow
 - [x] Cycle Audit, Catalog, Remnant Rack, Settings

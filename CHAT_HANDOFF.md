@@ -1,6 +1,7 @@
 # DeptSync Hub — Chat Handoff
 
 ## Latest (2026-09-04)
+- **Layer-1 metrics (A-1):** Canonical owner `lib/store-ops/rotation-metrics.ts` (`weekly-rotation-metrics-v1`). Floor / readiness / store health / weekly rollup / Map week overlay distinguish **reported** vs **verified** (`VERIFIED_COMPLETE` only). No schema changes. Tests: `rotation-metrics.test.ts`. Screenshots/fixtures: `tmp/layer1-metrics-validation/` (do not commit).
 - **Constitution:** `DEPTSYNC_CONSTITUTION.md` established (docs-only). Governing laws for operating boundary, human/data/intelligence authority, rotation/verification, UI hierarchy, anti-drift. Baseline `d6d5806`. No app behavior changes.
 - **Information hierarchy:** Floor operate-only (Topology demoted to More); verification strip → existing rollup modal; empty week Stage plan; Map navigator before Snap Bay Photo. Screenshots: `tmp/hierarchy-implementation/` (do not commit).
 - **Mobile shell scroll:** `.hub-app-shell` = fixed `h-dvh` viewport; keep-alive tabs (`absolute inset-0 overflow-y-auto`) are the scroll owners; `--hub-workspace-pad-bottom` clears the fixed bottom nav. Screenshots: `tmp/mobile-shell-validation/` (do not commit).

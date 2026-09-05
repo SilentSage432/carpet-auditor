@@ -65,11 +65,16 @@ export async function GET(request: Request) {
       totals: {
         assigned: 0,
         completed: 0,
+        reported_complete: 0,
+        pending_verification: 0,
+        verified_complete: 0,
         open: 0,
         exceptions: 0,
         completion_pct: 0,
+        verified_target_deficit: 0,
       },
       telemetry: null,
+      metrics_method: "weekly-rotation-metrics-v1",
       error: err instanceof Error ? err.message : "Failed to load store health",
     });
   }

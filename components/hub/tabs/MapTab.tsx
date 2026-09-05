@@ -27,6 +27,7 @@ import {
 } from "@/lib/store-ops/auth-soft";
 import { readableError, isExistingDepartmentConflict } from "@/lib/store-ops/errors";
 import type { Department, StoreLocation } from "@/lib/store-ops/types";
+import { isWeekVerifiedForMapOverlay } from "@/lib/store-ops/rotation-metrics";
 import { isoWeekLabel } from "@/lib/store-ops/week";
 import type { WorkflowTabProps } from "@/components/hub/tabs/tab-props";
 
@@ -93,7 +94,7 @@ export function MapTab({ specialist }: WorkflowTabProps) {
       const nextWeek = (weekData.rotations ?? [])
         .map((row) => ({
           locationId: String(row.location_id || row.store_locations?.id || ""),
-          completed: Boolean(row.is_completed),
+          completed: isWeekVerifiedForMapOverlay(row),
         }))
         .filter((row) => row.locationId);
       const nextBarriers = (exceptions.exceptions ?? [])
@@ -170,7 +171,7 @@ export function MapTab({ specialist }: WorkflowTabProps) {
               locationId: String(
                 row.location_id || row.store_locations?.id || ""
               ),
-              completed: Boolean(row.is_completed),
+              completed: isWeekVerifiedForMapOverlay(row),
             }))
             .filter((row) => row.locationId);
           setWeekRotationLocations((prev) =>

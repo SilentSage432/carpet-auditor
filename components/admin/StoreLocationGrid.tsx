@@ -520,7 +520,7 @@ export function StoreLocationGrid({
                             Aisle {aisle.aisle}
                             <span className="ml-1 text-xs font-medium text-zinc-400">
                               · {bayCount} Bay{bayCount === 1 ? "" : "s"} ·{" "}
-                              {complete} Complete / {stale} Stale
+                              {complete} Verified / {stale} Stale
                             </span>
                           </span>
                         </p>

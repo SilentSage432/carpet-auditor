@@ -18,6 +18,7 @@ type Props = {
 /**
  * Store Health Scorecard — first card on Zebra dashboard.
  * DS: department pace + barriers. Super Admin: storewide grid + bottleneck summary.
+ * Pace % / quota progress use verified complete (Art VI). Reported is labeled separately.
  */
 export function StoreHealthCard({ specialist, refreshKey }: Props) {
   const [data, setData] = useState<StoreHealthSnapshotClient | null>(null);
@@ -67,12 +68,26 @@ function DepartmentSupervisorHealth({
 }) {
   const dept = data.department;
   const assigned = dept?.assigned ?? data.totals.assigned;
-  const completed = dept?.completed ?? data.totals.completed;
+  const verified =
+    dept?.verified_complete ??
+    data.totals.verified_complete ??
+    0;
+  const reported =
+    dept?.reported_complete ??
+    data.totals.reported_complete ??
+    dept?.completed ??
+    data.totals.completed;
+  const awaiting =
+    dept?.pending_verification ?? data.totals.pending_verification ?? 0;
   const target = dept?.weekly_bay_target ?? Math.max(assigned, 1);
   const pct =
     assigned > 0
       ? data.department?.completion_pct ?? data.totals.completion_pct
       : 0;
+  const deficit =
+    dept?.verified_target_deficit ??
+    data.totals.verified_target_deficit ??
+    Math.max(0, target - verified);
   const barriers = data.barriers;
   const [barriersOpen, setBarriersOpen] = useState(false);
 
@@ -90,7 +105,7 @@ function DepartmentSupervisorHealth({
       <div className="mt-2">
         <div className="mb-1.5 flex items-end justify-between gap-2">
           <p className="text-sm font-semibold text-slate-100">
-            {completed}/{assigned > 0 ? assigned : target} Bays Completed
+            {verified}/{assigned > 0 ? assigned : target} Bays Verified
           </p>
           <p className="font-mono text-xs text-emerald-300">{pct}%</p>
         </div>
@@ -101,8 +116,11 @@ function DepartmentSupervisorHealth({
           />
         </div>
         <p className="mt-1.5 text-xs text-slate-500">
-          Target {target}/week · {Math.max(0, (assigned || target) - completed)}{" "}
-          remaining
+          Target {target}/week · deficit {deficit}
+          {awaiting > 0 ? ` · ${awaiting} awaiting review` : ""}
+          {reported > verified
+            ? ` · ${reported} reported`
+            : ""}
         </p>
       </div>
 
@@ -141,6 +159,9 @@ function DepartmentSupervisorHealth({
 function SuperAdminHealth({ data }: { data: StoreHealthSnapshotClient }) {
   const { totals, departments, bottleneck_summary } = data;
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const verified = totals.verified_complete ?? 0;
+  const reported = totals.reported_complete ?? totals.completed;
+  const awaiting = totals.pending_verification ?? 0;
 
   return (
     <section className="mb-3 rounded-2xl border-2 border-amber-400/40 bg-amber-950/20 px-3 py-2.5">
@@ -148,11 +169,13 @@ function SuperAdminHealth({ data }: { data: StoreHealthSnapshotClient }) {
         Store Health Scorecard
       </p>
       <h2 className="mt-0.5 text-base font-bold text-slate-50">
-        Storewide Completion
+        Storewide Verification
       </h2>
       <p className="mt-0.5 font-mono text-xs text-slate-400">
-        {data.assigned_week || "This week"} · {totals.completed}/
-        {totals.assigned} bays · {totals.completion_pct}%
+        {data.assigned_week || "This week"} · {verified}/{totals.assigned}{" "}
+        verified · {totals.completion_pct}%
+        {awaiting > 0 ? ` · ${awaiting} awaiting` : ""}
+        {reported > verified ? ` · ${reported} reported` : ""}
       </p>
 
       <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-slate-800">
@@ -202,7 +225,11 @@ function SuperAdminHealth({ data }: { data: StoreHealthSnapshotClient }) {
                     </span>
                   </div>
                   <p className="mt-1 font-mono text-[11px] text-slate-400">
-                    {d.completed}/{d.assigned || d.weekly_bay_target} done
+                    {d.verified_complete ?? 0}/{d.assigned || d.weekly_bay_target}{" "}
+                    verified
+                    {(d.pending_verification ?? 0) > 0
+                      ? ` · ${d.pending_verification} awaiting`
+                      : ""}
                     {d.exception_count > 0
                       ? ` · ${d.exception_count} barrier${
                           d.exception_count === 1 ? "" : "s"

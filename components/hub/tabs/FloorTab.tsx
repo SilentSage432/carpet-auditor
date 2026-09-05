@@ -66,6 +66,10 @@ import {
 import { getStoreNumber } from "@/lib/store";
 import { composeFloorReadinessLine } from "@/lib/store-ops/floor-readiness";
 import {
+  composeFloorWeekProgressLine,
+  composeWeeklyRotationMetrics,
+} from "@/lib/store-ops/rotation-metrics";
+import {
   composeBayFreshness,
   readBayTouches,
 } from "@/lib/heatmap/bay-tracker";
@@ -173,13 +177,6 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
   const supervisor = isSupervisor(specialist);
   const master = isMasterAdmin(specialist);
   const assignmentDept = working === "all" ? "flooring" : working;
-  const completedCount = rotations.filter((r) => r.is_completed).length;
-  const pendingVerifyCount = rotations.filter(
-    (r) =>
-      r.is_completed &&
-      String(r.verification_status ?? "").toUpperCase() ===
-        "PENDING_VERIFICATION"
-  ).length;
 
   const activeDept = useMemo(
     () => departments.find((dept) => dept.id === deptId) ?? null,
@@ -362,7 +359,18 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
     return filterFlooringRotations(scoped, flooringDeptId);
   }, [rotations, flooringFocus, flooringDeptId, working, deptId]);
 
-  const openBayCount = displayRotations.filter((r) => !r.is_completed).length;
+  const weekMetrics = useMemo(
+    () =>
+      composeWeeklyRotationMetrics({
+        rotations: displayRotations,
+        weeklyTarget: activeDept?.weekly_bay_target,
+        locations: mappedLocations,
+      }),
+    [displayRotations, activeDept?.weekly_bay_target, mappedLocations]
+  );
+  const pendingVerifyCount = weekMetrics.pendingVerification;
+  const reportedCompleteCount = weekMetrics.reportedComplete;
+  const weekProgressLine = composeFloorWeekProgressLine(weekMetrics);
 
   const sundayPending = useMemo(() => {
     const bays = buildSundayStagedBays(displayRotations, assignments);
@@ -437,15 +445,13 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
       staleCount: summary.staleCount,
       weeklyTarget:
         activeDept?.weekly_bay_target ?? resolveWeeklyBayTarget(null),
-      weekOpen: openBayCount,
-      weekComplete: completedCount,
+      weekMetrics,
     });
   }, [
     freshnessLocations,
     storeNumber,
     activeDept?.weekly_bay_target,
-    openBayCount,
-    completedCount,
+    weekMetrics,
   ]);
 
   const workload = useMemo(
@@ -470,8 +476,8 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
         assigned_week: week,
       });
       setVerifyMsg(
-        `Week signed off — ${completedCount} completed bay${
-          completedCount === 1 ? "" : "s"
+        `Week signed off — ${pendingVerifyCount} bay${
+          pendingVerifyCount === 1 ? "" : "s"
         } verified.`
       );
       silentRefresh();
@@ -492,7 +498,7 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
             {rotationTitle}
           </h1>
           <p className="mt-0.5 text-xs text-zinc-500">
-            {openBayCount} open · {completedCount} complete
+            {weekProgressLine}
             {week ? ` · week ${week}` : ""}
           </p>
           <p
@@ -612,7 +618,7 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
                 const active = floorBayFilter === filter.id;
                 const badge =
                   filter.id === "completed"
-                    ? completedCount
+                    ? reportedCompleteCount
                     : filter.id === "attention"
                       ? pendingVerifyCount
                       : null;
@@ -788,7 +794,7 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
               {pendingVerifyCount > 0 ? ` (${pendingVerifyCount})` : ""}
             </button>
           ) : null}
-          {!simplified && completedCount > 0 ? (
+          {!simplified && pendingVerifyCount > 0 ? (
             <button
               type="button"
               disabled={verifyBusy || !deptId}
@@ -797,7 +803,7 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
             >
               {verifyBusy
                 ? "Signing off…"
-                : `Verify completed bays (${completedCount})`}
+                : `Verify awaiting review (${pendingVerifyCount})`}
             </button>
           ) : null}
           {!simplified ? (

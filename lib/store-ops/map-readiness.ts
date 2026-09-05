@@ -39,10 +39,13 @@ export function emitBayReadiness(detail: BayReadinessEventDetail): void {
 }
 
 /**
- * Green: verified this ISO week.
- * Yellow: on this week's rotation, not yet complete.
+ * Green: verified this ISO week (verification_status or last_completed_at in week).
+ * Yellow: on this week's rotation, not yet verified.
  * Red: stale >7d or active barrier.
  * Idle: mapped, none of the above.
+ *
+ * `currentWeekCompleted` MUST mean verified — pending verification must not paint green.
+ * `last_completed_at` is set only on DS verify / auto-verify close.
  */
 export function classifyMapReadiness(
   input: MapReadinessInput

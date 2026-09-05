@@ -1263,9 +1263,13 @@ export type StoreHealthSnapshotClient = {
     weekly_bay_target: number;
     assigned: number;
     completed: number;
+    reported_complete: number;
+    pending_verification: number;
+    verified_complete: number;
     open: number;
     exception_count: number;
     completion_pct: number;
+    verified_target_deficit: number;
   } | null;
   departments: Array<{
     department_id: string;
@@ -1274,9 +1278,13 @@ export type StoreHealthSnapshotClient = {
     weekly_bay_target: number;
     assigned: number;
     completed: number;
+    reported_complete: number;
+    pending_verification: number;
+    verified_complete: number;
     open: number;
     exception_count: number;
     completion_pct: number;
+    verified_target_deficit: number;
   }>;
   barriers: Array<{
     id: string;
@@ -1289,12 +1297,17 @@ export type StoreHealthSnapshotClient = {
   totals: {
     assigned: number;
     completed: number;
+    reported_complete: number;
+    pending_verification: number;
+    verified_complete: number;
     open: number;
     exceptions: number;
     completion_pct: number;
+    verified_target_deficit: number;
   };
   telemetry?: import("@/lib/store-ops/telemetry").StoreAuditTelemetry | null;
   bay_health?: import("@/lib/store-ops/bay-health").BayHealthBriefingContext | null;
+  metrics_method?: string;
 };
 
 export async function fetchStoreHealth(
@@ -1341,7 +1354,8 @@ function localBriefingFromSnapshot(
     totals: snapshot.totals,
     telemetry: snapshot.telemetry ?? null,
     bay_health: snapshot.bay_health ?? null,
-  });
+    metrics_method: "weekly-rotation-metrics-v1",
+  } as import("@/lib/store-ops/health").StoreHealthSnapshot);
   return {
     ...local,
     assigned_week: snapshot.assigned_week,

@@ -380,11 +380,19 @@ export function SupervisorAuditSummaryModal({
               <>
                 <section className="rounded-xl border border-emerald-500/30 bg-emerald-950/25 px-3 py-3">
                   <p className="text-sm font-semibold text-zinc-100">
-                    {rollup.completed}/{rollup.quota} bays vs weekly quota
+                    {rollup.verifiedComplete}/{rollup.quota} verified vs weekly
+                    quota
                   </p>
                   <p className="mt-0.5 font-mono text-xs text-zinc-400">
-                    Assigned {rollup.assigned} · remaining {rollup.remaining} · {pct}%
+                    Staged {rollup.assigned} · reported {rollup.reportedComplete}{" "}
+                    · awaiting {rollup.pendingVerification} · open{" "}
+                    {rollup.remaining} · {pct}% verified
                   </p>
+                  {rollup.verifiedTargetDeficit > 0 ? (
+                    <p className="mt-1 font-mono text-[11px] text-amber-200/90">
+                      Verified target deficit {rollup.verifiedTargetDeficit}
+                    </p>
+                  ) : null}
                   <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-zinc-800">
                     <div
                       className="h-full rounded-full bg-emerald-500"
@@ -420,7 +428,7 @@ export function SupervisorAuditSummaryModal({
                             ) : null}
                           </span>
                           <span className="shrink-0 font-mono text-xs text-zinc-400">
-                            {row.completed}/{row.assigned}
+                            {row.completed}r / {row.verified}v / {row.assigned}
                           </span>
                         </li>
                       ))}
@@ -428,8 +436,8 @@ export function SupervisorAuditSummaryModal({
                   )}
                   {rollup.unassigned.assigned > 0 ? (
                     <p className="mt-2 font-mono text-xs text-zinc-500">
-                      Unassigned {rollup.unassigned.completed}/
-                      {rollup.unassigned.assigned} complete
+                      Unassigned {rollup.unassigned.completed}r /{" "}
+                      {rollup.unassigned.verified}v / {rollup.unassigned.assigned}
                     </p>
                   ) : null}
                 </section>

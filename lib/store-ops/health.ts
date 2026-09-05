@@ -10,6 +10,11 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type { BayHealthBriefingContext } from "./bay-health";
 import { resolveDepartmentIdByCode } from "./rotations";
 import {
+  composeWeeklyRotationMetrics,
+  isRotationReportedComplete,
+  WEEKLY_ROTATION_METRICS_METHOD,
+} from "./rotation-metrics";
+import {
   buildStoreAuditTelemetry,
   type StoreAuditTelemetry,
   type TelemetryCompletionEvent,
@@ -26,10 +31,16 @@ export type DepartmentHealthRow = {
   department_code: string;
   weekly_bay_target: number;
   assigned: number;
+  /** Reported complete (includes pending verification). Not verified readiness. */
   completed: number;
+  reported_complete: number;
+  pending_verification: number;
+  verified_complete: number;
   open: number;
   exception_count: number;
+  /** Verified vs assigned — Art VI readiness pace. */
   completion_pct: number;
+  verified_target_deficit: number;
 };
 
 export type BarrierRow = {
@@ -56,14 +67,19 @@ export type StoreHealthSnapshot = {
   totals: {
     assigned: number;
     completed: number;
+    reported_complete: number;
+    pending_verification: number;
+    verified_complete: number;
     open: number;
     exceptions: number;
     completion_pct: number;
+    verified_target_deficit: number;
   };
   /** Active-shift hourly velocity (06:00–22:00). */
   telemetry: StoreAuditTelemetry | null;
   /** Compact bay-health flags for shift briefing (diagnostics owned by bay-health.ts). */
   bay_health: BayHealthBriefingContext | null;
+  metrics_method: typeof WEEKLY_ROTATION_METRICS_METHOD;
 };
 
 /**
@@ -163,26 +179,33 @@ export async function buildStoreHealthSnapshot(
     totals: {
       assigned: 0,
       completed: 0,
+      reported_complete: 0,
+      pending_verification: 0,
+      verified_complete: 0,
       open: 0,
       exceptions: 0,
       completion_pct: 0,
+      verified_target_deficit: 0,
     },
     telemetry: null,
     bay_health: await emptyBayHealthBriefing(),
+    metrics_method: WEEKLY_ROTATION_METRICS_METHOD,
   };
 
   if (deptIds.length === 0) return empty;
 
   let rotQuery = supabase
     .from("weekly_rotations")
-    .select("id, department_id, is_completed, completed_at, assigned_week")
+    .select(
+      "id, department_id, is_completed, completed_at, verification_status, assigned_week"
+    )
     .eq("store_id", opts.storeId)
     .eq("assigned_week", week)
     .in("department_id", deptIds);
 
   const { data: rotations, error: rotError } = await rotQuery;
   if (rotError) {
-    // Missing store_id column / empty — try without store filter
+    // Missing store_id / verification_status column — degrade gracefully
     const fallback = await supabase
       .from("weekly_rotations")
       .select("id, department_id, is_completed, completed_at, assigned_week")
@@ -370,14 +393,20 @@ function composeSnapshot(
     department_id: string;
     is_completed: boolean;
     completed_at?: string | null;
+    verification_status?: string | null;
   }>,
   barriers: BarrierRow[]
 ): StoreHealthSnapshot {
   const rows: DepartmentHealthRow[] = deptList.map((dept) => {
     const mine = rotations.filter((r) => r.department_id === dept.id);
-    const assigned = mine.length;
-    const completed = mine.filter((r) => r.is_completed).length;
-    const open = assigned - completed;
+    const target =
+      Number(dept.weekly_bay_target) > 0
+        ? Math.floor(Number(dept.weekly_bay_target))
+        : 10;
+    const metrics = composeWeeklyRotationMetrics({
+      rotations: mine,
+      weeklyTarget: target,
+    });
     const exception_count = barriers.filter(
       (b) => b.department_id === dept.id
     ).length;
@@ -385,14 +414,19 @@ function composeSnapshot(
       department_id: dept.id,
       department_name: dept.name,
       department_code: dept.code,
-      weekly_bay_target: Number(dept.weekly_bay_target) > 0
-        ? Math.floor(Number(dept.weekly_bay_target))
-        : 10,
-      assigned,
-      completed,
-      open,
+      weekly_bay_target: target,
+      assigned: metrics.staged,
+      completed: metrics.reportedComplete,
+      reported_complete: metrics.reportedComplete,
+      pending_verification: metrics.pendingVerification,
+      verified_complete: metrics.verifiedComplete,
+      open: metrics.open,
       exception_count,
-      completion_pct: computeDepartmentCompletionPct(completed, assigned),
+      completion_pct: computeDepartmentCompletionPct(
+        metrics.verifiedComplete,
+        metrics.staged
+      ),
+      verified_target_deficit: metrics.verifiedTargetDeficit,
     };
   });
 
@@ -407,7 +441,17 @@ function composeSnapshot(
 
   const assigned = rows.reduce((s, r) => s + r.assigned, 0);
   const completed = rows.reduce((s, r) => s + r.completed, 0);
-  const open = assigned - completed;
+  const reported_complete = rows.reduce((s, r) => s + r.reported_complete, 0);
+  const pending_verification = rows.reduce(
+    (s, r) => s + r.pending_verification,
+    0
+  );
+  const verified_complete = rows.reduce((s, r) => s + r.verified_complete, 0);
+  const open = rows.reduce((s, r) => s + r.open, 0);
+  const verified_target_deficit = rows.reduce(
+    (s, r) => s + r.verified_target_deficit,
+    0
+  );
   const exceptions = barriers.length;
 
   const codeById = new Map(rows.map((r) => [r.department_id, r] as const));
@@ -418,7 +462,8 @@ function composeSnapshot(
       department_id: r.department_id,
       department_code: meta?.department_code,
       department_name: meta?.department_name,
-      is_completed: Boolean(r.is_completed),
+      // Telemetry tracks reported submits (pace), not verified readiness.
+      is_completed: isRotationReportedComplete(r),
     };
   });
 
@@ -449,11 +494,19 @@ function composeSnapshot(
     totals: {
       assigned,
       completed,
+      reported_complete,
+      pending_verification,
+      verified_complete,
       open,
       exceptions,
-      completion_pct: computeDepartmentCompletionPct(completed, assigned),
+      completion_pct: computeDepartmentCompletionPct(
+        verified_complete,
+        assigned
+      ),
+      verified_target_deficit,
     },
     telemetry,
     bay_health: null,
+    metrics_method: WEEKLY_ROTATION_METRICS_METHOD,
   };
 }
