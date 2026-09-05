@@ -1,0 +1,396 @@
+{
+  "label": "LOWE'S FY2026 COMPANY-PUBLISHED FISCAL CALENDAR",
+  "fiscal_year": 2026,
+  "start_date": "2026-01-31",
+  "end_date": "2027-01-29",
+  "week_count": 52,
+  "source_type": "COMPANY_PUBLISHED",
+  "source_reference": "https://vendorgateway.lowes.com/vpp/assets/Fiscal_calendar.pdf",
+  "source_year": 2026,
+  "declared_by": null,
+  "source_document_title": "FISCAL 4-5-4 CALENDAR (52 WEEKS)",
+  "source_page_year_label": "2026",
+  "retrieval_date": "2026-09-05",
+  "fiscal_week_boundary": "Saturday–Friday",
+  "notes": [
+    "Extracted from Lowe's Vendor Gateway published Fiscal_calendar.pdf page labeled 2026.",
+    "Direct HTTP download returned Akamai Access Denied (403); content obtained via Cursor WebFetch of the same URL.",
+    "Holidays and EARNINGS RELEASED markers appear on the PDF but are NOT imported in FS-001.",
+    "Do not treat display month names as Gregorian month boundaries (e.g. February period begins 2026-01-31)."
+  ],
+  "secondary_validation": {
+    "q1_end_expected": "2026-05-01",
+    "q2_end_expected": "2026-07-31",
+    "fy_end_expected": "2027-01-29",
+    "sources": [
+      "https://corporate.lowes.com/sites/lowes-corp/files/q1-2026-earnings/lowes-q1-2026-press-release-final.pdf",
+      "https://corporate.lowes.com/newsroom/press-releases/lowes-reports-second-quarter-2026-sales-and-earnings-results-08-19-26"
+    ]
+  },
+  "weeks": [
+    {
+      "fiscal_week": 1,
+      "fiscal_quarter": 1,
+      "fiscal_period": 1,
+      "start_date": "2026-01-31",
+      "end_date": "2026-02-06"
+    },
+    {
+      "fiscal_week": 2,
+      "fiscal_quarter": 1,
+      "fiscal_period": 1,
+      "start_date": "2026-02-07",
+      "end_date": "2026-02-13"
+    },
+    {
+      "fiscal_week": 3,
+      "fiscal_quarter": 1,
+      "fiscal_period": 1,
+      "start_date": "2026-02-14",
+      "end_date": "2026-02-20"
+    },
+    {
+      "fiscal_week": 4,
+      "fiscal_quarter": 1,
+      "fiscal_period": 1,
+      "start_date": "2026-02-21",
+      "end_date": "2026-02-27"
+    },
+    {
+      "fiscal_week": 5,
+      "fiscal_quarter": 1,
+      "fiscal_period": 2,
+      "start_date": "2026-02-28",
+      "end_date": "2026-03-06"
+    },
+    {
+      "fiscal_week": 6,
+      "fiscal_quarter": 1,
+      "fiscal_period": 2,
+      "start_date": "2026-03-07",
+      "end_date": "2026-03-13"
+    },
+    {
+      "fiscal_week": 7,
+      "fiscal_quarter": 1,
+      "fiscal_period": 2,
+      "start_date": "2026-03-14",
+      "end_date": "2026-03-20"
+    },
+    {
+      "fiscal_week": 8,
+      "fiscal_quarter": 1,
+      "fiscal_period": 2,
+      "start_date": "2026-03-21",
+      "end_date": "2026-03-27"
+    },
+    {
+      "fiscal_week": 9,
+      "fiscal_quarter": 1,
+      "fiscal_period": 2,
+      "start_date": "2026-03-28",
+      "end_date": "2026-04-03"
+    },
+    {
+      "fiscal_week": 10,
+      "fiscal_quarter": 1,
+      "fiscal_period": 3,
+      "start_date": "2026-04-04",
+      "end_date": "2026-04-10"
+    },
+    {
+      "fiscal_week": 11,
+      "fiscal_quarter": 1,
+      "fiscal_period": 3,
+      "start_date": "2026-04-11",
+      "end_date": "2026-04-17"
+    },
+    {
+      "fiscal_week": 12,
+      "fiscal_quarter": 1,
+      "fiscal_period": 3,
+      "start_date": "2026-04-18",
+      "end_date": "2026-04-24"
+    },
+    {
+      "fiscal_week": 13,
+      "fiscal_quarter": 1,
+      "fiscal_period": 3,
+      "start_date": "2026-04-25",
+      "end_date": "2026-05-01"
+    },
+    {
+      "fiscal_week": 14,
+      "fiscal_quarter": 2,
+      "fiscal_period": 4,
+      "start_date": "2026-05-02",
+      "end_date": "2026-05-08"
+    },
+    {
+      "fiscal_week": 15,
+      "fiscal_quarter": 2,
+      "fiscal_period": 4,
+      "start_date": "2026-05-09",
+      "end_date": "2026-05-15"
+    },
+    {
+      "fiscal_week": 16,
+      "fiscal_quarter": 2,
+      "fiscal_period": 4,
+      "start_date": "2026-05-16",
+      "end_date": "2026-05-22"
+    },
+    {
+      "fiscal_week": 17,
+      "fiscal_quarter": 2,
+      "fiscal_period": 4,
+      "start_date": "2026-05-23",
+      "end_date": "2026-05-29"
+    },
+    {
+      "fiscal_week": 18,
+      "fiscal_quarter": 2,
+      "fiscal_period": 5,
+      "start_date": "2026-05-30",
+      "end_date": "2026-06-05"
+    },
+    {
+      "fiscal_week": 19,
+      "fiscal_quarter": 2,
+      "fiscal_period": 5,
+      "start_date": "2026-06-06",
+      "end_date": "2026-06-12"
+    },
+    {
+      "fiscal_week": 20,
+      "fiscal_quarter": 2,
+      "fiscal_period": 5,
+      "start_date": "2026-06-13",
+      "end_date": "2026-06-19"
+    },
+    {
+      "fiscal_week": 21,
+      "fiscal_quarter": 2,
+      "fiscal_period": 5,
+      "start_date": "2026-06-20",
+      "end_date": "2026-06-26"
+    },
+    {
+      "fiscal_week": 22,
+      "fiscal_quarter": 2,
+      "fiscal_period": 5,
+      "start_date": "2026-06-27",
+      "end_date": "2026-07-03"
+    },
+    {
+      "fiscal_week": 23,
+      "fiscal_quarter": 2,
+      "fiscal_period": 6,
+      "start_date": "2026-07-04",
+      "end_date": "2026-07-10"
+    },
+    {
+      "fiscal_week": 24,
+      "fiscal_quarter": 2,
+      "fiscal_period": 6,
+      "start_date": "2026-07-11",
+      "end_date": "2026-07-17"
+    },
+    {
+      "fiscal_week": 25,
+      "fiscal_quarter": 2,
+      "fiscal_period": 6,
+      "start_date": "2026-07-18",
+      "end_date": "2026-07-24"
+    },
+    {
+      "fiscal_week": 26,
+      "fiscal_quarter": 2,
+      "fiscal_period": 6,
+      "start_date": "2026-07-25",
+      "end_date": "2026-07-31"
+    },
+    {
+      "fiscal_week": 27,
+      "fiscal_quarter": 3,
+      "fiscal_period": 7,
+      "start_date": "2026-08-01",
+      "end_date": "2026-08-07"
+    },
+    {
+      "fiscal_week": 28,
+      "fiscal_quarter": 3,
+      "fiscal_period": 7,
+      "start_date": "2026-08-08",
+      "end_date": "2026-08-14"
+    },
+    {
+      "fiscal_week": 29,
+      "fiscal_quarter": 3,
+      "fiscal_period": 7,
+      "start_date": "2026-08-15",
+      "end_date": "2026-08-21"
+    },
+    {
+      "fiscal_week": 30,
+      "fiscal_quarter": 3,
+      "fiscal_period": 7,
+      "start_date": "2026-08-22",
+      "end_date": "2026-08-28"
+    },
+    {
+      "fiscal_week": 31,
+      "fiscal_quarter": 3,
+      "fiscal_period": 8,
+      "start_date": "2026-08-29",
+      "end_date": "2026-09-04"
+    },
+    {
+      "fiscal_week": 32,
+      "fiscal_quarter": 3,
+      "fiscal_period": 8,
+      "start_date": "2026-09-05",
+      "end_date": "2026-09-11"
+    },
+    {
+      "fiscal_week": 33,
+      "fiscal_quarter": 3,
+      "fiscal_period": 8,
+      "start_date": "2026-09-12",
+      "end_date": "2026-09-18"
+    },
+    {
+      "fiscal_week": 34,
+      "fiscal_quarter": 3,
+      "fiscal_period": 8,
+      "start_date": "2026-09-19",
+      "end_date": "2026-09-25"
+    },
+    {
+      "fiscal_week": 35,
+      "fiscal_quarter": 3,
+      "fiscal_period": 8,
+      "start_date": "2026-09-26",
+      "end_date": "2026-10-02"
+    },
+    {
+      "fiscal_week": 36,
+      "fiscal_quarter": 3,
+      "fiscal_period": 9,
+      "start_date": "2026-10-03",
+      "end_date": "2026-10-09"
+    },
+    {
+      "fiscal_week": 37,
+      "fiscal_quarter": 3,
+      "fiscal_period": 9,
+      "start_date": "2026-10-10",
+      "end_date": "2026-10-16"
+    },
+    {
+      "fiscal_week": 38,
+      "fiscal_quarter": 3,
+      "fiscal_period": 9,
+      "start_date": "2026-10-17",
+      "end_date": "2026-10-23"
+    },
+    {
+      "fiscal_week": 39,
+      "fiscal_quarter": 3,
+      "fiscal_period": 9,
+      "start_date": "2026-10-24",
+      "end_date": "2026-10-30"
+    },
+    {
+      "fiscal_week": 40,
+      "fiscal_quarter": 4,
+      "fiscal_period": 10,
+      "start_date": "2026-10-31",
+      "end_date": "2026-11-06"
+    },
+    {
+      "fiscal_week": 41,
+      "fiscal_quarter": 4,
+      "fiscal_period": 10,
+      "start_date": "2026-11-07",
+      "end_date": "2026-11-13"
+    },
+    {
+      "fiscal_week": 42,
+      "fiscal_quarter": 4,
+      "fiscal_period": 10,
+      "start_date": "2026-11-14",
+      "end_date": "2026-11-20"
+    },
+    {
+      "fiscal_week": 43,
+      "fiscal_quarter": 4,
+      "fiscal_period": 10,
+      "start_date": "2026-11-21",
+      "end_date": "2026-11-27"
+    },
+    {
+      "fiscal_week": 44,
+      "fiscal_quarter": 4,
+      "fiscal_period": 11,
+      "start_date": "2026-11-28",
+      "end_date": "2026-12-04"
+    },
+    {
+      "fiscal_week": 45,
+      "fiscal_quarter": 4,
+      "fiscal_period": 11,
+      "start_date": "2026-12-05",
+      "end_date": "2026-12-11"
+    },
+    {
+      "fiscal_week": 46,
+      "fiscal_quarter": 4,
+      "fiscal_period": 11,
+      "start_date": "2026-12-12",
+      "end_date": "2026-12-18"
+    },
+    {
+      "fiscal_week": 47,
+      "fiscal_quarter": 4,
+      "fiscal_period": 11,
+      "start_date": "2026-12-19",
+      "end_date": "2026-12-25"
+    },
+    {
+      "fiscal_week": 48,
+      "fiscal_quarter": 4,
+      "fiscal_period": 11,
+      "start_date": "2026-12-26",
+      "end_date": "2027-01-01"
+    },
+    {
+      "fiscal_week": 49,
+      "fiscal_quarter": 4,
+      "fiscal_period": 12,
+      "start_date": "2027-01-02",
+      "end_date": "2027-01-08"
+    },
+    {
+      "fiscal_week": 50,
+      "fiscal_quarter": 4,
+      "fiscal_period": 12,
+      "start_date": "2027-01-09",
+      "end_date": "2027-01-15"
+    },
+    {
+      "fiscal_week": 51,
+      "fiscal_quarter": 4,
+      "fiscal_period": 12,
+      "start_date": "2027-01-16",
+      "end_date": "2027-01-22"
+    },
+    {
+      "fiscal_week": 52,
+      "fiscal_quarter": 4,
+      "fiscal_period": 12,
+      "start_date": "2027-01-23",
+      "end_date": "2027-01-29"
+    }
+  ]
+}

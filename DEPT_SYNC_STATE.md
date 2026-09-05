@@ -32,7 +32,7 @@
 | **Lifecycle** | **Awaiting first natural** report/review (do not fabricate rotations) |
 | **Privacy** | Actor ids for provenance only; not associate leaderboards |
 | **Future intelligence** | Enables first-pass / rework / lag metrics; seasonal correlation needs FS-002+ after fiscal calendar seeded |
-| **Fiscal calendar (FS-001)** | Schema **LIVE**; app ships with this commit; ISO rotation identity unchanged; **FY not seeded** → context unavailable |
+| **Fiscal calendar (FS-001)** | Schema **LIVE**; FY2026 **authoritatively seeded** from Lowe's Vendor Gateway PDF; ISO rotation identity unchanged; seasons/events not started |
 
 ### Core stack
 
@@ -234,7 +234,7 @@ Until applied, production Hub falls back to localStorage for catalog/remnants; r
 | 10 | `store_locations` | `id`; unique `(department_id, aisle, bay, type)` | Aisle/bay topology |
 | 11 | `weekly_rotations` | `id`; unique `(location_id, assigned_week)` WHERE active | Weekly bay assignment rows |
 | 11b | `weekly_rotation_completion_attempts` | FK → `weekly_rotations` ON DELETE RESTRICT; one PENDING per rotation | Report/review history — **LIVE in production**; first natural lifecycle pending |
-| 11c | `fiscal_years` / `fiscal_weeks` | Unique `fiscal_year`; weeks unique `(fiscal_year_id, fiscal_week)` | FS-001 parallel retail calendar — **LIVE**; authoritative FY **not seeded** |
+| 11c | `fiscal_years` / `fiscal_weeks` | Unique `fiscal_year`; weeks unique `(fiscal_year_id, fiscal_week)` | FS-001 LIVE; **FY2026 seeded** (52 weeks, Sat–Fri); holidays not imported |
 | 12 | `sunday_bay_assignments` | composite | Sunday specialist↔bay staging |
 | 13 | `downstock_queue` | — | Top-stock / packdown flags |
 | 14 | `rotation_exceptions` | — | Mid-week barrier reasons |
@@ -294,7 +294,8 @@ Until applied, production Hub falls back to localStorage for catalog/remnants; r
 | Layer-1 rotation metrics | `lib/store-ops/rotation-metrics.ts` (`weekly-rotation-metrics-v1`) | Floor / health / rollup / Map consume; Art VI A-1; **active rows only** |
 | Weekly rotation history | `superseded_at` + `20260905_weekly_rotations_superseded.sql`; `rotation-history.ts` | Force Draw supersedes incomplete stages; pre-migration deletes UNKNOWN |
 | Completion-attempt history | `weekly_rotation_completion_attempts` + `completion-attempt-history.ts` | Schema **LIVE**; send-back preserves attempts; first natural lifecycle pending |
-| Fiscal calendar (FS-001) | `fiscal_years` / `fiscal_weeks` + `fiscal-calendar.ts` + `GET /api/fiscal-calendar` | Schema **LIVE**; app deployed with this commit; ISO `assigned_week` unchanged; FY **not seeded**; seasons/events/pressure deferred |
+| Fiscal calendar (FS-001) | `fiscal_years` / `fiscal_weeks` + `fiscal-calendar.ts` + `GET /api/fiscal-calendar` | Schema **LIVE**; **FY2026 COMPANY_PUBLISHED seeded**; ISO `assigned_week` unchanged; seasons/events/pressure deferred |
+| Fiscal calendar lifecycle (FS-001A) | Roadmap only | Coverage monitoring, future-year discovery, source validation, **Master approval before promotion** — not started |
 | Auth & hub gate | `proxy.ts`, `lib/auth-gate.ts`, `AccessGate`, `AuthWall` | Cookie + JWT + RLS |
 | Roster / PIN / invite / QR pair | `lib/specialists.ts`, `app/pair/page.tsx`, `app/auth/verify/[token]`, `/api/roster/*` | End-to-end onboarding |
 | Floor bay rotations (Zebra) | `ZebraChecklist.tsx`, `completeRotation()`, `/api/rotations/complete` | Optimistic UI + offline queue |

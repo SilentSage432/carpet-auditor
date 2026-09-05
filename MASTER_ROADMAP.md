@@ -4,7 +4,9 @@
 - [x] Canonical Layer-1 rotation metrics (`weekly-rotation-metrics-v1`) — Art VI A-1: reported ≠ verified on Floor / health / rollup / Map week overlay
 - [x] Weekly rotation history preservation — Force Draw supersedes incomplete stages (`20260905_weekly_rotations_superseded.sql`); active = `superseded_at IS NULL`; Layer-1 counts active only
 - [x] Completion-attempt history (send-back preserves evidence) — schema LIVE; app deploy with this commit; first natural lifecycle pending
-- [x] FS-001 Fiscal calendar foundation (years/weeks, provenance, import validation, store-local resolve) — schema LIVE; app deploy; **FY not seeded**
+- [x] FS-001 Fiscal calendar foundation (years/weeks, provenance, import validation, store-local resolve) — schema LIVE; app deploy
+- [x] FY2026 authoritative calendar seed (Lowe's Vendor Gateway published PDF; 52 Sat–Fri weeks; holidays not imported)
+- [ ] FS-001A — Fiscal Calendar Lifecycle & Coverage Monitoring (coverage monitoring, future-year discovery, authoritative-source validation, Master approval before promotion, source-change detection). Principle: authoritative calendar discovery/validation may be automated; promotion into authoritative operational state requires explicit Master approval.
 - [ ] FS-002 Seasons / events
 - [ ] FS-003 Department + location seasonal relevance
 - [ ] SI-001 / SI-002 Seasonal signal contract + Day-1 deterministic pressure

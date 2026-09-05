@@ -1,5 +1,20 @@
 # DeptSync Hub — Development Journal
 
+## 2026-09-05 — FY2026 authoritative fiscal calendar seed
+
+### Source
+- Primary: Lowe's Vendor Gateway `https://vendorgateway.lowes.com/vpp/assets/Fiscal_calendar.pdf` — title **FISCAL 4-5-4 CALENDAR (52 WEEKS)**, page labeled **2026**. Retrieval 2026-09-05 (direct curl Akamai 403; content via WebFetch of same URL).
+- Secondary: Q1 press release (quarter ended May 1, 2026); Q2 press/10-Q (quarter ended July 31, 2026); FY ends Friday nearest end of January → Jan 29, 2027.
+- Discovery: Lowe's fiscal week = **Saturday–Friday** (parallel to ISO Mon–Sun `assigned_week`).
+
+### Seed
+- Artifact: `data/fiscal-calendars/lowes-fy2026-company-published.json` (versioned import data; not runtime constants).
+- Production: `fiscal_years=1`, `fiscal_weeks=52`; envelope `2026-01-31`→`2027-01-29`; provenance `COMPANY_PUBLISHED` + URL + `source_year=2026`; `declared_by` null.
+- Holidays / EARNINGS RELEASED markers **not** imported (FS-002 candidates).
+- Pre-seed dump `…T18-19-05-059Z.dump` retained. Completion-attempt first natural lifecycle still pending.
+- Status: **FY2026 AUTHORITATIVE FISCAL CALENDAR LIVE**
+- Next roadmap: **FS-001A** Fiscal Calendar Lifecycle & Coverage Monitoring — discovery/validation may be automated; promotion to authoritative operational state requires explicit Master approval. Not implemented in this tranche.
+
 ## 2026-09-05 — FS-001 Fiscal calendar foundation
 
 ### Shipped

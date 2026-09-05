@@ -100,7 +100,8 @@ app/api/stores/settings           → GET/PATCH Sunday auto-stage time, auto-run
 lib/store-ops/sunday-schedule.ts  → Store-owned Sunday timing knowledge (defaults 05:00 America/Denver)
 lib/store-ops/fiscal-calendar.ts  → FS-001 fiscal years/weeks authority (import/validate/resolve); parallel to ISO `assigned_week`; `calendar_unavailable` when unseeded
 app/api/fiscal-calendar/route.ts  → GET Supervisor+ fiscal context for store-local date (additive; rotations unaffected)
-supabase/migrations/20260905_fiscal_calendar.sql → `fiscal_years` + `fiscal_weeks` (**LIVE**; FY not seeded)
+supabase/migrations/20260905_fiscal_calendar.sql → `fiscal_years` + `fiscal_weeks` (**LIVE**; FY2026 COMPANY_PUBLISHED seeded)
+data/fiscal-calendars/lowes-fy2026-company-published.json → Versioned Lowe's FY2026 import artifact (not runtime hard-code)
 supabase/migrations/20260816_sunday_rotation_schedule.sql → stores.sunday_auto_generate / sunday_auto_stage_time / timezone
 supabase/migrations/20260809_push_notifications.sql → push_subscriptions + RLS
 supabase/migrations/20260809_weekly_rotation_cron.sql → weekly_bay_target + Lowe's dept codes
