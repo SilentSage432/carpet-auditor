@@ -4,6 +4,12 @@ import {
   mapApplianceScanRow,
 } from "@/lib/appliance-scans";
 import { storeNumberQueryValues } from "@/lib/store";
+import { actorBoundStoreNumber } from "@/lib/store-ops/appliance-store-scope";
+import {
+  resolveStoreOpsActor,
+  requireStoreOpsActor,
+  StoreOpsAuthError,
+} from "@/lib/store-ops/auth-server";
 import { getSupabaseAdmin } from "@/lib/store-ops/supabase-admin";
 import { supabaseAdminMissingMessage } from "@/lib/supabase/env";
 import {
@@ -12,18 +18,10 @@ import {
   resolveApplianceCategoryPair,
 } from "@/lib/types";
 
-function storeFromRequest(request: Request): string {
-  const url = new URL(request.url);
-  return (
-    request.headers.get("x-store-number")?.trim() ||
-    url.searchParams.get("store_number")?.trim() ||
-    "0000"
-  );
-}
-
-/** GET /api/appliances/scans?store_number=&format=csv */
+/** GET /api/appliances/scans — authenticated; store scoped to actor. Optional ?format=csv. */
 export async function GET(request: Request) {
   try {
+    const actor = requireStoreOpsActor(await resolveStoreOpsActor(request));
     const supabase = getSupabaseAdmin();
     if (!supabase) {
       console.error("[POST/GET appliances/scans] Supabase admin not configured");
@@ -33,8 +31,12 @@ export async function GET(request: Request) {
       );
     }
 
-    const store = storeFromRequest(request);
     const url = new URL(request.url);
+    const store = actorBoundStoreNumber(
+      actor,
+      url.searchParams.get("store_number") ??
+        request.headers.get("x-store-number")
+    );
     const format = url.searchParams.get("format");
     const storeKeys = storeNumberQueryValues(store);
 
@@ -83,6 +85,9 @@ export async function GET(request: Request) {
 
     return NextResponse.json({ store_number: store, scans });
   } catch (err) {
+    if (err instanceof StoreOpsAuthError) {
+      return NextResponse.json({ error: err.message }, { status: err.status });
+    }
     console.error("[GET /api/appliances/scans] unexpected", err);
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Unknown error" },
@@ -94,6 +99,7 @@ export async function GET(request: Request) {
 /** POST /api/appliances/scans — log a floor scan (requires sub_category) */
 export async function POST(request: Request) {
   try {
+    const actor = requireStoreOpsActor(await resolveStoreOpsActor(request));
     const supabase = getSupabaseAdmin();
     if (!supabase) {
       console.error("[POST /api/appliances/scans] Supabase admin not configured");
@@ -104,9 +110,10 @@ export async function POST(request: Request) {
     }
 
     const body = (await request.json()) as Record<string, unknown>;
-    const store = String(
-      body.store_number ?? storeFromRequest(request)
-    ).trim();
+    const store = actorBoundStoreNumber(
+      actor,
+      body.store_number != null ? String(body.store_number) : null
+    );
     const item_number = String(body.item_number ?? "").trim();
     const serial_number = String(body.serial_number ?? "").trim();
     const location = String(body.location ?? "").trim();
@@ -138,7 +145,6 @@ export async function POST(request: Request) {
       );
     }
 
-    // Match public.appliance_scans columns exactly — omit id so DB generates uuid.
     const payload: Record<string, string | number> = {
       store_number: store,
       item_number,
@@ -207,6 +213,9 @@ export async function POST(request: Request) {
       scan: mapApplianceScanRow(data as Record<string, unknown>),
     });
   } catch (err) {
+    if (err instanceof StoreOpsAuthError) {
+      return NextResponse.json({ error: err.message }, { status: err.status });
+    }
     const message = err instanceof Error ? err.message : "Unknown error";
     console.error("[POST /api/appliances/scans] error", message, err);
     return NextResponse.json({ error: message }, { status: 500 });
@@ -216,6 +225,7 @@ export async function POST(request: Request) {
 /** PATCH /api/appliances/scans — update scan row or lock showroom baseline */
 export async function PATCH(request: Request) {
   try {
+    const actor = requireStoreOpsActor(await resolveStoreOpsActor(request));
     const supabase = getSupabaseAdmin();
     if (!supabase) {
       return NextResponse.json(
@@ -225,9 +235,10 @@ export async function PATCH(request: Request) {
     }
 
     const body = (await request.json()) as Record<string, unknown>;
-    const store = String(
-      body.store_number ?? storeFromRequest(request)
-    ).trim();
+    const store = actorBoundStoreNumber(
+      actor,
+      body.store_number != null ? String(body.store_number) : null
+    );
     const storeKeys = storeNumberQueryValues(store);
 
     if (body.action === "lock_showroom_baseline") {
@@ -311,6 +322,9 @@ export async function PATCH(request: Request) {
       scan: mapApplianceScanRow(data as Record<string, unknown>),
     });
   } catch (err) {
+    if (err instanceof StoreOpsAuthError) {
+      return NextResponse.json({ error: err.message }, { status: err.status });
+    }
     const message = err instanceof Error ? err.message : "Unknown error";
     console.error("[PATCH /api/appliances/scans] error", message);
     return NextResponse.json({ error: message }, { status: 500 });
@@ -320,6 +334,7 @@ export async function PATCH(request: Request) {
 /** DELETE /api/appliances/scans?id=&store_number= OR ?scope=store */
 export async function DELETE(request: Request) {
   try {
+    const actor = requireStoreOpsActor(await resolveStoreOpsActor(request));
     const supabase = getSupabaseAdmin();
     if (!supabase) {
       return NextResponse.json(
@@ -331,7 +346,11 @@ export async function DELETE(request: Request) {
     const url = new URL(request.url);
     const id = url.searchParams.get("id")?.trim();
     const scope = url.searchParams.get("scope")?.trim();
-    const store = storeFromRequest(request);
+    const store = actorBoundStoreNumber(
+      actor,
+      url.searchParams.get("store_number") ??
+        request.headers.get("x-store-number")
+    );
     const storeKeys = storeNumberQueryValues(store);
 
     const preserveBaseline =
@@ -390,6 +409,9 @@ export async function DELETE(request: Request) {
 
     return NextResponse.json({ ok: true, deleted: 1 });
   } catch (err) {
+    if (err instanceof StoreOpsAuthError) {
+      return NextResponse.json({ error: err.message }, { status: err.status });
+    }
     const message = err instanceof Error ? err.message : "Unknown error";
     console.error("[DELETE /api/appliances/scans] error", message);
     return NextResponse.json({ error: message }, { status: 500 });

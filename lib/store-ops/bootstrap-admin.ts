@@ -7,11 +7,16 @@ import "server-only";
 
 import { randomBytes } from "crypto";
 import { createClient } from "@supabase/supabase-js";
-import { DEFAULT_SUPERVISOR_PIN, mapRow } from "@/lib/specialists";
+import { mapRow } from "@/lib/specialists";
 import { normalizeStoreNumber } from "@/lib/store";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getSupabaseAnonKey, getSupabaseUrl } from "@/lib/supabase/env";
 import { linkAuthUserToSpecialistProfile } from "./link-auth-profile";
+import {
+  getHubMasterPin,
+  isHubMasterPin,
+  requireHubMasterPin,
+} from "./hub-master-pin";
 import { resolveStoreByNumber } from "./stores";
 import type { StoreSpecialist } from "@/lib/types";
 
@@ -19,14 +24,7 @@ export const HUB_MASTER_USERNAME = "master_admin";
 export const HUB_MASTER_NAME = "Master Admin";
 export const HUB_MASTER_AUTH_EMAIL = "hub.master-admin@deptsync.hub";
 
-export function getHubMasterPin(): string {
-  const fromEnv = process.env.HUB_MASTER_PIN?.trim();
-  return fromEnv && fromEnv.length > 0 ? fromEnv : DEFAULT_SUPERVISOR_PIN;
-}
-
-export function isHubMasterPin(pin: string): boolean {
-  return String(pin ?? "").trim() === getHubMasterPin();
-}
+export { getHubMasterPin, isHubMasterPin, requireHubMasterPin };
 
 function hubBridgeEmail(specialistId: string): string {
   const safe = String(specialistId)
@@ -76,7 +74,8 @@ async function resolveBootstrapStoreNumber(
   return "0001";
 }
 
-async function findExistingMasterSpecialist(): Promise<StoreSpecialist | null> {
+/** Public login may authenticate an existing Master Admin — never create one. */
+export async function findExistingMasterSpecialist(): Promise<StoreSpecialist | null> {
   const admin = createAdminClient();
 
   const { data: byUsername } = await admin
@@ -111,7 +110,7 @@ async function ensureAuthUserLinked(
 ): Promise<{ userId: string; email: string; created: boolean }> {
   const admin = createAdminClient();
   const email = hubBridgeEmail(specialist.id);
-  const pin = getHubMasterPin();
+  const pin = requireHubMasterPin();
 
   const { data: linkedProfile } = await admin
     .from("profiles")
@@ -258,7 +257,7 @@ export async function ensureMasterAdminBootstrap(input?: {
   mint_session?: boolean;
 }): Promise<BootstrapAdminResult> {
   const admin = createAdminClient();
-  const pin = getHubMasterPin();
+  const pin = requireHubMasterPin();
   const storeNumber = await resolveBootstrapStoreNumber(input?.store_number);
   await resolveStoreByNumber(admin, storeNumber);
 

@@ -7,6 +7,7 @@
  */
 
 import { createDebouncedPersist } from "./debounced-persist";
+import { storeOpsAuthHeadersAsync } from "./store-ops/auth";
 import { getStoreNumber, sameStoreNumber, storeNumberQueryValues } from "./store";
 import { getSupabase } from "./supabase";
 import { enqueueSyncAction, isBrowserOnline } from "./sync-queue";
@@ -225,11 +226,12 @@ export function buildApplianceScanPayload(
 }
 
 async function fetchScansViaApi(store: string): Promise<ApplianceScan[]> {
+  const authHeaders = await storeOpsAuthHeadersAsync();
   const res = await fetch(
     `/api/appliances/scans?store_number=${encodeURIComponent(store)}`,
     {
       method: "GET",
-      headers: { "x-store-number": store },
+      headers: { ...authHeaders, "x-store-number": store },
       cache: "no-store",
     }
   );
@@ -336,10 +338,11 @@ export async function saveApplianceScan(
   }
 
   try {
+    const authHeaders = await storeOpsAuthHeadersAsync();
     const res = await fetch("/api/appliances/scans", {
       method: "POST",
       headers: {
-        "Content-Type": "application/json",
+        ...authHeaders,
         "x-store-number": store,
       },
       body: JSON.stringify(payload),
@@ -382,11 +385,12 @@ export async function deleteApplianceScan(id: string): Promise<void> {
     return;
   }
 
+  const authHeaders = await storeOpsAuthHeadersAsync();
   const res = await fetch(
     `/api/appliances/scans?id=${encodeURIComponent(id)}&store_number=${encodeURIComponent(store)}`,
     {
       method: "DELETE",
-      headers: { "x-store-number": store },
+      headers: { ...authHeaders, "x-store-number": store },
     }
   );
   if (!res.ok) {
@@ -436,9 +440,10 @@ export async function clearAllApplianceScans(
   });
   if (preserve) qs.set("preserve_baseline", "true");
 
+  const authHeaders = await storeOpsAuthHeadersAsync();
   const res = await fetch(`/api/appliances/scans?${qs.toString()}`, {
     method: "DELETE",
-    headers: { "x-store-number": store },
+    headers: { ...authHeaders, "x-store-number": store },
   });
   const json = (await res.json().catch(() => ({}))) as {
     deleted?: number;
@@ -483,10 +488,11 @@ export async function lockApplianceShowroomBaseline(
     return { locked: showroomIds.size };
   }
 
+  const authHeaders = await storeOpsAuthHeadersAsync();
   const res = await fetch("/api/appliances/scans", {
     method: "PATCH",
     headers: {
-      "Content-Type": "application/json",
+      ...authHeaders,
       "x-store-number": store,
     },
     body: JSON.stringify({
@@ -795,10 +801,11 @@ export async function updateApplianceScan(
     return { ...next, offline: true };
   }
 
+  const authHeaders = await storeOpsAuthHeadersAsync();
   const res = await fetch("/api/appliances/scans", {
     method: "PATCH",
     headers: {
-      "Content-Type": "application/json",
+      ...authHeaders,
       "x-store-number": store,
     },
     body: JSON.stringify({

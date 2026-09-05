@@ -9,12 +9,19 @@ import { randomBytes } from "crypto";
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
 const service = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
 const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim();
-const masterPin = (process.env.HUB_MASTER_PIN || "1234").trim();
+const masterPin = process.env.HUB_MASTER_PIN?.trim() || "";
 const username = "master_admin";
 const name = "Master Admin";
 
 if (!url || !service || !anon) {
   console.error("Missing NEXT_PUBLIC_SUPABASE_URL / ANON / SERVICE_ROLE in env");
+  process.exit(1);
+}
+
+if (!masterPin) {
+  console.error(
+    "HUB_MASTER_PIN is required — set a unique Master PIN in .env.local (no default)"
+  );
   process.exit(1);
 }
 

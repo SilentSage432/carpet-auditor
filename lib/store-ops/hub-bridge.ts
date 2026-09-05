@@ -14,7 +14,7 @@ import { normalizeStoreNumber } from "@/lib/store";
 import { getSupabaseAnonKey, getSupabaseUrl } from "@/lib/supabase/env";
 import { createAdminClient } from "@/lib/supabase/admin";
 import {
-  ensureMasterAdminBootstrap,
+  findExistingMasterSpecialist,
   HUB_MASTER_USERNAME,
   isHubMasterPin,
 } from "./bootstrap-admin";
@@ -273,7 +273,8 @@ async function mintSessionForSpecialist(
 
 /**
  * Verify Hub PIN against store_specialists and mint a Supabase Auth session
- * (service-role path). Master PIN auto-provisions Super Admin when missing.
+ * (service-role path). Master PIN authenticates an existing Master Admin only —
+ * it never creates/bootstraps one (use POST /api/auth/bootstrap-admin).
  */
 export async function mintHubBridgeSession(input: {
   username?: string;
@@ -311,12 +312,9 @@ export async function mintHubBridgeSession(input: {
     specialist?.pin_hash?.trim() || specialist?.pin_code?.trim() || "";
 
   if (specialist && !storedPin) {
+    // No app PIN yet — Master PIN may unlock an already-provisioned Master Admin.
     if (isHubMasterPin(pin)) {
-      const boot = await ensureMasterAdminBootstrap({
-        store_number: input.store_number ?? specialist.store_number ?? null,
-        mint_session: false,
-      });
-      return mintSessionForSpecialist(boot.specialist);
+      return mintExistingMasterWithHubPin();
     }
     throw new Error("This profile has no app access yet");
   }
@@ -331,14 +329,21 @@ export async function mintHubBridgeSession(input: {
     return mintSessionForSpecialist(specialist);
   }
 
-  // Master PIN resilience: never lock out Super Admin — bootstrap + mint.
+  // Configured Master PIN unlocks the existing Master Admin only (no bootstrap).
   if (isHubMasterPin(pin)) {
-    const boot = await ensureMasterAdminBootstrap({
-      store_number: input.store_number ?? specialist?.store_number ?? null,
-      mint_session: false,
-    });
-    return mintSessionForSpecialist(boot.specialist);
+    return mintExistingMasterWithHubPin();
   }
 
   throw new Error("Invalid username or PIN");
+}
+
+async function mintExistingMasterWithHubPin(): Promise<HubBridgeResult> {
+  const master = await findExistingMasterSpecialist();
+  if (!master || master.is_active === false) {
+    throw new Error("Invalid username or PIN");
+  }
+  if (master.status === "invited" || master.status === "suspended") {
+    throw new Error("Invalid username or PIN");
+  }
+  return mintSessionForSpecialist(master);
 }

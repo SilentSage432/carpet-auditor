@@ -17,13 +17,15 @@ Remnant sq yd = (Width × Length) / 9
 
 ```bash
 cp .env.example .env.local
-# set NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY
+# Required: NEXT_PUBLIC_SUPABASE_URL, NEXT_PUBLIC_SUPABASE_ANON_KEY,
+# SUPABASE_SERVICE_ROLE_KEY, HUB_MASTER_PIN (unique; no default), CRON_SECRET
+# Recommended: HUB_GATE_SECRET. Optional: Gemini, VAPID, Twilio — see .env.example
 
 npm install
 npm run dev
 ```
 
-Apply `supabase/schema.sql` (creates `carpet_audits`, `carpet_catalog`, `carpet_remnants`).
+Apply Supabase migrations under `supabase/migrations/` (and baseline `supabase/schema.sql` as needed). Master Admin recovery: secret-authenticated `POST /api/auth/bootstrap-admin` or `node --env-file=.env.local scripts/bootstrap-admin.mjs` (requires `HUB_MASTER_PIN`).
 
 ## Scripts
 

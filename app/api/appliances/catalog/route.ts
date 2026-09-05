@@ -1,5 +1,11 @@
 import { NextResponse } from "next/server";
 import { mapApplianceCatalogRow } from "@/lib/appliance-catalog";
+import { actorBoundStoreNumber } from "@/lib/store-ops/appliance-store-scope";
+import {
+  resolveStoreOpsActor,
+  requireStoreOpsActor,
+  StoreOpsAuthError,
+} from "@/lib/store-ops/auth-server";
 import { getSupabaseAdmin } from "@/lib/store-ops/supabase-admin";
 import { supabaseAdminMissingMessage } from "@/lib/supabase/env";
 import {
@@ -8,18 +14,10 @@ import {
   resolveApplianceCategoryPair,
 } from "@/lib/types";
 
-function storeFromRequest(request: Request): string {
-  const url = new URL(request.url);
-  return (
-    request.headers.get("x-store-number")?.trim() ||
-    url.searchParams.get("store_number")?.trim() ||
-    "0000"
-  );
-}
-
-/** GET /api/appliances/catalog?store_number= */
+/** GET /api/appliances/catalog — authenticated; store scoped to actor. */
 export async function GET(request: Request) {
   try {
+    const actor = requireStoreOpsActor(await resolveStoreOpsActor(request));
     const supabase = getSupabaseAdmin();
     if (!supabase) {
       return NextResponse.json(
@@ -28,7 +26,12 @@ export async function GET(request: Request) {
       );
     }
 
-    const store = storeFromRequest(request);
+    const url = new URL(request.url);
+    const store = actorBoundStoreNumber(
+      actor,
+      url.searchParams.get("store_number") ??
+        request.headers.get("x-store-number")
+    );
     const { data, error } = await supabase
       .from("appliance_catalog")
       .select("*")
@@ -46,6 +49,9 @@ export async function GET(request: Request) {
       ),
     });
   } catch (err) {
+    if (err instanceof StoreOpsAuthError) {
+      return NextResponse.json({ error: err.message }, { status: err.status });
+    }
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Unknown error" },
       { status: 500 }
@@ -56,6 +62,7 @@ export async function GET(request: Request) {
 /** POST /api/appliances/catalog — upsert UPC↔Item link with required sub_category */
 export async function POST(request: Request) {
   try {
+    const actor = requireStoreOpsActor(await resolveStoreOpsActor(request));
     const supabase = getSupabaseAdmin();
     if (!supabase) {
       return NextResponse.json(
@@ -65,9 +72,10 @@ export async function POST(request: Request) {
     }
 
     const body = (await request.json()) as Record<string, unknown>;
-    const store = String(
-      body.store_number ?? storeFromRequest(request)
-    ).trim();
+    const store = actorBoundStoreNumber(
+      actor,
+      body.store_number != null ? String(body.store_number) : null
+    );
     const item_number = String(body.item_number ?? "").trim();
     const description = String(body.description ?? "").trim();
     const upcRaw = body.upc;
@@ -123,6 +131,9 @@ export async function POST(request: Request) {
       item: mapApplianceCatalogRow((data ?? payload) as Record<string, unknown>),
     });
   } catch (err) {
+    if (err instanceof StoreOpsAuthError) {
+      return NextResponse.json({ error: err.message }, { status: err.status });
+    }
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Unknown error" },
       { status: 500 }
@@ -133,6 +144,7 @@ export async function POST(request: Request) {
 /** DELETE /api/appliances/catalog?id=&store_number= */
 export async function DELETE(request: Request) {
   try {
+    const actor = requireStoreOpsActor(await resolveStoreOpsActor(request));
     const supabase = getSupabaseAdmin();
     if (!supabase) {
       return NextResponse.json(
@@ -143,7 +155,10 @@ export async function DELETE(request: Request) {
 
     const url = new URL(request.url);
     const id = url.searchParams.get("id")?.trim();
-    const store = storeFromRequest(request);
+    const store = actorBoundStoreNumber(
+      actor,
+      url.searchParams.get("store_number")
+    );
     if (!id) {
       return NextResponse.json({ error: "id is required" }, { status: 400 });
     }
@@ -160,6 +175,9 @@ export async function DELETE(request: Request) {
 
     return NextResponse.json({ ok: true });
   } catch (err) {
+    if (err instanceof StoreOpsAuthError) {
+      return NextResponse.json({ error: err.message }, { status: err.status });
+    }
     return NextResponse.json(
       { error: err instanceof Error ? err.message : "Unknown error" },
       { status: 500 }

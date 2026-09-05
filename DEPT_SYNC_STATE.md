@@ -85,13 +85,17 @@
 | `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Browser client |
 | `SUPABASE_SERVICE_ROLE_KEY` | API routes / admin writes |
-| `GEMINI_API_KEY` | Snap Bay, Copilot, taxonomy AI |
+| `HUB_MASTER_PIN` | **Required** for Master PIN login / bootstrap — no default; unset = Master PIN unavailable |
+| `HUB_GATE_SECRET` | Recommended HMAC for hub gate + QR pair (else `CRON_SECRET` / service role chain) |
+| `BOOTSTRAP_SECRET` | Optional; `POST /api/auth/bootstrap-admin` (else `CRON_SECRET`) |
+| `HUB_BOOTSTRAP_STORE_NUMBER` | Optional store for Master Admin bootstrap |
+| `GEMINI_API_KEY` / `GEMINI_MODEL` | Snap Bay, Copilot, taxonomy AI (optional) |
 | VAPID keys | Web Push (`lib/push/*`) |
 | Twilio env / `SMS_INVITE_WEBHOOK_URL` | Roster invite SMS |
-| `CRON_SECRET` | Weekly rotation cron auth |
+| `CRON_SECRET` | Weekly rotation cron auth (+ signing/bootstrap fallback) |
 | Hub gate HMAC | `lib/auth-gate.ts` — `deptsync_hub_gate` cookie |
 
-Placeholder detection: `lib/supabase/env.ts` rejects obvious placeholder URLs/keys.
+Canonical env comments live in `.env.example`. Placeholder detection: `lib/supabase/env.ts` rejects obvious placeholder URLs/keys.
 
 ### npm scripts
 
