@@ -189,8 +189,18 @@ Browser request
 
 ## 3. Database Schema & Parity Register
 
-**Schema source:** `supabase/schema.sql` + `supabase/migrations/*.sql` (48 files).  
+**Schema source:** `supabase/schema.sql` + `supabase/migrations/*.sql`.  
 **TypeScript types:** hand-written in `lib/types.ts`, `lib/store-ops/types.ts` — **no `database.types.ts`**.
+
+### Live specialty drift (2026-09-05 audit — pending migration apply)
+
+| Table | Live (pre-parity) | Hub contract | Status |
+|-------|-------------------|--------------|--------|
+| `carpet_catalog` | **Hub canonical live** (M2 applied 2026-09-05); **0 rows**; store RLS | `sku` / `store_number` / SIMS; unique `(store_number, sku)` | **APPLIED** |
+| `carpet_remnants` | **Hub canonical live** (M2 applied 2026-09-05); **0 rows**; store RLS | Hub remnant + markdown + `updated_at` | **APPLIED** |
+| `store_specialists` | Hub-aligned; **`home_department` now live** (M1 applied 2026-09-05; all NULL, no backfill) | Nullable `home_department`; `assigned_department` canonical | M1 **APPLIED** (specialty M2 also live) |
+
+Until applied, production Hub falls back to localStorage for catalog/remnants; roster uses specialty select fallback. No app deploy required for the parity fix.
 
 ### Remote table register (19 tables)
 
@@ -199,7 +209,7 @@ Browser request
 | 1 | `carpet_audits` | `id` (uuid) | Flooring/SIMS cycle audit log |
 | 2 | `carpet_catalog` | `id` (uuid); unique `(store_number, sku)` | Master SKU catalog |
 | 3 | `carpet_remnants` | `id` (uuid) | Remnant rack inventory |
-| 4 | `store_specialists` | `id` (uuid); unique `(store_number, name)` | Roster, PIN, auth link, dept access |
+| 4 | `store_specialists` | `id` (uuid); unique `(store_number, name)` | Roster, PIN, auth link, dept access (`home_department` optional) |
 | 5 | `appliance_catalog` | `id`; unique `(store_number, item_number)` | Appliance master catalog |
 | 6 | `appliance_scans` | `id` (uuid) | Appliance floor/showroom scans |
 | 7 | `stores` | `id` (uuid) | Multi-store registry + Sunday cron settings |

@@ -1,5 +1,43 @@
 # DeptSync Hub — Development Journal
 
+## 2026-09-05 — Specialty M2 production gate (applied)
+
+### Production
+- Fresh pre-M2 dump `tmp/production-backups/deptsync-fmeinlwhixngednabhgy-2026-09-05T15-09-55-089Z.dump` (prior dumps retained).
+- Preconditions: both specialty tables legacy + 0 rows; no deps.
+- Applied `20260905_specialty_catalog_remnants_parity.sql` — Hub recreate + `jwt_matches_store` RLS.
+- PostgREST: catalog/remnants former failing queries → **200** empty arrays; specialists still 200 (M1).
+- Invented specialty rows: **0**. Anon table access denied (fail-closed).
+
+## 2026-09-05 — Strengthen M2 specialty canonical detection
+
+### Shipped (SQL correction only)
+- Tightened already-Hub detection in `20260905_specialty_catalog_remnants_parity.sql`.
+- Catalog: required columns include `roll_width_ft` / `updated_at` (+ category/SIMS); proves **full** unique `(store_number, sku)` via constraint or non-partial unique index (`indpred IS NULL`); partial uniques rejected.
+- Remnants: required dimension + `updated_at` (+ status/created_at); proves PK/`id` unique (full).
+- Mixed Hub/legacy → explicit exception. Recreate/RLS/zero-row/non-CASCADE unchanged.
+- Local Postgres Cases 1–7 validated. **M2 still not applied to production.**
+
+## 2026-09-05 — Specialty parity production gate (M1 only)
+
+### Production
+- Fresh logical dump taken (PG 17.4 `-Fc`); prior rotation-history dump retained.
+- **M1 applied:** `store_specialists.home_department text NULL` — 8 rows unchanged; 0 backfilled.
+- PostgREST specialist select including `home_department` → 200.
+- **M2 NOT applied:** already-Hub detection insufficient for gate (catalog missing `roll_width_ft`/`updated_at`/unique proof; remnants missing dimension columns). Requires migration correction before apply.
+- Catalog/remnants still legacy-shaped, 0 rows, former 400s remain.
+
+## 2026-09-05 — Specialty schema parity migrations (authored, not applied)
+
+### Shipped (SQL + docs only)
+- `20260905_store_specialists_home_department.sql`: additive nullable `home_department`; no backfill; `assigned_department` remains canonical.
+- `20260905_specialty_catalog_remnants_parity.sql`: zero-row guards → `DROP TABLE` without `CASCADE` → recreate Hub `carpet_catalog` / `carpet_remnants` → store-scoped RLS via `jwt_matches_store`. Full unique `(store_number, sku)` for catalog upserts.
+- No application code changes; no production apply in this tranche.
+- Live audit (pre-author): specialty tables empty + legacy-shaped; roster missing `home_department` only. App still falls back locally until migrations are applied.
+
+### Validation
+- Local: `npm test` · `npm run typecheck` · `npm run build` · lint regression-only.
+
 ## 2026-09-04 — Preserve weekly rotation history (Force Draw supersession)
 
 ### Shipped

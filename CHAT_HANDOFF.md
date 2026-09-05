@@ -1,7 +1,9 @@
 # DeptSync Hub — Chat Handoff
 
-## Latest (2026-09-04)
-- **Weekly rotation history (Force Draw):** Incomplete Force Draw / Admin reset **supersedes** `weekly_rotations` (`superseded_at`) instead of hard-delete. Active plan = `superseded_at IS NULL`. Migration `20260905_weekly_rotations_superseded.sql`. Layer-1 metrics still `weekly-rotation-metrics-v1` on active rows only. Apply migration before relying on live history. Assignment-history wipe on restage remains open debt.
+## Latest (2026-09-05)
+- **Specialty M2 PRODUCTION VERIFIED:** `20260905_specialty_catalog_remnants_parity.sql` applied live. Hub `carpet_catalog` / `carpet_remnants` recreated (0 rows); PostgREST former 400s → **200 []**. M1 `home_department` already live. Pre-M2 dump `…T15-09-55-089Z.dump` retained with prior dumps. App deploy not required for schema fix. Safe to commit migration + docs when ready.
+- **M2 detection strengthened** then applied after gate. Mixed-state fail-closed; full unique `(store_number, sku)` + remnants PK proven.
+- **Weekly rotation history (Force Draw):** Incomplete Force Draw / Admin reset **supersedes** `weekly_rotations` (`superseded_at`) instead of hard-delete. Active plan = `superseded_at IS NULL`. Migration `20260905_weekly_rotations_superseded.sql` — **production applied** with app `eb4152d`. Layer-1 metrics still `weekly-rotation-metrics-v1` on active rows only. Assignment-history wipe on restage remains open debt.
 - **Layer-1 metrics (A-1):** Canonical owner `lib/store-ops/rotation-metrics.ts` (`weekly-rotation-metrics-v1`). Floor / readiness / store health / weekly rollup / Map week overlay distinguish **reported** vs **verified** (`VERIFIED_COMPLETE` only). No schema changes. Tests: `rotation-metrics.test.ts`. Screenshots/fixtures: `tmp/layer1-metrics-validation/` (do not commit).
 - **Constitution:** `DEPTSYNC_CONSTITUTION.md` established (docs-only). Governing laws for operating boundary, human/data/intelligence authority, rotation/verification, UI hierarchy, anti-drift. Baseline `d6d5806`. No app behavior changes.
 - **Information hierarchy:** Floor operate-only (Topology demoted to More); verification strip → existing rollup modal; empty week Stage plan; Map navigator before Snap Bay Photo. Screenshots: `tmp/hierarchy-implementation/` (do not commit).
