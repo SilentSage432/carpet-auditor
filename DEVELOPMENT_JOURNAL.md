@@ -1,5 +1,20 @@
 # DeptSync Hub — Development Journal
 
+## 2026-09-04 — Preserve weekly rotation history (Force Draw supersession)
+
+### Shipped
+- Migration `20260905_weekly_rotations_superseded.sql`: `superseded_at` / `supersede_source` / `superseded_by`; drop full unique; partial unique on active `(location_id, assigned_week) WHERE superseded_at IS NULL`.
+- Force Draw / Admin reset **supersede** incomplete (or all, for admin) active rows instead of hard-delete — original `id` + `created_at` survive.
+- Active plan contract: `superseded_at IS NULL`. Layer-1 `weekly-rotation-metrics-v1` filters active rows only (method id unchanged — output meaning matches intended operational plan).
+- PostgREST `ON CONFLICT(location_id,assigned_week)` cannot reliably target the partial index → Force Draw stays insert-after-clear; upsert mismatch falls through to active-row merge; unique-violation recovery supersedes conflicts instead of deleting.
+- Sunday assignment rows for superseded rotation ids are still cleared (assignment history remains known P1 debt).
+- Pre-migration Force Draw deletions remain **UNKNOWN** — no fabricated backfill.
+- Tests: `rotation-history.test.ts` Cases A–H (uniqueness Case C is DB-enforced by partial unique index).
+
+### Validation
+- Local: `npm test` · `npm run typecheck` · `npm run build` · lint regression-only.
+- Migration not applied to production in this tranche — schema validated as SQL + code paths only.
+
 ## 2026-09-04 — Canonical Layer-1 rotation metrics (A-1)
 
 ### Shipped

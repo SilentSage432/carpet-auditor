@@ -843,6 +843,7 @@ export type ResetStagedRotationResult = {
     week_label: string;
     include_completed: boolean;
     deleted_rotations: number;
+    superseded_rotations?: number;
     deleted_assignments: number;
     reset_locations: number;
     rotation_ids: string[];

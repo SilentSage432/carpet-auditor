@@ -100,17 +100,25 @@ async function fetchWeekRotations(
     departmentIds: string[] | null;
   }
 ): Promise<unknown[]> {
-  // Prefer store-scoped query; fall back if store_id column is missing.
-  const attempts: Array<{ withStoreId: boolean; select: string }> = [
-    { withStoreId: true, select: ROTATION_SELECT_WORKFLOW },
-    { withStoreId: true, select: ROTATION_SELECT_VERIFY },
-    { withStoreId: true, select: ROTATION_SELECT },
-    { withStoreId: true, select: ROTATION_SELECT_NO_LAST },
-    { withStoreId: false, select: ROTATION_SELECT_WORKFLOW },
-    { withStoreId: false, select: ROTATION_SELECT_VERIFY },
-    { withStoreId: false, select: ROTATION_SELECT },
-    { withStoreId: false, select: ROTATION_SELECT_NO_LAST },
+  // Prefer store-scoped + active-only (superseded_at IS NULL). Fall back if columns missing.
+  const selectAttempts = [
+    ROTATION_SELECT_WORKFLOW,
+    ROTATION_SELECT_VERIFY,
+    ROTATION_SELECT,
+    ROTATION_SELECT_NO_LAST,
   ];
+  const attempts: Array<{
+    withStoreId: boolean;
+    select: string;
+    activeOnly: boolean;
+  }> = [];
+  for (const activeOnly of [true, false]) {
+    for (const withStoreId of [true, false]) {
+      for (const select of selectAttempts) {
+        attempts.push({ withStoreId, select, activeOnly });
+      }
+    }
+  }
 
   let lastError: unknown = null;
   for (const attempt of attempts) {
@@ -138,7 +146,7 @@ function buildQuery(
     storeId: string | null;
     departmentIds: string[] | null;
   },
-  attempt: { withStoreId: boolean; select: string }
+  attempt: { withStoreId: boolean; select: string; activeOnly: boolean }
 ) {
   let query = supabase
     .from("weekly_rotations")
@@ -146,6 +154,9 @@ function buildQuery(
     .eq("assigned_week", opts.week)
     .order("created_at", { ascending: true });
 
+  if (attempt.activeOnly) {
+    query = query.is("superseded_at", null);
+  }
   if (attempt.withStoreId && opts.storeId) {
     query = query.eq("store_id", opts.storeId);
   }

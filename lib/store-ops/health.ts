@@ -194,18 +194,40 @@ export async function buildStoreHealthSnapshot(
 
   if (deptIds.length === 0) return empty;
 
-  let rotQuery = supabase
+  const rotQuery = supabase
     .from("weekly_rotations")
     .select(
-      "id, department_id, is_completed, completed_at, verification_status, assigned_week"
+      "id, department_id, is_completed, completed_at, verification_status, assigned_week, superseded_at"
     )
     .eq("store_id", opts.storeId)
     .eq("assigned_week", week)
-    .in("department_id", deptIds);
+    .in("department_id", deptIds)
+    .is("superseded_at", null);
 
   const { data: rotations, error: rotError } = await rotQuery;
   if (rotError) {
-    // Missing store_id / verification_status column — degrade gracefully
+    if (/superseded_at/i.test(rotError.message)) {
+      const withoutActive = await supabase
+        .from("weekly_rotations")
+        .select(
+          "id, department_id, is_completed, completed_at, verification_status, assigned_week"
+        )
+        .eq("store_id", opts.storeId)
+        .eq("assigned_week", week)
+        .in("department_id", deptIds);
+      if (!withoutActive.error) {
+        const snapshot = composeSnapshot(
+          week,
+          opts.storeId,
+          scope,
+          deptList,
+          withoutActive.data ?? [],
+          await loadExceptions(supabase, week, deptIds, deptList)
+        );
+        return enrichSnapshotBayHealth(supabase, snapshot, deptIds);
+      }
+    }
+    // Missing store_id / verification_status — degrade gracefully
     const fallback = await supabase
       .from("weekly_rotations")
       .select("id, department_id, is_completed, completed_at, assigned_week")
@@ -313,12 +335,28 @@ async function loadBayHealthRotations(
       .from("weekly_rotations")
       .select(attempt.select)
       .eq("assigned_week", opts.week)
-      .in("department_id", opts.departmentIds);
+      .in("department_id", opts.departmentIds)
+      .is("superseded_at", null);
     if (attempt.withStore && opts.storeId) {
       query = query.eq("store_id", opts.storeId);
     }
     const { data, error } = await query;
     if (!error) return ((data ?? []) as unknown) as Array<Record<string, unknown>>;
+    // Pre-migration: superseded_at missing — retry without active filter once per attempt shape
+    if (/superseded_at/i.test(error.message)) {
+      let legacy = supabase
+        .from("weekly_rotations")
+        .select(attempt.select)
+        .eq("assigned_week", opts.week)
+        .in("department_id", opts.departmentIds);
+      if (attempt.withStore && opts.storeId) {
+        legacy = legacy.eq("store_id", opts.storeId);
+      }
+      const retry = await legacy;
+      if (!retry.error) {
+        return ((retry.data ?? []) as unknown) as Array<Record<string, unknown>>;
+      }
+    }
   }
   return [];
 }

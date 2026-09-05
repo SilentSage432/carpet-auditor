@@ -12,6 +12,7 @@ import type {
   WeeklyRotationWithLocation,
 } from "./types";
 import { resolveWeeklyBayTarget } from "./week";
+import { filterActiveWeeklyRotations } from "./rotation-history";
 
 /** Stable method id for weekly rotation Layer-1 claims. */
 export const WEEKLY_ROTATION_METRICS_METHOD = "weekly-rotation-metrics-v1";
@@ -24,6 +25,8 @@ export type RotationMetricRow = {
   verification_status?: string | null;
   completed_at?: string | null;
   verified_at?: string | null;
+  /** NULL / absent = active operational plan row. */
+  superseded_at?: string | null;
 };
 
 export type WeeklyRotationMetrics = {
@@ -170,7 +173,8 @@ export function composeWeeklyRotationMetrics(input: {
   >;
   now?: Date;
 }): WeeklyRotationMetrics {
-  const rotations = input.rotations ?? [];
+  // Layer-1 = active operational plan only (exclude Force Draw history).
+  const rotations = filterActiveWeeklyRotations(input.rotations ?? []);
   const staged = rotations.length;
   let reportedComplete = 0;
   let pendingVerification = 0;

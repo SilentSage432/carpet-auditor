@@ -2,6 +2,9 @@
 
 ## Done
 - [x] Canonical Layer-1 rotation metrics (`weekly-rotation-metrics-v1`) — Art VI A-1: reported ≠ verified on Floor / health / rollup / Map week overlay
+- [x] Weekly rotation history preservation — Force Draw supersedes incomplete stages (`20260905_weekly_rotations_superseded.sql`); active = `superseded_at IS NULL`; Layer-1 counts active only
+- [ ] Completion-attempt history (send-back clears evidence) — next History Integrity debt
+- [ ] Sunday assignment history across Force Draw / rebalance — known P1
 - [x] Carpet Hub shell with sticky header + slide-over nav
 - [x] Number input sanitize + barcode Marry workflow
 - [x] Cycle Audit, Catalog, Remnant Rack, Settings

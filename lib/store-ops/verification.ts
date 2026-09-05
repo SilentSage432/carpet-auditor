@@ -68,6 +68,11 @@ export async function verifyWeeklyRotations(
 
     if (fetchError) throw new Error(fetchError.message);
     if (!rotation) continue;
+    const supersededAt = (rotation as { superseded_at?: string | null })
+      .superseded_at;
+    if (supersededAt != null && String(supersededAt).trim() !== "") {
+      continue;
+    }
 
     if (!rotation.is_completed) {
       const { error: rotError } = await supabase
@@ -370,7 +375,8 @@ async function fetchWeekRotationsForDepartment(
     .from("weekly_rotations")
     .select("id, department_id, cycle_number, is_completed, completed_at")
     .eq("department_id", departmentId)
-    .eq("assigned_week", weekLabel);
+    .eq("assigned_week", weekLabel)
+    .is("superseded_at", null);
 
   if (!primary.error) {
     return (primary.data ?? []) as WeekRotationRow[];
@@ -380,12 +386,26 @@ async function fetchWeekRotationsForDepartment(
     .from("weekly_rotations")
     .select("id, department_id, is_completed, completed_at")
     .eq("department_id", departmentId)
-    .eq("assigned_week", weekLabel);
+    .eq("assigned_week", weekLabel)
+    .is("superseded_at", null);
 
-  if (fallback.error) {
-    return [];
+  if (!fallback.error) {
+    return (fallback.data ?? []) as WeekRotationRow[];
   }
-  return (fallback.data ?? []) as WeekRotationRow[];
+
+  // Pre-migration: no superseded_at column
+  if (/superseded_at/i.test(primary.error.message + (fallback.error?.message ?? ""))) {
+    const legacy = await supabase
+      .from("weekly_rotations")
+      .select("id, department_id, is_completed, completed_at")
+      .eq("department_id", departmentId)
+      .eq("assigned_week", weekLabel);
+    if (!legacy.error) {
+      return (legacy.data ?? []) as WeekRotationRow[];
+    }
+  }
+
+  return [];
 }
 
 export function rotationLocationId(

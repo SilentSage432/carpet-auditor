@@ -15,7 +15,7 @@ import { supabaseAdminMissingMessage } from "@/lib/supabase/env";
 /**
  * POST /api/admin/rotations/reset
  * Body: { department_id: uuid, week_label?: string (e.g. 2026-W34), include_completed?: boolean }
- * Master Admin — deletes staged weekly_rotations + sunday_bay_assignments for the week.
+ * Master Admin — supersedes staged weekly_rotations + clears sunday_bay_assignments for the week.
  */
 export async function POST(request: Request) {
   try {
@@ -84,6 +84,8 @@ export async function POST(request: Request) {
       {
         store_number: store.store_number,
         includeCompleted,
+        supersede_source: "ADMIN_RESET",
+        superseded_by: actor.specialistId ?? null,
       }
     );
 

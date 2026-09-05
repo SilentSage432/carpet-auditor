@@ -27,6 +27,7 @@ import {
 } from "./errors";
 import { departmentCodesMatch } from "./department-codes";
 import { evaluateSundayAutoRun } from "./sunday-schedule";
+import type { RotationSupersedeSource } from "./rotation-history";
 
 function isStandardAisleLocation(loc: StoreLocation): boolean {
   return (loc.location_type ?? "STANDARD") !== "SHOWROOM_STACKOUT";
@@ -56,7 +57,13 @@ export type GenerateRotationsOptions = {
   store_number?: string | null;
 };
 
-/** Unique key on public.weekly_rotations — one bay per ISO week. */
+/**
+ * Legacy PostgREST upsert target (full UNIQUE on location_id + assigned_week).
+ * After `20260905_weekly_rotations_superseded.sql`, uniqueness is a **partial**
+ * index (`WHERE superseded_at IS NULL`). PostgREST `onConflict: location_id,assigned_week`
+ * often cannot target that partial index — writes fall through to
+ * `mergeWeeklyRotationsByLocationWeek` (active-row merge) or insert-after-supersede.
+ */
 export const WEEKLY_ROTATIONS_ON_CONFLICT = "location_id,assigned_week" as const;
 /** Present on some live schemas; stripped only when PostgREST reports the column missing. */
 const OPTIONAL_WEEKLY_ROTATION_COLUMNS = [
@@ -145,8 +152,9 @@ function schemaCacheStaleMessage(column: string): string {
 }
 
 /**
- * Merge by location_id + assigned_week when the live table has no UNIQUE
- * matching PostgREST ON CONFLICT (CREATE TABLE IF NOT EXISTS never added it).
+ * Merge against the **active** row for location_id + assigned_week.
+ * Used when PostgREST cannot target the partial unique index via ON CONFLICT.
+ * Never updates superseded historical rows — inserts a new active row instead.
  */
 async function mergeWeeklyRotationsByLocationWeek(
   supabase: SupabaseClient,
@@ -160,13 +168,27 @@ async function mergeWeeklyRotationsByLocationWeek(
       throw new Error("Weekly rotation upsert failed: location_id and assigned_week are required");
     }
 
-    const existing = await supabase
+    let existing = await supabase
       .from("weekly_rotations")
       .select("id")
       .eq("location_id", locationId)
       .eq("assigned_week", week)
+      .is("superseded_at", null)
       .order("created_at", { ascending: false })
       .limit(1);
+
+    if (
+      existing.error &&
+      isMissingColumnError(existing.error, "superseded_at")
+    ) {
+      existing = await supabase
+        .from("weekly_rotations")
+        .select("id")
+        .eq("location_id", locationId)
+        .eq("assigned_week", week)
+        .order("created_at", { ascending: false })
+        .limit(1);
+    }
 
     if (existing.error) {
       throw new Error(
@@ -202,26 +224,51 @@ async function mergeWeeklyRotationsByLocationWeek(
  * year when known. week_number / year are parsed from assigned_week (e.g.
  * 2026-W34 → 34 / 2026) so NOT NULL week_number is never sent as null.
  * Strips a column only when PostgREST reports it missing.
- * onConflict matches UNIQUE(location_id, assigned_week).
+ *
+ * Prefer insert-after-supersede for Force Draw. Legacy upsert ON CONFLICT may
+ * fail against the partial active unique index — merge path is authoritative.
  */
 type UpsertWeeklyRotationsOptions = {
-  /** After a staged-week clear, prefer insert to avoid stale ON CONFLICT targets. */
+  /** After a staged-week supersede, prefer insert (new active rows). */
   insertAfterClear?: boolean;
 };
 
-async function deleteWeeklyRotationConflicts(
+/** Retire active conflict rows without deleting stage history. */
+async function supersedeWeeklyRotationConflicts(
   supabase: SupabaseClient,
   row: Record<string, unknown>
 ): Promise<void> {
+  const now = new Date().toISOString();
+  const patch = {
+    superseded_at: now,
+    supersede_source: "CONFLICT_CLEAR" as RotationSupersedeSource,
+  };
+
   const locationId = String(row.location_id ?? "").trim();
   const week = String(row.assigned_week ?? "").trim();
   if (locationId && week) {
     const { error } = await supabase
       .from("weekly_rotations")
-      .delete()
+      .update(patch)
       .eq("location_id", locationId)
-      .eq("assigned_week", week);
-    if (error) throw new Error(readableError(error, "Weekly rotation clear failed"));
+      .eq("assigned_week", week)
+      .is("superseded_at", null);
+    if (error) {
+      if (isMissingColumnError(error, "superseded_at")) {
+        const { error: delError } = await supabase
+          .from("weekly_rotations")
+          .delete()
+          .eq("location_id", locationId)
+          .eq("assigned_week", week);
+        if (delError) {
+          throw new Error(
+            readableError(delError, "Weekly rotation clear failed")
+          );
+        }
+      } else {
+        throw new Error(readableError(error, "Weekly rotation clear failed"));
+      }
+    }
   }
 
   const storeNumber = asStoreNumber(row.store_number);
@@ -235,11 +282,24 @@ async function deleteWeeklyRotationConflicts(
   ) {
     const { error } = await supabase
       .from("weekly_rotations")
-      .delete()
+      .update(patch)
       .eq("store_number", storeNumber)
       .eq("department_id", departmentId)
-      .eq("week_number", Number(weekNumber));
-    if (error && !isMissingColumnError(error, "week_number")) {
+      .eq("week_number", Number(weekNumber))
+      .is("superseded_at", null);
+    if (error && isMissingColumnError(error, "superseded_at")) {
+      const { error: delError } = await supabase
+        .from("weekly_rotations")
+        .delete()
+        .eq("store_number", storeNumber)
+        .eq("department_id", departmentId)
+        .eq("week_number", Number(weekNumber));
+      if (delError && !isMissingColumnError(delError, "week_number")) {
+        throw new Error(
+          readableError(delError, "Weekly rotation clear failed")
+        );
+      }
+    } else if (error && !isMissingColumnError(error, "week_number")) {
       throw new Error(readableError(error, "Weekly rotation clear failed"));
     }
   }
@@ -297,7 +357,7 @@ async function upsertWeeklyRotations(
       (options.insertAfterClear || isStoreDeptWeekUniqueViolation(error))
     ) {
       for (const row of payload) {
-        await deleteWeeklyRotationConflicts(supabase, row);
+        await supersedeWeeklyRotationConflicts(supabase, row);
       }
       const retry = await supabase
         .from("weekly_rotations")
@@ -406,12 +466,33 @@ export async function reclaimStaleAssignments(
   departmentId: string,
   weekLabel: string
 ): Promise<number> {
-  const { data: openThisWeek, error: openError } = await supabase
-    .from("weekly_rotations")
-    .select("location_id")
-    .eq("department_id", departmentId)
-    .eq("assigned_week", weekLabel)
-    .eq("is_completed", false);
+  let openThisWeek: { location_id: string }[] | null = null;
+  let openError: { message: string } | null = null;
+
+  {
+    const openQuery = supabase
+      .from("weekly_rotations")
+      .select("location_id")
+      .eq("department_id", departmentId)
+      .eq("assigned_week", weekLabel)
+      .eq("is_completed", false)
+      .is("superseded_at", null);
+
+    const primary = await openQuery;
+    openThisWeek = primary.data;
+    openError = primary.error;
+
+    if (openError && isMissingColumnError(openError, "superseded_at")) {
+      const fallback = await supabase
+        .from("weekly_rotations")
+        .select("location_id")
+        .eq("department_id", departmentId)
+        .eq("assigned_week", weekLabel)
+        .eq("is_completed", false);
+      openThisWeek = fallback.data;
+      openError = fallback.error;
+    }
+  }
 
   if (openError) throw new Error(openError.message);
 
@@ -523,11 +604,29 @@ export async function countWeekRotations(
   departmentId: string,
   weekLabel: string
 ): Promise<number> {
-  const { count, error } = await supabase
-    .from("weekly_rotations")
-    .select("id", { count: "exact", head: true })
-    .eq("department_id", departmentId)
-    .eq("assigned_week", weekLabel);
+  let count: number | null = null;
+  let error: { message: string } | null = null;
+
+  {
+    const primary = await supabase
+      .from("weekly_rotations")
+      .select("id", { count: "exact", head: true })
+      .eq("department_id", departmentId)
+      .eq("assigned_week", weekLabel)
+      .is("superseded_at", null);
+    count = primary.count;
+    error = primary.error;
+
+    if (error && isMissingColumnError(error, "superseded_at")) {
+      const fallback = await supabase
+        .from("weekly_rotations")
+        .select("id", { count: "exact", head: true })
+        .eq("department_id", departmentId)
+        .eq("assigned_week", weekLabel);
+      count = fallback.count;
+      error = fallback.error;
+    }
+  }
 
   if (error) throw new Error(error.message);
   return count ?? 0;
@@ -537,18 +636,23 @@ export type ResetStagedWeekOptions = {
   store_number?: string | null;
   /** When false (Force Draw), completed bays stay. Admin reset clears all staged rows. */
   includeCompleted?: boolean;
+  supersede_source?: RotationSupersedeSource;
+  superseded_by?: string | null;
 };
 
 export type ResetStagedWeekResult = {
+  /** Rows retired from the active plan (superseded; historically named deleted). */
   deleted_rotations: number;
+  superseded_rotations: number;
   deleted_assignments: number;
   reset_locations: number;
   rotation_ids: string[];
 };
 
 /**
- * Remove staged weekly_rotations for a department + ISO week.
- * Clears sunday_bay_assignments and returns affected bays to PENDING.
+ * Retire staged weekly_rotations for a department + ISO week (non-destructive).
+ * Marks active rows superseded, clears sunday_bay_assignments, returns bays to PENDING.
+ * Preserves original rotation id + created_at for History Integrity V1.
  */
 export async function resetStagedWeekRotations(
   supabase: SupabaseClient,
@@ -556,9 +660,17 @@ export async function resetStagedWeekRotations(
   weekLabel: string,
   options: ResetStagedWeekOptions = {}
 ): Promise<ResetStagedWeekResult> {
+  const empty: ResetStagedWeekResult = {
+    deleted_rotations: 0,
+    superseded_rotations: 0,
+    deleted_assignments: 0,
+    reset_locations: 0,
+    rotation_ids: [],
+  };
+
   let query = supabase
     .from("weekly_rotations")
-    .select("id, location_id")
+    .select("id, location_id, is_completed, superseded_at")
     .eq("department_id", departmentId)
     .eq("assigned_week", weekLabel);
 
@@ -570,20 +682,40 @@ export async function resetStagedWeekRotations(
     query = query.eq("is_completed", false);
   }
 
-  const { data: rows, error } = await query;
+  let { data: rows, error } = await query;
+  if (error && isMissingColumnError(error, "superseded_at")) {
+    let legacy = supabase
+      .from("weekly_rotations")
+      .select("id, location_id, is_completed")
+      .eq("department_id", departmentId)
+      .eq("assigned_week", weekLabel);
+    if (storeNumber) legacy = legacy.eq("store_number", storeNumber);
+    if (options.includeCompleted !== true) {
+      legacy = legacy.eq("is_completed", false);
+    }
+    const fallback = await legacy;
+    rows = (fallback.data ?? []).map((row) => ({
+      ...row,
+      superseded_at: null,
+    }));
+    error = fallback.error;
+  }
   if (error) throw new Error(error.message);
-  if (!rows?.length) {
-    return {
-      deleted_rotations: 0,
-      deleted_assignments: 0,
-      reset_locations: 0,
-      rotation_ids: [],
-    };
+
+  const activeRows = (rows ?? []).filter((row) => {
+    const raw = (row as { superseded_at?: string | null }).superseded_at;
+    return raw == null || String(raw).trim() === "";
+  });
+
+  if (!activeRows.length) {
+    return empty;
   }
 
-  const rotationIds = rows.map((row) => String(row.id));
+  const rotationIds = activeRows.map((row) => String(row.id));
   const locationIds = [
-    ...new Set(rows.map((row) => String(row.location_id)).filter(Boolean)),
+    ...new Set(
+      activeRows.map((row) => String(row.location_id)).filter(Boolean)
+    ),
   ];
 
   let deletedAssignments = 0;
@@ -607,14 +739,46 @@ export async function resetStagedWeekRotations(
     throw new Error(assignError.message);
   }
 
-  const { error: deleteError } = await supabase
+  const now = new Date().toISOString();
+  const source: RotationSupersedeSource =
+    options.supersede_source ??
+    (options.includeCompleted === true ? "ADMIN_RESET" : "FORCE_DRAW");
+  const supersedePatch: Record<string, unknown> = {
+    superseded_at: now,
+    supersede_source: source,
+  };
+  if (options.superseded_by) {
+    supersedePatch.superseded_by = options.superseded_by;
+  }
+
+  const { error: supersedeError } = await supabase
     .from("weekly_rotations")
-    .delete()
+    .update(supersedePatch)
     .in("id", rotationIds);
-  if (deleteError) throw new Error(deleteError.message);
+
+  if (supersedeError) {
+    if (isMissingColumnError(supersedeError, "superseded_at")) {
+      const { error: deleteError } = await supabase
+        .from("weekly_rotations")
+        .delete()
+        .in("id", rotationIds);
+      if (deleteError) throw new Error(deleteError.message);
+    } else if (
+      isMissingColumnError(supersedeError, "supersede_source") ||
+      isMissingColumnError(supersedeError, "superseded_by")
+    ) {
+      const minimal = { superseded_at: now };
+      const retry = await supabase
+        .from("weekly_rotations")
+        .update(minimal)
+        .in("id", rotationIds);
+      if (retry.error) throw new Error(retry.error.message);
+    } else {
+      throw new Error(supersedeError.message);
+    }
+  }
 
   if (locationIds.length > 0) {
-    const now = new Date().toISOString();
     const { error: resetError } = await supabase
       .from("store_locations")
       .update({ status: "PENDING", updated_at: now })
@@ -623,7 +787,8 @@ export async function resetStagedWeekRotations(
   }
 
   return {
-    deleted_rotations: rows.length,
+    deleted_rotations: activeRows.length,
+    superseded_rotations: activeRows.length,
     deleted_assignments: deletedAssignments,
     reset_locations: locationIds.length,
     rotation_ids: rotationIds,
@@ -631,8 +796,8 @@ export async function resetStagedWeekRotations(
 }
 
 /**
- * Drop incomplete rows for this ISO week so Master Admin can restage.
- * Completed bays stay. Matching sunday_bay_assignments are cleared.
+ * Retire incomplete active rows for this ISO week so Master Admin can restage.
+ * Completed bays stay active. Matching sunday_bay_assignments are cleared.
  */
 export async function replaceIncompleteWeekRotations(
   supabase: SupabaseClient,
@@ -644,9 +809,13 @@ export async function replaceIncompleteWeekRotations(
     supabase,
     departmentId,
     weekLabel,
-    { store_number: storeNumber, includeCompleted: false }
+    {
+      store_number: storeNumber,
+      includeCompleted: false,
+      supersede_source: "FORCE_DRAW",
+    }
   );
-  return result.deleted_rotations;
+  return result.superseded_rotations;
 }
 
 export async function generateWeeklyRotations(
@@ -1188,6 +1357,11 @@ export async function completeWeeklyRotation(
 
   if (fetchError) throw new Error(fetchError.message);
   if (!rotation) throw new Error("Rotation not found");
+
+  const supersededAt = (rotation as WeeklyRotation).superseded_at;
+  if (supersededAt != null && String(supersededAt).trim() !== "") {
+    throw new Error("Rotation was superseded and is no longer on the active week plan");
+  }
 
   if (
     expectedDepartmentId &&

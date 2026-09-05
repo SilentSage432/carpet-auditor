@@ -49,17 +49,33 @@ export async function GET(request: Request) {
     const { data: rotations, error: rotError } = await supabase
       .from("weekly_rotations")
       .select(
-        "id, assigned_week, is_completed, completed_at, created_at, location_id"
+        "id, assigned_week, is_completed, completed_at, created_at, location_id, superseded_at, supersede_source, verification_status, verified_at"
       )
       .eq("location_id", locationId)
       .order("assigned_week", { ascending: false })
-      .limit(24);
+      .order("created_at", { ascending: false })
+      .limit(48);
 
     if (rotError) {
-      return NextResponse.json(
-        { error: readableError(rotError, "Could not load bay history") },
-        { status: 500 }
-      );
+      const legacy = await supabase
+        .from("weekly_rotations")
+        .select(
+          "id, assigned_week, is_completed, completed_at, created_at, location_id"
+        )
+        .eq("location_id", locationId)
+        .order("assigned_week", { ascending: false })
+        .limit(24);
+      if (legacy.error) {
+        return NextResponse.json(
+          { error: readableError(legacy.error, "Could not load bay history") },
+          { status: 500 }
+        );
+      }
+      return NextResponse.json({
+        store_id: store.id,
+        location,
+        rotations: legacy.data ?? [],
+      });
     }
 
     return NextResponse.json({

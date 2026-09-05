@@ -263,7 +263,8 @@ Browser request
 
 | Module | Owner / entry points | Evidence |
 |--------|---------------------|----------|
-| Layer-1 rotation metrics | `lib/store-ops/rotation-metrics.ts` (`weekly-rotation-metrics-v1`) | Floor / health / rollup / Map consume; Art VI A-1 |
+| Layer-1 rotation metrics | `lib/store-ops/rotation-metrics.ts` (`weekly-rotation-metrics-v1`) | Floor / health / rollup / Map consume; Art VI A-1; **active rows only** |
+| Weekly rotation history | `superseded_at` + `20260905_weekly_rotations_superseded.sql`; `rotation-history.ts` | Force Draw supersedes incomplete stages; pre-migration deletes UNKNOWN |
 | Auth & hub gate | `proxy.ts`, `lib/auth-gate.ts`, `AccessGate`, `AuthWall` | Cookie + JWT + RLS |
 | Roster / PIN / invite / QR pair | `lib/specialists.ts`, `app/pair/page.tsx`, `app/auth/verify/[token]`, `/api/roster/*` | End-to-end onboarding |
 | Floor bay rotations (Zebra) | `ZebraChecklist.tsx`, `completeRotation()`, `/api/rotations/complete` | Optimistic UI + offline queue |

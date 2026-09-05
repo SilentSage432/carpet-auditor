@@ -155,6 +155,15 @@ export async function verifyPendingRotation(
   if (error) throw new Error(error.message);
   if (!rotation) throw new Error("Rotation not found");
   if (
+    (rotation as { superseded_at?: string | null }).superseded_at != null &&
+    String((rotation as { superseded_at?: string | null }).superseded_at).trim() !==
+      ""
+  ) {
+    throw new Error(
+      "Rotation was superseded and is no longer on the active week plan"
+    );
+  }
+  if (
     expectedDepartmentId &&
     rotation.department_id !== expectedDepartmentId
   ) {
@@ -198,6 +207,15 @@ export async function sendBackWeeklyRotation(
   if (error) throw new Error(error.message);
   if (!rotation) throw new Error("Rotation not found");
   if (
+    (rotation as { superseded_at?: string | null }).superseded_at != null &&
+    String((rotation as { superseded_at?: string | null }).superseded_at).trim() !==
+      ""
+  ) {
+    throw new Error(
+      "Rotation was superseded and is no longer on the active week plan"
+    );
+  }
+  if (
     expectedDepartmentId &&
     rotation.department_id !== expectedDepartmentId
   ) {
@@ -236,13 +254,28 @@ export async function verifyAllPendingRotations(
     .select("id, department_id")
     .eq("assigned_week", input.assignedWeek)
     .eq("store_id", input.storeId)
-    .eq("verification_status", "PENDING_VERIFICATION");
+    .eq("verification_status", "PENDING_VERIFICATION")
+    .is("superseded_at", null);
 
   if (input.departmentId) {
     query = query.eq("department_id", input.departmentId);
   }
 
-  const { data, error } = await query;
+  let { data, error } = await query;
+  if (error && isMissingColumnError(error, "superseded_at")) {
+    let legacy = supabase
+      .from("weekly_rotations")
+      .select("id, department_id")
+      .eq("assigned_week", input.assignedWeek)
+      .eq("store_id", input.storeId)
+      .eq("verification_status", "PENDING_VERIFICATION");
+    if (input.departmentId) {
+      legacy = legacy.eq("department_id", input.departmentId);
+    }
+    const retry = await legacy;
+    data = retry.data;
+    error = retry.error;
+  }
   if (error) {
     if (isMissingColumnError(error, "verification_status")) {
       return { verified_count: 0, department_ids: [] };
@@ -286,13 +319,31 @@ export async function listPendingVerificationQueue(
     .eq("assigned_week", input.assignedWeek)
     .eq("store_id", input.storeId)
     .eq("verification_status", "PENDING_VERIFICATION")
+    .is("superseded_at", null)
     .order("completed_at", { ascending: true });
 
   if (input.departmentId) {
     query = query.eq("department_id", input.departmentId);
   }
 
-  const { data, error } = await query;
+  let { data, error } = await query;
+  if (error && isMissingColumnError(error, "superseded_at")) {
+    let legacy = supabase
+      .from("weekly_rotations")
+      .select(
+        "id, department_id, location_id, assigned_week, is_completed, completed_at, completed_by, review_note, verification_status, store_locations(id, aisle, bay, type)"
+      )
+      .eq("assigned_week", input.assignedWeek)
+      .eq("store_id", input.storeId)
+      .eq("verification_status", "PENDING_VERIFICATION")
+      .order("completed_at", { ascending: true });
+    if (input.departmentId) {
+      legacy = legacy.eq("department_id", input.departmentId);
+    }
+    const retry = await legacy;
+    data = retry.data;
+    error = retry.error;
+  }
   if (error) {
     if (isMissingColumnError(error, "verification_status")) {
       return [];

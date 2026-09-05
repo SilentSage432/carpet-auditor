@@ -141,6 +141,10 @@ export type WeeklyRotation = {
   verified_by?: string | null;
   verified_at?: string | null;
   review_note?: string | null;
+  /** NULL = active operational plan row; set when Force Draw / reset retires the stage. */
+  superseded_at?: string | null;
+  supersede_source?: string | null;
+  superseded_by?: string | null;
   created_at?: string;
 };
 
