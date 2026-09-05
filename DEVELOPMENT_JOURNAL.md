@@ -1,5 +1,14 @@
 # DeptSync Hub — Development Journal
 
+## 2026-09-04 — Mobile shell scroll ownership
+
+### Shipped
+- Authenticated workflow shell locks to `h-dvh` / `max-h-dvh` with `overflow-hidden` (`.hub-app-shell`). Keep-alive tab panels are `absolute inset-0` and own vertical scroll.
+- `.hub-main` bottom padding clears the fixed dock via `--hub-bottom-nav-min-height` + safe-area + breathing room (replaces hard-coded `pb-28`).
+- Specialty hub (`app/page.tsx`) uses the same viewport shell so scan tools clear the fixed dock.
+- `SessionGate` restore is try/catch wrapped so a corrupt local session cannot leave the splash hung.
+- Root cause: `min-h-dvh` + nested `overflow-y-auto` grew with content so mobile touch scrolling trapped on a non-scrolling overflow box while the fixed bottom nav covered unreachable content.
+
 ## 2026-09-04 — Two-DS floor pilot polish
 
 ### Shipped

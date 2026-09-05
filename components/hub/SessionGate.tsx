@@ -46,33 +46,43 @@ export function SessionGate({
   const [storeNumber, setStoreNumber] = useState("");
 
   useEffect(() => {
-    const session = readAuthSession();
+    try {
+      const session = readAuthSession();
 
-    if (session && isAuthSessionExpired(session)) {
-      clearAuthSession();
+      if (session && isAuthSessionExpired(session)) {
+        clearAuthSession();
+        setSpecialist(null);
+        setStoreNumber(resolveActiveStoreNumber());
+        setReady(true);
+        window.location.replace("/login");
+        return;
+      }
+      if (session) {
+        const touched = touchAuthSession() ?? session;
+        const store = adoptStoreNumberFromSpecialist(
+          touched.specialist.store_number
+        );
+        setSpecialist({
+          ...touched.specialist,
+          store_number: store || touched.specialist.store_number,
+        });
+        setStoreNumber(
+          store || resolveActiveStoreNumber(touched.specialist.store_number)
+        );
+        setReady(true);
+        return;
+      }
       setSpecialist(null);
       setStoreNumber(resolveActiveStoreNumber());
       setReady(true);
       window.location.replace("/login");
-      return;
-    }
-    if (session) {
-      const touched = touchAuthSession() ?? session;
-      const store = adoptStoreNumberFromSpecialist(
-        touched.specialist.store_number
-      );
-      setSpecialist({
-        ...touched.specialist,
-        store_number: store || touched.specialist.store_number,
-      });
-      setStoreNumber(store || resolveActiveStoreNumber(touched.specialist.store_number));
+    } catch (err) {
+      console.error("[SessionGate] session restore failed", err);
+      setSpecialist(null);
+      setStoreNumber(resolveActiveStoreNumber());
       setReady(true);
-      return;
+      window.location.replace("/login");
     }
-    setSpecialist(null);
-    setStoreNumber(resolveActiveStoreNumber());
-    setReady(true);
-    window.location.replace("/login");
   }, []);
 
   function logout() {

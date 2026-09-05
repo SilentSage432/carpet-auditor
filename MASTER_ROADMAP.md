@@ -102,6 +102,7 @@
 - [x] Store Map bay edit/delete — per-bay Edit (aisle/bay/type/status) + Delete; multi-select batch delete; Bulk Generator Clean-Up tab; hard DELETE by id or ids[]
 - [x] Downstock queue + Store Map heatmap + supervisor weekly rollup
 - [x] Layout / nav / iconography polish — thumb-zone bottom tabs, compact hub-main, unified Lucide HubIcon (stroke 2), 44px Quick Touch / filter chips
+- [x] Mobile shell scroll contract — fixed `h-dvh` hub shell; keep-alive tab panels own vertical scroll; workspace pad clears fixed bottom nav + safe area (2026-09-04)
 - [x] Theme engine — five dark tactical presets + high-contrast / compact density, CSS variables, Settings Appearance selector
 - [x] Phase 1 UX/UI consolidation — floating splash mark, department dropdown pill, Floor/Map/Stock/Settings workflow tabs, Store Map dual-pill + kebab rows
 - [x] Phase 2 UX/UI consolidation — Roll Measurement Pad, Admin Tools 2-col grid, department targets matrix

@@ -147,7 +147,7 @@ Event bus: `carpet-sync-queue-changed` — header/Settings must listen.
 
 ### State management
 
-- **Keep-alive shell:** `app/(workflow)/layout.tsx` → `WorkflowTabShell` mounts Floor / Map / Roster / More with opacity/visibility transitions (static mounts, no remount flash). Bottom nav uses a sliding active pill (`hub-nav-active-pill`).
+- **Keep-alive shell:** `app/(workflow)/layout.tsx` → `WorkflowTabShell` mounts Floor / Map / Roster / More in a fixed `h-dvh` `.hub-app-shell`. Each tab panel is `absolute inset-0 overflow-y-auto` (primary scroll owner) with opacity/visibility transitions. Bottom nav stays fixed; `.hub-main` uses `--hub-workspace-pad-bottom`. Bottom nav uses a sliding active pill (`hub-nav-active-pill`).
 - **Working department pin:** `lib/use-working-department.ts` + `lib/admin-department-context.ts` — `useSyncExternalStore`; pin change does **not** wipe IndexedDB.
 - **Custom events:** `deptsync:*` namespace (store-locations-changed, downstock, shift-tasks, sync-conflict, etc.).
 - **No external state libraries** — no Redux, Zustand, Jotai, Recoil in `lib/`.

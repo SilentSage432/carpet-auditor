@@ -102,7 +102,7 @@ export function NavigationHub({
 
   return (
     <>
-      <div className="sticky top-0 z-40 pt-safe">
+      <div className="sticky top-0 z-40 shrink-0 pt-safe">
         {canOpen && sandbox.previewRole ? (
           <DevSandboxBanner sandbox={sandbox} />
         ) : null}

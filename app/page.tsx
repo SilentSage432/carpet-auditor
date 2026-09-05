@@ -523,16 +523,18 @@ export default function DeptSyncHubPage() {
   }
 
   return (
-    <div className="flex min-h-dvh flex-col">
-      <NavigationHub
-        title={sectionTitle(activeSection, viewMember)}
-        specialist={viewMember}
-        sandboxActor={specialist}
-        onOpenSpecialist={() => setSpecialistOpen(true)}
-        onChangePin={specialist ? () => setChangePinOpen(true) : undefined}
-        onLogout={handleLogout}
-        storeNumber={storeNumber}
-      />
+    <div className="hub-app-shell flex h-dvh max-h-dvh flex-col overflow-hidden">
+      <div className="hub-app-header shrink-0">
+        <NavigationHub
+          title={sectionTitle(activeSection, viewMember)}
+          specialist={viewMember}
+          sandboxActor={specialist}
+          onOpenSpecialist={() => setSpecialistOpen(true)}
+          onChangePin={specialist ? () => setChangePinOpen(true) : undefined}
+          onLogout={handleLogout}
+          storeNumber={storeNumber}
+        />
+      </div>
       <SpecialistModal
         open={specialistOpen}
         active={specialist}
@@ -567,7 +569,7 @@ export default function DeptSyncHubPage() {
 
       {authenticated ? (
         <>
-          <div className="mx-auto w-full max-w-lg flex-1 overflow-x-hidden px-3 py-2 hub-scan-dock-pad">
+          <div className="hub-app-workspace mx-auto min-h-0 w-full max-w-lg flex-1 overflow-x-hidden overflow-y-auto overscroll-y-contain px-3 py-2 hub-scan-dock-pad">
             {!isSimplifiedAssociateView(viewMember) ? (
               <AssociateSpecialtySwitcher
                 active={activeSection}

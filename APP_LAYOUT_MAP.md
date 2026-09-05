@@ -37,10 +37,11 @@
 
 ```
 ┌─────────────────────────────────────┐
-│ HubHeader (sticky, z-40)            │  ← title / store # · dept pill · account/PIN
+│ HubHeader (shrink-0 · pt-safe)      │  ← title / store # · dept pill · account/PIN
 ├─────────────────────────────────────┤
 │                                     │
-│  max-w-lg · hub-main (pb-28)        │  ← keep-alive Floor / Map / Roster / Settings
+│  hub-app-workspace (scroll owner)   │  ← keep-alive Floor / Map / Roster / Settings
+│  .hub-main pad clears bottom dock   │     each tab panel: absolute inset-0 + overflow-y-auto
 │                                     │
 ├─────────────────────────────────────┤
 │ BottomNav (fixed, z-30)             │  ← Floor · Map · Roster · Settings
@@ -48,12 +49,13 @@
      + overlay stack (sheets/modals)
 ```
 
+- **Shell contract:** `.hub-app-shell` locks to `h-dvh` / `max-h-dvh` with `overflow-hidden`. Document body is not the scroll owner for authenticated workflow or specialty hub content.
 - **Default land after login:** `/dashboard` (Floor checklist). Unauthenticated `/` redirects to `/login`. Hub `/` without `?section=` redirects there when signed in. Specialty scans use `/?section=audit|appliances|department`.
 - **Primary nav:** exactly four bottom tabs. No header hamburger, More sheet, or Admin Tools drawer.
-- **`pb-28` / audit `pb-44`** reserves space for bottom nav (+ sticky Log bar on specialty scans).
+- **`--hub-workspace-pad-bottom`** (nav stack + breathing room) / specialty `hub-scan-dock-pad` reserve space for the fixed bottom dock (+ sticky Log bar on specialty scans).
 - Body scroll locks when the specialist modal or change-PIN modal is open.
 
-**Last reviewed:** 2026-08-15 (role-based views + 3-tap sandbox).
+**Last reviewed:** 2026-09-04 (mobile shell scroll ownership).
 
 ### A.2 Sticky header bar (`NavigationHub`)
 
@@ -83,7 +85,7 @@ Master Admin: compact department **dropdown pill** in the header. Close glyphs a
 | Roster | `/roster` | Hidden from CSA. DS sees assigned departments; Master sees full store |
 | Settings | `/settings` | Hidden from CSA. Master tools + DS targets |
 
-Store Ops pages use `.hub-main` (`px-3 pt-2 pb-28`) so bay lists, status pills, and pace timers clear the fold on handhelds. Quick Touch / filter chips use `.btn-quick-touch` / `.chip-filter` (44px min).
+Store Ops pages use `.hub-main` (`px-3 pt-2` + `--hub-workspace-pad-bottom`) so bay lists, status pills, and pace timers clear the fixed bottom dock on handhelds. Quick Touch / filter chips use `.btn-quick-touch` / `.chip-filter` (44px min).
 
 ### A.4 Page-level toasts & notices (non-modal)
 

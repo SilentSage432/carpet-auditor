@@ -474,14 +474,23 @@ body {
 /*
  * Unified mobile bottom dock: floating pill nav + scan action + undo toast.
  * Pill touch targets are min-h-12 (48px) + outer padding.
+ *
+ * Authenticated workflow shell (WorkflowTabShell):
+ *   .hub-app-shell     → fixed h-dvh viewport, overflow hidden
+ *   .hub-app-header    → shrink-0 chrome
+ *   .hub-app-workspace → flex-1 min-h-0; each keep-alive tab panel scrolls
+ *   .hub-main          → content pad clears fixed bottom nav + safe area
  */
 :root {
-  --hub-bottom-nav-min-height: 3.75rem;
+  /* Floating pill ≈ 48px targets + inner padding + outer chrome. */
+  --hub-bottom-nav-min-height: 4.25rem;
   --hub-scan-action-height: 4.75rem;
   --hub-dock-safe-bottom: max(0.75rem, env(safe-area-inset-bottom, 0px));
   --hub-bottom-nav-stack: calc(
     var(--hub-bottom-nav-min-height) + var(--hub-dock-safe-bottom)
   );
+  /* Clear the fixed dock with breathing room above the pill. */
+  --hub-workspace-pad-bottom: calc(var(--hub-bottom-nav-stack) + 2rem);
 }
 
 .hub-bottom-nav {
@@ -539,7 +548,17 @@ body {
 
 /* Compact page shell — keeps bays / badges above the fold on handhelds */
 .hub-main {
-  @apply mx-auto w-full max-w-lg flex-1 px-3 pt-2 pb-28;
+  @apply mx-auto w-full max-w-lg flex-1 px-3 pt-2;
+  /* Inline calc so Turbopack/HMR cannot leave a stale --hub-workspace-pad-bottom. */
+  padding-bottom: calc(
+    var(--hub-bottom-nav-min-height) + var(--hub-dock-safe-bottom) + 2.5rem
+  );
+}
+
+/* Viewport-locked hub chrome — single scroll contract for workflow tabs */
+.hub-app-shell {
+  /* Isolates scroll from document; tabs own vertical overflow. */
+  overscroll-behavior: none;
 }
 
 [data-density="compact"] .hub-main {

@@ -33,6 +33,11 @@ import {
 } from "@/lib/specialists";
 import type { StoreSpecialist } from "@/lib/types";
 
+/**
+ * Per-tab scroll owner: absolute inset fills the constrained workspace so
+ * overflow-y-auto always has a definite height (never grows past the shell).
+ * Inactive panels stay mounted for keep-alive but do not receive input.
+ */
 function KeepAlivePanel({
   active,
   children,
@@ -45,10 +50,8 @@ function KeepAlivePanel({
       data-active={active ? "true" : "false"}
       aria-hidden={!active}
       inert={!active}
-      className={`hub-tab-panel min-h-0 overflow-y-auto overscroll-y-contain ${
-        active
-          ? "relative z-10 flex-1"
-          : "pointer-events-none absolute inset-0 z-0"
+      className={`hub-tab-panel absolute inset-0 min-h-0 overflow-x-hidden overflow-y-auto overscroll-y-contain ${
+        active ? "z-10" : "pointer-events-none z-0"
       }`}
     >
       {children}
@@ -148,15 +151,17 @@ export function WorkflowTabShell(props: WorkflowTabProps) {
   }
 
   return (
-    <div className="flex min-h-dvh flex-col">
-      <NavigationHub
-        title={workflowTabTitle(active, view, working)}
-        specialist={view}
-        sandboxActor={member}
-        storeNumber={storeNumber}
-        onLogout={props.logout}
-        onChangePin={() => setChangePinOpen(true)}
-      />
+    <div className="hub-app-shell flex h-dvh max-h-dvh flex-col overflow-hidden">
+      <div className="hub-app-header shrink-0">
+        <NavigationHub
+          title={workflowTabTitle(active, view, working)}
+          specialist={view}
+          sandboxActor={member}
+          storeNumber={storeNumber}
+          onLogout={props.logout}
+          onChangePin={() => setChangePinOpen(true)}
+        />
+      </div>
       <ChangePinModal
         key={changePinOpen ? `pin-${member.id}` : "pin-closed"}
         open={changePinOpen}
@@ -164,7 +169,7 @@ export function WorkflowTabShell(props: WorkflowTabProps) {
         onClose={() => setChangePinOpen(false)}
         onUpdated={handleUpdated}
       />
-      <div className="relative flex min-h-0 flex-1 flex-col">
+      <div className="hub-app-workspace relative min-h-0 flex-1">
         <KeepAlivePanel active={active === "/dashboard"}>
           <FloorTab {...tabProps} />
         </KeepAlivePanel>
