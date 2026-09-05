@@ -65,6 +65,12 @@ import {
   type OnDutyWorkloadMember,
 } from "@/lib/store-ops/weekly-rotations";
 import { getStoreNumber } from "@/lib/store";
+import { composeFloorReadinessLine } from "@/lib/store-ops/floor-readiness";
+import {
+  composeBayFreshness,
+  readBayTouches,
+} from "@/lib/heatmap/bay-tracker";
+import { resolveWeeklyBayTarget } from "@/lib/store-ops/week";
 import {
   departmentMeta,
   specialistHomeDepartment,
@@ -421,6 +427,27 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
       .filter((loc): loc is NonNullable<typeof loc> => Boolean(loc));
   }, [mappedLocations, displayRotations]);
 
+  const readinessLine = useMemo(() => {
+    const summary = composeBayFreshness({
+      locations: freshnessLocations,
+      overlay: readBayTouches(storeNumber || getStoreNumber()),
+    });
+    return composeFloorReadinessLine({
+      totalBays: summary.cells.length,
+      staleCount: summary.staleCount,
+      weeklyTarget:
+        activeDept?.weekly_bay_target ?? resolveWeeklyBayTarget(null),
+      weekOpen: openBayCount,
+      weekComplete: completedCount,
+    });
+  }, [
+    freshnessLocations,
+    storeNumber,
+    activeDept?.weekly_bay_target,
+    openBayCount,
+    completedCount,
+  ]);
+
   const workload = useMemo(
     () =>
       composeOnDutyBayWorkload({
@@ -467,6 +494,12 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
           <p className="mt-0.5 text-xs text-zinc-500">
             {openBayCount} open · {completedCount} complete
             {week ? ` · week ${week}` : ""}
+          </p>
+          <p
+            className="mt-1 font-mono text-[11px] leading-snug text-amber-200/90"
+            data-testid="floor-readiness-line"
+          >
+            {readinessLine}
           </p>
         </header>
 

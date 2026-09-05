@@ -15,7 +15,10 @@ import {
   readAuthSession,
   touchAuthSession,
 } from "@/lib/auth-session";
-import { getStoreNumber } from "@/lib/store";
+import {
+  adoptStoreNumberFromSpecialist,
+  resolveActiveStoreNumber,
+} from "@/lib/store";
 import type { StoreSpecialist } from "@/lib/types";
 
 type SessionGateProps = {
@@ -48,20 +51,26 @@ export function SessionGate({
     if (session && isAuthSessionExpired(session)) {
       clearAuthSession();
       setSpecialist(null);
-      setStoreNumber(getStoreNumber());
+      setStoreNumber(resolveActiveStoreNumber());
       setReady(true);
       window.location.replace("/login");
       return;
     }
     if (session) {
       const touched = touchAuthSession() ?? session;
-      setSpecialist(touched.specialist);
-      setStoreNumber(getStoreNumber());
+      const store = adoptStoreNumberFromSpecialist(
+        touched.specialist.store_number
+      );
+      setSpecialist({
+        ...touched.specialist,
+        store_number: store || touched.specialist.store_number,
+      });
+      setStoreNumber(store || resolveActiveStoreNumber(touched.specialist.store_number));
       setReady(true);
       return;
     }
     setSpecialist(null);
-    setStoreNumber(getStoreNumber());
+    setStoreNumber(resolveActiveStoreNumber());
     setReady(true);
     window.location.replace("/login");
   }, []);

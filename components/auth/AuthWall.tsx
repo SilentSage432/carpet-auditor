@@ -51,7 +51,10 @@ export function AuthWall({
   onAuthenticated,
   onRequestFullLogin,
 }: Props) {
-  const storeLabel = formatStoreLabel(getStoreNumber());
+  // Prefer known specialist profile store (unlock/setup); else device hub store.
+  const storeLabel = formatStoreLabel(
+    member?.store_number?.trim() || getStoreNumber()
+  );
 
   return (
     <div className="glass-void fixed inset-0 z-[90] flex items-end justify-center sm:items-center">

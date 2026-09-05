@@ -33,7 +33,12 @@ import {
   needsCredentialSetup,
   syncActiveSpecialistFromRoster,
 } from "@/lib/specialists";
-import { getStoreNumber, setStoreNumber, STORE_CHANGED_EVENT } from "@/lib/store";
+import {
+  adoptStoreNumberFromSpecialist,
+  getStoreNumber,
+  setStoreNumber,
+  STORE_CHANGED_EVENT,
+} from "@/lib/store";
 import { flushSyncQueue } from "@/lib/sync-queue";
 import { getSupabase } from "@/lib/supabase";
 import type {
@@ -223,7 +228,12 @@ export default function DeptSyncHubPage() {
 
     touchAuthSession();
     markWorkspaceUnlocked(refreshed.sessionToken);
-    setSpecialist(matched);
+    const adopted = adoptStoreNumberFromSpecialist(matched.store_number);
+    const withStore = adopted
+      ? { ...matched, store_number: adopted }
+      : matched;
+    setSpecialist(withStore);
+    if (adopted) setStoreNumberState(adopted);
 
     const fromQuery =
       typeof window !== "undefined"

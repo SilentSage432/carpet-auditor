@@ -56,6 +56,32 @@ export function calculateSquareYards(squareFeet: number): number {
   return squareFeet / 9;
 }
 
+/**
+ * Remnant cut calculator live area.
+ * Formula: sqFt = widthFt × lengthFt; sqYd = sqFt / 9.
+ */
+export function composeRemnantArea(
+  widthFt: number,
+  lengthFt: number
+): { sqFt: number; sqYd: number; label: string } {
+  const width = Number.isFinite(widthFt) && widthFt > 0 ? widthFt : 0;
+  const length = Number.isFinite(lengthFt) && lengthFt > 0 ? lengthFt : 0;
+  const sqFt = calculateSquareFeet(width, length);
+  const sqYd = calculateSquareYards(sqFt);
+  if (length <= 0 || width <= 0) {
+    return {
+      sqFt: 0,
+      sqYd: 0,
+      label: "Enter width & length (ft) to calculate",
+    };
+  }
+  return {
+    sqFt,
+    sqYd,
+    label: `${sqFt.toFixed(2)} sq ft · ${formatSqYd(sqYd)} sq yd`,
+  };
+}
+
 /** Compact live badge: `51.32 CLF | 615.84 SQFT | 68.43 SQYD (12 ft Roll)`. */
 export function formatRollAreaBadge(
   clf: number,

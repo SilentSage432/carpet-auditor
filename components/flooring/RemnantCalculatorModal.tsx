@@ -7,9 +7,7 @@
 import { useEffect, useState } from "react";
 import { findCatalogBySkuOrBarcode } from "@/lib/catalog";
 import {
-  calculateSquareFeet,
-  calculateSquareYards,
-  formatSqYd,
+  composeRemnantArea,
 } from "@/lib/calc";
 import { sanitizeBarcodeScan } from "@/lib/barcode";
 import { toNumber } from "@/lib/number-input";
@@ -103,10 +101,9 @@ export function RemnantCalculatorModal({
     return () => window.removeEventListener("keydown", onKey);
   }, [open, onClose]);
 
-  const widthNum = toNumber(width, 12);
+  const widthNum = toNumber(width, DEFAULT_ROLL_WIDTH_FT);
   const lengthNum = toNumber(length, 0);
-  const sqFt = calculateSquareFeet(widthNum, lengthNum);
-  const sqYd = calculateSquareYards(sqFt);
+  const area = composeRemnantArea(widthNum, lengthNum);
   const remnantIsRoll = isRollGoodsCategory(category);
 
   function handleSkuChange(next: string) {
@@ -272,11 +269,19 @@ export function RemnantCalculatorModal({
               mode="decimal"
               value={length}
               onChange={setLength}
-              placeholder="8.5"
+              placeholder="e.g. 8.5"
             />
           </div>
-          <p className="rounded-xl border border-slate-800 bg-slate-950/70 px-3 py-2 font-mono text-sm text-emerald-400">
-            {sqFt.toFixed(2)} sq ft · {formatSqYd(sqYd)} sq yd
+          <p
+            className={`rounded-xl border px-3 py-2 font-mono text-sm ${
+              lengthNum > 0 && widthNum > 0
+                ? "border-emerald-500/40 bg-emerald-950/30 text-emerald-300"
+                : "border-slate-800 bg-slate-950/70 text-slate-400"
+            }`}
+            data-testid="remnant-area-output"
+            aria-live="polite"
+          >
+            {area.label}
           </p>
           <NumberField
             label="Estimated value ($)"

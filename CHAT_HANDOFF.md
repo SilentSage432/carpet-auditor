@@ -1,5 +1,8 @@
 # DeptSync Hub — Chat Handoff
 
+## Latest (2026-09-04)
+- **Two-DS pilot polish:** store identity adopts profile store when hub store unset (`lib/store.ts` + `SessionGate`); Floor readiness line (`composeFloorReadinessLine`); Sunday staged-work / hours→share UX (engine unchanged); remnant live area via `composeRemnantArea`. Ops checklist: `DEPT_SYNC_STATE.md` Appendix D. Screenshots: `tmp/ds-pilot-polish/` (do not commit).
+
 ## Product
 DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's store teams. Multi-category flooring + appliances, barcode scan-to-catalog, dual roll/carton audit engine, SIMS location finder, PWA offline shell + sync queue, multi-store isolation, department-scoped RBAC, specialist PIN / password, CLF/sqft variance, remnant aging, manager markdown, and **Store Operations** (aisle/bay map + automated weekly maintenance rotations).
 

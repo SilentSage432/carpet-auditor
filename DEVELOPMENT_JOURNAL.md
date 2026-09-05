@@ -1,5 +1,14 @@
 # DeptSync Hub — Development Journal
 
+## 2026-09-04 — Two-DS floor pilot polish
+
+### Shipped
+- Store identity: `resolveActiveStoreNumber` / `adoptStoreNumberFromSpecialist` — SessionGate + cold restore adopt authenticated profile store when device hub store is unset (fixes `SET STORE #` with known session store).
+- Remnant calculator: `composeRemnantArea` live label; empty length no longer looks like a calculated `0.00` with a filled-looking placeholder.
+- Sunday assignment: staged-work summary + hours→share copy first; cross-dept access collapsed by default; proportional engine unchanged.
+- Floor readiness headline from `composeBayFreshness` + weekly target (`composeFloorReadinessLine`).
+- Pilot ops checklist: `DEPT_SYNC_STATE.md` Appendix D.
+
 ## 2026-08-17 — Bay workflow profiles + Appliance SIMS / placard checklist
 
 ### Shipped

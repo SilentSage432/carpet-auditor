@@ -73,6 +73,32 @@ export function setStoreNumber(raw: string): string {
   return next;
 }
 
+/**
+ * Resolve the active store for display/queries without inventing a default.
+ * Prefer the device hub store; fall back to the authenticated specialist profile.
+ */
+export function resolveActiveStoreNumber(
+  specialistStore?: string | null
+): string {
+  const fromDevice = getStoreNumber();
+  if (fromDevice) return fromDevice;
+  return normalizeStoreNumber(specialistStore ?? "");
+}
+
+/**
+ * When local store is unset, adopt the specialist profile store into the
+ * single hub session key. Never invents a store number.
+ */
+export function adoptStoreNumberFromSpecialist(
+  specialistStore?: string | null
+): string {
+  const active = getStoreNumber();
+  if (active) return active;
+  const profile = normalizeStoreNumber(specialistStore ?? "");
+  if (!profile) return "";
+  return setStoreNumber(profile);
+}
+
 export function formatStoreLabel(storeNumber = getStoreNumber()): string {
   const n = normalizeStoreNumber(storeNumber);
   return n ? `Lowe's #${n}` : "Lowe's (set store #)";

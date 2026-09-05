@@ -228,7 +228,7 @@ export function AssociateRosterPanel({
         </p>
         <p className="mt-1 text-[11px] leading-snug text-zinc-400">
           {stagingDepartment
-            ? `${departmentMeta(stagingDepartment).shortLabel}-tagged associates start selected. Master Admin can turn anyone on for coverage.`
+            ? `Who is in the ${departmentMeta(stagingDepartment).shortLabel} Sunday pool. Cross-department access is collapsed below each name. Hours and bay share are set in “Who gets which share” above.`
             : "Specialty depts can be Specialist or CSA (Flooring CSA still groups under D23). Core depts default to CSA. Cashier and Receiving stay on the chosen home department. On-duty names feed the Sunday shift balancer."}
         </p>
         {selectionSummary ? (
@@ -340,20 +340,33 @@ export function AssociateRosterPanel({
                   {canGrant &&
                   member.role !== "MasterAdmin" &&
                   (canManage || member.role === "Associate") ? (
-                    <div className="mt-2">
-                      <DepartmentAccessChips
-                        primary={dept}
-                        value={composeAccessibleDepartments(
-                          dept,
-                          member.accessible_departments
-                        )}
-                        disabled={busyId === member.id}
-                        onChange={(next) => void handleAccess(member, next)}
-                      />
-                    </div>
+                    <details className="mt-2 group">
+                      <summary className="cursor-pointer list-none font-mono text-[10px] font-bold uppercase tracking-wide text-zinc-500 [&::-webkit-details-marker]:hidden">
+                        <span className="inline-flex items-center gap-1.5 rounded-lg border border-zinc-800 px-2 py-1 text-zinc-400 transition group-open:border-zinc-600 group-open:text-zinc-200">
+                          Cross-department access
+                          <span className="text-zinc-600 group-open:hidden">
+                            · tap to expand
+                          </span>
+                        </span>
+                      </summary>
+                      <div className="mt-2">
+                        <DepartmentAccessChips
+                          primary={dept}
+                          value={composeAccessibleDepartments(
+                            dept,
+                            member.accessible_departments
+                          )}
+                          disabled={busyId === member.id}
+                          onChange={(next) => void handleAccess(member, next)}
+                        />
+                      </div>
+                    </details>
                   ) : null}
-                  {onShiftHoursChange && onDuty ? (
-                    <div className="mt-1.5 flex flex-wrap gap-1">
+                  {onShiftHoursChange && onDuty && !stagingDepartment ? (
+                    <div className="mt-1.5 flex flex-wrap items-center gap-1">
+                      <span className="mr-1 font-mono text-[9px] font-bold uppercase tracking-wide text-zinc-500">
+                        Shift
+                      </span>
                       {SHIFT_HOUR_PRESETS.map((h) => (
                         <button
                           key={h}

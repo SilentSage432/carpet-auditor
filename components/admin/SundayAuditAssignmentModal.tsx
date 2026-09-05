@@ -400,6 +400,20 @@ export function SundayAuditAssignmentModal({
         </header>
 
         <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-4">
+          <div className="rounded-xl border border-zinc-700/80 bg-zinc-950/60 px-3 py-2.5">
+            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-zinc-400">
+              This week&apos;s staged work
+            </p>
+            <p className="mt-1 text-sm font-semibold text-zinc-50">
+              {bays.length} Flooring bay{bays.length === 1 ? "" : "s"} staged
+              {pending > 0 ? ` · ${pending} still need a person` : ""}
+            </p>
+            <p className="mt-1.5 text-[11px] leading-snug text-zinc-400">
+              Shift hours influence each associate&apos;s share of the staged
+              bays. The 4h / 6h / 8h chips set hours — not a fixed bay count.
+            </p>
+          </div>
+
           <div className="grid gap-2 sm:grid-cols-2">
             <button
               type="button"
@@ -423,63 +437,19 @@ export function SundayAuditAssignmentModal({
             </button>
           </div>
 
-          <AssociateRosterPanel
-            compact
-            specialist={specialist}
-            roster={roster}
-            stagingDepartment={FLOORING_STAGING_DEPT}
-            selectionSummary={selectionSummary.label}
-            onRosterChange={(next) => {
-              const assignable = sundayAssignableRoster(next);
-              setRoster(assignable);
-              persistRoster(
-                mergeShiftRoster(
-                  assignable,
-                  shiftRoster,
-                  sundayShiftSeedActive(FLOORING_STAGING_DEPT)
-                )
-              );
-            }}
-            shiftHours={Object.fromEntries(
-              shiftRoster.map((row) => [row.specialist_id, row.hours])
-            )}
-            shiftActive={Object.fromEntries(
-              shiftRoster.map((row) => [row.specialist_id, row.active])
-            )}
-            onShiftHoursChange={(patch) => {
-              const exists = shiftRoster.some(
-                (row) => row.specialist_id === patch.specialist_id
-              );
-              if (!exists) {
-                const member = roster.find(
-                  (m) => String(m.id) === patch.specialist_id
-                );
-                persistRoster([
-                  ...shiftRoster,
-                  {
-                    specialist_id: patch.specialist_id,
-                    specialist_name: member?.name ?? "Associate",
-                    active: patch.active !== false,
-                    hours: patch.hours,
-                  },
-                ]);
-                return;
-              }
-              patchMember(patch.specialist_id, {
-                hours: patch.hours,
-                ...(patch.active !== undefined ? { active: patch.active } : {}),
-              });
-            }}
-          />
-
           {shiftRoster.length > 0 ? (
             <section className="rounded-xl border border-cyan-500/30 bg-cyan-950/20 p-3">
               <p className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-cyan-300">
-                Shift balancer · hours → bay quota
+                Who gets which share
               </p>
               <p className="mt-1 text-[11px] text-cyan-100/70">
-                Flooring-tagged associates start selected. Master Admin can
-                toggle anyone for cross-department coverage.
+                Selected people and their bay share from shift hours
+                {bays.length > 0
+                  ? ` across ${bays.length} staged bay${
+                      bays.length === 1 ? "" : "s"
+                    }`
+                  : ""}
+                .
               </p>
               <ul className="mt-2 space-y-2">
                 {shiftRoster.map((row) => {
@@ -526,7 +496,7 @@ export function SundayAuditAssignmentModal({
                       </span>
                       <span className="shrink-0 font-mono text-[10px] text-cyan-300">
                         {row.active
-                          ? `${row.hours}h · ${
+                          ? `${row.hours}h → ${
                               balancerPlan.loads.find(
                                 (l) => l.specialist_id === row.specialist_id
                               )?.quota ?? 0
@@ -536,6 +506,9 @@ export function SundayAuditAssignmentModal({
                     </label>
                     {row.active ? (
                       <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                        <span className="font-mono text-[9px] font-bold uppercase tracking-wide text-zinc-500">
+                          Hours
+                        </span>
                         {SHIFT_HOUR_PRESETS.map((h) => (
                           <button
                             key={h}
@@ -615,6 +588,55 @@ export function SundayAuditAssignmentModal({
               </button>
             </section>
           ) : null}
+
+          <AssociateRosterPanel
+            compact
+            specialist={specialist}
+            roster={roster}
+            stagingDepartment={FLOORING_STAGING_DEPT}
+            selectionSummary={selectionSummary.label}
+            onRosterChange={(next) => {
+              const assignable = sundayAssignableRoster(next);
+              setRoster(assignable);
+              persistRoster(
+                mergeShiftRoster(
+                  assignable,
+                  shiftRoster,
+                  sundayShiftSeedActive(FLOORING_STAGING_DEPT)
+                )
+              );
+            }}
+            shiftHours={Object.fromEntries(
+              shiftRoster.map((row) => [row.specialist_id, row.hours])
+            )}
+            shiftActive={Object.fromEntries(
+              shiftRoster.map((row) => [row.specialist_id, row.active])
+            )}
+            onShiftHoursChange={(patch) => {
+              const exists = shiftRoster.some(
+                (row) => row.specialist_id === patch.specialist_id
+              );
+              if (!exists) {
+                const member = roster.find(
+                  (m) => String(m.id) === patch.specialist_id
+                );
+                persistRoster([
+                  ...shiftRoster,
+                  {
+                    specialist_id: patch.specialist_id,
+                    specialist_name: member?.name ?? "Associate",
+                    active: patch.active !== false,
+                    hours: patch.hours,
+                  },
+                ]);
+                return;
+              }
+              patchMember(patch.specialist_id, {
+                hours: patch.hours,
+                ...(patch.active !== undefined ? { active: patch.active } : {}),
+              });
+            }}
+          />
 
           {status ? (
             <p

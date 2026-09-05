@@ -476,4 +476,57 @@ Public paths: `lib/auth-gate.ts` `isAuthGatePublicPath()` — login, pair, verif
 
 ---
 
-*Last updated: 2026-08-26 (Phase 3 polish — fluid tab transitions + sliding nav pill)*
+## Appendix D — Two-DS Floor Pilot Setup Checklist
+
+Operational configuration only — do **not** hardcode store numbers, PINs, or targets in source.
+
+### Hosting / environment
+
+- [ ] `NEXT_PUBLIC_SUPABASE_URL` + `NEXT_PUBLIC_SUPABASE_ANON_KEY` + `SUPABASE_SERVICE_ROLE_KEY`
+- [ ] Unique `HUB_MASTER_PIN` (required; no default)
+- [ ] `HUB_GATE_SECRET` (recommended) and `CRON_SECRET`
+- [ ] Master recovery: `node --env-file=.env.local scripts/bootstrap-admin.mjs` or `POST /api/auth/bootstrap-admin` with Bearer `BOOTSTRAP_SECRET` / `CRON_SECRET`
+- [ ] Optional `HUB_BOOTSTRAP_STORE_NUMBER` for bootstrap store
+- [ ] HTTPS host for PWA install on personal phones (or trusted local tunnel for dry-run)
+
+### Store identity
+
+- [ ] After first Master login, confirm header shows `DeptSync · #<store>` (profile store adopts into hub session when device store was unset)
+- [ ] Master can set/confirm store # under More → Device & Diagnostics / store field if needed
+
+### Accounts (two Department Supervisors)
+
+- [ ] Roster → **Add Team Member** for DS #1 and DS #2 (role **Supervisor**, correct home department, store matches)
+- [ ] **Pair Device via QR** from each specialist sheet → each DS sets PIN on their phone at `/pair?t=`
+- [ ] Confirm role badge shows DS Supervisor and department pin matches their dept
+- [ ] Verify login unlock from each personal phone
+
+### Department readiness
+
+- [ ] Topology exists (More → Store Topology / Bulk Bay Generator); sanity-check bay count on Map
+- [ ] More → Department Targets: set weekly `/wk` for the pilot department(s)
+- [ ] Roster schedules / on-duty enough for Sunday staging pool
+
+### First week loop
+
+- [ ] Floor → Stage Weekly Rotation / Sunday drawer → Stage/Draw (Master) or use cron auto-stage
+- [ ] Review person ↔ bay share (`hours → N bays`); Balance & Assign
+- [ ] DS copies assignments into Lowe's existing dashboard (outside DeptSync)
+- [ ] Associates execute on Zebra; DS physically validates bays
+- [ ] DS verifies completion in DeptSync (Awaiting DS → Verified)
+- [ ] Confirm Map/Floor readiness line and week open/complete advance
+
+### Specialty smoke (non-production)
+
+- [ ] Flooring: More or specialty hub → Remnant calculator — enter width/length, confirm live sq ft / sq yd (`sqFt = W×L`, `sqYd = sqFt/9`); optional one sample roll pad calc without saving production data
+- [ ] Appliances (if in pilot): Scan & Count — continuous focus + one safe sample scan
+
+### Explicit non-goals for this pilot
+
+- No Zebra integration
+- No per-associate bay-capacity engine (hours proportional assignment remains authoritative)
+- Associates are not required to install DeptSync
+
+---
+
+*Last updated: 2026-09-04 (Two-DS pilot polish — store identity, remnant live area, Sunday clarity, Floor readiness line)*
