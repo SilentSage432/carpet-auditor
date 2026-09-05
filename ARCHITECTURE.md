@@ -98,6 +98,11 @@ app/api/cron/weekly-rotation      → Sunday automated rotation engine (CRON_SEC
 vercel.json                       → Cron Sunday `0 11 * * 0` (11:00 UTC ≈ 05:00 America/Denver; Hobby daily limit)
 app/api/stores/settings           → GET/PATCH Sunday auto-stage time, auto-run, timezone (Master PATCH)
 lib/store-ops/sunday-schedule.ts  → Store-owned Sunday timing knowledge (defaults 05:00 America/Denver)
+lib/store-ops/operational-context.ts → FS-002 declared seasons/events + department relevance (Master-declared path)
+app/api/operational-contexts/route.ts → GET Supervisor+ resolve/list
+app/api/admin/operational-contexts/* → Master CRUD + relevance
+components/admin/OperationalContextCard.tsx → More→Settings Master manager
+supabase/migrations/20260905_operational_contexts.sql → contexts + relevance (**LIVE** after apply)
 lib/store-ops/fiscal-calendar.ts  → FS-001 authority (import/validate/resolve) + FS-001A `computeFiscalCoverage` (derived; Master signal)
 app/api/fiscal-calendar/route.ts  → GET Supervisor+ fiscal context for store-local date (additive; rotations unaffected)
 app/api/admin/fiscal-calendar/coverage/route.ts → GET Master-only coverage status (HEALTHY/ATTENTION/URGENT/EXPIRED)
@@ -234,7 +239,8 @@ supabase/migrations/20260812_sunday_bay_assignments.sql → sunday specialist↔
 | Store Operations map + rotations | `lib/store-ops/*` + `/admin/store-map` + `/dashboard` (visual navigator: `StoreLocationGrid` + `WalkTheFloorSheet`; topology CRUD in Settings: `AisleBayManager` + `AddBaySheet` + `EditBayDrawer` + prune/batch + bulk velocity seed + `workflow_type`; floor checklist: `ZebraChecklist` / `ApplianceSimsChecklist`; walk log: `bay-service.ts` + `POST /api/store-locations/service`; Sunday pick: carry-over prepend then `rotation.ts` velocity + `custom_decay_days`; persist owner `rotations.ts` (`weekly_rotations` upsert `store_id` + `store_number`); department cron: Settings `DepartmentTargetsMatrix`; Sunday clock: `sunday-schedule.ts` + Settings `SundayScheduleCard`) |
 | Bay workflow profiles | `store_locations.workflow_type` (`lib/store-ops/types.ts`) + Bulk Generator / Edit Bay. Floor routes SIMS bays; scans stay in `lib/appliance-scans.ts`; recon in `lib/appliances/sims-reconciliation.ts` |
 | Sunday schedule | `lib/store-ops/sunday-schedule.ts` (time / timezone / auto-run) + `stores` columns + `/api/cron/weekly-rotation` (skip if week already staged) + Master Force Draw overwrite + `/api/admin/rotations/reset` |
-| Fiscal calendar (FS-001 / FS-001A min) | `lib/store-ops/fiscal-calendar.ts` + `fiscal_years`/`fiscal_weeks` + `GET /api/fiscal-calendar` + Master `GET /api/admin/fiscal-calendar/coverage` — ISO rotation unchanged; FY2026 seeded; coverage derived on read; no seasons/events yet |
+| Fiscal calendar (FS-001 / FS-001A min) | `lib/store-ops/fiscal-calendar.ts` + `fiscal_years`/`fiscal_weeks` + `GET /api/fiscal-calendar` + Master `GET /api/admin/fiscal-calendar/coverage` — ISO rotation unchanged; FY2026 seeded; coverage derived on read |
+| Operational seasons/events (FS-002) | `operational-context.ts` + tables + Master Settings — declared Gregorian contexts + dept relevance; no SI / location priority |
 | Sunday assignments | `lib/store-ops/sunday-audit.ts` (persist + department seed `associateMatchesSundayDepartment`) + `SundayAuditAssignmentModal` + `AssociateRosterPanel` |
 | Daily shift board | `lib/store-ops/shift-status.ts` (`associate_shift_days` week matrix; throws on live write failure) |
 | Call-out bay rebalance | `lib/store-ops/call-out.ts` (pool / auto / carry-over loop; stamps `carried_over` + Sunday `CARRIED_OVER`; does not generate rotations) |

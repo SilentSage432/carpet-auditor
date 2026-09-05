@@ -1660,3 +1660,109 @@ export async function fetchFiscalCoverage(
     specialist
   );
 }
+
+/** FS-002 operational context (seasons / events). */
+export type OperationalContextClient = {
+  id: string;
+  kind: "SEASON" | "EVENT";
+  store_id: string | null;
+  title: string;
+  concept_key: string | null;
+  start_date: string;
+  end_date: string;
+  source_type: string;
+  source_reference: string | null;
+  source_year: number | null;
+  declared_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type OperationalContextRelevanceClient = {
+  id: string;
+  context_id: string;
+  department_code: string;
+  relevance: "NONE" | "LOW" | "MEDIUM" | "HIGH";
+};
+
+export async function fetchOperationalContextsList(
+  specialist: StoreSpecialist
+): Promise<{
+  contexts: OperationalContextClient[];
+  relevance: OperationalContextRelevanceClient[];
+}> {
+  return storeOpsFetch(
+    "/api/operational-contexts?mode=list",
+    specialist
+  );
+}
+
+export async function createOperationalContext(
+  specialist: StoreSpecialist,
+  input: {
+    kind: "SEASON" | "EVENT";
+    title: string;
+    start_date: string;
+    end_date: string;
+  }
+): Promise<{ ok: true; context: OperationalContextClient }> {
+  return storeOpsFetch("/api/admin/operational-contexts", specialist, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+}
+
+export async function updateOperationalContext(
+  specialist: StoreSpecialist,
+  id: string,
+  input: {
+    kind?: "SEASON" | "EVENT";
+    title?: string;
+    start_date?: string;
+    end_date?: string;
+  }
+): Promise<{ ok: true; context: OperationalContextClient }> {
+  return storeOpsFetch(
+    `/api/admin/operational-contexts/${encodeURIComponent(id)}`,
+    specialist,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(input),
+    }
+  );
+}
+
+export async function deleteOperationalContext(
+  specialist: StoreSpecialist,
+  id: string
+): Promise<{ ok: true }> {
+  return storeOpsFetch(
+    `/api/admin/operational-contexts/${encodeURIComponent(id)}`,
+    specialist,
+    { method: "DELETE" }
+  );
+}
+
+export async function setOperationalContextRelevance(
+  specialist: StoreSpecialist,
+  id: string,
+  input: {
+    department_code: string;
+    relevance: "UNSET" | "NONE" | "LOW" | "MEDIUM" | "HIGH";
+  }
+): Promise<{ ok: true; department_relevance: string | null }> {
+  return storeOpsFetch(
+    `/api/admin/operational-contexts/${encodeURIComponent(id)}/relevance`,
+    specialist,
+    {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        department_code: input.department_code,
+        relevance: input.relevance === "UNSET" ? null : input.relevance,
+      }),
+    }
+  );
+}

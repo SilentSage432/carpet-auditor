@@ -1,5 +1,23 @@
 # DeptSync Hub — Development Journal
 
+## 2026-09-05 — FS-002 operational seasons & events foundation
+
+### Shipped
+- Migration `20260905_operational_contexts.sql`: `operational_contexts` + `operational_context_department_relevance` (CASCADE relevance; store CASCADE; declared_by → profiles SET NULL). RLS authenticated SELECT (global + actor store); service-role writes.
+- Domain `lib/store-ops/operational-context.ts`: Master-declared CRUD, relevance UNSET vs NONE, Gregorian resolve arrays, provenance.
+- APIs: `GET /api/operational-contexts` (Supervisor+); Master `POST/PATCH/DELETE /api/admin/operational-contexts*` + relevance PUT.
+- More→Settings `OperationalContextCard` (Master only). No Floor chip (FS-002B). No company/public seed. No rotation/priority coupling.
+- Tests: `operational-context.test.ts`.
+
+### Production
+- Pre-migration dump `tmp/production-backups/deptsync-fmeinlwhixngednabhgy-2026-09-05T19-13-06-331Z.dump` (507080 bytes; prior dumps retained). Migration sha256 `e4fe26cafd602e6c20dbb4ce6f842b79d49b552c27b44a320b1000d644b28c1b`.
+- Schema **LIVE**: contexts=0, relevance=0. No company/public seed.
+
+### Status
+- **FS-002 SEASONS / EVENTS FOUNDATION LIVE** (empty production seed is valid).
+- Completion-attempt first natural lifecycle still pending.
+- Next: **FS-002B** Floor context surface and/or **FS-003** location relevance.
+
 ## 2026-09-05 — FS-001A minimum fiscal calendar coverage
 
 ### Shipped
@@ -12,7 +30,6 @@
 ### Status
 - **FS-001A MINIMUM FISCAL CALENDAR LIFECYCLE LIVE** (coverage awareness only).
 - FY2026 authoritative calendar still LIVE; completion-attempt first natural lifecycle still pending.
-- Next: **FS-002** Seasons / events (does not require automated FY2027 discovery).
 
 ## 2026-09-05 — FY2026 authoritative fiscal calendar seed
 

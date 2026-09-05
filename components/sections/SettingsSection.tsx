@@ -25,6 +25,7 @@ import { ThemeSelector } from "@/components/settings/ThemeSelector";
 import { SyncQueuePanel } from "@/components/settings/SyncQueuePanel";
 import { SundayScheduleCard } from "@/components/admin/SundayScheduleCard";
 import { FiscalCoverageCard } from "@/components/admin/FiscalCoverageCard";
+import { OperationalContextCard } from "@/components/admin/OperationalContextCard";
 import {
   clearLocalApplianceScans,
   countLocalApplianceScans,
@@ -412,6 +413,7 @@ export function SettingsSection({
               <>
                 <SundayScheduleCard specialist={activeSpecialist} />
                 <FiscalCoverageCard specialist={activeSpecialist} />
+                <OperationalContextCard specialist={activeSpecialist} />
                 <button
                   type="button"
                   onClick={() => setForceOpen(true)}
