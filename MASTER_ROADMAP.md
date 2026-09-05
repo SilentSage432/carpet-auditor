@@ -4,6 +4,10 @@
 - [x] Canonical Layer-1 rotation metrics (`weekly-rotation-metrics-v1`) — Art VI A-1: reported ≠ verified on Floor / health / rollup / Map week overlay
 - [x] Weekly rotation history preservation — Force Draw supersedes incomplete stages (`20260905_weekly_rotations_superseded.sql`); active = `superseded_at IS NULL`; Layer-1 counts active only
 - [x] Completion-attempt history (send-back preserves evidence) — schema LIVE; app deploy with this commit; first natural lifecycle pending
+- [x] FS-001 Fiscal calendar foundation (years/weeks, provenance, import validation, store-local resolve) — schema LIVE; app deploy; **FY not seeded**
+- [ ] FS-002 Seasons / events
+- [ ] FS-003 Department + location seasonal relevance
+- [ ] SI-001 / SI-002 Seasonal signal contract + Day-1 deterministic pressure
 - [ ] Sunday assignment history across Force Draw / rebalance — known P1
 - [x] Carpet Hub shell with sticky header + slide-over nav
 - [x] Number input sanitize + barcode Marry workflow

@@ -1,5 +1,19 @@
 # DeptSync Hub — Development Journal
 
+## 2026-09-05 — FS-001 Fiscal calendar foundation
+
+### Shipped
+- Additive migration `20260905_fiscal_calendar.sql`: `fiscal_years` + `fiscal_weeks` (unique FY; week unique per year; RLS authenticated SELECT; service-role writes).
+- Domain owner `lib/store-ops/fiscal-calendar.ts`: provenance (`COMPANY_PUBLISHED` / `MASTER_ADMIN_DECLARED`), import validation (contiguous 7-day weeks, 52/53, 4-5-4 period lengths for 52-week), no silent overwrite, identical re-import no-op, `resolveFiscalContextForDate` / store-timezone instant mapping, ISO↔fiscal overlap by date range, `calendar_unavailable` when uncovered.
+- Read API `GET /api/fiscal-calendar?date=YYYY-MM-DD` (Supervisor+). Floor/Map/rotations not dependent on fiscal tables.
+- Synthetic test fixtures only — **no fabricated Lowe’s fiscal year**. ISO `assigned_week` unchanged. Seasons/events/pressure deferred (FS-002+ / SI-*).
+- Completion-attempt first natural lifecycle still pending (untouched).
+
+### Production
+- Schema **LIVE** on `fmeinlwhixngednabhgy` (pre-migration dump `…T18-05-26-994Z.dump`). App ships with this commit.
+- **Authoritative FY NOT SEEDED** — fiscal context remains `calendar_unavailable` until proven seed.
+- Status: FS-001 FISCAL CALENDAR FOUNDATION LIVE — AWAITING AUTHORITATIVE FY SEED.
+
 ## 2026-09-05 — Completion-attempt history production-blocker correction
 
 ### Shipped (local only)

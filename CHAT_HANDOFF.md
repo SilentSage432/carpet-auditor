@@ -1,6 +1,7 @@
 # DeptSync Hub — Chat Handoff
 
 ## Latest (2026-09-05)
+- **FS-001 Fiscal calendar LIVE (schema + app):** `fiscal_years` / `fiscal_weeks` **production applied**. App: `fiscal-calendar.ts` + `GET /api/fiscal-calendar`. ISO `assigned_week` unchanged (fiscal is contextual only). No seasons/events/pressure. **Authoritative FY NOT SEEDED** → `calendar_unavailable` until seed. Pre-FS-001 dump `…T18-05-26-994Z.dump` retained.
 - **Completion-attempt history LIVE (schema + app):** Table `weekly_rotation_completion_attempts` **production applied**. App wires complete/verify/send-back/auto-verify + history API. Missing-relation skip is table-specific; auto-verify retry recovers from parent stamps; RESTRICT retained. **First natural lifecycle pending** (rotations/attempts currently 0 — do not fabricate). Pre-migration dump `…T17-41-43-893Z.dump` retained.
 - **Specialty M2 PRODUCTION VERIFIED:** `20260905_specialty_catalog_remnants_parity.sql` applied live. Hub `carpet_catalog` / `carpet_remnants` recreated (0 rows); PostgREST former 400s → **200 []**. M1 `home_department` already live. Pre-M2 dump `…T15-09-55-089Z.dump` retained with prior dumps. App deploy not required for schema fix. Safe to commit migration + docs when ready.
 - **M2 detection strengthened** then applied after gate. Mixed-state fail-closed; full unique `(store_number, sku)` + remnants PK proven.
