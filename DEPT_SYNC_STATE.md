@@ -295,7 +295,7 @@ Until applied, production Hub falls back to localStorage for catalog/remnants; r
 | Weekly rotation history | `superseded_at` + `20260905_weekly_rotations_superseded.sql`; `rotation-history.ts` | Force Draw supersedes incomplete stages; pre-migration deletes UNKNOWN |
 | Completion-attempt history | `weekly_rotation_completion_attempts` + `completion-attempt-history.ts` | Schema **LIVE**; send-back preserves attempts; first natural lifecycle pending |
 | Fiscal calendar (FS-001) | `fiscal_years` / `fiscal_weeks` + `fiscal-calendar.ts` + `GET /api/fiscal-calendar` | Schema **LIVE**; **FY2026 COMPANY_PUBLISHED seeded**; ISO `assigned_week` unchanged; seasons/events/pressure deferred |
-| Fiscal calendar lifecycle (FS-001A) | Roadmap only | Coverage monitoring, future-year discovery, source validation, **Master approval before promotion** — not started |
+| Fiscal calendar coverage (FS-001A min) | `computeFiscalCoverage` + `GET /api/admin/fiscal-calendar/coverage` + Settings `FiscalCoverageCard` | Derived on read; Master-only signal; **no** discovery/promote/cron/push/persistence |
 | Auth & hub gate | `proxy.ts`, `lib/auth-gate.ts`, `AccessGate`, `AuthWall` | Cookie + JWT + RLS |
 | Roster / PIN / invite / QR pair | `lib/specialists.ts`, `app/pair/page.tsx`, `app/auth/verify/[token]`, `/api/roster/*` | End-to-end onboarding |
 | Floor bay rotations (Zebra) | `ZebraChecklist.tsx`, `completeRotation()`, `/api/rotations/complete` | Optimistic UI + offline queue |

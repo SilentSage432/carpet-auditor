@@ -1632,3 +1632,31 @@ export async function scanBayVisual(
     }
   );
 }
+
+/** Master-only fiscal calendar coverage (FS-001A). */
+export type FiscalCoverageClient = {
+  status: "HEALTHY" | "ATTENTION" | "URGENT" | "EXPIRED";
+  operational_date: string;
+  current_fiscal_year: number | null;
+  coverage_start_date: string | null;
+  coverage_end_date: string | null;
+  days_remaining: number | null;
+  next_fiscal_year: number | null;
+  next_fiscal_year_loaded: boolean;
+  current_source_type: "COMPANY_PUBLISHED" | "MASTER_ADMIN_DECLARED" | null;
+  reason_codes: string[];
+  generated_at: string;
+  store_timezone?: string;
+  iso_rotation_unaffected?: boolean;
+};
+
+export async function fetchFiscalCoverage(
+  specialist: StoreSpecialist,
+  date?: string
+): Promise<FiscalCoverageClient> {
+  const qs = date ? `?date=${encodeURIComponent(date)}` : "";
+  return storeOpsFetch<FiscalCoverageClient>(
+    `/api/admin/fiscal-calendar/coverage${qs}`,
+    specialist
+  );
+}

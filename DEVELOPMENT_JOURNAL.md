@@ -1,5 +1,19 @@
 # DeptSync Hub — Development Journal
 
+## 2026-09-05 — FS-001A minimum fiscal calendar coverage
+
+### Shipped
+- Domain: `computeFiscalCoverage` / `computeFiscalCoverageFromYears` / `fetchAuthoritativeFiscalYears` in `fiscal-calendar.ts` — Layer-1 derived coverage (HEALTHY / ATTENTION / URGENT / EXPIRED); thresholds 90 / 30 days as operational constants; gap-aware next-year semantics (FY N+1 only).
+- Master-only `GET /api/admin/fiscal-calendar/coverage` (`requireStoreOpsActor` → `requireSuperAdmin`).
+- More → Settings `FiscalCoverageCard` (Master only).
+- No migration, discovery, promote API, cron, push, or Vendor Gateway fetch. Promotion remains existing importer / offline workflow.
+- Tests: `fiscal-calendar.coverage.test.ts`.
+
+### Status
+- **FS-001A MINIMUM FISCAL CALENDAR LIFECYCLE LIVE** (coverage awareness only).
+- FY2026 authoritative calendar still LIVE; completion-attempt first natural lifecycle still pending.
+- Next: **FS-002** Seasons / events (does not require automated FY2027 discovery).
+
 ## 2026-09-05 — FY2026 authoritative fiscal calendar seed
 
 ### Source

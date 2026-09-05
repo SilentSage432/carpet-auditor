@@ -1013,3 +1013,389 @@ export function buildSyntheticFiscalCalendarImport(opts: {
     weeks,
   };
 }
+
+// ---------------------------------------------------------------------------
+// FS-001A — Fiscal calendar coverage (derived on read; no persistence)
+// ---------------------------------------------------------------------------
+
+/**
+ * Days remaining ≤ this with next FY absent → ATTENTION.
+ * Operational meaning: preparation / acquisition window for Master.
+ */
+export const FISCAL_COVERAGE_ATTENTION_DAYS = 90;
+
+/**
+ * Days remaining ≤ this with next FY absent → URGENT.
+ * Operational meaning: immediate Master action window.
+ */
+export const FISCAL_COVERAGE_URGENT_DAYS = 30;
+
+export type FiscalCoverageStatus =
+  | "HEALTHY"
+  | "ATTENTION"
+  | "URGENT"
+  | "EXPIRED";
+
+export type FiscalCoverageReasonCode =
+  | "NEXT_YEAR_MISSING"
+  | "NEXT_YEAR_LOADED"
+  | "COVERAGE_ATTENTION"
+  | "COVERAGE_URGENT"
+  | "COVERAGE_EXPIRED"
+  | "GAP_AFTER_LAST_YEAR"
+  | "NO_AUTHORITATIVE_CALENDAR"
+  | "SCHEMA_UNAVAILABLE";
+
+/**
+ * Deterministic Layer-1 coverage contract.
+ * Derived from authoritative fiscal_years rows + store-local operational date.
+ */
+export type FiscalCoverage = {
+  status: FiscalCoverageStatus;
+  operational_date: string;
+  current_fiscal_year: number | null;
+  coverage_start_date: string | null;
+  coverage_end_date: string | null;
+  days_remaining: number | null;
+  next_fiscal_year: number | null;
+  next_fiscal_year_loaded: boolean;
+  /** Provenance of the year covering operational_date, when present. */
+  current_source_type: FiscalCalendarSource | null;
+  reason_codes: FiscalCoverageReasonCode[];
+  generated_at: string;
+};
+
+export type ComputeFiscalCoverageInput = {
+  operationalDate?: string;
+  instant?: Date | string;
+  timeZone?: string;
+  /** Override clock for tests — ISO string. */
+  generatedAt?: string;
+};
+
+/**
+ * Load all authoritative fiscal years ordered by fiscal_year ascending.
+ */
+export async function fetchAuthoritativeFiscalYears(
+  client: SupabaseClient
+): Promise<
+  | { ok: true; years: FiscalYear[] }
+  | { ok: false; missingRelation: true }
+  | { ok: false; error: string }
+> {
+  const { data, error } = await client
+    .from(FISCAL_YEARS_TABLE)
+    .select(YEAR_SELECT)
+    .order("fiscal_year", { ascending: true });
+
+  if (error) {
+    if (isFiscalCalendarUnavailable(error)) {
+      return { ok: false, missingRelation: true };
+    }
+    return { ok: false, error: readableError(error) };
+  }
+
+  return {
+    ok: true,
+    years: (data ?? []).map((row) =>
+      mapYearRow(row as Record<string, unknown>)
+    ),
+  };
+}
+
+function yearCoversDate(year: FiscalYear, operationalDate: string): boolean {
+  return (
+    compareOperationalDates(year.start_date, operationalDate) <= 0 &&
+    compareOperationalDates(operationalDate, year.end_date) <= 0
+  );
+}
+
+/**
+ * Contiguous coverage end walking forward from `fromYear`.
+ * Stops when the next fiscal_year number is missing or dates are not adjacent.
+ * Does not invent dates across gaps.
+ */
+export function contiguousCoverageEndFrom(
+  years: FiscalYear[],
+  fromYear: FiscalYear
+): { end_date: string; gap_after: boolean } {
+  const byNumber = new Map(years.map((y) => [y.fiscal_year, y]));
+  let cursor = fromYear;
+  let end = fromYear.end_date;
+  let gap_after = false;
+
+  while (true) {
+    const next = byNumber.get(cursor.fiscal_year + 1);
+    if (!next) {
+      // A later year may exist with a skipped number — that is a gap.
+      const later = years.some((y) => y.fiscal_year > cursor.fiscal_year);
+      gap_after = later;
+      break;
+    }
+    const expectedStart = addDaysToOperationalDate(cursor.end_date, 1);
+    if (next.start_date !== expectedStart) {
+      gap_after = true;
+      break;
+    }
+    cursor = next;
+    end = next.end_date;
+  }
+
+  return { end_date: end, gap_after };
+}
+
+/**
+ * Pure coverage derivation from authoritative year rows.
+ *
+ * Next-year semantics:
+ * - When a year covers operational_date, next_fiscal_year = that year + 1.
+ * - When none covers, next_fiscal_year = (most recent year that has ended) + 1,
+ *   or the earliest upcoming fiscal_year if none have ended yet.
+ * - next_fiscal_year_loaded is true only when that exact year number exists.
+ * - A later year (e.g. FY2028 while FY2027 is missing) is never "next".
+ */
+export function computeFiscalCoverageFromYears(
+  years: FiscalYear[],
+  operationalDate: string,
+  generatedAt: string = new Date().toISOString()
+): FiscalCoverage {
+  const op = parseOperationalDate(operationalDate);
+  if (!op) {
+    return {
+      status: "EXPIRED",
+      operational_date: String(operationalDate),
+      current_fiscal_year: null,
+      coverage_start_date: null,
+      coverage_end_date: null,
+      days_remaining: null,
+      next_fiscal_year: null,
+      next_fiscal_year_loaded: false,
+      current_source_type: null,
+      reason_codes: ["COVERAGE_EXPIRED"],
+      generated_at: generatedAt,
+    };
+  }
+
+  const sorted = [...years].sort((a, b) => a.fiscal_year - b.fiscal_year);
+
+  if (sorted.length === 0) {
+    return {
+      status: "EXPIRED",
+      operational_date: op,
+      current_fiscal_year: null,
+      coverage_start_date: null,
+      coverage_end_date: null,
+      days_remaining: null,
+      next_fiscal_year: null,
+      next_fiscal_year_loaded: false,
+      current_source_type: null,
+      reason_codes: ["NO_AUTHORITATIVE_CALENDAR", "COVERAGE_EXPIRED"],
+      generated_at: generatedAt,
+    };
+  }
+
+  const coverage_start_date = sorted.reduce(
+    (min, y) =>
+      compareOperationalDates(y.start_date, min) < 0 ? y.start_date : min,
+    sorted[0]!.start_date
+  );
+  const latest_end = sorted.reduce(
+    (max, y) =>
+      compareOperationalDates(y.end_date, max) > 0 ? y.end_date : max,
+    sorted[0]!.end_date
+  );
+
+  const covering = sorted.filter((y) => yearCoversDate(y, op));
+  const byNumber = new Map(sorted.map((y) => [y.fiscal_year, y]));
+
+  if (covering.length === 0) {
+    const ended = sorted.filter(
+      (y) => compareOperationalDates(y.end_date, op) < 0
+    );
+    const upcoming = sorted.filter(
+      (y) => compareOperationalDates(y.start_date, op) > 0
+    );
+
+    let next_fiscal_year: number | null = null;
+    if (ended.length > 0) {
+      const mostRecent = ended.reduce((a, b) =>
+        compareOperationalDates(a.end_date, b.end_date) >= 0 ? a : b
+      );
+      next_fiscal_year = mostRecent.fiscal_year + 1;
+    } else if (upcoming.length > 0) {
+      next_fiscal_year = upcoming.reduce((a, b) =>
+        a.fiscal_year < b.fiscal_year ? a : b
+      ).fiscal_year;
+    }
+
+    const next_fiscal_year_loaded =
+      next_fiscal_year != null && byNumber.has(next_fiscal_year);
+
+    const reason_codes: FiscalCoverageReasonCode[] = ["COVERAGE_EXPIRED"];
+    if (ended.length > 0 && upcoming.length > 0) {
+      reason_codes.push("GAP_AFTER_LAST_YEAR");
+    } else if (
+      ended.length > 0 &&
+      compareOperationalDates(op, latest_end) > 0
+    ) {
+      // Past all authoritative coverage.
+    } else if (ended.length > 0 && !next_fiscal_year_loaded) {
+      reason_codes.push("GAP_AFTER_LAST_YEAR");
+    }
+    if (next_fiscal_year != null && !next_fiscal_year_loaded) {
+      reason_codes.push("NEXT_YEAR_MISSING");
+    } else if (next_fiscal_year_loaded) {
+      reason_codes.push("NEXT_YEAR_LOADED");
+    }
+
+    return {
+      status: "EXPIRED",
+      operational_date: op,
+      current_fiscal_year: null,
+      coverage_start_date,
+      coverage_end_date: latest_end,
+      days_remaining: 0,
+      next_fiscal_year,
+      next_fiscal_year_loaded,
+      current_source_type: null,
+      reason_codes,
+      generated_at: generatedAt,
+    };
+  }
+
+  // Integrity: multiple covering years → treat as unavailable coverage (expired).
+  if (covering.length > 1) {
+    return {
+      status: "EXPIRED",
+      operational_date: op,
+      current_fiscal_year: null,
+      coverage_start_date,
+      coverage_end_date: latest_end,
+      days_remaining: null,
+      next_fiscal_year: null,
+      next_fiscal_year_loaded: false,
+      current_source_type: null,
+      reason_codes: ["COVERAGE_EXPIRED"],
+      generated_at: generatedAt,
+    };
+  }
+
+  const current = covering[0]!;
+  const next_fiscal_year = current.fiscal_year + 1;
+  const next_fiscal_year_loaded = byNumber.has(next_fiscal_year);
+  const contiguous = contiguousCoverageEndFrom(sorted, current);
+  const coverage_end_date = contiguous.end_date;
+  const days_remaining = Math.max(
+    0,
+    inclusiveDayCount(op, coverage_end_date) - 1
+  );
+
+  const reason_codes: FiscalCoverageReasonCode[] = [];
+  if (next_fiscal_year_loaded) {
+    reason_codes.push("NEXT_YEAR_LOADED");
+  } else {
+    reason_codes.push("NEXT_YEAR_MISSING");
+  }
+  if (contiguous.gap_after) {
+    reason_codes.push("GAP_AFTER_LAST_YEAR");
+  }
+
+  let status: FiscalCoverageStatus;
+  if (next_fiscal_year_loaded || days_remaining > FISCAL_COVERAGE_ATTENTION_DAYS) {
+    status = "HEALTHY";
+  } else if (days_remaining <= FISCAL_COVERAGE_URGENT_DAYS) {
+    status = "URGENT";
+    reason_codes.push("COVERAGE_URGENT");
+  } else {
+    status = "ATTENTION";
+    reason_codes.push("COVERAGE_ATTENTION");
+  }
+
+  return {
+    status,
+    operational_date: op,
+    current_fiscal_year: current.fiscal_year,
+    coverage_start_date,
+    coverage_end_date,
+    days_remaining,
+    next_fiscal_year,
+    next_fiscal_year_loaded,
+    current_source_type: current.source_type,
+    reason_codes,
+    generated_at: generatedAt,
+  };
+}
+
+/**
+ * Derive fiscal calendar coverage for a store-local operational date.
+ * Never invents years. Never mutates ISO rotation state.
+ */
+export async function computeFiscalCoverage(
+  client: SupabaseClient,
+  input: ComputeFiscalCoverageInput
+): Promise<
+  | { ok: true; coverage: FiscalCoverage }
+  | { ok: false; missingRelation: true; coverage: FiscalCoverage }
+  | { ok: false; error: string }
+> {
+  let operationalDate: string;
+  if (input.operationalDate) {
+    const parsed = parseOperationalDate(input.operationalDate);
+    if (!parsed) {
+      return {
+        ok: false,
+        error: `Invalid operational date: ${input.operationalDate}`,
+      };
+    }
+    operationalDate = parsed;
+  } else if (input.instant != null) {
+    try {
+      operationalDate = operationalDateFromInstant(
+        input.instant,
+        input.timeZone ?? "America/Denver"
+      );
+    } catch {
+      return { ok: false, error: "Invalid instant for store-local date" };
+    }
+  } else {
+    return {
+      ok: false,
+      error: "operationalDate or instant is required",
+    };
+  }
+
+  const generatedAt = input.generatedAt ?? new Date().toISOString();
+  const yearsRes = await fetchAuthoritativeFiscalYears(client);
+
+  if (!yearsRes.ok) {
+    if ("missingRelation" in yearsRes && yearsRes.missingRelation) {
+      const coverage: FiscalCoverage = {
+        status: "EXPIRED",
+        operational_date: operationalDate,
+        current_fiscal_year: null,
+        coverage_start_date: null,
+        coverage_end_date: null,
+        days_remaining: null,
+        next_fiscal_year: null,
+        next_fiscal_year_loaded: false,
+        current_source_type: null,
+        reason_codes: ["SCHEMA_UNAVAILABLE", "COVERAGE_EXPIRED"],
+        generated_at: generatedAt,
+      };
+      return { ok: false, missingRelation: true, coverage };
+    }
+    return {
+      ok: false,
+      error: "error" in yearsRes ? yearsRes.error : "Failed to load fiscal years",
+    };
+  }
+
+  return {
+    ok: true,
+    coverage: computeFiscalCoverageFromYears(
+      yearsRes.years,
+      operationalDate,
+      generatedAt
+    ),
+  };
+}

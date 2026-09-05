@@ -24,6 +24,7 @@ import { WeeklyBayTargetCard } from "@/components/hub/WeeklyBayTargetCard";
 import { ThemeSelector } from "@/components/settings/ThemeSelector";
 import { SyncQueuePanel } from "@/components/settings/SyncQueuePanel";
 import { SundayScheduleCard } from "@/components/admin/SundayScheduleCard";
+import { FiscalCoverageCard } from "@/components/admin/FiscalCoverageCard";
 import {
   clearLocalApplianceScans,
   countLocalApplianceScans,
@@ -410,6 +411,7 @@ export function SettingsSection({
             {masterSession ? (
               <>
                 <SundayScheduleCard specialist={activeSpecialist} />
+                <FiscalCoverageCard specialist={activeSpecialist} />
                 <button
                   type="button"
                   onClick={() => setForceOpen(true)}
