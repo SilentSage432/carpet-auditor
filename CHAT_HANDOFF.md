@@ -1,6 +1,7 @@
 # DeptSync Hub — Chat Handoff
 
 ## Latest (2026-09-04)
+- **Information hierarchy:** Floor operate-only (Topology demoted to More); verification strip → existing rollup modal; empty week Stage plan; Map navigator before Snap Bay Photo. Screenshots: `tmp/hierarchy-implementation/` (do not commit).
 - **Mobile shell scroll:** `.hub-app-shell` = fixed `h-dvh` viewport; keep-alive tabs (`absolute inset-0 overflow-y-auto`) are the scroll owners; `--hub-workspace-pad-bottom` clears the fixed bottom nav. Screenshots: `tmp/mobile-shell-validation/` (do not commit).
 - **Two-DS pilot polish:** store identity adopts profile store when hub store unset (`lib/store.ts` + `SessionGate`); Floor readiness line (`composeFloorReadinessLine`); Sunday staged-work / hours→share UX (engine unchanged); remnant live area via `composeRemnantArea`. Ops checklist: `DEPT_SYNC_STATE.md` Appendix D. Screenshots: `tmp/ds-pilot-polish/` (do not commit).
 

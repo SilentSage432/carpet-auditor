@@ -260,7 +260,7 @@ export function WalkTheFloorSheet({
                 className="btn-primary-glow flex min-h-12 w-full items-center justify-center gap-2 rounded-xl px-4 text-sm"
               >
                 <Camera className="w-4 h-4 mr-2" strokeWidth={1.75} />
-                Snap Bay AI Audit
+                Snap Bay Photo
               </button>
             </div>
           )}

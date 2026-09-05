@@ -1,5 +1,15 @@
 # DeptSync Hub — Development Journal
 
+## 2026-09-04 — Information hierarchy (Floor / Map operate vs configure)
+
+### Shipped
+- Floor: removed Topology / Bay Setup CTA (configure stays in More → Store Topology). Stage CTA relabeled **Stage this week**.
+- Floor: when `pendingVerifyCount > 0`, first-class **Awaiting your verification** strip opens existing `SupervisorAuditSummaryModal` (no new mutation path).
+- Empty week: operational plan (week · 0 staged · target · mapped) + Stage; no Floor route to Master Trigger/cron.
+- Map: aisle navigator before **Snap Bay Photo** (tool demoted below grid).
+- Copy: Snap Bay Photo; More **Generate this week's list**; targets **weekly auto-stage**. **Needs Attention** filter label unchanged (multi-condition; not verify-only).
+- Screenshots: `tmp/hierarchy-implementation/` (do not commit).
+
 ## 2026-09-04 — Mobile shell scroll ownership
 
 ### Shipped

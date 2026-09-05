@@ -217,7 +217,7 @@ export function ForceRotationModal({
               id="force-rotation-title"
               className="glass-title mt-1 text-lg"
             >
-              Trigger Weekly Rotation
+              Generate this week&apos;s list
             </h2>
           </div>
           <button

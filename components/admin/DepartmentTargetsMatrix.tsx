@@ -171,7 +171,7 @@ export function DepartmentTargetsMatrix({ specialist }: Props) {
       );
       setMessage(
         updated.is_active
-          ? `${updated.name} on for Sunday cron`
+          ? `${updated.name} on for weekly auto-stage`
           : `${updated.name} paused`
       );
     } catch (err) {
@@ -189,7 +189,7 @@ export function DepartmentTargetsMatrix({ specialist }: Props) {
         </h2>
         <p className="mt-1 text-sm text-zinc-400">
           {master
-            ? "Weekly bay quotas for Sunday cron. Toggle pauses a department. Changes save on blur or Save All."
+            ? "Weekly bay quotas for weekly auto-stage. Toggle pauses a department. Changes save on blur or Save All."
             : "How many bays Sunday should assign for your department (default 10)."}
         </p>
       </div>

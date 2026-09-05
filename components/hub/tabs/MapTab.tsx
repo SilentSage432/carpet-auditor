@@ -237,17 +237,6 @@ export function MapTab({ specialist }: WorkflowTabProps) {
           </button>
         </div>
 
-        {!locatorOnly ? (
-          <button
-            type="button"
-            onClick={() => setBayScanOpen(true)}
-            className="btn-primary-glow mb-3 flex min-h-11 w-full items-center justify-center rounded-xl px-4 text-sm"
-          >
-            <Camera className="w-4 h-4 mr-2" strokeWidth={ICON_STROKE} />
-            Snap Bay AI Audit
-          </button>
-        ) : null}
-
         {authRequired ? (
           <p className="glass-card mb-3 border-amber-500/40 bg-amber-950/25 px-3 py-2.5 text-sm text-amber-100">
             {STORE_OPS_AUTH_HINT}
@@ -294,6 +283,17 @@ export function MapTab({ specialist }: WorkflowTabProps) {
             />
           )}
         </div>
+
+        {!locatorOnly ? (
+          <button
+            type="button"
+            onClick={() => setBayScanOpen(true)}
+            className="btn-primary-glow mt-3 flex min-h-11 w-full items-center justify-center rounded-xl px-4 text-sm"
+          >
+            <Camera className="mr-2 h-4 w-4" strokeWidth={ICON_STROKE} />
+            Snap Bay Photo
+          </button>
+        ) : null}
       </main>
 
       {bayScanOpen ? (

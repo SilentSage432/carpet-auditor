@@ -226,8 +226,8 @@ Stacked cards (~1.5–2 handheld screens):
 | Card | Contents |
 |------|----------|
 | **Profile & Preferences** | Name, role badge, store #; Change PIN; Lucide Palette Appearance & Theme; Device & sync accordion; phone rotation alerts |
-| **Department Targets & Sunday Auto-Stage** | Sunday auto-stage (Master); weekly `/wk` quotas; Trigger Weekly Rotation Now |
-| **Store Topology & Bay Setup** | Collapsible `AisleBayManager` (add bay, bulk generate, delete) |
+| **Department Targets & Sunday Auto-Stage** | Sunday auto-stage (Master); weekly `/wk` quotas; **Generate this week's list** |
+| **Store Topology & Bay Setup** | Collapsible `AisleBayManager` (add bay, bulk generate, delete) — Floor no longer hosts Topology CTA |
 | **Catalog & Remnants** | Collapsible taxonomies + remnant inventory / markdown |
 
 **Roster management** lives on the **Roster** tab (`SpecialistCard` + `SpecialistEditSheet`), not Settings: add team member (name, role, home department, optional phone), pair devices via QR.
@@ -260,7 +260,7 @@ Floor Pad is no longer a Settings tool. Master/DS open **Walk & Talk** from Floo
 | **SimsLocationFinder** | `SimsLocationFinder.tsx` | Catalog CTA + Audit 📍 SIMS Stock | Search drawer / dialog |
 | **ApplyMarkdownModal** | `ApplyMarkdownModal.tsx` | Remnant markdown CTA | % Off / Fixed $ + preview |
 | **Quick-AddCatalogModal** | `QuickAddCatalogModal.tsx` | Cycle Audit / scan flows | Link unlinked barcode → catalog (supersedes retired MarryBarcodeModal) |
-| **VisualBayScannerModal** | `store-ops/VisualBayScannerModal.tsx` | Floor header **Snap Bay AI Audit** / Store Map CTA / bay sheet / Cycle Audit | Camera or upload → Gemini scan beam → results drawer (z-90) |
+| **VisualBayScannerModal** | `store-ops/VisualBayScannerModal.tsx` | Floor analytics **Snap Bay Photo** / Store Map (below navigator) / bay sheet / Cycle Audit | Camera or upload → Gemini scan beam → results drawer (z-90) |
 | **TacticalVoiceFloorPad** | `dashboard/TacticalVoiceFloorPad.tsx` | Floor Shift Analytics → Walk & Talk | Listening pill + bottom sheet voice/scratchpad + Copilot cards (z-80) |
 | **ExecutiveFloorPad** | `manager-notes/ExecutiveFloorPad.tsx` | Floor Pad sheet “full notes” / `#floor-pad` | Full-screen TipTap Floor Pad + Gemini Copilot + archive (z-80) |
 | Pin / Sync toasts | `app/page.tsx` | PIN save / online flush | Fixed top status pills |

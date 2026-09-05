@@ -908,9 +908,7 @@ export function ZebraChecklist({
         <p className="rounded-2xl border border-dashed border-slate-700 px-4 py-4 text-center text-sm text-slate-400">
           {isAssociate(specialist)
             ? "No bays scheduled on your rotation — see your supervisor"
-            : isMasterAdmin(specialist)
-              ? "No bays scheduled this week. Open Settings → Trigger weekly rotation."
-              : "No bays scheduled this week — ask Master Admin to set the rotation."}
+            : "No bays staged this week. Stage this week to build the floor plan."}
         </p>
       ) : null}
 

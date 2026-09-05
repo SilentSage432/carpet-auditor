@@ -499,7 +499,7 @@ export function VisualBayScannerModal({
               id="visual-bay-scan-title"
               className="mt-0.5 text-base font-semibold tracking-tight text-white"
             >
-              Snap Bay AI Audit
+              Snap Bay Photo
             </h2>
             <p className="mt-0.5 text-xs text-white/70">
               {locLabel || "Capture aisle / bay photo for Gemini compliance"}

@@ -420,7 +420,7 @@ export function SettingsSection({
                     strokeWidth={ICON_STROKE}
                     aria-hidden
                   />
-                  Trigger Weekly Rotation Now
+                  Generate this week&apos;s list
                 </button>
               </>
             ) : null}

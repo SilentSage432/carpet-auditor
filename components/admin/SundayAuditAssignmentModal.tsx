@@ -665,7 +665,7 @@ export function SundayAuditAssignmentModal({
               <span className="font-semibold text-amber-200">
                 Stage / Draw 12 Flooring Bays
               </span>{" "}
-              or Settings → Trigger weekly rotation (Master Admin).
+              or More → Generate this week&apos;s list (Master Admin).
             </p>
           ) : (
             <ul className="space-y-2">
