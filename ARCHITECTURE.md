@@ -210,6 +210,7 @@ supabase/migrations/20260816_store_locations_read.sql → (superseded) open SELE
 supabase/migrations/20260816_rls_read_write_parity.sql → digit-equal jwt_matches_store, department aliases
 supabase/migrations/20260817_rls_security_lockdown.sql → Drop anon/open SELECT; authenticated store RLS; Realtime on sunday_bay_assignments / manager_notes / downstock_queue
 supabase/migrations/20260818_weekly_rotation_verification.sql → weekly_rotations.verification_status (associate submit → DS verify)
+supabase/migrations/20260905_weekly_rotation_completion_attempts.sql → child attempt history (send-back preserves evidence; local until prod gate)
 supabase/migrations/20260818_store_location_workflow_type.sql → store_locations.workflow_type (STANDARD_MERCH | APPLIANCE_SIMS_AUDIT | BULK_PALLET_AUDIT)
 supabase/migrations/20260818_appliance_scans_bay_location.sql → appliance_scans.location_id / aisle / bay_number
 supabase/migrations/20260812_manager_notes.sql → durable manager_notes (store_number/department/author) + JWT RLS

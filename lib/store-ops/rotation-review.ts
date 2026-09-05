@@ -6,6 +6,10 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { BayAuditLogRow } from "@/lib/ai/contracts/bay-audit";
 import { fetchLatestBayAuditLogsByRotationIds } from "./bay-audit-logs";
+import {
+  sendBackCompletionAttempt,
+  verifyCompletionAttempt,
+} from "./completion-attempt-history";
 import { isMissingColumnError } from "./errors";
 import type { StoreLocation, WeeklyRotation } from "./types";
 
@@ -179,6 +183,11 @@ export async function verifyPendingRotation(
     verified_at: now,
     review_note: null,
   });
+  await verifyCompletionAttempt(supabase, {
+    weeklyRotationId: rotationId,
+    reviewedAt: now,
+    reviewedBy: actorId ?? null,
+  });
   const location = await markLocationCompleted(
     supabase,
     String(rotation.location_id),
@@ -191,7 +200,8 @@ export async function sendBackWeeklyRotation(
   supabase: SupabaseClient,
   rotationId: string,
   note: string,
-  expectedDepartmentId?: string | null
+  expectedDepartmentId?: string | null,
+  actorId?: string | null
 ): Promise<ReviewRotationResult> {
   const trimmed = note.trim();
   if (!trimmed) {
@@ -231,6 +241,12 @@ export async function sendBackWeeklyRotation(
     verified_by: null,
     verified_at: null,
     review_note: trimmed,
+  });
+  await sendBackCompletionAttempt(supabase, {
+    weeklyRotationId: rotationId,
+    reviewedAt: now,
+    reviewedBy: actorId ?? null,
+    reviewNote: trimmed,
   });
   const location = await restoreLocationAssigned(
     supabase,

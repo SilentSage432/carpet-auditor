@@ -8,6 +8,11 @@ import { normalizeStoreNumber, storeNumberQueryValues } from "@/lib/store";
 import type { Department, StoreLocation, WeeklyRotation } from "./types";
 import { resolveVerificationStatus } from "./types";
 import { verifyPendingRotation } from "./rotation-review";
+import {
+  openPendingCompletionAttempt,
+  recordAutoVerifiedCompletionAttempt,
+  recoverAutoVerifiedAttemptFromParent,
+} from "./completion-attempt-history";
 import { listActiveStores } from "./stores";
 import { pickSundayCarryOverFirst, pickSundayVelocityPrioritized } from "./rotation";
 import {
@@ -1387,6 +1392,33 @@ export async function completeWeeklyRotation(
         location: closed.location as StoreLocation,
       };
     }
+    // Idempotent replay: recover history if parent is awaiting review but attempt insert failed earlier.
+    if (
+      resolveVerificationStatus(rotation as WeeklyRotation) ===
+      "PENDING_VERIFICATION"
+    ) {
+      const stamp = (rotation as WeeklyRotation).completed_at;
+      if (!stamp) {
+        throw new Error(
+          "Cannot recover completion attempt: parent completed_at is missing"
+        );
+      }
+      await openPendingCompletionAttempt(supabase, {
+        weeklyRotationId: rotationId,
+        reportedAt: String(stamp),
+        reportedBy: options.actorId ?? (rotation as WeeklyRotation).completed_by,
+      });
+    } else if (
+      options.autoVerify &&
+      resolveVerificationStatus(rotation as WeeklyRotation) ===
+        "VERIFIED_COMPLETE"
+    ) {
+      // Operation-local auto-verify retry: recover child from parent facts only.
+      await recoverAutoVerifiedAttemptFromParent(
+        supabase,
+        rotation as WeeklyRotation
+      );
+    }
     const { data: location } = await supabase
       .from("store_locations")
       .select("*")
@@ -1443,6 +1475,11 @@ export async function completeWeeklyRotation(
   const closeLocation =
     autoVerify || resolveVerificationStatus(updatedRotation) !== "PENDING_VERIFICATION";
   if (!closeLocation) {
+    await openPendingCompletionAttempt(supabase, {
+      weeklyRotationId: rotationId,
+      reportedAt: now,
+      reportedBy: options.actorId ?? null,
+    });
     const { data: location } = await supabase
       .from("store_locations")
       .select("*")
@@ -1453,6 +1490,13 @@ export async function completeWeeklyRotation(
       location: location as StoreLocation,
     };
   }
+
+  await recordAutoVerifiedCompletionAttempt(supabase, {
+    weeklyRotationId: rotationId,
+    reportedAt: now,
+    reviewedAt: now,
+    actorId: options.actorId ?? null,
+  });
 
   let { data: location, error: locError } = await supabase
     .from("store_locations")

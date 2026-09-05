@@ -18,6 +18,21 @@
 | **Default post-login land** | `/dashboard` (Floor checklist) |
 | **Specialty scan hub** | `/` with `?section=audit\|appliances\|department` |
 
+### History integrity (completion attempts)
+
+| Field | Value |
+|-------|-------|
+| **Parent** | `weekly_rotations` = current operational state |
+| **Child** | `weekly_rotation_completion_attempts` = authoritative report/review history |
+| **Migration** | `20260905_weekly_rotation_completion_attempts.sql` — **LIVE in production**; app ships with this commit |
+| **Gap closed** | DS send-back no longer destroys prior reported-complete evidence |
+| **Compatibility** | History skip only when this table is absent (`42P01`/`PGRST205` + table name); auto-verify retry recovers from parent stamps |
+| **RESTRICT** | Attempt FK `ON DELETE RESTRICT` — location hard-delete may fail once attempts exist (intentional; soft-delete deferred) |
+| **Backfill** | None — legacy verified rows may lack attempts |
+| **Lifecycle** | **Awaiting first natural** report/review (do not fabricate rotations) |
+| **Privacy** | Actor ids for provenance only; not associate leaderboards |
+| **Future intelligence** | Enables first-pass / rework / lag metrics; seasonal correlation needs calendar (deferred) |
+
 ### Core stack
 
 | Layer | Technology | Version / location |
@@ -216,7 +231,8 @@ Until applied, production Hub falls back to localStorage for catalog/remnants; r
 | 8 | `departments` | `id` (uuid); unique `code` | Lowe's dept codes + weekly bay targets |
 | 9 | `profiles` | `id` → `auth.users` | Supabase Auth RBAC |
 | 10 | `store_locations` | `id`; unique `(department_id, aisle, bay, type)` | Aisle/bay topology |
-| 11 | `weekly_rotations` | `id`; unique `(location_id, assigned_week)` | Weekly bay assignment rows |
+| 11 | `weekly_rotations` | `id`; unique `(location_id, assigned_week)` WHERE active | Weekly bay assignment rows |
+| 11b | `weekly_rotation_completion_attempts` | FK → `weekly_rotations` ON DELETE RESTRICT; one PENDING per rotation | Report/review history (local migration not yet production) |
 | 12 | `sunday_bay_assignments` | composite | Sunday specialist↔bay staging |
 | 13 | `downstock_queue` | — | Top-stock / packdown flags |
 | 14 | `rotation_exceptions` | — | Mid-week barrier reasons |
@@ -275,6 +291,7 @@ Until applied, production Hub falls back to localStorage for catalog/remnants; r
 |--------|---------------------|----------|
 | Layer-1 rotation metrics | `lib/store-ops/rotation-metrics.ts` (`weekly-rotation-metrics-v1`) | Floor / health / rollup / Map consume; Art VI A-1; **active rows only** |
 | Weekly rotation history | `superseded_at` + `20260905_weekly_rotations_superseded.sql`; `rotation-history.ts` | Force Draw supersedes incomplete stages; pre-migration deletes UNKNOWN |
+| Completion-attempt history | `weekly_rotation_completion_attempts` + `completion-attempt-history.ts` | Schema **LIVE**; send-back preserves attempts; first natural lifecycle pending |
 | Auth & hub gate | `proxy.ts`, `lib/auth-gate.ts`, `AccessGate`, `AuthWall` | Cookie + JWT + RLS |
 | Roster / PIN / invite / QR pair | `lib/specialists.ts`, `app/pair/page.tsx`, `app/auth/verify/[token]`, `/api/roster/*` | End-to-end onboarding |
 | Floor bay rotations (Zebra) | `ZebraChecklist.tsx`, `completeRotation()`, `/api/rotations/complete` | Optimistic UI + offline queue |

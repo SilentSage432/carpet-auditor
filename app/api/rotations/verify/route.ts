@@ -200,7 +200,8 @@ export async function POST(request: Request) {
           supabase,
           rotationId,
           body.note ?? "",
-          scoped.expectedDepartmentId
+          scoped.expectedDepartmentId,
+          actor.specialistId
         );
         return NextResponse.json({
           ok: true,

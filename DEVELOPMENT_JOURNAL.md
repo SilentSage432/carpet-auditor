@@ -1,5 +1,31 @@
 # DeptSync Hub — Development Journal
 
+## 2026-09-05 — Completion-attempt history production-blocker correction
+
+### Shipped (local only)
+- Tightened `isCompletionAttemptHistoryUnavailable` to **this table only** (`42P01` / `PGRST205` + relation name). Missing column, wrong table, permission, unique, network no longer silently disable history.
+- Auto-verify idempotent retry recovers a VERIFIED child from parent `completed_at` / `completed_by` / `verified_at` / `verified_by` via `recoverAutoVerifiedAttemptFromParent` (operation-local; no legacy backfill).
+- `ON DELETE RESTRICT` retained — location hard-delete may fail once attempts exist (intentional fail-closed; soft-delete deferred).
+
+### Production (updated after migration gate)
+- Schema **LIVE** on `fmeinlwhixngednabhgy` via `20260905_weekly_rotation_completion_attempts.sql` (pre-migration dump `…T17-41-43-893Z.dump`).
+- App implementation ships with this commit; first natural report/review lifecycle still **pending** (no fabricated rotations).
+
+## 2026-09-05 — Completion-attempt history (local, not migrated)
+
+### Shipped
+- Additive migration `20260905_weekly_rotation_completion_attempts.sql`: child history for report/review cycles (`PENDING` / `VERIFIED` / `SENT_BACK`), FK `ON DELETE RESTRICT`, one-PENDING partial unique, RLS via parent `weekly_rotations` store/department.
+- Domain owner `lib/store-ops/completion-attempt-history.ts`; wired into `completeWeeklyRotation`, `verifyPendingRotation`, `sendBackWeeklyRotation` (now records reviewer), auto-verify (single VERIFIED attempt).
+- Super Admin `GET /api/store-locations/history` attaches `completion_attempts` when table exists.
+- No legacy backfill. Parent remains current operational state. Missing-table skip only for relation absence during rollout.
+- Privacy: actor ids are provenance, not performance scoring. Enables future first-pass/rework/lag derivation; seasonal correlation deferred.
+
+### Production
+- **Migration NOT applied.** Status: COMPLETION ATTEMPT HISTORY IMPLEMENTED LOCALLY — NOT MIGRATED.
+
+### Validation
+- Tests A–J in `completion-attempt-history.test.ts`; full suite / typecheck / build / lint regression.
+
 ## 2026-09-05 — Specialty M2 production gate (applied)
 
 ### Production

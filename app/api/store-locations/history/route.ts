@@ -4,6 +4,7 @@ import {
   requireSuperAdmin,
   StoreOpsAuthError,
 } from "@/lib/store-ops/auth-server";
+import { listCompletionAttemptsForRotations } from "@/lib/store-ops/completion-attempt-history";
 import { resolveStoreByNumber } from "@/lib/store-ops/stores";
 import { requireSupabaseAdmin } from "@/lib/supabase/admin-response";
 import { readableError } from "@/lib/store-ops/errors";
@@ -11,6 +12,7 @@ import { readableError } from "@/lib/store-ops/errors";
 /**
  * GET /api/store-locations/history?location_id=
  * Super Admin — bay rotation history for Store Map bottom sheet.
+ * Optionally attaches completion_attempts per rotation when the history table exists.
  */
 export async function GET(request: Request) {
   try {
@@ -75,13 +77,33 @@ export async function GET(request: Request) {
         store_id: store.id,
         location,
         rotations: legacy.data ?? [],
+        completion_attempt_history_available: false,
       });
+    }
+
+    const rotationRows = rotations ?? [];
+    const { attempts, unavailable } = await listCompletionAttemptsForRotations(
+      supabase,
+      rotationRows.map((row) => String((row as { id?: string }).id ?? ""))
+    );
+    const attemptsByRotation = new Map<string, typeof attempts>();
+    for (const attempt of attempts) {
+      const list = attemptsByRotation.get(attempt.weekly_rotation_id) ?? [];
+      list.push(attempt);
+      attemptsByRotation.set(attempt.weekly_rotation_id, list);
     }
 
     return NextResponse.json({
       store_id: store.id,
       location,
-      rotations: rotations ?? [],
+      rotations: rotationRows.map((row) => {
+        const id = String((row as { id?: string }).id ?? "");
+        return {
+          ...row,
+          completion_attempts: attemptsByRotation.get(id) ?? [],
+        };
+      }),
+      completion_attempt_history_available: !unavailable,
     });
   } catch (err) {
     if (err instanceof StoreOpsAuthError) {
