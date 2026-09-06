@@ -300,7 +300,8 @@ Until applied, production Hub falls back to localStorage for catalog/remnants; r
 | Floor fiscal/season strip (FS-002B) | `floor-operational-context.ts` + `FloorOperationalContextStrip` on Floor | Fiscal + active context + current dept relevance; empty OK; non-blocking |
 | Location seasonal relevance (FS-003) | `operational_context_location_relevance` + domain/API + Settings assign | Declared only; empty seed valid; no rotation/priority/SI/Map |
 | Map seasonal badges (FS-003B) | `map-location-context.ts` + MapTab / StoreLocationGrid / Walk sheet | Batched resolve; UNSET omit; NONE detail-only; no heatmap overload |
-| Location attention pressure (SI-001) | `location-attention-pressure.ts` + `location-eligibility.ts` (`location-attention-pressure-v1`) | **Foundation LIVE** (pure Layer-1 engine); no API/UI/persistence; confidence≠actionability; seasonal scale differentiated |
+| Location attention pressure (SI-001) | `location-attention-pressure.ts` + `location-eligibility.ts` (`location-attention-pressure-v1`) | **Foundation LIVE** (pure Layer-1 engine); confidence≠actionability; seasonal scale differentiated |
+| Attention read API (SI-001A) | `location-attention-read-model.ts` + `GET /api/store-intelligence/attention` | **FOUNDATION IMPLEMENTED** (awaiting deploy confirmation); hybrid degradation; Case B barriers independent of rotation failure when exceptions empty; no UI/persistence/rotation coupling |
 | Auth & hub gate | `proxy.ts`, `lib/auth-gate.ts`, `AccessGate`, `AuthWall` | Cookie + JWT + RLS |
 | Roster / PIN / invite / QR pair | `lib/specialists.ts`, `app/pair/page.tsx`, `app/auth/verify/[token]`, `/api/roster/*` | End-to-end onboarding |
 | Floor bay rotations (Zebra) | `ZebraChecklist.tsx`, `completeRotation()`, `/api/rotations/complete` | Optimistic UI + offline queue |

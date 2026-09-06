@@ -1,5 +1,15 @@
 # DeptSync Hub — Development Journal
 
+## 2026-09-05 — SI-001A Attention Read API (local)
+
+- Read boundary: `lib/store-ops/location-attention-read-model.ts` + `GET /api/store-intelligence/attention?department_id=`.
+- Owns auth/scope, batched evidence, availability truth, normalization, degradation metadata, `generated_at`; does not own SI pressure/confidence/actionability.
+- Hybrid: foundational location fetch fails the request; rotation/barriers/seasonal degrade with flags (empty success = available).
+- Barrier open = week exceptions whose `bay_id` (= `store_locations.id`) is not `VERIFIED_COMPLETE`. Exception READ is independent of rotation; open/closed classification requires rotation only when scoped exception rows exist (zero exceptions → barriers AVAILABLE even if rotation failed).
+- Eligibility: API returns eligible Map/rotation locations only (`isEligibleRotationLocation`); SI gate remains defensive.
+- Duplicate active rotations → conflict → rotation unavailable (no invented authority).
+- No schema/UI/persistence/ranking/rotation writes. **SI-001A ATTENTION READ API FOUNDATION IMPLEMENTED** (not Map/Floor LIVE).
+
 ## 2026-09-05 — SI-001 semantic correction (local)
 
 ### Corrected
