@@ -1,5 +1,13 @@
 # DeptSync Hub — Development Journal
 
+## 2026-09-06 — LAB-001 Department Labor Availability foundation
+
+- Pure domain: `composeDepartmentLaborAvailability` + `knownShiftHours` (`department-scheduled-labor-v1`).
+- Persisted shift evidence only; unknown duration ≠ 8; no board defaults; home attribution via `specialistHomeDepartment`; Master excluded; Supervisors as schedule evidence only.
+- Semantic gates: conflicting duplicate shift keys → `CONFLICTING_SHIFT_DAY` (no invented winner); unavailable sources → `null` aggregates (not zero claims); `known_scheduled_hours` = gross declared schedule including call-out; `expected_on_duty` day-scoped from persisted rows only.
+- Tests: `labor-availability.test.ts` (53). No API/UI/schema/persistence/capacity/recommendation/rotation writes. CAP-001 remains deferred.
+- Status: **LAB-001 FOUNDATION IMPLEMENTED** (not LIVE — no API/UI/runtime consumer).
+
 ## 2026-09-06 — CAP-001 Department Operational Capacity deferred (audit only)
 
 - Architecture-audited; **no implementation**.
