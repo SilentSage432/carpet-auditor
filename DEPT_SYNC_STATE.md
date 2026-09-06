@@ -299,7 +299,8 @@ Until applied, production Hub falls back to localStorage for catalog/remnants; r
 | Floor → Map investigation (UX-004) | `map-attention-investigation.ts` + Floor CTA URL intent + MapTab strip / marker emphasize | **CLOSED on hardware** — navigation intent only; Map resolves current SI; geography preserved; Standard on arrival; Show all clears; no ranking/REC/LAB/schema/API/SI semantics |
 | Quiet Show all clear (UX-004B) | `exitMapAttentionInvestigation` + `replaceState(history.state)` then `router.replace` | **LIVE lineage** — clear independent of SI result; history.state preserved; elevated preserved; UX004A-02 pin deferred |
 | Temporal week copy | Floor `Staging week` / Map `Calendar week` presentation helpers | **LIVE** `8e106f3` — clocks unchanged; Sunday staging vs calendar divergence intentional; fiscal separate; Map overlay week prop deferred |
-| Mobile interaction (UX-004C) | Floor 2×2 filters; `HubPortal` sheets; `.hub-modal-sheet`; `SpecialtyToolsHost` | **IMPLEMENTED LOCALLY — AWAITING COMMIT REVIEW** — panel stays beneath nav; Samsung re-smoke required after deploy |
+| Mobile interaction (UX-004C) | Floor 2×2 filters; `HubPortal` sheets; `.hub-modal-sheet`; `SpecialtyToolsHost` | **PARTIAL DEVICE PASS on `0b939be`** — Executive Floor Pad FAIL → UX-004C.1 |
+| Executive Floor Pad handoff (UX-004C.1) | Durable `?open=executive-floor-pad`; Floor `ExecutiveFloorPadIntentBridge` consume-once | **COMMITTED — READY FOR SAMSUNG ACCEPTANCE** |
 | Fiscal calendar (FS-001) | `fiscal_years` / `fiscal_weeks` + `fiscal-calendar.ts` + `GET /api/fiscal-calendar` | Schema **LIVE**; **FY2026 COMPANY_PUBLISHED seeded**; ISO `assigned_week` unchanged; seasons/events/pressure deferred |
 | Fiscal calendar coverage (FS-001A min) | `computeFiscalCoverage` + `GET /api/admin/fiscal-calendar/coverage` + Settings `FiscalCoverageCard` | Derived on read; Master-only signal; **no** discovery/promote/cron/push/persistence |
 | Operational seasons/events (FS-002) | `operational_contexts` + relevance + `operational-context.ts` + APIs + Settings card | Master-declared foundation LIVE; empty seed valid; no SI / location priority |
@@ -381,7 +382,7 @@ Until applied, production Hub falls back to localStorage for catalog/remnants; r
 | `/catalog` | `/appliances` |
 | `/flooring` | `/dashboard` + Sunday drawer |
 | `/sunday-audit`, `/sunday-rotation` | `/dashboard` + Sunday drawer (`requestSundayAuditDrawer()`) |
-| `/manager-notes` | `/dashboard#floor-pad` |
+| `/manager-notes` | `/dashboard?open=executive-floor-pad` |
 | `/stock`, `/department`, `/verify-rotation` | `/dashboard` |
 | `/admin/exceptions` | `/dashboard` |
 | `/admin/supervisors`, `/admin/roles` | `/roster` |

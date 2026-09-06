@@ -12,7 +12,6 @@ import {
   APPLIANCE_SCANNER_OPEN_EVENT,
   REMNANT_CALCULATOR_OPEN_EVENT,
   EXECUTIVE_FLOOR_PAD_OPEN_EVENT,
-  EXECUTIVE_FLOOR_PAD_HASH,
 } from "@/lib/specialty-tools";
 
 const root = path.resolve(__dirname, "../..");
@@ -79,7 +78,7 @@ describe("UX-004C More Floor Utilities destinations", () => {
     expect(settings).toContain('data-testid="more-executive-floor-pad"');
     expect(settings).toContain("requestApplianceScanner()");
     expect(settings).toContain("requestRemnantCalculator()");
-    expect(settings).toContain("requestExecutiveFloorPad()");
+    expect(settings).toContain("router.push(buildExecutiveFloorPadHref())");
     expect(settings).not.toMatch(
       /href="\/dashboard#floor-pad"/
     );
@@ -94,15 +93,11 @@ describe("UX-004C More Floor Utilities destinations", () => {
     try {
       requestApplianceScanner();
       requestRemnantCalculator();
-      // On /dashboard path in jsdom — hash + event
-      window.history.pushState({}, "", `/dashboard#other`);
+      window.history.pushState({}, "", `/dashboard`);
       requestExecutiveFloorPad();
       expect(seen).toContain(APPLIANCE_SCANNER_OPEN_EVENT);
       expect(seen).toContain(REMNANT_CALCULATOR_OPEN_EVENT);
       expect(seen).toContain(EXECUTIVE_FLOOR_PAD_OPEN_EVENT);
-      expect(window.location.hash.replace(/^#/, "")).toBe(
-        EXECUTIVE_FLOOR_PAD_HASH
-      );
     } finally {
       window.removeEventListener(APPLIANCE_SCANNER_OPEN_EVENT, handler);
       window.removeEventListener(REMNANT_CALCULATOR_OPEN_EVENT, handler);

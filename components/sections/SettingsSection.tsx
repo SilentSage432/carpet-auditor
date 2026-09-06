@@ -1,7 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import {
   Camera,
@@ -36,8 +36,8 @@ import { selectOnFocus } from "@/lib/number-input";
 import { canAccessSection, canManageMapConsole, isMasterAdmin } from "@/lib/rbac";
 import { clearLocalRemnants, countLocalRemnants, fetchRemnants } from "@/lib/remnants";
 import {
+  buildExecutiveFloorPadHref,
   requestApplianceScanner,
-  requestExecutiveFloorPad,
   requestRemnantCalculator,
 } from "@/lib/specialty-tools";
 import { dedupeRoster, fetchSpecialists, isSupervisor } from "@/lib/specialists";
@@ -145,6 +145,7 @@ export function SettingsSection({
   const showRemnants =
     Boolean(activeSpecialist) && canAccessSection(activeSpecialist, "remnants");
   const pathname = usePathname();
+  const router = useRouter();
 
   void cacheTick;
   const applianceAuditCache = countLocalApplianceScans(storeNumber);
@@ -240,7 +241,7 @@ export function SettingsSection({
         hash === "s-pen-notes" ||
         hash === "floor-pad"
       ) {
-        window.location.replace("/dashboard#floor-pad");
+        router.replace(buildExecutiveFloorPadHref());
       } else if (hash === "taxonomies") {
         setOpenSection("taxonomies");
         setTaxonomyOpen(true);
@@ -261,7 +262,7 @@ export function SettingsSection({
     applyHash();
     window.addEventListener("hashchange", applyHash);
     return () => window.removeEventListener("hashchange", applyHash);
-  }, [pathname]);
+  }, [pathname, router]);
 
   async function testConnection() {
     setPing("checking");
@@ -355,7 +356,7 @@ export function SettingsSection({
             <button
               type="button"
               data-testid="more-executive-floor-pad"
-              onClick={() => requestExecutiveFloorPad()}
+              onClick={() => router.push(buildExecutiveFloorPadHref())}
               className="flex min-h-12 items-center justify-center gap-2 rounded-xl border border-violet-500/40 bg-violet-950/30 px-3 text-sm font-semibold text-violet-100 sm:col-span-2"
             >
               <NotebookPen className="h-4 w-4" strokeWidth={ICON_STROKE} aria-hidden />

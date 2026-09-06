@@ -1,5 +1,13 @@
 # DeptSync Hub — Development Journal
 
+## 2026-09-06 — UX-004C.1 Executive Floor Pad durable handoff (local)
+- Samsung FAIL only: More → Executive Floor Pad flickered; Walk & Talk did not open.
+- Root: hard `location.assign('/dashboard#floor-pad')` without surviving open intent; event was not dispatched across reload; hash unreliable under keep-alive.
+- Fix: `buildExecutiveFloorPadHref()` → `/dashboard?open=executive-floor-pad`; More soft `router.push`; Floor `ExecutiveFloorPadIntentBridge` consumes query/legacy hash after mount, dispatches existing `EXECUTIVE_FLOOR_PAD_OPEN_EVENT`, then `syncExecutiveFloorPadIntentConsumedUrl` + `router.replace('/dashboard')`.
+- Gate hardening: pathname must be Floor (`/dashboard`); bridge rendered after `TacticalVoiceFloorPad` / drawer listeners; `/` excluded (specialty hub).
+- Unchanged: filters, HubPortal, scanner, remnant, SI/LAB/REC, rotation, temporal clocks.
+- Status: **UX-004C.1 final commit gate** (Samsung re-smoke after deploy)
+
 ## 2026-09-06 — UX-004C Mobile interaction reliability (local)
 - Samsung SM-S948U defects: Floor filter horizontal scroll; bottom sheets under BottomNav stacking context; More Floor Utilities dead taps.
 - Floor: mobile `grid-cols-2` filter tablist (predicates unchanged).

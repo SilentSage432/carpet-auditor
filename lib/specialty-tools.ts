@@ -11,9 +11,57 @@ export const APPLIANCE_SCANNER_HASH = "scan";
 export const REMNANT_CALCULATOR_HASH = "remnants-calculator";
 export const EXECUTIVE_FLOOR_PAD_HASH = "floor-pad";
 
+/** Durable Floor handoff — survives soft nav and hard reload (UX-004C.1). */
+export const EXECUTIVE_FLOOR_PAD_OPEN_PARAM = "open";
+export const EXECUTIVE_FLOOR_PAD_OPEN_VALUE = "executive-floor-pad";
+
 export const APPLIANCE_SCANNER_OPEN_EVENT = "deptsync:appliance-scanner-open";
 export const REMNANT_CALCULATOR_OPEN_EVENT = "deptsync:remnant-calculator-open";
 export const EXECUTIVE_FLOOR_PAD_OPEN_EVENT = "deptsync:executive-floor-pad-open";
+
+const FLOOR_PAD_HASHES = new Set([
+  EXECUTIVE_FLOOR_PAD_HASH,
+  "manager-notes",
+  "s-pen-notes",
+]);
+
+/** Bare Floor path after intent consumption (UX-004C.1). */
+export const EXECUTIVE_FLOOR_PAD_BARE_HREF = "/dashboard";
+
+export function buildExecutiveFloorPadHref(): string {
+  return `${EXECUTIVE_FLOOR_PAD_BARE_HREF}?${EXECUTIVE_FLOOR_PAD_OPEN_PARAM}=${EXECUTIVE_FLOOR_PAD_OPEN_VALUE}`;
+}
+
+export function isExecutiveFloorPadOpenIntent(
+  searchParams: URLSearchParams | { get(name: string): string | null }
+): boolean {
+  return (
+    searchParams.get(EXECUTIVE_FLOOR_PAD_OPEN_PARAM) ===
+    EXECUTIVE_FLOOR_PAD_OPEN_VALUE
+  );
+}
+
+export function isExecutiveFloorPadHash(hash: string): boolean {
+  return FLOOR_PAD_HASHES.has(hash.replace(/^#/, ""));
+}
+
+/** Floor command surface only — `/` is specialty scan hub, not Floor. */
+export function isExecutiveFloorPadFloorPath(pathname: string): boolean {
+  return pathname === "/dashboard" || pathname.startsWith("/dashboard/");
+}
+
+/**
+ * Strip query/hash intent while preserving history.state (Map investigation pattern).
+ * Call after dispatching the open event so listeners receive it before URL clears.
+ */
+export function syncExecutiveFloorPadIntentConsumedUrl(
+  href: string = EXECUTIVE_FLOOR_PAD_BARE_HREF
+): void {
+  if (typeof window === "undefined") return;
+  const url = new URL(window.location.href);
+  if (url.pathname === href && url.search === "" && url.hash === "") return;
+  window.history.replaceState(window.history.state, "", href);
+}
 
 export type SpecialtyToolId = "appliance-scanner" | "remnant-calculator";
 
@@ -90,23 +138,21 @@ export function requestRemnantCalculator() {
 
 /**
  * Open Executive Floor Pad / Walk & Talk on Floor.
- * Navigates to the Floor tab and sets the canonical hash so ShiftAnalyticsDrawer
- * + TacticalVoiceFloorPad expand (keep-alive safe).
+ *
+ * When already on Floor: dispatch open event (listeners are mounted keep-alive).
+ * From other routes: navigate with durable query intent
+ * (`/dashboard?open=executive-floor-pad`). Prefer Next `router.push(href)` from
+ * UI callers so keep-alive soft-nav avoids a full reload. Hard `assign` remains
+ * a durable fallback — query survives reload; Floor bridge consumes after mount.
  */
 export function requestExecutiveFloorPad() {
   if (typeof window === "undefined") return;
   const path = window.location.pathname || "";
-  const onFloor = path === "/dashboard" || path === "/";
-  if (!onFloor) {
-    window.location.assign(`/dashboard#${EXECUTIVE_FLOOR_PAD_HASH}`);
+  if (isExecutiveFloorPadFloorPath(path)) {
+    window.dispatchEvent(new CustomEvent(EXECUTIVE_FLOOR_PAD_OPEN_EVENT));
     return;
   }
-  if (window.location.hash.replace(/^#/, "") !== EXECUTIVE_FLOOR_PAD_HASH) {
-    window.location.hash = EXECUTIVE_FLOOR_PAD_HASH;
-  } else {
-    window.dispatchEvent(new Event("hashchange"));
-  }
-  window.dispatchEvent(new CustomEvent(EXECUTIVE_FLOOR_PAD_OPEN_EVENT));
+  window.location.assign(buildExecutiveFloorPadHref());
 }
 
 export function isApplianceScannerHash(hash: string): boolean {

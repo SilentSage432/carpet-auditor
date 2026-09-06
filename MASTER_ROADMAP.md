@@ -1,7 +1,8 @@
 # DeptSync Hub — Master Roadmap
 
 ## Done
-- [ ] UX-004C Mobile interaction reliability — Floor 2×2 filters; HubPortal sheets above nav; More specialty tools host (**IMPLEMENTED LOCALLY — AWAITING COMMIT REVIEW**; Samsung re-smoke required)
+- [x] UX-004C.1 Executive Floor Pad handoff — durable `?open=executive-floor-pad` + Floor intent bridge consume-once (**COMMITTED — READY FOR SAMSUNG ACCEPTANCE**)
+- [x] UX-004C Mobile interaction reliability — Floor 2×2 filters; HubPortal sheets above nav; More specialty tools host (**LIVE baseline `0b939be`**; Executive Floor Pad FAIL on Samsung → UX-004C.1; other defects PASS)
 - [x] Temporal copy clarification — Floor **Staging week** / Map **Calendar week** labels; clocks unchanged; Sunday divergence intentional; Map overlay week semantics deferred (**LIVE** `8e106f3`; device validated)
 - [x] UX-004 Floor → Map investigation context — URL intent handoff; Map resolves SI; emphasize MEDIUM/HIGH in place; Standard on arrival; Show all clears; no ranking/filter/LAB/REC/SI semantic change (**IMPLEMENTED**; UX-004 closed on real hardware after UX-004B)
 - [x] UX-004B Quiet investigation Show all clear — History `replaceState(history.state)` + `router.replace`; SI-independent exit; history.state preserved (**IMPLEMENTED**; device re-smoke PASSED)

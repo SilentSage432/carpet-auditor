@@ -1,7 +1,8 @@
 # DeptSync Hub — Chat Handoff
 
 ## Latest (2026-09-06)
-- **UX-004C MOBILE INTERACTION RELIABILITY IMPLEMENTED LOCALLY — AWAITING COMMIT REVIEW:** Samsung defects — Floor filters 2×2 (no horizontal scroll); sheets elevate via `HubPortal` to `document.body` (active keep-alive panel stays `z-10` beneath BottomNav `z-30`); `.hub-modal-sheet` safe-area pad; More Floor Utilities via shell `SpecialtyToolsHost` + `requestExecutiveFloorPad`. No SI/rotation/time/calc changes. Temporal copy (`8e106f3`) preserved. Not LIVE / Samsung re-smoke required after deploy.
+- **UX-004C.1 EXECUTIVE FLOOR PAD HANDOFF — FINAL GATE:** Durable `?open=executive-floor-pad`; Floor bridge gated on `/dashboard` pathname (keep-alive mount alone insufficient); bridge mounts after Walk & Talk listeners; sync `replaceState` + `router.replace` after open dispatch; commit pending Samsung acceptance.
+- **UX-004C MOBILE INTERACTION RELIABILITY:** Samsung PASS except Executive Floor Pad → UX-004C.1. Baseline `0b939be`.
 - **TEMPORAL COPY CLARIFICATION LIVE — DEVICE VALIDATED:** Floor **Staging week** / Map **Calendar week**; clocks unchanged; Sunday W37 vs W36 intentional. Commit `8e106f3`.
 - **UX-004B DEVICE RE-SMOKE PASSED — UX-004 CLOSED ON REAL HARDWARE:** Quiet + elevated Show all clear on Samsung SM-S948U production; keep-alive path OK.
 - **UX-004B QUIET INVESTIGATION CLEAR RELIABILITY FIX IMPLEMENTED:** UX004A-01 — quiet Show all did not reliably clear URL/strip (elevated cleared). Root cause: soft `router.replace` alone failed to sync keep-alive MapTab search params on null store-map page. Fix: History `replaceState(history.state, "", bare)` then `router.replace` (still replace; preserves history.state; no push/reload). Clear invariant is SI-result-independent. Pin policy (UX004A-02) deferred; week-label ambiguity addressed by temporal copy clarification (clocks unchanged).

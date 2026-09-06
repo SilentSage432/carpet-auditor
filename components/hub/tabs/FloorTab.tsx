@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, Suspense } from "react";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { Users, Zap } from "lucide-react";
@@ -15,6 +15,7 @@ import { FloorAttentionSummary } from "@/components/store-ops/FloorAttentionSumm
 import { FloorOperationalContextStrip } from "@/components/store-ops/FloorOperationalContextStrip";
 import { OnDutyAssociateStrip } from "@/components/store-ops/OnDutyAssociateStrip";
 import { ShiftAnalyticsDrawer } from "@/components/store-ops/ShiftAnalyticsDrawer";
+import { ExecutiveFloorPadIntentBridge } from "@/components/hub/ExecutiveFloorPadIntentBridge";
 import { ZebraChecklist, type FloorBayFilter } from "@/components/store-ops/ZebraChecklist";
 import { ShiftBriefingCard } from "@/components/store-ops/ShiftBriefingCard";
 import { PredictiveCopilotBanner } from "@/components/store-ops/PredictiveCopilotBanner";
@@ -927,6 +928,10 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
             ) : null}
           </ShiftAnalyticsDrawer>
         </div>
+        {/* After pad listeners so cold-mount effect order registers them first. */}
+        <Suspense fallback={null}>
+          <ExecutiveFloorPadIntentBridge />
+        </Suspense>
       </main>
 
       <SupervisorAuditSummaryModal
