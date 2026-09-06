@@ -1,5 +1,15 @@
 # DeptSync Hub — Development Journal
 
+## 2026-09-06 — UX-004 Floor → Map investigation context
+
+- Floor Current Attention CTA passes navigation intent only: `/admin/store-map?investigate=current-attention&dept=<scope>` (not SI evidence).
+- Map resolves elevated MEDIUM/HIGH from its own SI response; current SI wins over stale Floor counts.
+- Minimal investigation strip + Show all clear; existing markers emphasized in place; geography not filtered; no ranking/REC/LAB; Standard mode on arrival (no Velocity auto-activate).
+- Keep-alive: URL search params + `useSearchParams` (Suspense wrap); department pin synced via `setAdminWorkingDepartment` when intent present.
+- Helper: `map-attention-investigation.ts` (presentation/navigation only). No schema/API/SI semantic changes.
+- Status: **UX-004 FLOOR → MAP INVESTIGATION CONTEXT IMPLEMENTED** (commit/push ≠ real-device navigation smoke; not production-mobile-validated)
+- Known pilot note: while investigation URL holds `dept=X`, pin changes may reconcile back to X until Show all / navigate away (navigation context, not authorization).
+
 ## 2026-09-06 — UX-003 Floor decision hierarchy
 
 - Floor remains primary DS command surface; bottom nav unchanged.

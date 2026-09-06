@@ -79,6 +79,7 @@ import {
 } from "@/lib/store-ops/weekly-rotations";
 import { getStoreNumber } from "@/lib/store";
 import { shouldShowFloorAttentionSummary } from "@/lib/store-ops/floor-attention-visibility";
+import { buildMapCurrentAttentionHref } from "@/lib/store-ops/map-attention-investigation";
 import { composeFloorFreshnessLine } from "@/lib/store-ops/floor-readiness";
 import {
   composeFloorWeekProgressLine,
@@ -831,7 +832,15 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
               summary={attentionSummary}
               generatedAt={attentionGeneratedAt}
               degraded={attentionDegraded}
-              onViewMap={() => router.push("/admin/store-map")}
+              onViewMap={() => {
+                if (working === "all") {
+                  router.push("/admin/store-map");
+                  return;
+                }
+                router.push(
+                  buildMapCurrentAttentionHref({ departmentScope: working })
+                );
+              }}
             />
           </div>
         ) : null}

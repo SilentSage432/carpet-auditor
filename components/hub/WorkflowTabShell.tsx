@@ -7,7 +7,7 @@
  */
 
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { Suspense, useEffect, useMemo, useState, type ReactNode } from "react";
 import { ChangePinModal } from "@/components/hub/ChangePinModal";
 import { NavigationHub } from "@/components/hub/NavigationHub";
 import { FloorTab } from "@/components/hub/tabs/FloorTab";
@@ -175,7 +175,9 @@ export function WorkflowTabShell(props: WorkflowTabProps) {
         </KeepAlivePanel>
         {visited.has("/admin/store-map") ? (
           <KeepAlivePanel active={active === "/admin/store-map"}>
-            <MapTab {...tabProps} />
+            <Suspense fallback={null}>
+              <MapTab {...tabProps} />
+            </Suspense>
           </KeepAlivePanel>
         ) : null}
         {visited.has("/roster") && canAccessWorkflowTab(view, "/roster") ? (

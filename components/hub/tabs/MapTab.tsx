@@ -2,10 +2,15 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
-import { Camera, Layers, Zap } from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Camera, Focus, Layers, Zap } from "lucide-react";
 import { StoreLocationGrid } from "@/components/admin/StoreLocationGrid";
 import { isMasterAdmin, isSimplifiedAssociateView } from "@/lib/rbac";
-import { workingDepartmentId } from "@/lib/admin-department-context";
+import {
+  setAdminWorkingDepartment,
+  workingDepartmentId,
+} from "@/lib/admin-department-context";
+import { accessibleDepartments } from "@/lib/department-access";
 import { useWorkingDepartment } from "@/lib/use-working-department";
 import {
   fetchDepartmentsDetailed,
@@ -48,6 +53,11 @@ import {
   isAttentionResponseCurrent,
   nextAttentionRequestToken,
 } from "@/lib/store-ops/location-attention-request";
+import {
+  clearMapAttentionInvestigationHref,
+  composeMapAttentionInvestigationView,
+  resolveMapAttentionInvestigationIntent,
+} from "@/lib/store-ops/map-attention-investigation";
 
 const ICON_STROKE = 1.75;
 
@@ -60,6 +70,8 @@ const VisualBayScannerModal = dynamic(
 );
 
 export function MapTab({ specialist }: WorkflowTabProps) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [departments, setDepartments] = useState<Department[]>([]);
   const [locations, setLocations] = useState<StoreLocation[]>([]);
   const [loading, setLoading] = useState(true);
@@ -105,6 +117,51 @@ export function MapTab({ specialist }: WorkflowTabProps) {
     const ids = new Set(visibleDepartments.map((dept) => dept.id));
     return locations.filter((loc) => ids.has(loc.department_id));
   }, [locations, working, activeDepartmentId, visibleDepartments]);
+
+  const investigationIntent = useMemo(
+    () =>
+      resolveMapAttentionInvestigationIntent({
+        searchParams,
+        allowedDepartmentScopes: accessibleDepartments(specialist),
+      }),
+    [searchParams, specialist]
+  );
+
+  const investigationView = useMemo(
+    () =>
+      composeMapAttentionInvestigationView({
+        intent: investigationIntent,
+        attentionStatus,
+        signals: attentionByLocationId,
+      }),
+    [investigationIntent, attentionStatus, attentionByLocationId]
+  );
+
+  const emphasizeAttentionMarkers = Boolean(
+    investigationView &&
+      (attentionStatus === "AVAILABLE" || attentionStatus === "DEGRADED") &&
+      investigationView.elevated_count > 0
+  );
+
+  const investigationIntentKey = investigationIntent
+    ? `${investigationIntent.kind}:${investigationIntent.departmentScope}`
+    : null;
+  const [appliedInvestigationKey, setAppliedInvestigationKey] = useState<
+    string | null
+  >(null);
+  if (investigationIntentKey !== appliedInvestigationKey) {
+    setAppliedInvestigationKey(investigationIntentKey);
+    if (investigationIntentKey) {
+      setMapMode("standard");
+    }
+  }
+
+  useEffect(() => {
+    if (!investigationIntent) return;
+    if (working !== investigationIntent.departmentScope) {
+      setAdminWorkingDepartment(investigationIntent.departmentScope);
+    }
+  }, [investigationIntent, working]);
 
   const clearAttentionPaint = useCallback(() => {
     setAttentionByLocationId(new Map());
@@ -365,6 +422,42 @@ export function MapTab({ specialist }: WorkflowTabProps) {
           </p>
         ) : null}
 
+        {investigationView ? (
+          <div
+            className="mb-3 flex items-start gap-2 rounded-xl border border-zinc-800/80 bg-zinc-950/40 px-2.5 py-1.5"
+            data-testid="map-attention-investigation"
+            data-status={investigationView.status}
+          >
+            <Focus
+              className="mt-0.5 h-3.5 w-3.5 shrink-0 text-zinc-400"
+              strokeWidth={ICON_STROKE}
+              aria-hidden
+            />
+            <div className="min-w-0 flex-1">
+              <p className="font-mono text-[9px] font-bold uppercase tracking-wide text-zinc-500">
+                {investigationView.title}
+              </p>
+              <p className="mt-0.5 text-xs font-medium leading-snug text-zinc-200">
+                {investigationView.body}
+              </p>
+              <p className="mt-0.5 font-mono text-[10px] leading-snug text-zinc-600">
+                {investigationView.provenance}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() =>
+                router.replace(clearMapAttentionInvestigationHref(), {
+                  scroll: false,
+                })
+              }
+              className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-lg border border-zinc-700/80 px-2.5 text-[11px] font-semibold text-zinc-300 transition active:scale-[0.99]"
+            >
+              Show all
+            </button>
+          </div>
+        ) : null}
+
         <div
           className="mb-3 inline-flex h-11 w-full items-center rounded-full border border-zinc-700/80 bg-zinc-950/70 p-0.5"
           role="group"
@@ -450,6 +543,7 @@ export function MapTab({ specialist }: WorkflowTabProps) {
               attentionDegraded={attentionDegraded}
               attentionUnavailableEvidence={attentionUnavailable}
               heatmap={heatmap}
+              emphasizeAttentionMarkers={emphasizeAttentionMarkers}
               onChanged={() => void reload(specialist)}
             />
           )}

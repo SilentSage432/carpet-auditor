@@ -68,6 +68,8 @@ type Props = {
   attentionUnavailableEvidence?: AttentionEvidenceDimension[];
   /** Velocity heatmap overlay. Standard Map is the default navigator. */
   heatmap?: boolean;
+  /** UX-004: emphasize existing MEDIUM/HIGH markers during Floor investigation. */
+  emphasizeAttentionMarkers?: boolean;
 };
 
 type BayPair = {
@@ -239,6 +241,7 @@ export function StoreLocationGrid({
   attentionDegraded = false,
   attentionUnavailableEvidence = [],
   heatmap = false,
+  emphasizeAttentionMarkers = false,
 }: Props) {
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -629,6 +632,7 @@ export function StoreLocationGrid({
                                     ])
                                   : null
                               }
+                              emphasizeAttention={emphasizeAttentionMarkers}
                               departmentId={dept.departmentId}
                               departmentName={dept.departmentName}
                               onOpenWalk={openWalkSheet}
@@ -774,6 +778,7 @@ const BayRow = memo(function BayRow({
   topstockActive,
   seasonalBadge,
   attentionMarker,
+  emphasizeAttention = false,
   departmentId,
   departmentName,
   onOpenWalk,
@@ -789,6 +794,7 @@ const BayRow = memo(function BayRow({
   topstockActive: boolean;
   seasonalBadge?: string | null;
   attentionMarker?: ReturnType<typeof attentionCellMarkerForPair>;
+  emphasizeAttention?: boolean;
   departmentId: string;
   departmentName: string;
   onOpenWalk: (bay: SheetBay) => void;
@@ -858,7 +864,14 @@ const BayRow = memo(function BayRow({
             <span
               title="Current attention"
               data-testid="bay-attention-marker"
-              className={`inline-flex shrink-0 items-center gap-0.5 rounded-full border border-zinc-500/50 bg-zinc-950/50 px-1.5 py-0.5 font-mono text-[9px] font-bold tracking-tight text-zinc-200 ${
+              data-emphasized={
+                emphasizeAttention ? "true" : undefined
+              }
+              className={`inline-flex shrink-0 items-center gap-0.5 rounded-full border px-1.5 py-0.5 font-mono text-[9px] font-bold tracking-tight ${
+                emphasizeAttention
+                  ? "border-accent/55 bg-accent/15 text-accent"
+                  : "border-zinc-500/50 bg-zinc-950/50 text-zinc-200"
+              } ${
                 attentionMarker.compact_label === "High" ? "font-extrabold" : ""
               }`}
             >
