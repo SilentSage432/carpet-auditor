@@ -1,7 +1,8 @@
 # DeptSync Hub — Master Roadmap
 
 ## Done
-- [x] UX-004 Floor → Map investigation context — URL intent handoff; Map resolves SI; emphasize MEDIUM/HIGH in place; Standard on arrival; Show all clears; no ranking/filter/LAB/REC/SI semantic change (**IMPLEMENTED**; not production-mobile-validated)
+- [x] UX-004 Floor → Map investigation context — URL intent handoff; Map resolves SI; emphasize MEDIUM/HIGH in place; Standard on arrival; Show all clears; no ranking/filter/LAB/REC/SI semantic change (**IMPLEMENTED**; UX-004A real-device usable w/ follow-ups)
+- [x] UX-004B Quiet investigation Show all clear — History `replaceState(history.state)` + `router.replace`; SI-independent exit; history.state preserved (**IMPLEMENTED**; device re-smoke required)
 - [x] UX-003 Floor decision hierarchy — identity → verification → week state → checklist; Open issues rename; SI quiet demoted; fiscal/analytics demoted; no Map handoff/LAB/REC
 - [x] UX-002 Verification authority safety — remove false Shift Analytics “Verify awaiting review” empty-ID week-stamp CTA; canonical strip→modal `review_action` path unchanged; week-signoff primitive retained after verify_all; legacy empty-ID API hardening deferred
 - [x] Canonical Layer-1 rotation metrics (`weekly-rotation-metrics-v1`) — Art VI A-1: reported ≠ verified on Floor / health / rollup / Map week overlay

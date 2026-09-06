@@ -128,6 +128,56 @@ export function clearMapAttentionInvestigationHref(): string {
   return "/admin/store-map";
 }
 
+/**
+ * True when the URL still carries Current Attention investigation context.
+ * Used by Show all exit — independent of SI result contents.
+ */
+export function hasMapAttentionInvestigationSearchParams(
+  searchParams: URLSearchParams | { get(name: string): string | null }
+): boolean {
+  return parseMapAttentionInvestigationSearchParams(searchParams) != null;
+}
+
+/**
+ * Exit Current Attention investigation navigation context.
+ *
+ * Invariant (UX-004B): if the URL contains valid investigation context,
+ * activating Show all removes that context regardless of SI result
+ * (elevated / quiet / degraded / unavailable / loading).
+ *
+ * Soft `router.replace` alone can leave keep-alive MapTab `useSearchParams`
+ * stale for search-param-only exits on the null store-map page. Callers SHOULD
+ * pass `syncBrowserUrl` that synchronously normalizes the visible URL via
+ * History **replaceState** (preserving existing history.state), then
+ * `replace` for App Router reconciliation. Still **replace** (no push /
+ * assign / reload).
+ */
+export function exitMapAttentionInvestigation(input: {
+  replace: (href: string) => void;
+  /** When set, runs before replace to sync the browser URL (replaceState). */
+  syncBrowserUrl?: (href: string) => void;
+}): string {
+  const href = clearMapAttentionInvestigationHref();
+  input.syncBrowserUrl?.(href);
+  input.replace(href);
+  return href;
+}
+
+/**
+ * Browser History sync for investigation exit (client-only; no SSR access).
+ * Preserves existing `history.state` and replaces only the URL — equivalent to
+ * `history.replaceState(history.state, "", "/admin/store-map")`.
+ * Does not push, reload, or clear unrelated history metadata.
+ */
+export function syncMapAttentionInvestigationClearUrl(href: string): void {
+  if (typeof window === "undefined") return;
+  const params = new URLSearchParams(window.location.search);
+  if (params.get(MAP_INVESTIGATE_PARAM) !== MAP_INVESTIGATE_CURRENT_ATTENTION) {
+    return;
+  }
+  window.history.replaceState(window.history.state, "", href);
+}
+
 function signalsToArray(
   signals:
     | ReadonlyArray<LocationAttentionSignal>

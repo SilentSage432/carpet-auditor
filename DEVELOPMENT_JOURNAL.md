@@ -1,5 +1,13 @@
 # DeptSync Hub — Development Journal
 
+## 2026-09-06 — UX-004B Quiet investigation Show all clear
+- Defect: UX004A-01 real-device — quiet Map investigation Show all did not reliably clear URL/strip; elevated cleared with same control.
+- Root cause: SI-result-independent control already; soft `router.replace` alone insufficient under keep-alive + null store-map page for search-param-only exit (`useSearchParams` can stay stale).
+- Fix: `exitMapAttentionInvestigation` + `syncMapAttentionInvestigationClearUrl` via `history.replaceState(history.state, "", bare)` then `router.replace` (still replace, not push; history.state preserved; no reload).
+- Invariant: valid investigation URL + Show all → bare `/admin/store-map` regardless of SI elevated/quiet/degraded/unavailable/loading.
+- Deferred unchanged: UX004A-02 pin-while-investigating; UX004A-03 Floor/Map week labels.
+- Status: **UX-004B QUIET INVESTIGATION CLEAR RELIABILITY FIX IMPLEMENTED** — device re-smoke still required (not production/mobile validated)
+
 ## 2026-09-06 — UX-004 Floor → Map investigation context
 
 - Floor Current Attention CTA passes navigation intent only: `/admin/store-map?investigate=current-attention&dept=<scope>` (not SI evidence).

@@ -54,9 +54,10 @@ import {
   nextAttentionRequestToken,
 } from "@/lib/store-ops/location-attention-request";
 import {
-  clearMapAttentionInvestigationHref,
   composeMapAttentionInvestigationView,
+  exitMapAttentionInvestigation,
   resolveMapAttentionInvestigationIntent,
+  syncMapAttentionInvestigationClearUrl,
 } from "@/lib/store-ops/map-attention-investigation";
 
 const ICON_STROKE = 1.75;
@@ -162,6 +163,16 @@ export function MapTab({ specialist }: WorkflowTabProps) {
       setAdminWorkingDepartment(investigationIntent.departmentScope);
     }
   }, [investigationIntent, working]);
+
+  /** UX-004B: clear is SI-result-independent; replace history (not push). */
+  const exitAttentionInvestigation = useCallback(() => {
+    exitMapAttentionInvestigation({
+      syncBrowserUrl: syncMapAttentionInvestigationClearUrl,
+      replace: (href) => {
+        router.replace(href, { scroll: false });
+      },
+    });
+  }, [router]);
 
   const clearAttentionPaint = useCallback(() => {
     setAttentionByLocationId(new Map());
@@ -446,11 +457,8 @@ export function MapTab({ specialist }: WorkflowTabProps) {
             </div>
             <button
               type="button"
-              onClick={() =>
-                router.replace(clearMapAttentionInvestigationHref(), {
-                  scroll: false,
-                })
-              }
+              data-testid="map-attention-investigation-clear"
+              onClick={exitAttentionInvestigation}
               className="inline-flex min-h-11 shrink-0 items-center justify-center rounded-lg border border-zinc-700/80 px-2.5 text-[11px] font-semibold text-zinc-300 transition active:scale-[0.99]"
             >
               Show all
