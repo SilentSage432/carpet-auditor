@@ -1,5 +1,12 @@
 # DeptSync Hub — Development Journal
 
+## 2026-09-06 — SI-001C Floor Attention Summary (committed/pushed)
+
+- Commit `21e1a72` (`feat: add Floor current attention summary`) pushed to `origin/main`.
+- Pure aggregation + Floor independent SI fetch + compact Current attention strip; verify-batch/barrier success notify locations-changed.
+- Unauthenticated production smoke: `/login` OK; attention API 401; `/dashboard` and `/admin/store-map` auth-gate to sign-in.
+- **Exact Vercel production SHA not verified** (expired local Vercel CLI token; GitHub deployments API forbidden). Status: **COMMITTED AND PUSHED — DEPLOYMENT SHA VERIFICATION PENDING** (not LIVE).
+
 ## 2026-09-06 — SI-001C Floor Attention Summary (local)
 
 - Pure aggregation: `lib/store-ops/location-attention-summary.ts` counts SI-001A `signals` by pressure tier only (no score/rank/reclassify).
