@@ -1,5 +1,14 @@
 # DeptSync Hub — Development Journal
 
+## 2026-09-06 — SI-001C Floor Attention Summary (local)
+
+- Pure aggregation: `lib/store-ops/location-attention-summary.ts` counts SI-001A `signals` by pressure tier only (no score/rank/reclassify).
+- Floor: independent `fetchLocationAttention` in `FloorTab` with SI-001B race helpers; compact `FloorAttentionSummary` after readiness/fiscal strip.
+- MEDIUM/HIGH foreground; NONE/LOW → “No Medium/High attention”; degraded keeps counts; unavailable ≠ quiet; Master `all` gated.
+- Refresh: `STORE_OPS_LOCATIONS_CHANGED` + dept switch; Sunday/shift Floor reload paths do **not** call SI. `verifyWeeklyRotationBatch` + `reportRotationBarriers` now emit location-changed (evidence mutations).
+- Keep-alive: Map+Floor may each GET attention — accepted pilot isolation; not shared snapshot.
+- Tests: `location-attention-summary.test.ts`. Docs: handoff/state/roadmap. **SI-001C FLOOR ATTENTION SUMMARY IMPLEMENTED LOCALLY — AWAITING REVIEW** (not LIVE).
+
 ## 2026-09-06 — SI-001B Map Attention Surface (local)
 
 - Presentation: `location-attention-presentation.ts` + MapTab fetch/`Attention` status + Focus+Med/High cell marker + Walk sheet Current attention block.

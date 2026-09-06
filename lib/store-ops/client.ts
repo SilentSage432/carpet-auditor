@@ -1040,6 +1040,8 @@ export async function verifyWeeklyRotationBatch(
     body: JSON.stringify(input),
   });
   await invalidateStoreOpsListCaches();
+  // Verification mutates evidence SI-001 reads (last_completed_at / review status).
+  notifyStoreLocationsChanged();
   return {
     completed_count: result.completed_count ?? 0,
     exception_count: result.exception_count ?? 0,
@@ -1175,6 +1177,8 @@ export async function reportRotationBarriers(
     }
   );
   await invalidateStoreOpsListCaches();
+  // Barriers mutate evidence SI-001 reads (open barriers / actionability).
+  notifyStoreLocationsChanged();
   return { exception_count: result.exception_count ?? input.incomplete.length };
 }
 

@@ -1,7 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
+import { useRouter } from "next/navigation";
 import { ChevronRight, Users, Zap } from "lucide-react";
 import { SundayAuditStagingCard } from "@/components/admin/SundayAuditStagingCard";
 import { ExceptionFeed } from "@/components/admin/ExceptionFeed";
@@ -10,6 +11,7 @@ import { ShowroomQuickTouchCard } from "@/components/dashboard/ShowroomQuickTouc
 import { TacticalVoiceFloorPad } from "@/components/dashboard/TacticalVoiceFloorPad";
 import { BayFreshnessGrid } from "@/components/dashboard/BayFreshnessGrid";
 import { FlagDownstockSheet } from "@/components/store-ops/FlagDownstockSheet";
+import { FloorAttentionSummary } from "@/components/store-ops/FloorAttentionSummary";
 import { FloorOperationalContextStrip } from "@/components/store-ops/FloorOperationalContextStrip";
 import { OnDutyAssociateStrip } from "@/components/store-ops/OnDutyAssociateStrip";
 import { ShiftAnalyticsDrawer } from "@/components/store-ops/ShiftAnalyticsDrawer";
@@ -30,8 +32,10 @@ import {
 } from "@/lib/specialty-tools";
 import { canAccessDepartment } from "@/lib/department-access";
 import { dedupeRoster, fetchSpecialists, isSupervisor } from "@/lib/specialists";
+import { isStoreOpsAuthFailureMessage } from "@/lib/store-ops/auth-soft";
 import {
   fetchDepartments,
+  fetchLocationAttention,
   fetchStoreLocationsDetailed,
   fetchThisWeekRotations,
   peekCachedDepartments,
@@ -41,6 +45,16 @@ import {
   verifyAllCompletedBays,
 } from "@/lib/store-ops/client";
 import { fingerprintsEqual } from "@/lib/store-ops/cache";
+import { readableError } from "@/lib/store-ops/errors";
+import type { MapAttentionClientStatus } from "@/lib/store-ops/location-attention-presentation";
+import {
+  nextAttentionRequestToken,
+  isAttentionResponseCurrent,
+} from "@/lib/store-ops/location-attention-request";
+import {
+  composeLocationAttentionSummary,
+  type LocationAttentionSummary,
+} from "@/lib/store-ops/location-attention-summary";
 import {
   buildSundayStagedBays,
   fetchSundayAssignments,
@@ -134,6 +148,7 @@ const FLOOR_FILTERS: Array<{ id: FloorBayFilter; label: string }> = [
 ];
 
 export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
+  const router = useRouter();
   const [week, setWeek] = useState("");
   const [deptId, setDeptId] = useState<string | null>(null);
   const [departments, setDepartments] = useState<Department[]>([]);
@@ -172,11 +187,29 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
   const [floorBayFilter, setFloorBayFilter] = useState<FloorBayFilter>("all");
   const [rosterSheetOpen, setRosterSheetOpen] = useState(false);
 
+  /**
+   * SI-001C — Floor owns an independent attention fetch (pilot isolation).
+   * Keep-alive may also keep Map mounted → ~1 Map GET + 1 Floor GET on common
+   * department/evidence refresh. Not shared/synchronized snapshot state.
+   * Staging/Sunday and shift-status do NOT trigger this path.
+   */
+  const [attentionStatus, setAttentionStatus] =
+    useState<MapAttentionClientStatus>("IDLE");
+  const [attentionSummary, setAttentionSummary] =
+    useState<LocationAttentionSummary | null>(null);
+  const [attentionGeneratedAt, setAttentionGeneratedAt] = useState<
+    string | null
+  >(null);
+  const [attentionDegraded, setAttentionDegraded] = useState(false);
+  const attentionGenRef = useRef(0);
+  const attentionAbortRef = useRef<AbortController | null>(null);
+
   const working = useWorkingDepartment(specialist);
   const flooringFocus = working === "flooring";
   const simplified = isSimplifiedAssociateView(specialist);
   const supervisor = isSupervisor(specialist);
   const master = isMasterAdmin(specialist);
+  const canReadAttention = supervisor;
   const assignmentDept = working === "all" ? "flooring" : working;
 
   const activeDept = useMemo(
@@ -293,6 +326,126 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
     void reload(specialist, { silent: true });
   }, [reload, specialist]);
 
+  const clearAttentionPaint = useCallback(() => {
+    setAttentionSummary(null);
+    setAttentionGeneratedAt(null);
+    setAttentionDegraded(false);
+  }, []);
+
+  /**
+   * SI-001C attention reload — independent of Floor rotation reload.
+   * Triggers: dept resolve/switch, STORE_OPS_LOCATIONS_CHANGED only.
+   * Does not run on SUNDAY_AUDIT_EVENT or SHIFT_STATUS_EVENT.
+   */
+  const reloadAttention = useCallback(
+    async (departmentId: string | null) => {
+      // Yield so effect-driven loads are not synchronous cascading setState.
+      await Promise.resolve();
+
+      if (!canReadAttention) {
+        attentionAbortRef.current?.abort();
+        attentionAbortRef.current = null;
+        const token = nextAttentionRequestToken(attentionGenRef.current, null);
+        attentionGenRef.current = token.generation;
+        setAttentionStatus("IDLE");
+        clearAttentionPaint();
+        return;
+      }
+
+      if (working === "all" || !departmentId) {
+        attentionAbortRef.current?.abort();
+        attentionAbortRef.current = null;
+        const token = nextAttentionRequestToken(attentionGenRef.current, null);
+        attentionGenRef.current = token.generation;
+        setAttentionStatus(
+          working === "all" ? "NEEDS_DEPARTMENT" : "LOADING"
+        );
+        clearAttentionPaint();
+        return;
+      }
+
+      attentionAbortRef.current?.abort();
+      const abort = new AbortController();
+      attentionAbortRef.current = abort;
+      const token = nextAttentionRequestToken(
+        attentionGenRef.current,
+        departmentId
+      );
+      attentionGenRef.current = token.generation;
+      clearAttentionPaint();
+      setAttentionStatus("LOADING");
+
+      try {
+        const payload = await fetchLocationAttention(specialist, departmentId, {
+          signal: abort.signal,
+        });
+        if (
+          !isAttentionResponseCurrent(
+            token,
+            attentionGenRef.current,
+            departmentId
+          )
+        ) {
+          return;
+        }
+        setAttentionSummary(composeLocationAttentionSummary(payload.signals));
+        setAttentionGeneratedAt(payload.generated_at);
+        setAttentionDegraded(Boolean(payload.degraded));
+        setAttentionStatus(payload.degraded ? "DEGRADED" : "AVAILABLE");
+      } catch (err) {
+        if (abort.signal.aborted) return;
+        if (
+          !isAttentionResponseCurrent(
+            token,
+            attentionGenRef.current,
+            departmentId
+          )
+        ) {
+          return;
+        }
+        const message = readableError(err, "Attention request failed");
+        if (isStoreOpsAuthFailureMessage(message)) {
+          setAttentionStatus("IDLE");
+          clearAttentionPaint();
+          return;
+        }
+        console.error("[FloorTab] attention failed (non-blocking)", err);
+        setAttentionStatus("UNAVAILABLE");
+        clearAttentionPaint();
+      }
+    },
+    [canReadAttention, clearAttentionPaint, specialist, working]
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadFloorAttention() {
+      if (cancelled) return;
+      await reloadAttention(deptId);
+    }
+    void loadFloorAttention();
+    return () => {
+      cancelled = true;
+      attentionAbortRef.current?.abort();
+    };
+  }, [deptId, reloadAttention, working, specialist]);
+
+  useEffect(() => {
+    function onLocationsChanged() {
+      void reloadAttention(deptId);
+    }
+    window.addEventListener(
+      STORE_OPS_LOCATIONS_CHANGED_EVENT,
+      onLocationsChanged
+    );
+    return () => {
+      window.removeEventListener(
+        STORE_OPS_LOCATIONS_CHANGED_EVENT,
+        onLocationsChanged
+      );
+    };
+  }, [deptId, reloadAttention]);
+
   useEffect(() => {
     let cancelled = false;
     async function boot() {
@@ -338,16 +491,20 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
   }, [specialist, reload, working]);
 
   useEffect(() => {
-    function onSunday() {
+    function onFloorOpsReload() {
       void reload(specialist, { silent: true });
     }
-    window.addEventListener(SUNDAY_AUDIT_EVENT, onSunday);
-    window.addEventListener(STORE_OPS_LOCATIONS_CHANGED_EVENT, onSunday);
-    window.addEventListener(SHIFT_STATUS_EVENT, onSunday);
+    // Sunday staging + shift status refresh Floor ops lists only — not SI-001C.
+    window.addEventListener(SUNDAY_AUDIT_EVENT, onFloorOpsReload);
+    window.addEventListener(STORE_OPS_LOCATIONS_CHANGED_EVENT, onFloorOpsReload);
+    window.addEventListener(SHIFT_STATUS_EVENT, onFloorOpsReload);
     return () => {
-      window.removeEventListener(SUNDAY_AUDIT_EVENT, onSunday);
-      window.removeEventListener(STORE_OPS_LOCATIONS_CHANGED_EVENT, onSunday);
-      window.removeEventListener(SHIFT_STATUS_EVENT, onSunday);
+      window.removeEventListener(SUNDAY_AUDIT_EVENT, onFloorOpsReload);
+      window.removeEventListener(
+        STORE_OPS_LOCATIONS_CHANGED_EVENT,
+        onFloorOpsReload
+      );
+      window.removeEventListener(SHIFT_STATUS_EVENT, onFloorOpsReload);
     };
   }, [reload, specialist]);
 
@@ -520,6 +677,15 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
             }
             refreshKey={healthKey}
           />
+          {canReadAttention ? (
+            <FloorAttentionSummary
+              status={attentionStatus}
+              summary={attentionSummary}
+              generatedAt={attentionGeneratedAt}
+              degraded={attentionDegraded}
+              onViewMap={() => router.push("/admin/store-map")}
+            />
+          ) : null}
         </header>
 
         <section className="overflow-hidden rounded-2xl border border-zinc-800/90 bg-zinc-950/70 shadow-[0_12px_40px_-20px_rgba(0,0,0,0.75)]">
