@@ -12,6 +12,7 @@ import { useWorkingDepartment } from "@/lib/use-working-department";
 import {
   fetchDepartmentsDetailed,
   fetchExceptionSummary,
+  fetchOperationalContextLocationRelevanceResolve,
   fetchStoreLocationsDetailed,
   fetchThisWeekRotations,
   invalidateStoreOpsListCaches,
@@ -20,6 +21,10 @@ import {
   peekCachedStoreLocations,
   STORE_OPS_LOCATIONS_CHANGED_EVENT,
 } from "@/lib/store-ops/client";
+import {
+  indexMapLocationSeasonalViews,
+  type MapLocationSeasonalView,
+} from "@/lib/store-ops/map-location-context";
 import { fingerprintsEqual } from "@/lib/store-ops/cache";
 import {
   isStoreOpsAuthFailureMessage,
@@ -29,6 +34,7 @@ import { readableError, isExistingDepartmentConflict } from "@/lib/store-ops/err
 import type { Department, StoreLocation } from "@/lib/store-ops/types";
 import { isWeekVerifiedForMapOverlay } from "@/lib/store-ops/rotation-metrics";
 import { isoWeekLabel } from "@/lib/store-ops/week";
+import { isSupervisor } from "@/lib/specialists";
 import type { WorkflowTabProps } from "@/components/hub/tabs/tab-props";
 
 const ICON_STROKE = 1.75;
@@ -53,9 +59,13 @@ export function MapTab({ specialist }: WorkflowTabProps) {
     Array<{ locationId: string; completed: boolean }>
   >([]);
   const [barrierLocationIds, setBarrierLocationIds] = useState<string[]>([]);
+  const [seasonalByLocationId, setSeasonalByLocationId] = useState<
+    Map<string, MapLocationSeasonalView>
+  >(() => new Map());
   const currentWeek = isoWeekLabel();
   const master = isMasterAdmin(specialist);
   const locatorOnly = isSimplifiedAssociateView(specialist);
+  const canReadSeasonal = isSupervisor(specialist);
   const heatmap = mapMode === "heatmap";
   const working = useWorkingDepartment(specialist);
   const activeDepartmentId = workingDepartmentId(specialist, departments);
@@ -85,10 +95,21 @@ export function MapTab({ specialist }: WorkflowTabProps) {
       });
 
       const deptId = workingDepartmentId(member, depts.items);
-      const [locs, weekData, exceptions] = await Promise.all([
+      const [locs, weekData, exceptions, seasonalResult] = await Promise.all([
         fetchStoreLocationsDetailed(member, deptId),
         fetchThisWeekRotations(member, deptId),
         fetchExceptionSummary(member),
+        canReadSeasonal
+          ? fetchOperationalContextLocationRelevanceResolve(member).catch(
+              (err) => {
+                console.error(
+                  "[StoreMap] seasonal location context failed (non-blocking)",
+                  err
+                );
+                return null;
+              }
+            )
+          : Promise.resolve(null),
       ]);
 
       const nextWeek = (weekData.rotations ?? [])
@@ -113,6 +134,14 @@ export function MapTab({ specialist }: WorkflowTabProps) {
       setBarrierLocationIds((prev) =>
         fingerprintsEqual(prev, nextBarriers) ? prev : nextBarriers
       );
+      if (seasonalResult?.items) {
+        setSeasonalByLocationId(
+          indexMapLocationSeasonalViews(seasonalResult.items)
+        );
+      } else if (!canReadSeasonal || seasonalResult === null) {
+        // Omit badges on failure / associates — Map still usable.
+        setSeasonalByLocationId(new Map());
+      }
       if (depts.authRequired || locs.authRequired) {
         setAuthRequired(true);
       }
@@ -139,7 +168,7 @@ export function MapTab({ specialist }: WorkflowTabProps) {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [canReadSeasonal]);
 
   useEffect(() => {
     let cancelled = false;
@@ -279,6 +308,7 @@ export function MapTab({ specialist }: WorkflowTabProps) {
               assignedWeek={currentWeek}
               weekRotationLocations={weekRotationLocations}
               barrierLocationIds={barrierLocationIds}
+              seasonalByLocationId={seasonalByLocationId}
               heatmap={heatmap}
               onChanged={() => void reload(specialist)}
             />

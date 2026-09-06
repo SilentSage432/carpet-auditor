@@ -106,6 +106,10 @@ app/api/admin/operational-contexts/* → Master CRUD + dept/location relevance
 components/admin/OperationalContextCard.tsx → More→Settings Master manager (incl. location assign)
 supabase/migrations/20260905_operational_contexts.sql → contexts + dept relevance (**LIVE**)
 supabase/migrations/20260905_operational_context_location_relevance.sql → FS-003 location relevance
+lib/store-ops/map-location-context.ts → FS-003B Map presentation composition (badges/detail)
+components/hub/tabs/MapTab.tsx → batched resolve-locations + pass views to grid
+components/admin/StoreLocationGrid.tsx → bay seasonal badge (secondary to readiness)
+components/admin/WalkTheFloorSheet.tsx → seasonal context detail
 lib/store-ops/fiscal-calendar.ts  → FS-001 authority (import/validate/resolve) + FS-001A `computeFiscalCoverage` (derived; Master signal)
 app/api/fiscal-calendar/route.ts  → GET Supervisor+ fiscal context for store-local date (additive; rotations unaffected)
 app/api/admin/fiscal-calendar/coverage/route.ts → GET Master-only coverage status (HEALTHY/ATTENTION/URGENT/EXPIRED)
@@ -246,6 +250,7 @@ supabase/migrations/20260812_sunday_bay_assignments.sql → sunday specialist↔
 | Operational seasons/events (FS-002) | `operational-context.ts` + tables + Master Settings — declared Gregorian contexts + dept relevance; no SI / location priority |
 | Floor context strip (FS-002B) | `floor-operational-context.ts` + `FloorOperationalContextStrip` — fiscal + active season/event + current dept relevance; empty valid; no rotation effect |
 | Location seasonal relevance (FS-003) | `operational_context_location_relevance` + Settings assign — declared bay emphasis; no SI / rotation / priority mutation |
+| Map context surface (FS-003B) | `map-location-context.ts` + Map badges / walk detail — explicit location relevance only; no inheritance / scores |
 | Sunday assignments | `lib/store-ops/sunday-audit.ts` (persist + department seed `associateMatchesSundayDepartment`) + `SundayAuditAssignmentModal` + `AssociateRosterPanel` |
 | Daily shift board | `lib/store-ops/shift-status.ts` (`associate_shift_days` week matrix; throws on live write failure) |
 | Call-out bay rebalance | `lib/store-ops/call-out.ts` (pool / auto / carry-over loop; stamps `carried_over` + Sunday `CARRIED_OVER`; does not generate rotations) |

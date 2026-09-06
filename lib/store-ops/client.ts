@@ -1817,6 +1817,40 @@ export async function fetchOperationalContextsResolve(
   );
 }
 
+/** FS-003B Map — batched active location seasonal relevance (one request). */
+export type OperationalContextLocationResolveClient = {
+  operational_date: string;
+  store_id: string;
+  items: Array<{
+    location_id: string;
+    context_id: string;
+    kind: "SEASON" | "EVENT";
+    title: string;
+    start_date: string;
+    end_date: string;
+    source_type: string;
+    location_relevance: "NONE" | "LOW" | "MEDIUM" | "HIGH";
+    location_is_active: boolean;
+  }>;
+  store_timezone?: string;
+  schema_unavailable?: boolean;
+};
+
+export async function fetchOperationalContextLocationRelevanceResolve(
+  specialist: StoreSpecialist,
+  options?: { date?: string; location_ids?: string[] }
+): Promise<OperationalContextLocationResolveClient> {
+  const params = new URLSearchParams({ mode: "resolve-locations" });
+  if (options?.date) params.set("date", options.date);
+  if (options?.location_ids && options.location_ids.length > 0) {
+    params.set("location_ids", options.location_ids.join(","));
+  }
+  return storeOpsFetch(
+    `/api/operational-contexts?${params.toString()}`,
+    specialist
+  );
+}
+
 export async function createOperationalContext(
   specialist: StoreSpecialist,
   input: {

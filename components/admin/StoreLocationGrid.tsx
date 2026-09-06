@@ -33,6 +33,10 @@ import {
   worstVelocityHeat,
   type VelocityHeatTone,
 } from "@/lib/store-ops/velocity";
+import {
+  composeBayPairSeasonalBadge,
+  type MapLocationSeasonalView,
+} from "@/lib/store-ops/map-location-context";
 
 const AISLE_CHUNK = 16;
 const BAY_CHUNK = 24;
@@ -45,6 +49,8 @@ type Props = {
   assignedWeek?: string;
   weekRotationLocations?: Array<{ locationId: string; completed: boolean }>;
   barrierLocationIds?: string[];
+  /** FS-003B batched seasonal views by location id (read-only). */
+  seasonalByLocationId?: Map<string, MapLocationSeasonalView>;
   /** Velocity heatmap overlay. Standard Map is the default navigator. */
   heatmap?: boolean;
 };
@@ -211,6 +217,7 @@ export function StoreLocationGrid({
   assignedWeek,
   weekRotationLocations = [],
   barrierLocationIds = [],
+  seasonalByLocationId,
   heatmap = false,
 }: Props) {
   const [pendingId, setPendingId] = useState<string | null>(null);
@@ -577,6 +584,14 @@ export function StoreLocationGrid({
                                     pair.topstock.is_active)
                                   : false
                               }
+                              seasonalBadge={composeBayPairSeasonalBadge([
+                                pair.selling
+                                  ? seasonalByLocationId?.get(pair.selling.id)
+                                  : undefined,
+                                pair.topstock
+                                  ? seasonalByLocationId?.get(pair.topstock.id)
+                                  : undefined,
+                              ])}
                               departmentId={dept.departmentId}
                               departmentName={dept.departmentName}
                               onOpenWalk={openWalkSheet}
@@ -645,6 +660,7 @@ export function StoreLocationGrid({
           departments={departments}
           bay={liveWalkBay}
           canMutate={false}
+          seasonalByLocationId={seasonalByLocationId}
           onClose={() => setWalkBay(null)}
           onChanged={onChanged}
           onError={setError}
@@ -714,6 +730,7 @@ const BayRow = memo(function BayRow({
   canMutate,
   sellingActive,
   topstockActive,
+  seasonalBadge,
   departmentId,
   departmentName,
   onOpenWalk,
@@ -727,6 +744,7 @@ const BayRow = memo(function BayRow({
   canMutate: boolean;
   sellingActive: boolean;
   topstockActive: boolean;
+  seasonalBadge?: string | null;
   departmentId: string;
   departmentName: string;
   onOpenWalk: (bay: SheetBay) => void;
@@ -763,7 +781,9 @@ const BayRow = memo(function BayRow({
         type="button"
         onClick={() => onOpenWalk(sheetPayload)}
         className="min-w-0 flex-1 rounded-xl px-1 py-1 text-left active:bg-zinc-800/80"
-        aria-label={`Bay ${pair.bay} ${rowToneLabel}`}
+        aria-label={`Bay ${pair.bay} ${rowToneLabel}${
+          seasonalBadge ? ` · ${seasonalBadge}` : ""
+        }`}
       >
         <span className="flex items-center gap-1.5">
           <ReadinessGlyph tone={rowTone} heatmap={heatmap} />
@@ -780,6 +800,14 @@ const BayRow = memo(function BayRow({
               className="shrink-0 rounded-full border border-amber-500/45 bg-amber-950/35 px-1.5 py-0.5 font-mono text-[9px] font-bold tracking-tight text-amber-100"
             >
               Pending
+            </span>
+          ) : null}
+          {seasonalBadge ? (
+            <span
+              title="Declared seasonal location relevance"
+              className="shrink-0 rounded-full border border-sky-500/35 bg-sky-950/30 px-1.5 py-0.5 font-mono text-[9px] font-bold tracking-tight text-sky-200/90"
+            >
+              {seasonalBadge}
             </span>
           ) : null}
         </span>

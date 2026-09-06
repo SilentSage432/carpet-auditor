@@ -23,6 +23,7 @@ import {
   type StoreLocation,
 } from "@/lib/store-ops/types";
 import type { StoreSpecialist } from "@/lib/types";
+import type { MapLocationSeasonalView } from "@/lib/store-ops/map-location-context";
 
 type BayPair = {
   bay: number;
@@ -71,6 +72,7 @@ export function WalkTheFloorSheet({
   departments,
   bay,
   canMutate = false,
+  seasonalByLocationId,
   onClose,
   onChanged,
   onError,
@@ -79,6 +81,7 @@ export function WalkTheFloorSheet({
   departments: Department[];
   bay: WalkTheFloorBay;
   canMutate?: boolean;
+  seasonalByLocationId?: Map<string, MapLocationSeasonalView>;
   onClose: () => void;
   onChanged: () => void;
   onError: (msg: string | null) => void;
@@ -107,6 +110,9 @@ export function WalkTheFloorSheet({
   }, [faces]);
 
   const target = faces.find((loc) => loc.id === targetId) ?? faces[0] ?? null;
+  const seasonalView = target
+    ? seasonalByLocationId?.get(target.id)
+    : undefined;
   const dept = departments.find((d) => d.id === bay.departmentId);
   const deptCode = dept?.code ?? target?.department_code ?? "";
   const deptName = dept?.name ?? bay.departmentName;
@@ -228,6 +234,41 @@ export function WalkTheFloorSheet({
               </button>
             ))}
           </div>
+        ) : null}
+
+        {seasonalView && seasonalView.detail_lines.length > 0 ? (
+          <section
+            className="mb-4 rounded-xl border border-sky-500/25 bg-sky-950/20 px-3 py-2.5"
+            data-testid="walk-sheet-seasonal-context"
+          >
+            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-sky-300/90">
+              Seasonal context
+            </p>
+            <ul className="mt-1.5 space-y-1">
+              {seasonalView.detail_lines.map((line) => (
+                <li
+                  key={`${line.context_id}-${line.relevance}`}
+                  className="flex flex-wrap items-baseline justify-between gap-2 text-xs"
+                >
+                  <span className="min-w-0 truncate text-slate-200">
+                    {line.title}
+                    <span className="ml-1.5 font-mono text-[10px] text-slate-500">
+                      · {line.provenance_label}
+                    </span>
+                  </span>
+                  <span
+                    className={`shrink-0 font-mono text-[11px] font-bold ${
+                      line.relevance === "NONE"
+                        ? "text-slate-500"
+                        : "text-sky-200"
+                    }`}
+                  >
+                    {line.relevance}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </section>
         ) : null}
 
         <section className="mb-4">

@@ -11,7 +11,8 @@
 - [x] FS-002 foundation — Operational seasons/events (`operational_contexts` + department relevance); Master-declared; Gregorian resolve; no company seed / recurrence / location priority / SI
 - [x] FS-002B — Floor fiscal + season context surface (presentation composition; empty context valid; no SI / location priority / rotation effect)
 - [x] FS-003 foundation — Location seasonal relevance (`operational_context_location_relevance`); Master CRUD; resolve; Settings assign; no Map/SI/rotation
-- [ ] FS-003 follow-ups — Map bay badge / batched resolve UX; SI consumption
+- [x] FS-003B — Map context surface (read-only location seasonal badges + walk-sheet detail; no inheritance/scores/rotation)
+- [ ] FS-003 follow-ups — Map polish if needed; SI consumption
 - [ ] SI-001 / SI-002 Seasonal signal contract + Day-1 deterministic pressure
 - [ ] Public holiday seed artifact (`PUBLIC_CALENDAR`) — evidence-gated
 - [ ] Sunday assignment history across Force Draw / rebalance — known P1

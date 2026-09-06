@@ -1,5 +1,18 @@
 # DeptSync Hub — Development Journal
 
+## 2026-09-05 — FS-003B Map location seasonal context surface
+
+### Shipped
+- Presentation `lib/store-ops/map-location-context.ts` + tests — cell badge / detail composition; UNSET omit; NONE detail-only; multi-context `HIGH +N` without score merge; provenance labels.
+- Client `fetchOperationalContextLocationRelevanceResolve` — one batched `mode=resolve-locations` read.
+- `MapTab` non-blocking Supervisor+ fetch; `StoreLocationGrid` bay badge; `WalkTheFloorSheet` detail. Heatmap colors unchanged.
+- No schema/seed/rotation/Floor/SI.
+
+### Status
+- **FS-003B MAP CONTEXT SURFACE LIVE** (production empty contexts → no badges until Master declares).
+- Completion-attempt first natural lifecycle still pending.
+- Next: SI architecture audit (deferred) or Map polish if needed.
+
 ## 2026-09-05 — FS-003 location seasonal relevance foundation
 
 ### Shipped
