@@ -305,6 +305,8 @@ Until applied, production Hub falls back to localStorage for catalog/remnants; r
 | Map attention surface (SI-001B) | `location-attention-presentation.ts` + MapTab / StoreLocationGrid / WalkTheFloorSheet | **LIVE** on production `88da2e8`; MEDIUM/HIGH cell marker only; seasonal copy from SI `effect`; `As of` device-local; Master all needs department; failure-independent; no sort/filter/heatmap |
 | Floor attention summary (SI-001C) | `location-attention-summary.ts` + `FloorAttentionSummary` + FloorTab | **LIVE — CLOSED** (`21e1a72` in production `88da2e81cfd14e841947f012dd1b1aaa63887ea9`, manual Vercel confirmation); pure MEDIUM/HIGH tier counts; independent Floor SI fetch; Master all gated; staging/shift do not refetch SI; verify/barrier success notifies locations-changed |
 | Operational Priority (SI-002) | — | **DEFERRED / NOT IMPLEMENTED** (2026-09-06 audit). Explored; name/concept rejected (overloaded + command risk); constraint-aware consideration possible but insufficient Day-1 value beyond SI-001. Deliberate deferral — not a technical failure. No evaluator/API/UI/schema/score/ranking/rotation coupling. Current Attention remains final current-state intelligence until recommendation architecture needs a stronger intermediate boundary. |
+| Department Operational Capacity (CAP-001) | — | **NOT IMPLEMENTED** (2026-09-06 audit). Inferred bay capacity unsupported. Rejected: people×3, hours÷productivity, weekly target as capacity, person-specific productivity, inferred absorption. `weekly_bay_target` remains desired staging volume / operational target. Shift hours valid for relative assignment only — do not prove bay capacity. No second Planning Allowance. Capacity deferred until recommendation proves need. |
+| Department Labor Availability (LAB-001) | — | **NEXT FOUNDATION** (CAP-001 reframe). Operational evidence over roster / `associate_shift_days` / call-out. Labor Availability ≠ Capacity ≠ Productivity ≠ Recommendation ≠ Weekly Target. Not implemented in this decision record; no bay conversion; UI deferred; does not revive SI-002. |
 | Auth & hub gate | `proxy.ts`, `lib/auth-gate.ts`, `AccessGate`, `AuthWall` | Cookie + JWT + RLS |
 | Roster / PIN / invite / QR pair | `lib/specialists.ts`, `app/pair/page.tsx`, `app/auth/verify/[token]`, `/api/roster/*` | End-to-end onboarding |
 | Floor bay rotations (Zebra) | `ZebraChecklist.tsx`, `completeRotation()`, `/api/rotations/complete` | Optimistic UI + offline queue |
@@ -568,6 +570,7 @@ Operational configuration only — do **not** hardcode store numbers, PINs, or t
 
 - No Zebra integration
 - No per-associate bay-capacity engine (hours proportional assignment remains authoritative)
+- No inferred Department Operational Capacity (CAP-001 NOT IMPLEMENTED; LAB-001 Labor Availability is next fact foundation — not capacity)
 - Associates are not required to install DeptSync
 
 ---

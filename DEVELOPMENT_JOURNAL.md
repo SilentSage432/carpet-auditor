@@ -1,5 +1,15 @@
 # DeptSync Hub — Development Journal
 
+## 2026-09-06 — CAP-001 Department Operational Capacity deferred (audit only)
+
+- Architecture-audited; **no implementation**.
+- Finding: repository does not currently support a truthful inferred bay-capacity model.
+- Rejected: people×3 bays; scheduled hours ÷ productivity constant; `weekly_bay_target` interpreted as capacity; individual productivity ratings; inferred bay absorption ability.
+- **`weekly_bay_target` remains desired staging volume / operational target.** Shift hours remain valid for relative assignment distribution; shift hours do **not** prove bay capacity.
+- Product decision: **no** second declared Planning Allowance. Capacity may be revisited only when recommendation architecture demonstrates a real product need.
+- **Next foundation: LAB-001 Department Labor Availability** — workforce/schedule/call-out evidence only. Labor Availability ≠ Capacity ≠ Productivity ≠ Recommendation ≠ Weekly Target. Not SI-002.
+- Docs: handoff / state / roadmap. Status: **CAP-001 NOT IMPLEMENTED — READY FOR LAB-001**.
+
 ## 2026-09-06 — SI-002 Operational Priority deferred + SI-001C LIVE closed (docs)
 
 - SI-002 explored via architecture audit; **no implementation**. Name/concept rejected for implementation (semantically overloaded; command risk; collides with draw `priority_*`). Constraint-aware consideration possible but insufficient Day-1 value beyond SI-001 (Arts XX / XXI). **Deliberate DEFER** — not a technical failure. No evaluator/API/UI/schema/score/ranking/rotation coupling. Current Attention remains the final current-state intelligence layer until recommendation architecture needs a stronger intermediate boundary.
