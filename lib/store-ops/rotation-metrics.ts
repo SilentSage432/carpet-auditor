@@ -205,6 +205,9 @@ export function composeWeeklyRotationMetrics(input: {
 /**
  * Compact Floor week line — verified vs awaiting review, never ambiguous "complete".
  * Example: `12 staged · 4 verified · 2 awaiting review`
+ *
+ * Empty state omits "this week" — pair with `composeFloorWeekProgressWithStagingWeek`
+ * so the staging week key is named explicitly (Sunday may differ from calendar ISO).
  */
 export function composeFloorWeekProgressLine(
   metrics: Pick<
@@ -213,7 +216,7 @@ export function composeFloorWeekProgressLine(
   >
 ): string {
   const staged = Math.max(0, Math.floor(metrics.staged));
-  if (staged <= 0) return "No bays staged this week";
+  if (staged <= 0) return "No bays staged";
 
   const verified = Math.max(0, Math.floor(metrics.verifiedComplete));
   const awaiting = Math.max(0, Math.floor(metrics.pendingVerification));
@@ -225,4 +228,20 @@ export function composeFloorWeekProgressLine(
     if (stillOpen > 0) parts.push(`${stillOpen} open`);
   }
   return parts.join(" · ");
+}
+
+/**
+ * Floor progress + explicit staging-week key (presentation only).
+ * Does not compute week labels — callers pass `sundayStagingWeekLabel` / API assigned_week.
+ */
+export function composeFloorWeekProgressWithStagingWeek(
+  metrics: Pick<
+    WeeklyRotationMetrics,
+    "staged" | "verifiedComplete" | "pendingVerification" | "open"
+  >,
+  stagingWeek: string
+): string {
+  const line = composeFloorWeekProgressLine(metrics);
+  const week = String(stagingWeek ?? "").trim();
+  return week ? `${line} · Staging week ${week}` : line;
 }

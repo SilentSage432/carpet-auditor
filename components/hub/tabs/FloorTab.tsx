@@ -82,7 +82,7 @@ import { shouldShowFloorAttentionSummary } from "@/lib/store-ops/floor-attention
 import { buildMapCurrentAttentionHref } from "@/lib/store-ops/map-attention-investigation";
 import { composeFloorFreshnessLine } from "@/lib/store-ops/floor-readiness";
 import {
-  composeFloorWeekProgressLine,
+  composeFloorWeekProgressWithStagingWeek,
   composeWeeklyRotationMetrics,
 } from "@/lib/store-ops/rotation-metrics";
 import {
@@ -530,7 +530,10 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
   );
   const pendingVerifyCount = weekMetrics.pendingVerification;
   const reportedCompleteCount = weekMetrics.reportedComplete;
-  const weekProgressLine = composeFloorWeekProgressLine(weekMetrics);
+  const weekProgressLine = composeFloorWeekProgressWithStagingWeek(
+    weekMetrics,
+    week
+  );
 
   const sundayPending = useMemo(() => {
     const bays = buildSundayStagedBays(displayRotations, assignments);
@@ -672,7 +675,6 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
             data-testid="floor-week-progress-line"
           >
             {weekProgressLine}
-            {week ? ` · week ${week}` : ""}
           </p>
           <p
             className="mt-0.5 font-mono text-[11px] leading-snug text-zinc-500"
@@ -771,8 +773,8 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
               >
                 <p className="text-sm font-semibold text-zinc-200">
                   {week
-                    ? `Week ${week} · 0 staged`
-                    : "0 bays staged this week"}
+                    ? `Staging week ${week} · 0 staged`
+                    : "0 bays staged"}
                 </p>
                 <p className="mt-1 font-mono text-[11px] leading-snug text-zinc-400">
                   Target{" "}

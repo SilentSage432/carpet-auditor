@@ -38,6 +38,7 @@ import { readableError, isExistingDepartmentConflict } from "@/lib/store-ops/err
 import type { Department, StoreLocation } from "@/lib/store-ops/types";
 import { isWeekVerifiedForMapOverlay } from "@/lib/store-ops/rotation-metrics";
 import { isoWeekLabel } from "@/lib/store-ops/week";
+import { formatMapCalendarWeekChrome } from "@/lib/store-ops/week-copy";
 import { isSupervisor } from "@/lib/specialists";
 import type { WorkflowTabProps } from "@/components/hub/tabs/tab-props";
 import type {
@@ -418,9 +419,9 @@ export function MapTab({ specialist }: WorkflowTabProps) {
       <main className="hub-main">
         <p className="mb-2 font-mono text-[11px] text-zinc-400">
           {locatorOnly
-            ? `Bay locator · week ${currentWeek}`
+            ? formatMapCalendarWeekChrome(currentWeek, "locator")
             : master
-              ? `Week ${currentWeek}`
+              ? formatMapCalendarWeekChrome(currentWeek, "master")
               : "This week's bay map"}
         </p>
 

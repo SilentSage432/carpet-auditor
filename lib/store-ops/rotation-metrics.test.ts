@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   composeWeeklyRotationMetrics,
   composeFloorWeekProgressLine,
+  composeFloorWeekProgressWithStagingWeek,
   isRotationPendingVerification,
   isRotationReportedComplete,
   isRotationVerifiedComplete,
@@ -231,7 +232,45 @@ describe("weekly-rotation-metrics-v1", () => {
         pendingVerification: 0,
         open: 0,
       })
-    ).toBe("No bays staged this week");
+    ).toBe("No bays staged");
+  });
+
+  it("composeFloorWeekProgressWithStagingWeek names staging week explicitly", () => {
+    expect(
+      composeFloorWeekProgressWithStagingWeek(
+        {
+          staged: 0,
+          verifiedComplete: 0,
+          pendingVerification: 0,
+          open: 0,
+        },
+        "2026-W37"
+      )
+    ).toBe("No bays staged · Staging week 2026-W37");
+
+    expect(
+      composeFloorWeekProgressWithStagingWeek(
+        {
+          staged: 3,
+          verifiedComplete: 1,
+          pendingVerification: 0,
+          open: 2,
+        },
+        "2026-W36"
+      )
+    ).toBe("3 staged · 1 verified · 2 open · Staging week 2026-W36");
+
+    expect(
+      composeFloorWeekProgressWithStagingWeek(
+        {
+          staged: 0,
+          verifiedComplete: 0,
+          pendingVerification: 0,
+          open: 0,
+        },
+        ""
+      )
+    ).toBe("No bays staged");
   });
 });
 

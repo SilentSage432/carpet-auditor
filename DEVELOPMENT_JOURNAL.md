@@ -1,12 +1,20 @@
 # DeptSync Hub — Development Journal
 
+## 2026-09-06 — Temporal copy clarification (staging vs calendar week)
+- Audit: Floor W37 vs Map W36 on Sunday are both correct clocks; defect was ambiguous labels.
+- Floor: `composeFloorWeekProgressWithStagingWeek` → e.g. `No bays staged · Staging week 2026-W37` (omits ambiguous “this week” on empty progress).
+- Map: `formatMapCalendarWeekChrome` → `Calendar week · 2026-W36` (Master); locator includes Calendar week.
+- Unchanged: `sundayStagingWeekLabel`, `isoWeekLabel`, cron, rotations, APIs, schema, Map overlay `assignedWeek` prop semantics.
+- Fiscal week remains separate. Map overlay staging-week alignment deferred (UX-005).
+- Status: **TEMPORAL COPY CLARIFICATION IMPLEMENTED LOCALLY — AWAITING COMMIT REVIEW** (not LIVE)
+
 ## 2026-09-06 — UX-004B Quiet investigation Show all clear
 - Defect: UX004A-01 real-device — quiet Map investigation Show all did not reliably clear URL/strip; elevated cleared with same control.
 - Root cause: SI-result-independent control already; soft `router.replace` alone insufficient under keep-alive + null store-map page for search-param-only exit (`useSearchParams` can stay stale).
 - Fix: `exitMapAttentionInvestigation` + `syncMapAttentionInvestigationClearUrl` via `history.replaceState(history.state, "", bare)` then `router.replace` (still replace, not push; history.state preserved; no reload).
 - Invariant: valid investigation URL + Show all → bare `/admin/store-map` regardless of SI elevated/quiet/degraded/unavailable/loading.
-- Deferred unchanged: UX004A-02 pin-while-investigating; UX004A-03 Floor/Map week labels.
-- Status: **UX-004B QUIET INVESTIGATION CLEAR RELIABILITY FIX IMPLEMENTED** — device re-smoke still required (not production/mobile validated)
+- Deferred: UX004A-02 pin-while-investigating; UX004A-03 week-label ambiguity → temporal copy clarification (clocks unchanged).
+- Status: **UX-004B QUIET INVESTIGATION CLEAR RELIABILITY FIX IMPLEMENTED** — device re-smoke PASSED; UX-004 closed on hardware
 
 ## 2026-09-06 — UX-004 Floor → Map investigation context
 
