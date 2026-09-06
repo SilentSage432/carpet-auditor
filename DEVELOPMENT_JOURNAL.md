@@ -1,5 +1,15 @@
 # DeptSync Hub — Development Journal
 
+## 2026-09-06 — UX-002 Verification authority safety correction
+
+- UX-001 P0: Floor Shift Analytics “Verify awaiting review” → `verifyAllCompletedBays` with empty `completed_rotation_ids` → `verifyWeeklyRotations` stamped `departments.last_verified_*` while UI claimed bays verified (Art VI false-authority risk).
+- Correction **A**: removed duplicate CTA + `signOffCompleted` / `verifyBusy` / `verifyMsg` from `FloorTab`; removed unused `verifyAllCompletedBays` helper; false success copy removed. Canonical strip → `SupervisorAuditSummaryModal` → `review_action` verify / send_back / verify_all unchanged (sole bay-review owner).
+- Empty-ID week stamp retained only as post-`verify_all` department metadata (legitimate authority B), not as bay verification. No backend verification semantic change.
+- Deferred: direct legacy API empty-ID POST without `review_action` hardening (pilot UI path closed).
+- No Floor redesign, schema, migration, LAB/REC, assignment, or completion-attempt changes. Feature freeze remains.
+- Tests: `verification-authority.contract.test.ts` (+ existing completion-attempt / rotation-metrics / SI summary suites).
+- Status: **UX-002 VERIFICATION AUTHORITY SAFETY CORRECTION IMPLEMENTED** (commit/push ≠ production lifecycle validation).
+
 ## 2026-09-06 — REC-001 Department Staging Consideration foundation (local)
 
 - Pure domain: `composeDepartmentStagingConsideration` (`department-staging-consideration-v1`).

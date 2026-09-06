@@ -1015,6 +1015,12 @@ export async function completeShowroomLocation(
   return data.location;
 }
 
+/**
+ * End-of-week verification batch: verify listed rotation IDs and/or log barriers.
+ * Empty `completed_rotation_ids` only stamps department `last_verified_*` —
+ * it does NOT verify PENDING_VERIFICATION bays. Bay verification must use
+ * `review_action` helpers (`verifyPendingBay` / `verifyAllPendingBays`).
+ */
 export async function verifyWeeklyRotationBatch(
   specialist: StoreSpecialist,
   input: {
@@ -1046,19 +1052,6 @@ export async function verifyWeeklyRotationBatch(
     completed_count: result.completed_count ?? 0,
     exception_count: result.exception_count ?? 0,
   };
-}
-
-/** Stamp the week verified without completing remaining open bays. */
-export async function verifyAllCompletedBays(
-  specialist: StoreSpecialist,
-  input: { department_id: string; assigned_week: string }
-): Promise<{ completed_count: number; exception_count: number }> {
-  return verifyWeeklyRotationBatch(specialist, {
-    department_id: input.department_id,
-    assigned_week: input.assigned_week,
-    completed_rotation_ids: [],
-    incomplete: [],
-  });
 }
 
 export type VerificationQueueItem = {

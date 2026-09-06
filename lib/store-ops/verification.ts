@@ -1,6 +1,12 @@
 /**
  * End-of-week verification + exception logging.
  * Incomplete bays become CARRIED_OVER and are prioritized next week.
+ *
+ * Authority split:
+ * - `completedRotationIds` → bay-level VERIFIED_COMPLETE + location COMPLETED
+ * - empty `completedRotationIds` → department week stamp only (`last_verified_*`);
+ *   does not close PENDING_VERIFICATION rows. Canonical bay review owns
+ *   `rotation-review.ts` (`verifyPendingRotation` / `verifyAllPendingRotations`).
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";

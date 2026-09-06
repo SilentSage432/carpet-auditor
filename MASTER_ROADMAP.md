@@ -1,6 +1,7 @@
 # DeptSync Hub — Master Roadmap
 
 ## Done
+- [x] UX-002 Verification authority safety — remove false Shift Analytics “Verify awaiting review” empty-ID week-stamp CTA; canonical strip→modal `review_action` path unchanged; week-signoff primitive retained after verify_all; legacy empty-ID API hardening deferred
 - [x] Canonical Layer-1 rotation metrics (`weekly-rotation-metrics-v1`) — Art VI A-1: reported ≠ verified on Floor / health / rollup / Map week overlay
 - [x] Weekly rotation history preservation — Force Draw supersedes incomplete stages (`20260905_weekly_rotations_superseded.sql`); active = `superseded_at IS NULL`; Layer-1 counts active only
 - [x] Completion-attempt history (send-back preserves evidence) — schema LIVE; app deploy with this commit; first natural lifecycle pending

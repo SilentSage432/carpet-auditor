@@ -42,7 +42,6 @@ import {
   peekCachedRotations,
   peekCachedStoreLocations,
   STORE_OPS_LOCATIONS_CHANGED_EVENT,
-  verifyAllCompletedBays,
 } from "@/lib/store-ops/client";
 import { fingerprintsEqual } from "@/lib/store-ops/cache";
 import { readableError } from "@/lib/store-ops/errors";
@@ -158,8 +157,6 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
   const [loading, setLoading] = useState(true);
   const [healthKey, setHealthKey] = useState(0);
   const [rollupOpen, setRollupOpen] = useState(false);
-  const [verifyBusy, setVerifyBusy] = useState(false);
-  const [verifyMsg, setVerifyMsg] = useState<string | null>(null);
   const [bayScanOpen, setBayScanOpen] = useState(false);
   const [bayAudits, setBayAudits] = useState<
     Record<
@@ -624,30 +621,6 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
     [displayRotations, assignments, onDuty]
   );
 
-  async function signOffCompleted() {
-    if (!deptId || !week) return;
-    setVerifyBusy(true);
-    setVerifyMsg(null);
-    try {
-      await verifyAllCompletedBays(specialist, {
-        department_id: deptId,
-        assigned_week: week,
-      });
-      setVerifyMsg(
-        `Week signed off — ${pendingVerifyCount} bay${
-          pendingVerifyCount === 1 ? "" : "s"
-        } verified.`
-      );
-      silentRefresh();
-    } catch (err) {
-      setVerifyMsg(
-        err instanceof Error ? err.message : "Could not sign off this week"
-      );
-    } finally {
-      setVerifyBusy(false);
-    }
-  }
-
   return (
     <>
       <main className="hub-main">
@@ -905,12 +878,6 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
           />
         ) : null}
 
-        {verifyMsg ? (
-          <p className="mb-3 mt-3 rounded-xl border border-emerald-500/40 bg-emerald-950/40 px-3 py-2 text-sm text-emerald-200">
-            {verifyMsg}
-          </p>
-        ) : null}
-
         <ShiftAnalyticsDrawer>
           {!simplified ? (
             <div className="mb-3 grid grid-cols-2 gap-2">
@@ -971,18 +938,6 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
             >
               Weekly audit rollup
               {pendingVerifyCount > 0 ? ` (${pendingVerifyCount})` : ""}
-            </button>
-          ) : null}
-          {!simplified && pendingVerifyCount > 0 ? (
-            <button
-              type="button"
-              disabled={verifyBusy || !deptId}
-              onClick={() => void signOffCompleted()}
-              className="mb-3 flex min-h-11 w-full items-center justify-center rounded-xl border border-emerald-500/40 bg-emerald-950/25 px-3 text-sm font-bold text-emerald-100 disabled:opacity-40"
-            >
-              {verifyBusy
-                ? "Signing off…"
-                : `Verify awaiting review (${pendingVerifyCount})`}
             </button>
           ) : null}
           {!simplified ? (
