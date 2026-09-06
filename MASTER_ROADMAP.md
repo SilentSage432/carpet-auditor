@@ -13,7 +13,9 @@
 - [x] FS-003 foundation — Location seasonal relevance (`operational_context_location_relevance`); Master CRUD; resolve; Settings assign; no Map/SI/rotation
 - [x] FS-003B — Map context surface (read-only location seasonal badges + walk-sheet detail; no inheritance/scores/rotation)
 - [ ] FS-003 follow-ups — Map polish if needed; SI consumption
-- [ ] SI-001 / SI-002 — seasonal signal contract; Day-1 pressure (**SI-001 foundation LIVE**; **SI-001A read API LIVE**; **SI-001B Map attention surface implemented** — awaiting deploy LIVE; **SI-001C Floor attention summary committed/pushed `21e1a72` — deployment SHA verification pending**)
+- [x] SI-001 Current Attention — foundation + read API + Map + Floor summary **LIVE** on production `88da2e81cfd14e841947f012dd1b1aaa63887ea9` (includes SI-001C `21e1a72`; SI-001C **CLOSED**)
+- [ ] SI-002 Operational Priority — **DEFERRED / NOT IMPLEMENTED** (audit 2026-09-06): explored; name/concept rejected (overloaded + command risk); constraint-aware consideration possible; deferred under complexity/Day-1 value test — not a technical failure. No evaluator/API/UI/schema/score/ranking/rotation coupling. Current Attention remains final current-state intelligence until recommendation architecture needs a stronger intermediate boundary.
+- [ ] Seasonal / recommendation intelligence follow-ons — only after product need; no premature priority score/rank
 - [ ] Public holiday seed artifact (`PUBLIC_CALENDAR`) — evidence-gated
 - [ ] Sunday assignment history across Force Draw / rebalance — known P1
 - [x] Carpet Hub shell with sticky header + slide-over nav

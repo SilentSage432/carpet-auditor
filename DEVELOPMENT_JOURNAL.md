@@ -1,11 +1,18 @@
 # DeptSync Hub — Development Journal
 
+## 2026-09-06 — SI-002 Operational Priority deferred + SI-001C LIVE closed (docs)
+
+- SI-002 explored via architecture audit; **no implementation**. Name/concept rejected for implementation (semantically overloaded; command risk; collides with draw `priority_*`). Constraint-aware consideration possible but insufficient Day-1 value beyond SI-001 (Arts XX / XXI). **Deliberate DEFER** — not a technical failure. No evaluator/API/UI/schema/score/ranking/rotation coupling. Current Attention remains the final current-state intelligence layer until recommendation architecture needs a stronger intermediate boundary.
+- SI-001C canonical status corrected: production Vercel manually confirmed on `88da2e81cfd14e841947f012dd1b1aaa63887ea9` (contains `21e1a72`). **SI-001C FLOOR ATTENTION SUMMARY LIVE — CLOSED.**
+- Completion-attempt first natural lifecycle remains pending (no fabricated proof).
+- Docs-only: handoff / state / roadmap / journal.
+
 ## 2026-09-06 — SI-001C Floor Attention Summary (committed/pushed)
 
 - Commit `21e1a72` (`feat: add Floor current attention summary`) pushed to `origin/main`.
 - Pure aggregation + Floor independent SI fetch + compact Current attention strip; verify-batch/barrier success notify locations-changed.
 - Unauthenticated production smoke: `/login` OK; attention API 401; `/dashboard` and `/admin/store-map` auth-gate to sign-in.
-- **Exact Vercel production SHA not verified** (expired local Vercel CLI token; GitHub deployments API forbidden). Status: **COMMITTED AND PUSHED — DEPLOYMENT SHA VERIFICATION PENDING** (not LIVE).
+- Historical note: at commit time Vercel SHA was not CLI-verified; later manual confirmation closed SI-001C as LIVE on `88da2e8` (see entry above).
 
 ## 2026-09-06 — SI-001C Floor Attention Summary (local)
 
