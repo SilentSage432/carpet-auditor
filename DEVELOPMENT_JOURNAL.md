@@ -1,5 +1,16 @@
 # DeptSync Hub — Development Journal
 
+## 2026-09-06 — UX-003 Floor decision hierarchy
+
+- Floor remains primary DS command surface; bottom nav unchanged.
+- Hierarchy: **identity → verification (conditional) → compact week/freshness → work surface** (thin Stage/On-duty + filters + checklist) → Current Attention (quiet AVAILABLE demoted via `shouldShowFloorAttentionSummary`) → fiscal/season demoted → More tools accordion (renamed from Shift Analytics chrome).
+- Pre-commit correction: week progress/freshness moved below verification so operational telemetry does not outrank pending supervisory obligation.
+- Filter rename: Needs Attention → Open issues (predicate unchanged; ZebraChecklist empty copy updated).
+- Week/readiness compression: `composeFloorFreshnessLine` + week progress (no duplicated staged/verified appendix on Floor).
+- No LAB/REC, Map handoff, backend/SI/rotation/verification semantics.
+- Tests: `floor-hierarchy.contract.test.ts`, `floor-attention-visibility.test.ts`, freshness tests.
+- Status: **UX-003 FLOOR DECISION HIERARCHY IMPLEMENTED** (commit/push ≠ production mobile validation)
+
 ## 2026-09-06 — UX-002 Verification authority safety correction
 
 - UX-001 P0: Floor Shift Analytics “Verify awaiting review” → `verifyAllCompletedBays` with empty `completed_rotation_ids` → `verifyWeeklyRotations` stamped `departments.last_verified_*` while UI claimed bays verified (Art VI false-authority risk).

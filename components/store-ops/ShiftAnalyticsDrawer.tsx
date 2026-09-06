@@ -1,9 +1,9 @@
 "use client";
 
 /**
- * Collapsed Floor analytics accordion — presentation chrome only.
- * Shift velocity, store health, and Walk & Talk nest here so the primary
- * Floor viewport stays on-duty bay distribution.
+ * Collapsed Floor secondary-tools accordion — presentation chrome only.
+ * Snap, velocity, health, and Walk & Talk nest here so the primary Floor
+ * viewport stays on verification and active week work (UX-003).
  */
 
 import { useEffect, useId, useState, type ReactNode } from "react";
@@ -31,25 +31,25 @@ export function ShiftAnalyticsDrawer({ children }: Props) {
   }, []);
 
   return (
-    <section className="mb-3 overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-950/70">
+    <section className="mb-3 overflow-hidden rounded-xl border border-zinc-800/70 bg-zinc-950/40">
       <button
         type="button"
         aria-expanded={open}
         aria-controls={panelId}
         onClick={() => setOpen((prev) => !prev)}
-        className="flex min-h-11 w-full items-center gap-2 px-3 py-2 text-left"
+        className="flex min-h-10 w-full items-center gap-2 px-3 py-2 text-left"
       >
         <Activity
-          className="h-4 w-4 shrink-0 text-zinc-400"
+          className="h-3.5 w-3.5 shrink-0 text-zinc-500"
           strokeWidth={ICON_STROKE}
           aria-hidden
         />
         <span className="min-w-0 flex-1">
-          <span className="block text-sm font-semibold text-zinc-100">
-            Shift Analytics
+          <span className="block text-sm font-semibold text-zinc-300">
+            More tools
           </span>
-          <span className="block font-mono text-[10px] uppercase tracking-[0.14em] text-zinc-500">
-            Velocity · health · Walk &amp; Talk
+          <span className="block font-mono text-[10px] uppercase tracking-[0.14em] text-zinc-600">
+            Secondary · analytics · Walk &amp; Talk
           </span>
         </span>
         {open ? (

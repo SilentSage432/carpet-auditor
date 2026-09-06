@@ -2,6 +2,10 @@
  * Floor readiness headline — Layer-1 freshness + week context (floor-readiness-v1).
  * Stale uses store_locations.last_completed_at (set on DS verify / auto-verify).
  * Week appendix uses verified / awaiting review — never ambiguous "complete" (Art VI).
+ *
+ * UX-003: Floor prefers `composeFloorFreshnessLine` beside week progress so week
+ * counts are not duplicated. Full `composeFloorReadinessLine` remains for callers
+ * that still want a single combined string.
  */
 
 import {
@@ -29,6 +33,22 @@ export type FloorReadinessInput = {
    */
   weekComplete?: number;
 };
+
+/**
+ * Layer-1 freshness only — no week staged/verified appendix.
+ * Pair with `composeFloorWeekProgressLine` on Floor (UX-003).
+ */
+export function composeFloorFreshnessLine(
+  input: Pick<FloorReadinessInput, "totalBays" | "staleCount" | "weeklyTarget">
+): string {
+  const total = Math.max(0, Math.floor(input.totalBays));
+  const stale = Math.max(0, Math.min(total, Math.floor(input.staleCount)));
+  if (total <= 0) {
+    return "No mapped bays yet";
+  }
+  const target = resolveWeeklyBayTarget(input.weeklyTarget);
+  return `${stale} of ${total} stale · target ${target}/week`;
+}
 
 /**
  * Truthful mobile line for Floor header.

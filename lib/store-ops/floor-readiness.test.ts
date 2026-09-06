@@ -1,5 +1,26 @@
 import { describe, expect, it } from "vitest";
-import { composeFloorReadinessLine } from "@/lib/store-ops/floor-readiness";
+import {
+  composeFloorFreshnessLine,
+  composeFloorReadinessLine,
+} from "@/lib/store-ops/floor-readiness";
+
+describe("composeFloorFreshnessLine", () => {
+  it("reports stale-of-total and target without week appendix", () => {
+    expect(
+      composeFloorFreshnessLine({
+        totalBays: 124,
+        staleCount: 87,
+        weeklyTarget: 15,
+      })
+    ).toBe("87 of 124 stale · target 15/week");
+  });
+
+  it("handles empty topology", () => {
+    expect(composeFloorFreshnessLine({ totalBays: 0, staleCount: 0 })).toBe(
+      "No mapped bays yet"
+    );
+  });
+});
 
 describe("composeFloorReadinessLine", () => {
   it("reports truthful stale-of-total with weekly target", () => {

@@ -945,7 +945,7 @@ export function ZebraChecklist({
       queueFilter !== "downstock" &&
       displayQueue.length === 0 ? (
         <p className="rounded-xl border border-dashed border-amber-500/35 bg-amber-950/20 px-4 py-3 text-center text-sm text-amber-100">
-          No bays need attention right now — great work.
+          No open issues right now — great work.
         </p>
       ) : null}
 
