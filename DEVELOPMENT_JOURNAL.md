@@ -1,5 +1,14 @@
 # DeptSync Hub — Development Journal
 
+## 2026-09-06 — REC-001 Department Staging Consideration foundation (local)
+
+- Pure domain: `composeDepartmentStagingConsideration` (`department-staging-consideration-v1`).
+- Consumes normalized SI-001 signals + Layer-1 planning (`target` / `staged` / `staging_deficit`) + authoritative staged location ids.
+- Full qualifying pool (MEDIUM|HIGH + ACTIONABLE + unstaged + eligible); never truncated to deficit; no rank/score; deficit = planning context only (not capacity).
+- Statuses: `AVAILABLE` | `NO_ADDITIONAL_STAGING_NEEDED` | `UNAVAILABLE`. Missing **or conflicting** required SI (when deficit > 0) ≠ empty success. Deficit 0 short-circuits without requiring SI. No LAB. No API/UI/schema/persistence/mutation.
+- Tests: `staging-consideration.test.ts` (46). Docs updated.
+- Status: **REC-001 STAGING CONSIDERATION FOUNDATION IMPLEMENTED** (not LIVE / not DEPLOYED / not production-verified — no runtime consumer). Intelligence foundation phase complete.
+
 ## 2026-09-06 — LAB-001 Department Labor Availability foundation
 
 - Pure domain: `composeDepartmentLaborAvailability` + `knownShiftHours` (`department-scheduled-labor-v1`).
