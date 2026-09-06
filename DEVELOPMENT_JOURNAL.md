@@ -1,5 +1,30 @@
 # DeptSync Hub — Development Journal
 
+## 2026-09-05 — SI-001 semantic correction (local)
+
+### Corrected
+- Confidence = evidence maturity (availability flags + substantive current observations); **orthogonal** to actionability / pressure.
+- Seasonal LOW/MEDIUM/HIGH differentiated: LOW CONTEXT only; MEDIUM MODIFY without tier raise; HIGH at most +1 when need exists; overlap uses strongest once.
+- Evidence count = independent material families (not claim/barrier cardinality).
+- Empty vs unavailable via `current_rotation_evidence_available` / `barrier_evidence_available` / `seasonal_context_evidence_available`.
+- Eligibility extracted to neutral `location-eligibility.ts` (shared with rotation-metrics; no week import into SI).
+
+### Status
+- **SI-001 FOUNDATION IMPLEMENTED** (deterministic engine in app; no API/UI/schema). Not Map/Floor/rotation intelligence LIVE.
+
+## 2026-09-05 — SI-001 Current Attention Pressure (local foundation)
+
+### Shipped (local only — awaiting review)
+- Pure Layer-1 engine `lib/store-ops/location-attention-pressure.ts` (`location-attention-pressure-v1`).
+- Deterministic pressure / actionability / confidence / reason codes from normalized present facts + declared context claims.
+- Context claims preserved per `context_id` (no pre-collapse max). Seasonal MODIFY bounded to +1 tier. CRITICAL deferred.
+- Explicit barrier actionability classifier from reviewed `EXCEPTION_REASONS` sets (no fuzzy text).
+- Tests: `location-attention-pressure.test.ts` (Garden/Flooring/zero-context/zero-history/overlap/purity).
+- No API, UI, schema, persistence, rotation coupling, or manual draw-priority fields.
+
+### Status
+- **SI-001 FOUNDATION IMPLEMENTED LOCALLY — AWAITING REVIEW** (not production LIVE).
+
 ## 2026-09-05 — FS-003B Map location seasonal context surface
 
 ### Shipped

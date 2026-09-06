@@ -7,12 +7,15 @@
  */
 
 import { BAY_STALE_DAYS, daysSinceIso } from "./bay-health";
+import { isEligibleRotationLocation } from "./location-eligibility";
 import type {
   StoreLocation,
   WeeklyRotationWithLocation,
 } from "./types";
 import { resolveWeeklyBayTarget } from "./week";
 import { filterActiveWeeklyRotations } from "./rotation-history";
+
+export { isEligibleRotationLocation } from "./location-eligibility";
 
 /** Stable method id for weekly rotation Layer-1 claims. */
 export const WEEKLY_ROTATION_METRICS_METHOD = "weekly-rotation-metrics-v1";
@@ -90,18 +93,6 @@ export function isRotationReportedComplete(
     return true;
   }
   return Boolean(row.is_completed);
-}
-
-/**
- * Eligible for weekly aisle rotation / cycle readiness denominator.
- * Matches draw filters: active + not SHOWROOM_STACKOUT.
- */
-export function isEligibleRotationLocation(
-  loc: Pick<StoreLocation, "is_active" | "location_type"> | null | undefined
-): boolean {
-  if (!loc) return false;
-  if (loc.is_active === false) return false;
-  return (loc.location_type ?? "STANDARD") !== "SHOWROOM_STACKOUT";
 }
 
 export function countEligibleLocations(
