@@ -1,6 +1,7 @@
 /**
  * FS-002 Operational seasons & events foundation.
- * Declared context occurrences + department relevance.
+ * FS-003 Location seasonal relevance (declared only; no rotation/priority mutation).
+ * Declared context occurrences + department / location relevance.
  * Does not invent company events. Does not mutate rotations or bay priority.
  */
 
@@ -15,6 +16,8 @@ import {
 export const OPERATIONAL_CONTEXTS_TABLE = "operational_contexts" as const;
 export const OPERATIONAL_CONTEXT_RELEVANCE_TABLE =
   "operational_context_department_relevance" as const;
+export const OPERATIONAL_CONTEXT_LOCATION_RELEVANCE_TABLE =
+  "operational_context_location_relevance" as const;
 
 export type OperationalContextKind = "SEASON" | "EVENT";
 
@@ -54,6 +57,17 @@ export type OperationalContextDepartmentRelevance = {
   updated_at: string;
 };
 
+/** FS-003 declared location relevance. Missing row = UNSET. */
+export type OperationalContextLocationRelevance = {
+  id: string;
+  context_id: string;
+  location_id: string;
+  relevance: OperationalContextRelevance;
+  declared_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
 /** Resolved item for a date — relevance null = UNSET (missing row). */
 export type ResolvedOperationalContext = {
   id: string;
@@ -87,6 +101,8 @@ const CONTEXT_SELECT =
   "id, kind, store_id, title, concept_key, start_date, end_date, source_type, source_reference, source_year, declared_by, created_at, updated_at";
 const RELEVANCE_SELECT =
   "id, context_id, department_code, relevance, created_at, updated_at";
+const LOCATION_RELEVANCE_SELECT =
+  "id, context_id, location_id, relevance, declared_by, created_at, updated_at";
 
 export function isOperationalContextKind(
   raw: unknown
@@ -132,8 +148,10 @@ function messageNamesContextTable(msg: string): boolean {
   return (
     msg.includes(OPERATIONAL_CONTEXTS_TABLE) ||
     msg.includes(OPERATIONAL_CONTEXT_RELEVANCE_TABLE) ||
+    msg.includes(OPERATIONAL_CONTEXT_LOCATION_RELEVANCE_TABLE) ||
     msg.includes(`public.${OPERATIONAL_CONTEXTS_TABLE}`) ||
-    msg.includes(`public.${OPERATIONAL_CONTEXT_RELEVANCE_TABLE}`)
+    msg.includes(`public.${OPERATIONAL_CONTEXT_RELEVANCE_TABLE}`) ||
+    msg.includes(`public.${OPERATIONAL_CONTEXT_LOCATION_RELEVANCE_TABLE}`)
   );
 }
 
@@ -193,6 +211,21 @@ function mapRelevanceRow(
     context_id: String(row.context_id),
     department_code: String(row.department_code),
     relevance: isOperationalContextRelevance(relevance) ? relevance : "NONE",
+    created_at: String(row.created_at),
+    updated_at: String(row.updated_at),
+  };
+}
+
+function mapLocationRelevanceRow(
+  row: Record<string, unknown>
+): OperationalContextLocationRelevance {
+  const relevance = String(row.relevance ?? "");
+  return {
+    id: String(row.id),
+    context_id: String(row.context_id),
+    location_id: String(row.location_id),
+    relevance: isOperationalContextRelevance(relevance) ? relevance : "NONE",
+    declared_by: row.declared_by == null ? null : String(row.declared_by),
     created_at: String(row.created_at),
     updated_at: String(row.updated_at),
   };
@@ -659,6 +692,7 @@ export async function listOperationalContextsForStore(
       ok: true;
       contexts: OperationalContext[];
       relevance: OperationalContextDepartmentRelevance[];
+      location_relevance: OperationalContextLocationRelevance[];
     }
   | { ok: false; missingRelation: true }
   | { ok: false; error: string }
@@ -682,7 +716,7 @@ export async function listOperationalContextsForStore(
   );
   const ids = contexts.map((c) => c.id);
   if (ids.length === 0) {
-    return { ok: true, contexts: [], relevance: [] };
+    return { ok: true, contexts: [], relevance: [], location_relevance: [] };
   }
 
   const { data: relRows, error: relError } = await client
@@ -697,12 +731,42 @@ export async function listOperationalContextsForStore(
     return { ok: false, error: readableError(relError) };
   }
 
+  const { data: locIds, error: locIdsError } = await client
+    .from("store_locations")
+    .select("id")
+    .eq("store_id", storeId);
+
+  if (locIdsError) {
+    return { ok: false, error: readableError(locIdsError) };
+  }
+
+  const locationIds = (locIds ?? []).map((row) => String(row.id));
+  let location_relevance: OperationalContextLocationRelevance[] = [];
+  if (locationIds.length > 0) {
+    const { data: locRelRows, error: locRelError } = await client
+      .from(OPERATIONAL_CONTEXT_LOCATION_RELEVANCE_TABLE)
+      .select(LOCATION_RELEVANCE_SELECT)
+      .in("context_id", ids)
+      .in("location_id", locationIds);
+
+    if (locRelError) {
+      if (isOperationalContextUnavailable(locRelError)) {
+        return { ok: false, missingRelation: true };
+      }
+      return { ok: false, error: readableError(locRelError) };
+    }
+    location_relevance = (locRelRows ?? []).map((row) =>
+      mapLocationRelevanceRow(row as Record<string, unknown>)
+    );
+  }
+
   return {
     ok: true,
     contexts,
     relevance: (relRows ?? []).map((row) =>
       mapRelevanceRow(row as Record<string, unknown>)
     ),
+    location_relevance,
   };
 }
 
@@ -850,6 +914,353 @@ export async function resolveOperationalContextsForDate(
       departmentCode: input.departmentCode,
       contexts: listed.contexts,
       relevance: listed.relevance,
+    }),
+  };
+}
+
+/**
+ * Upsert or clear location relevance (FS-003).
+ * Pass relevance null to delete the row (restore UNSET).
+ * Never mutates store_locations priority / velocity fields.
+ */
+export async function setOperationalContextLocationRelevance(
+  client: SupabaseClient,
+  input: {
+    context_id: string;
+    store_id: string;
+    location_id: string;
+    relevance: OperationalContextRelevance | null;
+    declared_by?: string | null;
+  }
+): Promise<
+  | { ok: true; relevance: OperationalContextLocationRelevance | null }
+  | {
+      ok: false;
+      code:
+        | "validation_failed"
+        | "not_found"
+        | "forbidden"
+        | "missing_relation"
+        | "write_failed";
+      message: string;
+    }
+> {
+  const locationId = String(input.location_id ?? "").trim();
+  if (!locationId) {
+    return {
+      ok: false,
+      code: "validation_failed",
+      message: "location_id is required",
+    };
+  }
+  if (input.relevance != null && !isOperationalContextRelevance(input.relevance)) {
+    return {
+      ok: false,
+      code: "validation_failed",
+      message: "relevance must be NONE, LOW, MEDIUM, or HIGH",
+    };
+  }
+
+  const existing = await fetchOperationalContextById(client, input.context_id);
+  if (!existing.ok) {
+    if ("missingRelation" in existing && existing.missingRelation) {
+      return {
+        ok: false,
+        code: "missing_relation",
+        message: "Operational context tables are not available",
+      };
+    }
+    return {
+      ok: false,
+      code: "write_failed",
+      message: "error" in existing ? existing.error : "Failed to load context",
+    };
+  }
+  if (!existing.context) {
+    return { ok: false, code: "not_found", message: "Context not found" };
+  }
+  if (existing.context.store_id !== input.store_id) {
+    return {
+      ok: false,
+      code: "forbidden",
+      message: "Context is outside actor store scope",
+    };
+  }
+  if (existing.context.source_type !== "MASTER_ADMIN_DECLARED") {
+    return {
+      ok: false,
+      code: "forbidden",
+      message: "Only MASTER_ADMIN_DECLARED contexts accept location relevance edits",
+    };
+  }
+
+  const { data: loc, error: locError } = await client
+    .from("store_locations")
+    .select("id, store_id, is_active")
+    .eq("id", locationId)
+    .maybeSingle();
+
+  if (locError) {
+    return {
+      ok: false,
+      code: "write_failed",
+      message: readableError(locError, "Failed to load location"),
+    };
+  }
+  if (!loc) {
+    return { ok: false, code: "not_found", message: "Location not found" };
+  }
+  if (String(loc.store_id) !== input.store_id) {
+    return {
+      ok: false,
+      code: "forbidden",
+      message: "Location is outside actor store scope",
+    };
+  }
+
+  if (input.relevance == null) {
+    const { error } = await client
+      .from(OPERATIONAL_CONTEXT_LOCATION_RELEVANCE_TABLE)
+      .delete()
+      .eq("context_id", input.context_id)
+      .eq("location_id", locationId);
+    if (error) {
+      if (isOperationalContextUnavailable(error)) {
+        return {
+          ok: false,
+          code: "missing_relation",
+          message: "Location relevance table is not available",
+        };
+      }
+      return {
+        ok: false,
+        code: "write_failed",
+        message: readableError(error, "Failed to clear location relevance"),
+      };
+    }
+    return { ok: true, relevance: null };
+  }
+
+  const now = new Date().toISOString();
+  const { data, error } = await client
+    .from(OPERATIONAL_CONTEXT_LOCATION_RELEVANCE_TABLE)
+    .upsert(
+      {
+        context_id: input.context_id,
+        location_id: locationId,
+        relevance: input.relevance,
+        declared_by: input.declared_by ?? null,
+        updated_at: now,
+      },
+      { onConflict: "context_id,location_id" }
+    )
+    .select(LOCATION_RELEVANCE_SELECT)
+    .single();
+
+  if (error || !data) {
+    if (isOperationalContextUnavailable(error)) {
+      return {
+        ok: false,
+        code: "missing_relation",
+        message: "Location relevance table is not available",
+      };
+    }
+    return {
+      ok: false,
+      code: "write_failed",
+      message: readableError(error, "Failed to set location relevance"),
+    };
+  }
+  return {
+    ok: true,
+    relevance: mapLocationRelevanceRow(data as Record<string, unknown>),
+  };
+}
+
+export type ResolvedLocationContextRelevance = {
+  location_id: string;
+  context_id: string;
+  kind: OperationalContextKind;
+  title: string;
+  start_date: string;
+  end_date: string;
+  source_type: OperationalContextSourceType;
+  /** Declared location relevance — never fabricated from department. */
+  location_relevance: OperationalContextRelevance;
+  location_is_active: boolean;
+};
+
+export type ResolveLocationContextRelevanceResult = {
+  operational_date: string;
+  store_id: string;
+  items: ResolvedLocationContextRelevance[];
+};
+
+/**
+ * Pure resolve: active contexts × explicit location relevance rows.
+ * Does not inherit department relevance. Inactive locations stay in history
+ * lists when includeInactive=true; default active resolve omits them.
+ */
+export function resolveLocationContextRelevanceFromRows(input: {
+  operationalDate: string;
+  storeId: string;
+  contexts: OperationalContext[];
+  location_relevance: OperationalContextLocationRelevance[];
+  locations: Array<{ id: string; store_id: string; is_active: boolean }>;
+  locationIds?: string[] | null;
+  includeInactive?: boolean;
+}): ResolveLocationContextRelevanceResult {
+  const op = parseOperationalDate(input.operationalDate);
+  const filterIds =
+    input.locationIds && input.locationIds.length > 0
+      ? new Set(input.locationIds.map(String))
+      : null;
+
+  if (!op) {
+    return {
+      operational_date: String(input.operationalDate),
+      store_id: input.storeId,
+      items: [],
+    };
+  }
+
+  const locById = new Map(
+    input.locations
+      .filter((l) => String(l.store_id) === input.storeId)
+      .map((l) => [String(l.id), l] as const)
+  );
+
+  const activeContexts = input.contexts.filter((c) => {
+    if (c.store_id != null && c.store_id !== input.storeId) return false;
+    if (compareOperationalDates(c.start_date, op) > 0) return false;
+    if (compareOperationalDates(op, c.end_date) > 0) return false;
+    return true;
+  });
+  const activeById = new Map(activeContexts.map((c) => [c.id, c] as const));
+
+  const items: ResolvedLocationContextRelevance[] = [];
+  for (const row of input.location_relevance) {
+    const context = activeById.get(row.context_id);
+    if (!context) continue;
+    if (filterIds && !filterIds.has(row.location_id)) continue;
+    const loc = locById.get(row.location_id);
+    if (!loc) continue;
+    if (!input.includeInactive && loc.is_active === false) continue;
+    items.push({
+      location_id: row.location_id,
+      context_id: context.id,
+      kind: context.kind,
+      title: context.title,
+      start_date: context.start_date,
+      end_date: context.end_date,
+      source_type: context.source_type,
+      location_relevance: row.relevance,
+      location_is_active: loc.is_active !== false,
+    });
+  }
+
+  items.sort((a, b) => {
+    const loc = a.location_id.localeCompare(b.location_id);
+    if (loc !== 0) return loc;
+    const d = compareOperationalDates(a.start_date, b.start_date);
+    if (d !== 0) return d;
+    return a.title.localeCompare(b.title);
+  });
+
+  return {
+    operational_date: op,
+    store_id: input.storeId,
+    items,
+  };
+}
+
+export async function resolveLocationContextRelevanceForDate(
+  client: SupabaseClient,
+  input: {
+    storeId: string;
+    operationalDate?: string;
+    instant?: Date | string;
+    timeZone?: string;
+    locationIds?: string[] | null;
+    includeInactive?: boolean;
+  }
+): Promise<
+  | { ok: true; result: ResolveLocationContextRelevanceResult }
+  | {
+      ok: false;
+      missingRelation: true;
+      result: ResolveLocationContextRelevanceResult;
+    }
+  | { ok: false; error: string }
+> {
+  let operationalDate: string;
+  if (input.operationalDate) {
+    const parsed = parseOperationalDate(input.operationalDate);
+    if (!parsed) {
+      return {
+        ok: false,
+        error: `Invalid operational date: ${input.operationalDate}`,
+      };
+    }
+    operationalDate = parsed;
+  } else if (input.instant != null) {
+    try {
+      operationalDate = operationalDateFromInstant(
+        input.instant,
+        input.timeZone ?? "America/Denver"
+      );
+    } catch {
+      return { ok: false, error: "Invalid instant for store-local date" };
+    }
+  } else {
+    return { ok: false, error: "operationalDate or instant is required" };
+  }
+
+  const listed = await listOperationalContextsForStore(client, input.storeId);
+  if (!listed.ok) {
+    if ("missingRelation" in listed && listed.missingRelation) {
+      return {
+        ok: false,
+        missingRelation: true,
+        result: {
+          operational_date: operationalDate,
+          store_id: input.storeId,
+          items: [],
+        },
+      };
+    }
+    return {
+      ok: false,
+      error: "error" in listed ? listed.error : "Failed to load contexts",
+    };
+  }
+
+  let locQuery = client
+    .from("store_locations")
+    .select("id, store_id, is_active")
+    .eq("store_id", input.storeId);
+  if (input.locationIds && input.locationIds.length > 0) {
+    locQuery = locQuery.in("id", input.locationIds);
+  }
+  const { data: locs, error: locError } = await locQuery;
+  if (locError) {
+    return { ok: false, error: readableError(locError) };
+  }
+
+  return {
+    ok: true,
+    result: resolveLocationContextRelevanceFromRows({
+      operationalDate,
+      storeId: input.storeId,
+      contexts: listed.contexts,
+      location_relevance: listed.location_relevance,
+      locations: (locs ?? []).map((row) => ({
+        id: String(row.id),
+        store_id: String(row.store_id),
+        is_active: row.is_active !== false,
+      })),
+      locationIds: input.locationIds,
+      includeInactive: input.includeInactive,
     }),
   };
 }

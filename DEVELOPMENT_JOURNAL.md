@@ -1,5 +1,20 @@
 # DeptSync Hub — Development Journal
 
+## 2026-09-05 — FS-003 location seasonal relevance foundation
+
+### Shipped
+- Migration `20260905_operational_context_location_relevance.sql`: `(context_id, location_id)` unique; NONE|LOW|MEDIUM|HIGH; `declared_by`; CASCADE from context + location; RLS authenticated SELECT.
+- Domain: `setOperationalContextLocationRelevance`, `resolveLocationContextRelevanceFromRows` / `ForDate`. List includes `location_relevance`. No dept→location inheritance writes. No priority/rotation mutation.
+- APIs: Master `PUT /api/admin/operational-contexts/[id]/location-relevance`; Supervisor+ `mode=list` + `mode=resolve-locations`.
+- Settings `OperationalContextCard`: optional bay assign/clear under each declared context.
+- Tests: `operational-context.location.test.ts`. No Map UI. No SI. No seed.
+
+### Status
+- **FS-003 LOCATION SEASONAL RELEVANCE FOUNDATION** (empty production seed valid).
+- Production: pre-migration dump `…T00-22-06-828Z.dump` (518573 bytes); table LIVE count=0; contexts/relevance still 0; locations 124.
+- Completion-attempt first natural lifecycle still pending.
+- Next: Map read badge / SI consumption (deferred).
+
 ## 2026-09-05 — FS-002B Floor fiscal + seasonal context surface
 
 ### Shipped

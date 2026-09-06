@@ -101,10 +101,11 @@ lib/store-ops/sunday-schedule.ts  → Store-owned Sunday timing knowledge (defau
 lib/store-ops/operational-context.ts → FS-002 declared seasons/events + department relevance (Master-declared path)
 lib/store-ops/floor-operational-context.ts → FS-002B Floor presentation composition (fiscal + season/event + dept relevance)
 components/store-ops/FloorOperationalContextStrip.tsx → Floor header strip (Supervisor+; non-blocking)
-app/api/operational-contexts/route.ts → GET Supervisor+ resolve/list
-app/api/admin/operational-contexts/* → Master CRUD + relevance
-components/admin/OperationalContextCard.tsx → More→Settings Master manager
-supabase/migrations/20260905_operational_contexts.sql → contexts + relevance (**LIVE** after apply)
+app/api/operational-contexts/route.ts → GET Supervisor+ resolve/list/resolve-locations
+app/api/admin/operational-contexts/* → Master CRUD + dept/location relevance
+components/admin/OperationalContextCard.tsx → More→Settings Master manager (incl. location assign)
+supabase/migrations/20260905_operational_contexts.sql → contexts + dept relevance (**LIVE**)
+supabase/migrations/20260905_operational_context_location_relevance.sql → FS-003 location relevance
 lib/store-ops/fiscal-calendar.ts  → FS-001 authority (import/validate/resolve) + FS-001A `computeFiscalCoverage` (derived; Master signal)
 app/api/fiscal-calendar/route.ts  → GET Supervisor+ fiscal context for store-local date (additive; rotations unaffected)
 app/api/admin/fiscal-calendar/coverage/route.ts → GET Master-only coverage status (HEALTHY/ATTENTION/URGENT/EXPIRED)
@@ -244,6 +245,7 @@ supabase/migrations/20260812_sunday_bay_assignments.sql → sunday specialist↔
 | Fiscal calendar (FS-001 / FS-001A min) | `lib/store-ops/fiscal-calendar.ts` + `fiscal_years`/`fiscal_weeks` + `GET /api/fiscal-calendar` + Master `GET /api/admin/fiscal-calendar/coverage` — ISO rotation unchanged; FY2026 seeded; coverage derived on read |
 | Operational seasons/events (FS-002) | `operational-context.ts` + tables + Master Settings — declared Gregorian contexts + dept relevance; no SI / location priority |
 | Floor context strip (FS-002B) | `floor-operational-context.ts` + `FloorOperationalContextStrip` — fiscal + active season/event + current dept relevance; empty valid; no rotation effect |
+| Location seasonal relevance (FS-003) | `operational_context_location_relevance` + Settings assign — declared bay emphasis; no SI / rotation / priority mutation |
 | Sunday assignments | `lib/store-ops/sunday-audit.ts` (persist + department seed `associateMatchesSundayDepartment`) + `SundayAuditAssignmentModal` + `AssociateRosterPanel` |
 | Daily shift board | `lib/store-ops/shift-status.ts` (`associate_shift_days` week matrix; throws on live write failure) |
 | Call-out bay rebalance | `lib/store-ops/call-out.ts` (pool / auto / carry-over loop; stamps `carried_over` + Sunday `CARRIED_OVER`; does not generate rotations) |

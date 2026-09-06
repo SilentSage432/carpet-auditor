@@ -1,11 +1,12 @@
 /**
- * In-memory fake for operational_contexts / relevance (FS-002 tests).
+ * In-memory fake for operational_contexts / dept + location relevance (FS-002/003).
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type {
   OperationalContext,
   OperationalContextDepartmentRelevance,
+  OperationalContextLocationRelevance,
 } from "./operational-context";
 
 function uid(prefix: string): string {
@@ -17,18 +18,34 @@ type QueryResult = {
   error: { code?: string; message: string } | null;
 };
 
+type FakeLocation = {
+  id: string;
+  store_id: string;
+  is_active: boolean;
+  /** Priority fields — FS-003 must never mutate these via domain. */
+  manual_priority_count: number;
+  priority_override: boolean;
+  custom_decay_days: number | null;
+  velocity_tier: string;
+};
+
 export type FakeOperationalContextDb = {
   client: SupabaseClient;
   contexts: OperationalContext[];
   relevance: OperationalContextDepartmentRelevance[];
+  locationRelevance: OperationalContextLocationRelevance[];
+  locations: FakeLocation[];
   setMissingRelation: (missing: boolean) => void;
   clear: () => void;
+  seedLocation: (loc: Partial<FakeLocation> & Pick<FakeLocation, "id" | "store_id">) => void;
 };
 
 export function createFakeOperationalContextDb(): FakeOperationalContextDb {
   let missingRelation = false;
   const contexts: OperationalContext[] = [];
   const relevance: OperationalContextDepartmentRelevance[] = [];
+  const locationRelevance: OperationalContextLocationRelevance[] = [];
+  const locations: FakeLocation[] = [];
 
   function missingError(table: string): QueryResult {
     return {
@@ -51,14 +68,12 @@ export function createFakeOperationalContextDb(): FakeOperationalContextDb {
     let wantMaybeSingle = false;
     const orderCols: Array<{ col: string; asc: boolean }> = [];
     let orExpr: string | null = null;
-    let inCol: string | null = null;
-    let inVals: unknown[] = [];
+    const inFilters: Array<{ col: string; vals: unknown[] }> = [];
 
     const api: Record<string, unknown> = {};
 
     const matchesContext = (row: OperationalContext) => {
       if (orExpr) {
-        // store_id.is.null,store_id.eq.<uuid>
         const parts = orExpr.split(",");
         const ok = parts.some((p) => {
           if (p === "store_id.is.null") return row.store_id == null;
@@ -76,9 +91,40 @@ export function createFakeOperationalContextDb(): FakeOperationalContextDb {
       });
     };
 
-    const matchesRelevance = (row: OperationalContextDepartmentRelevance) => {
-      if (inCol === "context_id") {
-        if (!inVals.map(String).includes(row.context_id)) return false;
+    const matchesDeptRel = (row: OperationalContextDepartmentRelevance) => {
+      for (const inn of inFilters) {
+        if (inn.col === "context_id") {
+          if (!inn.vals.map(String).includes(row.context_id)) return false;
+        }
+      }
+      return filters.every((f) => {
+        const raw = (row as unknown as Record<string, unknown>)[f.col];
+        if (f.op === "eq") return String(raw) === String(f.val);
+        return true;
+      });
+    };
+
+    const matchesLocRel = (row: OperationalContextLocationRelevance) => {
+      for (const inn of inFilters) {
+        if (inn.col === "context_id") {
+          if (!inn.vals.map(String).includes(row.context_id)) return false;
+        }
+        if (inn.col === "location_id") {
+          if (!inn.vals.map(String).includes(row.location_id)) return false;
+        }
+      }
+      return filters.every((f) => {
+        const raw = (row as unknown as Record<string, unknown>)[f.col];
+        if (f.op === "eq") return String(raw) === String(f.val);
+        return true;
+      });
+    };
+
+    const matchesLocation = (row: FakeLocation) => {
+      for (const inn of inFilters) {
+        if (inn.col === "id") {
+          if (!inn.vals.map(String).includes(row.id)) return false;
+        }
       }
       return filters.every((f) => {
         const raw = (row as unknown as Record<string, unknown>)[f.col];
@@ -89,6 +135,36 @@ export function createFakeOperationalContextDb(): FakeOperationalContextDb {
 
     const run = async (): Promise<QueryResult> => {
       if (missingRelation) return missingError(table);
+
+      if (table === "store_locations") {
+        if (mode === "select") {
+          const rows = locations.filter(matchesLocation);
+          if (wantSingle || wantMaybeSingle) {
+            if (rows.length === 0) {
+              return wantMaybeSingle
+                ? { data: null, error: null }
+                : { data: null, error: { message: "no rows" } };
+            }
+            return { data: rows[0], error: null };
+          }
+          return { data: rows, error: null };
+        }
+        if (mode === "update") {
+          const idx = locations.findIndex(matchesLocation);
+          if (idx < 0) {
+            return { data: null, error: { message: "no rows" } };
+          }
+          locations[idx] = {
+            ...locations[idx]!,
+            ...(updatePayload as Partial<FakeLocation>),
+          };
+          return {
+            data: wantSingle || wantMaybeSingle ? locations[idx] : [locations[idx]],
+            error: null,
+          };
+        }
+        return { data: null, error: { message: `unsupported ${mode} on store_locations` } };
+      }
 
       if (mode === "insert" || mode === "upsert") {
         const rows = Array.isArray(insertPayload)
@@ -128,6 +204,41 @@ export function createFakeOperationalContextDb(): FakeOperationalContextDb {
           return { data, error: null };
         }
 
+        if (table === "operational_context_location_relevance") {
+          const created: OperationalContextLocationRelevance[] = [];
+          for (const row of rows) {
+            const existingIdx = locationRelevance.findIndex(
+              (r) =>
+                r.context_id === String(row.context_id) &&
+                r.location_id === String(row.location_id)
+            );
+            const rel: OperationalContextLocationRelevance = {
+              id:
+                existingIdx >= 0
+                  ? locationRelevance[existingIdx]!.id
+                  : String(row.id ?? uid("oclr")),
+              context_id: String(row.context_id),
+              location_id: String(row.location_id),
+              relevance:
+                row.relevance as OperationalContextLocationRelevance["relevance"],
+              declared_by:
+                row.declared_by == null ? null : String(row.declared_by),
+              created_at:
+                existingIdx >= 0
+                  ? locationRelevance[existingIdx]!.created_at
+                  : String(row.created_at ?? new Date().toISOString()),
+              updated_at: String(row.updated_at ?? new Date().toISOString()),
+            };
+            if (existingIdx >= 0) locationRelevance[existingIdx] = rel;
+            else locationRelevance.push(rel);
+            created.push(rel);
+          }
+          return {
+            data: wantSingle ? created[0] ?? null : created,
+            error: null,
+          };
+        }
+
         const created: OperationalContextDepartmentRelevance[] = [];
         for (const row of rows) {
           const existingIdx = relevance.findIndex(
@@ -142,7 +253,8 @@ export function createFakeOperationalContextDb(): FakeOperationalContextDb {
                 : String(row.id ?? uid("ocr")),
             context_id: String(row.context_id),
             department_code: String(row.department_code),
-            relevance: row.relevance as OperationalContextDepartmentRelevance["relevance"],
+            relevance:
+              row.relevance as OperationalContextDepartmentRelevance["relevance"],
             created_at:
               existingIdx >= 0
                 ? relevance[existingIdx]!.created_at
@@ -153,8 +265,10 @@ export function createFakeOperationalContextDb(): FakeOperationalContextDb {
           else relevance.push(rel);
           created.push(rel);
         }
-        const data = wantSingle ? created[0] ?? null : created;
-        return { data, error: null };
+        return {
+          data: wantSingle ? created[0] ?? null : created,
+          error: null,
+        };
       }
 
       if (mode === "update" && table === "operational_contexts") {
@@ -162,10 +276,7 @@ export function createFakeOperationalContextDb(): FakeOperationalContextDb {
         if (idx < 0) {
           return wantMaybeSingle
             ? { data: null, error: null }
-            : {
-                data: null,
-                error: { message: "no rows" },
-              };
+            : { data: null, error: { message: "no rows" } };
         }
         const next = {
           ...contexts[idx]!,
@@ -181,7 +292,10 @@ export function createFakeOperationalContextDb(): FakeOperationalContextDb {
           ),
         };
         contexts[idx] = next as OperationalContext;
-        return { data: wantMaybeSingle || wantSingle ? next : [next], error: null };
+        return {
+          data: wantMaybeSingle || wantSingle ? next : [next],
+          error: null,
+        };
       }
 
       if (mode === "delete") {
@@ -195,21 +309,33 @@ export function createFakeOperationalContextDb(): FakeOperationalContextDb {
           for (let i = relevance.length - 1; i >= 0; i -= 1) {
             if (removed.has(relevance[i]!.context_id)) relevance.splice(i, 1);
           }
+          for (let i = locationRelevance.length - 1; i >= 0; i -= 1) {
+            if (removed.has(locationRelevance[i]!.context_id)) {
+              locationRelevance.splice(i, 1);
+            }
+          }
+        } else if (table === "operational_context_location_relevance") {
+          const keep = locationRelevance.filter((r) => !matchesLocRel(r));
+          locationRelevance.length = 0;
+          locationRelevance.push(...keep);
         } else {
-          const keep = relevance.filter((r) => !matchesRelevance(r));
+          const keep = relevance.filter((r) => !matchesDeptRel(r));
           relevance.length = 0;
           relevance.push(...keep);
         }
         return { data: null, error: null };
       }
 
-      // select
       if (table === "operational_contexts") {
         let rows = contexts.filter(matchesContext);
         for (const ord of orderCols) {
           rows = [...rows].sort((a, b) => {
-            const av = String((a as unknown as Record<string, unknown>)[ord.col] ?? "");
-            const bv = String((b as unknown as Record<string, unknown>)[ord.col] ?? "");
+            const av = String(
+              (a as unknown as Record<string, unknown>)[ord.col] ?? ""
+            );
+            const bv = String(
+              (b as unknown as Record<string, unknown>)[ord.col] ?? ""
+            );
             if (av === bv) return 0;
             const cmp = av < bv ? -1 : 1;
             return ord.asc ? cmp : -cmp;
@@ -226,7 +352,20 @@ export function createFakeOperationalContextDb(): FakeOperationalContextDb {
         return { data: rows, error: null };
       }
 
-      const relRows = relevance.filter(matchesRelevance);
+      if (table === "operational_context_location_relevance") {
+        const relRows = locationRelevance.filter(matchesLocRel);
+        if (wantSingle || wantMaybeSingle) {
+          if (relRows.length === 0) {
+            return wantMaybeSingle
+              ? { data: null, error: null }
+              : { data: null, error: { message: "no rows" } };
+          }
+          return { data: relRows[0], error: null };
+        }
+        return { data: relRows, error: null };
+      }
+
+      const relRows = relevance.filter(matchesDeptRel);
       if (wantSingle || wantMaybeSingle) {
         if (relRows.length === 0) {
           return wantMaybeSingle
@@ -279,8 +418,7 @@ export function createFakeOperationalContextDb(): FakeOperationalContextDb {
         return api;
       },
       in(col: string, vals: unknown[]) {
-        inCol = col;
-        inVals = vals;
+        inFilters.push({ col, vals });
         return api;
       },
       order(col: string, opts?: { ascending?: boolean }) {
@@ -305,13 +443,27 @@ export function createFakeOperationalContextDb(): FakeOperationalContextDb {
     client: { from } as unknown as SupabaseClient,
     contexts,
     relevance,
+    locationRelevance,
+    locations,
     setMissingRelation: (m) => {
       missingRelation = m;
     },
     clear: () => {
       contexts.length = 0;
       relevance.length = 0;
+      locationRelevance.length = 0;
+      locations.length = 0;
       missingRelation = false;
+    },
+    seedLocation: (loc) => {
+      locations.push({
+        manual_priority_count: 0,
+        priority_override: false,
+        custom_decay_days: null,
+        velocity_tier: "standard",
+        is_active: true,
+        ...loc,
+      });
     },
   };
 }

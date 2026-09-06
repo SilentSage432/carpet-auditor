@@ -1727,10 +1727,43 @@ export async function fetchOperationalContextsList(
 ): Promise<{
   contexts: OperationalContextClient[];
   relevance: OperationalContextRelevanceClient[];
+  location_relevance: OperationalContextLocationRelevanceClient[];
 }> {
   return storeOpsFetch(
     "/api/operational-contexts?mode=list",
     specialist
+  );
+}
+
+export type OperationalContextLocationRelevanceClient = {
+  id: string;
+  context_id: string;
+  location_id: string;
+  relevance: "NONE" | "LOW" | "MEDIUM" | "HIGH";
+  declared_by: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export async function setOperationalContextLocationRelevance(
+  specialist: StoreSpecialist,
+  id: string,
+  input: {
+    location_id: string;
+    relevance: "UNSET" | "NONE" | "LOW" | "MEDIUM" | "HIGH";
+  }
+): Promise<{ ok: true; location_relevance: string | null }> {
+  return storeOpsFetch(
+    `/api/admin/operational-contexts/${encodeURIComponent(id)}/location-relevance`,
+    specialist,
+    {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        location_id: input.location_id,
+        relevance: input.relevance === "UNSET" ? null : input.relevance,
+      }),
+    }
   );
 }
 

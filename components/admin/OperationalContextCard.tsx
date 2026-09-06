@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Master-only FS-002 season/event declaration manager.
+ * Master-only FS-002 season/event declaration manager + FS-003 location relevance.
  * MASTER_ADMIN_DECLARED only — no company source masquerading.
  */
 
@@ -10,14 +10,18 @@ import {
   createOperationalContext,
   deleteOperationalContext,
   fetchOperationalContextsList,
+  fetchStoreLocationsDetailed,
+  setOperationalContextLocationRelevance,
   setOperationalContextRelevance,
   updateOperationalContext,
   type OperationalContextClient,
+  type OperationalContextLocationRelevanceClient,
   type OperationalContextRelevanceClient,
 } from "@/lib/store-ops/client";
 import { STORE_DEPARTMENT_TEMPLATES } from "@/lib/store-ops/stores";
 import { isMasterAdmin } from "@/lib/rbac";
 import { readableError } from "@/lib/store-ops/errors";
+import type { StoreLocation } from "@/lib/store-ops/types";
 import type { StoreSpecialist } from "@/lib/types";
 
 type Props = {
@@ -34,12 +38,23 @@ const RELEVANCE_OPTIONS: RelevanceChoice[] = [
   "HIGH",
 ];
 
+function locationLabel(loc: StoreLocation): string {
+  const aisle = String(loc.aisle ?? "").trim();
+  const bay = Number(loc.bay);
+  const face = loc.type === "TOPSTOCK" ? "T" : "S";
+  return `A${aisle} · B${bay} · ${face}`;
+}
+
 export function OperationalContextCard({ specialist }: Props) {
   const master = isMasterAdmin(specialist);
   const [contexts, setContexts] = useState<OperationalContextClient[]>([]);
   const [relevance, setRelevance] = useState<
     OperationalContextRelevanceClient[]
   >([]);
+  const [locationRelevance, setLocationRelevance] = useState<
+    OperationalContextLocationRelevanceClient[]
+  >([]);
+  const [locations, setLocations] = useState<StoreLocation[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -49,6 +64,8 @@ export function OperationalContextCard({ specialist }: Props) {
   const [title, setTitle] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
+  const [locPick, setLocPick] = useState<Record<string, string>>({});
+  const [locLevel, setLocLevel] = useState<Record<string, RelevanceChoice>>({});
 
   const declaredOnly = useMemo(
     () =>
@@ -60,15 +77,43 @@ export function OperationalContextCard({ specialist }: Props) {
     [contexts]
   );
 
+  const activeLocations = useMemo(
+    () =>
+      locations
+        .filter((l) => l.is_active !== false)
+        .slice()
+        .sort((a, b) => {
+          const aisle = String(a.aisle).localeCompare(String(b.aisle), undefined, {
+            numeric: true,
+          });
+          if (aisle !== 0) return aisle;
+          return Number(a.bay) - Number(b.bay);
+        }),
+    [locations]
+  );
+
+  const locationsById = useMemo(() => {
+    const map = new Map<string, StoreLocation>();
+    for (const loc of locations) map.set(loc.id, loc);
+    return map;
+  }, [locations]);
+
   useEffect(() => {
     if (!master) return;
     let cancelled = false;
     async function load() {
       try {
-        const next = await fetchOperationalContextsList(specialist);
+        const [next, locs] = await Promise.all([
+          fetchOperationalContextsList(specialist),
+          fetchStoreLocationsDetailed(specialist).catch(() => ({
+            items: [] as StoreLocation[],
+          })),
+        ]);
         if (cancelled) return;
         setContexts(next.contexts);
         setRelevance(next.relevance);
+        setLocationRelevance(next.location_relevance ?? []);
+        setLocations(locs.items ?? []);
         setError(null);
       } catch (err) {
         if (cancelled) return;
@@ -96,10 +141,15 @@ export function OperationalContextCard({ specialist }: Props) {
     return row?.relevance ?? "UNSET";
   }
 
+  function locationRowsFor(contextId: string) {
+    return locationRelevance.filter((r) => r.context_id === contextId);
+  }
+
   async function reload() {
     const next = await fetchOperationalContextsList(specialist);
     setContexts(next.contexts);
     setRelevance(next.relevance);
+    setLocationRelevance(next.location_relevance ?? []);
   }
 
   async function onSave() {
@@ -169,6 +219,29 @@ export function OperationalContextCard({ specialist }: Props) {
     }
   }
 
+  async function onLocationRelevance(
+    contextId: string,
+    locationId: string,
+    value: RelevanceChoice
+  ) {
+    if (!locationId) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await setOperationalContextLocationRelevance(specialist, contextId, {
+        location_id: locationId,
+        relevance: value,
+      });
+      setLocPick((prev) => ({ ...prev, [contextId]: "" }));
+      setLocLevel((prev) => ({ ...prev, [contextId]: "HIGH" }));
+      await reload();
+    } catch (err) {
+      setError(readableError(err, "Location relevance update failed"));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   function beginEdit(c: OperationalContextClient) {
     setEditingId(c.id);
     setKind(c.kind);
@@ -184,7 +257,8 @@ export function OperationalContextCard({ specialist }: Props) {
       </p>
       <p className="mt-1 text-xs text-slate-500">
         Master-declared seasons and events for this store. Source is always
-        MASTER_ADMIN_DECLARED.
+        MASTER_ADMIN_DECLARED. Location relevance is optional bay-level emphasis
+        — it does not change Sunday draw or velocity.
       </p>
 
       {loading ? (
@@ -271,6 +345,99 @@ export function OperationalContextCard({ specialist }: Props) {
                   </label>
                 );
               })}
+            </div>
+
+            <div className="mt-3 border-t border-slate-800 pt-2">
+              <p className="font-mono text-[10px] font-bold uppercase tracking-wide text-slate-500">
+                Location relevance (optional)
+              </p>
+              <ul className="mt-1.5 space-y-1">
+                {locationRowsFor(c.id).map((row) => {
+                  const loc = locationsById.get(row.location_id);
+                  return (
+                    <li
+                      key={row.id}
+                      className="flex min-h-9 items-center justify-between gap-2 rounded-md border border-slate-800 px-2 text-xs"
+                    >
+                      <span className="truncate font-mono text-slate-300">
+                        {loc ? locationLabel(loc) : row.location_id.slice(0, 8)}
+                      </span>
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-mono text-[11px] text-emerald-300">
+                          {row.relevance}
+                        </span>
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() =>
+                            void onLocationRelevance(
+                              c.id,
+                              row.location_id,
+                              "UNSET"
+                            )
+                          }
+                          className="rounded border border-slate-700 px-1.5 py-0.5 text-[10px] text-slate-400"
+                        >
+                          Clear
+                        </button>
+                      </div>
+                    </li>
+                  );
+                })}
+                {locationRowsFor(c.id).length === 0 ? (
+                  <li className="text-[11px] text-slate-600">
+                    No bay exceptions — department relevance alone is fine.
+                  </li>
+                ) : null}
+              </ul>
+              <div className="mt-2 flex flex-col gap-1.5 sm:flex-row sm:items-center">
+                <select
+                  value={locPick[c.id] ?? ""}
+                  disabled={busy || activeLocations.length === 0}
+                  onChange={(e) =>
+                    setLocPick((prev) => ({ ...prev, [c.id]: e.target.value }))
+                  }
+                  className="min-h-9 flex-1 rounded border border-slate-700 bg-slate-950 px-2 font-mono text-[11px] text-slate-200"
+                >
+                  <option value="">Select bay…</option>
+                  {activeLocations.map((loc) => (
+                    <option key={loc.id} value={loc.id}>
+                      {locationLabel(loc)}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  value={locLevel[c.id] ?? "HIGH"}
+                  disabled={busy}
+                  onChange={(e) =>
+                    setLocLevel((prev) => ({
+                      ...prev,
+                      [c.id]: e.target.value as RelevanceChoice,
+                    }))
+                  }
+                  className="min-h-9 rounded border border-slate-700 bg-slate-950 px-2 font-mono text-[11px] text-emerald-300"
+                >
+                  {(["NONE", "LOW", "MEDIUM", "HIGH"] as const).map((opt) => (
+                    <option key={opt} value={opt}>
+                      {opt}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  disabled={busy || !(locPick[c.id] ?? "")}
+                  onClick={() =>
+                    void onLocationRelevance(
+                      c.id,
+                      locPick[c.id] ?? "",
+                      (locLevel[c.id] ?? "HIGH") as RelevanceChoice
+                    )
+                  }
+                  className="min-h-9 rounded-lg border border-emerald-500/35 px-2 text-xs font-semibold text-emerald-300 disabled:opacity-40"
+                >
+                  Assign
+                </button>
+              </div>
             </div>
           </div>
         ))}
