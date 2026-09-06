@@ -13,7 +13,7 @@
 - [x] FS-003 foundation — Location seasonal relevance (`operational_context_location_relevance`); Master CRUD; resolve; Settings assign; no Map/SI/rotation
 - [x] FS-003B — Map context surface (read-only location seasonal badges + walk-sheet detail; no inheritance/scores/rotation)
 - [ ] FS-003 follow-ups — Map polish if needed; SI consumption
-- [ ] SI-001 / SI-002 — seasonal signal contract; Day-1 pressure (**SI-001 foundation LIVE**; **SI-001A attention read API foundation implemented**; no Map/Floor surface yet)
+- [ ] SI-001 / SI-002 — seasonal signal contract; Day-1 pressure (**SI-001 foundation LIVE**; **SI-001A read API LIVE**; **SI-001B Map attention surface implemented** — awaiting deploy LIVE)
 - [ ] Public holiday seed artifact (`PUBLIC_CALENDAR`) — evidence-gated
 - [ ] Sunday assignment history across Force Draw / rebalance — known P1
 - [x] Carpet Hub shell with sticky header + slide-over nav

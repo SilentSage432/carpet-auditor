@@ -24,6 +24,21 @@ import {
 } from "@/lib/store-ops/types";
 import type { StoreSpecialist } from "@/lib/types";
 import type { MapLocationSeasonalView } from "@/lib/store-ops/map-location-context";
+import type {
+  AttentionEvidenceDimension,
+  LocationAttentionSignal,
+} from "@/lib/store-ops/location-attention-contract";
+import {
+  ATTENTION_PROVENANCE_LABEL,
+  ATTENTION_SOME_EVIDENCE_UNAVAILABLE,
+  attentionActionabilityLabel,
+  attentionConfidenceLabel,
+  attentionReasonDisplayLines,
+  attentionTierLabel,
+  attentionUnavailableDimensionLabel,
+  formatAttentionAsOf,
+  type MapAttentionClientStatus,
+} from "@/lib/store-ops/location-attention-presentation";
 
 type BayPair = {
   bay: number;
@@ -73,6 +88,11 @@ export function WalkTheFloorSheet({
   bay,
   canMutate = false,
   seasonalByLocationId,
+  attentionByLocationId,
+  attentionStatus = "IDLE",
+  attentionGeneratedAt = null,
+  attentionDegraded = false,
+  attentionUnavailableEvidence = [],
   onClose,
   onChanged,
   onError,
@@ -82,6 +102,11 @@ export function WalkTheFloorSheet({
   bay: WalkTheFloorBay;
   canMutate?: boolean;
   seasonalByLocationId?: Map<string, MapLocationSeasonalView>;
+  attentionByLocationId?: Map<string, LocationAttentionSignal>;
+  attentionStatus?: MapAttentionClientStatus;
+  attentionGeneratedAt?: string | null;
+  attentionDegraded?: boolean;
+  attentionUnavailableEvidence?: AttentionEvidenceDimension[];
   onClose: () => void;
   onChanged: () => void;
   onError: (msg: string | null) => void;
@@ -113,6 +138,19 @@ export function WalkTheFloorSheet({
   const seasonalView = target
     ? seasonalByLocationId?.get(target.id)
     : undefined;
+  const attentionSignal =
+    target &&
+    (attentionStatus === "AVAILABLE" || attentionStatus === "DEGRADED")
+      ? attentionByLocationId?.get(target.id)
+      : undefined;
+  const attentionReasonLines = attentionSignal
+    ? attentionReasonDisplayLines(attentionSignal.reasons)
+    : [];
+  const showAttentionSection =
+    attentionStatus === "AVAILABLE" ||
+    attentionStatus === "DEGRADED" ||
+    attentionStatus === "UNAVAILABLE" ||
+    attentionStatus === "NEEDS_DEPARTMENT";
   const dept = departments.find((d) => d.id === bay.departmentId);
   const deptCode = dept?.code ?? target?.department_code ?? "";
   const deptName = dept?.name ?? bay.departmentName;
@@ -268,6 +306,70 @@ export function WalkTheFloorSheet({
                 </li>
               ))}
             </ul>
+          </section>
+        ) : null}
+
+        {showAttentionSection ? (
+          <section
+            className="mb-4 rounded-xl border border-zinc-600/40 bg-zinc-950/40 px-3 py-2.5"
+            data-testid="walk-sheet-current-attention"
+          >
+            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-zinc-400">
+              Current attention
+            </p>
+            {attentionStatus === "UNAVAILABLE" ? (
+              <p className="mt-1.5 text-xs text-zinc-400">
+                Attention unavailable
+              </p>
+            ) : attentionStatus === "NEEDS_DEPARTMENT" ? (
+              <p className="mt-1.5 text-xs text-zinc-400">
+                Select a department for current attention.
+              </p>
+            ) : attentionSignal ? (
+              <div className="mt-1.5 space-y-1 text-xs text-zinc-200">
+                <p>
+                  Current attention ·{" "}
+                  <span className="font-semibold">
+                    {attentionTierLabel(attentionSignal.pressure)}
+                  </span>
+                </p>
+                <p className="text-zinc-400">
+                  Confidence ·{" "}
+                  {attentionConfidenceLabel(attentionSignal.confidence)}
+                </p>
+                <p className="text-zinc-400">
+                  Actionability ·{" "}
+                  {attentionActionabilityLabel(attentionSignal.actionability)}
+                </p>
+                {attentionReasonLines.length > 0 ? (
+                  <ul className="mt-1.5 list-disc space-y-0.5 pl-4 text-zinc-300">
+                    {attentionReasonLines.map((line) => (
+                      <li key={line}>{line}</li>
+                    ))}
+                  </ul>
+                ) : null}
+                {attentionDegraded || attentionStatus === "DEGRADED" ? (
+                  <div className="mt-1.5 space-y-0.5 text-[11px] text-zinc-500">
+                    <p>{ATTENTION_SOME_EVIDENCE_UNAVAILABLE}</p>
+                    {attentionUnavailableEvidence.map((dim) => (
+                      <p key={dim}>
+                        {attentionUnavailableDimensionLabel(dim)}
+                      </p>
+                    ))}
+                  </div>
+                ) : null}
+                <p className="mt-1.5 font-mono text-[10px] text-zinc-500">
+                  {ATTENTION_PROVENANCE_LABEL}
+                  {attentionGeneratedAt
+                    ? ` · ${formatAttentionAsOf(attentionGeneratedAt)}`
+                    : ""}
+                </p>
+              </div>
+            ) : (
+              <p className="mt-1.5 text-xs text-zinc-400">
+                Current attention · None
+              </p>
+            )}
           </section>
         ) : null}
 

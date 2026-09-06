@@ -1,5 +1,14 @@
 # DeptSync Hub — Development Journal
 
+## 2026-09-06 — SI-001B Map Attention Surface (local)
+
+- Presentation: `location-attention-presentation.ts` + MapTab fetch/`Attention` status + Focus+Med/High cell marker + Walk sheet Current attention block.
+- MEDIUM/HIGH only on cells; NONE/LOW quiet; AVAILABLE quiet ≠ UNAVAILABLE status line.
+- Master `all` → NEEDS_DEPARTMENT (no fan-out). Race: AbortController + generation token at state-write boundary.
+- Timestamp: displays SI-001A `generated_at` formatted **device-local** (store timezone not on Map without SI-001A/API expansion; not claimed as store-local).
+- Seasonal reasons: DS copy from SI `effect` — CONTEXT → “present”; MODIFY → “strengthened”; not from code alone.
+- No sort/filter/heatmap/ranking/SI recompute/rotation writes. **SI-001B MAP ATTENTION SURFACE IMPLEMENTED** (awaiting production deploy confirmation).
+
 ## 2026-09-05 — SI-001A Attention Read API (local)
 
 - Read boundary: `lib/store-ops/location-attention-read-model.ts` + `GET /api/store-intelligence/attention?department_id=`.

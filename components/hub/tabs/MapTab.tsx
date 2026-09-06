@@ -1,17 +1,16 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import dynamic from "next/dynamic";
 import { Camera, Layers, Zap } from "lucide-react";
 import { StoreLocationGrid } from "@/components/admin/StoreLocationGrid";
 import { isMasterAdmin, isSimplifiedAssociateView } from "@/lib/rbac";
-import {
-  workingDepartmentId,
-} from "@/lib/admin-department-context";
+import { workingDepartmentId } from "@/lib/admin-department-context";
 import { useWorkingDepartment } from "@/lib/use-working-department";
 import {
   fetchDepartmentsDetailed,
   fetchExceptionSummary,
+  fetchLocationAttention,
   fetchOperationalContextLocationRelevanceResolve,
   fetchStoreLocationsDetailed,
   fetchThisWeekRotations,
@@ -36,6 +35,19 @@ import { isWeekVerifiedForMapOverlay } from "@/lib/store-ops/rotation-metrics";
 import { isoWeekLabel } from "@/lib/store-ops/week";
 import { isSupervisor } from "@/lib/specialists";
 import type { WorkflowTabProps } from "@/components/hub/tabs/tab-props";
+import type {
+  AttentionEvidenceDimension,
+  LocationAttentionSignal,
+} from "@/lib/store-ops/location-attention-contract";
+import {
+  indexAttentionSignalsByLocation,
+  mapAttentionStatusLabel,
+  type MapAttentionClientStatus,
+} from "@/lib/store-ops/location-attention-presentation";
+import {
+  isAttentionResponseCurrent,
+  nextAttentionRequestToken,
+} from "@/lib/store-ops/location-attention-request";
 
 const ICON_STROKE = 1.75;
 
@@ -62,10 +74,25 @@ export function MapTab({ specialist }: WorkflowTabProps) {
   const [seasonalByLocationId, setSeasonalByLocationId] = useState<
     Map<string, MapLocationSeasonalView>
   >(() => new Map());
+  const [attentionStatus, setAttentionStatus] =
+    useState<MapAttentionClientStatus>("IDLE");
+  const [attentionByLocationId, setAttentionByLocationId] = useState<
+    Map<string, LocationAttentionSignal>
+  >(() => new Map());
+  const [attentionGeneratedAt, setAttentionGeneratedAt] = useState<
+    string | null
+  >(null);
+  const [attentionDegraded, setAttentionDegraded] = useState(false);
+  const [attentionUnavailable, setAttentionUnavailable] = useState<
+    AttentionEvidenceDimension[]
+  >([]);
+  const attentionGenRef = useRef(0);
+  const attentionAbortRef = useRef<AbortController | null>(null);
   const currentWeek = isoWeekLabel();
   const master = isMasterAdmin(specialist);
   const locatorOnly = isSimplifiedAssociateView(specialist);
   const canReadSeasonal = isSupervisor(specialist);
+  const canReadAttention = isSupervisor(specialist);
   const heatmap = mapMode === "heatmap";
   const working = useWorkingDepartment(specialist);
   const activeDepartmentId = workingDepartmentId(specialist, departments);
@@ -79,96 +106,185 @@ export function MapTab({ specialist }: WorkflowTabProps) {
     return locations.filter((loc) => ids.has(loc.department_id));
   }, [locations, working, activeDepartmentId, visibleDepartments]);
 
-  const reload = useCallback(async (member: typeof specialist, silent = false) => {
-    if (!silent) setLoading(true);
-    setError(null);
-    setAuthRequired(false);
-    try {
-      const depts = await fetchDepartmentsDetailed(member).catch(async (err) => {
-        if (!isExistingDepartmentConflict(err)) throw err;
-        console.warn(
-          "[StoreMap] departments already exist — retrying list without seed error",
-          err
+  const clearAttentionPaint = useCallback(() => {
+    setAttentionByLocationId(new Map());
+    setAttentionGeneratedAt(null);
+    setAttentionDegraded(false);
+    setAttentionUnavailable([]);
+  }, []);
+
+  const reload = useCallback(
+    async (member: typeof specialist, silent = false) => {
+      if (!silent) setLoading(true);
+      setError(null);
+      setAuthRequired(false);
+      try {
+        const depts = await fetchDepartmentsDetailed(member).catch(
+          async (err) => {
+            if (!isExistingDepartmentConflict(err)) throw err;
+            console.warn(
+              "[StoreMap] departments already exist — retrying list without seed error",
+              err
+            );
+            invalidateStoreOpsListCaches();
+            return fetchDepartmentsDetailed(member);
+          }
         );
-        invalidateStoreOpsListCaches();
-        return fetchDepartmentsDetailed(member);
-      });
 
-      const deptId = workingDepartmentId(member, depts.items);
-      const [locs, weekData, exceptions, seasonalResult] = await Promise.all([
-        fetchStoreLocationsDetailed(member, deptId),
-        fetchThisWeekRotations(member, deptId),
-        fetchExceptionSummary(member),
-        canReadSeasonal
-          ? fetchOperationalContextLocationRelevanceResolve(member).catch(
-              (err) => {
-                console.error(
-                  "[StoreMap] seasonal location context failed (non-blocking)",
-                  err
-                );
-                return null;
-              }
-            )
-          : Promise.resolve(null),
-      ]);
+        const deptId = workingDepartmentId(member, depts.items);
+        const workingAll = !deptId;
 
-      const nextWeek = (weekData.rotations ?? [])
-        .map((row) => ({
-          locationId: String(row.location_id || row.store_locations?.id || ""),
-          completed: isWeekVerifiedForMapOverlay(row),
-        }))
-        .filter((row) => row.locationId);
-      const nextBarriers = (exceptions.exceptions ?? [])
-        .map((row) => String(row.bay_id ?? ""))
-        .filter(Boolean);
-
-      setDepartments((prev) =>
-        fingerprintsEqual(prev, depts.items) ? prev : depts.items
-      );
-      setLocations((prev) =>
-        fingerprintsEqual(prev, locs.items) ? prev : locs.items
-      );
-      setWeekRotationLocations((prev) =>
-        fingerprintsEqual(prev, nextWeek) ? prev : nextWeek
-      );
-      setBarrierLocationIds((prev) =>
-        fingerprintsEqual(prev, nextBarriers) ? prev : nextBarriers
-      );
-      if (seasonalResult?.items) {
-        setSeasonalByLocationId(
-          indexMapLocationSeasonalViews(seasonalResult.items)
+        attentionAbortRef.current?.abort();
+        const abort = new AbortController();
+        attentionAbortRef.current = abort;
+        const token = nextAttentionRequestToken(
+          attentionGenRef.current,
+          workingAll || !canReadAttention ? null : deptId
         );
-      } else if (!canReadSeasonal || seasonalResult === null) {
-        // Omit badges on failure / associates — Map still usable.
-        setSeasonalByLocationId(new Map());
+        attentionGenRef.current = token.generation;
+        clearAttentionPaint();
+
+        if (!canReadAttention) {
+          setAttentionStatus("IDLE");
+        } else if (workingAll) {
+          setAttentionStatus("NEEDS_DEPARTMENT");
+        } else {
+          setAttentionStatus("LOADING");
+        }
+
+        const attentionPromise =
+          canReadAttention && deptId
+            ? fetchLocationAttention(member, deptId, { signal: abort.signal })
+                .then((payload) => ({ ok: true as const, payload }))
+                .catch((err: unknown) => ({ ok: false as const, err }))
+            : Promise.resolve(null);
+
+        const [locs, weekData, exceptions, seasonalResult, attentionResult] =
+          await Promise.all([
+            fetchStoreLocationsDetailed(member, deptId),
+            fetchThisWeekRotations(member, deptId),
+            fetchExceptionSummary(member),
+            canReadSeasonal
+              ? fetchOperationalContextLocationRelevanceResolve(member).catch(
+                  (err) => {
+                    console.error(
+                      "[StoreMap] seasonal location context failed (non-blocking)",
+                      err
+                    );
+                    return null;
+                  }
+                )
+              : Promise.resolve(null),
+            attentionPromise,
+          ]);
+
+        const nextWeek = (weekData.rotations ?? [])
+          .map((row) => ({
+            locationId: String(
+              row.location_id || row.store_locations?.id || ""
+            ),
+            completed: isWeekVerifiedForMapOverlay(row),
+          }))
+          .filter((row) => row.locationId);
+        const nextBarriers = (exceptions.exceptions ?? [])
+          .map((row) => String(row.bay_id ?? ""))
+          .filter(Boolean);
+
+        setDepartments((prev) =>
+          fingerprintsEqual(prev, depts.items) ? prev : depts.items
+        );
+        setLocations((prev) =>
+          fingerprintsEqual(prev, locs.items) ? prev : locs.items
+        );
+        setWeekRotationLocations((prev) =>
+          fingerprintsEqual(prev, nextWeek) ? prev : nextWeek
+        );
+        setBarrierLocationIds((prev) =>
+          fingerprintsEqual(prev, nextBarriers) ? prev : nextBarriers
+        );
+        if (seasonalResult?.items) {
+          setSeasonalByLocationId(
+            indexMapLocationSeasonalViews(seasonalResult.items)
+          );
+        } else if (!canReadSeasonal || seasonalResult === null) {
+          setSeasonalByLocationId(new Map());
+        }
+        if (depts.authRequired || locs.authRequired) {
+          setAuthRequired(true);
+        }
+        if (depts.items.length > 0) {
+          setError(null);
+        }
+
+        if (
+          isAttentionResponseCurrent(
+            token,
+            attentionGenRef.current,
+            workingAll || !canReadAttention ? null : deptId
+          )
+        ) {
+          if (!canReadAttention) {
+            setAttentionStatus("IDLE");
+            clearAttentionPaint();
+          } else if (workingAll) {
+            setAttentionStatus("NEEDS_DEPARTMENT");
+            clearAttentionPaint();
+          } else if (!attentionResult) {
+            setAttentionStatus("UNAVAILABLE");
+            clearAttentionPaint();
+          } else if (!attentionResult.ok) {
+            const message = readableError(
+              attentionResult.err,
+              "Attention request failed"
+            );
+            if (isStoreOpsAuthFailureMessage(message)) {
+              setAuthRequired(true);
+              setAttentionStatus("IDLE");
+              clearAttentionPaint();
+            } else if (!abort.signal.aborted) {
+              console.error(
+                "[StoreMap] attention failed (non-blocking)",
+                attentionResult.err
+              );
+              setAttentionStatus("UNAVAILABLE");
+              clearAttentionPaint();
+            }
+          } else {
+            const payload = attentionResult.payload;
+            setAttentionByLocationId(
+              indexAttentionSignalsByLocation(payload.signals)
+            );
+            setAttentionGeneratedAt(payload.generated_at);
+            setAttentionDegraded(Boolean(payload.degraded));
+            setAttentionUnavailable(payload.unavailable_evidence ?? []);
+            setAttentionStatus(payload.degraded ? "DEGRADED" : "AVAILABLE");
+          }
+        }
+      } catch (err) {
+        const message = readableError(err, "Failed to load store map");
+        if (
+          isExistingDepartmentConflict(err) ||
+          isExistingDepartmentConflict(message)
+        ) {
+          console.warn("[StoreMap] departments already exist", err);
+          setError(null);
+          return;
+        }
+        if (isStoreOpsAuthFailureMessage(message)) {
+          setAuthRequired(true);
+          setDepartments([]);
+          setLocations([]);
+          setAttentionStatus("IDLE");
+          clearAttentionPaint();
+        } else {
+          setError(message);
+        }
+      } finally {
+        setLoading(false);
       }
-      if (depts.authRequired || locs.authRequired) {
-        setAuthRequired(true);
-      }
-      if (depts.items.length > 0) {
-        setError(null);
-      }
-    } catch (err) {
-      const message = readableError(err, "Failed to load store map");
-      if (
-        isExistingDepartmentConflict(err) ||
-        isExistingDepartmentConflict(message)
-      ) {
-        console.warn("[StoreMap] departments already exist", err);
-        setError(null);
-        return;
-      }
-      if (isStoreOpsAuthFailureMessage(message)) {
-        setAuthRequired(true);
-        setDepartments([]);
-        setLocations([]);
-      } else {
-        setError(message);
-      }
-    } finally {
-      setLoading(false);
-    }
-  }, [canReadSeasonal]);
+    },
+    [canReadSeasonal, canReadAttention, clearAttentionPaint]
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -208,12 +324,12 @@ export function MapTab({ specialist }: WorkflowTabProps) {
           );
         }
       }
-      // Keep painted map visible; revalidate in the background without a spinner.
       if (!cancelled) void reload(specialist, true);
     }
     void boot();
     return () => {
       cancelled = true;
+      attentionAbortRef.current?.abort();
     };
   }, [specialist, reload, working]);
 
@@ -227,6 +343,8 @@ export function MapTab({ specialist }: WorkflowTabProps) {
     };
   }, [reload, specialist]);
 
+  const attentionStatusLabel = mapAttentionStatusLabel(attentionStatus);
+
   return (
     <>
       <main className="hub-main">
@@ -237,6 +355,15 @@ export function MapTab({ specialist }: WorkflowTabProps) {
               ? `Week ${currentWeek}`
               : "This week's bay map"}
         </p>
+
+        {attentionStatusLabel ? (
+          <p
+            className="mb-2 font-mono text-[10px] text-zinc-500"
+            data-testid="map-attention-status"
+          >
+            {attentionStatusLabel}
+          </p>
+        ) : null}
 
         <div
           className="mb-3 inline-flex h-11 w-full items-center rounded-full border border-zinc-700/80 bg-zinc-950/70 p-0.5"
@@ -251,10 +378,14 @@ export function MapTab({ specialist }: WorkflowTabProps) {
               !heatmap ? "bg-accent/25 text-accent" : "text-zinc-400"
             }`}
           >
-              <Layers className="mr-1.5 h-3.5 w-3.5" strokeWidth={ICON_STROKE} aria-hidden />
-              Standard Map
-            </button>
-            <button
+            <Layers
+              className="mr-1.5 h-3.5 w-3.5"
+              strokeWidth={ICON_STROKE}
+              aria-hidden
+            />
+            Standard Map
+          </button>
+          <button
             type="button"
             aria-pressed={heatmap}
             onClick={() => setMapMode("heatmap")}
@@ -262,7 +393,11 @@ export function MapTab({ specialist }: WorkflowTabProps) {
               heatmap ? "bg-accent/25 text-accent" : "text-zinc-400"
             }`}
           >
-              <Zap className="mr-1.5 h-3.5 w-3.5" strokeWidth={ICON_STROKE} aria-hidden />
+            <Zap
+              className="mr-1.5 h-3.5 w-3.5"
+              strokeWidth={ICON_STROKE}
+              aria-hidden
+            />
             Velocity Heatmap
           </button>
         </div>
@@ -309,6 +444,11 @@ export function MapTab({ specialist }: WorkflowTabProps) {
               weekRotationLocations={weekRotationLocations}
               barrierLocationIds={barrierLocationIds}
               seasonalByLocationId={seasonalByLocationId}
+              attentionByLocationId={attentionByLocationId}
+              attentionStatus={attentionStatus}
+              attentionGeneratedAt={attentionGeneratedAt}
+              attentionDegraded={attentionDegraded}
+              attentionUnavailableEvidence={attentionUnavailable}
               heatmap={heatmap}
               onChanged={() => void reload(specialist)}
             />

@@ -15,6 +15,13 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { operationalDateFromInstant } from "./fiscal-calendar";
 import { isEligibleRotationLocation } from "./location-eligibility";
 import {
+  ATTENTION_EVIDENCE_DIMENSIONS,
+  type AttentionDepartmentMeta,
+  type AttentionEvidenceDimension,
+  type EvidenceStatus,
+  type LocationAttentionResponse,
+} from "./location-attention-contract";
+import {
   LOCATION_ATTENTION_PRESSURE_METHOD,
   LOCATION_ATTENTION_PRESSURE_VERSION,
   attachAttentionGeneratedAt,
@@ -40,17 +47,13 @@ import { normalizeStoreTimezone } from "./sunday-schedule";
 import { readableError } from "./errors";
 import { isoWeekLabel } from "./week";
 
-/** Degradable evidence dimensions (deterministic unavailable list order). */
-export const ATTENTION_EVIDENCE_DIMENSIONS = [
-  "current_rotation",
-  "barriers",
-  "seasonal_context",
-] as const;
-
-export type AttentionEvidenceDimension =
-  (typeof ATTENTION_EVIDENCE_DIMENSIONS)[number];
-
-export type EvidenceStatus = "AVAILABLE" | "UNAVAILABLE";
+export type {
+  AttentionDepartmentMeta,
+  AttentionEvidenceDimension,
+  EvidenceStatus,
+  LocationAttentionResponse,
+} from "./location-attention-contract";
+export { ATTENTION_EVIDENCE_DIMENSIONS } from "./location-attention-contract";
 
 /**
  * Explicit success vs failure — never coerce failure to empty arrays.
@@ -92,12 +95,6 @@ export type AttentionExceptionRow = {
   assigned_week: string | null;
 };
 
-export type AttentionDepartmentMeta = {
-  id: string;
-  code: string;
-  name: string;
-};
-
 export type AttentionReadScope = {
   storeId: string;
   storeTimezone: string;
@@ -118,18 +115,6 @@ export type AttentionEvidenceBundle = {
     department_claims: ActiveDepartmentRelevanceClaim[];
     location_claims_by_id: Map<string, ActiveLocationRelevanceClaim[]>;
   }>;
-};
-
-export type LocationAttentionResponse = {
-  operational_date: string;
-  generated_at: string;
-  department: AttentionDepartmentMeta;
-  method: typeof LOCATION_ATTENTION_PRESSURE_METHOD;
-  method_version: typeof LOCATION_ATTENTION_PRESSURE_VERSION;
-  degraded: boolean;
-  unavailable_evidence: AttentionEvidenceDimension[];
-  evidence_status: Record<AttentionEvidenceDimension, EvidenceStatus>;
-  signals: LocationAttentionSignal[];
 };
 
 export type AttentionFoundationalError = {

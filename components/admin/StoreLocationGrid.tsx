@@ -8,6 +8,7 @@ import {
   ChevronDown,
   ChevronUp,
   Clock,
+  Focus,
 } from "lucide-react";
 import { compareAisles } from "@/lib/store-ops/aisle";
 import { formatBayTag, isPendingDrawLocation, type Department, type StoreLocation } from "@/lib/store-ops/types";
@@ -37,6 +38,14 @@ import {
   composeBayPairSeasonalBadge,
   type MapLocationSeasonalView,
 } from "@/lib/store-ops/map-location-context";
+import type {
+  AttentionEvidenceDimension,
+  LocationAttentionSignal,
+} from "@/lib/store-ops/location-attention-contract";
+import {
+  attentionCellMarkerForPair,
+  type MapAttentionClientStatus,
+} from "@/lib/store-ops/location-attention-presentation";
 
 const AISLE_CHUNK = 16;
 const BAY_CHUNK = 24;
@@ -51,6 +60,12 @@ type Props = {
   barrierLocationIds?: string[];
   /** FS-003B batched seasonal views by location id (read-only). */
   seasonalByLocationId?: Map<string, MapLocationSeasonalView>;
+  /** SI-001B attention signals by location UUID (read-only). */
+  attentionByLocationId?: Map<string, LocationAttentionSignal>;
+  attentionStatus?: MapAttentionClientStatus;
+  attentionGeneratedAt?: string | null;
+  attentionDegraded?: boolean;
+  attentionUnavailableEvidence?: AttentionEvidenceDimension[];
   /** Velocity heatmap overlay. Standard Map is the default navigator. */
   heatmap?: boolean;
 };
@@ -218,6 +233,11 @@ export function StoreLocationGrid({
   weekRotationLocations = [],
   barrierLocationIds = [],
   seasonalByLocationId,
+  attentionByLocationId,
+  attentionStatus = "IDLE",
+  attentionGeneratedAt = null,
+  attentionDegraded = false,
+  attentionUnavailableEvidence = [],
   heatmap = false,
 }: Props) {
   const [pendingId, setPendingId] = useState<string | null>(null);
@@ -592,6 +612,23 @@ export function StoreLocationGrid({
                                   ? seasonalByLocationId?.get(pair.topstock.id)
                                   : undefined,
                               ])}
+                              attentionMarker={
+                                attentionStatus === "AVAILABLE" ||
+                                attentionStatus === "DEGRADED"
+                                  ? attentionCellMarkerForPair([
+                                      pair.selling
+                                        ? attentionByLocationId?.get(
+                                            pair.selling.id
+                                          )
+                                        : undefined,
+                                      pair.topstock
+                                        ? attentionByLocationId?.get(
+                                            pair.topstock.id
+                                          )
+                                        : undefined,
+                                    ])
+                                  : null
+                              }
                               departmentId={dept.departmentId}
                               departmentName={dept.departmentName}
                               onOpenWalk={openWalkSheet}
@@ -661,6 +698,11 @@ export function StoreLocationGrid({
           bay={liveWalkBay}
           canMutate={false}
           seasonalByLocationId={seasonalByLocationId}
+          attentionByLocationId={attentionByLocationId}
+          attentionStatus={attentionStatus}
+          attentionGeneratedAt={attentionGeneratedAt}
+          attentionDegraded={attentionDegraded}
+          attentionUnavailableEvidence={attentionUnavailableEvidence}
           onClose={() => setWalkBay(null)}
           onChanged={onChanged}
           onError={setError}
@@ -731,6 +773,7 @@ const BayRow = memo(function BayRow({
   sellingActive,
   topstockActive,
   seasonalBadge,
+  attentionMarker,
   departmentId,
   departmentName,
   onOpenWalk,
@@ -745,6 +788,7 @@ const BayRow = memo(function BayRow({
   sellingActive: boolean;
   topstockActive: boolean;
   seasonalBadge?: string | null;
+  attentionMarker?: ReturnType<typeof attentionCellMarkerForPair>;
   departmentId: string;
   departmentName: string;
   onOpenWalk: (bay: SheetBay) => void;
@@ -783,7 +827,7 @@ const BayRow = memo(function BayRow({
         className="min-w-0 flex-1 rounded-xl px-1 py-1 text-left active:bg-zinc-800/80"
         aria-label={`Bay ${pair.bay} ${rowToneLabel}${
           seasonalBadge ? ` · ${seasonalBadge}` : ""
-        }`}
+        }${attentionMarker ? ` · ${attentionMarker.a11y_suffix}` : ""}`}
       >
         <span className="flex items-center gap-1.5">
           <ReadinessGlyph tone={rowTone} heatmap={heatmap} />
@@ -808,6 +852,18 @@ const BayRow = memo(function BayRow({
               className="shrink-0 rounded-full border border-sky-500/35 bg-sky-950/30 px-1.5 py-0.5 font-mono text-[9px] font-bold tracking-tight text-sky-200/90"
             >
               {seasonalBadge}
+            </span>
+          ) : null}
+          {attentionMarker ? (
+            <span
+              title="Current attention"
+              data-testid="bay-attention-marker"
+              className={`inline-flex shrink-0 items-center gap-0.5 rounded-full border border-zinc-500/50 bg-zinc-950/50 px-1.5 py-0.5 font-mono text-[9px] font-bold tracking-tight text-zinc-200 ${
+                attentionMarker.compact_label === "High" ? "font-extrabold" : ""
+              }`}
+            >
+              <Focus className="h-2.5 w-2.5" strokeWidth={ICON_STROKE} aria-hidden />
+              {attentionMarker.compact_label}
             </span>
           ) : null}
         </span>

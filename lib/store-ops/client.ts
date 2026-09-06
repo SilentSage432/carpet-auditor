@@ -35,6 +35,7 @@ import type {
   VelocityTier,
   WeeklyRotationWithLocation,
 } from "./types";
+import type { LocationAttentionResponse } from "./location-attention-contract";
 
 const STORE_OPS_LIST_TTL_MS = 45_000;
 
@@ -1848,6 +1849,27 @@ export async function fetchOperationalContextLocationRelevanceResolve(
   return storeOpsFetch(
     `/api/operational-contexts?${params.toString()}`,
     specialist
+  );
+}
+
+/**
+ * SI-001A attention signals for one department (Supervisor+).
+ * Does not cache — present-tense intelligence.
+ */
+export async function fetchLocationAttention(
+  specialist: StoreSpecialist,
+  departmentId: string,
+  init?: RequestInit
+): Promise<LocationAttentionResponse> {
+  const id = String(departmentId ?? "").trim();
+  if (!id) {
+    throw new Error("department_id is required");
+  }
+  const qs = `?department_id=${encodeURIComponent(id)}`;
+  return storeOpsFetch(
+    `/api/store-intelligence/attention${qs}`,
+    specialist,
+    init
   );
 }
 
