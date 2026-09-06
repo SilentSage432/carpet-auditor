@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import { AddBaySheet } from "@/components/admin/AddBaySheet";
 import { EditBayDrawer } from "@/components/admin/EditBayDrawer";
+import { HubPortal } from "@/components/hub/HubPortal";
 import { ChevronDown, ChevronUp, Lock, Pencil, Plus, Sparkles, Trash2, X } from "lucide-react";
 import { compareAisles } from "@/lib/store-ops/aisle";
 import { deleteStoreLocations } from "@/lib/store-ops/client";
@@ -518,6 +519,7 @@ export function AisleBayManager({
       ) : null}
 
       {bulkOpen ? (
+        <HubPortal>
         <div className="glass-backdrop fixed inset-0 z-[80] flex flex-col justify-end">
           <button
             type="button"
@@ -528,7 +530,7 @@ export function AisleBayManager({
           <div
             role="dialog"
             aria-modal="true"
-            className="glass-card theme-modal relative z-10 max-h-[90dvh] w-full overflow-y-auto !rounded-t-2xl !rounded-b-none border-t-2 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3"
+            className="glass-card theme-modal hub-modal-sheet relative z-10 max-h-[90dvh] w-full overflow-y-auto !rounded-t-2xl !rounded-b-none border-t-2 px-4 pt-3"
           >
             <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-zinc-600" />
             <div className="mb-3 flex items-center justify-between">
@@ -552,6 +554,7 @@ export function AisleBayManager({
             />
           </div>
         </div>
+        </HubPortal>
       ) : null}
 
       {deleteFaces ? (

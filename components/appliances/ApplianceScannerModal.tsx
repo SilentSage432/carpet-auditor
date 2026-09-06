@@ -56,7 +56,7 @@ export function ApplianceScannerModal({
         role="dialog"
         aria-modal="true"
         aria-label="Appliance UPC audit scanner"
-        className="relative z-10 max-h-[92dvh] overflow-y-auto rounded-t-2xl border-t-2 border-cyan-500/40 bg-slate-950 px-3 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3"
+        className="hub-modal-sheet relative z-10 max-h-[92dvh] overflow-y-auto rounded-t-2xl border-t-2 border-cyan-500/40 bg-slate-950 px-3 pt-3"
       >
         <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-slate-600" />
         <div className="mb-3 flex items-center justify-between gap-2 px-1">

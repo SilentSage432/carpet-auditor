@@ -27,6 +27,7 @@ import {
 } from "@/lib/store-ops/ai-walk-parse";
 import { parseFloorWalk } from "@/lib/store-ops/client";
 import { readableError } from "@/lib/store-ops/errors";
+import { EXECUTIVE_FLOOR_PAD_OPEN_EVENT } from "@/lib/specialty-tools";
 import {
   dispatchShiftWalkTasks,
   parsedToDraftTask,
@@ -184,9 +185,16 @@ export function TacticalVoiceFloorPad({
       const hash = window.location.hash.replace(/^#/, "");
       if (FLOOR_PAD_HASHES.has(hash)) openSheet();
     }
+    function onPadOpen() {
+      openSheet();
+    }
     applyHash();
     window.addEventListener("hashchange", applyHash);
-    return () => window.removeEventListener("hashchange", applyHash);
+    window.addEventListener(EXECUTIVE_FLOOR_PAD_OPEN_EVENT, onPadOpen);
+    return () => {
+      window.removeEventListener("hashchange", applyHash);
+      window.removeEventListener(EXECUTIVE_FLOOR_PAD_OPEN_EVENT, onPadOpen);
+    };
   }, [openSheet]);
 
   useEffect(() => {

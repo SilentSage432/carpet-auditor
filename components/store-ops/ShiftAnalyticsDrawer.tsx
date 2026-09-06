@@ -8,6 +8,7 @@
 
 import { useEffect, useId, useState, type ReactNode } from "react";
 import { Activity, ChevronDown, ChevronUp } from "lucide-react";
+import { EXECUTIVE_FLOOR_PAD_OPEN_EVENT } from "@/lib/specialty-tools";
 
 const FLOOR_PAD_HASHES = new Set(["floor-pad", "manager-notes", "s-pen-notes"]);
 const ICON_STROKE = 1.75;
@@ -25,9 +26,16 @@ export function ShiftAnalyticsDrawer({ children }: Props) {
       const hash = window.location.hash.replace(/^#/, "");
       if (FLOOR_PAD_HASHES.has(hash)) setOpen(true);
     }
+    function onPadOpen() {
+      setOpen(true);
+    }
     applyHash();
     window.addEventListener("hashchange", applyHash);
-    return () => window.removeEventListener("hashchange", applyHash);
+    window.addEventListener(EXECUTIVE_FLOOR_PAD_OPEN_EVENT, onPadOpen);
+    return () => {
+      window.removeEventListener("hashchange", applyHash);
+      window.removeEventListener(EXECUTIVE_FLOOR_PAD_OPEN_EVENT, onPadOpen);
+    };
   }, []);
 
   return (

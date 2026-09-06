@@ -178,7 +178,7 @@ export function RemnantCalculatorModal({
         role="dialog"
         aria-modal="true"
         aria-label="Carpet remnant calculator"
-        className="relative z-10 max-h-[85dvh] overflow-y-auto rounded-t-2xl border-t-2 border-emerald-500/40 bg-slate-950 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3"
+        className="hub-modal-sheet relative z-10 max-h-[85dvh] overflow-y-auto rounded-t-2xl border-t-2 border-emerald-500/40 bg-slate-950 px-4 pt-3"
       >
         <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-slate-600" />
         <div className="space-y-3">

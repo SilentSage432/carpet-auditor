@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import { Camera, X } from "lucide-react";
+import { HubPortal } from "@/components/hub/HubPortal";
 import { assignLocationsToWeek, logBayService } from "@/lib/store-ops/client";
 import { toastError, toastSuccess } from "@/lib/toast";
 import { hapticSuccess, playErrorTone, playSuccessTone } from "@/lib/ui/feedback";
@@ -221,6 +222,7 @@ export function WalkTheFloorSheet({
   }
 
   return (
+    <HubPortal>
     <div className="glass-backdrop fixed inset-0 z-[80] flex flex-col justify-end">
       <button
         type="button"
@@ -232,7 +234,7 @@ export function WalkTheFloorSheet({
         role="dialog"
         aria-modal="true"
         aria-labelledby="walk-floor-title"
-        className="glass-card theme-modal relative z-10 max-h-[88dvh] w-full overflow-y-auto !rounded-t-2xl !rounded-b-none border-t-2 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3"
+        className="glass-card theme-modal hub-modal-sheet relative z-10 max-h-[88dvh] w-full overflow-y-auto !rounded-t-2xl !rounded-b-none border-t-2 px-4 pt-3"
       >
         <div className="mx-auto mb-3 h-1 w-10 rounded-full bg-zinc-600" />
         <div className="mb-3 flex items-start justify-between gap-3">
@@ -438,5 +440,6 @@ export function WalkTheFloorSheet({
         />
       ) : null}
     </div>
+    </HubPortal>
   );
 }

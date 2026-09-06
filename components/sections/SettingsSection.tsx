@@ -37,6 +37,7 @@ import { canAccessSection, canManageMapConsole, isMasterAdmin } from "@/lib/rbac
 import { clearLocalRemnants, countLocalRemnants, fetchRemnants } from "@/lib/remnants";
 import {
   requestApplianceScanner,
+  requestExecutiveFloorPad,
   requestRemnantCalculator,
 } from "@/lib/specialty-tools";
 import { dedupeRoster, fetchSpecialists, isSupervisor } from "@/lib/specialists";
@@ -333,6 +334,7 @@ export function SettingsSection({
           {showApplianceScanner ? (
             <button
               type="button"
+              data-testid="more-scan-count-appliances"
               onClick={() => requestApplianceScanner()}
               className="flex min-h-12 items-center justify-center gap-2 rounded-xl border border-sky-500/40 bg-sky-950/30 px-3 text-sm font-semibold text-sky-100"
             >
@@ -342,6 +344,7 @@ export function SettingsSection({
           {showRemnantTools ? (
             <button
               type="button"
+              data-testid="more-remnant-calculator"
               onClick={() => requestRemnantCalculator()}
               className="flex min-h-12 items-center justify-center gap-2 rounded-xl border border-emerald-500/40 bg-emerald-950/30 px-3 text-sm font-semibold text-emerald-100"
             >
@@ -349,13 +352,15 @@ export function SettingsSection({
             </button>
           ) : null}
           {showFloorPad ? (
-            <a
-              href="/dashboard#floor-pad"
+            <button
+              type="button"
+              data-testid="more-executive-floor-pad"
+              onClick={() => requestExecutiveFloorPad()}
               className="flex min-h-12 items-center justify-center gap-2 rounded-xl border border-violet-500/40 bg-violet-950/30 px-3 text-sm font-semibold text-violet-100 sm:col-span-2"
             >
               <NotebookPen className="h-4 w-4" strokeWidth={ICON_STROKE} aria-hidden />
               Executive Floor Pad
-            </a>
+            </button>
           ) : null}
         </div>
         {showRemnants ? (

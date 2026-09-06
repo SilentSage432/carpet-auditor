@@ -1,12 +1,19 @@
 # DeptSync Hub — Development Journal
 
+## 2026-09-06 — UX-004C Mobile interaction reliability (local)
+- Samsung SM-S948U defects: Floor filter horizontal scroll; bottom sheets under BottomNav stacking context; More Floor Utilities dead taps.
+- Floor: mobile `grid-cols-2` filter tablist (predicates unchanged).
+- Shell: active keep-alive panel remains `z-10` beneath BottomNav `z-30`; Map Walk + Bulk Generator use `HubPortal` → `document.body`; `.hub-modal-sheet` pads device safe-area (not full nav-stack dead space).
+- More: `SpecialtyToolsHost` outside `inert` panels; `requestExecutiveFloorPad`; RemnantSection no longer duplicates global remnant-open listener.
+- Status: **UX-004C MOBILE INTERACTION RELIABILITY IMPLEMENTED LOCALLY — AWAITING COMMIT REVIEW** (Samsung re-smoke after deploy)
+
 ## 2026-09-06 — Temporal copy clarification (staging vs calendar week)
 - Audit: Floor W37 vs Map W36 on Sunday are both correct clocks; defect was ambiguous labels.
 - Floor: `composeFloorWeekProgressWithStagingWeek` → e.g. `No bays staged · Staging week 2026-W37` (omits ambiguous “this week” on empty progress).
 - Map: `formatMapCalendarWeekChrome` → `Calendar week · 2026-W36` (Master); locator includes Calendar week.
 - Unchanged: `sundayStagingWeekLabel`, `isoWeekLabel`, cron, rotations, APIs, schema, Map overlay `assignedWeek` prop semantics.
 - Fiscal week remains separate. Map overlay staging-week alignment deferred (UX-005).
-- Status: **TEMPORAL COPY CLARIFICATION IMPLEMENTED LOCALLY — AWAITING COMMIT REVIEW** (not LIVE)
+- Status: **TEMPORAL COPY CLARIFICATION LIVE — DEVICE VALIDATED** (`8e106f3`)
 
 ## 2026-09-06 — UX-004B Quiet investigation Show all clear
 - Defect: UX004A-01 real-device — quiet Map investigation Show all did not reliably clear URL/strip; elevated cleared with same control.

@@ -10,6 +10,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { Suspense, useEffect, useMemo, useState, type ReactNode } from "react";
 import { ChangePinModal } from "@/components/hub/ChangePinModal";
 import { NavigationHub } from "@/components/hub/NavigationHub";
+import { SpecialtyToolsHost } from "@/components/hub/SpecialtyToolsHost";
 import { FloorTab } from "@/components/hub/tabs/FloorTab";
 import { MapTab } from "@/components/hub/tabs/MapTab";
 import { RosterTab } from "@/components/hub/tabs/RosterTab";
@@ -51,6 +52,8 @@ function KeepAlivePanel({
       aria-hidden={!active}
       inert={!active}
       className={`hub-tab-panel absolute inset-0 min-h-0 overflow-x-hidden overflow-y-auto overscroll-y-contain ${
+        /* Ordinary panel content stays beneath BottomNav (z-30). Modal/sheet
+         * surfaces must HubPortal to document.body to paint above the nav. */
         active ? "z-10" : "pointer-events-none z-0"
       }`}
     >
@@ -169,6 +172,8 @@ export function WorkflowTabShell(props: WorkflowTabProps) {
         onClose={() => setChangePinOpen(false)}
         onUpdated={handleUpdated}
       />
+      {/* Outside keep-alive `inert` panels so More utilities can open tools. */}
+      <SpecialtyToolsHost specialist={view} storeNumber={storeNumber} />
       <div className="hub-app-workspace relative min-h-0 flex-1">
         <KeepAlivePanel active={active === "/dashboard"}>
           <FloorTab {...tabProps} />

@@ -1,7 +1,8 @@
 # DeptSync Hub — Master Roadmap
 
 ## Done
-- [x] Temporal copy clarification — Floor **Staging week** / Map **Calendar week** labels; clocks unchanged; Sunday divergence intentional; Map overlay week semantics deferred (**IMPLEMENTED LOCALLY — AWAITING COMMIT REVIEW**)
+- [ ] UX-004C Mobile interaction reliability — Floor 2×2 filters; HubPortal sheets above nav; More specialty tools host (**IMPLEMENTED LOCALLY — AWAITING COMMIT REVIEW**; Samsung re-smoke required)
+- [x] Temporal copy clarification — Floor **Staging week** / Map **Calendar week** labels; clocks unchanged; Sunday divergence intentional; Map overlay week semantics deferred (**LIVE** `8e106f3`; device validated)
 - [x] UX-004 Floor → Map investigation context — URL intent handoff; Map resolves SI; emphasize MEDIUM/HIGH in place; Standard on arrival; Show all clears; no ranking/filter/LAB/REC/SI semantic change (**IMPLEMENTED**; UX-004 closed on real hardware after UX-004B)
 - [x] UX-004B Quiet investigation Show all clear — History `replaceState(history.state)` + `router.replace`; SI-independent exit; history.state preserved (**IMPLEMENTED**; device re-smoke PASSED)
 - [x] UX-003 Floor decision hierarchy — identity → verification → week state → checklist; Open issues rename; SI quiet demoted; fiscal/analytics demoted; no Map handoff/LAB/REC

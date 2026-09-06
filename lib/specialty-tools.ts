@@ -9,9 +9,11 @@ import type { HubSection, StoreSpecialist } from "@/lib/types";
 
 export const APPLIANCE_SCANNER_HASH = "scan";
 export const REMNANT_CALCULATOR_HASH = "remnants-calculator";
+export const EXECUTIVE_FLOOR_PAD_HASH = "floor-pad";
 
 export const APPLIANCE_SCANNER_OPEN_EVENT = "deptsync:appliance-scanner-open";
 export const REMNANT_CALCULATOR_OPEN_EVENT = "deptsync:remnant-calculator-open";
+export const EXECUTIVE_FLOOR_PAD_OPEN_EVENT = "deptsync:executive-floor-pad-open";
 
 export type SpecialtyToolId = "appliance-scanner" | "remnant-calculator";
 
@@ -84,6 +86,27 @@ export function requestApplianceScanner(
 export function requestRemnantCalculator() {
   if (typeof window === "undefined") return;
   window.dispatchEvent(new CustomEvent(REMNANT_CALCULATOR_OPEN_EVENT));
+}
+
+/**
+ * Open Executive Floor Pad / Walk & Talk on Floor.
+ * Navigates to the Floor tab and sets the canonical hash so ShiftAnalyticsDrawer
+ * + TacticalVoiceFloorPad expand (keep-alive safe).
+ */
+export function requestExecutiveFloorPad() {
+  if (typeof window === "undefined") return;
+  const path = window.location.pathname || "";
+  const onFloor = path === "/dashboard" || path === "/";
+  if (!onFloor) {
+    window.location.assign(`/dashboard#${EXECUTIVE_FLOOR_PAD_HASH}`);
+    return;
+  }
+  if (window.location.hash.replace(/^#/, "") !== EXECUTIVE_FLOOR_PAD_HASH) {
+    window.location.hash = EXECUTIVE_FLOOR_PAD_HASH;
+  } else {
+    window.dispatchEvent(new Event("hashchange"));
+  }
+  window.dispatchEvent(new CustomEvent(EXECUTIVE_FLOOR_PAD_OPEN_EVENT));
 }
 
 export function isApplianceScannerHash(hash: string): boolean {

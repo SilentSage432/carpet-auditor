@@ -15,7 +15,6 @@ import { formatSqYd } from "@/lib/calc";
 import { clearanceBadgeLabel } from "@/lib/markdown";
 import { deleteRemnant, remnantRackAlert, saveRemnant } from "@/lib/remnants";
 import {
-  REMNANT_CALCULATOR_OPEN_EVENT,
   isRemnantCalculatorHash,
 } from "@/lib/specialty-tools";
 import { isSupervisor } from "@/lib/specialists";
@@ -100,19 +99,14 @@ export function RemnantSection({
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    function openCalculator() {
-      openAdd();
-    }
     function applyHash() {
       if (isRemnantCalculatorHash(window.location.hash)) {
         openAdd();
       }
     }
-    window.addEventListener(REMNANT_CALCULATOR_OPEN_EVENT, openCalculator);
     window.addEventListener("hashchange", applyHash);
     applyHash();
     return () => {
-      window.removeEventListener(REMNANT_CALCULATOR_OPEN_EVENT, openCalculator);
       window.removeEventListener("hashchange", applyHash);
     };
   }, []);

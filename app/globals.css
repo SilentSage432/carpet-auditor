@@ -479,7 +479,10 @@ body {
  *   .hub-app-shell     → fixed h-dvh viewport, overflow hidden
  *   .hub-app-header    → shrink-0 chrome
  *   .hub-app-workspace → flex-1 min-h-0; each keep-alive tab panel scrolls
+ *   .hub-tab-panel[data-active=true] → z-10 (beneath .hub-bottom-nav z-30)
+ *   HubPortal          → document.body escape for sheets/modals above nav
  *   .hub-main          → content pad clears fixed bottom nav + safe area
+ *   .hub-modal-sheet   → sheet body pad clears device safe area (sheet covers nav)
  */
 :root {
   /* Floating pill ≈ 48px targets + inner padding + outer chrome. */
@@ -495,6 +498,15 @@ body {
 
 .hub-bottom-nav {
   @apply fixed bottom-0 left-0 right-0 z-30 flex justify-center px-4;
+}
+
+/**
+ * Bottom sheets / modal dialogs portaled above BottomNav.
+ * Clears device home inset only — sheet covers the nav pill; nav-stack pad
+ * would add excessive empty space on short sheets.
+ */
+.hub-modal-sheet {
+  padding-bottom: max(1.25rem, env(safe-area-inset-bottom, 0px));
 }
 
 .hub-bottom-pill {

@@ -26,10 +26,6 @@ import {
 } from "@/lib/admin-department-context";
 import { useWorkingDepartment } from "@/lib/use-working-department";
 import { isMasterAdmin, isSimplifiedAssociateView } from "@/lib/rbac";
-import {
-  APPLIANCE_SCANNER_OPEN_EVENT,
-  type ApplianceScannerLocationContext,
-} from "@/lib/specialty-tools";
 import { canAccessDepartment } from "@/lib/department-access";
 import { dedupeRoster, fetchSpecialists, isSupervisor } from "@/lib/specialists";
 import { isStoreOpsAuthFailureMessage } from "@/lib/store-ops/auth-soft";
@@ -122,14 +118,6 @@ const VisualBayScannerModal = dynamic(
   { ssr: false }
 );
 
-const ApplianceScannerModal = dynamic(
-  () =>
-    import("@/components/appliances/ApplianceScannerModal").then(
-      (mod) => mod.ApplianceScannerModal
-    ),
-  { ssr: false }
-);
-
 function rotationBayRef(rotation: WeeklyRotationWithLocation) {
   return {
     rotationId: rotation.id,
@@ -183,9 +171,6 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
     ApplianceCatalogItem[]
   >([]);
   const [applianceScans, setApplianceScans] = useState<ApplianceScan[]>([]);
-  const [simsScannerOpen, setSimsScannerOpen] = useState(false);
-  const [simsBayLocation, setSimsBayLocation] =
-    useState<ApplianceScannerLocationContext | null>(null);
   const [floorBayFilter, setFloorBayFilter] = useState<FloorBayFilter>("all");
   const [rosterSheetOpen, setRosterSheetOpen] = useState(false);
 
@@ -574,23 +559,6 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
     void loadApplianceLedger();
   }, [hasSimsBays, loadApplianceLedger, healthKey]);
 
-  useEffect(() => {
-    function onOpen(event: Event) {
-      const detail = (event as CustomEvent<ApplianceScannerLocationContext | null>)
-        .detail;
-      if (detail && typeof detail === "object" && detail.location_id) {
-        setSimsBayLocation(detail);
-      } else {
-        setSimsBayLocation(null);
-      }
-      setSimsScannerOpen(true);
-    }
-    window.addEventListener(APPLIANCE_SCANNER_OPEN_EVENT, onOpen);
-    return () => {
-      window.removeEventListener(APPLIANCE_SCANNER_OPEN_EVENT, onOpen);
-    };
-  }, []);
-
   const freshnessLocations = useMemo(() => {
     if (mappedLocations.length > 0) return mappedLocations;
     return displayRotations
@@ -730,7 +698,8 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
             <div
               role="tablist"
               aria-label="Bay filters"
-              className="flex gap-1.5 overflow-x-auto pb-0.5 no-scrollbar"
+              data-testid="floor-bay-filters"
+              className="grid grid-cols-2 gap-1.5 sm:flex sm:flex-wrap sm:overflow-visible"
             >
               {FLOOR_FILTERS.map((filter) => {
                 const active = floorBayFilter === filter.id;
@@ -747,7 +716,7 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
                     role="tab"
                     aria-selected={active}
                     onClick={() => setFloorBayFilter(filter.id)}
-                    className={`chip-filter shrink-0 rounded-full px-3 ${
+                    className={`chip-filter min-h-11 w-full rounded-xl px-3 sm:w-auto sm:shrink-0 sm:rounded-full ${
                       active
                         ? "border-cyan-400/55 bg-cyan-950/45 text-cyan-100 shadow-[0_0_12px_-4px_rgba(34,211,238,0.55)]"
                         : "border-zinc-700 text-zinc-300"
@@ -1000,28 +969,6 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
           onFlagged={silentRefresh}
         />
       ) : null}
-      <ApplianceScannerModal
-        open={simsScannerOpen}
-        onClose={() => {
-          setSimsScannerOpen(false);
-          setSimsBayLocation(null);
-        }}
-        catalog={applianceCatalog}
-        onCatalogChange={setApplianceCatalog}
-        scannedBy={specialist.name}
-        activeSpecialist={specialist}
-        scannerEnabled={simsScannerOpen}
-        bayLocation={simsBayLocation}
-        onLogged={(record) => {
-          setApplianceScans((prev) => [
-            record,
-            ...prev.filter((row) => row.id !== record.id),
-          ]);
-          void fetchApplianceScans()
-            .then(setApplianceScans)
-            .catch(() => undefined);
-        }}
-      />
     </>
   );
 }
