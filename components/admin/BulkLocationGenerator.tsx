@@ -12,7 +12,6 @@ import {
   DEFAULT_BAY_PATTERN,
   expandBayNumbers,
 } from "@/lib/store-ops/bay-pattern";
-import { departmentCodesMatch } from "@/lib/store-ops/department-codes";
 import { locationIdsInBayRange } from "@/lib/store-ops/locations";
 import type {
   BayNumberingPattern,
@@ -34,6 +33,11 @@ import {
   VELOCITY_CADENCE_STANDARD_DAYS,
 } from "@/lib/store-ops/velocity";
 import {
+  formatManualBulkSavedMessage,
+  workflowTypeForDepartmentCode,
+  type BulkGeneratedEvent,
+} from "@/lib/store-ops/bulk-mapping-session";
+import {
   aiParseLocations,
   applyDepartmentWorkflowType,
   bulkGenerateLocations,
@@ -48,7 +52,8 @@ type GeneratorTab = "manual" | "ai" | "cleanup";
 type Props = {
   specialist: StoreSpecialist;
   departments: Department[];
-  onGenerated: () => void;
+  /** Parent refreshes topology; close policy is source-aware (manual stays open). */
+  onGenerated: (event: BulkGeneratedEvent) => void;
 };
 
 function typesForMode(mode: LocationMode): StoreLocationType[] {
@@ -71,6 +76,7 @@ export function BulkLocationGenerator({
   onGenerated,
 }: Props) {
   const fileRef = useRef<HTMLInputElement>(null);
+  const aisleInputRef = useRef<HTMLInputElement>(null);
   const [tab, setTab] = useState<GeneratorTab>("manual");
   const [departmentId, setDepartmentId] = useState(departments[0]?.id ?? "");
   const [aisle, setAisle] = useState("1");
@@ -81,8 +87,9 @@ export function BulkLocationGenerator({
     useState<BayNumberingPattern>(DEFAULT_BAY_PATTERN);
   const [velocitySeed, setVelocitySeed] =
     useState<VelocitySeedPreset>("standard");
-  const [workflowType, setWorkflowType] =
-    useState<LocationWorkflowType>("STANDARD_MERCH");
+  const [workflowType, setWorkflowType] = useState<LocationWorkflowType>(() =>
+    workflowTypeForDepartmentCode(departments[0]?.code)
+  );
   const [mapLocations, setMapLocations] = useState<StoreLocation[]>([]);
   const [cleanupEntireAisle, setCleanupEntireAisle] = useState(false);
   const [cleanupConfirm, setCleanupConfirm] = useState(false);
@@ -101,14 +108,11 @@ export function BulkLocationGenerator({
     [departments, departmentId]
   );
 
-  useEffect(() => {
-    const code = selectedDepartment?.code ?? "";
-    setWorkflowType(
-      departmentCodesMatch(code, "appliances")
-        ? "APPLIANCE_SIMS_AUDIT"
-        : "STANDARD_MERCH"
-    );
-  }, [departmentId, selectedDepartment?.code]);
+  function selectDepartment(nextId: string) {
+    setDepartmentId(nextId);
+    const dept = departments.find((d) => d.id === nextId);
+    setWorkflowType(workflowTypeForDepartmentCode(dept?.code));
+  }
 
   useEffect(() => {
     if (tab !== "cleanup") return;
@@ -182,7 +186,7 @@ export function BulkLocationGenerator({
           workflowType
         )}.`
       );
-      onGenerated();
+      onGenerated({ source: "apply_workflow" });
     } catch (err) {
       setError(bulkAuthFriendlyError(err, "Could not tag department workflow"));
     } finally {
@@ -229,15 +233,21 @@ export function BulkLocationGenerator({
         workflow_type: workflowType,
       });
 
-      const expected = bayPreview.length * types.length;
+      // Capture before clear — success copy must name the submitted aisle.
+      const submittedAisle = aisleCode;
+      const departmentName =
+        selectedDepartment?.name ?? "this department";
       setMessage(
-        result.created > 0
-          ? `Upserted ${result.created} location${
-              result.created === 1 ? "" : "s"
-            } for aisle ${aisleCode} (${types.join(" + ")} per bay; re-runs refresh PENDING).`
-          : `No locations written for this aisle/bay range (expected ${expected}).`
+        formatManualBulkSavedMessage({
+          saved: result.created,
+          departmentName,
+          aisle: submittedAisle,
+        })
       );
-      onGenerated();
+      onGenerated({ source: "manual" });
+      setAisle("");
+      // Prefer focus for next aisle; no setTimeout / scroll choreography.
+      aisleInputRef.current?.focus();
     } catch (err) {
       setError(bulkAuthFriendlyError(err, "Failed to generate locations"));
     } finally {
@@ -310,7 +320,7 @@ export function BulkLocationGenerator({
       if (rowErrors.length) {
         setError(rowErrors.slice(0, 5).join(" · "));
       }
-      onGenerated();
+      onGenerated({ source: "csv" });
     } catch (err) {
       setError(bulkAuthFriendlyError(err, "Failed to parse / load CSV batch"));
     } finally {
@@ -405,7 +415,7 @@ export function BulkLocationGenerator({
       }
       setAiPreview(null);
       setAiCorrections([]);
-      onGenerated();
+      onGenerated({ source: "ai" });
     } catch (err) {
       setError(bulkAuthFriendlyError(err, "Confirm & bulk create failed"));
     } finally {
@@ -441,7 +451,7 @@ export function BulkLocationGenerator({
       setCleanupConfirm(false);
       const refreshed = await fetchStoreLocationsDetailed(specialist);
       setMapLocations(refreshed.items);
-      onGenerated();
+      onGenerated({ source: "cleanup" });
     } catch (err) {
       setError(bulkAuthFriendlyError(err, "Could not delete bays"));
     } finally {
@@ -453,7 +463,8 @@ export function BulkLocationGenerator({
     <section className="glass-card space-y-1 p-4">
       <h2 className="glass-subtitle text-emerald-400">Bulk Generator</h2>
       <p className="glass-muted mt-1 text-sm">
-        Map an aisle bay range in one tap. Aisle accepts alphanumeric codes
+        Map a department aisle-by-aisle in one session. Select the department
+        once, then generate each aisle range. Aisle accepts alphanumeric codes
         (BW, RW, LW, GC, 12, A1). BOTH writes Selling and Topstock for each bay
         (unique on department, aisle, bay, type). Re-running upserts status
         back to PENDING.
@@ -518,7 +529,7 @@ export function BulkLocationGenerator({
               <span className="mb-1 block text-zinc-300">Department</span>
               <select
                 value={departmentId}
-                onChange={(e) => setDepartmentId(e.target.value)}
+                onChange={(e) => selectDepartment(e.target.value)}
                 className="glass-input"
               >
                 {departments.map((d) => (
@@ -532,11 +543,13 @@ export function BulkLocationGenerator({
             <label className="block text-sm">
               <span className="mb-1 block text-zinc-300">Aisle</span>
               <input
+                ref={aisleInputRef}
+                data-testid="bulk-manual-aisle"
                 type="text"
                 inputMode="text"
                 autoCapitalize="characters"
                 spellCheck={false}
-                placeholder="BW, RW, 12, A1…"
+                placeholder="Next aisle (e.g. 39, BW, A1)"
                 value={aisle}
                 onChange={(e) => setAisle(formatAisleInput(e.target.value))}
                 onBlur={() => setAisle(normalizeAisle(aisle))}
@@ -742,6 +755,7 @@ export function BulkLocationGenerator({
 
           <button
             type="button"
+            data-testid="bulk-manual-generate"
             disabled={busy || !departmentId || !isValidAisle(aisle)}
             onClick={handleGenerate}
             className="btn-primary-glow mt-4 flex min-h-14 w-full items-center justify-center rounded-xl px-4 text-base"
@@ -812,7 +826,7 @@ export function BulkLocationGenerator({
             </span>
             <select
               value={departmentId}
-              onChange={(e) => setDepartmentId(e.target.value)}
+              onChange={(e) => selectDepartment(e.target.value)}
               className="glass-input"
             >
               {departments.map((d) => (
@@ -997,7 +1011,7 @@ export function BulkLocationGenerator({
               <select
                 value={departmentId}
                 onChange={(e) => {
-                  setDepartmentId(e.target.value);
+                  selectDepartment(e.target.value);
                   setCleanupConfirm(false);
                 }}
                 className="glass-input"
@@ -1190,12 +1204,20 @@ export function BulkLocationGenerator({
       ) : null}
 
       {message ? (
-        <p className="mt-3 text-sm font-medium text-emerald-300" role="status">
+        <p
+          className="mt-3 text-sm font-medium text-emerald-300"
+          role="status"
+          data-testid="bulk-generator-status"
+        >
           {message}
         </p>
       ) : null}
       {error ? (
-        <p className="mt-3 text-sm font-medium text-rose-300" role="alert">
+        <p
+          className="mt-3 text-sm font-medium text-rose-300"
+          role="alert"
+          data-testid="bulk-generator-error"
+        >
           {error}
         </p>
       ) : null}

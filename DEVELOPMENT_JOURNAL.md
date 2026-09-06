@@ -1,5 +1,14 @@
 # DeptSync Hub — Development Journal
 
+## 2026-09-06 — TOPO-UX-001 Continuous department mapping
+- Field: aisle-by-aisle Bulk Generator closed after every manual success → reselect department.
+- Fix (manual mode only): `onGenerated({ source })`; AisleBayManager closes only when `shouldCloseBulkGeneratorAfterGenerated` (exhaustive; unknown fails closed).
+- Post-success: KEEP department / type / velocity / workflow / parity / start / end; CLEAR aisle; KEEP sheet open; upsert-safe `N locations saved · Dept · Aisle` from captured aisle.
+- Appliances workflow via `workflowTypeForDepartmentCode` on select/init (no effect).
+- No schema/API/auth/seasonal/Map changes. Session = open component lifetime.
+- Deferred: **RBAC-TOPO-001** Department-Scoped Topology Authority; range seasonal editing; upsert PENDING reset risk unchanged.
+- Status: **TOPO-UX-001 COMMITTED — READY FOR SAMSUNG ACCEPTANCE**
+
 ## 2026-09-06 — UX-004C.1 Executive Floor Pad durable handoff (local)
 - Samsung FAIL only: More → Executive Floor Pad flickered; Walk & Talk did not open.
 - Root: hard `location.assign('/dashboard#floor-pad')` without surviving open intent; event was not dispatched across reload; hash unreliable under keep-alive.

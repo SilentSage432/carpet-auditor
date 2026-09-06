@@ -1,6 +1,7 @@
 # DeptSync Hub — Master Roadmap
 
 ## Done
+- [x] TOPO-UX-001 Continuous department mapping — manual Bulk Generator session stays open; aisle clears; defaults retained; upsert-safe saved copy (**COMMITTED — READY FOR SAMSUNG ACCEPTANCE**; deferred RBAC-TOPO-001)
 - [x] UX-004C.1 Executive Floor Pad handoff — durable `?open=executive-floor-pad` + Floor intent bridge consume-once (**COMMITTED — READY FOR SAMSUNG ACCEPTANCE**)
 - [x] UX-004C Mobile interaction reliability — Floor 2×2 filters; HubPortal sheets above nav; More specialty tools host (**LIVE baseline `0b939be`**; Executive Floor Pad FAIL on Samsung → UX-004C.1; other defects PASS)
 - [x] Temporal copy clarification — Floor **Staging week** / Map **Calendar week** labels; clocks unchanged; Sunday divergence intentional; Map overlay week semantics deferred (**LIVE** `8e106f3`; device validated)

@@ -301,6 +301,7 @@ Until applied, production Hub falls back to localStorage for catalog/remnants; r
 | Temporal week copy | Floor `Staging week` / Map `Calendar week` presentation helpers | **LIVE** `8e106f3` — clocks unchanged; Sunday staging vs calendar divergence intentional; fiscal separate; Map overlay week prop deferred |
 | Mobile interaction (UX-004C) | Floor 2×2 filters; `HubPortal` sheets; `.hub-modal-sheet`; `SpecialtyToolsHost` | **PARTIAL DEVICE PASS on `0b939be`** — Executive Floor Pad FAIL → UX-004C.1 |
 | Executive Floor Pad handoff (UX-004C.1) | Durable `?open=executive-floor-pad`; Floor `ExecutiveFloorPadIntentBridge` consume-once | **COMMITTED — READY FOR SAMSUNG ACCEPTANCE** |
+| Continuous department mapping (TOPO-UX-001) | Manual Bulk Generator session: source-aware `onGenerated`; keep open + clear aisle + retain defaults | **COMMITTED — READY FOR SAMSUNG ACCEPTANCE** — no schema/API/auth; seasonal separate; upsert PENDING reset risk unchanged; deferred **RBAC-TOPO-001** |
 | Fiscal calendar (FS-001) | `fiscal_years` / `fiscal_weeks` + `fiscal-calendar.ts` + `GET /api/fiscal-calendar` | Schema **LIVE**; **FY2026 COMPANY_PUBLISHED seeded**; ISO `assigned_week` unchanged; seasons/events/pressure deferred |
 | Fiscal calendar coverage (FS-001A min) | `computeFiscalCoverage` + `GET /api/admin/fiscal-calendar/coverage` + Settings `FiscalCoverageCard` | Derived on read; Master-only signal; **no** discovery/promote/cron/push/persistence |
 | Operational seasons/events (FS-002) | `operational_contexts` + relevance + `operational-context.ts` + APIs + Settings card | Master-declared foundation LIVE; empty seed valid; no SI / location priority |
@@ -442,6 +443,7 @@ Public paths: `lib/auth-gate.ts` `isAuthGatePublicPath()` — login, pair, verif
 |----|-------|----------|--------|
 | P2-1 | **Manager notes online-only** | `lib/store-ops/manager-notes.ts` | Floor Pad lost offline |
 | P2-2 | **Topology CRUD online-only** | `/api/store-locations/*` | Cannot bootstrap bays offline |
+| P2-2b | **RBAC-TOPO-001 — Department-Scoped Topology Authority** | Settings `AisleBayManager` vs `POST /api/store-locations/bulk` `requireSuperAdmin` | Supervisor may see topology UI; bulk write Master-only — separate product/security decision; pilot uses Master authority |
 | P2-3 | **SMS stub without Twilio** | `lib/onboarding/sms-dispatch.ts` | Invites require manual link copy |
 | P2-4 | **No sync topological ordering** | `lib/sync-queue.ts` FIFO replay | Parent/child write ordering not enforced |
 

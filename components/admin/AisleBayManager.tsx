@@ -22,6 +22,7 @@ import {
 import { parseVelocityTier } from "@/lib/store-ops/velocity";
 import { toastError, toastSuccess } from "@/lib/toast";
 import type { StoreSpecialist } from "@/lib/types";
+import { shouldCloseBulkGeneratorAfterGenerated } from "@/lib/store-ops/bulk-mapping-session";
 
 const BulkLocationGenerator = dynamic(
   () =>
@@ -547,9 +548,12 @@ export function AisleBayManager({
             <BulkLocationGenerator
               specialist={specialist}
               departments={departments}
-              onGenerated={() => {
+              onGenerated={(event) => {
                 onChanged();
-                setBulkOpen(false);
+                // TOPO-UX-001: manual aisle mapping stays open; other modes close.
+                if (shouldCloseBulkGeneratorAfterGenerated(event.source)) {
+                  setBulkOpen(false);
+                }
               }}
             />
           </div>
