@@ -2,8 +2,8 @@
 
 /**
  * Appliance scan/input island — owns form state + drafts.
- * Historical scan log stays in ApplianceAuditSection so keystrokes do not
- * reconcile the accordion table.
+ * Quiet COUNT path for known UPCs; Quick-Add TEACH for unknowns.
+ * Historical scan log stays in ApplianceAuditSection.
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -101,6 +101,8 @@ export function ApplianceScanForm({
   const [quickAddBarcode, setQuickAddBarcode] = useState<string | null>(null);
   const [sessionTotal, setSessionTotal] = useState(0);
   const [draftRestored, setDraftRestored] = useState(false);
+  /** Progressive disclosure — wedge field stays mounted; UI expands on demand. */
+  const [manualEntry, setManualEntry] = useState(false);
 
   serialRef.current = serialNumber;
   locationRef.current = location;
@@ -141,6 +143,7 @@ export function ApplianceScanForm({
     setLocation(draft.location);
     setLocationType(draft.locationType ?? "showroom");
     setDescription(draft.description);
+    if (draft.itemNumber) setManualEntry(true);
     setDraftRestored(true);
   }, [draftRestored]);
 
@@ -181,14 +184,16 @@ export function ApplianceScanForm({
 
   useEffect(() => {
     if (!focusOnMount || !scannerEnabled) return;
+    // Keep wedge target focused even when visually quiet.
     window.setTimeout(() => itemInputRef.current?.focus(), 50);
-  }, [focusOnMount, scannerEnabled]);
+  }, [focusOnMount, scannerEnabled, quickAddBarcode, manualEntry]);
 
   const clearForNextScan = useCallback(() => {
     setItemNumber("");
     setSerialNumber("");
     setDescription("");
     setScanFlash(false);
+    setManualEntry(false);
     dismissKeyboard();
     window.setTimeout(() => itemInputRef.current?.focus(), 50);
   }, [dismissKeyboard]);
@@ -285,12 +290,12 @@ export function ApplianceScanForm({
       }
 
       setQuickAddBarcode(resolution.scanned);
-      flashStatus("New item — choose category & sub-category");
+      flashStatus("Unknown item — teach mapping to continue");
     },
     [catalog, commitScan, flashStatus, quickAddBarcode]
   );
 
-  useGlobalBarcodeScanner(handleItemLookup, scannerEnabled);
+  useGlobalBarcodeScanner(handleItemLookup, scannerEnabled && quickAddBarcode == null);
 
   async function handleQuickAdded(item: ApplianceCatalogItem) {
     const next = [
@@ -309,11 +314,17 @@ export function ApplianceScanForm({
     clearForNextScan();
   }
 
+  function openManualEntry() {
+    setManualEntry(true);
+    window.setTimeout(() => itemInputRef.current?.focus(), 50);
+  }
+
   return (
     <>
       <QuickAddApplianceModal
         open={quickAddBarcode != null}
         scannedBarcode={quickAddBarcode ?? ""}
+        catalog={catalog}
         onClose={closeQuickAdd}
         onSaved={(item) => void handleQuickAdded(item)}
       />
@@ -354,7 +365,7 @@ export function ApplianceScanForm({
           </p>
         ) : (
           <p className="mt-0.5 text-center text-[11px] font-medium text-sky-300/70">
-            Continuous mode — scan barcode to log instantly
+            Ready — scan barcode to log instantly
           </p>
         )}
       </div>
@@ -375,20 +386,49 @@ export function ApplianceScanForm({
       <div className={`${cardClass} space-y-4 overflow-x-auto`}>
         <div className="flex items-center justify-between gap-2">
           <h2 className="glass-subtitle">Appliance Floor Scan</h2>
-          <span className="glass-pill-cyan">Continuous</span>
+          <span className="glass-pill-cyan">Quiet count</span>
         </div>
 
-        <NumberField
-          label="Item # / SKU / Barcode"
-          mode="digits"
-          value={itemNumber}
-          onChange={handleItemChange}
-          onScanCommit={handleItemLookup}
-          flash={scanFlash}
-          placeholder="Scan barcode — auto-logs on detect"
-          leftIcon={<BarcodeIcon className="h-5 w-5" />}
-          inputRef={itemInputRef}
-        />
+        {/*
+          Wedge field always mounted with NumberField scan debounce.
+          Quiet label by default; "Enter item manually" expands typing affordance.
+        */}
+        <div className="space-y-2">
+          <NumberField
+            label={manualEntry ? "Item # / SKU / Barcode" : "Scan barcode"}
+            mode="digits"
+            value={itemNumber}
+            onChange={handleItemChange}
+            onScanCommit={handleItemLookup}
+            flash={scanFlash}
+            placeholder={
+              manualEntry
+                ? "Type Item # or scan — Enter to log"
+                : "Hardware scan auto-logs known UPCs"
+            }
+            leftIcon={<BarcodeIcon className="h-5 w-5" />}
+            inputRef={itemInputRef}
+          />
+          {!manualEntry ? (
+            <p className="text-center text-[11px] text-slate-500">
+              Known UPCs resolve quietly · unknown opens Teach
+            </p>
+          ) : null}
+          <button
+            type="button"
+            onClick={() => {
+              if (manualEntry) {
+                setManualEntry(false);
+                window.setTimeout(() => itemInputRef.current?.focus(), 50);
+              } else {
+                openManualEntry();
+              }
+            }}
+            className="flex min-h-11 w-full items-center justify-center rounded-xl border border-slate-700 bg-slate-950/60 px-3 text-xs font-semibold text-slate-300"
+          >
+            {manualEntry ? "Done with manual entry" : "Enter item manually"}
+          </button>
+        </div>
 
         <TextField
           label="Serial # (optional — applied to next scan)"
@@ -397,10 +437,10 @@ export function ApplianceScanForm({
           placeholder="Scan or type serial before item barcode"
         />
 
-        {description ? (
+        {description && catalogMatch ? (
           <p className="rounded-xl border border-slate-800 bg-slate-950/60 px-3 py-2 text-sm text-slate-300">
             {description}
-            {catalogMatch?.sub_category
+            {catalogMatch.sub_category
               ? ` · ${catalogMatch.category} / ${catalogMatch.sub_category}`
               : ""}
           </p>

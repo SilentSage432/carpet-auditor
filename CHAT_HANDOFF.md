@@ -1,6 +1,8 @@
 # DeptSync Hub — Chat Handoff
 
 ## Latest (2026-09-06)
+- **APP-UX-001A CATALOG WRITE-PATH VERIFICATION:** Online application failures (400/401/403/409) no longer fall through to direct Supabase; API-only online path; network-unavailable still queues offline teach. Awaiting commit with APP-UX-001.
+- **APP-UX-001 APPLIANCE TEACH & CATALOG RECOVERY — AWAITING COMMIT REVIEW:** Manage appliance mappings sheet (search/edit UPC↔Item↔category↔sub↔description); quiet known-UPC scan; Quick-Add teach for unknowns; UPC conflict fail-visible (no silent remap); no reconciliation/OH/session architecture. Offline teach kept; offline mapping **correction** deferred. Not claiming APP-DISC-001 future inventory architecture.
 - **TOPO-UX-001 CONTINUOUS DEPARTMENT MAPPING — READY FOR SAMSUNG ACCEPTANCE:** Manual Bulk Generator stays open after success; department + stable defaults retained; aisle clears; start/end kept as mapping template; upsert-safe `saved` copy uses captured aisle; base velocity seed unchanged; seasonal relevance untouched; session ends on explicit close/unmount; no schema/API/auth change. Deferred **RBAC-TOPO-001** (Supervisor UI vs Master-only bulk write).
 - **UX-004C.1 EXECUTIVE FLOOR PAD HANDOFF — FINAL GATE:** Durable `?open=executive-floor-pad`; Floor bridge gated on `/dashboard` pathname (keep-alive mount alone insufficient); bridge mounts after Walk & Talk listeners; sync `replaceState` + `router.replace` after open dispatch; commit pending Samsung acceptance.
 - **UX-004C MOBILE INTERACTION RELIABILITY:** Samsung PASS except Executive Floor Pad → UX-004C.1. Baseline `0b939be`.

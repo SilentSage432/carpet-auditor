@@ -104,6 +104,39 @@ export async function POST(request: Request) {
       );
     }
 
+    // Application-layer UPC uniqueness (DB index is non-unique).
+    if (upc) {
+      const { data: upcRows, error: upcError } = await supabase
+        .from("appliance_catalog")
+        .select("*")
+        .eq("store_number", store)
+        .eq("upc", upc);
+      if (upcError) {
+        return NextResponse.json({ error: upcError.message }, { status: 500 });
+      }
+      const bodyId = body.id ? String(body.id) : "";
+      const conflict = (upcRows ?? []).find((row) => {
+        const rowItem = String(
+          (row as { item_number?: string }).item_number ?? ""
+        ).trim();
+        const rowId = String((row as { id?: string }).id ?? "");
+        if (bodyId && rowId === bodyId) return false;
+        if (rowItem === item_number) return false;
+        return true;
+      });
+      if (conflict) {
+        return NextResponse.json(
+          {
+            error: `UPC ${upc} is already linked to Item ${String(
+              (conflict as { item_number?: string }).item_number ?? "?"
+            ).trim()}. Clear or change that mapping first.`,
+            conflict,
+          },
+          { status: 409 }
+        );
+      }
+    }
+
     const now = new Date().toISOString();
     const payload = {
       id: body.id ? String(body.id) : undefined,

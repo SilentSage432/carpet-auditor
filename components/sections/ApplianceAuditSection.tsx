@@ -8,6 +8,7 @@ import {
   ApplianceUnitLocationBadge,
   formatApplianceUnitDetail,
 } from "@/components/appliances/ApplianceShowroomBadge";
+import { ApplianceCatalogManageSheet } from "@/components/appliances/ApplianceCatalogManageSheet";
 import { ApplianceScannerModal } from "@/components/appliances/ApplianceScannerModal";
 import { ApplianceScanEditModal } from "@/components/appliances/ApplianceScanEditModal";
 import { ConfirmModal } from "@/components/hub/ConfirmModal";
@@ -93,6 +94,7 @@ export function ApplianceAuditSection({
   const [pendingDeleteGroup, setPendingDeleteGroup] =
     useState<AggregatedApplianceScan | null>(null);
   const [scannerOpen, setScannerOpen] = useState(false);
+  const [manageOpen, setManageOpen] = useState(false);
   const [bayLocation, setBayLocation] =
     useState<ApplianceScannerLocationContext | null>(null);
 
@@ -361,6 +363,21 @@ export function ApplianceAuditSection({
         Scan &amp; Count Appliances
       </button>
 
+      <button
+        type="button"
+        onClick={() => setManageOpen(true)}
+        className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-emerald-500/40 bg-emerald-950/25 px-4 text-sm font-semibold text-emerald-100"
+      >
+        Manage appliance mappings
+      </button>
+
+      <ApplianceCatalogManageSheet
+        open={manageOpen}
+        catalog={catalog}
+        onCatalogChange={onCatalogChange}
+        onClose={() => setManageOpen(false)}
+      />
+
       <ApplianceScannerModal
         open={scannerOpen}
         onClose={() => {
@@ -371,7 +388,7 @@ export function ApplianceAuditSection({
         onCatalogChange={onCatalogChange}
         scannedBy={scannedBy}
         activeSpecialist={activeSpecialist}
-        scannerEnabled={scannerEnabled && scannerOpen}
+        scannerEnabled={scannerEnabled && scannerOpen && !manageOpen}
         bayLocation={bayLocation}
         onLogged={handleLogged}
       />

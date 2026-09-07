@@ -311,10 +311,11 @@ supabase/migrations/20260812_sunday_bay_assignments.sql → sunday specialist↔
    - Scan log aggregated by SKU (Qty + expandable unit detail); sticky category filter + SKU/location search; Edit modal for qty/serials/bay
    - CSV: SUMMARY (counts/locations) + RAW DETAIL audit trail
    - Continuous mode: barcode detect → immediate `POST /api/appliances/scans`; session total counter; new items pause on Quick-Add then auto-log
+   - APP-UX-001: quiet known-UPC count; `ApplianceCatalogManageSheet` for intentional mapping edit; UPC conflict → 409
    - Scan form is `ApplianceScanForm` (isolated from the accordion log)
    - SIMS bay workflow stamps `location_id` / aisle / bay when opened from Floor
    - APIs: `/api/appliances/catalog`, `/api/appliances/scans` (`GET|POST|PATCH|DELETE`)
-3. **Universal / Appliance Catalog** — removed from bottom nav; SKU linking remains via Quick-Add / scan flows (`carpet_catalog` / `appliance_catalog`). `/catalog` redirects to `/appliances`.
+3. **Universal / Appliance Catalog** — removed from bottom nav; SKU linking via Quick-Add / scan teach + **Manage appliance mappings** sheet (`appliance_catalog`). `/catalog` redirects to `/appliances`.
 4. **Remnant Rack** — Settings accordion (`#remnants`) when RBAC allows
 5. **Settings** — theme, PIN, weekly targets, push, device/sync; Master: bulk / taxonomies / force rotation / store #. Floor Pad lives on Floor.
 

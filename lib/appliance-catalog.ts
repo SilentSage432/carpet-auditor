@@ -1,12 +1,20 @@
 /**
  * Appliance master catalog — owns public.appliance_catalog.
  * Flooring catalog stays in lib/catalog.ts (carpet_catalog).
+ *
+ * Teach-once identity: UPC ↔ Lowe's item # ↔ category ↔ sub-category ↔ description.
+ * UPC is not DB-unique; application layer refuses ambiguous UPC remaps.
  */
 
 import { sanitizeBarcodeScan } from "./barcode";
 import { getStoreNumber } from "./store";
+import { storeOpsAuthHeadersAsync } from "./store-ops/auth";
 import { getSupabase } from "./supabase";
-import { enqueueSyncAction, shouldSaveOffline } from "./sync-queue";
+import {
+  enqueueSyncAction,
+  isBrowserOnline,
+  shouldSaveOffline,
+} from "./sync-queue";
 import { uid } from "./uid";
 import {
   normalizeApplianceCategory,
@@ -18,6 +26,17 @@ import {
 
 const STORAGE_KEY = "appliance_catalog_offline";
 const TABLE = "appliance_catalog";
+
+/** Raised when a UPC is already linked to a different catalog item. */
+export class ApplianceCatalogConflictError extends Error {
+  readonly conflict: ApplianceCatalogItem;
+
+  constructor(message: string, conflict: ApplianceCatalogItem) {
+    super(message);
+    this.name = "ApplianceCatalogConflictError";
+    this.conflict = conflict;
+  }
+}
 
 function readAllLocal(): ApplianceCatalogItem[] {
   if (typeof window === "undefined") return [];
@@ -71,27 +90,92 @@ function mapRow(row: Record<string, unknown>): ApplianceCatalogItem {
   return mapApplianceCatalogRow(row);
 }
 
+/**
+ * Find another catalog row that already owns this UPC.
+ * Same item id / item_number is not a conflict (self-update).
+ */
+export function findApplianceUpcConflict(
+  items: ApplianceCatalogItem[],
+  upcRaw: string | null | undefined,
+  options?: { excludeId?: string; excludeItemNumber?: string }
+): ApplianceCatalogItem | undefined {
+  const upc = upcRaw ? sanitizeBarcodeScan(upcRaw) : "";
+  if (!upc) return undefined;
+  const excludeItem = options?.excludeItemNumber
+    ? sanitizeBarcodeScan(options.excludeItemNumber)
+    : "";
+
+  return items.find((item) => {
+    if (options?.excludeId && item.id === options.excludeId) return false;
+    if (
+      excludeItem &&
+      sanitizeBarcodeScan(item.item_number) === excludeItem
+    ) {
+      return false;
+    }
+    return (
+      item.upc != null &&
+      item.upc !== "" &&
+      sanitizeBarcodeScan(item.upc) === upc
+    );
+  });
+}
+
+/** Search Item #, UPC, description, category, and sub-category for manage UI. */
+export function filterApplianceCatalog(
+  catalog: ApplianceCatalogItem[],
+  query: string
+): ApplianceCatalogItem[] {
+  const sorted = [...catalog].sort((a, b) =>
+    a.item_number.localeCompare(b.item_number)
+  );
+  const q = query.trim().toLowerCase();
+  const qDigits = sanitizeBarcodeScan(query);
+  if (!q && !qDigits) return sorted;
+
+  return sorted.filter((item) => {
+    if (
+      item.item_number.toLowerCase().includes(q) ||
+      item.description.toLowerCase().includes(q) ||
+      item.category.toLowerCase().includes(q) ||
+      (item.sub_category ?? "").toLowerCase().includes(q)
+    ) {
+      return true;
+    }
+    if (!qDigits) return false;
+    return (
+      sanitizeBarcodeScan(item.item_number).includes(qDigits) ||
+      (item.upc != null && sanitizeBarcodeScan(item.upc).includes(qDigits))
+    );
+  });
+}
+
+function assertNoUpcConflict(
+  store: string,
+  record: Pick<ApplianceCatalogItem, "id" | "item_number" | "upc">
+): void {
+  const conflict = findApplianceUpcConflict(forStore(store), record.upc, {
+    excludeId: record.id,
+    excludeItemNumber: record.item_number,
+  });
+  if (conflict) {
+    throw new ApplianceCatalogConflictError(
+      `UPC ${record.upc} is already linked to Item ${conflict.item_number}. Open Manage mappings and clear or change that link first.`,
+      conflict
+    );
+  }
+}
+
 function upsertLocal(record: ApplianceCatalogItem): ApplianceCatalogItem[] {
-  const upc = record.upc ? sanitizeBarcodeScan(record.upc) : null;
-  const existing = readAllLocal()
-    .filter(
-      (r) =>
-        !(
-          r.store_number === record.store_number &&
-          (r.id === record.id || r.item_number === record.item_number)
-        )
-    )
-    .map((r) => {
-      if (
-        upc &&
+  assertNoUpcConflict(record.store_number, record);
+
+  const existing = readAllLocal().filter(
+    (r) =>
+      !(
         r.store_number === record.store_number &&
-        r.upc &&
-        sanitizeBarcodeScan(r.upc) === upc
-      ) {
-        return { ...r, upc: null };
-      }
-      return r;
-    });
+        (r.id === record.id || r.item_number === record.item_number)
+      )
+  );
 
   const next = [...existing, record].sort((a, b) =>
     a.item_number.localeCompare(b.item_number)
@@ -173,40 +257,109 @@ export async function saveApplianceCatalogItem(
     offline: false,
   };
 
-  const supabase = getSupabase();
-  if (!supabase || shouldSaveOffline()) {
-    const offlineRecord = { ...record, offline: true };
-    upsertLocal(offlineRecord);
-    enqueueSyncAction(
-      "upsert_appliance_catalog",
-      catalogPayload(offlineRecord),
-      store
-    );
-    return { record: offlineRecord, offline: true };
+  assertNoUpcConflict(store, record);
+
+  /**
+   * Online: actor-bound catalog API only.
+   * Application responses (400/401/403/409/5xx) MUST remain failures —
+   * never fall through to direct client Supabase upsert.
+   * Network unavailable (no HTTP response): intentional offline teach queue.
+   */
+  if (isBrowserOnline()) {
+    let gotHttpResponse = false;
+    try {
+      const authHeaders = await storeOpsAuthHeadersAsync();
+      const res = await fetch("/api/appliances/catalog", {
+        method: "POST",
+        headers: {
+          ...authHeaders,
+          "Content-Type": "application/json",
+          "x-store-number": store,
+        },
+        body: JSON.stringify({
+          id: record.id,
+          store_number: store,
+          item_number: record.item_number,
+          upc: record.upc,
+          description: record.description,
+          category: record.category,
+          sub_category: record.sub_category ?? "",
+        }),
+      });
+      gotHttpResponse = true;
+      const json = (await res.json().catch(() => ({}))) as {
+        item?: Record<string, unknown>;
+        error?: string;
+        conflict?: Record<string, unknown>;
+      };
+
+      if (res.status === 409) {
+        const conflictRow = json.conflict ? mapRow(json.conflict) : null;
+        throw new ApplianceCatalogConflictError(
+          json.error ||
+            `UPC ${record.upc} is already linked to another item.`,
+          conflictRow ??
+            ({
+              id: "unknown",
+              store_number: store,
+              item_number: "?",
+              upc: record.upc,
+              description: "",
+              category: "Laundry",
+              created_at: now,
+              updated_at: now,
+            } satisfies ApplianceCatalogItem)
+        );
+      }
+
+      if (!res.ok) {
+        throw new Error(
+          json.error || `Catalog save failed (${res.status})`
+        );
+      }
+      if (!json.item) {
+        throw new Error("API returned no catalog item");
+      }
+
+      const saved = mapRow(json.item);
+      const existing = readAllLocal().filter(
+        (r) =>
+          !(
+            r.store_number === saved.store_number &&
+            (r.id === saved.id || r.item_number === saved.item_number)
+          )
+      );
+      writeAllLocal(
+        [...existing, saved].sort((a, b) =>
+          a.item_number.localeCompare(b.item_number)
+        )
+      );
+      return { record: saved, offline: false };
+    } catch (err) {
+      if (err instanceof ApplianceCatalogConflictError) throw err;
+      // HTTP application/auth/validation failures stay failures.
+      if (gotHttpResponse) throw err;
+      // No HTTP response (network down / aborted) → offline teach queue.
+      const offlineRecord = { ...record, offline: true };
+      upsertLocal(offlineRecord);
+      enqueueSyncAction(
+        "upsert_appliance_catalog",
+        catalogPayload(offlineRecord),
+        store
+      );
+      return { record: offlineRecord, offline: true };
+    }
   }
 
-  try {
-    const { data, error } = await supabase
-      .from(TABLE)
-      .upsert(catalogPayload(record), { onConflict: "store_number,item_number" })
-      .select("*")
-      .maybeSingle();
-    if (error) throw error;
-    const saved = data
-      ? mapRow(data as Record<string, unknown>)
-      : record;
-    upsertLocal(saved);
-    return { record: saved, offline: false };
-  } catch {
-    const offlineRecord = { ...record, offline: true };
-    upsertLocal(offlineRecord);
-    enqueueSyncAction(
-      "upsert_appliance_catalog",
-      catalogPayload(offlineRecord),
-      store
-    );
-    return { record: offlineRecord, offline: true };
-  }
+  // Explicit browser offline (or offline-forced): queue for replay.
+  const offlineRecord = { ...record, offline: true };
+  upsertLocal(offlineRecord);
+  enqueueSyncAction(
+    "upsert_appliance_catalog",
+    catalogPayload(offlineRecord),
+    store
+  );
+  return { record: offlineRecord, offline: true };
 }
 
 export async function deleteApplianceCatalogItem(id: string): Promise<void> {

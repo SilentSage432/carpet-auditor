@@ -1,5 +1,20 @@
 # DeptSync Hub — Development Journal
 
+## 2026-09-06 — APP-UX-001A Catalog write-path pre-commit verification
+- Defect: online API 400 (and other non-401/403 `!ok`) could fall through to direct client Supabase upsert, bypassing actor-bound API + conflict authority.
+- Fix: `saveApplianceCatalogItem` — online uses API only; any HTTP response failure (incl. 400/401/403/409/5xx) throws; network-no-response queues offline teach; removed online direct Supabase fallback.
+- Tests: `lib/appliance-catalog-write-path.test.ts` (+ existing APP-UX-001 suite).
+- Status: **APP-UX-001A VERIFIED + CORRECTED LOCALLY — AWAITING COMMIT REVIEW**
+
+## 2026-09-06 — APP-UX-001 Appliance Teach & Catalog Recovery
+- Recovered intentional **Manage appliance mappings** sheet (search + edit UPC / Item # / category / sub-category / description) after `ApplianceCatalogSection` chrome deletion (`b1f3739`) — not a blind restore; no delete button.
+- Quiet COUNT scanner: known UPC auto-logs; category/description stay off the count path; **Enter item manually** progressive disclosure; wedge `NumberField` retained.
+- Unknown UPC → Quick-Add TEACH (item # + category + sub + description); UPC conflict refuses ambiguous remaps (client + API 409).
+- Catalog writes prefer actor-bound `POST /api/appliances/catalog` when online; offline teach still queues. Offline **correction** of existing mappings deferred (needs connectivity).
+- No audit sessions, OH, variance, location-tag scan, or reconciliation architecture.
+- Tests: `lib/appliance-catalog.test.ts`, `lib/appliance-ux001-teach.contract.test.ts`.
+- Status: **APP-UX-001 IMPLEMENTED LOCALLY — AWAITING COMMIT REVIEW**
+
 ## 2026-09-06 — TOPO-UX-001 Continuous department mapping
 - Field: aisle-by-aisle Bulk Generator closed after every manual success → reselect department.
 - Fix (manual mode only): `onGenerated({ source })`; AisleBayManager closes only when `shouldCloseBulkGeneratorAfterGenerated` (exhaustive; unknown fails closed).
