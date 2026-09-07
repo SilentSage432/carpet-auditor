@@ -3,7 +3,7 @@
 > **Appliance specialty evolution (directional):** [`docs/product/APPLIANCE_EVOLUTION_ROADMAP.md`](docs/product/APPLIANCE_EVOLUTION_ROADMAP.md) — next: APP-CAT-001 (after APP-OBS-001 field validation); later APP-ROT-001 / APP-INT-001. Do not leapfrog evidence foundations.
 
 ## Done
-- [x] APP-OBS-001 Appliance fulfillment disposition — per-unit NULL/STAGED_PICKUP/STAGED_DELIVERY; last-scan actions; soft after CLOSED; recon breakdown (**IMPLEMENTED — MIGRATION PENDING APPLY — REAL-HARDWARE VALIDATION PENDING**)
+- [x] APP-OBS-001 Appliance fulfillment disposition — per-unit NULL/STAGED_PICKUP/STAGED_DELIVERY; last-scan actions; soft after CLOSED; recon breakdown (**PRODUCTION MIGRATION LIVE — REAL-HARDWARE VALIDATION PENDING**)
 - [x] APP-AUD-002B Physical evidence freeze hardening — Option B: explicit membership; CLOSED WHAT/WHERE/WHEN/WHICH freeze (API + DB); ad-hoc/Floor unbound (**COMMITTED, PUSHED, PRODUCTION MIGRATION LIVE — REAL-HARDWARE VALIDATION PENDING**; `20260907_appliance_scans_closed_evidence_freeze.sql`)
 - [x] APP-AUD-002A Audit lifecycle clarity & recent history — Option A UX; derived recon progress; recent CLOSED list (**COMMITTED — REAL-HARDWARE VALIDATION PENDING**)
 - [x] APP-ROADMAP-001 Appliance evolution roadmap documented (**DOCS ONLY** — `docs/product/APPLIANCE_EVOLUTION_ROADMAP.md`)
@@ -204,7 +204,7 @@
 - [x] Pair landing PWA install — standalone detect, deferred `beforeinstallprompt`, iOS Add to Home Screen card, then Floor (`/`)
 
 ## Next
-- [ ] **Appliances — APP-OBS-001** apply `20260907_appliance_scans_fulfillment_disposition.sql` + field validation
+- [ ] **Appliances — APP-OBS-001** field validation (migration LIVE on `fmeinlwhixngednabhgy`)
 - [ ] **Appliances — APP-AUD-002** field validation to close tranche after 002A/002B hardware smoke
 - [ ] **Appliances — APP-CAT-001** Local catalog promotion + multi-identifier resolution (queued after OBS)
 - [x] Apply specialty schema parity (`20260905_store_specialists_home_department.sql`, `20260905_specialty_catalog_remnants_parity.sql`) after fresh backup — **M1+M2 live** 2026-09-05; commit pending

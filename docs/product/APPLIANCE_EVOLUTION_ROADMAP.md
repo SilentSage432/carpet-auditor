@@ -118,13 +118,13 @@ Still pending where noted: **real-hardware validation** for field-facing pieces.
 - Late in-window offline evidence (APP-AUD-001A) remains valid.
 - Catalog snapshot/version provenance remains deferred (presentation drift only).
 
-**Next after APP-AUD-002 closes:** APP-OBS-001 (implemented — migration apply + field validation pending).
+**Next after APP-AUD-002 closes:** APP-OBS-001 (production migration LIVE — real-hardware validation pending).
 
 ### Queued (after APP-AUD-002 foundations)
 
 #### APP-OBS-001 — Appliance Availability Classification
 
-**Status:** Implemented (migration pending apply; real-hardware validation pending).
+**Status:** Production migration LIVE — real-hardware validation pending.
 
 Per-unit physical observation: `fulfillment_disposition` on `appliance_scans`.
 

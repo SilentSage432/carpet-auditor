@@ -6,9 +6,9 @@
 - Quiet rapid COUNT; optional last-unit Staged pickup / Staged delivery; edit sheet clear-to-NULL.
 - Soft mutable after CLOSED (not in APP-AUD-002B freeze set). Offline/API/queue threaded; membership preserved.
 - Derived recon breakdown (showroom / staged pickup / staged delivery / no staged disposition recorded). Plain CSV column.
-- Migration `20260907_appliance_scans_fulfillment_disposition.sql` (**not applied this tranche**).
+- Migration `20260907_appliance_scans_fulfillment_disposition.sql` applied + verified on `fmeinlwhixngednabhgy` (fingerprint unchanged; 18 scan rows all NULL). Pre-migration dump retained under `tmp/production-backups/`.
 - APP-CAT-001 multi-identifier remains next; no correction history / Excel polish / INT.
-- Status: **APP-OBS-001 IMPLEMENTED — AWAITING COMMIT / MIGRATION APPLY / REAL-HARDWARE VALIDATION**
+- Status: **APP-OBS-001 COMMITTED, PUSHED, AND PRODUCTION MIGRATION LIVE — REAL-HARDWARE VALIDATION PENDING**
 
 ## 2026-09-07 — APP-AUD-002B Physical evidence freeze hardening
 - Option B: explicit audit membership (omit `audit_session_id` → unbound; removed server ACTIVE auto-bind).
