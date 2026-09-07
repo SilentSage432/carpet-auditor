@@ -21,6 +21,7 @@ import {
   saveApplianceScan,
   scheduleApplianceScanDraftSave,
 } from "@/lib/appliance-scans";
+import { loadCachedActiveAuditSessionId } from "@/lib/appliances/audit-client";
 import { sanitizeBarcodeScan } from "@/lib/barcode";
 import { blurActiveInput } from "@/lib/focus-input";
 import { useGlobalBarcodeScanner } from "@/lib/hardware-scanner";
@@ -69,6 +70,8 @@ type Props = {
   focusOnMount?: boolean;
   /** When opened from a mapped SIMS bay, lock location and attach location_id. */
   bayLocation?: ApplianceScannerLocationContext | null;
+  /** Active physical audit session id (APP-AUD-001). */
+  auditSessionId?: string | null;
   onLogged: (record: ApplianceScan, offline: boolean) => void;
 };
 
@@ -80,6 +83,7 @@ export function ApplianceScanForm({
   scannerEnabled = true,
   focusOnMount = false,
   bayLocation = null,
+  auditSessionId = null,
   onLogged,
 }: Props) {
   const itemInputRef = useRef<HTMLInputElement>(null);
@@ -210,6 +214,8 @@ export function ApplianceScanForm({
       flushApplianceScanDraftSave();
       setSaving(true);
       try {
+        const sessionId =
+          auditSessionId || loadCachedActiveAuditSessionId() || undefined;
         const { record, offline } = await saveApplianceScan({
           item_number: item.item_number,
           serial_number: serialRef.current.trim(),
@@ -224,6 +230,7 @@ export function ApplianceScanForm({
           location_id: bayLocation?.location_id,
           aisle: bayLocation?.aisle,
           bay_number: bayLocation?.bay,
+          audit_session_id: sessionId,
         });
 
         setSessionTotal((n) => n + 1);
@@ -247,7 +254,7 @@ export function ApplianceScanForm({
         setSaving(false);
       }
     },
-    [activeSpecialist?.name, bayLocation, clearForNextScan, flashStatus, onLogged, scannedBy]
+    [activeSpecialist?.name, auditSessionId, bayLocation, clearForNextScan, flashStatus, onLogged, scannedBy]
   );
 
   function handleItemChange(raw: string) {

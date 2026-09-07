@@ -62,16 +62,15 @@ describe("APP-UX-001 appliance teach / quiet scan contracts", () => {
     expect(saveFn).not.toMatch(/\.from\("appliance_catalog"\)\s*\n?\s*\.upsert/);
   });
 
-  it("does not introduce reconciliation / OH / audit session architecture", () => {
+  it("manage / teach surfaces do not invent Lowe's OH or reconciliation UI", () => {
     const manage = readRepo(
       "components/appliances/ApplianceCatalogManageSheet.tsx"
     );
-    const form = readRepo("components/sections/ApplianceScanForm.tsx");
-    for (const src of [manage, form]) {
+    const quick = readRepo("components/barcode/QuickAddApplianceModal.tsx");
+    for (const src of [manage, quick]) {
       expect(src).not.toMatch(/reconciliation_snapshot/i);
-      expect(src).not.toMatch(/lowes_oh/i);
-      expect(src).not.toMatch(/audit_session/i);
-      expect(src).not.toMatch(/declared_oh/i);
+      expect(src).not.toMatch(/declared_lowes_oh/i);
+      expect(src).not.toMatch(/physical_audit/i);
     }
   });
 });

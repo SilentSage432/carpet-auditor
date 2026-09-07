@@ -134,6 +134,9 @@ export function mapApplianceScanRow(row: Record<string, unknown>): ApplianceScan
       row.bay_number == null || row.bay_number === ""
         ? null
         : Math.floor(Number(row.bay_number)),
+    audit_session_id: row.audit_session_id
+      ? String(row.audit_session_id)
+      : null,
   };
 }
 
@@ -166,6 +169,10 @@ export function buildApplianceScanPayload(
   scanned_at: string;
   location_type: string;
   condition_tag: string;
+  location_id?: string;
+  aisle?: string;
+  bay_number?: number;
+  audit_session_id?: string;
   id?: string;
 } {
   const pair = resolveApplianceCategoryPair(
@@ -198,6 +205,7 @@ export function buildApplianceScanPayload(
     location_id?: string;
     aisle?: string;
     bay_number?: number;
+    audit_session_id?: string;
     id?: string;
   } = {
     store_number: store,
@@ -221,6 +229,8 @@ export function buildApplianceScanPayload(
   if (aisle) payload.aisle = aisle;
   const bayNumber = Number(input.bay_number);
   if (Number.isFinite(bayNumber)) payload.bay_number = Math.floor(bayNumber);
+  const auditSessionId = String(input.audit_session_id ?? "").trim();
+  if (auditSessionId) payload.audit_session_id = auditSessionId;
 
   return payload;
 }
@@ -316,7 +326,7 @@ export async function saveApplianceScan(
   console.log("[appliance_scans] save payload", payload);
 
   // Truly offline — queue for later. Do not use this path to hide DB errors.
-  if (!isBrowserOnline()) {
+    if (!isBrowserOnline()) {
     const offlineRecord: ApplianceScan = {
       id: payload.id ?? uid(),
       store_number: payload.store_number,
@@ -331,6 +341,7 @@ export async function saveApplianceScan(
       scanned_at: payload.scanned_at,
       offline: true,
       is_showroom_baseline: false,
+      audit_session_id: payload.audit_session_id ?? null,
     };
     upsertLocal(offlineRecord);
     enqueueSyncAction("upsert_appliance_scan", { ...payload, id: offlineRecord.id }, store);
@@ -401,7 +412,9 @@ export async function deleteApplianceScan(id: string): Promise<void> {
   }
 }
 
-/** Clear appliance scans for the active store (audit session reset). */
+/** Clear unbound appliance scans for the active store (ledger cleanup).
+ * APP-AUD-001A: never deletes rows bound to a physical audit session.
+ */
 export async function clearAllApplianceScans(
   options: {
     store?: string;
@@ -412,26 +425,35 @@ export async function clearAllApplianceScans(
   const store = options.store ?? getStoreNumber();
   const preserve = options.preserveShowroomBaseline ?? false;
   const local = forStore(store);
+  const auditBound = local.filter((r) => Boolean(r.audit_session_id));
+  const unbound = local.filter((r) => !r.audit_session_id);
   const toDelete = preserve
-    ? local.filter((r) => !r.is_showroom_baseline)
-    : local;
-  const preserved = preserve
-    ? local.filter((r) => Boolean(r.is_showroom_baseline))
-    : [];
+    ? unbound.filter((r) => !r.is_showroom_baseline)
+    : unbound;
+  const preservedLocal = [
+    ...auditBound,
+    ...(preserve
+      ? unbound.filter((r) => Boolean(r.is_showroom_baseline))
+      : []),
+  ];
 
   writeAllLocal([
     ...readAllLocal().filter((r) => r.store_number !== store),
-    ...preserved,
+    ...preservedLocal,
   ]);
   clearApplianceScanDraft();
 
   if (!isBrowserOnline()) {
     enqueueSyncAction(
       "clear_appliance_scans",
-      { store_number: store, preserve_showroom_baseline: preserve },
+      {
+        store_number: store,
+        preserve_showroom_baseline: preserve,
+        preserve_audit_bound: true,
+      },
       store
     );
-    return { deleted: toDelete.length, preserved: preserved.length };
+    return { deleted: toDelete.length, preserved: preservedLocal.length };
   }
 
   const qs = new URLSearchParams({
@@ -455,7 +477,7 @@ export async function clearAllApplianceScans(
   }
   return {
     deleted: json.deleted ?? toDelete.length,
-    preserved: json.preserved ?? preserved.length,
+    preserved: json.preserved ?? preservedLocal.length,
   };
 }
 

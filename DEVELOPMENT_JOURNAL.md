@@ -1,5 +1,20 @@
 # DeptSync Hub — Development Journal
 
+## 2026-09-06 — APP-AUD-001A Physical evidence pre-commit verification
+- Late offline vs close: close flushes/blocks while session-bound scan upserts pending; UI shows unsynced count; CLOSED bind allowed only when `scanned_at` is within [started_at, closed_at] (API + queue replay + DB trigger). Post-close observations cannot join.
+- Reconciliation: Option B — one mutable row per (audit, item) via upsert; not immutable declaration history. Terminology corrected.
+- Clear scan ledger: deletes only unbound (`audit_session_id IS NULL`); closed-audit rows protected from single delete.
+- Migration: observation-time trigger; RLS skip remains fail-closed (policies require `jwt_matches_store` from prior migrations).
+- Status: **APP-AUD-001A VERIFIED + INCLUDED IN APP-AUD-001 COMMIT — PRODUCTION MIGRATION PENDING**
+
+## 2026-09-06 — APP-AUD-001 Appliance physical audit & reconciliation foundation
+- Added `appliance_audit_sessions` (ACTIVE|CLOSED, one ACTIVE/store) + `appliance_reconciliation_snapshots` (latest declared Lowe's OH + derived variance per item; mutable upsert) + nullable `appliance_scans.audit_session_id`.
+- Evidence: scans OBSERVED; OH DECLARED current state; variance DERIVED (`physical - OH`); blank OH ≠ zero. Outcomes RESOLVED | NEEDS_FOLLOW_UP only.
+- UX: Start/Close physical audit; history inspect; reconcile sheet; audit CSV share/export. Destructive clear ledger remains secondary and must not wipe audit-bound scans.
+- Authority: actor-bound APIs; recon Supervisor+; online-only reconciliation; offline scan can carry cached session id.
+- No Lowe's/SIMS/Zebra integration; no pattern intelligence; legacy NULL session scans untouched.
+- Status: **APP-AUD-001 COMMITTED — PRODUCTION MIGRATION PENDING** (apply `20260906_appliance_audit_sessions.sql` before production use)
+
 ## 2026-09-06 — APP-UX-001A Catalog write-path pre-commit verification
 - Defect: online API 400 (and other non-401/403 `!ok`) could fall through to direct client Supabase upsert, bypassing actor-bound API + conflict authority.
 - Fix: `saveApplianceCatalogItem` — online uses API only; any HTTP response failure (incl. 400/401/403/409/5xx) throws; network-no-response queues offline teach; removed online direct Supabase fallback.

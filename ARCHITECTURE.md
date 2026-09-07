@@ -312,6 +312,7 @@ supabase/migrations/20260812_sunday_bay_assignments.sql → sunday specialist↔
    - CSV: SUMMARY (counts/locations) + RAW DETAIL audit trail
    - Continuous mode: barcode detect → immediate `POST /api/appliances/scans`; session total counter; new items pause on Quick-Add then auto-log
    - APP-UX-001: quiet known-UPC count; `ApplianceCatalogManageSheet` for intentional mapping edit; UPC conflict → 409
+   - APP-AUD-001 / APP-AUD-001A: `appliance_audit_sessions` + reconciliation state rows (mutable upsert per item); Close flushes/blocks pending session scans; observation-time CLOSED bind; Clear ledger preserves audit-bound scans; declared Lowe's OH; derived variance
    - Scan form is `ApplianceScanForm` (isolated from the accordion log)
    - SIMS bay workflow stamps `location_id` / aisle / bay when opened from Floor
    - APIs: `/api/appliances/catalog`, `/api/appliances/scans` (`GET|POST|PATCH|DELETE`)

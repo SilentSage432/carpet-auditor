@@ -19,6 +19,8 @@ type Props = {
   activeSpecialist: StoreSpecialist | null;
   scannerEnabled?: boolean;
   bayLocation?: ApplianceScannerLocationContext | null;
+  /** Active physical audit — new scans bind when present. */
+  auditSessionId?: string | null;
   onLogged: (record: ApplianceScan, offline: boolean) => void;
 };
 
@@ -31,6 +33,7 @@ export function ApplianceScannerModal({
   activeSpecialist,
   scannerEnabled = true,
   bayLocation = null,
+  auditSessionId = null,
   onLogged,
 }: Props) {
   useEffect(() => {
@@ -63,6 +66,7 @@ export function ApplianceScannerModal({
           <h2 className="font-mono text-xs font-bold uppercase tracking-wide text-cyan-200">
             Scan &amp; Count Appliances
             {bayLocation ? ` · ${bayLocation.location_tag}` : ""}
+            {auditSessionId ? " · Physical audit" : ""}
           </h2>
           <button
             type="button"
@@ -80,6 +84,7 @@ export function ApplianceScannerModal({
           scannerEnabled={scannerEnabled}
           focusOnMount
           bayLocation={bayLocation}
+          auditSessionId={auditSessionId}
           onLogged={onLogged}
         />
       </div>

@@ -9,11 +9,13 @@ import {
   formatApplianceUnitDetail,
 } from "@/components/appliances/ApplianceShowroomBadge";
 import { ApplianceCatalogManageSheet } from "@/components/appliances/ApplianceCatalogManageSheet";
+import { AppliancePhysicalAuditPanel } from "@/components/appliances/AppliancePhysicalAuditPanel";
 import { ApplianceScannerModal } from "@/components/appliances/ApplianceScannerModal";
 import { ApplianceScanEditModal } from "@/components/appliances/ApplianceScanEditModal";
 import { ConfirmModal } from "@/components/hub/ConfirmModal";
 import { DepartmentIcon } from "@/components/hub/NavIcons";
 import { LocationStatusIcon } from "@/components/hub/StatusPills";
+import type { ApplianceAuditSession } from "@/lib/appliances/physical-audit";
 import {
   aggregateApplianceScans,
   applianceCategoryEmoji,
@@ -95,6 +97,8 @@ export function ApplianceAuditSection({
     useState<AggregatedApplianceScan | null>(null);
   const [scannerOpen, setScannerOpen] = useState(false);
   const [manageOpen, setManageOpen] = useState(false);
+  const [activeAudit, setActiveAudit] =
+    useState<ApplianceAuditSession | null>(null);
   const [bayLocation, setBayLocation] =
     useState<ApplianceScannerLocationContext | null>(null);
 
@@ -318,6 +322,11 @@ export function ApplianceAuditSection({
 
   return (
     <div className="space-y-4 overflow-x-hidden pb-4">
+      <AppliancePhysicalAuditPanel
+        onActiveSessionChange={setActiveAudit}
+        onStatus={(msg, tone = "ok") => flashStatus(msg, tone)}
+      />
+
       <ApplianceAuditActionBar
         scans={exportScans}
         csvOptions={{ descriptions: catalogDescriptions }}
@@ -390,6 +399,7 @@ export function ApplianceAuditSection({
         activeSpecialist={activeSpecialist}
         scannerEnabled={scannerEnabled && scannerOpen && !manageOpen}
         bayLocation={bayLocation}
+        auditSessionId={activeAudit?.id ?? null}
         onLogged={handleLogged}
       />
 

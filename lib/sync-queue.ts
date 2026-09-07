@@ -8,6 +8,7 @@ import {
   requestConflictResolution,
   SyncConflictError,
 } from "./sync-conflict";
+import { mayBindScanToAuditSession } from "./appliances/physical-audit";
 import { getStoreNumber } from "./store";
 import { getSupabase } from "./supabase";
 import { uid } from "./uid";
@@ -240,6 +241,24 @@ export function getQuarantinedSync(storeNumber = getStoreNumber()): SyncAction[]
 
 export function countPendingSync(storeNumber = getStoreNumber()): number {
   return getPendingSync(storeNumber).length;
+}
+
+/** Pending/quarantined appliance scan upserts bound to a physical audit session. */
+export function getPendingApplianceScanSyncForAudit(
+  auditSessionId: string,
+  storeNumber = getStoreNumber()
+): SyncAction[] {
+  const sessionId = String(auditSessionId ?? "").trim();
+  if (!sessionId) return [];
+  return readQueue().filter((a) => {
+    if (a.store_number !== storeNumber) return false;
+    if (a.type !== "upsert_appliance_scan") return false;
+    if (a.status !== "pending" && a.status !== "quarantined") return false;
+    return (
+      String((a.payload as { audit_session_id?: string }).audit_session_id ?? "")
+        .trim() === sessionId
+    );
+  });
 }
 
 export function countQuarantinedSync(storeNumber = getStoreNumber()): number {
@@ -688,6 +707,37 @@ async function replayAction(action: SyncAction): Promise<void> {
         return;
       }
       case "upsert_appliance_scan": {
+        // APP-AUD-001A: when binding a CLOSED audit, enforce observation-time window
+        // (direct client replay bypasses the HTTP route).
+        const sessionId = String(
+          (payload as { audit_session_id?: string }).audit_session_id ?? ""
+        ).trim();
+        if (sessionId) {
+          const { data: sessionRow, error: sessionError } = await supabase
+            .from("appliance_audit_sessions")
+            .select("id, status, started_at, closed_at")
+            .eq("id", sessionId)
+            .maybeSingle();
+          if (sessionError) throw sessionError;
+          if (!sessionRow) {
+            throw new Error("audit_session_id not found");
+          }
+          const bind = mayBindScanToAuditSession({
+            status: String(sessionRow.status),
+            scanned_at: String(
+              (payload as { scanned_at?: string }).scanned_at ?? ""
+            ),
+            started_at: String(sessionRow.started_at ?? ""),
+            closed_at: sessionRow.closed_at
+              ? String(sessionRow.closed_at)
+              : null,
+          });
+          if (!bind.ok) {
+            const err = new Error(bind.reason) as Error & { status?: number };
+            err.status = 409;
+            throw err;
+          }
+        }
         const { error } = await supabase
           .from("appliance_scans")
           .upsert(payload, { onConflict: "id" });
@@ -770,10 +820,12 @@ async function replayAction(action: SyncAction): Promise<void> {
           (payload as { preserve_showroom_baseline?: boolean })
             .preserve_showroom_baseline
         );
+        // APP-AUD-001A: never wipe audit-bound physical evidence from queue replay.
         let query = supabase
           .from("appliance_scans")
           .delete()
-          .eq("store_number", action.store_number);
+          .eq("store_number", action.store_number)
+          .is("audit_session_id", null);
         if (preserve) {
           query = query.eq("is_showroom_baseline", false);
         }

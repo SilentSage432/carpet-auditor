@@ -987,6 +987,8 @@ export type ApplianceScan = {
   location_id?: string | null;
   aisle?: string | null;
   bay_number?: number | null;
+  /** Physical audit session (APP-AUD-001). NULL = pre-session / unbound legacy. */
+  audit_session_id?: string | null;
 };
 
 export type ApplianceScanInsert = Omit<

@@ -3,6 +3,7 @@ import {
   applianceScansToCsv,
   mapApplianceScanRow,
 } from "@/lib/appliance-scans";
+import { mayBindScanToAuditSession } from "@/lib/appliances/physical-audit";
 import { storeNumberQueryValues } from "@/lib/store";
 import { actorBoundStoreNumber } from "@/lib/store-ops/appliance-store-scope";
 import {
@@ -169,6 +170,59 @@ export async function POST(request: Request) {
     const bayNumber = Number(body.bay_number);
     if (Number.isFinite(bayNumber)) payload.bay_number = Math.floor(bayNumber);
 
+    // Bind using observation time (APP-AUD-001 / APP-AUD-001A).
+    // ACTIVE: join freely. CLOSED: only if scanned_at is within the open window
+    // so legitimately queued offline scans survive close without accepting
+    // post-close observations into history.
+    const requestedSession = String(body.audit_session_id ?? "").trim();
+    let auditSessionId: string | null = null;
+    if (requestedSession) {
+      const { data: sessionRow, error: sessionError } = await supabase
+        .from("appliance_audit_sessions")
+        .select("id, store_number, status, started_at, closed_at")
+        .eq("id", requestedSession)
+        .maybeSingle();
+      if (sessionError) {
+        return NextResponse.json(
+          { error: sessionError.message },
+          { status: 500 }
+        );
+      }
+      if (!sessionRow) {
+        return NextResponse.json(
+          { error: "audit_session_id not found" },
+          { status: 400 }
+        );
+      }
+      if (String(sessionRow.store_number) !== store) {
+        return NextResponse.json(
+          { error: "audit_session_id store mismatch" },
+          { status: 403 }
+        );
+      }
+      const bind = mayBindScanToAuditSession({
+        status: String(sessionRow.status),
+        scanned_at: String(payload.scanned_at),
+        started_at: String(sessionRow.started_at ?? ""),
+        closed_at: sessionRow.closed_at
+          ? String(sessionRow.closed_at)
+          : null,
+      });
+      if (!bind.ok) {
+        return NextResponse.json({ error: bind.reason }, { status: 409 });
+      }
+      auditSessionId = String(sessionRow.id);
+    } else {
+      const { data: active } = await supabase
+        .from("appliance_audit_sessions")
+        .select("id")
+        .eq("store_number", store)
+        .eq("status", "ACTIVE")
+        .maybeSingle();
+      if (active?.id) auditSessionId = String(active.id);
+    }
+    if (auditSessionId) payload.audit_session_id = auditSessionId;
+
     console.log("[POST /api/appliances/scans] insert", payload);
 
     const first = await supabase
@@ -184,6 +238,7 @@ export async function POST(request: Request) {
       delete stripped.location_id;
       delete stripped.aisle;
       delete stripped.bay_number;
+      delete stripped.audit_session_id;
       const retry = await supabase
         .from("appliance_scans")
         .insert(stripped)
@@ -357,10 +412,12 @@ export async function DELETE(request: Request) {
       url.searchParams.get("preserve_baseline") === "true";
 
     if (scope === "store") {
+      // APP-AUD-001A: never destroy audit-bound physical evidence via ledger clear.
       let query = supabase
         .from("appliance_scans")
         .delete()
-        .in("store_number", storeKeys.length ? storeKeys : [store]);
+        .in("store_number", storeKeys.length ? storeKeys : [store])
+        .is("audit_session_id", null);
       if (preserveBaseline) {
         query = query.eq("is_showroom_baseline", false);
       }
@@ -373,13 +430,20 @@ export async function DELETE(request: Request) {
       }
 
       let preserved = 0;
+      const { count: auditBound } = await supabase
+        .from("appliance_scans")
+        .select("id", { count: "exact", head: true })
+        .in("store_number", storeKeys.length ? storeKeys : [store])
+        .not("audit_session_id", "is", null);
+      preserved += auditBound ?? 0;
       if (preserveBaseline) {
         const { count } = await supabase
           .from("appliance_scans")
           .select("id", { count: "exact", head: true })
           .in("store_number", storeKeys.length ? storeKeys : [store])
-          .eq("is_showroom_baseline", true);
-        preserved = count ?? 0;
+          .eq("is_showroom_baseline", true)
+          .is("audit_session_id", null);
+        preserved += count ?? 0;
       }
 
       return NextResponse.json({
@@ -394,6 +458,32 @@ export async function DELETE(request: Request) {
         { error: "id is required unless scope=store" },
         { status: 400 }
       );
+    }
+
+    const { data: existing, error: existingError } = await supabase
+      .from("appliance_scans")
+      .select("id, audit_session_id")
+      .eq("id", id)
+      .eq("store_number", store)
+      .maybeSingle();
+    if (existingError) {
+      throw new Error(existingError.message);
+    }
+    if (existing?.audit_session_id) {
+      const { data: sessionRow } = await supabase
+        .from("appliance_audit_sessions")
+        .select("status")
+        .eq("id", existing.audit_session_id)
+        .maybeSingle();
+      if (sessionRow && String(sessionRow.status) === "CLOSED") {
+        return NextResponse.json(
+          {
+            error:
+              "Closed physical audit observations cannot be deleted — evidence is preserved",
+          },
+          { status: 409 }
+        );
+      }
     }
 
     const { error } = await supabase

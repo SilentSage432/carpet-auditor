@@ -93,10 +93,10 @@ export function ApplianceAuditActionBar({
       onResetComplete();
       onStatus(
         preserved > 0
-          ? `Topstock reset — cleared ${deleted} scan(s), kept ${preserved} baseline showroom unit(s)`
+          ? `Ledger clear — removed ${deleted} unbound scan(s), preserved ${preserved} audit-bound/baseline row(s)`
           : deleted > 0
-            ? `Audit session reset — ${deleted} scan(s) cleared`
-            : "Audit session reset — ledger is empty"
+            ? `Ledger clear — ${deleted} unbound scan(s) cleared`
+            : "Ledger clear — nothing to remove (audit-bound rows preserved)"
       );
     } catch (err) {
       onStatus(
@@ -136,14 +136,14 @@ export function ApplianceAuditActionBar({
     <>
       <ConfirmModal
         open={resetStep === 1}
-        title="Reset appliance audit session?"
+        title="Clear appliance scan ledger?"
         message={
           baselineCount > 0
-            ? `Clears weekly boxed/topstock counts for store ${getStoreNumber()}. ${baselineCount} locked showroom baseline unit(s) stay until MST resets the floor.`
-            : `This permanently deletes ${scans.length} scan record(s) for store ${getStoreNumber()} and cannot be undone.`
+            ? `Deletes unbound non-baseline scan rows for store ${getStoreNumber()}. Audit-bound physical observations and locked showroom baseline units stay.`
+            : `Deletes unbound scan rows for store ${getStoreNumber()}. Scans linked to a physical audit are preserved.`
         }
         confirmLabel={
-          baselineCount > 0 ? "Reset topstock counts" : "Yes, reset audit"
+          baselineCount > 0 ? "Clear non-baseline scans" : "Yes, clear ledger"
         }
         danger
         onClose={() => setResetStep(0)}
@@ -189,7 +189,7 @@ export function ApplianceAuditActionBar({
             onClick={() => setResetStep(1)}
             className="col-span-2 flex min-h-11 items-center justify-center gap-1.5 rounded-xl border border-rose-500/40 bg-rose-950/30 px-2 text-xs font-bold text-rose-100 disabled:opacity-40 sm:col-span-1 sm:text-sm"
           >
-            {busy === "reset" ? "…" : "🗑️ Reset Audit Session"}
+            {busy === "reset" ? "…" : "🗑️ Clear scan ledger"}
           </button>
         </div>
 

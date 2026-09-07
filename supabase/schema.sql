@@ -446,6 +446,8 @@ alter table public.appliance_scans enable row level security;
 drop policy if exists "anon_all_appliance_catalog" on public.appliance_catalog;
 drop policy if exists "anon_all_appliance_scans" on public.appliance_scans;
 -- Appliance RLS owned by 20260817_rls_security_lockdown.sql (authenticated + store).
+-- Physical audit sessions + reconciliation snapshots:
+--   supabase/migrations/20260906_appliance_audit_sessions.sql
 
 -- P0 list-path composite indexes (see supabase/migrations/20260813_p0_query_indexes.sql)
 create index if not exists carpet_audits_store_created_at_idx
