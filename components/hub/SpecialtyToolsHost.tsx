@@ -10,6 +10,9 @@
  *
  * Durable appliance physical audit lives on `/?section=appliances`
  * (ApplianceAuditSection). More → Department Tools → Appliances navigates there.
+ *
+ * APP-AUD-002B: contextual / Floor opens never bind to an ACTIVE Physical Audit
+ * (ignoreCachedAuditSession). Membership is explicit on the Appliances home path only.
  */
 
 import dynamic from "next/dynamic";
@@ -127,6 +130,9 @@ export function SpecialtyToolsHost({ specialist, storeNumber }: Props) {
         activeSpecialist={specialist}
         scannerEnabled={scannerOpen}
         bayLocation={bayLocation}
+        // APP-AUD-002B: Floor/SIMS contextual scans stay unbound — never resume
+        // a cached Physical Audit session or inherit store ACTIVE membership.
+        ignoreCachedAuditSession
         onLogged={(record: ApplianceScan) => {
           void fetchApplianceScans().catch(() => undefined);
           void record;

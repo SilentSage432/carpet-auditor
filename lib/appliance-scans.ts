@@ -845,6 +845,13 @@ export async function updateApplianceScan(
         sub_category: next.sub_category ?? "",
         scanned_by: next.scanned_by,
         scanned_at: next.scanned_at,
+        // APP-AUD-002B: preserve capture-time membership (bound or null).
+        // Omitting audit_session_id on upsert must not erase an existing bind.
+        audit_session_id: next.audit_session_id ?? null,
+        location_id: next.location_id ?? null,
+        aisle: next.aisle ?? null,
+        bay_number: next.bay_number ?? null,
+        is_showroom_baseline: Boolean(next.is_showroom_baseline),
       },
       store
     );

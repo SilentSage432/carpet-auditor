@@ -3,7 +3,12 @@ import {
   applianceScansToCsv,
   mapApplianceScanRow,
 } from "@/lib/appliance-scans";
-import { mayBindScanToAuditSession } from "@/lib/appliances/physical-audit";
+import {
+  closedAuditFreezeViolationMessage,
+  closedAuditFrozenFieldChanges,
+  mayBindScanToAuditSession,
+  type ApplianceClosedFrozenScanField,
+} from "@/lib/appliances/physical-audit";
 import { storeNumberQueryValues } from "@/lib/store";
 import { actorBoundStoreNumber } from "@/lib/store-ops/appliance-store-scope";
 import {
@@ -170,12 +175,10 @@ export async function POST(request: Request) {
     const bayNumber = Number(body.bay_number);
     if (Number.isFinite(bayNumber)) payload.bay_number = Math.floor(bayNumber);
 
-    // Bind using observation time (APP-AUD-001 / APP-AUD-001A).
-    // ACTIVE: join freely. CLOSED: only if scanned_at is within the open window
-    // so legitimately queued offline scans survive close without accepting
-    // post-close observations into history.
+    // Explicit membership only (APP-AUD-002B). Omitted audit_session_id → unbound.
+    // Never infer the store's ACTIVE audit. When supplied: ACTIVE joins freely;
+    // CLOSED only if scanned_at is within the observation window (APP-AUD-001A).
     const requestedSession = String(body.audit_session_id ?? "").trim();
-    let auditSessionId: string | null = null;
     if (requestedSession) {
       const { data: sessionRow, error: sessionError } = await supabase
         .from("appliance_audit_sessions")
@@ -211,17 +214,8 @@ export async function POST(request: Request) {
       if (!bind.ok) {
         return NextResponse.json({ error: bind.reason }, { status: 409 });
       }
-      auditSessionId = String(sessionRow.id);
-    } else {
-      const { data: active } = await supabase
-        .from("appliance_audit_sessions")
-        .select("id")
-        .eq("store_number", store)
-        .eq("status", "ACTIVE")
-        .maybeSingle();
-      if (active?.id) auditSessionId = String(active.id);
+      payload.audit_session_id = String(sessionRow.id);
     }
-    if (auditSessionId) payload.audit_session_id = auditSessionId;
 
     console.log("[POST /api/appliances/scans] insert", payload);
 
@@ -360,6 +354,56 @@ export async function PATCH(request: Request) {
       );
     }
 
+    const { data: existing, error: existingError } = await supabase
+      .from("appliance_scans")
+      .select(
+        "id, audit_session_id, item_number, serial_number, scanned_at, location, location_id, aisle, bay_number, location_type"
+      )
+      .eq("id", id)
+      .eq("store_number", store)
+      .maybeSingle();
+    if (existingError) {
+      throw new Error(existingError.message);
+    }
+    if (!existing) {
+      return NextResponse.json({ error: "Scan not found" }, { status: 404 });
+    }
+
+    const sessionId = existing.audit_session_id
+      ? String(existing.audit_session_id)
+      : "";
+    if (sessionId) {
+      const { data: sessionRow } = await supabase
+        .from("appliance_audit_sessions")
+        .select("status")
+        .eq("id", sessionId)
+        .maybeSingle();
+      if (sessionRow && String(sessionRow.status) === "CLOSED") {
+        const proposed: Partial<
+          Record<ApplianceClosedFrozenScanField, unknown>
+        > = {};
+        for (const field of [
+          "serial_number",
+          "location",
+          "location_type",
+        ] as const) {
+          if (field in updates) {
+            proposed[field] = updates[field];
+          }
+        }
+        const changed = closedAuditFrozenFieldChanges(
+          existing as Partial<Record<ApplianceClosedFrozenScanField, unknown>>,
+          proposed
+        );
+        if (changed.length > 0) {
+          return NextResponse.json(
+            { error: closedAuditFreezeViolationMessage(changed) },
+            { status: 409 }
+          );
+        }
+      }
+    }
+
     const { data, error } = await supabase
       .from("appliance_scans")
       .update(updates)
@@ -370,6 +414,10 @@ export async function PATCH(request: Request) {
 
     if (error) {
       console.error("[PATCH /api/appliances/scans] failed", error);
+      const msg = error.message || "";
+      if (/closed physical audit evidence/i.test(msg)) {
+        return NextResponse.json({ error: msg }, { status: 409 });
+      }
       throw new Error(error.message);
     }
 

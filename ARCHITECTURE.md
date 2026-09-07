@@ -233,6 +233,8 @@ supabase/migrations/20260818_weekly_rotation_verification.sql → weekly_rotatio
 supabase/migrations/20260905_weekly_rotation_completion_attempts.sql → child attempt history (send-back preserves evidence; local until prod gate)
 supabase/migrations/20260818_store_location_workflow_type.sql → store_locations.workflow_type (STANDARD_MERCH | APPLIANCE_SIMS_AUDIT | BULK_PALLET_AUDIT)
 supabase/migrations/20260818_appliance_scans_bay_location.sql → appliance_scans.location_id / aisle / bay_number
+supabase/migrations/20260906_appliance_audit_sessions.sql → appliance_audit_sessions + recon snapshots + bind trigger
+supabase/migrations/20260907_appliance_scans_closed_evidence_freeze.sql → CLOSED audit-bound observation freeze (UPDATE; APP-AUD-002B)
 supabase/migrations/20260812_manager_notes.sql → durable manager_notes (store_number/department/author) + JWT RLS
 supabase/migrations/20260812_sunday_bay_assignments.sql → sunday specialist↔bay assignments + JWT RLS
 
@@ -315,6 +317,8 @@ supabase/migrations/20260812_sunday_bay_assignments.sql → sunday specialist↔
    - Continuous mode: barcode detect → immediate `POST /api/appliances/scans`; session total counter; new items pause on Quick-Add then auto-log
    - APP-UX-001: quiet known-UPC count; `ApplianceCatalogManageSheet` for intentional mapping edit; UPC conflict → 409
    - APP-AUD-001 / APP-AUD-001A: `appliance_audit_sessions` + reconciliation state rows (mutable upsert per item); Close flushes/blocks pending session scans; observation-time CLOSED bind; Clear ledger preserves audit-bound scans; declared Lowe's OH; derived variance
+   - APP-AUD-002A: CLOSED = physical count frozen (≠ recon complete); derived recon progress; recent CLOSED history
+   - APP-AUD-002B: explicit `audit_session_id` membership (omit = unbound); ad-hoc/Floor/SIMS unbound; CLOSED freezes WHAT/WHERE/WHEN/WHICH (API + DB trigger); soft classification fields remain mutable; catalog snapshot deferred
    - APP-FIELD-001: known COUNT local-first + sync queue; scanner Review/Finish; catalog `store_number` restore migration pending apply
    - Scan form is `ApplianceScanForm` (isolated from the accordion log)
    - SIMS bay workflow stamps `location_id` / aisle / bay when opened from Floor

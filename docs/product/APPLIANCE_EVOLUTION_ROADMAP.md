@@ -104,17 +104,19 @@ Still pending where noted: **real-hardware validation** for field-facing pieces.
 
 #### APP-AUD-002 — Audit Closure & History Lifecycle
 
-**Status:** Discovery complete; **APP-AUD-002A** Option A committed (real-hardware validation pending).
+**Status:** **APP-AUD-002A** Option A committed (real-hardware validation pending). **APP-AUD-002B** Option B implemented (migration pending apply; field validation pending).
 
 **Canonical meaning:** `CLOSED` = physical observation closed / physical count frozen. It does **not** mean reconciliation complete. Reconciliation progress is **derived** from existing Option B snapshot rows (mutable current state). No `RECONCILED` session status. No declaration-version history. No hard lock after reconciliation. No auto-delete of historical audits.
 
 **UX shipped in 002A:** two-phase lifecycle language; recent 3–5 CLOSED audits + View all; just-closed reconciliation banner; Start Physical Audit returns after close; export/email remain evidence-only (no lifecycle mutation).
 
-**Deferred — APP-AUD-002B Physical Evidence Freeze Hardening:**
+**APP-AUD-002B Physical Evidence Freeze Hardening (Option B):**
 
-- server auto-bind when an ACTIVE audit exists  
-- CLOSED audit-bound metadata PATCH restrictions  
-- catalog snapshot/version provenance  
+- Audit membership is **explicit**: omit `audit_session_id` → unbound (server does **not** auto-bind to store ACTIVE).
+- Canonical Physical Audit scanner supplies session id; ad-hoc and Floor/SIMS remain unbound.
+- CLOSED freezes authoritative WHAT/WHERE/WHEN/WHICH fields (API + DB trigger); soft classification fields stay mutable for APP-OBS-001.
+- Late in-window offline evidence (APP-AUD-001A) remains valid.
+- Catalog snapshot/version provenance remains deferred (presentation drift only).
 
 **Next after APP-AUD-002 closes:** APP-OBS-001.
 
@@ -185,7 +187,7 @@ No Gemini / external LLM required for **core** reasoning.
 
 | Item | Notes |
 |------|--------|
-| Floor SIMS → active physical-audit binding | Contextual opens remain unbound until explicit product decision |
+| Floor SIMS → active physical-audit binding | **Resolved by APP-AUD-002B:** contextual opens stay unbound (ignore cache; no server auto-bind). Revisit only with explicit product decision. |
 | More → Tools relabel / nav evolution | UX-NAV-001 kept More label; fifth tab deferred |
 | Global Gemini dependency review | Unrelated consumers (Snap Bay, walk parse, etc.) intact after APP-QA-001 |
 | Declaration-version history for reconciliation | Option B is current-state; immutable OH history not promised |

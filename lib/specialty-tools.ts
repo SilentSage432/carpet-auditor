@@ -7,6 +7,7 @@
  *   Flooring cycle audit). Do not use requestApplianceScanner() as the More primary.
  * - SpecialtyToolsHost + requestApplianceScanner remain for contextual / ad-hoc /
  *   Floor SIMS launches only — not the durable physical-audit product path.
+ *   APP-AUD-002B: these opens stay unbound (ignoreCachedAuditSession; no server auto-bind).
  */
 
 import { canAccessSection } from "@/lib/rbac";

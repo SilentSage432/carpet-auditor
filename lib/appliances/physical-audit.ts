@@ -48,11 +48,76 @@ export type ApplianceReconciliationSnapshot = {
 };
 
 /**
+ * Authoritative WHAT / WHERE / WHEN / WHICH fields for a CLOSED physical audit.
+ * Soft classification (condition_tag, category, sub_category, scanned_by,
+ * is_showroom_baseline) remains mutable so APP-OBS-001 can extend later.
+ */
+export const APPLIANCE_CLOSED_FROZEN_SCAN_FIELDS = [
+  "item_number",
+  "serial_number",
+  "scanned_at",
+  "audit_session_id",
+  "location",
+  "location_id",
+  "aisle",
+  "bay_number",
+  "location_type",
+] as const;
+
+export type ApplianceClosedFrozenScanField =
+  (typeof APPLIANCE_CLOSED_FROZEN_SCAN_FIELDS)[number];
+
+function normalizeFrozenCompareValue(
+  field: ApplianceClosedFrozenScanField,
+  raw: unknown
+): string {
+  if (field === "bay_number") {
+    if (raw == null || raw === "") return "";
+    const n = Number(raw);
+    return Number.isFinite(n) ? String(Math.floor(n)) : "";
+  }
+  if (field === "location_type") {
+    return String(raw ?? "showroom").trim().toLowerCase() || "showroom";
+  }
+  if (field === "scanned_at") {
+    const parsed = Date.parse(String(raw ?? ""));
+    return Number.isFinite(parsed) ? new Date(parsed).toISOString() : String(raw ?? "").trim();
+  }
+  return String(raw ?? "").trim();
+}
+
+/**
+ * Returns protected field names that would change between existing and proposed.
+ * Idempotent upserts (same values) yield [].
+ */
+export function closedAuditFrozenFieldChanges(
+  existing: Partial<Record<ApplianceClosedFrozenScanField, unknown>>,
+  proposed: Partial<Record<ApplianceClosedFrozenScanField, unknown>>
+): ApplianceClosedFrozenScanField[] {
+  const changed: ApplianceClosedFrozenScanField[] = [];
+  for (const field of APPLIANCE_CLOSED_FROZEN_SCAN_FIELDS) {
+    if (!(field in proposed)) continue;
+    const before = normalizeFrozenCompareValue(field, existing[field]);
+    const after = normalizeFrozenCompareValue(field, proposed[field]);
+    if (before !== after) changed.push(field);
+  }
+  return changed;
+}
+
+export function closedAuditFreezeViolationMessage(
+  fields: readonly string[]
+): string {
+  const list = fields.join(", ");
+  return `Closed physical audit evidence cannot change (${list}) — start a correction workflow in a future tranche`;
+}
+
+/**
  * Observation-time vs replay-time bind rule.
- * ACTIVE: any new observation may join.
+ * ACTIVE: any new observation may join when explicitly declared.
  * CLOSED: only observations captured while the audit was open
  * (scanned_at within [started_at, closed_at]) may attach — preserves
  * legitimately queued offline scans without accepting post-close joins.
+ * Membership is never inferred from store ACTIVE presence alone (APP-AUD-002B).
  */
 export function mayBindScanToAuditSession(input: {
   status: string;

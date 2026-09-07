@@ -1,5 +1,14 @@
 # DeptSync Hub — Development Journal
 
+## 2026-09-07 — APP-AUD-002B Physical evidence freeze hardening
+- Option B: explicit audit membership (omit `audit_session_id` → unbound; removed server ACTIVE auto-bind).
+- Ad-hoc + Floor/SIMS (`SpecialtyToolsHost` `ignoreCachedAuditSession`) remain outside Physical Audit lifecycle.
+- CLOSED freezes WHAT/WHERE/WHEN/WHICH (item/serial/scanned_at/session/location/location_id/aisle/bay/location_type) at API + DB trigger; soft fields (condition/category/scanned_by/baseline) stay mutable for APP-OBS-001.
+- Offline update upserts retain `audit_session_id`; late in-window offline bind (001A) unchanged.
+- Migration: `supabase/migrations/20260907_appliance_scans_closed_evidence_freeze.sql` (**not applied this tranche**).
+- Catalog snapshot provenance deferred (presentation drift only).
+- Status: **APP-AUD-002B IMPLEMENTED — AWAITING COMMIT / MIGRATION APPLY / REAL-HARDWARE VALIDATION**
+
 ## 2026-09-07 — APP-AUD-002A Audit lifecycle clarity & recent history
 - Option A: CLOSED = physical observation closed / count frozen; not reconciliation complete.
 - Derived recon progress from Option B snapshot rows (OH / variance / outcomes); phases awaiting / in progress / entered.

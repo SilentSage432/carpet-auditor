@@ -23,11 +23,12 @@ describe("APP-AUD-001 appliance physical audit contracts", () => {
     expect(sql).not.toMatch(/shrink|theft|zebra.?api/i);
   });
 
-  it("scan API binds by observation time (ACTIVE free; CLOSED windowed)", () => {
+  it("scan API binds only when audit_session_id is explicit (ACTIVE free; CLOSED windowed)", () => {
     const route = readRepo("app/api/appliances/scans/route.ts");
     expect(route).toContain("appliance_audit_sessions");
     expect(route).toContain("mayBindScanToAuditSession");
-    expect(route).toContain('status", "ACTIVE"');
+    expect(route).toContain("Explicit membership only");
+    expect(route).not.toMatch(/else \{\s*const \{ data: active \}/);
   });
 
   it("reconcile derives variance server-side and rejects physical overwrite", () => {
