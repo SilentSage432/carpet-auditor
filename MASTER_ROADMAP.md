@@ -1,8 +1,8 @@
 # DeptSync Hub — Master Roadmap
 
 ## Done
-- [x] APP-AUD-001 Appliance physical audit & reconciliation foundation — sessions, scan linkage, declared OH state, derived variance, history/reconcile UX (**COMMITTED — PRODUCTION MIGRATION PENDING**; apply `20260906_appliance_audit_sessions.sql`)
-- [x] APP-AUD-001A Evidence integrity verification — late offline vs close, Option B recon terminology, clear-ledger protection (**INCLUDED IN APP-AUD-001 COMMIT**)
+- [x] APP-AUD-001 Appliance physical audit & reconciliation foundation — sessions, scan linkage, declared OH state, derived variance, history/reconcile UX (**PRODUCTION LIVE**; `20260906_appliance_audit_sessions.sql` applied + verified)
+- [x] APP-AUD-001A Evidence integrity verification — late offline vs close, Option B recon terminology, clear-ledger protection (**INCLUDED + LIVE**)
 - [x] APP-UX-001 Appliance Teach & Catalog Recovery — Manage mappings sheet + quiet known-UPC scan + Quick-Add teach + UPC conflict guard (**COMMITTED** `0821e70`)
 - [x] TOPO-UX-001 Continuous department mapping — manual Bulk Generator session stays open; aisle clears; defaults retained; upsert-safe saved copy (**COMMITTED — READY FOR SAMSUNG ACCEPTANCE**; deferred RBAC-TOPO-001)
 - [x] UX-004C.1 Executive Floor Pad handoff — durable `?open=executive-floor-pad` + Floor intent bridge consume-once (**COMMITTED — READY FOR SAMSUNG ACCEPTANCE**)
