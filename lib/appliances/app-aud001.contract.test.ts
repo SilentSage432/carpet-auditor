@@ -45,7 +45,7 @@ describe("APP-AUD-001 appliance physical audit contracts", () => {
     const panel = readRepo(
       "components/appliances/AppliancePhysicalAuditPanel.tsx"
     );
-    expect(panel).toContain("Start physical audit");
+    expect(panel).toContain("Start Physical Audit");
     expect(panel).toContain("Close physical count");
     expect(panel).toContain("Reconcile with Lowe");
     expect(panel).toContain("Physical count");

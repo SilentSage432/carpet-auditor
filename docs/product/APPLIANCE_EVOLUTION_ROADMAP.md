@@ -92,8 +92,9 @@ Do not allow new ideas to silently become the next implementation tranche.
 | ID | Name | Role |
 |----|------|------|
 | **APP-AUD-001** (+001A) | Durable physical audit & reconciliation foundation | Sessions, observation bind, close flush/block, DS-declared Lowe’s OH, derived variance, Option B recon state, evidence integrity |
-| **APP-FIELD-001** / **001B** | Rapid-fire + teach repair + audit entry/exit | Local-first known COUNT; catalog `store_number`; Start/Continue primary; ad-hoc secondary; Review / Finish |
+| **APP-FIELD-001** / **001B** | Rapid-fire + teach repair + audit entry/exit | Local-first known COUNT; catalog `store_number`; panel-owned Start/Continue; ad-hoc secondary (UX-005A); Review / Finish |
 | **UX-NAV-001** | Specialty operational home | More → Department Tools → Appliances → audit-aware home (not bare scanner) |
+| **UX-005A** | Appliances operational home simplification | One physical-audit spine; secondary tools demoted (not deleted); no schema/semantics change; real-hardware acceptance pending. Program remainder: [`UX005_OPERATIONAL_SIMPLICITY_BACKLOG.md`](./UX005_OPERATIONAL_SIMPLICITY_BACKLOG.md) |
 | **APP-QA-001** | Surface reliability | Share/export repair; Gemini Scan Anomaly Detection removed from Appliances |
 
 Still pending where noted: **real-hardware validation** for field-facing pieces.

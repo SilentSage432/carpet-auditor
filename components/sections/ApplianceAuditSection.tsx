@@ -12,13 +12,9 @@ import { AppliancePhysicalAuditPanel } from "@/components/appliances/AppliancePh
 import { ApplianceScannerModal } from "@/components/appliances/ApplianceScannerModal";
 import { ApplianceScanEditModal } from "@/components/appliances/ApplianceScanEditModal";
 import { ConfirmModal } from "@/components/hub/ConfirmModal";
-import { DepartmentIcon } from "@/components/hub/NavIcons";
 import { LocationStatusIcon } from "@/components/hub/StatusPills";
 import type { ApplianceAuditSession } from "@/lib/appliances/physical-audit";
-import {
-  fetchApplianceAuditSessions,
-  startAppliancePhysicalAudit,
-} from "@/lib/appliances/audit-client";
+import { fetchApplianceAuditSessions } from "@/lib/appliances/audit-client";
 import {
   aggregateApplianceScans,
   applianceCategoryEmoji,
@@ -79,7 +75,8 @@ export function ApplianceAuditSection({
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
   const [statusTone, setStatusTone] = useState<"ok" | "error">("ok");
   const [loaded, setLoaded] = useState(false);
-  const [summaryExpanded, setSummaryExpanded] = useState(false);
+  const [moreToolsOpen, setMoreToolsOpen] = useState(false);
+  const [scanLogOpen, setScanLogOpen] = useState(false);
   const [logFilter, setLogFilter] =
     useState<ApplianceScanLogFilterId>("all");
   const [logQuery, setLogQuery] = useState("");
@@ -105,7 +102,6 @@ export function ApplianceAuditSection({
   const [activeAudit, setActiveAudit] =
     useState<ApplianceAuditSession | null>(null);
   const [reviewFinishToken, setReviewFinishToken] = useState(0);
-  const [auditEntryBusy, setAuditEntryBusy] = useState(false);
   /** When 'adhoc', scanner must not bind to / show durable physical audit. */
   const [scannerAuditMode, setScannerAuditMode] = useState<"audit" | "adhoc">(
     "audit"
@@ -243,34 +239,6 @@ export function ApplianceAuditSection({
     setScannerOpen(true);
   }, []);
 
-  const handleStartPhysicalAudit = useCallback(async () => {
-    setAuditEntryBusy(true);
-    try {
-      const existing = await fetchApplianceAuditSessions({ status: "ACTIVE" });
-      if (existing[0]) {
-        setActiveAudit(existing[0]);
-        setScannerAuditMode("audit");
-        setBayLocation(null);
-        setScannerOpen(true);
-        flashStatus("Resumed active physical audit — scan to continue");
-        return;
-      }
-      const { session } = await startAppliancePhysicalAudit();
-      setActiveAudit(session);
-      setScannerAuditMode("audit");
-      setBayLocation(null);
-      setScannerOpen(true);
-      flashStatus("Physical audit started — scan appliances, then Finish count");
-    } catch (err) {
-      flashStatus(
-        err instanceof Error ? err.message : "Could not start physical audit",
-        "error"
-      );
-    } finally {
-      setAuditEntryBusy(false);
-    }
-  }, [flashStatus]);
-
   const handleAdHocScan = useCallback(() => {
     setBayLocation(null);
     setScannerAuditMode("adhoc");
@@ -406,11 +374,15 @@ export function ApplianceAuditSection({
   const exportScans = shiftScans.length > 0 ? shiftScans : scans;
 
   return (
-    <div className="space-y-4 overflow-x-hidden pb-4">
+    <div
+      className="space-y-3 overflow-x-hidden pb-4"
+      data-testid="appliance-audit-section"
+    >
       <AppliancePhysicalAuditPanel
         onActiveSessionChange={setActiveAudit}
         onStatus={(msg, tone = "ok") => flashStatus(msg, tone)}
         reviewFinishToken={reviewFinishToken}
+        onContinueScanning={() => void openScannerWithActiveAudit()}
         onStarted={(session) => {
           setActiveAudit(session);
           setScannerAuditMode("audit");
@@ -419,82 +391,105 @@ export function ApplianceAuditSection({
         }}
       />
 
-      <ApplianceAuditActionBar
-        scans={exportScans}
-        csvOptions={{ descriptions: catalogDescriptions }}
-        disabled={!loaded}
-        onResetComplete={() => {
-          void fetchApplianceScans().then(setScans).catch(() => setScans([]));
-        }}
-        onRefresh={() => {
-          void fetchApplianceScans().then(setScans).catch(() => undefined);
-        }}
-        onStatus={(msg, tone = "ok") => flashStatus(msg, tone)}
-      />
+      {statusMsg ? (
+        <p
+          role="status"
+          className={`rounded-xl border px-3 py-2 text-center text-sm font-medium ${
+            statusTone === "error"
+              ? "border-red-500/40 bg-red-950/50 text-red-200"
+              : "border-emerald-500/30 bg-emerald-950/50 text-emerald-200"
+          }`}
+        >
+          {statusMsg}
+        </p>
+      ) : null}
 
-      <ApplianceScanEditModal
-        open={editingGroup != null}
-        group={editingGroup}
-        saving={editSaving}
-        onClose={() => {
-          if (!editSaving) setEditingGroup(null);
-        }}
-        onSave={(input) => void handleSaveGroupEdit(input)}
-      />
+      <p
+        className="px-1 font-mono text-[11px] text-slate-500"
+        data-testid="appliance-scanned-today-summary"
+      >
+        {loaded ? shiftScans.length : "—"} scanned today
+      </p>
 
-      <ConfirmModal
-        open={pendingDeleteGroup != null}
-        title={`Delete Item ${pendingDeleteGroup?.item_number ?? ""}?`}
-        message={`This removes all ${pendingDeleteGroup?.quantity ?? 0} scanned unit(s) for this SKU from the log.`}
-        confirmLabel="Delete all"
-        danger
-        onClose={() => setPendingDeleteGroup(null)}
-        onConfirm={() => void confirmDeleteGroup()}
-      />
-
-      <div className="space-y-2">
-        {activeAudit ? (
-          <button
-            type="button"
-            disabled={auditEntryBusy}
-            onClick={() => void openScannerWithActiveAudit()}
-            className="btn-primary-glow flex min-h-12 w-full items-center justify-center gap-2 rounded-xl px-4 text-sm font-bold disabled:opacity-50"
-          >
-            <span aria-hidden>📷</span>
-            Continue Physical Audit
-          </button>
-        ) : (
-          <button
-            type="button"
-            disabled={auditEntryBusy}
-            onClick={() => void handleStartPhysicalAudit()}
-            className="btn-primary-glow flex min-h-12 w-full items-center justify-center gap-2 rounded-xl px-4 text-sm font-bold disabled:opacity-50"
-          >
-            <span aria-hidden>📋</span>
-            {auditEntryBusy ? "Starting…" : "Start Physical Audit"}
-          </button>
-        )}
+      <section
+        className="overflow-hidden rounded-xl border border-slate-800/80 bg-slate-950/40"
+        data-testid="more-appliance-tools"
+      >
         <button
           type="button"
-          disabled={auditEntryBusy}
-          onClick={handleAdHocScan}
-          className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-slate-700 bg-slate-950/60 px-4 text-xs font-semibold text-slate-300 disabled:opacity-50"
+          aria-expanded={moreToolsOpen}
+          onClick={() => setMoreToolsOpen((v) => !v)}
+          className="flex min-h-11 w-full items-center justify-between gap-2 px-3 py-2 text-left"
         >
-          Ad-hoc scan (no audit)
+          <span>
+            <span className="block text-sm font-semibold text-slate-300">
+              More appliance tools
+            </span>
+            <span className="block font-mono text-[10px] uppercase tracking-wide text-slate-600">
+              Ad-hoc · mappings · export · ledger
+            </span>
+          </span>
+          <span className="shrink-0 text-xs font-semibold text-slate-500">
+            {moreToolsOpen ? "Hide ▴" : "Show ▾"}
+          </span>
         </button>
-        <p className="text-center text-[11px] text-slate-500">
-          Physical Audit preserves a durable count you can close and reconcile.
-          Ad-hoc scan only adds to the local ledger.
-        </p>
-      </div>
+        {moreToolsOpen ? (
+          <div className="space-y-3 border-t border-slate-800 px-3 py-3">
+            <button
+              type="button"
+              onClick={handleAdHocScan}
+              data-testid="adhoc-appliance-scan"
+              className="flex min-h-11 w-full items-center justify-center rounded-xl border border-slate-700 bg-slate-950/60 px-4 text-xs font-semibold text-slate-300"
+            >
+              Ad-hoc scan (no audit)
+            </button>
+            <p className="text-center text-[11px] leading-snug text-slate-500">
+              Ad-hoc scan adds to the local ledger only — it is not part of a
+              durable physical count.
+            </p>
 
-      <button
-        type="button"
-        onClick={() => setManageOpen(true)}
-        className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-emerald-500/40 bg-emerald-950/25 px-4 text-sm font-semibold text-emerald-100"
-      >
-        Manage appliance mappings
-      </button>
+            <button
+              type="button"
+              onClick={() => setManageOpen(true)}
+              data-testid="manage-appliance-mappings"
+              className="flex min-h-11 w-full items-center justify-center rounded-xl border border-emerald-500/35 bg-emerald-950/20 px-4 text-sm font-semibold text-emerald-100"
+            >
+              Manage appliance mappings
+            </button>
+
+            <ApplianceAuditActionBar
+              scans={exportScans}
+              csvOptions={{ descriptions: catalogDescriptions }}
+              disabled={!loaded}
+              onResetComplete={() => {
+                void fetchApplianceScans()
+                  .then(setScans)
+                  .catch(() => setScans([]));
+              }}
+              onRefresh={() => {
+                void fetchApplianceScans()
+                  .then(setScans)
+                  .catch(() => undefined);
+              }}
+              onStatus={(msg, tone = "ok") => flashStatus(msg, tone)}
+            />
+
+            <button
+              type="button"
+              aria-expanded={scanLogOpen}
+              onClick={() => setScanLogOpen((v) => !v)}
+              data-testid="view-appliance-scans"
+              className="flex min-h-11 w-full items-center justify-between gap-2 rounded-xl border border-slate-700 bg-slate-950/50 px-3 text-sm font-semibold text-slate-200"
+            >
+              <span>View scan log</span>
+              <span className="font-mono text-[11px] font-medium text-slate-500">
+                {loaded ? `${scans.length} total` : "…"}
+                {scanLogOpen ? " · Hide ▴" : " · Show ▾"}
+              </span>
+            </button>
+          </div>
+        ) : null}
+      </section>
 
       <ApplianceCatalogManageSheet
         open={manageOpen}
@@ -527,395 +522,354 @@ export function ApplianceAuditSection({
         onLogged={handleLogged}
       />
 
-      <section
-        aria-label="Appliance shift summary"
-        className="overflow-x-auto glass-card shadow-lg shadow-black/20"
-      >
-        <button
-          type="button"
-          onClick={() => setSummaryExpanded((v) => !v)}
-          aria-expanded={summaryExpanded}
-          className="flex min-h-12 w-full items-center gap-2 px-3 py-2 text-left"
+      <ApplianceScanEditModal
+        open={editingGroup != null}
+        group={editingGroup}
+        saving={editSaving}
+        onClose={() => {
+          if (!editSaving) setEditingGroup(null);
+        }}
+        onSave={(input) => void handleSaveGroupEdit(input)}
+      />
+
+      <ConfirmModal
+        open={pendingDeleteGroup != null}
+        title={`Delete Item ${pendingDeleteGroup?.item_number ?? ""}?`}
+        message={`This removes all ${pendingDeleteGroup?.quantity ?? 0} scanned unit(s) for this SKU from the log.`}
+        confirmLabel="Delete all"
+        danger
+        onClose={() => setPendingDeleteGroup(null)}
+        onConfirm={() => void confirmDeleteGroup()}
+      />
+
+      {scanLogOpen ? (
+        <section
+          className="overflow-x-hidden rounded-xl border border-slate-800/80 bg-slate-950/30 p-3"
+          aria-label="Appliance scan log"
+          data-testid="appliance-scan-log"
         >
-          <span className="flex min-w-0 flex-1 items-center gap-2 truncate font-mono text-xs font-semibold tabular-nums text-slate-200 sm:text-sm">
-            <DepartmentIcon
-              department="appliances"
-              className="h-4 w-4 shrink-0 text-accent"
-            />
-            {loaded ? shiftScans.length : "—"} Scanned today
-          </span>
-          <span className="shrink-0 text-xs font-semibold text-emerald-400">
-            {summaryExpanded ? "Collapse ▴" : "Expand ▾"}
-          </span>
-        </button>
-        {summaryExpanded ? (
-          <div className="space-y-3 border-t border-slate-800 p-4">
-            <div className="rounded-xl border border-slate-800 bg-slate-950/70 p-3">
-              <p className="text-[10px] font-medium uppercase tracking-wide text-slate-400">
-                Entries today
-              </p>
-              <p className="mt-1 font-mono text-2xl font-semibold tabular-nums text-slate-50">
-                {loaded ? shiftScans.length : "—"}
-              </p>
-            </div>
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <h2 className="glass-subtitle">Scan log</h2>
             <button
               type="button"
               onClick={handleDownloadCsv}
               disabled={!loaded || scans.length === 0}
-              className="flex h-12 w-full items-center justify-center rounded-xl border border-sky-500/40 bg-sky-950/40 px-3 text-sm font-bold text-sky-200 active:scale-[0.98] disabled:opacity-40"
+              className="flex min-h-10 items-center justify-center rounded-xl border border-sky-500/40 bg-sky-950/40 px-3 text-xs font-bold text-sky-200 disabled:opacity-40"
             >
               Download CSV Inventory
             </button>
           </div>
-        ) : null}
-      </section>
 
-      {statusMsg ? (
-        <p
-          role="status"
-          className={`rounded-xl border px-3 py-2 text-center text-sm font-medium ${
-            statusTone === "error"
-              ? "border-red-500/40 bg-red-950/50 text-red-200"
-              : "border-emerald-500/30 bg-emerald-950/50 text-emerald-200"
-          }`}
-        >
-          {statusMsg}
-        </p>
-      ) : null}
-
-      <section className="overflow-x-hidden" aria-label="Appliance scan log">
-        <div className="mb-3 flex items-baseline justify-between gap-2 px-1">
-          <h2 className="glass-subtitle">
-            Scan log
-          </h2>
-          {logFilter === "all" ? (
-            <span className="font-mono text-xs text-slate-500">
-              Showing All · {aggregated.length} SKU
-              {aggregated.length === 1 ? "" : "s"}
-            </span>
-          ) : (
-            <span className="font-mono text-xs text-slate-500">
-              {aggregated.length} SKU · {filteredScans.length} units
-            </span>
-          )}
-        </div>
-
-        {/* Static filter header — no sticky/absolute overlap with cards */}
-        <div className="relative z-10 mb-4 flex w-full flex-col gap-3">
-          <div className="no-scrollbar flex gap-2 overflow-x-auto pb-1">
-            {APPLIANCE_SCAN_LOG_FILTERS.map((chip) => {
-              const active = logFilter === chip.id;
-              return (
-                <button
-                  key={chip.id}
-                  type="button"
-                  onClick={() => setLogFilter(chip.id)}
-                  className={`shrink-0 rounded-lg border px-3 py-2 text-[11px] font-semibold transition ${
-                    active
-                      ? "border-emerald-500/50 bg-emerald-950/40 text-emerald-300 ring-1 ring-emerald-500/30"
-                      : "border-slate-700 bg-slate-900 text-slate-400 active:bg-slate-800"
-                  }`}
-                >
-                  {chip.label}
-                </button>
-              );
-            })}
+          <div className="relative z-10 mb-4 flex w-full flex-col gap-3">
+            <div className="no-scrollbar flex gap-2 overflow-x-auto pb-1">
+              {APPLIANCE_SCAN_LOG_FILTERS.map((chip) => {
+                const active = logFilter === chip.id;
+                return (
+                  <button
+                    key={chip.id}
+                    type="button"
+                    onClick={() => setLogFilter(chip.id)}
+                    className={`shrink-0 rounded-lg border px-3 py-2 text-[11px] font-semibold transition ${
+                      active
+                        ? "border-emerald-500/50 bg-emerald-950/40 text-emerald-300 ring-1 ring-emerald-500/30"
+                        : "border-slate-700 bg-slate-900 text-slate-400 active:bg-slate-800"
+                    }`}
+                  >
+                    {chip.label}
+                  </button>
+                );
+              })}
+            </div>
+            <label className="block w-full">
+              <span className="sr-only">Quick search</span>
+              <input
+                type="search"
+                value={logQuery}
+                onChange={(e) => setLogQuery(e.target.value)}
+                placeholder="Filter by SKU or Location..."
+                className="w-full rounded-xl border border-slate-700 bg-slate-900 p-3 text-sm text-slate-100 outline-none placeholder:text-slate-500 focus:border-emerald-500"
+              />
+            </label>
           </div>
-          <label className="block w-full">
-            <span className="sr-only">Quick search</span>
-            <input
-              type="search"
-              value={logQuery}
-              onChange={(e) => setLogQuery(e.target.value)}
-              placeholder="Filter by SKU or Location..."
-              className="w-full rounded-xl border border-slate-700 bg-slate-900 p-3 text-sm text-slate-100 outline-none placeholder:text-slate-500 focus:border-emerald-500"
-            />
-          </label>
-        </div>
 
-        <div className="mt-2 space-y-2">
-        {!loaded ? (
-          <p className="glass-card border-dashed px-4 py-6 text-center text-sm text-zinc-400">
-            Loading scans…
-          </p>
-        ) : null}
+          <div className="mt-2 space-y-2">
+            {!loaded ? (
+              <p className="glass-card border-dashed px-4 py-6 text-center text-sm text-zinc-400">
+                Loading scans…
+              </p>
+            ) : null}
 
-        {loaded && scans.length === 0 ? (
-          <p className="glass-card border-dashed px-4 py-8 text-center text-sm text-zinc-400">
-            No appliance scans yet — scan a barcode to start.
-          </p>
-        ) : null}
+            {loaded && scans.length === 0 ? (
+              <p className="glass-card border-dashed px-4 py-8 text-center text-sm text-zinc-400">
+                No appliance scans yet — start a physical audit to count.
+              </p>
+            ) : null}
 
-        {loaded && scans.length > 0 && categoryAccordions.length === 0 ? (
-          <p className="glass-card border-dashed px-4 py-8 text-center text-sm text-zinc-400">
-            No scans match this filter.
-          </p>
-        ) : null}
+            {loaded && scans.length > 0 && categoryAccordions.length === 0 ? (
+              <p className="glass-card border-dashed px-4 py-8 text-center text-sm text-zinc-400">
+                No scans match this filter.
+              </p>
+            ) : null}
 
-        <ul className="space-y-2">
-          {categoryAccordions.map((accordion) => {
-            const categoryOpen = expandedCategories.has(accordion.category);
-            const page = categoryPages[accordion.category] ?? 0;
-            const pageCount = Math.max(
-              1,
-              Math.ceil(accordion.items.length / APPLIANCE_SCAN_LOG_PAGE_SIZE)
-            );
-            const safePage = Math.min(page, pageCount - 1);
-            const pageStart = safePage * APPLIANCE_SCAN_LOG_PAGE_SIZE;
-            const pageItems = accordion.items.slice(
-              pageStart,
-              pageStart + APPLIANCE_SCAN_LOG_PAGE_SIZE
-            );
-            const subSummary = accordion.subGroups
-              .map((g) => g.sub_category)
-              .slice(0, 3)
-              .join(" · ");
+            <ul className="space-y-2">
+              {categoryAccordions.map((accordion) => {
+                const categoryOpen = expandedCategories.has(accordion.category);
+                const page = categoryPages[accordion.category] ?? 0;
+                const pageCount = Math.max(
+                  1,
+                  Math.ceil(
+                    accordion.items.length / APPLIANCE_SCAN_LOG_PAGE_SIZE
+                  )
+                );
+                const safePage = Math.min(page, pageCount - 1);
+                const pageStart = safePage * APPLIANCE_SCAN_LOG_PAGE_SIZE;
+                const pageItems = accordion.items.slice(
+                  pageStart,
+                  pageStart + APPLIANCE_SCAN_LOG_PAGE_SIZE
+                );
+                const subSummary = accordion.subGroups
+                  .map((g) => g.sub_category)
+                  .slice(0, 3)
+                  .join(" · ");
 
-            return (
-              <li
-                key={accordion.category}
-                className="glass-card rounded-2xl"
-              >
-                <button
-                  type="button"
-                  aria-expanded={categoryOpen}
-                  onClick={() => toggleCategory(accordion.category)}
-                  className="flex min-h-14 w-full items-center gap-3 px-3 py-3 text-left"
-                >
-                  <span className="min-w-0 flex-1">
-                    <span className="block text-base font-bold text-slate-50">
-                      {applianceCategoryEmoji(accordion.category)}{" "}
-                      {accordion.category}{" "}
-                      <span className="font-semibold text-emerald-300">
-                        — {accordion.unitCount} unit
-                        {accordion.unitCount === 1 ? "" : "s"}
+                return (
+                  <li key={accordion.category} className="glass-card rounded-2xl">
+                    <button
+                      type="button"
+                      aria-expanded={categoryOpen}
+                      onClick={() => toggleCategory(accordion.category)}
+                      className="flex min-h-14 w-full items-center gap-3 px-3 py-3 text-left"
+                    >
+                      <span className="min-w-0 flex-1">
+                        <span className="block text-base font-bold text-slate-50">
+                          {applianceCategoryEmoji(accordion.category)}{" "}
+                          {accordion.category}{" "}
+                          <span className="font-semibold text-emerald-300">
+                            — {accordion.unitCount} unit
+                            {accordion.unitCount === 1 ? "" : "s"}
+                          </span>
+                        </span>
+                        <span className="mt-0.5 block truncate text-xs text-slate-500">
+                          {accordion.skuCount} SKU
+                          {accordion.skuCount === 1 ? "" : "s"}
+                          {subSummary ? ` · ${subSummary}` : ""}
+                          {accordion.subGroups.length > 3
+                            ? ` +${accordion.subGroups.length - 3}`
+                            : ""}
+                        </span>
                       </span>
-                    </span>
-                    <span className="mt-0.5 block truncate text-xs text-slate-500">
-                      {accordion.skuCount} SKU
-                      {accordion.skuCount === 1 ? "" : "s"}
-                      {subSummary ? ` · ${subSummary}` : ""}
-                      {accordion.subGroups.length > 3
-                        ? ` +${accordion.subGroups.length - 3}`
-                        : ""}
-                    </span>
-                  </span>
-                  <span className="shrink-0 text-xs font-semibold text-emerald-400">
-                    {categoryOpen ? "Collapse ▴" : "Expand ▾"}
-                  </span>
-                </button>
+                      <span className="shrink-0 text-xs font-semibold text-emerald-400">
+                        {categoryOpen ? "Collapse ▴" : "Expand ▾"}
+                      </span>
+                    </button>
 
-                {categoryOpen ? (
-                  <div className="space-y-3 border-t border-slate-800 px-3 pb-3 pt-2">
-                    {accordion.subGroups.map((sub) => {
-                      const subItems = pageItems.filter(
-                        (item) =>
-                          (String(item.sub_category ?? "").trim() ||
-                            "Unspecified") === sub.sub_category
-                      );
-                      if (subItems.length === 0) return null;
-                      return (
-                        <div key={sub.sub_category} className="space-y-2">
-                          <p className="px-0.5 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-                            {sub.sub_category}{" "}
-                            <span className="font-mono normal-case text-slate-500">
-                              · {sub.unitCount} unit
-                              {sub.unitCount === 1 ? "" : "s"}
-                            </span>
-                          </p>
-                          <ul className="space-y-2">
-                            {subItems.map((group) => {
-                              const expanded = expandedItems.has(
-                                group.item_number
-                              );
-                              return (
-                                <li
-                                  key={group.item_number}
-                                  className="rounded-xl border border-slate-800 bg-slate-950/70"
-                                >
-                                  <div className="flex gap-2 p-3">
-                                    <button
-                                      type="button"
-                                      onClick={() =>
-                                        toggleExpanded(group.item_number)
-                                      }
-                                      aria-expanded={expanded}
-                                      className="min-w-0 flex-1 space-y-1 text-left"
+                    {categoryOpen ? (
+                      <div className="space-y-3 border-t border-slate-800 px-3 pb-3 pt-2">
+                        {accordion.subGroups.map((sub) => {
+                          const subItems = pageItems.filter(
+                            (item) =>
+                              (String(item.sub_category ?? "").trim() ||
+                                "Unspecified") === sub.sub_category
+                          );
+                          if (subItems.length === 0) return null;
+                          return (
+                            <div key={sub.sub_category} className="space-y-2">
+                              <p className="px-0.5 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+                                {sub.sub_category}{" "}
+                                <span className="font-mono normal-case text-slate-500">
+                                  · {sub.unitCount} unit
+                                  {sub.unitCount === 1 ? "" : "s"}
+                                </span>
+                              </p>
+                              <ul className="space-y-2">
+                                {subItems.map((group) => {
+                                  const expanded = expandedItems.has(
+                                    group.item_number
+                                  );
+                                  return (
+                                    <li
+                                      key={group.item_number}
+                                      className="rounded-xl border border-slate-800 bg-slate-950/70"
                                     >
-                                      <div className="flex flex-wrap items-center gap-2">
-                                        <span className="font-mono text-base font-bold tracking-tight tabular-nums text-slate-50">
-                                          Item {group.item_number}
-                                        </span>
-                                        {group.hasOffline ? (
-                                          <span className="rounded bg-orange-500/20 px-2 py-0.5 text-[10px] font-bold uppercase text-orange-300">
-                                            Offline
-                                          </span>
-                                        ) : null}
-                                      </div>
-                                      <ApplianceGroupCountSummary
-                                        scans={group.scans}
-                                        className="mt-1"
-                                      />
-                                      {(() => {
-                                        const showroomScan = group.scans.find(
-                                          (s) => isApplianceShowroomDisplayScan(s)
-                                        );
-                                        if (!showroomScan) return null;
-                                        return (
-                                          <div className="mt-1.5 flex flex-wrap gap-1">
-                                            <ApplianceUnitLocationBadge
-                                              scan={showroomScan}
-                                              compact
-                                            />
-                                          </div>
-                                        );
-                                      })()}
-                                      {group.description ? (
-                                        <p className="truncate text-xs text-slate-400">
-                                          {group.description}
-                                        </p>
-                                      ) : null}
-                                      {group.locations.length > 0 ? (
-                                        <p className="flex items-center gap-1 font-mono text-xs text-emerald-400/90">
-                                          <LocationStatusIcon className="h-3 w-3 shrink-0" />
-                                          {group.locations.join(" · ")}
-                                        </p>
-                                      ) : null}
-                                      <p className="text-[11px] font-medium text-slate-500">
-                                        {expanded
-                                          ? "Hide unit details ▴"
-                                          : `Show ${group.quantity} unit detail${
-                                              group.quantity === 1 ? "" : "s"
-                                            } ▾`}
-                                      </p>
-                                    </button>
-                                    <div className="flex shrink-0 flex-col gap-1.5 self-center">
-                                      <button
-                                        type="button"
-                                        aria-label={`Edit item ${group.item_number}`}
-                                        onClick={() => setEditingGroup(group)}
-                                        className="flex h-11 w-12 items-center justify-center rounded-xl border border-sky-500/40 text-sm font-semibold text-sky-300"
-                                      >
-                                        Edit
-                                      </button>
-                                      <button
-                                        type="button"
-                                        aria-label={`Delete item ${group.item_number}`}
-                                        onClick={() =>
-                                          setPendingDeleteGroup(group)
-                                        }
-                                        className="flex h-11 w-12 items-center justify-center rounded-xl border border-red-500/40 text-sm font-semibold text-red-400"
-                                      >
-                                        Del
-                                      </button>
-                                    </div>
-                                  </div>
-
-                                  {expanded ? (
-                                    <ul className="space-y-2 border-t border-slate-800 px-3 pb-3 pt-2">
-                                      {group.scans.map((scan) => (
-                                        <li
-                                          key={scan.id}
-                                          className="flex gap-2 rounded-xl border border-slate-800/80 bg-slate-900/80 p-2.5"
+                                      <div className="flex gap-2 p-3">
+                                        <button
+                                          type="button"
+                                          onClick={() =>
+                                            toggleExpanded(group.item_number)
+                                          }
+                                          aria-expanded={expanded}
+                                          className="min-w-0 flex-1 space-y-1 text-left"
                                         >
-                                          <div className="min-w-0 flex-1 space-y-1">
-                                            <ApplianceUnitLocationBadge
-                                              scan={scan}
-                                              compact
-                                            />
-                                            {scan.serial_number ? (
-                                              <p className="font-mono text-xs text-sky-300">
-                                                Serial {scan.serial_number}
-                                              </p>
-                                            ) : (
-                                              <p className="text-xs text-slate-500">
-                                                No serial
-                                              </p>
-                                            )}
-                                            <p className="text-[11px] text-slate-400">
-                                              {formatApplianceUnitDetail(scan)}
-                                            </p>
-                                            {scan.location ? (
-                                              <p className="flex items-center gap-1 font-mono text-xs text-emerald-400/90">
-                                                <LocationStatusIcon className="h-3 w-3 shrink-0" />
-                                                {scan.location}
-                                              </p>
-                                            ) : null}
-                                            <time
-                                              dateTime={scan.scanned_at}
-                                              className="block font-mono text-xs text-slate-500"
-                                            >
-                                              {formatTime(scan.scanned_at)}
-                                            </time>
-                                            {scan.scanned_by ? (
-                                              <p className="text-xs text-slate-500">
-                                                Logged by {scan.scanned_by}
-                                              </p>
+                                          <div className="flex flex-wrap items-center gap-2">
+                                            <span className="font-mono text-base font-bold tracking-tight tabular-nums text-slate-50">
+                                              Item {group.item_number}
+                                            </span>
+                                            {group.hasOffline ? (
+                                              <span className="rounded bg-orange-500/20 px-2 py-0.5 text-[10px] font-bold uppercase text-orange-300">
+                                                Offline
+                                              </span>
                                             ) : null}
                                           </div>
+                                          <ApplianceGroupCountSummary
+                                            scans={group.scans}
+                                            className="mt-1"
+                                          />
+                                          {(() => {
+                                            const showroomScan = group.scans.find(
+                                              (s) =>
+                                                isApplianceShowroomDisplayScan(s)
+                                            );
+                                            if (!showroomScan) return null;
+                                            return (
+                                              <div className="mt-1.5 flex flex-wrap gap-1">
+                                                <ApplianceUnitLocationBadge
+                                                  scan={showroomScan}
+                                                  compact
+                                                />
+                                              </div>
+                                            );
+                                          })()}
+                                          {group.description ? (
+                                            <p className="truncate text-xs text-slate-400">
+                                              {group.description}
+                                            </p>
+                                          ) : null}
+                                          {group.locations.length > 0 ? (
+                                            <p className="flex items-center gap-1 font-mono text-xs text-emerald-400/90">
+                                              <LocationStatusIcon className="h-3 w-3 shrink-0" />
+                                              {group.locations.join(" · ")}
+                                            </p>
+                                          ) : null}
+                                          <p className="text-[11px] font-medium text-slate-500">
+                                            {expanded
+                                              ? "Hide unit details ▴"
+                                              : `Show ${group.quantity} unit detail${
+                                                  group.quantity === 1 ? "" : "s"
+                                                } ▾`}
+                                          </p>
+                                        </button>
+                                        <div className="flex shrink-0 flex-col gap-1.5 self-center">
                                           <button
                                             type="button"
-                                            aria-label={`Delete scan at ${formatTime(scan.scanned_at)}`}
+                                            aria-label={`Edit item ${group.item_number}`}
+                                            onClick={() => setEditingGroup(group)}
+                                            className="flex h-11 w-12 items-center justify-center rounded-xl border border-sky-500/40 text-sm font-semibold text-sky-300"
+                                          >
+                                            Edit
+                                          </button>
+                                          <button
+                                            type="button"
+                                            aria-label={`Delete item ${group.item_number}`}
                                             onClick={() =>
-                                              void handleDeleteScan(scan.id)
+                                              setPendingDeleteGroup(group)
                                             }
-                                            className="flex h-10 w-10 shrink-0 items-center justify-center self-center rounded-lg border border-red-500/30 text-xs font-semibold text-red-400"
+                                            className="flex h-11 w-12 items-center justify-center rounded-xl border border-red-500/40 text-sm font-semibold text-red-400"
                                           >
                                             Del
                                           </button>
-                                        </li>
-                                      ))}
-                                    </ul>
-                                  ) : null}
-                                </li>
-                              );
-                            })}
-                          </ul>
-                        </div>
-                      );
-                    })}
+                                        </div>
+                                      </div>
 
-                    {accordion.items.length > APPLIANCE_SCAN_LOG_PAGE_SIZE ? (
-                      <div className="flex items-center justify-between gap-2 pt-1">
-                        <button
-                          type="button"
-                          disabled={safePage <= 0}
-                          onClick={() =>
-                            setCategoryPage(
-                              accordion.category,
-                              safePage - 1
-                            )
-                          }
-                          className="flex min-h-11 flex-1 items-center justify-center rounded-xl border border-slate-700 text-sm font-semibold text-slate-200 disabled:opacity-40"
-                        >
-                          Prev
-                        </button>
-                        <span className="shrink-0 font-mono text-xs tabular-nums text-slate-500">
-                          {safePage + 1} / {pageCount}
-                        </span>
-                        <button
-                          type="button"
-                          disabled={safePage >= pageCount - 1}
-                          onClick={() =>
-                            setCategoryPage(
-                              accordion.category,
-                              safePage + 1
-                            )
-                          }
-                          className="flex min-h-11 flex-1 items-center justify-center rounded-xl border border-slate-700 text-sm font-semibold text-slate-200 disabled:opacity-40"
-                        >
-                          Next
-                        </button>
+                                      {expanded ? (
+                                        <ul className="space-y-2 border-t border-slate-800 px-3 pb-3 pt-2">
+                                          {group.scans.map((scan) => (
+                                            <li
+                                              key={scan.id}
+                                              className="flex gap-2 rounded-xl border border-slate-800/80 bg-slate-900/80 p-2.5"
+                                            >
+                                              <div className="min-w-0 flex-1 space-y-1">
+                                                <ApplianceUnitLocationBadge
+                                                  scan={scan}
+                                                  compact
+                                                />
+                                                {scan.serial_number ? (
+                                                  <p className="font-mono text-xs text-sky-300">
+                                                    Serial {scan.serial_number}
+                                                  </p>
+                                                ) : (
+                                                  <p className="text-xs text-slate-500">
+                                                    No serial
+                                                  </p>
+                                                )}
+                                                <p className="text-[11px] text-slate-400">
+                                                  {formatApplianceUnitDetail(scan)}
+                                                </p>
+                                                {scan.location ? (
+                                                  <p className="flex items-center gap-1 font-mono text-xs text-emerald-400/90">
+                                                    <LocationStatusIcon className="h-3 w-3 shrink-0" />
+                                                    {scan.location}
+                                                  </p>
+                                                ) : null}
+                                                <time
+                                                  dateTime={scan.scanned_at}
+                                                  className="block font-mono text-xs text-slate-500"
+                                                >
+                                                  {formatTime(scan.scanned_at)}
+                                                </time>
+                                                {scan.scanned_by ? (
+                                                  <p className="text-xs text-slate-500">
+                                                    Logged by {scan.scanned_by}
+                                                  </p>
+                                                ) : null}
+                                              </div>
+                                              <button
+                                                type="button"
+                                                aria-label={`Delete scan at ${formatTime(scan.scanned_at)}`}
+                                                onClick={() =>
+                                                  void handleDeleteScan(scan.id)
+                                                }
+                                                className="flex h-10 w-10 shrink-0 items-center justify-center self-center rounded-lg border border-red-500/30 text-xs font-semibold text-red-400"
+                                              >
+                                                Del
+                                              </button>
+                                            </li>
+                                          ))}
+                                        </ul>
+                                      ) : null}
+                                    </li>
+                                  );
+                                })}
+                              </ul>
+                            </div>
+                          );
+                        })}
+
+                        {accordion.items.length > APPLIANCE_SCAN_LOG_PAGE_SIZE ? (
+                          <div className="flex items-center justify-between gap-2 pt-1">
+                            <button
+                              type="button"
+                              disabled={safePage <= 0}
+                              onClick={() =>
+                                setCategoryPage(accordion.category, safePage - 1)
+                              }
+                              className="flex min-h-11 flex-1 items-center justify-center rounded-xl border border-slate-700 text-sm font-semibold text-slate-200 disabled:opacity-40"
+                            >
+                              Prev
+                            </button>
+                            <span className="shrink-0 font-mono text-xs tabular-nums text-slate-500">
+                              {safePage + 1} / {pageCount}
+                            </span>
+                            <button
+                              type="button"
+                              disabled={safePage >= pageCount - 1}
+                              onClick={() =>
+                                setCategoryPage(accordion.category, safePage + 1)
+                              }
+                              className="flex min-h-11 flex-1 items-center justify-center rounded-xl border border-slate-700 text-sm font-semibold text-slate-200 disabled:opacity-40"
+                            >
+                              Next
+                            </button>
+                          </div>
+                        ) : null}
                       </div>
                     ) : null}
-                  </div>
-                ) : null}
-              </li>
-            );
-          })}
-        </ul>
-        </div>
-      </section>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        </section>
+      ) : null}
     </div>
   );
 }

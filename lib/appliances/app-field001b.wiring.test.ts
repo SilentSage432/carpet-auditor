@@ -10,19 +10,27 @@ function readRepo(rel: string): string {
 
 describe("APP-FIELD-001B physical audit exit wiring", () => {
   it("Appliances entry exposes Start Physical Audit when none active", () => {
+    const panel = readRepo(
+      "components/appliances/AppliancePhysicalAuditPanel.tsx"
+    );
     const section = readRepo("components/sections/ApplianceAuditSection.tsx");
-    expect(section).toContain("Start Physical Audit");
-    expect(section).toContain("startAppliancePhysicalAudit");
-    expect(section).toContain("Continue Physical Audit");
+    expect(panel).toContain("Start Physical Audit");
+    expect(panel).toContain("startAppliancePhysicalAudit");
+    expect(panel).toContain("Continue scanning");
     expect(section).toContain("Ad-hoc scan (no audit)");
+    expect(section).toContain("onContinueScanning");
   });
 
   it("Start creates durable audit and opens scanner with audit mode", () => {
+    const panel = readRepo(
+      "components/appliances/AppliancePhysicalAuditPanel.tsx"
+    );
     const section = readRepo("components/sections/ApplianceAuditSection.tsx");
-    expect(section).toContain("handleStartPhysicalAudit");
+    expect(panel).toContain("startAppliancePhysicalAudit");
+    expect(panel).toContain("onStarted?.(session)");
+    expect(section).toContain("onStarted=");
     expect(section).toContain('setScannerAuditMode("audit")');
     expect(section).toContain("setScannerOpen(true)");
-    expect(section).toContain("onStarted");
   });
 
   it("scanner renders Physical audit active + Review / Finish when session resolved", () => {

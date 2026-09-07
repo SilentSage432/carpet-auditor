@@ -1,5 +1,20 @@
 # DeptSync Hub — Development Journal
 
+## 2026-09-07 — UX-005 governing backlog preserved
+- Canonical program constraints recorded in `docs/product/UX005_OPERATIONAL_SIMPLICITY_BACKLOG.md`.
+- UX-005A is first tranche only; Questions 1,3–7 remain open; Question 2 owned by 005A; Question 8 demote-only.
+- UX/product/architecture debt, do-not-touch guardrails, and sequence UX-005B→F preserved — not silently closed by 005A.
+- Status: **UX-005 GOVERNING BACKLOG ACTIVE**
+
+## 2026-09-07 — UX-005A Appliances operational home simplification
+- Presentation / information architecture only: one canonical physical-audit spine on Appliances home.
+- Panel owns Start / Continue scanning / Review count / Close; just-closed Reconcile with Lowe's elevated; Phase 1/2 teaching copy removed (closing ≠ recon complete truth retained).
+- Section demotes Ad-hoc scan, Manage mappings, ActionBar, and scan log under **More appliance tools** (capabilities preserved, not deleted).
+- No schema; no audit/scan/recon/CAT/ROT semantics changed; bottom nav and More top-level IA unchanged.
+- Explicitly did **not** preempt UX-005B–F (specialty findability, Floor drawer, Map, language, AI review).
+- Contracts: `lib/appliances/ux005a.home.contract.test.ts`; APP-AUD/FIELD/QA/OBS/CAT/ROT + UX-NAV stay green. Typecheck + build pass.
+- Status: **UX-005A IMPLEMENTED — REAL-HARDWARE ACCEPTANCE PENDING** (not committed in this session)
+
 ## 2026-09-07 — APP-ROT-001 Appliance audit consideration
 - Pure composer `lib/appliances/audit-consideration.ts` (`appliance-audit-consideration-v1`): CLOSED audits + audit-bound scans + Option B snapshots → advisory consideration items.
 - Reasons: NEEDS_FOLLOW_UP, MISSING_DECLARED_OH, REPEATED_NONZERO_VARIANCE, RECENT_NONZERO_VARIANCE. No risk score, fixed cadence, or stale-day eligibility (days-since is context only).

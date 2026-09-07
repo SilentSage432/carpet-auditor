@@ -49,11 +49,12 @@ describe("APP-QA-001 appliance home contracts", () => {
   const exportLib = readRepo("lib/appliances/audit-export.ts");
 
   it("primary physical audit CTA and secondary ad-hoc remain", () => {
-    expect(section).toContain("Start Physical Audit");
-    expect(section).toContain("Continue Physical Audit");
+    expect(section).toContain("AppliancePhysicalAuditPanel");
     expect(section).toContain("Ad-hoc scan (no audit)");
     expect(section).toContain("Manage appliance mappings");
-    expect(section).toContain("AppliancePhysicalAuditPanel");
+    expect(section).toContain('data-testid="more-appliance-tools"');
+    expect(panel).toContain("Start Physical Audit");
+    expect(panel).toContain("Continue scanning");
   });
 
   it("mapping management + reconciliation remain reachable", () => {

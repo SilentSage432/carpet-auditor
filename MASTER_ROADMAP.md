@@ -2,7 +2,17 @@
 
 > **Appliance specialty evolution (directional):** [`docs/product/APPLIANCE_EVOLUTION_ROADMAP.md`](docs/product/APPLIANCE_EVOLUTION_ROADMAP.md) — APP-ROT-001 consideration composer implemented; CAT-001A ESL field validation pending; CAT-001B deferred; later APP-INT-001. Do not leapfrog evidence foundations.
 
+> **UX-005 Operational Simplicity (active program):** [`docs/product/UX005_OPERATIONAL_SIMPLICITY_BACKLOG.md`](docs/product/UX005_OPERATIONAL_SIMPLICITY_BACKLOG.md) — UX-005A is first tranche only; B–F and open Question Its Place items remain constraints.
+
+## Next (UX-005 remainder — do not preempt)
+- [ ] UX-005B Specialty findability (Appliances/Flooring under More vs elevated entry — field evidence)
+- [ ] UX-005C Floor secondary drawer
+- [ ] UX-005D Map operate vs investigate
+- [ ] UX-005E Operational language
+- [ ] UX-005F AI earn-your-place review
+
 ## Done
+- [x] UX-005A Appliances operational home simplification — one physical-audit spine; secondary tools demoted (**IMPLEMENTED — REAL-HARDWARE ACCEPTANCE PENDING**; no schema; no appliance semantics changed; dual Start owned; action bar demoted not deleted; governing backlog preserved)
 - [x] APP-ROT-001 Appliance audit consideration — evidence composer + Consider checking again strip (**COMMITTED AND PUSHED — REAL-HARDWARE SMOKE PENDING**; no schema; not Floor rotation)
 - [x] APP-CAT-001A Multi-identifier resolution & teach — alias table + dual-read upc + Link/Create (**PRODUCTION MIGRATION LIVE — ESL / REAL-HARDWARE VALIDATION PENDING**)
 - [x] APP-OBS-001 Appliance fulfillment disposition — per-unit NULL/STAGED_PICKUP/STAGED_DELIVERY; last-scan actions; soft after CLOSED; recon breakdown (**PRODUCTION MIGRATION LIVE — REAL-HARDWARE VALIDATION PENDING**)

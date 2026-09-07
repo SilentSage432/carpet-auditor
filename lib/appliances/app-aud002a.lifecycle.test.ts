@@ -156,7 +156,7 @@ describe("APP-AUD-002A UI contracts", () => {
 
   it("newly closed audit is easy to reach for reconciliation", () => {
     expect(panel).toContain('data-testid="awaiting-reconciliation-banner"');
-    expect(panel).toContain("Reconcile just-closed audit");
+    expect(panel).toContain("Reconcile with Lowe");
     expect(panel).toContain("setHighlightClosedId(closed.id)");
     expect(panel).toContain('data-testid="start-physical-audit"');
   });
@@ -180,7 +180,8 @@ describe("APP-AUD-002A UI contracts", () => {
   it("Start Physical Audit remains on home after close path", () => {
     expect(panel).toContain("setActive(null)");
     expect(panel).toContain("onActiveSessionChange(null)");
-    expect(section).toContain("Start Physical Audit");
+    expect(panel).toContain("Start Physical Audit");
+    expect(section).toContain("AppliancePhysicalAuditPanel");
   });
 
   it("UX-NAV canonical Appliances path remains intact", () => {

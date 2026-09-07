@@ -44,6 +44,8 @@ type Props = {
   reviewFinishToken?: number;
   /** After Start, parent should open scanner with audit context. */
   onStarted?: (session: ApplianceAuditSession) => void;
+  /** Active audit — continue scanning (parent opens scanner in audit mode). */
+  onContinueScanning?: () => void;
 };
 
 type ReconDraft = {
@@ -94,6 +96,7 @@ export function AppliancePhysicalAuditPanel({
   onStatus,
   reviewFinishToken = 0,
   onStarted,
+  onContinueScanning,
 }: Props) {
   const [active, setActive] = useState<ApplianceAuditSession | null>(null);
   const [closedSessions, setClosedSessions] = useState<ApplianceAuditSession[]>(
@@ -218,34 +221,37 @@ export function AppliancePhysicalAuditPanel({
     };
   }, [refreshPending]);
 
+  const openActiveReview = useCallback(async () => {
+    await refresh();
+    const sessions = await fetchApplianceAuditSessions({ status: "ACTIVE" });
+    const current = sessions[0];
+    if (!current) {
+      onStatus("No active physical audit to review", "error");
+      return;
+    }
+    setActive(current);
+    onActiveSessionChange(current);
+    try {
+      const loaded = await fetchApplianceAuditDetail(current.id);
+      setDetail(loaded);
+      setDrafts(seedDrafts(loaded.physical_items, loaded.snapshots));
+      setDetailOpen(true);
+      setReconOpen(false);
+      onStatus("Review observed units — then Close physical count");
+    } catch (err) {
+      onStatus(
+        err instanceof Error ? err.message : "Could not open audit review",
+        "error"
+      );
+    }
+  }, [onActiveSessionChange, onStatus, refresh]);
+
   useEffect(() => {
     if (!reviewFinishToken) return;
     let cancelled = false;
     void (async () => {
-      await refresh();
       if (cancelled) return;
-      const sessions = await fetchApplianceAuditSessions({ status: "ACTIVE" });
-      const current = sessions[0];
-      if (!current) {
-        onStatus("No active physical audit to review", "error");
-        return;
-      }
-      setActive(current);
-      onActiveSessionChange(current);
-      try {
-        const loaded = await fetchApplianceAuditDetail(current.id);
-        if (cancelled) return;
-        setDetail(loaded);
-        setDrafts(seedDrafts(loaded.physical_items, loaded.snapshots));
-        setDetailOpen(true);
-        setReconOpen(false);
-        onStatus("Review observed units — then Close physical count");
-      } catch (err) {
-        onStatus(
-          err instanceof Error ? err.message : "Could not open audit review",
-          "error"
-        );
-      }
+      await openActiveReview();
     })();
     return () => {
       cancelled = true;
@@ -451,64 +457,99 @@ export function AppliancePhysicalAuditPanel({
       data-testid="appliance-physical-audit-panel"
     >
       <div className="flex items-start justify-between gap-2">
-        <div>
+        <div className="min-w-0">
           <p className="font-mono text-[10px] font-bold uppercase tracking-wide text-cyan-300">
             Physical audit
           </p>
-          <p className="mt-0.5 text-xs text-slate-400">
-            Phase 1: observe &amp; freeze count. Phase 2: declare Lowe&apos;s OH
-            after close. Closing is not reconciliation complete.
+          <p className="mt-0.5 text-xs leading-snug text-slate-400">
+            {active
+              ? "Keep scanning, review the count, then close it."
+              : highlightClosedId
+                ? "Count is closed — reconcile with Lowe's OH when ready."
+                : "Count what you see, close the count, then reconcile with Lowe's OH."}
           </p>
         </div>
         {active ? (
-          <span className="shrink-0 rounded-full border border-emerald-400/40 bg-emerald-950/40 px-2 py-0.5 font-mono text-[10px] font-bold text-emerald-200">
+          <span
+            className="shrink-0 rounded-full border border-emerald-400/40 bg-emerald-950/40 px-2 py-0.5 font-mono text-[10px] font-bold text-emerald-200"
+            data-testid="physical-audit-status-active"
+          >
             Physical audit active
           </span>
         ) : (
-          <span className="shrink-0 rounded-full border border-slate-600 px-2 py-0.5 font-mono text-[10px] font-bold text-slate-400">
+          <span
+            className="shrink-0 rounded-full border border-slate-600 px-2 py-0.5 font-mono text-[10px] font-bold text-slate-400"
+            data-testid="physical-audit-status-idle"
+          >
             Idle
           </span>
         )}
       </div>
 
-      <div className="grid grid-cols-2 gap-2">
-        <button
-          type="button"
-          disabled={busy || active != null}
-          onClick={() => void handleStart()}
-          data-testid="start-physical-audit"
-          className="flex min-h-11 items-center justify-center rounded-xl border border-cyan-400/50 bg-cyan-600/90 px-2 text-xs font-bold text-zinc-950 disabled:opacity-40"
-        >
-          Start physical audit
-        </button>
-        <button
-          type="button"
-          disabled={busy || !active}
-          onClick={() => void handleClose()}
-          data-testid="close-physical-count"
-          className="flex min-h-11 items-center justify-center rounded-xl border border-amber-400/50 bg-amber-500/90 px-2 text-xs font-bold text-zinc-950 disabled:opacity-40"
-        >
-          Close physical count
-        </button>
-      </div>
-
       {active ? (
-        <p className="font-mono text-[11px] text-cyan-100/90">
-          Physical audit active · {active.id.slice(0, 8)}…
-          {pendingAuditScans > 0
-            ? ` · ${pendingAuditScans} unsynced observation(s) — sync before close`
-            : ""}
-        </p>
-      ) : null}
-
-      <ApplianceAuditConsiderationList
-        items={considerationItems}
-        eligibleCount={considerationEligible}
-        loading={considerationLoading}
-        expanded={considerationExpanded}
-        onToggleExpanded={() => setConsiderationExpanded((v) => !v)}
-        onOpenHistory={(item) => void openConsiderationHistory(item)}
-      />
+        <div className="space-y-2" data-testid="active-physical-audit-actions">
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => onContinueScanning?.()}
+            data-testid="continue-physical-audit"
+            className="btn-primary-glow flex min-h-12 w-full items-center justify-center rounded-xl px-3 text-sm font-bold text-zinc-950 disabled:opacity-40"
+          >
+            Continue scanning
+          </button>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => void openActiveReview()}
+              data-testid="review-physical-count"
+              className="flex min-h-11 items-center justify-center rounded-xl border border-cyan-400/45 bg-cyan-950/40 px-2 text-xs font-bold text-cyan-50 disabled:opacity-40"
+            >
+              Review count
+            </button>
+            <button
+              type="button"
+              disabled={busy}
+              onClick={() => void handleClose()}
+              data-testid="close-physical-count"
+              className="flex min-h-11 items-center justify-center rounded-xl border border-amber-400/50 bg-amber-500/90 px-2 text-xs font-bold text-zinc-950 disabled:opacity-40"
+            >
+              Close physical count
+            </button>
+          </div>
+          {pendingAuditScans > 0 ? (
+            <p
+              className="rounded-lg border border-amber-500/35 bg-amber-950/25 px-2.5 py-2 font-mono text-[11px] leading-snug text-amber-100"
+              data-testid="unsynced-audit-warning"
+            >
+              {pendingAuditScans} unsynced observation
+              {pendingAuditScans === 1 ? "" : "s"} — sync before closing
+            </p>
+          ) : null}
+        </div>
+      ) : (
+        <div className="space-y-2">
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => void handleStart()}
+            data-testid="start-physical-audit"
+            className={`flex min-h-12 w-full items-center justify-center rounded-xl px-3 text-sm font-bold disabled:opacity-40 ${
+              highlightClosedId
+                ? "border border-cyan-400/45 bg-cyan-950/35 text-cyan-50"
+                : "btn-primary-glow text-zinc-950"
+            }`}
+          >
+            {busy ? "Starting…" : "Start Physical Audit"}
+          </button>
+          {!highlightClosedId ? (
+            <p className="text-center text-[11px] leading-snug text-slate-500">
+              Closing is not reconciliation complete — reconcile Lowe&apos;s OH
+              after you close the count.
+            </p>
+          ) : null}
+        </div>
+      )}
 
       {highlightClosedId && !active ? (
         <div
@@ -528,17 +569,26 @@ export function AppliancePhysicalAuditPanel({
                   ?.session;
               if (session) void openHistory(session, { openRecon: true });
             }}
-            className="mt-2 flex min-h-10 w-full items-center justify-center rounded-xl border border-emerald-400/50 bg-emerald-600/90 px-3 text-xs font-bold text-zinc-950 disabled:opacity-40"
+            className="btn-primary-glow mt-2 flex min-h-11 w-full items-center justify-center rounded-xl px-3 text-sm font-bold text-zinc-950 disabled:opacity-40"
           >
-            Reconcile just-closed audit
+            Reconcile with Lowe&apos;s
           </button>
         </div>
       ) : null}
 
+      <ApplianceAuditConsiderationList
+        items={considerationItems}
+        eligibleCount={considerationEligible}
+        loading={considerationLoading}
+        expanded={considerationExpanded}
+        onToggleExpanded={() => setConsiderationExpanded((v) => !v)}
+        onOpenHistory={(item) => void openConsiderationHistory(item)}
+      />
+
       {recentCards.length > 0 ? (
         <div className="space-y-1.5 pt-1" data-testid="recent-physical-audits">
           <p className="font-mono text-[10px] font-bold uppercase tracking-wide text-slate-500">
-            Recent physical audits
+            Recent audits
           </p>
           <ul className="space-y-1.5">
             {recentCards.map((card) => {
@@ -562,7 +612,7 @@ export function AppliancePhysicalAuditPanel({
                         )}
                       </span>
                       <span className="font-mono text-[10px] text-slate-500">
-                        Physical count closed
+                        Closed
                       </span>
                     </span>
                     <span className="font-mono text-[11px] text-cyan-200/90">
@@ -747,7 +797,7 @@ export function AppliancePhysicalAuditPanel({
                               {item.description ||
                                 `${item.category}${item.sub_category ? ` · ${item.sub_category}` : ""}`}
                             </p>
-                              <p className="mt-1 font-mono text-xs text-cyan-200">
+                            <p className="mt-1 font-mono text-xs text-cyan-200">
                               Physical count: {item.physical_count}
                               {snap?.declared_lowes_oh != null
                                 ? ` · Declared OH: ${snap.declared_lowes_oh} · Variance: ${snap.variance}`

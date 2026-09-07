@@ -37,11 +37,14 @@ describe("UX-NAV-001 More Department Tools", () => {
     expect(APPLIANCES_OPERATIONAL_HOME_HREF).toBe("/appliances");
   });
 
-  it("Appliances home mounts ApplianceAuditSection with Start/Continue and secondary ad-hoc", () => {
-    expect(section).toContain("Start Physical Audit");
-    expect(section).toContain("Continue Physical Audit");
-    expect(section).toContain("Ad-hoc scan (no audit)");
+  it("Appliances home mounts ApplianceAuditSection with panel Start/Continue and secondary ad-hoc", () => {
     expect(section).toContain("AppliancePhysicalAuditPanel");
+    expect(section).toContain("onContinueScanning");
+    expect(section).toContain("Ad-hoc scan (no audit)");
+    expect(section).toContain('data-testid="more-appliance-tools"');
+    const panel = readRepo("components/appliances/AppliancePhysicalAuditPanel.tsx");
+    expect(panel).toContain("Start Physical Audit");
+    expect(panel).toContain("Continue scanning");
   });
 
   it("deep links preserve appliances and flooring specialty homes", () => {
