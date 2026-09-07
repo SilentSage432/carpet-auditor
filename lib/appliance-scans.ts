@@ -2,15 +2,16 @@
  * Appliance floor scans — owns public.appliance_scans.
  * Flooring cycle audits stay in lib/storage.ts (carpet_audits).
  *
- * Online saves go through POST /api/appliances/scans (service role) and throw
- * on failure — never silently report success via the offline queue.
+ * Online COUNT path uses local-first + sync queue (APP-FIELD-001).
+ * Edit/group paths may still await POST /api/appliances/scans.
+ * Online API failures still throw — never silently report success without a durable queue write.
  */
 
 import { createDebouncedPersist } from "./debounced-persist";
 import { storeOpsAuthHeadersAsync } from "./store-ops/auth";
 import { getStoreNumber, sameStoreNumber, storeNumberQueryValues } from "./store";
 import { getSupabase } from "./supabase";
-import { enqueueSyncAction, isBrowserOnline } from "./sync-queue";
+import { enqueueSyncAction, flushSyncQueue, isBrowserOnline } from "./sync-queue";
 import { uid } from "./uid";
 import {
   isValidApplianceSubCategory,
@@ -314,21 +315,27 @@ export async function fetchApplianceScans(): Promise<ApplianceScan[]> {
 }
 
 /**
- * Persist a floor scan. Online: direct POST /api/appliances/scans (throws on failure).
- * Offline only: local queue — never pretends a failed online write succeeded.
+ * Persist a floor scan.
+ *
+ * Default (await network when online): used by edit/group paths that need
+ * confirmation before continuing.
+ *
+ * `localFirst: true` (APP-FIELD-001 rapid-fire COUNT): durable local upsert +
+ * sync queue, returns immediately; flushes in background when online.
+ * Capture-time scanned_at / id / audit_session_id are fixed before enqueue.
  */
 export async function saveApplianceScan(
-  input: ApplianceScanInsert
+  input: ApplianceScanInsert,
+  options: { localFirst?: boolean } = {}
 ): Promise<{ record: ApplianceScan; offline: boolean }> {
   const store = input.store_number ?? getStoreNumber();
   const payload = buildApplianceScanPayload(input, store);
+  if (!payload.id) payload.id = uid();
+  if (!payload.scanned_at) payload.scanned_at = new Date().toISOString();
 
-  console.log("[appliance_scans] save payload", payload);
-
-  // Truly offline — queue for later. Do not use this path to hide DB errors.
-    if (!isBrowserOnline()) {
+  const queueLocal = (): ApplianceScan => {
     const offlineRecord: ApplianceScan = {
-      id: payload.id ?? uid(),
+      id: payload.id!,
       store_number: payload.store_number,
       item_number: payload.item_number,
       serial_number: payload.serial_number,
@@ -341,11 +348,32 @@ export async function saveApplianceScan(
       scanned_at: payload.scanned_at,
       offline: true,
       is_showroom_baseline: false,
+      location_id: payload.location_id,
+      aisle: payload.aisle,
+      bay_number: payload.bay_number,
       audit_session_id: payload.audit_session_id ?? null,
     };
     upsertLocal(offlineRecord);
-    enqueueSyncAction("upsert_appliance_scan", { ...payload, id: offlineRecord.id }, store);
-    return { record: offlineRecord, offline: true };
+    enqueueSyncAction(
+      "upsert_appliance_scan",
+      { ...payload, id: offlineRecord.id },
+      store
+    );
+    return offlineRecord;
+  };
+
+  // Truly offline — queue for later.
+  if (!isBrowserOnline()) {
+    return { record: queueLocal(), offline: true };
+  }
+
+  // Rapid-fire COUNT: acknowledge locally; do not await network round trip.
+  if (options.localFirst) {
+    const record = queueLocal();
+    void flushSyncQueue(store).catch((err) => {
+      console.error("[appliance_scans] background flush failed", err);
+    });
+    return { record, offline: false };
   }
 
   try {

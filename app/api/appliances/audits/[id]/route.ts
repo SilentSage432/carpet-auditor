@@ -60,7 +60,7 @@ export async function GET(request: Request, context: Ctx) {
       sessionRow as Record<string, unknown>
     );
 
-    const [{ data: scanRows }, { data: snapRows }, { data: catalogRows }] =
+    const [{ data: scanRows }, { data: snapRows }, catalogResult] =
       await Promise.all([
         supabase
           .from("appliance_scans")
@@ -78,6 +78,14 @@ export async function GET(request: Request, context: Ctx) {
           .select("*")
           .eq("store_number", store),
       ]);
+
+    // APP-FIELD-001: production catalog may lack store_number until migration;
+    // still return physical counts (descriptions optional).
+    const catalogRows =
+      catalogResult.error &&
+      /store_number/i.test(String(catalogResult.error.message ?? ""))
+        ? []
+        : catalogResult.data;
 
     const scans = (scanRows ?? []).map((row) =>
       mapApplianceScanRow(row as Record<string, unknown>)

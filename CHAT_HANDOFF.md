@@ -1,6 +1,7 @@
 # DeptSync Hub — Chat Handoff
 
 ## Latest (2026-09-06)
+- **APP-FIELD-001 APPLIANCE RAPID-FIRE / TEACH / AUDIT EXIT — PRODUCTION LIVE — REAL-HARDWARE REVALIDATION PENDING:** Local-first COUNT; fail-closed catalog `store_number` migration (no fictional 0000); scanner Review / Finish Audit. Local phone catalog preserved; no bulk upload.
 - **APP-AUD-001 APPLIANCE PHYSICAL AUDIT & RECONCILIATION CLOSED — PRODUCTION LIVE:** Sessions + Option B recon state + observation-time CLOSED bind + close flush/block + clear preserves audit-bound scans. Migration `20260906_appliance_audit_sessions.sql` applied + verified on `fmeinlwhixngednabhgy`. Pre-migration dump retained under `tmp/production-backups/`. No Lowe's/SIMS/Zebra integration; not immutable OH history; no fabricated legacy sessions.
 - **APP-UX-001A CATALOG WRITE-PATH VERIFICATION:** Online application failures (400/401/403/409) no longer fall through to direct Supabase; API-only online path; network-unavailable still queues offline teach. Awaiting commit with APP-UX-001.
 - **APP-UX-001 APPLIANCE TEACH & CATALOG RECOVERY — AWAITING COMMIT REVIEW:** Manage appliance mappings sheet (search/edit UPC↔Item↔category↔sub↔description); quiet known-UPC scan; Quick-Add teach for unknowns; UPC conflict fail-visible (no silent remap); no reconciliation/OH/session architecture. Offline teach kept; offline mapping **correction** deferred. Not claiming APP-DISC-001 future inventory architecture.

@@ -1,6 +1,7 @@
 # DeptSync Hub — Master Roadmap
 
 ## Done
+- [x] APP-FIELD-001 Appliance scanner rapid-fire + teach schema fix + audit exit UX (**PRODUCTION LIVE — REAL-HARDWARE REVALIDATION PENDING**; `20260907_appliance_catalog_store_number.sql`)
 - [x] APP-AUD-001 Appliance physical audit & reconciliation foundation — sessions, scan linkage, declared OH state, derived variance, history/reconcile UX (**PRODUCTION LIVE**; `20260906_appliance_audit_sessions.sql` applied + verified)
 - [x] APP-AUD-001A Evidence integrity verification — late offline vs close, Option B recon terminology, clear-ledger protection (**INCLUDED + LIVE**)
 - [x] APP-UX-001 Appliance Teach & Catalog Recovery — Manage mappings sheet + quiet known-UPC scan + Quick-Add teach + UPC conflict guard (**COMMITTED** `0821e70`)

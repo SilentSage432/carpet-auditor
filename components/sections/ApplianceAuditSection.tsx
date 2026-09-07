@@ -99,6 +99,7 @@ export function ApplianceAuditSection({
   const [manageOpen, setManageOpen] = useState(false);
   const [activeAudit, setActiveAudit] =
     useState<ApplianceAuditSession | null>(null);
+  const [reviewFinishToken, setReviewFinishToken] = useState(0);
   const [bayLocation, setBayLocation] =
     useState<ApplianceScannerLocationContext | null>(null);
 
@@ -211,14 +212,17 @@ export function ApplianceAuditSection({
   const handleLogged = useCallback(
     (record: ApplianceScan, _offline: boolean) => {
       setScans((prev) => [record, ...prev.filter((s) => s.id !== record.id)]);
-      void fetchApplianceScans()
-        .then((refreshed) => setScans(refreshed))
-        .catch((refreshErr) => {
-          console.error(
-            "[ApplianceAudit] re-fetch after save failed",
-            refreshErr
-          );
-        });
+      // Debounced remote refresh — do not block rapid-fire COUNT.
+      window.setTimeout(() => {
+        void fetchApplianceScans()
+          .then((refreshed) => setScans(refreshed))
+          .catch((refreshErr) => {
+            console.error(
+              "[ApplianceAudit] re-fetch after save failed",
+              refreshErr
+            );
+          });
+      }, 1500);
     },
     []
   );
@@ -325,6 +329,7 @@ export function ApplianceAuditSection({
       <AppliancePhysicalAuditPanel
         onActiveSessionChange={setActiveAudit}
         onStatus={(msg, tone = "ok") => flashStatus(msg, tone)}
+        reviewFinishToken={reviewFinishToken}
       />
 
       <ApplianceAuditActionBar
@@ -400,6 +405,11 @@ export function ApplianceAuditSection({
         scannerEnabled={scannerEnabled && scannerOpen && !manageOpen}
         bayLocation={bayLocation}
         auditSessionId={activeAudit?.id ?? null}
+        onReviewFinishAudit={() => {
+          setScannerOpen(false);
+          setBayLocation(null);
+          setReviewFinishToken((n) => n + 1);
+        }}
         onLogged={handleLogged}
       />
 

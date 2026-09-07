@@ -17,6 +17,7 @@ import {
 import {
   clearApplianceScanDraft,
   flushApplianceScanDraftSave,
+  getLocalApplianceScans,
   loadApplianceScanDraft,
   saveApplianceScan,
   scheduleApplianceScanDraftSave,
@@ -28,6 +29,10 @@ import { useGlobalBarcodeScanner } from "@/lib/hardware-scanner";
 import { playScanLoggedFeedback } from "@/lib/scan-feedback";
 import { playErrorTone } from "@/lib/ui/feedback";
 import { getStoreNumber } from "@/lib/store";
+import {
+  getPendingApplianceScanSyncForAudit,
+  SYNC_QUEUE_CHANGED_EVENT,
+} from "@/lib/sync-queue";
 import { useFlushOnLeave } from "@/lib/use-flush-on-leave";
 import {
   APPLIANCE_LOCATION_SUGGESTIONS,
@@ -72,6 +77,8 @@ type Props = {
   bayLocation?: ApplianceScannerLocationContext | null;
   /** Active physical audit session id (APP-AUD-001). */
   auditSessionId?: string | null;
+  /** Close scanner and open physical audit review/finish (APP-FIELD-001). */
+  onReviewFinishAudit?: () => void;
   onLogged: (record: ApplianceScan, offline: boolean) => void;
 };
 
@@ -84,13 +91,15 @@ export function ApplianceScanForm({
   focusOnMount = false,
   bayLocation = null,
   auditSessionId = null,
+  onReviewFinishAudit,
   onLogged,
 }: Props) {
   const itemInputRef = useRef<HTMLInputElement>(null);
   const serialRef = useRef("");
   const locationRef = useRef("");
   const locationTypeRef = useRef<ApplianceLocationType>("showroom");
-  const savingRef = useRef(false);
+  /** Teach path only — known rapid-fire must not hard-block the next barcode. */
+  const teachBusyRef = useRef(false);
 
   const [itemNumber, setItemNumber] = useState("");
   const [serialNumber, setSerialNumber] = useState("");
@@ -98,7 +107,7 @@ export function ApplianceScanForm({
   const [location, setLocation] = useState("");
   const [locationType, setLocationType] =
     useState<ApplianceLocationType>("showroom");
-  const [saving, setSaving] = useState(false);
+  const [teachBusy, setTeachBusy] = useState(false);
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
   const [statusTone, setStatusTone] = useState<"ok" | "error">("ok");
   const [scanFlash, setScanFlash] = useState(false);
@@ -107,11 +116,13 @@ export function ApplianceScanForm({
   const [draftRestored, setDraftRestored] = useState(false);
   /** Progressive disclosure — wedge field stays mounted; UI expands on demand. */
   const [manualEntry, setManualEntry] = useState(false);
+  const [pendingAuditScans, setPendingAuditScans] = useState(0);
+  const [auditUnitCount, setAuditUnitCount] = useState(0);
 
   serialRef.current = serialNumber;
   locationRef.current = location;
   locationTypeRef.current = locationType;
-  savingRef.current = saving;
+  teachBusyRef.current = teachBusy;
 
   const locationSuggestions = useMemo(() => {
     return [
@@ -192,6 +203,37 @@ export function ApplianceScanForm({
     window.setTimeout(() => itemInputRef.current?.focus(), 50);
   }, [focusOnMount, scannerEnabled, quickAddBarcode, manualEntry]);
 
+  const refreshAuditCounts = useCallback(() => {
+    const sessionId =
+      auditSessionId || loadCachedActiveAuditSessionId() || null;
+    if (!sessionId) {
+      setPendingAuditScans(0);
+      setAuditUnitCount(0);
+      return;
+    }
+    const store = getStoreNumber();
+    setPendingAuditScans(
+      getPendingApplianceScanSyncForAudit(sessionId, store).length
+    );
+    setAuditUnitCount(
+      getLocalApplianceScans(store).filter(
+        (s) => s.audit_session_id === sessionId
+      ).length
+    );
+  }, [auditSessionId]);
+
+  useEffect(() => {
+    refreshAuditCounts();
+    if (typeof window === "undefined") return;
+    const onQueue = () => refreshAuditCounts();
+    window.addEventListener(SYNC_QUEUE_CHANGED_EVENT, onQueue);
+    window.addEventListener("online", onQueue);
+    return () => {
+      window.removeEventListener(SYNC_QUEUE_CHANGED_EVENT, onQueue);
+      window.removeEventListener("online", onQueue);
+    };
+  }, [refreshAuditCounts]);
+
   const clearForNextScan = useCallback(() => {
     setItemNumber("");
     setSerialNumber("");
@@ -199,12 +241,11 @@ export function ApplianceScanForm({
     setScanFlash(false);
     setManualEntry(false);
     dismissKeyboard();
-    window.setTimeout(() => itemInputRef.current?.focus(), 50);
+    window.setTimeout(() => itemInputRef.current?.focus(), 0);
   }, [dismissKeyboard]);
 
   const commitScan = useCallback(
     async (item: ApplianceCatalogItem) => {
-      if (savingRef.current) return;
       if (!isValidApplianceSubCategory(item.category, item.sub_category)) {
         setQuickAddBarcode(item.upc || item.item_number);
         flashStatus("Select a sub-category to finish linking");
@@ -212,49 +253,68 @@ export function ApplianceScanForm({
       }
 
       flushApplianceScanDraftSave();
-      setSaving(true);
-      try {
-        const sessionId =
-          auditSessionId || loadCachedActiveAuditSessionId() || undefined;
-        const { record, offline } = await saveApplianceScan({
-          item_number: item.item_number,
-          serial_number: serialRef.current.trim(),
-          location: locationRef.current.trim(),
-          location_type: locationTypeRef.current,
-          condition_tag: defaultApplianceConditionForLocation(
-            locationTypeRef.current
-          ),
-          category: item.category,
-          sub_category: String(item.sub_category ?? "").trim(),
-          scanned_by: scannedBy || activeSpecialist?.name || "",
-          location_id: bayLocation?.location_id,
-          aisle: bayLocation?.aisle,
-          bay_number: bayLocation?.bay,
-          audit_session_id: sessionId,
-        });
+      const capturedAt = new Date().toISOString();
+      const sessionId =
+        auditSessionId || loadCachedActiveAuditSessionId() || undefined;
+      const serialSnapshot = serialRef.current.trim();
+      const locationSnapshot = locationRef.current.trim();
+      const locationTypeSnapshot = locationTypeRef.current;
 
-        setSessionTotal((n) => n + 1);
-        playScanLoggedFeedback();
-        setScanFlash(true);
-        window.setTimeout(() => setScanFlash(false), 600);
-        clearForNextScan();
+      // APP-FIELD-001: acknowledge before network — ready for next barcode.
+      setSessionTotal((n) => n + 1);
+      playScanLoggedFeedback();
+      setScanFlash(true);
+      window.setTimeout(() => setScanFlash(false), 450);
+      clearForNextScan();
+
+      try {
+        const { record, offline } = await saveApplianceScan(
+          {
+            item_number: item.item_number,
+            serial_number: serialSnapshot,
+            location: locationSnapshot,
+            location_type: locationTypeSnapshot,
+            condition_tag: defaultApplianceConditionForLocation(
+              locationTypeSnapshot
+            ),
+            category: item.category,
+            sub_category: String(item.sub_category ?? "").trim(),
+            scanned_by: scannedBy || activeSpecialist?.name || "",
+            scanned_at: capturedAt,
+            location_id: bayLocation?.location_id,
+            aisle: bayLocation?.aisle,
+            bay_number: bayLocation?.bay,
+            audit_session_id: sessionId,
+          },
+          { localFirst: true }
+        );
+
         onLogged(record, offline);
+        refreshAuditCounts();
         flashStatus(
           offline
-            ? `Logged ${item.item_number} offline — will sync`
-            : `Logged ${item.item_number}`
+            ? `Counted ${item.item_number} · syncing when online`
+            : `Counted ${item.item_number}`
         );
       } catch (err) {
         const message =
           err instanceof Error ? err.message : "Unknown error";
         console.error("[ApplianceAudit] continuous save failed", err);
+        setSessionTotal((n) => Math.max(0, n - 1));
         flashStatus(`Failed to save scan: ${message}`, "error");
         playErrorTone();
-      } finally {
-        setSaving(false);
       }
     },
-    [activeSpecialist?.name, auditSessionId, bayLocation, clearForNextScan, flashStatus, onLogged, scannedBy]
+    [
+      activeSpecialist?.name,
+      auditSessionId,
+      bayLocation,
+      clearForNextScan,
+      flashStatus,
+      onLogged,
+      refreshAuditCounts,
+      scannedBy,
+    ]
   );
 
   function handleItemChange(raw: string) {
@@ -272,7 +332,7 @@ export function ApplianceScanForm({
     (raw: string) => {
       const cleaned = sanitizeBarcodeScan(raw);
       if (!cleaned) return;
-      if (savingRef.current) return;
+      if (teachBusyRef.current) return;
       if (quickAddBarcode != null) return;
 
       setItemNumber(cleaned);
@@ -313,7 +373,13 @@ export function ApplianceScanForm({
     ].sort((a, b) => a.item_number.localeCompare(b.item_number));
     onCatalogChange(next);
     setQuickAddBarcode(null);
-    await commitScan(item);
+    setTeachBusy(true);
+    try {
+      // Logs the physical unit once — do not require a second scan of the tag.
+      await commitScan(item);
+    } finally {
+      setTeachBusy(false);
+    }
   }
 
   function closeQuickAdd() {
@@ -341,6 +407,29 @@ export function ApplianceScanForm({
         aria-live="polite"
         className="sticky top-0 z-30 -mx-1 space-y-2 rounded-2xl border border-cyan-500/40 bg-zinc-900/90 px-3 py-3 shadow-lg shadow-black/30 backdrop-blur-xl"
       >
+        {auditSessionId ? (
+          <div className="space-y-2 rounded-xl border border-emerald-500/35 bg-emerald-950/30 px-2.5 py-2">
+            <p className="text-center font-mono text-[10px] font-bold uppercase tracking-wide text-emerald-200">
+              Physical audit active
+            </p>
+            <p className="text-center text-xs text-emerald-100/90">
+              {Math.max(sessionTotal, auditUnitCount)} observed unit
+              {Math.max(sessionTotal, auditUnitCount) === 1 ? "" : "s"}
+              {pendingAuditScans > 0
+                ? ` · ${pendingAuditScans} unsynced`
+                : ""}
+            </p>
+            {onReviewFinishAudit ? (
+              <button
+                type="button"
+                onClick={onReviewFinishAudit}
+                className="flex min-h-11 w-full items-center justify-center rounded-xl border border-amber-400/50 bg-amber-500/90 px-3 text-xs font-bold text-zinc-950"
+              >
+                Review / Finish Audit
+              </button>
+            ) : null}
+          </div>
+        ) : null}
         <div className="grid grid-cols-2 gap-1.5">
           {APPLIANCE_SCAN_MODES.map((mode) => {
             const active = locationType === mode.id;
@@ -349,7 +438,7 @@ export function ApplianceScanForm({
                 key={mode.id}
                 type="button"
                 onClick={() => setLocationType(mode.id)}
-                disabled={saving}
+                disabled={teachBusy}
                 className={`flex min-h-11 items-center justify-center gap-1 rounded-xl border px-2 text-[11px] font-bold transition ${
                   active
                     ? "border-cyan-400/50 bg-cyan-950/50 text-cyan-100"
@@ -366,15 +455,11 @@ export function ApplianceScanForm({
           Session Total: {sessionTotal}{" "}
           {sessionTotal === 1 ? "item" : "items"} scanned
         </p>
-        {saving ? (
-          <p className="mt-0.5 text-center text-[11px] font-medium text-sky-300/80">
-            Logging to database…
-          </p>
-        ) : (
-          <p className="mt-0.5 text-center text-[11px] font-medium text-sky-300/70">
-            Ready — scan barcode to log instantly
-          </p>
-        )}
+        <p className="mt-0.5 text-center text-[11px] font-medium text-sky-300/70">
+          {teachBusy
+            ? "Saving mapping…"
+            : "Ready — scan next barcode"}
+        </p>
       </div>
 
       {statusMsg ? (

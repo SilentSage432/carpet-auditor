@@ -313,9 +313,13 @@ export async function saveApplianceCatalogItem(
       }
 
       if (!res.ok) {
-        throw new Error(
-          json.error || `Catalog save failed (${res.status})`
-        );
+        const raw = json.error || `Catalog save failed (${res.status})`;
+        if (/store_number/i.test(raw)) {
+          throw new Error(
+            "Appliance catalog is missing store_number on the server. Apply migration 20260907_appliance_catalog_store_number.sql, then retry teach."
+          );
+        }
+        throw new Error(raw);
       }
       if (!json.item) {
         throw new Error("API returned no catalog item");

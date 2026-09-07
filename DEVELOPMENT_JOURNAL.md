@@ -1,5 +1,17 @@
 # DeptSync Hub — Development Journal
 
+## 2026-09-06 — APP-FIELD-001A Catalog store_number migration fail-closed
+- Removed fictional `'0000'` backfill/default from `20260907_appliance_catalog_store_number.sql`.
+- Unattributed rows → visible EXCEPTION (no delete, no guessed ownership). Empty production catalog is the clean apply path.
+- Future rows: NOT NULL, no manufactured DEFAULT; API must supply actor-bound store_number.
+- Status: included in APP-FIELD-001 release
+
+## 2026-09-06 — APP-FIELD-001 Appliance scanner rapid-fire + teach failure + audit exit
+- Latency: known COUNT awaited network POST before ready; fixed via `saveApplianceScan({ localFirst: true })` (local upsert + sync queue + background flush). Capture-time `scanned_at` / id / audit_session_id preserved.
+- Teach failure: production `appliance_catalog` lacks `store_number` (OpenAPI-proven drift vs 20260810). Migration `20260907_appliance_catalog_store_number.sql` (fail-closed provenance — APP-FIELD-001A).
+- Scanner UX: active audit strip + Review / Finish Audit → panel review → Close → Reconcile.
+- Status: **APP-FIELD-001 RELEASE CANDIDATE**
+
 ## 2026-09-06 — APP-AUD-001 production migration applied
 - Applied `supabase/migrations/20260906_appliance_audit_sessions.sql` to production `fmeinlwhixngednabhgy` after prerequisite `jwt_matches_store` confirmed.
 - Verified: sessions + recon tables, `appliance_scans.audit_session_id`, one-ACTIVE index, FKs, variance check, RLS+store policies, bind trigger. Zero fabricated session/recon rows.

@@ -30,6 +30,8 @@ import { getStoreNumber } from "@/lib/store";
 type Props = {
   onActiveSessionChange: (session: ApplianceAuditSession | null) => void;
   onStatus: (message: string, tone?: "ok" | "error") => void;
+  /** Incremented by scanner Review / Finish — opens active audit review. */
+  reviewFinishToken?: number;
 };
 
 type ReconDraft = {
@@ -41,6 +43,7 @@ type ReconDraft = {
 export function AppliancePhysicalAuditPanel({
   onActiveSessionChange,
   onStatus,
+  reviewFinishToken = 0,
 }: Props) {
   const [active, setActive] = useState<ApplianceAuditSession | null>(null);
   const [history, setHistory] = useState<ApplianceAuditSession[]>([]);
@@ -95,6 +98,41 @@ export function AppliancePhysicalAuditPanel({
       window.removeEventListener("online", onQueue);
     };
   }, [refreshPending]);
+
+  useEffect(() => {
+    if (!reviewFinishToken) return;
+    let cancelled = false;
+    void (async () => {
+      await refresh();
+      if (cancelled) return;
+      const sessions = await fetchApplianceAuditSessions({ status: "ACTIVE" });
+      const current = sessions[0];
+      if (!current) {
+        onStatus("No active physical audit to review", "error");
+        return;
+      }
+      setActive(current);
+      onActiveSessionChange(current);
+      try {
+        const loaded = await fetchApplianceAuditDetail(current.id);
+        if (cancelled) return;
+        setDetail(loaded);
+        seedDrafts(loaded.physical_items, loaded.snapshots);
+        setDetailOpen(true);
+        setReconOpen(false);
+        onStatus("Review observed units — then Close physical audit");
+      } catch (err) {
+        onStatus(
+          err instanceof Error ? err.message : "Could not open audit review",
+          "error"
+        );
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- token edge only
+  }, [reviewFinishToken]);
 
   async function handleStart() {
     setBusy(true);
@@ -394,14 +432,24 @@ export function AppliancePhysicalAuditPanel({
                 {!reconOpen ? (
                   <>
                     <div className="grid grid-cols-2 gap-2">
-                      <button
-                        type="button"
-                        disabled={detail.session.status !== "CLOSED"}
-                        onClick={() => setReconOpen(true)}
-                        className="flex min-h-11 items-center justify-center rounded-xl border border-emerald-400/50 bg-emerald-600/90 px-2 text-xs font-bold text-zinc-950 disabled:opacity-40"
-                      >
-                        Reconcile with Lowe&apos;s
-                      </button>
+                      {detail.session.status === "ACTIVE" ? (
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() => void handleClose()}
+                          className="flex min-h-11 items-center justify-center rounded-xl border border-amber-400/50 bg-amber-500/90 px-2 text-xs font-bold text-zinc-950 disabled:opacity-40"
+                        >
+                          Close physical audit
+                        </button>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => setReconOpen(true)}
+                          className="flex min-h-11 items-center justify-center rounded-xl border border-emerald-400/50 bg-emerald-600/90 px-2 text-xs font-bold text-zinc-950"
+                        >
+                          Reconcile with Lowe&apos;s
+                        </button>
+                      )}
                       <button
                         type="button"
                         onClick={() => void handleExport()}
@@ -410,6 +458,12 @@ export function AppliancePhysicalAuditPanel({
                         Share / Export CSV
                       </button>
                     </div>
+                    {detail.session.status === "ACTIVE" ? (
+                      <p className="text-center text-[11px] text-amber-100/80">
+                        Close the physical audit to reconcile declared Lowe&apos;s
+                        OH.
+                      </p>
+                    ) : null}
                     <ul className="space-y-2">
                       {detail.physical_items.map((item) => {
                         const snap = detail.snapshots.find(

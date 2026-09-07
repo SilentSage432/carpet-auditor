@@ -448,6 +448,8 @@ drop policy if exists "anon_all_appliance_scans" on public.appliance_scans;
 -- Appliance RLS owned by 20260817_rls_security_lockdown.sql (authenticated + store).
 -- Physical audit sessions + reconciliation snapshots:
 --   supabase/migrations/20260906_appliance_audit_sessions.sql
+-- Catalog store_number restore (APP-FIELD-001 — apply after review):
+--   supabase/migrations/20260907_appliance_catalog_store_number.sql
 
 -- P0 list-path composite indexes (see supabase/migrations/20260813_p0_query_indexes.sql)
 create index if not exists carpet_audits_store_created_at_idx
