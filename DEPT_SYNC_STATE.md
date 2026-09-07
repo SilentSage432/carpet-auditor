@@ -461,6 +461,8 @@ Public paths: `lib/auth-gate.ts` `isAuthGatePublicPath()` — login, pair, verif
 
 > Check boxes as phases complete. Link PRs/commits inline when closing items.
 
+**Appliance specialty product evolution (directional, not contractual):** [`docs/product/APPLIANCE_EVOLUTION_ROADMAP.md`](docs/product/APPLIANCE_EVOLUTION_ROADMAP.md). Dependency law: reliable controls → audit lifecycle → richer observations → recurrence → longitudinal evidence → deterministic intelligence. Next: APP-AUD-002 discovery. Parking lot items (Floor SIMS audit bind, More→Tools, etc.) stay out of schedule until prerequisites clear.
+
 ### Phase 1: Critical sync hardening & quarantine handling ✅
 
 - [x] Add `updated_at` column to `carpet_audits` (migration + TS types + sync conflict parity)

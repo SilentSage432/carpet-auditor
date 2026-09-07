@@ -1,6 +1,7 @@
 # DeptSync Hub — Chat Handoff
 
 ## Latest (2026-09-07)
+- **APP-ROADMAP-001 APPLIANCE EVOLUTION ROADMAP — COMMITTED AND PUSHED:** Canonical appliance product direction + tranche order in [`docs/product/APPLIANCE_EVOLUTION_ROADMAP.md`](docs/product/APPLIANCE_EVOLUTION_ROADMAP.md). Next scheduled discovery: **APP-AUD-002**. APP-OBS-001 queued after lifecycle clarity + field validation. No runtime change.
 - **APP-QA-001 APPLIANCE SURFACE RELIABILITY — COMMITTED AND PUSHED — REAL-HARDWARE VALIDATION PENDING:** Share/Export CSV repaired (DOM-attached download + share abort/fallback). Gemini Scan Anomaly Detection removed from Appliances home. Deterministic reconciliation retained. APP-OBS-001 blue-sticker still deferred pending field validation.
 - **UX-NAV-001 SPECIALTY OPERATIONAL HOME — COMMITTED AND PUSHED:** More → Department Tools; Appliances navigates to audit-aware `/?section=appliances`; Flooring tools grouped; SpecialtyToolsHost retained for contextual/ad-hoc only.
 - **APP-FIELD-001B AUDIT EXIT WIRING — PRODUCTION CODE LIVE — REAL-HARDWARE VALIDATION PENDING:** Start/Continue Physical Audit primary; ad-hoc labeled secondary; scanner resolves auditSessionId; Review / Finish wired; unbound prior ledger scans not retro-attached.

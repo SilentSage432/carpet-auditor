@@ -1,5 +1,10 @@
 # DeptSync Hub — Development Journal
 
+## 2026-09-07 — APP-ROADMAP-001 Appliance evolution roadmap
+- Added `docs/product/APPLIANCE_EVOLUTION_ROADMAP.md`: product purpose, lifecycle, dependency law, field-validation rule, tranche order (APP-AUD-002 next; APP-OBS-001 / APP-CAT-001 queued; APP-ROT-001 / APP-INT-001 later), parking lot.
+- Pointers in `MASTER_ROADMAP.md`, `CHAT_HANDOFF.md`, `DEPT_SYNC_STATE.md`. No runtime/schema change.
+- Status: **APP-ROADMAP-001 APPLIANCE EVOLUTION ROADMAP — COMMITTED AND PUSHED**
+
 ## 2026-09-07 — APP-QA-001 Appliance surface reliability & Gemini anomaly removal
 - Root cause (Share/Export): mobile Chrome/Android treats detached `<a download>` clicks as silent no-ops; share AbortError/share failures were not always falling back to a visible download.
 - Fix: `shareOrDownloadTextFile` / DOM-attached `downloadTextFile`; cancel vs error vs download status; Copy CSV awaits clipboard with explicit failure; summary **Download CSV Inventory** uses the same helper.

@@ -1,6 +1,9 @@
 # DeptSync Hub — Master Roadmap
 
+> **Appliance specialty evolution (directional):** [`docs/product/APPLIANCE_EVOLUTION_ROADMAP.md`](docs/product/APPLIANCE_EVOLUTION_ROADMAP.md) — next: APP-AUD-002 (discovery); then APP-OBS-001 / APP-CAT-001; later APP-ROT-001 / APP-INT-001. Do not leapfrog evidence foundations.
+
 ## Done
+- [x] APP-ROADMAP-001 Appliance evolution roadmap documented (**DOCS ONLY** — `docs/product/APPLIANCE_EVOLUTION_ROADMAP.md`)
 - [x] APP-QA-001 Appliance surface reliability — Share/Export CSV fix; remove Gemini Scan Anomaly Detection from Appliances home (**COMMITTED AND PUSHED — REAL-HARDWARE VALIDATION PENDING**)
 - [x] UX-NAV-001 Specialty operational home — More → Department Tools; Appliances → audit-aware home; Flooring tools grouped (**COMMITTED AND PUSHED**)
 - [x] APP-FIELD-001 Appliance scanner rapid-fire + teach schema fix + audit exit UX (**PRODUCTION LIVE — REAL-HARDWARE REVALIDATION PENDING**; `20260907_appliance_catalog_store_number.sql`)
@@ -198,6 +201,8 @@
 - [x] Pair landing PWA install — standalone detect, deferred `beforeinstallprompt`, iOS Add to Home Screen card, then Floor (`/`)
 
 ## Next
+- [ ] **Appliances — APP-AUD-002** Audit Closure & History Lifecycle (**discovery first**; see [`docs/product/APPLIANCE_EVOLUTION_ROADMAP.md`](docs/product/APPLIANCE_EVOLUTION_ROADMAP.md))
+- [ ] **Appliances — APP-OBS-001** Availability classification (queued after APP-AUD-002 + APP-QA field validation)
 - [x] Apply specialty schema parity (`20260905_store_specialists_home_department.sql`, `20260905_specialty_catalog_remnants_parity.sql`) after fresh backup — **M1+M2 live** 2026-09-05; commit pending
 - [x] Apply Phase 1 JWT/RLS migration in Supabase + enable Custom Access Token Hook
 - [ ] Apply Phase 2 migrations (`20260812_manager_notes.sql`, `20260812_sunday_bay_assignments.sql`, `20260812_manager_notes_archive.sql`, `20260812_fix_manager_notes_rls.sql`, **`20260812_manager_notes_metadata.sql`**, **`enable_rls_flagged_tables.sql`**, **`20260813_p0_query_indexes.sql`**, **`20260814_downstock_queue.sql`**, **`20260814_cabinets_d29.sql`**, **`20260814_bay_velocity_heatmap.sql`**, **`20260814_multi_department_access.sql`**, **`20260815_associate_shift_days.sql`**, **`20260815_carry_over_priority.sql`**, **`20260815_custom_decay_days.sql`**, **`20260815_performance_indexes.sql`**, **`20260815_shift_walk_tasks.sql`**, **`20260815_roster_invite_onboarding.sql`**, **`20260815_unified_auth_token.sql`**, **`20260815_roster_app_access.sql`**, **`20260815_roster_auth_link.sql`**, **`20260815_roster_insert_rls.sql`**, **`20260816_store_locations_read.sql`**, **`20260816_rls_read_write_parity.sql`**, **`20260816_roster_floor_title.sql`**, **`20260816_sunday_rotation_schedule.sql`**, **`20260817_rls_security_lockdown.sql`**, **`20260817_weekly_rotations_location_week_unique.sql`**, **`20260818_weekly_rotation_verification.sql`**, **`20260818_store_location_workflow_type.sql`**, **`20260818_appliance_scans_bay_location.sql`**) + Realtime on notes/assignments/downstock tables
