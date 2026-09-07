@@ -236,7 +236,7 @@ supabase/migrations/20260818_appliance_scans_bay_location.sql → appliance_scan
 supabase/migrations/20260906_appliance_audit_sessions.sql → appliance_audit_sessions + recon snapshots + bind trigger
 supabase/migrations/20260907_appliance_scans_closed_evidence_freeze.sql → CLOSED audit-bound observation freeze (APP-AUD-002B; production LIVE)
 supabase/migrations/20260907_appliance_scans_fulfillment_disposition.sql → fulfillment_disposition soft field (APP-OBS-001; production LIVE)
-supabase/migrations/20260907_appliance_catalog_identifiers.sql → many taught identifiers → one item (APP-CAT-001A; pending apply)
+supabase/migrations/20260907_appliance_catalog_identifiers.sql → many taught identifiers → one item (APP-CAT-001A; production LIVE)
 supabase/migrations/20260812_manager_notes.sql → durable manager_notes (store_number/department/author) + JWT RLS
 supabase/migrations/20260812_sunday_bay_assignments.sql → sunday specialist↔bay assignments + JWT RLS
 

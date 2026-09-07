@@ -3,7 +3,7 @@
 > **Appliance specialty evolution (directional):** [`docs/product/APPLIANCE_EVOLUTION_ROADMAP.md`](docs/product/APPLIANCE_EVOLUTION_ROADMAP.md) — next: APP-CAT-001A field validation / migration apply; CAT-001B local promotion deferred; later APP-ROT-001 / APP-INT-001. Do not leapfrog evidence foundations.
 
 ## Done
-- [x] APP-CAT-001A Multi-identifier resolution & teach — alias table + dual-read upc + Link/Create (**IMPLEMENTED — MIGRATION PENDING APPLY — REAL-HARDWARE VALIDATION PENDING**)
+- [x] APP-CAT-001A Multi-identifier resolution & teach — alias table + dual-read upc + Link/Create (**PRODUCTION MIGRATION LIVE — ESL / REAL-HARDWARE VALIDATION PENDING**)
 - [x] APP-OBS-001 Appliance fulfillment disposition — per-unit NULL/STAGED_PICKUP/STAGED_DELIVERY; last-scan actions; soft after CLOSED; recon breakdown (**PRODUCTION MIGRATION LIVE — REAL-HARDWARE VALIDATION PENDING**)
 - [x] APP-AUD-002B Physical evidence freeze hardening — Option B: explicit membership; CLOSED WHAT/WHERE/WHEN/WHICH freeze (API + DB); ad-hoc/Floor unbound (**COMMITTED, PUSHED, PRODUCTION MIGRATION LIVE — REAL-HARDWARE VALIDATION PENDING**; `20260907_appliance_scans_closed_evidence_freeze.sql`)
 - [x] APP-AUD-002A Audit lifecycle clarity & recent history — Option A UX; derived recon progress; recent CLOSED list (**COMMITTED — REAL-HARDWARE VALIDATION PENDING**)

@@ -6,8 +6,8 @@
 - Unknown scan → Link existing (no metadata re-entry) OR Create new; known identifiers stay quiet.
 - Offline queue `upsert_appliance_catalog_identifier` refuses silent ownership overwrite on replay.
 - No identifier_type; no ESL encoding claims; no bulk local promotion (CAT-001B); no scan rewrite; OBS disposition stays on scan.
-- Migration `20260907_appliance_catalog_identifiers.sql` **not applied this tranche**.
-- Status: **APP-CAT-001A IMPLEMENTED — AWAITING COMMIT / MIGRATION APPLY / FIELD VALIDATION**
+- Migration `20260907_appliance_catalog_identifiers.sql` applied + verified on `fmeinlwhixngednabhgy` (catalog/scan fingerprints unchanged; 3 UPCs backfilled → 3 identifier rows). Pre-migration dump retained under `tmp/production-backups/`.
+- Status: **APP-CAT-001A COMMITTED, PUSHED, AND PRODUCTION MIGRATION LIVE — ESL / REAL-HARDWARE VALIDATION PENDING**
 
 ## 2026-09-07 — APP-OBS-001 Appliance fulfillment disposition
 - Per-unit `fulfillment_disposition` on `appliance_scans`: NULL | STAGED_PICKUP | STAGED_DELIVERY.

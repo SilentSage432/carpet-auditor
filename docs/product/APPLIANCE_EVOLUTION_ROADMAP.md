@@ -142,7 +142,7 @@ Soft mutable after CLOSED (APP-AUD-002B soft-field set). Quiet rapid scan + opti
 
 #### APP-CAT-001 — Local Catalog Promotion (+ multi-identifier)
 
-**APP-CAT-001A (implemented — migration pending apply):** Many taught scannable identifiers → one canonical `(store_number, item_number)`. Table `appliance_catalog_identifiers` UNIQUE `(store_number, identifier)`. Legacy `upc` retained and dual-read. Unknown identifier → **Link to existing** (no metadata re-entry) or **Create new**. Identifier type enum deferred. ESL encoding remains field evidence, not assumption. Historical scans do not change when aliases change. Disposition stays on `appliance_scans`.
+**APP-CAT-001A (production migration LIVE — ESL / real-hardware validation pending):** Many taught scannable identifiers → one canonical `(store_number, item_number)`. Table `appliance_catalog_identifiers` UNIQUE `(store_number, identifier)`. Legacy `upc` retained and dual-read. Unknown identifier → **Link to existing** (no metadata re-entry) or **Create new**. Identifier type enum deferred. ESL encoding remains field evidence, not assumption. Historical scans do not change when aliases change. Disposition stays on `appliance_scans`.
 
 **APP-CAT-001B (deferred):** Review locally taught mappings and **intentionally** promote valid ones into the authoritative store-scoped server catalog. Do **not** automatically upload legacy local mappings.
 
