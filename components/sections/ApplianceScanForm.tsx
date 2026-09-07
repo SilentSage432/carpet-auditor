@@ -21,6 +21,7 @@ import {
   loadApplianceScanDraft,
   saveApplianceScan,
   scheduleApplianceScanDraftSave,
+  updateApplianceScan,
 } from "@/lib/appliance-scans";
 import { loadCachedActiveAuditSessionId } from "@/lib/appliances/audit-client";
 import { sanitizeBarcodeScan } from "@/lib/barcode";
@@ -39,8 +40,10 @@ import {
   APPLIANCE_SCAN_MODES,
   APPLIANCE_SIMS_SUGGESTIONS,
   defaultApplianceConditionForLocation,
+  formatApplianceFulfillmentDisposition,
   isValidApplianceSubCategory,
   type ApplianceCatalogItem,
+  type ApplianceFulfillmentDisposition,
   type ApplianceLocationType,
   type ApplianceScan,
   type StoreSpecialist,
@@ -121,6 +124,14 @@ export function ApplianceScanForm({
   const [manualEntry, setManualEntry] = useState(false);
   const [pendingAuditScans, setPendingAuditScans] = useState(0);
   const [auditUnitCount, setAuditUnitCount] = useState(0);
+  /** Last created scan for optional blue-sticker disposition (APP-OBS-001). */
+  const [lastScanId, setLastScanId] = useState<string | null>(null);
+  const [lastScanItem, setLastScanItem] = useState<string | null>(null);
+  const [lastDisposition, setLastDisposition] =
+    useState<ApplianceFulfillmentDisposition | null>(null);
+  const [dispositionBusy, setDispositionBusy] = useState(false);
+  const lastScanIdRef = useRef<string | null>(null);
+  lastScanIdRef.current = lastScanId;
 
   serialRef.current = serialNumber;
   locationRef.current = location;
@@ -298,6 +309,9 @@ export function ApplianceScanForm({
 
         onLogged(record, offline);
         refreshAuditCounts();
+        setLastScanId(record.id);
+        setLastScanItem(record.item_number);
+        setLastDisposition(record.fulfillment_disposition ?? null);
         flashStatus(
           offline
             ? `Counted ${item.item_number} · syncing when online`
@@ -323,6 +337,38 @@ export function ApplianceScanForm({
       refreshAuditCounts,
       scannedBy,
     ]
+  );
+
+  const applyLastScanDisposition = useCallback(
+    async (value: ApplianceFulfillmentDisposition) => {
+      // Capture id before await — rapid Scan B must not retarget this PATCH,
+      // and a stale A response must not overwrite B's last-scan chrome.
+      const targetId = lastScanId;
+      const targetItem = lastScanItem;
+      if (!targetId || dispositionBusy) return;
+      setDispositionBusy(true);
+      try {
+        const saved = await updateApplianceScan(targetId, {
+          fulfillment_disposition: value,
+        });
+        onLogged(saved, Boolean(saved.offline));
+        if (lastScanIdRef.current === targetId) {
+          setLastDisposition(saved.fulfillment_disposition ?? null);
+          flashStatus(
+            `${formatApplianceFulfillmentDisposition(value)} · ${targetItem ?? ""}`.trim()
+          );
+        }
+        window.setTimeout(() => itemInputRef.current?.focus(), 0);
+      } catch (err) {
+        const message =
+          err instanceof Error ? err.message : "Could not update disposition";
+        flashStatus(message, "error");
+        playErrorTone();
+      } finally {
+        setDispositionBusy(false);
+      }
+    },
+    [dispositionBusy, flashStatus, lastScanId, lastScanItem, onLogged]
   );
 
   function handleItemChange(raw: string) {
@@ -472,6 +518,45 @@ export function ApplianceScanForm({
             ? "Saving mapping…"
             : "Ready — scan next barcode"}
         </p>
+        {lastScanId ? (
+          <div
+            className="mt-2 rounded-xl border border-slate-700/80 bg-slate-950/50 px-2 py-2"
+            data-testid="last-scan-fulfillment"
+          >
+            <p className="mb-1.5 text-center text-[10px] font-medium text-slate-500">
+              Last unit {lastScanItem ?? ""}
+              {lastDisposition
+                ? ` · ${formatApplianceFulfillmentDisposition(lastDisposition)}`
+                : " · optional blue sticker"}
+            </p>
+            <div className="grid grid-cols-2 gap-1.5">
+              <button
+                type="button"
+                disabled={dispositionBusy}
+                onClick={() => void applyLastScanDisposition("STAGED_PICKUP")}
+                className={`flex min-h-11 items-center justify-center rounded-xl border px-2 text-[11px] font-bold ${
+                  lastDisposition === "STAGED_PICKUP"
+                    ? "border-amber-400/60 bg-amber-950/50 text-amber-100"
+                    : "border-zinc-700 bg-zinc-950/70 text-zinc-300"
+                }`}
+              >
+                Staged pickup
+              </button>
+              <button
+                type="button"
+                disabled={dispositionBusy}
+                onClick={() => void applyLastScanDisposition("STAGED_DELIVERY")}
+                className={`flex min-h-11 items-center justify-center rounded-xl border px-2 text-[11px] font-bold ${
+                  lastDisposition === "STAGED_DELIVERY"
+                    ? "border-violet-400/60 bg-violet-950/50 text-violet-100"
+                    : "border-zinc-700 bg-zinc-950/70 text-zinc-300"
+                }`}
+              >
+                Staged delivery
+              </button>
+            </div>
+          </div>
+        ) : null}
       </div>
 
       {statusMsg ? (

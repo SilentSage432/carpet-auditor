@@ -11,6 +11,7 @@ import {
 } from "@/lib/appliance-scans";
 import {
   formatApplianceConditionTag,
+  formatApplianceFulfillmentDisposition,
   formatApplianceLocationType,
   type ApplianceScan,
 } from "@/lib/types";
@@ -48,10 +49,14 @@ export function applianceAuditExportCsv(
         const condition = scan.condition_tag
           ? formatApplianceConditionTag(scan.condition_tag)
           : null;
+        const disposition = formatApplianceFulfillmentDisposition(
+          scan.fulfillment_disposition
+        );
         const loc = scan.location.trim();
         const parts = [
           serial ? `SN:${serial}` : null,
           condition,
+          disposition || null,
           loc ? `@${loc}` : null,
         ].filter(Boolean);
         return parts.join(" · ") || "—";

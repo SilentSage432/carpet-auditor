@@ -767,6 +767,41 @@ export function formatApplianceConditionTag(tag: ApplianceConditionTag): string 
   );
 }
 
+/**
+ * Physically observed staged fulfillment (blue sticker).
+ * NULL = no staged disposition recorded — NOT official Lowe's availability.
+ * Orthogonal to location_type and condition_tag (APP-OBS-001).
+ */
+export type ApplianceFulfillmentDisposition = "STAGED_PICKUP" | "STAGED_DELIVERY";
+
+export const APPLIANCE_FULFILLMENT_DISPOSITIONS: {
+  id: ApplianceFulfillmentDisposition;
+  label: string;
+}[] = [
+  { id: "STAGED_PICKUP", label: "Staged pickup" },
+  { id: "STAGED_DELIVERY", label: "Staged delivery" },
+];
+
+/** Normalize raw → STAGED_* or null. Empty/unknown → null (never invent NORMAL/AVAILABLE). */
+export function normalizeApplianceFulfillmentDisposition(
+  raw: unknown
+): ApplianceFulfillmentDisposition | null {
+  if (raw == null || raw === "") return null;
+  const v = String(raw).trim().toUpperCase();
+  if (v === "STAGED_PICKUP" || v === "STAGED_DELIVERY") return v;
+  return null;
+}
+
+export function formatApplianceFulfillmentDisposition(
+  value: ApplianceFulfillmentDisposition | null | undefined
+): string {
+  if (!value) return "";
+  return (
+    APPLIANCE_FULFILLMENT_DISPOSITIONS.find((d) => d.id === value)?.label ??
+    value.replace(/_/g, " ")
+  );
+}
+
 export function defaultApplianceConditionForLocation(
   locationType: ApplianceLocationType
 ): ApplianceConditionTag {
@@ -989,6 +1024,11 @@ export type ApplianceScan = {
   bay_number?: number | null;
   /** Physical audit session (APP-AUD-001). NULL = pre-session / unbound legacy. */
   audit_session_id?: string | null;
+  /**
+   * Physically observed staged fulfillment (APP-OBS-001).
+   * NULL = no staged disposition recorded (not official availability).
+   */
+  fulfillment_disposition?: ApplianceFulfillmentDisposition | null;
 };
 
 export type ApplianceScanInsert = Omit<

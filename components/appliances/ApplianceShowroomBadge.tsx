@@ -2,6 +2,7 @@
 
 import {
   formatApplianceConditionTag,
+  formatApplianceFulfillmentDisposition,
   isApplianceShowroomDisplayScan,
   type ApplianceScan,
 } from "@/lib/types";
@@ -90,6 +91,10 @@ export function ApplianceGroupCountSummary({ scans, className = "" }: SummaryPro
 
 export function formatApplianceUnitDetail(scan: ApplianceScan): string {
   const bits = [formatApplianceConditionTag(scan.condition_tag)];
+  const disposition = formatApplianceFulfillmentDisposition(
+    scan.fulfillment_disposition
+  );
+  if (disposition) bits.push(disposition);
   if (scan.serial_number.trim()) bits.unshift(`SN ${scan.serial_number.trim()}`);
   return bits.join(" · ");
 }

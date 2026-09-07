@@ -17,10 +17,13 @@ import {
   isValidApplianceSubCategory,
   normalizeApplianceCategory,
   normalizeApplianceConditionTag,
+  normalizeApplianceFulfillmentDisposition,
   normalizeApplianceLocationType,
   resolveApplianceCategoryPair,
+  formatApplianceFulfillmentDisposition,
   type ApplianceCategory,
   type ApplianceConditionTag,
+  type ApplianceFulfillmentDisposition,
   type ApplianceLocationType,
   type ApplianceScan,
   type ApplianceScanInsert,
@@ -138,6 +141,9 @@ export function mapApplianceScanRow(row: Record<string, unknown>): ApplianceScan
     audit_session_id: row.audit_session_id
       ? String(row.audit_session_id)
       : null,
+    fulfillment_disposition: normalizeApplianceFulfillmentDisposition(
+      row.fulfillment_disposition
+    ),
   };
 }
 
@@ -174,6 +180,7 @@ export function buildApplianceScanPayload(
   aisle?: string;
   bay_number?: number;
   audit_session_id?: string;
+  fulfillment_disposition?: ApplianceFulfillmentDisposition | null;
   id?: string;
 } {
   const pair = resolveApplianceCategoryPair(
@@ -207,6 +214,7 @@ export function buildApplianceScanPayload(
     aisle?: string;
     bay_number?: number;
     audit_session_id?: string;
+    fulfillment_disposition?: ApplianceFulfillmentDisposition | null;
     id?: string;
   } = {
     store_number: store,
@@ -232,6 +240,12 @@ export function buildApplianceScanPayload(
   if (Number.isFinite(bayNumber)) payload.bay_number = Math.floor(bayNumber);
   const auditSessionId = String(input.audit_session_id ?? "").trim();
   if (auditSessionId) payload.audit_session_id = auditSessionId;
+  // Explicit only — omit from payload when null so DB default NULL applies on insert.
+  if (input.fulfillment_disposition !== undefined) {
+    payload.fulfillment_disposition = normalizeApplianceFulfillmentDisposition(
+      input.fulfillment_disposition
+    );
+  }
 
   return payload;
 }
@@ -352,6 +366,7 @@ export async function saveApplianceScan(
       aisle: payload.aisle,
       bay_number: payload.bay_number,
       audit_session_id: payload.audit_session_id ?? null,
+      fulfillment_disposition: payload.fulfillment_disposition ?? null,
     };
     upsertLocal(offlineRecord);
     enqueueSyncAction(
@@ -596,6 +611,7 @@ export type ApplianceScanCsvOptions = {
 export type ApplianceUnitEdit = {
   serial: string;
   condition_tag: ApplianceConditionTag;
+  fulfillment_disposition?: ApplianceFulfillmentDisposition | null;
 };
 
 export type ApplianceGroupEditInput = {
@@ -789,6 +805,7 @@ export async function updateApplianceScan(
       | "scanned_by"
       | "category"
       | "sub_category"
+      | "fulfillment_disposition"
     >
   >
 ): Promise<ApplianceScan> {
@@ -827,6 +844,12 @@ export async function updateApplianceScan(
       patch.sub_category !== undefined
         ? String(patch.sub_category).trim() || undefined
         : existing.sub_category,
+    fulfillment_disposition:
+      patch.fulfillment_disposition !== undefined
+        ? normalizeApplianceFulfillmentDisposition(
+            patch.fulfillment_disposition
+          )
+        : existing.fulfillment_disposition ?? null,
   };
 
   if (!isBrowserOnline()) {
@@ -852,6 +875,7 @@ export async function updateApplianceScan(
         aisle: next.aisle ?? null,
         bay_number: next.bay_number ?? null,
         is_showroom_baseline: Boolean(next.is_showroom_baseline),
+        fulfillment_disposition: next.fulfillment_disposition ?? null,
       },
       store
     );
@@ -859,23 +883,30 @@ export async function updateApplianceScan(
   }
 
   const authHeaders = await storeOpsAuthHeadersAsync();
+  const body: Record<string, unknown> = {
+    id,
+    store_number: store,
+  };
+  if (patch.serial_number !== undefined) body.serial_number = next.serial_number;
+  if (patch.location !== undefined) body.location = next.location;
+  if (patch.location_type !== undefined) body.location_type = next.location_type;
+  if (patch.condition_tag !== undefined) body.condition_tag = next.condition_tag;
+  if (patch.scanned_by !== undefined) body.scanned_by = next.scanned_by;
+  if (patch.category !== undefined || patch.sub_category !== undefined) {
+    body.category = next.category;
+    body.sub_category = next.sub_category ?? "";
+  }
+  if (patch.fulfillment_disposition !== undefined) {
+    body.fulfillment_disposition = next.fulfillment_disposition;
+  }
+
   const res = await fetch("/api/appliances/scans", {
     method: "PATCH",
     headers: {
       ...authHeaders,
       "x-store-number": store,
     },
-    body: JSON.stringify({
-      id,
-      store_number: store,
-      serial_number: next.serial_number,
-      location: next.location,
-      location_type: next.location_type,
-      condition_tag: next.condition_tag,
-      scanned_by: next.scanned_by,
-      category: next.category,
-      sub_category: next.sub_category ?? "",
-    }),
+    body: JSON.stringify(body),
   });
 
   const json = (await res.json().catch(() => ({}))) as {
@@ -906,9 +937,16 @@ export async function applyApplianceGroupEdit(
   const units = input.units.map((u) => ({
     serial: String(u.serial ?? "").trim(),
     condition_tag: normalizeApplianceConditionTag(u.condition_tag),
+    fulfillment_disposition: normalizeApplianceFulfillmentDisposition(
+      u.fulfillment_disposition
+    ),
   }));
   while (units.length < qty) {
-    units.push({ serial: "", condition_tag: "NEW_BOXED" });
+    units.push({
+      serial: "",
+      condition_tag: "NEW_BOXED" as const,
+      fulfillment_disposition: null,
+    });
   }
   units.length = qty;
 
@@ -926,12 +964,18 @@ export async function applyApplianceGroupEdit(
   const keptUpdated: ApplianceScan[] = [];
   for (let i = 0; i < keep.length; i++) {
     const scan = keep[i];
-    const unit = units[i] ?? { serial: "", condition_tag: "NEW_BOXED" as const };
+    const unit = units[i] ?? {
+      serial: "",
+      condition_tag: "NEW_BOXED" as const,
+      fulfillment_disposition: null,
+    };
+    const existingDisposition = scan.fulfillment_disposition ?? null;
     if (
       scan.serial_number === unit.serial &&
       scan.location === location &&
       scan.location_type === location_type &&
-      scan.condition_tag === unit.condition_tag
+      scan.condition_tag === unit.condition_tag &&
+      existingDisposition === unit.fulfillment_disposition
     ) {
       keptUpdated.push(scan);
       continue;
@@ -941,6 +985,7 @@ export async function applyApplianceGroupEdit(
       location,
       location_type,
       condition_tag: unit.condition_tag,
+      fulfillment_disposition: unit.fulfillment_disposition,
     });
     keptUpdated.push(updated);
   }
@@ -948,7 +993,11 @@ export async function applyApplianceGroupEdit(
   const created: ApplianceScan[] = [];
   const category = normalizeApplianceCategory(input.category);
   for (let i = keep.length; i < qty; i++) {
-    const unit = units[i] ?? { serial: "", condition_tag: "NEW_BOXED" as const };
+    const unit = units[i] ?? {
+      serial: "",
+      condition_tag: "NEW_BOXED" as const,
+      fulfillment_disposition: null,
+    };
     const { record } = await saveApplianceScan({
       item_number: input.item_number,
       serial_number: unit.serial,
@@ -958,6 +1007,7 @@ export async function applyApplianceGroupEdit(
       category,
       sub_category: input.sub_category,
       scanned_by: input.scanned_by,
+      fulfillment_disposition: unit.fulfillment_disposition,
     });
     created.push(record);
   }
@@ -1010,6 +1060,7 @@ export function applianceScansToCsv(
     "Serial #",
     "Location Type",
     "Condition",
+    "Fulfillment Disposition",
     "Location",
     "Scanned By",
     "Scanned At",
@@ -1029,6 +1080,7 @@ export function applianceScansToCsv(
         s.serial_number,
         s.location_type,
         s.condition_tag,
+        formatApplianceFulfillmentDisposition(s.fulfillment_disposition),
         s.location,
         s.scanned_by,
         s.scanned_at,

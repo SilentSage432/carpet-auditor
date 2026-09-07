@@ -1,8 +1,9 @@
 # DeptSync Hub — Master Roadmap
 
-> **Appliance specialty evolution (directional):** [`docs/product/APPLIANCE_EVOLUTION_ROADMAP.md`](docs/product/APPLIANCE_EVOLUTION_ROADMAP.md) — next: APP-OBS-001 (after APP-AUD-002B field validation); then APP-CAT-001; later APP-ROT-001 / APP-INT-001. Do not leapfrog evidence foundations.
+> **Appliance specialty evolution (directional):** [`docs/product/APPLIANCE_EVOLUTION_ROADMAP.md`](docs/product/APPLIANCE_EVOLUTION_ROADMAP.md) — next: APP-CAT-001 (after APP-OBS-001 field validation); later APP-ROT-001 / APP-INT-001. Do not leapfrog evidence foundations.
 
 ## Done
+- [x] APP-OBS-001 Appliance fulfillment disposition — per-unit NULL/STAGED_PICKUP/STAGED_DELIVERY; last-scan actions; soft after CLOSED; recon breakdown (**IMPLEMENTED — MIGRATION PENDING APPLY — REAL-HARDWARE VALIDATION PENDING**)
 - [x] APP-AUD-002B Physical evidence freeze hardening — Option B: explicit membership; CLOSED WHAT/WHERE/WHEN/WHICH freeze (API + DB); ad-hoc/Floor unbound (**COMMITTED, PUSHED, PRODUCTION MIGRATION LIVE — REAL-HARDWARE VALIDATION PENDING**; `20260907_appliance_scans_closed_evidence_freeze.sql`)
 - [x] APP-AUD-002A Audit lifecycle clarity & recent history — Option A UX; derived recon progress; recent CLOSED list (**COMMITTED — REAL-HARDWARE VALIDATION PENDING**)
 - [x] APP-ROADMAP-001 Appliance evolution roadmap documented (**DOCS ONLY** — `docs/product/APPLIANCE_EVOLUTION_ROADMAP.md`)
@@ -203,8 +204,9 @@
 - [x] Pair landing PWA install — standalone detect, deferred `beforeinstallprompt`, iOS Add to Home Screen card, then Floor (`/`)
 
 ## Next
+- [ ] **Appliances — APP-OBS-001** apply `20260907_appliance_scans_fulfillment_disposition.sql` + field validation
 - [ ] **Appliances — APP-AUD-002** field validation to close tranche after 002A/002B hardware smoke
-- [ ] **Appliances — APP-OBS-001** Availability classification (queued after APP-AUD-002 + APP-QA field validation)
+- [ ] **Appliances — APP-CAT-001** Local catalog promotion + multi-identifier resolution (queued after OBS)
 - [x] Apply specialty schema parity (`20260905_store_specialists_home_department.sql`, `20260905_specialty_catalog_remnants_parity.sql`) after fresh backup — **M1+M2 live** 2026-09-05; commit pending
 - [x] Apply Phase 1 JWT/RLS migration in Supabase + enable Custom Access Token Hook
 - [ ] Apply Phase 2 migrations (`20260812_manager_notes.sql`, `20260812_sunday_bay_assignments.sql`, `20260812_manager_notes_archive.sql`, `20260812_fix_manager_notes_rls.sql`, **`20260812_manager_notes_metadata.sql`**, **`enable_rls_flagged_tables.sql`**, **`20260813_p0_query_indexes.sql`**, **`20260814_downstock_queue.sql`**, **`20260814_cabinets_d29.sql`**, **`20260814_bay_velocity_heatmap.sql`**, **`20260814_multi_department_access.sql`**, **`20260815_associate_shift_days.sql`**, **`20260815_carry_over_priority.sql`**, **`20260815_custom_decay_days.sql`**, **`20260815_performance_indexes.sql`**, **`20260815_shift_walk_tasks.sql`**, **`20260815_roster_invite_onboarding.sql`**, **`20260815_unified_auth_token.sql`**, **`20260815_roster_app_access.sql`**, **`20260815_roster_auth_link.sql`**, **`20260815_roster_insert_rls.sql`**, **`20260816_store_locations_read.sql`**, **`20260816_rls_read_write_parity.sql`**, **`20260816_roster_floor_title.sql`**, **`20260816_sunday_rotation_schedule.sql`**, **`20260817_rls_security_lockdown.sql`**, **`20260817_weekly_rotations_location_week_unique.sql`**, **`20260818_weekly_rotation_verification.sql`**, **`20260818_store_location_workflow_type.sql`**, **`20260818_appliance_scans_bay_location.sql`**) + Realtime on notes/assignments/downstock tables

@@ -1,5 +1,15 @@
 # DeptSync Hub — Development Journal
 
+## 2026-09-07 — APP-OBS-001 Appliance fulfillment disposition
+- Per-unit `fulfillment_disposition` on `appliance_scans`: NULL | STAGED_PICKUP | STAGED_DELIVERY.
+- NULL = no staged disposition recorded (not official Lowe's availability). Orthogonal to location_type / condition_tag.
+- Quiet rapid COUNT; optional last-unit Staged pickup / Staged delivery; edit sheet clear-to-NULL.
+- Soft mutable after CLOSED (not in APP-AUD-002B freeze set). Offline/API/queue threaded; membership preserved.
+- Derived recon breakdown (showroom / staged pickup / staged delivery / no staged disposition recorded). Plain CSV column.
+- Migration `20260907_appliance_scans_fulfillment_disposition.sql` (**not applied this tranche**).
+- APP-CAT-001 multi-identifier remains next; no correction history / Excel polish / INT.
+- Status: **APP-OBS-001 IMPLEMENTED — AWAITING COMMIT / MIGRATION APPLY / REAL-HARDWARE VALIDATION**
+
 ## 2026-09-07 — APP-AUD-002B Physical evidence freeze hardening
 - Option B: explicit audit membership (omit `audit_session_id` → unbound; removed server ACTIVE auto-bind).
 - Ad-hoc + Floor/SIMS (`SpecialtyToolsHost` `ignoreCachedAuditSession`) remain outside Physical Audit lifecycle.

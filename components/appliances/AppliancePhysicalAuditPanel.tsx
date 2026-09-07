@@ -682,11 +682,18 @@ export function AppliancePhysicalAuditPanel({
                               {item.description ||
                                 `${item.category}${item.sub_category ? ` · ${item.sub_category}` : ""}`}
                             </p>
-                            <p className="mt-1 font-mono text-xs text-cyan-200">
+                              <p className="mt-1 font-mono text-xs text-cyan-200">
                               Physical count: {item.physical_count}
                               {snap?.declared_lowes_oh != null
                                 ? ` · Declared OH: ${snap.declared_lowes_oh} · Variance: ${snap.variance}`
                                 : " · Lowe's OH not entered"}
+                            </p>
+                            <p className="mt-1 text-[11px] leading-snug text-slate-400">
+                              Observed breakdown: Showroom {item.showroom_count}
+                              {" · "}Staged pickup {item.staged_pickup_count}
+                              {" · "}Staged delivery {item.staged_delivery_count}
+                              {" · "}No staged disposition recorded{" "}
+                              {item.no_staged_disposition_count}
                             </p>
                           </li>
                         );
@@ -734,6 +741,15 @@ export function AppliancePhysicalAuditPanel({
                                 {variance != null
                                   ? ` · Variance: ${variance}`
                                   : ""}
+                              </p>
+                              <p className="mt-1 text-[11px] leading-snug text-slate-400">
+                                Observed breakdown: Showroom{" "}
+                                {item.showroom_count}
+                                {" · "}Staged pickup {item.staged_pickup_count}
+                                {" · "}Staged delivery{" "}
+                                {item.staged_delivery_count}
+                                {" · "}No staged disposition recorded{" "}
+                                {item.no_staged_disposition_count}
                               </p>
                             </div>
                             <NumberField

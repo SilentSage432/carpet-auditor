@@ -43,6 +43,7 @@ import { downloadTextFile } from "@/lib/appliances/audit-export";
 import {
   type ApplianceCatalogItem,
   type ApplianceConditionTag,
+  type ApplianceFulfillmentDisposition,
   type ApplianceLocationType,
   type ApplianceScan,
   type StoreSpecialist,
@@ -323,7 +324,11 @@ export function ApplianceAuditSection({
     targetQuantity: number;
     location: string;
     location_type: ApplianceLocationType;
-    units: { serial: string; condition_tag: ApplianceConditionTag }[];
+    units: {
+      serial: string;
+      condition_tag: ApplianceConditionTag;
+      fulfillment_disposition: ApplianceFulfillmentDisposition | null;
+    }[];
   }) {
     if (!editingGroup) return;
     setEditSaving(true);

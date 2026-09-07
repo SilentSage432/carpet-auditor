@@ -5,6 +5,7 @@
  */
 
 import type { ApplianceCatalogItem, ApplianceScan } from "@/lib/types";
+import { isApplianceShowroomDisplayScan } from "@/lib/types";
 
 export const APPLIANCE_AUDIT_STATUSES = ["ACTIVE", "CLOSED"] as const;
 export type ApplianceAuditStatus = (typeof APPLIANCE_AUDIT_STATUSES)[number];
@@ -63,6 +64,9 @@ export const APPLIANCE_CLOSED_FROZEN_SCAN_FIELDS = [
   "bay_number",
   "location_type",
 ] as const;
+
+// Soft (mutable after CLOSED): condition_tag, category, sub_category,
+// scanned_by, is_showroom_baseline, fulfillment_disposition (APP-OBS-001).
 
 export type ApplianceClosedFrozenScanField =
   (typeof APPLIANCE_CLOSED_FROZEN_SCAN_FIELDS)[number];
@@ -169,6 +173,13 @@ export type AppliancePhysicalItemCount = {
   sub_category: string;
   upc: string | null;
   locations: string[];
+  /** Derived from location_type / showroom helpers — not official inventory. */
+  showroom_count: number;
+  /** Derived from fulfillment_disposition — physical observation only. */
+  staged_pickup_count: number;
+  staged_delivery_count: number;
+  /** Scans with no staged disposition recorded (NULL). */
+  no_staged_disposition_count: number;
 };
 
 export function mapApplianceAuditSessionRow(
@@ -278,6 +289,20 @@ export function composeAppliancePhysicalCounts(
         rowsForItem.map((s) => s.location.trim()).filter(Boolean)
       ),
     ].sort((a, b) => a.localeCompare(b));
+    let showroom_count = 0;
+    let staged_pickup_count = 0;
+    let staged_delivery_count = 0;
+    let no_staged_disposition_count = 0;
+    for (const unit of rowsForItem) {
+      if (isApplianceShowroomDisplayScan(unit)) showroom_count += 1;
+      if (unit.fulfillment_disposition === "STAGED_PICKUP") {
+        staged_pickup_count += 1;
+      } else if (unit.fulfillment_disposition === "STAGED_DELIVERY") {
+        staged_delivery_count += 1;
+      } else {
+        no_staged_disposition_count += 1;
+      }
+    }
     rows.push({
       item_number,
       physical_count: rowsForItem.length,
@@ -286,6 +311,10 @@ export function composeAppliancePhysicalCounts(
       sub_category: cat?.sub_category ?? head.sub_category ?? "",
       upc: cat?.upc ?? null,
       locations,
+      showroom_count,
+      staged_pickup_count,
+      staged_delivery_count,
+      no_staged_disposition_count,
     });
   }
 

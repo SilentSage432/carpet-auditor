@@ -5,15 +5,19 @@ import { NumberField, TextField } from "@/components/ui/NumberField";
 import type { AggregatedApplianceScan } from "@/lib/appliance-scans";
 import {
   APPLIANCE_CONDITION_TAGS,
+  APPLIANCE_FULFILLMENT_DISPOSITIONS,
   APPLIANCE_LOCATION_SUGGESTIONS,
   APPLIANCE_SCAN_MODES,
   APPLIANCE_SIMS_SUGGESTIONS,
   defaultApplianceConditionForLocation,
   formatApplianceConditionTag,
+  formatApplianceFulfillmentDisposition,
   formatApplianceLocationType,
   normalizeApplianceConditionTag,
+  normalizeApplianceFulfillmentDisposition,
   normalizeApplianceLocationType,
   type ApplianceConditionTag,
+  type ApplianceFulfillmentDisposition,
   type ApplianceLocationType,
 } from "@/lib/types";
 
@@ -21,7 +25,11 @@ export type ApplianceGroupEditSaveInput = {
   targetQuantity: number;
   location: string;
   location_type: ApplianceLocationType;
-  units: { serial: string; condition_tag: ApplianceConditionTag }[];
+  units: {
+    serial: string;
+    condition_tag: ApplianceConditionTag;
+    fulfillment_disposition: ApplianceFulfillmentDisposition | null;
+  }[];
 };
 
 type Props = {
@@ -35,6 +43,7 @@ type Props = {
 type UnitRow = {
   serial: string;
   condition_tag: ApplianceConditionTag;
+  fulfillment_disposition: ApplianceFulfillmentDisposition | null;
 };
 
 export function ApplianceScanEditModal({
@@ -65,6 +74,9 @@ export function ApplianceScanEditModal({
       .map((s) => ({
         serial: s.serial_number,
         condition_tag: normalizeApplianceConditionTag(s.condition_tag),
+        fulfillment_disposition: normalizeApplianceFulfillmentDisposition(
+          s.fulfillment_disposition
+        ),
       }));
     while (initial.length < qty) {
       initial.push({
@@ -72,6 +84,7 @@ export function ApplianceScanEditModal({
         condition_tag: defaultApplianceConditionForLocation(
           normalizeApplianceLocationType(head?.location_type ?? "showroom")
         ),
+        fulfillment_disposition: null,
       });
     }
     setUnits(initial.slice(0, qty));
@@ -84,6 +97,7 @@ export function ApplianceScanEditModal({
         next.push({
           serial: "",
           condition_tag: defaultApplianceConditionForLocation(locationType),
+          fulfillment_disposition: null,
         });
       }
       return next.slice(0, Math.max(0, quantity));
@@ -103,7 +117,11 @@ export function ApplianceScanEditModal({
 
   function updateUnit(
     index: number,
-    patch: Partial<{ serial: string; condition_tag: ApplianceConditionTag }>
+    patch: Partial<{
+      serial: string;
+      condition_tag: ApplianceConditionTag;
+      fulfillment_disposition: ApplianceFulfillmentDisposition | null;
+    }>
   ) {
     setUnits((prev) => {
       const next = [...prev];
@@ -294,6 +312,37 @@ export function ApplianceScanEditModal({
                     </label>
                     <p className="text-[10px] text-zinc-500">
                       {formatApplianceConditionTag(unit.condition_tag)}
+                    </p>
+                    <label className="block space-y-1.5">
+                      <span className="text-sm font-medium text-zinc-200">
+                        Fulfillment disposition
+                      </span>
+                      <select
+                        value={unit.fulfillment_disposition ?? ""}
+                        onChange={(e) =>
+                          updateUnit(index, {
+                            fulfillment_disposition:
+                              normalizeApplianceFulfillmentDisposition(
+                                e.target.value || null
+                              ),
+                          })
+                        }
+                        className="min-h-12 w-full rounded-xl border border-zinc-800 bg-zinc-950 px-3 text-base text-zinc-100"
+                      >
+                        <option value="">No staged disposition recorded</option>
+                        {APPLIANCE_FULFILLMENT_DISPOSITIONS.map((d) => (
+                          <option key={d.id} value={d.id}>
+                            {d.label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <p className="text-[10px] text-zinc-500">
+                      {unit.fulfillment_disposition
+                        ? formatApplianceFulfillmentDisposition(
+                            unit.fulfillment_disposition
+                          )
+                        : "No staged disposition recorded — not official availability"}
                     </p>
                   </li>
                 ))}

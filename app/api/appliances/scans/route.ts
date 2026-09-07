@@ -21,6 +21,7 @@ import { supabaseAdminMissingMessage } from "@/lib/supabase/env";
 import {
   isValidApplianceSubCategory,
   normalizeApplianceCategory,
+  normalizeApplianceFulfillmentDisposition,
   resolveApplianceCategoryPair,
 } from "@/lib/types";
 
@@ -151,7 +152,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const payload: Record<string, string | number> = {
+    const payload: Record<string, string | number | null> = {
       store_number: store,
       item_number,
       serial_number,
@@ -174,6 +175,26 @@ export async function POST(request: Request) {
     if (aisle) payload.aisle = aisle;
     const bayNumber = Number(body.bay_number);
     if (Number.isFinite(bayNumber)) payload.bay_number = Math.floor(bayNumber);
+
+    // APP-OBS-001: only set when client explicitly supplies a value.
+    if (body.fulfillment_disposition !== undefined) {
+      const raw = body.fulfillment_disposition;
+      if (raw == null || String(raw).trim() === "") {
+        payload.fulfillment_disposition = null;
+      } else {
+        const normalized = normalizeApplianceFulfillmentDisposition(raw);
+        if (!normalized) {
+          return NextResponse.json(
+            {
+              error:
+                "fulfillment_disposition must be STAGED_PICKUP, STAGED_DELIVERY, or null",
+            },
+            { status: 400 }
+          );
+        }
+        payload.fulfillment_disposition = normalized;
+      }
+    }
 
     // Explicit membership only (APP-AUD-002B). Omitted audit_session_id → unbound.
     // Never infer the store's ACTIVE audit. When supplied: ACTIVE joins freely;
@@ -320,7 +341,7 @@ export async function PATCH(request: Request) {
       return NextResponse.json({ error: "id is required" }, { status: 400 });
     }
 
-    const updates: Record<string, string | boolean> = {};
+    const updates: Record<string, string | boolean | null> = {};
     if (body.serial_number !== undefined) {
       updates.serial_number = String(body.serial_number ?? "").trim();
     }
@@ -345,6 +366,24 @@ export async function PATCH(request: Request) {
       );
       updates.category = normalizeApplianceCategory(pair.category);
       updates.sub_category = pair.sub_category;
+    }
+    if (body.fulfillment_disposition !== undefined) {
+      const raw = body.fulfillment_disposition;
+      if (raw == null || String(raw).trim() === "") {
+        updates.fulfillment_disposition = null;
+      } else {
+        const normalized = normalizeApplianceFulfillmentDisposition(raw);
+        if (!normalized) {
+          return NextResponse.json(
+            {
+              error:
+                "fulfillment_disposition must be STAGED_PICKUP, STAGED_DELIVERY, or null",
+            },
+            { status: 400 }
+          );
+        }
+        updates.fulfillment_disposition = normalized;
+      }
     }
 
     if (Object.keys(updates).length === 0) {

@@ -235,6 +235,7 @@ supabase/migrations/20260818_store_location_workflow_type.sql → store_location
 supabase/migrations/20260818_appliance_scans_bay_location.sql → appliance_scans.location_id / aisle / bay_number
 supabase/migrations/20260906_appliance_audit_sessions.sql → appliance_audit_sessions + recon snapshots + bind trigger
 supabase/migrations/20260907_appliance_scans_closed_evidence_freeze.sql → CLOSED audit-bound observation freeze (APP-AUD-002B; production LIVE)
+supabase/migrations/20260907_appliance_scans_fulfillment_disposition.sql → fulfillment_disposition soft field (APP-OBS-001; pending apply)
 supabase/migrations/20260812_manager_notes.sql → durable manager_notes (store_number/department/author) + JWT RLS
 supabase/migrations/20260812_sunday_bay_assignments.sql → sunday specialist↔bay assignments + JWT RLS
 
@@ -319,6 +320,7 @@ supabase/migrations/20260812_sunday_bay_assignments.sql → sunday specialist↔
    - APP-AUD-001 / APP-AUD-001A: `appliance_audit_sessions` + reconciliation state rows (mutable upsert per item); Close flushes/blocks pending session scans; observation-time CLOSED bind; Clear ledger preserves audit-bound scans; declared Lowe's OH; derived variance
    - APP-AUD-002A: CLOSED = physical count frozen (≠ recon complete); derived recon progress; recent CLOSED history
    - APP-AUD-002B: explicit `audit_session_id` membership (omit = unbound); ad-hoc/Floor/SIMS unbound; CLOSED freezes WHAT/WHERE/WHEN/WHICH (API + DB trigger); soft classification fields remain mutable; catalog snapshot deferred
+   - APP-OBS-001: `fulfillment_disposition` NULL|STAGED_PICKUP|STAGED_DELIVERY (per-unit physical observation; not official availability); last-scan sticker actions; derived recon breakdown
    - APP-FIELD-001: known COUNT local-first + sync queue; scanner Review/Finish; catalog `store_number` restore migration pending apply
    - Scan form is `ApplianceScanForm` (isolated from the accordion log)
    - SIMS bay workflow stamps `location_id` / aisle / bay when opened from Floor

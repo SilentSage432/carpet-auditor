@@ -301,7 +301,11 @@ describe("APP-AUD-002B selective CLOSED freeze", () => {
     expect(APPLIANCE_CLOSED_FROZEN_SCAN_FIELDS).not.toContain(
       "is_showroom_baseline"
     );
+    expect(APPLIANCE_CLOSED_FROZEN_SCAN_FIELDS).not.toContain(
+      "fulfillment_disposition"
+    );
     expect(route).toContain("condition_tag");
+    expect(route).toContain("fulfillment_disposition");
   });
 
   it("physical_count cannot grow from ad-hoc/Floor contamination (no auto-bind)", () => {

@@ -118,26 +118,33 @@ Still pending where noted: **real-hardware validation** for field-facing pieces.
 - Late in-window offline evidence (APP-AUD-001A) remains valid.
 - Catalog snapshot/version provenance remains deferred (presentation drift only).
 
-**Next after APP-AUD-002 closes:** APP-OBS-001.
+**Next after APP-AUD-002 closes:** APP-OBS-001 (implemented — migration apply + field validation pending).
 
 ### Queued (after APP-AUD-002 foundations)
 
 #### APP-OBS-001 — Appliance Availability Classification
 
-Human-declared physical observation exception for fulfillment stickers.
+**Status:** Implemented (migration pending apply; real-hardware validation pending).
 
-Initial concepts: `AVAILABLE` / `NORMAL`, `STAGED_PICKUP`, `STAGED_DELIVERY`.
+Per-unit physical observation: `fulfillment_disposition` on `appliance_scans`.
 
-- Do **not** overload `location_type` or `condition_tag`.  
-- Observed / declared **physical disposition**, not official Lowe’s sellable inventory.  
+| Value | Meaning |
+|-------|---------|
+| `NULL` | No staged disposition recorded (**not** official availability) |
+| `STAGED_PICKUP` | Blue sticker — staged for pickup |
+| `STAGED_DELIVERY` | Blue sticker — staged for delivery |
 
-Desired rapid workflow: scan normally → blue sticker observed → edit that observation → Pickup or Delivery.
+**Orthogonal:** LOCATION ≠ CONDITION ≠ FULFILLMENT DISPOSITION.
 
-**Prerequisite:** APP-QA-001 field-validated; prefer APP-AUD-002 lifecycle clarity so disposition attaches to trustworthy observation records.
+Soft mutable after CLOSED (APP-AUD-002B soft-field set). Quiet rapid scan + optional last-unit Pickup/Delivery. Derived recon breakdown. Plain CSV column.
 
-#### APP-CAT-001 — Local Catalog Promotion
+**Not:** official Lowe's availability, sellable inventory, correction history, ESL/multi-id (APP-CAT-001).
+
+#### APP-CAT-001 — Local Catalog Promotion (+ multi-identifier)
 
 Review locally taught mappings and **intentionally** promote valid ones into the authoritative store-scoped server catalog.
+
+**Multi-identifier resolution (field requirement):** many taught barcodes / ESL identifiers → one canonical Lowe's item number → scan-and-go. Disposition attaches to the resolved scan/unit row, not raw barcode identity.
 
 Do **not** automatically upload legacy local mappings (may predate authoritative store provenance).
 
