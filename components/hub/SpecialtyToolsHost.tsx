@@ -1,8 +1,15 @@
 "use client";
 
 /**
- * Shell-level specialty tool host — listens outside keep-alive `inert` panels
- * so More → Floor Utilities can open existing scanner / remnant calculator.
+ * Shell-level specialty tool host — listens outside keep-alive `inert` panels.
+ *
+ * UX-NAV-001 role (retained, not primary More entry):
+ * - Floor SIMS / bay-contextual appliance scanner opens
+ * - Explicit ad-hoc `requestApplianceScanner()` launches
+ * - Remnant calculator event opens (`requestRemnantCalculator`)
+ *
+ * Durable appliance physical audit lives on `/?section=appliances`
+ * (ApplianceAuditSection). More → Department Tools → Appliances navigates there.
  */
 
 import dynamic from "next/dynamic";

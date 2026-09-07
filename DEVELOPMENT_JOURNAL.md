@@ -1,5 +1,11 @@
 # DeptSync Hub — Development Journal
 
+## 2026-09-06 — UX-NAV-001 Specialty operational home
+- More first card is **Department Tools** (not Floor Utilities). Appliances → `/appliances` → `ApplianceAuditSection` (audit lifecycle). Flooring group: remnant calculator, inventory, cycle audit.
+- SpecialtyToolsHost retained for Floor SIMS / event-driven / ad-hoc scanner + remnant calculator modal — not primary More Appliances entry.
+- Floor SIMS audit-binding deferred (contextual open remains unbound unless product revisits).
+- Status: **UX-NAV-001 SPECIALTY OPERATIONAL HOME — COMMITTED AND PUSHED**
+
 ## 2026-09-06 — APP-FIELD-001B Missing physical audit exit on production scanner
 - Root cause: Scan & Count opened scanner with `auditSessionId=null` unless Start was used first; banner gated on prop only. Session Total was ad-hoc counter, not durable audit.
 - Production evidence: 0 audit sessions; all scans unbound (`audit_session_id` NULL) — not retroactively attached.

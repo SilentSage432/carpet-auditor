@@ -481,7 +481,7 @@ Public paths: `lib/auth-gate.ts` `isAuthGatePublicPath()` — login, pair, verif
 - [x] Floating pill bottom navigation (`components/hub/BottomNav.tsx`) — Floor · Map · Roster · More
 - [x] Sliding active pill indicator + fluid keep-alive tab transitions (opacity/visibility, no remount flicker)
 - [x] Central Floor workspace container with top rail, supervisor bar, and filter chips (`components/hub/tabs/FloorTab.tsx`)
-- [x] More tab reorganized into Floor Utilities / Store Management / Device & Diagnostics (`components/sections/SettingsSection.tsx`)
+- [x] More tab reorganized into Department Tools / Store Management / Device & Diagnostics (`components/sections/SettingsSection.tsx`; UX-NAV-001)
 - [x] 48px bay completion touch targets (`.btn-quick-touch` min-h-12)
 - [ ] Remnant card density reduction (noted in `APP_LAYOUT_MAP.md` D.3)
 - [ ] Continued handheld target sizing audit across legacy surfaces

@@ -59,7 +59,7 @@ describe("UX-004C bottom nav / sheet clearance", () => {
   });
 });
 
-describe("UX-004C More Floor Utilities destinations", () => {
+describe("UX-004C More specialty destinations", () => {
   it("hosts specialty tools outside keep-alive inert panels", () => {
     const shell = readRepo("components/hub/WorkflowTabShell.tsx");
     expect(shell).toContain("SpecialtyToolsHost");
@@ -71,17 +71,16 @@ describe("UX-004C More Floor Utilities destinations", () => {
     expect(host).not.toContain("pointer-events-none");
   });
 
-  it("More buttons invoke canonical specialty request helpers", () => {
+  it("More Department Tools reaches audit home; calculator still uses request helper", () => {
     const settings = readRepo("components/sections/SettingsSection.tsx");
-    expect(settings).toContain('data-testid="more-scan-count-appliances"');
+    expect(settings).toContain('data-testid="more-appliances-home"');
+    expect(settings).toContain("APPLIANCES_OPERATIONAL_HOME_HREF");
+    expect(settings).not.toContain("requestApplianceScanner()");
     expect(settings).toContain('data-testid="more-remnant-calculator"');
     expect(settings).toContain('data-testid="more-executive-floor-pad"');
-    expect(settings).toContain("requestApplianceScanner()");
     expect(settings).toContain("requestRemnantCalculator()");
     expect(settings).toContain("router.push(buildExecutiveFloorPadHref())");
-    expect(settings).not.toMatch(
-      /href="\/dashboard#floor-pad"/
-    );
+    expect(settings).not.toMatch(/href="\/dashboard#floor-pad"/);
   });
 
   it("request helpers dispatch the expected window events", () => {

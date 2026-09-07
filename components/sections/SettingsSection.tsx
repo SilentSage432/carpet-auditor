@@ -36,8 +36,9 @@ import { selectOnFocus } from "@/lib/number-input";
 import { canAccessSection, canManageMapConsole, isMasterAdmin } from "@/lib/rbac";
 import { clearLocalRemnants, countLocalRemnants, fetchRemnants } from "@/lib/remnants";
 import {
+  APPLIANCES_OPERATIONAL_HOME_HREF,
+  FLOORING_CYCLE_AUDIT_HOME_HREF,
   buildExecutiveFloorPadHref,
-  requestApplianceScanner,
   requestRemnantCalculator,
 } from "@/lib/specialty-tools";
 import { dedupeRoster, fetchSpecialists, isSupervisor } from "@/lib/specialists";
@@ -109,9 +110,9 @@ type SettingsAccordion =
 const ICON_STROKE = 1.75;
 
 /**
- * Settings — four scannable cards. Themes, PIN, sync, targets, topology, catalog.
- * Master Admin setup lives here as nested accordions / modals — not a second menu.
- * Floor Pad lives on Floor.
+ * More — Department Tools first (specialty ops), then Store Management / Device.
+ * Appliances primary entry navigates to the audit-aware operational home.
+ * SpecialtyToolsHost remains for contextual calculator / ad-hoc scanner only.
  */
 export function SettingsSection({
   activeSpecialist,
@@ -313,82 +314,159 @@ export function SettingsSection({
     setOpenSection((current) => (current === id ? null : id));
   }
 
-  const showApplianceScanner = canAccessSection(activeSpecialist, "appliances");
+  const showAppliancesHome = canAccessSection(activeSpecialist, "appliances");
   const showRemnantTools = canAccessSection(activeSpecialist, "remnants");
+  const showFlooringCycle = canAccessSection(activeSpecialist, "audit");
+  const showFlooringTools = showRemnantTools || showFlooringCycle;
   const showFloorPad = supervisorSession || masterSession;
+  const showDepartmentTools =
+    showAppliancesHome || showFlooringTools || showFloorPad;
 
   return (
     <div className="space-y-4">
       <header className="px-0.5">
         <h1 className="text-lg font-bold tracking-tight text-zinc-50">More</h1>
         <p className="mt-0.5 text-sm text-zinc-500">
-          Floor utilities, store admin, and device diagnostics
+          Department tools, store admin, and device diagnostics
         </p>
       </header>
 
-      <SettingsCard
-        title="Floor Utilities"
-        subtitle="Scan tools, remnants, and executive floor pad"
-        icons={[Camera, Scissors]}
-      >
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-          {showApplianceScanner ? (
-            <button
-              type="button"
-              data-testid="more-scan-count-appliances"
-              onClick={() => requestApplianceScanner()}
-              className="flex min-h-12 items-center justify-center gap-2 rounded-xl border border-sky-500/40 bg-sky-950/30 px-3 text-sm font-semibold text-sky-100"
-            >
-              Scan &amp; Count Appliances
-            </button>
-          ) : null}
-          {showRemnantTools ? (
-            <button
-              type="button"
-              data-testid="more-remnant-calculator"
-              onClick={() => requestRemnantCalculator()}
-              className="flex min-h-12 items-center justify-center gap-2 rounded-xl border border-emerald-500/40 bg-emerald-950/30 px-3 text-sm font-semibold text-emerald-100"
-            >
-              Carpet Remnant Calculator
-            </button>
-          ) : null}
-          {showFloorPad ? (
-            <button
-              type="button"
-              data-testid="more-executive-floor-pad"
-              onClick={() => router.push(buildExecutiveFloorPadHref())}
-              className="flex min-h-12 items-center justify-center gap-2 rounded-xl border border-violet-500/40 bg-violet-950/30 px-3 text-sm font-semibold text-violet-100 sm:col-span-2"
-            >
-              <NotebookPen className="h-4 w-4" strokeWidth={ICON_STROKE} aria-hidden />
-              Executive Floor Pad
-            </button>
-          ) : null}
-        </div>
-        {showRemnants ? (
-          <Accordion
-            id="remnants"
-            title="Remnant inventory"
-            subtitle="Rack status and markdown"
-            open={openSection === "remnants"}
-            onToggle={() => toggleSection("remnants")}
-          >
-            <RemnantSection
-              catalog={catalog}
-              remnants={remnants}
-              onRemnantsChange={setRemnants}
-              loggedBy={activeSpecialist!.name}
-              specialists={roster}
-              activeSpecialist={activeSpecialist}
-            />
-          </Accordion>
-        ) : null}
-      </SettingsCard>
+      {showDepartmentTools ? (
+        <SettingsCard
+          title="Department Tools"
+          subtitle="Specialty operational work — not diagnostics"
+          icons={[Camera, Scissors]}
+          data-testid="more-department-tools"
+        >
+          <div className="space-y-3">
+            {showAppliancesHome ? (
+              <button
+                type="button"
+                data-testid="more-appliances-home"
+                onClick={() => router.push(APPLIANCES_OPERATIONAL_HOME_HREF)}
+                className="flex min-h-14 w-full items-center gap-3 rounded-xl border border-sky-500/45 bg-sky-950/35 px-3.5 py-3 text-left active:bg-sky-950/55"
+              >
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-bold text-sky-50">
+                    Appliances
+                  </span>
+                  <span className="mt-0.5 block text-xs font-medium text-sky-200/75">
+                    Physical audit, scan &amp; count, reconcile
+                  </span>
+                </span>
+                <ChevronRight
+                  className="h-5 w-5 shrink-0 text-sky-300/80"
+                  strokeWidth={ICON_STROKE}
+                  aria-hidden
+                />
+              </button>
+            ) : null}
+
+            {showFlooringTools ? (
+              <div
+                data-testid="more-flooring-tools"
+                className="space-y-2 rounded-xl border border-emerald-500/25 bg-emerald-950/20 p-2.5"
+              >
+                <p className="px-1 font-mono text-[10px] font-bold uppercase tracking-wide text-emerald-300/80">
+                  Flooring
+                </p>
+                {showRemnantTools ? (
+                  <button
+                    type="button"
+                    data-testid="more-remnant-calculator"
+                    onClick={() => requestRemnantCalculator()}
+                    className="flex min-h-12 w-full items-center justify-between gap-2 rounded-xl border border-emerald-500/40 bg-emerald-950/40 px-3 text-sm font-semibold text-emerald-50"
+                  >
+                    Remnant calculator
+                    <ChevronRight
+                      className="h-4 w-4 shrink-0 opacity-70"
+                      strokeWidth={ICON_STROKE}
+                      aria-hidden
+                    />
+                  </button>
+                ) : null}
+                {showRemnants ? (
+                  <button
+                    type="button"
+                    data-testid="more-remnant-inventory"
+                    aria-expanded={openSection === "remnants"}
+                    onClick={() => toggleSection("remnants")}
+                    className="flex min-h-12 w-full items-center justify-between gap-2 rounded-xl border border-emerald-500/30 bg-slate-950/50 px-3 text-sm font-semibold text-emerald-100"
+                  >
+                    Remnant inventory
+                    {openSection === "remnants" ? (
+                      <ChevronUp
+                        className="h-4 w-4 shrink-0 opacity-70"
+                        strokeWidth={ICON_STROKE}
+                        aria-hidden
+                      />
+                    ) : (
+                      <ChevronDown
+                        className="h-4 w-4 shrink-0 opacity-70"
+                        strokeWidth={ICON_STROKE}
+                        aria-hidden
+                      />
+                    )}
+                  </button>
+                ) : null}
+                {showFlooringCycle ? (
+                  <button
+                    type="button"
+                    data-testid="more-flooring-cycle-audit"
+                    onClick={() => router.push(FLOORING_CYCLE_AUDIT_HOME_HREF)}
+                    className="flex min-h-12 w-full items-center justify-between gap-2 rounded-xl border border-emerald-500/30 bg-slate-950/50 px-3 text-sm font-semibold text-emerald-100"
+                  >
+                    Flooring cycle audit
+                    <ChevronRight
+                      className="h-4 w-4 shrink-0 opacity-70"
+                      strokeWidth={ICON_STROKE}
+                      aria-hidden
+                    />
+                  </button>
+                ) : null}
+                {showRemnants && openSection === "remnants" ? (
+                  <div
+                    id="remnants"
+                    className="rounded-xl border border-slate-800 bg-slate-950/70 p-2"
+                  >
+                    <RemnantSection
+                      catalog={catalog}
+                      remnants={remnants}
+                      onRemnantsChange={setRemnants}
+                      loggedBy={activeSpecialist!.name}
+                      specialists={roster}
+                      activeSpecialist={activeSpecialist}
+                    />
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
+
+            {showFloorPad ? (
+              <button
+                type="button"
+                data-testid="more-executive-floor-pad"
+                onClick={() => router.push(buildExecutiveFloorPadHref())}
+                className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-violet-500/40 bg-violet-950/30 px-3 text-sm font-semibold text-violet-100"
+              >
+                <NotebookPen
+                  className="h-4 w-4"
+                  strokeWidth={ICON_STROKE}
+                  aria-hidden
+                />
+                Executive Floor Pad
+              </button>
+            ) : null}
+          </div>
+        </SettingsCard>
+      ) : null}
 
       {(supervisorSession || masterSession) && activeSpecialist ? (
         <SettingsCard
           title="Store Management"
-          subtitle="Topology, quotas, and Sunday auto-stage"
+          subtitle="Admin configuration — topology, quotas, Sunday"
           icons={[Layers, Target]}
+          data-testid="more-store-management"
         >
           {mapConsole ? (
             <Accordion
@@ -466,6 +544,7 @@ export function SettingsSection({
         title="Device & Diagnostics"
         subtitle="Profile, sync queue, offline matrix, alerts"
         icons={[UserCheck, Sliders]}
+        data-testid="more-device-diagnostics"
       >
         {canChangePin && activeSpecialist ? (
           <>
@@ -691,6 +770,7 @@ function SettingsCard({
   collapsible = false,
   open = true,
   onToggle,
+  "data-testid": testId,
 }: {
   id?: string;
   title: string;
@@ -700,6 +780,7 @@ function SettingsCard({
   collapsible?: boolean;
   open?: boolean;
   onToggle?: () => void;
+  "data-testid"?: string;
 }) {
   const heading = (
     <>
@@ -742,6 +823,7 @@ function SettingsCard({
   return (
     <section
       id={id}
+      data-testid={testId}
       className="overflow-hidden rounded-2xl border border-slate-800 bg-slate-900/90"
     >
       {collapsible ? (

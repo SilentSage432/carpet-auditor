@@ -1,6 +1,7 @@
 # DeptSync Hub — Master Roadmap
 
 ## Done
+- [x] UX-NAV-001 Specialty operational home — More → Department Tools; Appliances → audit-aware home; Flooring tools grouped (**COMMITTED AND PUSHED**)
 - [x] APP-FIELD-001 Appliance scanner rapid-fire + teach schema fix + audit exit UX (**PRODUCTION LIVE — REAL-HARDWARE REVALIDATION PENDING**; `20260907_appliance_catalog_store_number.sql`)
 - [x] APP-AUD-001 Appliance physical audit & reconciliation foundation — sessions, scan linkage, declared OH state, derived variance, history/reconcile UX (**PRODUCTION LIVE**; `20260906_appliance_audit_sessions.sql` applied + verified)
 - [x] APP-AUD-001A Evidence integrity verification — late offline vs close, Option B recon terminology, clear-ledger protection (**INCLUDED + LIVE**)

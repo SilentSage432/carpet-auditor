@@ -92,7 +92,9 @@ components/dashboard/WeeklyRotationList.tsx → Compatibility re-export of Zebra
 app/department/page.tsx           → Redirect → /dashboard
 app/verify-rotation/page.tsx      → Redirect → /dashboard
 app/admin/exceptions/page.tsx     → Redirect → /dashboard
-app/settings/page.tsx             → Settings & Config (theme, targets, push, Master tools)
+app/settings/page.tsx             → More (Department Tools → specialty homes; Store Management; Device)
+components/hub/SpecialtyToolsHost.tsx → Contextual/ad-hoc scanner + remnant calculator (not More Appliances primary)
+app/appliances/page.tsx           → Redirect → /?section=appliances (audit-aware operational home)
 app/api/push/*                    → VAPID public key, subscribe, manual dispatch
 app/api/cron/weekly-rotation      → Sunday automated rotation engine (CRON_SECRET; per-store schedule)
 vercel.json                       → Cron Sunday `0 11 * * 0` (11:00 UTC ≈ 05:00 America/Denver; Hobby daily limit)

@@ -1,6 +1,12 @@
 /**
  * Specialty tool registry — appliance UPC audit scanner & carpet remnant calculator.
  * Presentation routes live here; scan/calc logic stays in section components.
+ *
+ * UX-NAV-001 ownership:
+ * - Primary More → Department Tools navigates to operational homes (Appliances hub,
+ *   Flooring cycle audit). Do not use requestApplianceScanner() as the More primary.
+ * - SpecialtyToolsHost + requestApplianceScanner remain for contextual / ad-hoc /
+ *   Floor SIMS launches only — not the durable physical-audit product path.
  */
 
 import { canAccessSection } from "@/lib/rbac";
@@ -10,6 +16,11 @@ import type { HubSection, StoreSpecialist } from "@/lib/types";
 export const APPLIANCE_SCANNER_HASH = "scan";
 export const REMNANT_CALCULATOR_HASH = "remnants-calculator";
 export const EXECUTIVE_FLOOR_PAD_HASH = "floor-pad";
+
+/** Canonical Appliances operational home (audit lifecycle + scanner). */
+export const APPLIANCES_OPERATIONAL_HOME_HREF = "/appliances";
+/** Canonical Flooring cycle-audit specialty home. */
+export const FLOORING_CYCLE_AUDIT_HOME_HREF = "/?section=audit";
 
 /** Durable Floor handoff — survives soft nav and hard reload (UX-004C.1). */
 export const EXECUTIVE_FLOOR_PAD_OPEN_PARAM = "open";
@@ -80,11 +91,11 @@ export type SpecialtyTool = {
 export const SPECIALTY_TOOLS: SpecialtyTool[] = [
   {
     id: "appliance-scanner",
-    label: "Appliance Audit Scanner",
-    shortLabel: "Appliance Scanner",
-    description: "Continuous UPC scan & count for appliance inventory audits",
+    label: "Appliances",
+    shortLabel: "Appliances",
+    description: "Physical audit, scan & count, and Lowe's reconciliation",
     icon: "tools",
-    href: `/?section=appliances#${APPLIANCE_SCANNER_HASH}`,
+    href: APPLIANCES_OPERATIONAL_HOME_HREF,
     section: "appliances",
   },
   {
@@ -118,7 +129,10 @@ export type ApplianceScannerLocationContext = {
   location_type?: "showroom" | "topstock";
 };
 
-/** Open appliance scanner on the specialty hub (in-page modal). */
+/**
+ * Open appliance scanner modal via SpecialtyToolsHost (contextual / ad-hoc).
+ * Not the primary More → Appliances entry — that navigates to the audit home.
+ */
 export function requestApplianceScanner(
   context?: ApplianceScannerLocationContext
 ) {
