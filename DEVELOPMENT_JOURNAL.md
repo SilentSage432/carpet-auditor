@@ -1,5 +1,14 @@
 # DeptSync Hub — Development Journal
 
+## 2026-09-07 — APP-QA-001 Appliance surface reliability & Gemini anomaly removal
+- Root cause (Share/Export): mobile Chrome/Android treats detached `<a download>` clicks as silent no-ops; share AbortError/share failures were not always falling back to a visible download.
+- Fix: `shareOrDownloadTextFile` / DOM-attached `downloadTextFile`; cancel vs error vs download status; Copy CSV awaits clipboard with explicit failure; summary **Download CSV Inventory** uses the same helper.
+- Removed appliance Gemini path: `ApplianceAnomalyWidget`, `POST /api/appliances/ai-anomaly`, `lib/appliances/ai-anomaly.ts`. Global Gemini retained for Snap Bay / walk parse / Pre-Flight / briefing / taxonomy / flooring insights / etc.
+- Deterministic reconciliation (observed physical vs DS-declared Lowe's OH → derived variance) unchanged.
+- Future deterministic appliance pattern candidates (not built): duplicate serials; same SKU across distant locations; showroom/topstock split; category/catalog mismatch; recurring recon variance history. No shrink inference from observation alone.
+- APP-OBS-001 blue-sticker classification remains deferred until this reliability tranche is field-validated.
+- Status: **APP-QA-001 APPLIANCE SURFACE RELIABILITY — COMMITTED AND PUSHED — REAL-HARDWARE VALIDATION PENDING**
+
 ## 2026-09-06 — UX-NAV-001 Specialty operational home
 - More first card is **Department Tools** (not Floor Utilities). Appliances → `/appliances` → `ApplianceAuditSection` (audit lifecycle). Flooring group: remnant calculator, inventory, cycle audit.
 - SpecialtyToolsHost retained for Floor SIMS / event-driven / ad-hoc scanner + remnant calculator modal — not primary More Appliances entry.

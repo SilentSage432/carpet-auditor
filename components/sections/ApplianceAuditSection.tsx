@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { ApplianceAnomalyWidget } from "@/components/appliances/ApplianceAnomalyWidget";
 import { ApplianceAuditActionBar } from "@/components/appliances/ApplianceAuditActionBar";
 import {
   ApplianceGroupCountSummary,
@@ -40,6 +39,7 @@ import {
   isApplianceScannerHash,
   type ApplianceScannerLocationContext,
 } from "@/lib/specialty-tools";
+import { downloadTextFile } from "@/lib/appliances/audit-export";
 import {
   type ApplianceCatalogItem,
   type ApplianceConditionTag,
@@ -377,16 +377,25 @@ export function ApplianceAuditSection({
 
   function handleDownloadCsv() {
     const rows = shiftScans.length > 0 ? shiftScans : scans;
-    const csv = applianceScansToCsv(rows, {
-      descriptions: catalogDescriptions,
-    });
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `appliance-inventory-${new Date().toISOString().slice(0, 10)}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
+    if (rows.length === 0) {
+      flashStatus("No scans to download yet", "error");
+      return;
+    }
+    try {
+      const csv = applianceScansToCsv(rows, {
+        descriptions: catalogDescriptions,
+      });
+      downloadTextFile(
+        csv,
+        `appliance-inventory-${new Date().toISOString().slice(0, 10)}.csv`
+      );
+      flashStatus("Inventory CSV downloaded");
+    } catch (err) {
+      flashStatus(
+        err instanceof Error ? err.message : "Could not download CSV",
+        "error"
+      );
+    }
   }
 
   const exportScans = shiftScans.length > 0 ? shiftScans : scans;
@@ -511,16 +520,6 @@ export function ApplianceAuditSection({
           setReviewFinishToken((n) => n + 1);
         }}
         onLogged={handleLogged}
-      />
-
-      <ApplianceAnomalyWidget
-        scans={loaded ? (shiftScans.length > 0 ? shiftScans : scans) : []}
-        catalog={catalog}
-        onFocusSku={(sku) => {
-          setLogQuery(sku);
-          setLogFilter("all");
-          setSummaryExpanded(false);
-        }}
       />
 
       <section

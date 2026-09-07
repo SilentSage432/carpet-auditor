@@ -51,17 +51,22 @@ export function ApplianceAuditActionBar({
   );
 
   async function handleShareExport() {
-    if (!hasScans) return;
+    if (!hasScans) {
+      onStatus("No scans to export yet", "error");
+      return;
+    }
     setBusy("export");
     try {
       const mode = await shareOrDownloadApplianceCsv(scans, {
         ...csvOptions,
         filename: `appliance-audit-${getStoreNumber()}-${new Date().toISOString().slice(0, 10)}.csv`,
       });
+      if (mode === "cancelled") {
+        onStatus("Share cancelled");
+        return;
+      }
       onStatus(
-        mode === "shared"
-          ? "Audit CSV shared"
-          : "Audit CSV downloaded"
+        mode === "shared" ? "Audit CSV shared" : "Audit CSV downloaded"
       );
     } catch (err) {
       onStatus(
@@ -74,13 +79,36 @@ export function ApplianceAuditActionBar({
   }
 
   function handleEmail() {
-    if (!hasScans) return;
+    if (!hasScans) {
+      onStatus("No scans to email yet", "error");
+      return;
+    }
     const href = buildApplianceAuditMailtoLink(scans, {
       ...csvOptions,
       storeNumber: getStoreNumber(),
     });
     window.location.href = href;
     onStatus("Opening email draft with audit summary");
+  }
+
+  async function handleCopyCsv() {
+    if (!hasScans) {
+      onStatus("No scans to copy yet", "error");
+      return;
+    }
+    try {
+      const csv = applianceScansToCsv(scans, csvOptions);
+      if (!navigator.clipboard?.writeText) {
+        throw new Error("Clipboard is not available on this device");
+      }
+      await navigator.clipboard.writeText(csv);
+      onStatus("Full CSV copied to clipboard");
+    } catch (err) {
+      onStatus(
+        err instanceof Error ? err.message : "Could not copy CSV",
+        "error"
+      );
+    }
   }
 
   async function confirmReset() {
@@ -174,11 +202,7 @@ export function ApplianceAuditActionBar({
           <button
             type="button"
             disabled={disabled || !hasScans || busy != null}
-            onClick={() => {
-              const csv = applianceScansToCsv(scans, csvOptions);
-              void navigator.clipboard?.writeText(csv);
-              onStatus("Full CSV copied to clipboard");
-            }}
+            onClick={() => void handleCopyCsv()}
             className="col-span-2 flex min-h-11 items-center justify-center gap-1.5 rounded-xl border border-zinc-600 bg-zinc-950/50 px-2 text-xs font-bold text-zinc-200 disabled:opacity-40 sm:col-span-1 sm:text-sm"
           >
             Copy CSV

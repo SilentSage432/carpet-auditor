@@ -1,6 +1,7 @@
 # DeptSync Hub — Chat Handoff
 
-## Latest (2026-09-06)
+## Latest (2026-09-07)
+- **APP-QA-001 APPLIANCE SURFACE RELIABILITY — COMMITTED AND PUSHED — REAL-HARDWARE VALIDATION PENDING:** Share/Export CSV repaired (DOM-attached download + share abort/fallback). Gemini Scan Anomaly Detection removed from Appliances home. Deterministic reconciliation retained. APP-OBS-001 blue-sticker still deferred pending field validation.
 - **UX-NAV-001 SPECIALTY OPERATIONAL HOME — COMMITTED AND PUSHED:** More → Department Tools; Appliances navigates to audit-aware `/?section=appliances`; Flooring tools grouped; SpecialtyToolsHost retained for contextual/ad-hoc only.
 - **APP-FIELD-001B AUDIT EXIT WIRING — PRODUCTION CODE LIVE — REAL-HARDWARE VALIDATION PENDING:** Start/Continue Physical Audit primary; ad-hoc labeled secondary; scanner resolves auditSessionId; Review / Finish wired; unbound prior ledger scans not retro-attached.
 - **APP-FIELD-001 APPLIANCE RAPID-FIRE / TEACH / AUDIT EXIT — PRODUCTION LIVE — REAL-HARDWARE REVALIDATION PENDING:** Local-first COUNT; fail-closed catalog `store_number` migration (no fictional 0000); scanner Review / Finish Audit. Local phone catalog preserved; no bulk upload.
@@ -76,7 +77,7 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 - **Flooring AI Insights:** `POST /api/flooring/ai-insights` (Store Ops JWT) — server-fetches remnants/audits, runs aging/variance locally, sends a compact findings packet to Gemini (compact-then-narrate). `FlooringAIInsightBanner` does not POST tables.
 - **Zebra Shift Briefing:** On-load uses `buildLocalShiftBriefing` from `GET /api/store-health` only (no Gemini). Manual refresh may POST `/api/store-health/ai-summary`; 429/quota/RPC errors fall back silently to the local brief. Raw GoogleGenerativeAI JSON is never shown.
 - **Audit Velocity Chart:** `lib/store-ops/telemetry.ts` + `StoreHealthChart` inside Floor `ShiftAnalyticsDrawer` (06:00–22:00 curve vs linear target; Overall / D23 / D35 pills)
-- **Appliance Anomaly Detection:** `POST /api/appliances/ai-anomaly` (Store Ops JWT) — server-fetches scans/catalog, local heuristics first, Gemini narrates the packet
+- **Appliance Anomaly Detection:** **REMOVED (APP-QA-001)** — former `POST /api/appliances/ai-anomaly` + Gemini narration. Deterministic reconciliation remains on the Appliances physical-audit home. Future evidence-derived pattern intelligence may return without LLMs.
 - **Catalog Taxonomies:** `lib/catalog/taxonomies.ts` + `POST /api/catalog/ai-taxonomy` (supervisor/admin JWT) + Settings `TaxonomyManagerModal`; known-folder packet + registry merge
 - **AI Visual Bay Scan:** `POST /api/store-ops/ai-bay-scan` + `lib/store-ops/ai-bay-scan.ts` + `VisualBayScannerModal` — 720p JPEG q=0.70 / 960px; route cap ~1.5MB; `responseSchema` + 512 output tokens
 - **Executive Floor Pad:** Full TipTap notes still owned by `extractTasksAndTag` (`lib/store-ops/ai-note-extract.ts`). Walk-of-consciousness parse is a separate owner: `POST /api/copilot/parse-walk` + `lib/store-ops/ai-walk-parse.ts` (structured location/category/priority JSON, 8k cap, 2048 tokens). `POST /api/store-ops/ai-note-summary` remains **410 Gone**.

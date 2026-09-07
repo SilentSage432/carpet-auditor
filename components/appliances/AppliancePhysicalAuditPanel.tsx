@@ -24,6 +24,7 @@ import {
   type ApplianceReconciliationSnapshot,
   type ApplianceReconOutcome,
 } from "@/lib/appliances/physical-audit";
+import { shareOrDownloadTextFile } from "@/lib/appliances/audit-export";
 import { getPendingApplianceScanSyncForAudit } from "@/lib/sync-queue";
 import { getStoreNumber } from "@/lib/store";
 
@@ -264,34 +265,18 @@ export function AppliancePhysicalAuditPanel({
       items: detail.physical_items,
       snapshots: detail.snapshots,
     });
-    // Reuse share helper by wrapping as File via temporary download path.
     const filename = `appliance-physical-audit-${detail.session.started_at.slice(0, 10)}.csv`;
     try {
-      const file = new File([csv], filename, {
-        type: "text/csv;charset=utf-8",
+      const mode = await shareOrDownloadTextFile(csv, {
+        filename,
+        title: "Appliance Physical Audit",
+        text: "Observed physical count + DS-declared Lowe's OH + derived variance",
       });
-      if (
-        typeof navigator !== "undefined" &&
-        typeof navigator.share === "function" &&
-        typeof navigator.canShare === "function" &&
-        navigator.canShare({ files: [file] })
-      ) {
-        await navigator.share({
-          title: "Appliance Physical Audit",
-          text: "Physical count + declared Lowe's OH",
-          files: [file],
-        });
-        onStatus("Audit CSV shared");
+      if (mode === "cancelled") {
+        onStatus("Share cancelled");
         return;
       }
-      const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = filename;
-      a.click();
-      URL.revokeObjectURL(url);
-      onStatus("Audit CSV downloaded");
+      onStatus(mode === "shared" ? "Audit CSV shared" : "Audit CSV downloaded");
     } catch (err) {
       onStatus(
         err instanceof Error ? err.message : "Could not export audit",

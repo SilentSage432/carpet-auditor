@@ -1,6 +1,7 @@
 # DeptSync Hub — Master Roadmap
 
 ## Done
+- [x] APP-QA-001 Appliance surface reliability — Share/Export CSV fix; remove Gemini Scan Anomaly Detection from Appliances home (**COMMITTED AND PUSHED — REAL-HARDWARE VALIDATION PENDING**)
 - [x] UX-NAV-001 Specialty operational home — More → Department Tools; Appliances → audit-aware home; Flooring tools grouped (**COMMITTED AND PUSHED**)
 - [x] APP-FIELD-001 Appliance scanner rapid-fire + teach schema fix + audit exit UX (**PRODUCTION LIVE — REAL-HARDWARE REVALIDATION PENDING**; `20260907_appliance_catalog_store_number.sql`)
 - [x] APP-AUD-001 Appliance physical audit & reconciliation foundation — sessions, scan linkage, declared OH state, derived variance, history/reconcile UX (**PRODUCTION LIVE**; `20260906_appliance_audit_sessions.sql` applied + verified)
@@ -105,7 +106,7 @@
 - [x] AI Pre-Flight Bulk Generator (`/api/store-locations/ai-parse` + Confirm → bulk upsert)
 - [x] Flooring AI Remnant Aging & Variance Intelligence (`/api/flooring/ai-insights` + banner CTA)
 - [x] Zebra Shift Intelligence Briefing (`/api/store-health/ai-summary` + `ShiftBriefingCard`)
-- [x] Appliance Scan Anomaly Detection (`/api/appliances/ai-anomaly` + `ApplianceAnomalyWidget`)
+- [x] Appliance Scan Anomaly Detection (`/api/appliances/ai-anomaly` + `ApplianceAnomalyWidget`) — **REMOVED in APP-QA-001** (Gemini narration of scan heuristics; not needed while deterministic reconciliation answers the operational question; future deterministic pattern intelligence deferred)
 - [x] Department-specific catalog category taxonomies + AI Taxonomy Generator (`lib/catalog/taxonomies.ts`, `/api/catalog/ai-taxonomy`, `TaxonomyManagerModal`)
 - [x] Extend glassification to AuthWall / Store Map chrome / remaining overlay modals
 - [x] Store Audit Velocity & Health Telemetry Chart (`StoreHealthChart` + `lib/store-ops/telemetry` on `/dashboard` / store-health)

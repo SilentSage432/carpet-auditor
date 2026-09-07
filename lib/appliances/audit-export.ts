@@ -1,5 +1,8 @@
 /**
  * Appliance audit export, share, and email utilities.
+ *
+ * Mobile Chrome / Android: download anchors must be attached to the document
+ * or the click is a silent no-op. Share AbortError is user cancel, not failure.
  */
 
 import {
@@ -11,6 +14,8 @@ import {
   formatApplianceLocationType,
   type ApplianceScan,
 } from "@/lib/types";
+
+export type ShareDownloadResult = "shared" | "downloaded" | "cancelled";
 
 function csvEscape(value: string | number | null | undefined): string {
   const s = String(value ?? "");
@@ -40,7 +45,9 @@ export function applianceAuditExportCsv(
     const serialDetails = group.scans
       .map((scan) => {
         const serial = scan.serial_number.trim();
-        const condition = formatApplianceConditionTag(scan.condition_tag);
+        const condition = scan.condition_tag
+          ? formatApplianceConditionTag(scan.condition_tag)
+          : null;
         const loc = scan.location.trim();
         const parts = [
           serial ? `SN:${serial}` : null,
@@ -123,36 +130,97 @@ export function buildApplianceAuditMailtoLink(
   return `mailto:${to}?subject=${subject}&body=${body}`;
 }
 
-export async function shareOrDownloadApplianceCsv(
-  scans: ApplianceScan[],
-  options: ApplianceScanCsvOptions & { filename?: string } = {}
-): Promise<"shared" | "downloaded"> {
-  const csv = applianceAuditExportCsv(scans, options);
-  const filename =
-    options.filename ??
-    `appliance-audit-${new Date().toISOString().slice(0, 10)}.csv`;
-  const file = new File([csv], filename, { type: "text/csv;charset=utf-8" });
+export function isShareAbortError(err: unknown): boolean {
+  if (!err || typeof err !== "object") return false;
+  const name = "name" in err ? String((err as { name?: unknown }).name) : "";
+  return name === "AbortError";
+}
 
-  if (
-    typeof navigator !== "undefined" &&
-    typeof navigator.share === "function" &&
-    typeof navigator.canShare === "function" &&
-    navigator.canShare({ files: [file] })
-  ) {
-    await navigator.share({
-      title: "Appliance Audit Export",
-      text: "Appliance inventory audit counts",
-      files: [file],
-    });
-    return "shared";
+/** DOM-attached download — required for mobile Chrome / Android (silent no-op otherwise). */
+export function downloadTextFile(
+  contents: string,
+  filename: string,
+  mimeType = "text/csv;charset=utf-8"
+): void {
+  if (typeof document === "undefined") {
+    throw new Error("Download is only available in the browser");
   }
-
-  const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+  const blob = new Blob([contents], { type: mimeType });
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
   anchor.href = url;
   anchor.download = filename;
+  anchor.rel = "noopener";
+  anchor.style.display = "none";
+  document.body.appendChild(anchor);
   anchor.click();
-  URL.revokeObjectURL(url);
+  document.body.removeChild(anchor);
+  window.setTimeout(() => URL.revokeObjectURL(url), 2500);
+}
+
+export function canShareFiles(file: File): boolean {
+  if (typeof navigator === "undefined" || typeof navigator.share !== "function") {
+    return false;
+  }
+  if (typeof navigator.canShare !== "function") {
+    return true;
+  }
+  try {
+    return navigator.canShare({ files: [file] });
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Prefer native file share when supported; otherwise download.
+ * User cancel (AbortError) → cancelled (not a failure).
+ * Share API errors fall through to download rather than silent failure.
+ */
+export async function shareOrDownloadTextFile(
+  contents: string,
+  options: {
+    filename: string;
+    title?: string;
+    text?: string;
+    mimeType?: string;
+  }
+): Promise<ShareDownloadResult> {
+  const mimeType = options.mimeType ?? "text/csv;charset=utf-8";
+  const file = new File([contents], options.filename, { type: mimeType });
+
+  if (canShareFiles(file)) {
+    try {
+      await navigator.share({
+        title: options.title ?? options.filename,
+        text: options.text,
+        files: [file],
+      });
+      return "shared";
+    } catch (err) {
+      if (isShareAbortError(err)) return "cancelled";
+      // Fall through — share unsupported / failed mid-sheet on some Android PWAs.
+    }
+  }
+
+  downloadTextFile(contents, options.filename, mimeType);
   return "downloaded";
+}
+
+export async function shareOrDownloadApplianceCsv(
+  scans: ApplianceScan[],
+  options: ApplianceScanCsvOptions & { filename?: string } = {}
+): Promise<ShareDownloadResult> {
+  if (scans.length === 0) {
+    throw new Error("No appliance scans to export");
+  }
+  const csv = applianceAuditExportCsv(scans, options);
+  const filename =
+    options.filename ??
+    `appliance-audit-${new Date().toISOString().slice(0, 10)}.csv`;
+  return shareOrDownloadTextFile(csv, {
+    filename,
+    title: "Appliance Audit Export",
+    text: "Appliance inventory audit counts (observed units)",
+  });
 }
