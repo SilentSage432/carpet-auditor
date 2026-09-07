@@ -979,15 +979,36 @@ export function normalizeApplianceSubCategory(
   return resolveApplianceCategoryPair(category, raw).sub_category;
 }
 
-/** Canonical appliance master SKU / UPC link record (`public.appliance_catalog`). */
+/**
+ * Canonical appliance item (`public.appliance_catalog`).
+ * Identity: (store_number, item_number). Legacy `upc` retained; additional
+ * taught scannable identifiers live on appliance_catalog_identifiers (APP-CAT-001A).
+ */
 export type ApplianceCatalogItem = {
   id: string;
   store_number: string;
   item_number: string;
+  /** Legacy primary UPC column — dual-read with `identifiers`. */
   upc: string | null;
   description: string;
   category: ApplianceCategory;
   sub_category?: string;
+  created_at: string;
+  updated_at: string;
+  offline?: boolean;
+  /**
+   * Taught scannable identifiers for this canonical item (APP-CAT-001A).
+   * May include values also present in `upc`. Not an ESL type claim.
+   */
+  identifiers?: string[];
+};
+
+/** Taught scannable identifier row (`public.appliance_catalog_identifiers`). */
+export type ApplianceCatalogIdentifier = {
+  id: string;
+  store_number: string;
+  item_number: string;
+  identifier: string;
   created_at: string;
   updated_at: string;
   offline?: boolean;

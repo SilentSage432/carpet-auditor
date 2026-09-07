@@ -54,6 +54,8 @@ export function syncActionLabel(type: SyncAction["type"]): string {
       return "Roster profile";
     case "upsert_appliance_catalog":
       return "Appliance catalog";
+    case "upsert_appliance_catalog_identifier":
+      return "Appliance identifier";
     case "upsert_appliance_scan":
       return "Appliance scan";
     case "delete_audit":

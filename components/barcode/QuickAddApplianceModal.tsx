@@ -1,11 +1,16 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ApplianceCategoryFields } from "@/components/appliances/ApplianceCategoryFields";
 import { NumberField, TextField } from "@/components/ui/NumberField";
 import {
   ApplianceCatalogConflictError,
-  findApplianceUpcConflict,
+  filterApplianceCatalog,
+  findApplianceByItemOrUpc,
+  findApplianceIdentifierConflict,
+  linkApplianceCatalogIdentifier,
+  listApplianceTaughtIdentifiers,
+  normalizeApplianceIdentifier,
   saveApplianceCatalogItem,
 } from "@/lib/appliance-catalog";
 import { sanitizeBarcodeScan } from "@/lib/barcode";
@@ -20,15 +25,17 @@ import {
 type Props = {
   open: boolean;
   scannedBarcode: string;
-  /** Current store catalog — used for UPC conflict checks before teach. */
+  /** Current store catalog — used for conflict checks and link search. */
   catalog?: ApplianceCatalogItem[];
   onClose: () => void;
   onSaved: (item: ApplianceCatalogItem) => void;
 };
 
+type TeachMode = "choose" | "link" | "create";
+
 /**
- * Pause continuous scan for NEW / unlinked items (TEACH path).
- * Requires category + sub_category + description; then parent logs the scan.
+ * Pause continuous scan for NEW / unlinked identifiers (APP-CAT-001A).
+ * Link to existing item (no metadata re-entry) OR create new canonical item.
  */
 export function QuickAddApplianceModal({
   open,
@@ -37,10 +44,14 @@ export function QuickAddApplianceModal({
   onClose,
   onSaved,
 }: Props) {
-  const cleaned = sanitizeBarcodeScan(scannedBarcode);
-  /** Long codes are treated as UPC; short codes as Item # / SKU. */
-  const isUpcScan = cleaned.length >= 8;
+  const cleaned =
+    normalizeApplianceIdentifier(scannedBarcode) ||
+    sanitizeBarcodeScan(scannedBarcode);
+  /** Longer codes are alternate identifiers; short may be typed item #. */
+  const isLongIdentifier = cleaned.length >= 8;
 
+  const [mode, setMode] = useState<TeachMode>("choose");
+  const [linkQuery, setLinkQuery] = useState("");
   const [itemNumber, setItemNumber] = useState("");
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState<ApplianceCategory>("Laundry");
@@ -50,22 +61,67 @@ export function QuickAddApplianceModal({
 
   useEffect(() => {
     if (!open) return;
-    setItemNumber(isUpcScan ? "" : cleaned);
+    setMode(catalog.length > 0 ? "choose" : "create");
+    setLinkQuery("");
+    setItemNumber(isLongIdentifier ? "" : cleaned);
     setDescription("");
     setCategory("Laundry");
     setSubCategory("");
     setError(null);
     setSaving(false);
     playQuickAddPrompt();
-  }, [open, cleaned, isUpcScan]);
+  }, [open, cleaned, isLongIdentifier, catalog.length]);
+
+  const linkHits = useMemo(() => {
+    const filtered = filterApplianceCatalog(catalog, linkQuery).slice(0, 8);
+    if (linkQuery.trim()) return filtered;
+    return catalog.slice(0, 8);
+  }, [catalog, linkQuery]);
 
   if (!open) return null;
 
-  const canSave =
+  const canCreate =
     Boolean(itemNumber.trim() && description.trim()) &&
     isValidApplianceSubCategory(category, subCategory);
 
-  async function handleSaveAndContinue() {
+  async function handleLink(item: ApplianceCatalogItem) {
+    if (!cleaned) {
+      setError("No scannable identifier to teach");
+      return;
+    }
+    const conflict = findApplianceIdentifierConflict(catalog, cleaned, {
+      excludeId: item.id,
+      excludeItemNumber: item.item_number,
+    });
+    if (conflict) {
+      setError(
+        `Identifier ${cleaned} is already linked to Item ${conflict.item_number}.`
+      );
+      return;
+    }
+
+    setSaving(true);
+    setError(null);
+    try {
+      const { record } = await linkApplianceCatalogIdentifier({
+        item,
+        identifier: cleaned,
+      });
+      onSaved(record);
+    } catch (err) {
+      if (err instanceof ApplianceCatalogConflictError) {
+        setError(err.message);
+      } else {
+        setError(
+          err instanceof Error ? err.message : "Could not link identifier"
+        );
+      }
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function handleCreateAndContinue() {
     if (!itemNumber.trim() || !description.trim()) {
       setError("Item # and description are required");
       return;
@@ -77,14 +133,24 @@ export function QuickAddApplianceModal({
 
     const nextItem =
       sanitizeBarcodeScan(itemNumber) || itemNumber.trim();
-    const nextUpc = isUpcScan && cleaned ? cleaned : null;
-    if (nextUpc) {
-      const conflict = findApplianceUpcConflict(catalog, nextUpc, {
+
+    // Existing canonical item → link path (do not overwrite metadata / upc).
+    const existing =
+      findApplianceByItemOrUpc(catalog, nextItem) ||
+      catalog.find((c) => c.item_number.trim() === nextItem);
+    if (existing && cleaned) {
+      await handleLink(existing);
+      return;
+    }
+
+    const teachIdentifier = isLongIdentifier && cleaned ? cleaned : null;
+    if (teachIdentifier) {
+      const conflict = findApplianceIdentifierConflict(catalog, teachIdentifier, {
         excludeItemNumber: nextItem,
       });
       if (conflict) {
         setError(
-          `UPC ${nextUpc} is already linked to Item ${conflict.item_number}. Use Manage mappings to correct that link.`
+          `Identifier ${teachIdentifier} is already linked to Item ${conflict.item_number}. Use Link to existing or Manage mappings.`
         );
         return;
       }
@@ -96,7 +162,8 @@ export function QuickAddApplianceModal({
       const { record } = await saveApplianceCatalogItem({
         item_number: nextItem,
         description: description.trim(),
-        upc: nextUpc,
+        upc: teachIdentifier,
+        teach_identifier: teachIdentifier,
         category,
         sub_category: subCategory.trim(),
       });
@@ -134,54 +201,146 @@ export function QuickAddApplianceModal({
           id="quick-add-appliance-title"
           className="text-lg font-bold text-white"
         >
-          {isUpcScan ? "Teach unknown UPC" : "New Appliance — Sub-Category"}
+          {mode === "link"
+            ? "Link to existing item"
+            : mode === "create"
+              ? "Create new item"
+              : "Unknown identifier"}
         </h2>
         <p className="mt-1 text-sm text-zinc-400">
-          {isUpcScan
-            ? "Link this barcode once — later scans will stay quiet."
-            : "Unrecognized item — choose category & sub-category to log and continue."}
+          {mode === "choose"
+            ? "Teach once — link to an item you already know, or create a new mapping."
+            : mode === "link"
+              ? "Reuse existing description and category. No metadata re-entry."
+              : "Enter Lowe's item details once — later scans stay quiet."}
         </p>
         <p className="mt-3 rounded-xl border border-amber-500/30 bg-amber-950/30 px-3 py-2 font-mono text-sm font-semibold text-amber-200">
-          {isUpcScan ? `UPC ${cleaned || "—"}` : `Scanned ${cleaned || "—"}`}
+          Scanned {cleaned || "—"}
         </p>
 
-        <div className="mt-4 space-y-3">
-          <NumberField
-            label="Lowe's Item # / SKU"
-            mode="digits"
-            value={itemNumber}
-            onChange={setItemNumber}
-            placeholder="Tap to type Item #"
-          />
-          <TextField
-            label="Description"
-            value={description}
-            onChange={setDescription}
-            placeholder="e.g. Whirlpool French Door"
-          />
-          <ApplianceCategoryFields
-            category={normalizeApplianceCategory(category)}
-            subCategory={subCategory}
-            onCategoryChange={(next) => {
-              setCategory(next);
-              setSubCategory("");
-            }}
-            onSubCategoryChange={setSubCategory}
-          />
-        </div>
+        {mode === "choose" ? (
+          <div className="mt-4 space-y-2">
+            <button
+              type="button"
+              disabled={catalog.length === 0}
+              onClick={() => {
+                setError(null);
+                setMode("link");
+              }}
+              className="flex min-h-12 w-full items-center justify-center btn-primary-glow rounded-xl text-sm disabled:opacity-40"
+            >
+              Link to existing item
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setError(null);
+                setMode("create");
+              }}
+              className="flex min-h-12 w-full items-center justify-center rounded-xl border border-zinc-600 text-sm font-semibold text-zinc-100"
+            >
+              Create new item
+            </button>
+          </div>
+        ) : null}
+
+        {mode === "link" ? (
+          <div className="mt-4 space-y-3">
+            <TextField
+              label="Find Item # or description"
+              value={linkQuery}
+              onChange={setLinkQuery}
+              placeholder="Type Item # or name"
+            />
+            {linkHits.length === 0 ? (
+              <p className="text-center text-sm text-zinc-400">
+                No matching items — create new instead.
+              </p>
+            ) : (
+              <ul className="max-h-56 space-y-2 overflow-y-auto">
+                {linkHits.map((item) => (
+                  <li key={item.id}>
+                    <button
+                      type="button"
+                      disabled={saving}
+                      onClick={() => void handleLink(item)}
+                      className="flex w-full flex-col rounded-xl border border-zinc-700 bg-zinc-900/80 px-3 py-2.5 text-left disabled:opacity-40"
+                    >
+                      <span className="font-mono text-sm font-bold text-white">
+                        {item.item_number}
+                      </span>
+                      <span className="truncate text-sm text-zinc-300">
+                        {item.description}
+                      </span>
+                      <span className="mt-0.5 text-[10px] uppercase text-zinc-500">
+                        {listApplianceTaughtIdentifiers(item).length} identifier
+                        {listApplianceTaughtIdentifiers(item).length === 1
+                          ? ""
+                          : "s"}
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <button
+              type="button"
+              onClick={() => setMode("choose")}
+              className="flex min-h-10 w-full items-center justify-center text-sm font-semibold text-zinc-400"
+            >
+              Back
+            </button>
+          </div>
+        ) : null}
+
+        {mode === "create" ? (
+          <div className="mt-4 space-y-3">
+            <NumberField
+              label="Lowe's Item # / SKU"
+              mode="digits"
+              value={itemNumber}
+              onChange={setItemNumber}
+              placeholder="Tap to type Item #"
+            />
+            <TextField
+              label="Description"
+              value={description}
+              onChange={setDescription}
+              placeholder="e.g. Whirlpool French Door"
+            />
+            <ApplianceCategoryFields
+              category={normalizeApplianceCategory(category)}
+              subCategory={subCategory}
+              onCategoryChange={(next) => {
+                setCategory(next);
+                setSubCategory("");
+              }}
+              onSubCategoryChange={setSubCategory}
+            />
+            <button
+              type="button"
+              disabled={saving || !canCreate}
+              onClick={() => void handleCreateAndContinue()}
+              className="mt-2 flex min-h-12 w-full items-center justify-center btn-primary-glow rounded-xl text-sm disabled:opacity-40"
+            >
+              {saving ? "Saving…" : "Save, Log Scan & Continue"}
+            </button>
+            {catalog.length > 0 ? (
+              <button
+                type="button"
+                onClick={() => setMode("choose")}
+                className="flex min-h-10 w-full items-center justify-center text-sm font-semibold text-zinc-400"
+              >
+                Back
+              </button>
+            ) : null}
+          </div>
+        ) : null}
 
         {error ? (
           <p className="mt-3 text-center text-sm text-red-400">{error}</p>
         ) : null}
 
-        <button
-          type="button"
-          disabled={saving || !canSave}
-          onClick={() => void handleSaveAndContinue()}
-          className="mt-4 flex min-h-12 w-full items-center justify-center btn-primary-glow rounded-xl text-sm disabled:opacity-40"
-        >
-          {saving ? "Saving…" : "Save, Log Scan & Continue"}
-        </button>
         <button
           type="button"
           onClick={onClose}

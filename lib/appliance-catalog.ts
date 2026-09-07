@@ -2,8 +2,9 @@
  * Appliance master catalog — owns public.appliance_catalog.
  * Flooring catalog stays in lib/catalog.ts (carpet_catalog).
  *
- * Teach-once identity: UPC ↔ Lowe's item # ↔ category ↔ sub-category ↔ description.
- * UPC is not DB-unique; application layer refuses ambiguous UPC remaps.
+ * APP-CAT-001A: canonical identity is (store_number, item_number).
+ * Scannable identifiers (legacy upc + appliance_catalog_identifiers) resolve
+ * to that identity. One identifier → one item per store.
  */
 
 import { sanitizeBarcodeScan } from "./barcode";
@@ -26,8 +27,9 @@ import {
 
 const STORAGE_KEY = "appliance_catalog_offline";
 const TABLE = "appliance_catalog";
+const IDENTIFIERS_TABLE = "appliance_catalog_identifiers";
 
-/** Raised when a UPC is already linked to a different catalog item. */
+/** Raised when a scannable identifier is already linked to a different catalog item. */
 export class ApplianceCatalogConflictError extends Error {
   readonly conflict: ApplianceCatalogItem;
 
@@ -36,6 +38,173 @@ export class ApplianceCatalogConflictError extends Error {
     this.name = "ApplianceCatalogConflictError";
     this.conflict = conflict;
   }
+}
+
+/**
+ * Stable storage form for a taught scannable identifier (APP-CAT-001A).
+ * Trims scanner framing/whitespace only — does NOT strip non-digits or
+ * leading zeros (those remain field-test / transport concerns).
+ */
+export function normalizeApplianceIdentifier(raw: unknown): string {
+  return String(raw ?? "")
+    .replace(/^[\s\u0000-\u001f]+|[\s\u0000-\u001f]+$/g, "")
+    .trim();
+}
+
+/**
+ * Lookup keys for dual-read resolution: exact normalized form plus digit-sanitized
+ * form used by legacy upc / current wedge transport.
+ *
+ * IMPORTANT: callers must NOT treat key intersection as a match across items.
+ * Use resolveApplianceCatalogItem — exact match first; sanitized fallback only
+ * when it uniquely identifies one canonical item.
+ */
+export function applianceIdentifierLookupKeys(raw: unknown): string[] {
+  const normalized = normalizeApplianceIdentifier(raw);
+  const keys: string[] = [];
+  if (normalized) keys.push(normalized);
+  const digits = sanitizeBarcodeScan(String(raw ?? ""));
+  if (digits && digits !== normalized) keys.push(digits);
+  else if (digits && !normalized) keys.push(digits);
+  return keys;
+}
+
+function exactIdentifierMatch(
+  stored: string | null | undefined,
+  rawExact: string
+): boolean {
+  if (!rawExact || stored == null || stored === "") return false;
+  return normalizeApplianceIdentifier(stored) === rawExact;
+}
+
+function digitIdentifierMatch(
+  stored: string | null | undefined,
+  digitKey: string
+): boolean {
+  if (!digitKey || stored == null || stored === "") return false;
+  const storedDigits = sanitizeBarcodeScan(stored);
+  return Boolean(storedDigits && storedDigits === digitKey);
+}
+
+function uniqueCatalogItems(
+  hits: ApplianceCatalogItem[]
+): ApplianceCatalogItem[] {
+  const byItem = new Map<string, ApplianceCatalogItem>();
+  for (const hit of hits) {
+    const key = `${hit.store_number}::${hit.item_number}`;
+    if (!byItem.has(key)) byItem.set(key, hit);
+  }
+  return [...byItem.values()];
+}
+
+export type ApplianceCatalogResolveResult =
+  | { status: "matched"; item: ApplianceCatalogItem }
+  | { status: "ambiguous" }
+  | { status: "none" };
+
+/**
+ * Deterministic catalog resolution (APP-CAT-001A).
+ *
+ * Order:
+ * 1. Exact normalized match on item_number
+ * 2. Exact normalized match on legacy upc
+ * 3. Exact normalized match on taught identifiers
+ * 4. Digit-sanitized compatibility fallback (legacy wedge / UPC) — ONLY if
+ *    exactly one canonical item matches; otherwise unresolved (no arbitrary pick)
+ */
+export function resolveApplianceCatalogItem(
+  items: ApplianceCatalogItem[],
+  raw: string
+): ApplianceCatalogResolveResult {
+  const exact = normalizeApplianceIdentifier(raw);
+  const digitKey = sanitizeBarcodeScan(raw);
+  if (!exact && !digitKey) return { status: "none" };
+
+  if (exact) {
+    const itemNumberHits = uniqueCatalogItems(
+      items.filter((item) => exactIdentifierMatch(item.item_number, exact))
+    );
+    if (itemNumberHits.length === 1) {
+      return { status: "matched", item: itemNumberHits[0]! };
+    }
+    if (itemNumberHits.length > 1) return { status: "ambiguous" };
+
+    const upcHits = uniqueCatalogItems(
+      items.filter((item) => exactIdentifierMatch(item.upc, exact))
+    );
+    if (upcHits.length === 1) return { status: "matched", item: upcHits[0]! };
+    if (upcHits.length > 1) return { status: "ambiguous" };
+
+    const aliasHits = uniqueCatalogItems(
+      items.filter((item) =>
+        (item.identifiers ?? []).some((id) => exactIdentifierMatch(id, exact))
+      )
+    );
+    if (aliasHits.length === 1) return { status: "matched", item: aliasHits[0]! };
+    if (aliasHits.length > 1) return { status: "ambiguous" };
+  }
+
+  if (!digitKey) return { status: "none" };
+
+  const digitHits = uniqueCatalogItems(
+    items.filter((item) => {
+      if (digitIdentifierMatch(item.item_number, digitKey)) return true;
+      if (digitIdentifierMatch(item.upc, digitKey)) return true;
+      return (item.identifiers ?? []).some((id) =>
+        digitIdentifierMatch(id, digitKey)
+      );
+    })
+  );
+  if (digitHits.length === 1) return { status: "matched", item: digitHits[0]! };
+  if (digitHits.length > 1) return { status: "ambiguous" };
+  return { status: "none" };
+}
+
+/**
+ * Conflict helper: another item already owns this exact identifier, OR owns an
+ * identifier/upc/item_number whose digit-sanitized form collapses to the same
+ * key (would make future sanitized fallback ambiguous).
+ */
+function identifierConflictsWithItem(
+  item: ApplianceCatalogItem,
+  identifierRaw: string
+): boolean {
+  const exact = normalizeApplianceIdentifier(identifierRaw);
+  const digitKey = sanitizeBarcodeScan(identifierRaw);
+  if (exact) {
+    if (exactIdentifierMatch(item.item_number, exact)) return true;
+    if (exactIdentifierMatch(item.upc, exact)) return true;
+    if ((item.identifiers ?? []).some((id) => exactIdentifierMatch(id, exact))) {
+      return true;
+    }
+  }
+  if (digitKey) {
+    if (digitIdentifierMatch(item.item_number, digitKey)) return true;
+    if (digitIdentifierMatch(item.upc, digitKey)) return true;
+    if (
+      (item.identifiers ?? []).some((id) => digitIdentifierMatch(id, digitKey))
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
+/** Union of legacy upc + taught identifiers (stable, de-duped). */
+export function listApplianceTaughtIdentifiers(
+  item: Pick<ApplianceCatalogItem, "upc" | "identifiers" | "item_number">
+): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  const push = (v: string | null | undefined) => {
+    const n = normalizeApplianceIdentifier(v);
+    if (!n || seen.has(n)) return;
+    seen.add(n);
+    out.push(n);
+  };
+  push(item.upc);
+  for (const id of item.identifiers ?? []) push(id);
+  return out;
 }
 
 function readAllLocal(): ApplianceCatalogItem[] {
@@ -67,8 +236,16 @@ export function mapApplianceCatalogRow(
   const upc =
     upcRaw == null || upcRaw === ""
       ? null
-      : sanitizeBarcodeScan(String(upcRaw));
+      : normalizeApplianceIdentifier(upcRaw) ||
+        sanitizeBarcodeScan(String(upcRaw)) ||
+        null;
   const pair = resolveApplianceCategoryPair(row.category, row.sub_category);
+  const identifiersRaw = row.identifiers;
+  const identifiers = Array.isArray(identifiersRaw)
+    ? identifiersRaw
+        .map((v) => normalizeApplianceIdentifier(v))
+        .filter(Boolean)
+    : undefined;
 
   return {
     id: String(row.id),
@@ -83,6 +260,7 @@ export function mapApplianceCatalogRow(
       row.updated_at ?? row.created_at ?? new Date().toISOString()
     ),
     offline: Boolean(row.offline),
+    identifiers,
   };
 }
 
@@ -90,38 +268,61 @@ function mapRow(row: Record<string, unknown>): ApplianceCatalogItem {
   return mapApplianceCatalogRow(row);
 }
 
+function withIdentifierOnItem(
+  item: ApplianceCatalogItem,
+  identifier: string
+): ApplianceCatalogItem {
+  const next = normalizeApplianceIdentifier(identifier);
+  if (!next) return item;
+  const existing = listApplianceTaughtIdentifiers(item);
+  if (existing.some((id) => normalizeApplianceIdentifier(id) === next)) {
+    return {
+      ...item,
+      identifiers: existing,
+    };
+  }
+  return {
+    ...item,
+    identifiers: [...existing, next],
+  };
+}
+
 /**
- * Find another catalog row that already owns this UPC.
- * Same item id / item_number is not a conflict (self-update).
+ * Find another catalog row that already owns this scannable identifier
+ * (legacy upc or taught alias). Same item id / item_number is not a conflict.
  */
 export function findApplianceUpcConflict(
   items: ApplianceCatalogItem[],
   upcRaw: string | null | undefined,
   options?: { excludeId?: string; excludeItemNumber?: string }
 ): ApplianceCatalogItem | undefined {
-  const upc = upcRaw ? sanitizeBarcodeScan(upcRaw) : "";
-  if (!upc) return undefined;
+  return findApplianceIdentifierConflict(items, upcRaw, options);
+}
+
+export function findApplianceIdentifierConflict(
+  items: ApplianceCatalogItem[],
+  identifierRaw: string | null | undefined,
+  options?: { excludeId?: string; excludeItemNumber?: string }
+): ApplianceCatalogItem | undefined {
+  const exact = normalizeApplianceIdentifier(identifierRaw);
+  const digitKey = sanitizeBarcodeScan(String(identifierRaw ?? ""));
+  if (!exact && !digitKey) return undefined;
   const excludeItem = options?.excludeItemNumber
-    ? sanitizeBarcodeScan(options.excludeItemNumber)
+    ? normalizeApplianceIdentifier(options.excludeItemNumber) ||
+      sanitizeBarcodeScan(options.excludeItemNumber)
     : "";
 
   return items.find((item) => {
     if (options?.excludeId && item.id === options.excludeId) return false;
-    if (
-      excludeItem &&
-      sanitizeBarcodeScan(item.item_number) === excludeItem
-    ) {
-      return false;
-    }
-    return (
-      item.upc != null &&
-      item.upc !== "" &&
-      sanitizeBarcodeScan(item.upc) === upc
-    );
+    const itemKey =
+      normalizeApplianceIdentifier(item.item_number) ||
+      sanitizeBarcodeScan(item.item_number);
+    if (excludeItem && itemKey === excludeItem) return false;
+    return identifierConflictsWithItem(item, String(identifierRaw ?? ""));
   });
 }
 
-/** Search Item #, UPC, description, category, and sub-category for manage UI. */
+/** Search Item #, identifiers, description, category, and sub-category for manage UI. */
 export function filterApplianceCatalog(
   catalog: ApplianceCatalogItem[],
   query: string
@@ -130,8 +331,9 @@ export function filterApplianceCatalog(
     a.item_number.localeCompare(b.item_number)
   );
   const q = query.trim().toLowerCase();
-  const qDigits = sanitizeBarcodeScan(query);
-  if (!q && !qDigits) return sorted;
+  if (!q && !normalizeApplianceIdentifier(query) && !sanitizeBarcodeScan(query)) {
+    return sorted;
+  }
 
   return sorted.filter((item) => {
     if (
@@ -142,32 +344,34 @@ export function filterApplianceCatalog(
     ) {
       return true;
     }
-    if (!qDigits) return false;
-    return (
-      sanitizeBarcodeScan(item.item_number).includes(qDigits) ||
-      (item.upc != null && sanitizeBarcodeScan(item.upc).includes(qDigits))
-    );
+    if (!q && !normalizeApplianceIdentifier(query)) return false;
+    const resolved = resolveApplianceCatalogItem([item], query);
+    return resolved.status === "matched";
   });
 }
 
-function assertNoUpcConflict(
+function assertNoIdentifierConflict(
   store: string,
-  record: Pick<ApplianceCatalogItem, "id" | "item_number" | "upc">
+  record: Pick<ApplianceCatalogItem, "id" | "item_number" | "upc">,
+  identifier?: string | null
 ): void {
-  const conflict = findApplianceUpcConflict(forStore(store), record.upc, {
+  const checkValue = identifier ?? record.upc;
+  const conflict = findApplianceIdentifierConflict(forStore(store), checkValue, {
     excludeId: record.id,
     excludeItemNumber: record.item_number,
   });
   if (conflict) {
     throw new ApplianceCatalogConflictError(
-      `UPC ${record.upc} is already linked to Item ${conflict.item_number}. Open Manage mappings and clear or change that link first.`,
+      `Identifier ${normalizeApplianceIdentifier(checkValue)} is already linked to Item ${conflict.item_number}. Clear or change that link first.`,
       conflict
     );
   }
 }
 
 function upsertLocal(record: ApplianceCatalogItem): ApplianceCatalogItem[] {
-  assertNoUpcConflict(record.store_number, record);
+  if (record.upc) {
+    assertNoIdentifierConflict(record.store_number, record, record.upc);
+  }
 
   const existing = readAllLocal().filter(
     (r) =>
@@ -198,6 +402,28 @@ function catalogPayload(record: ApplianceCatalogItem) {
   };
 }
 
+function attachIdentifiers(
+  items: ApplianceCatalogItem[],
+  rows: { store_number: string; item_number: string; identifier: string }[]
+): ApplianceCatalogItem[] {
+  const byItem = new Map<string, string[]>();
+  for (const row of rows) {
+    const key = `${row.store_number}::${row.item_number}`;
+    const list = byItem.get(key) ?? [];
+    const id = normalizeApplianceIdentifier(row.identifier);
+    if (id && !list.includes(id)) list.push(id);
+    byItem.set(key, list);
+  }
+  return items.map((item) => {
+    const extra = byItem.get(`${item.store_number}::${item.item_number}`) ?? [];
+    const merged = listApplianceTaughtIdentifiers({
+      ...item,
+      identifiers: extra,
+    });
+    return { ...item, identifiers: merged };
+  });
+}
+
 export async function fetchApplianceCatalog(): Promise<ApplianceCatalogItem[]> {
   const store = getStoreNumber();
   const local = forStore(store);
@@ -211,9 +437,25 @@ export async function fetchApplianceCatalog(): Promise<ApplianceCatalogItem[]> {
       .eq("store_number", store)
       .order("item_number");
     if (error) throw error;
-    const remote = (data ?? []).map((row) =>
+    let remote = (data ?? []).map((row) =>
       mapRow(row as Record<string, unknown>)
     );
+
+    const { data: idRows, error: idError } = await supabase
+      .from(IDENTIFIERS_TABLE)
+      .select("store_number, item_number, identifier")
+      .eq("store_number", store);
+    if (!idError && idRows) {
+      remote = attachIdentifiers(
+        remote,
+        idRows as {
+          store_number: string;
+          item_number: string;
+          identifier: string;
+        }[]
+      );
+    }
+
     const offlineOnly = local.filter((r) => r.offline);
     const merged = [
       ...remote.filter((r) => !offlineOnly.some((o) => o.id === r.id)),
@@ -229,8 +471,148 @@ export async function fetchApplianceCatalog(): Promise<ApplianceCatalogItem[]> {
   }
 }
 
+async function persistIdentifierOnline(input: {
+  store_number: string;
+  item_number: string;
+  identifier: string;
+  id?: string;
+}): Promise<void> {
+  const authHeaders = await storeOpsAuthHeadersAsync();
+  const res = await fetch("/api/appliances/catalog/identifiers", {
+    method: "POST",
+    headers: {
+      ...authHeaders,
+      "Content-Type": "application/json",
+      "x-store-number": input.store_number,
+    },
+    body: JSON.stringify({
+      id: input.id,
+      store_number: input.store_number,
+      item_number: input.item_number,
+      identifier: input.identifier,
+    }),
+  });
+  const json = (await res.json().catch(() => ({}))) as {
+    error?: string;
+    conflict?: Record<string, unknown>;
+  };
+  if (res.status === 409) {
+    const conflictRow = json.conflict ? mapRow(json.conflict) : null;
+    throw new ApplianceCatalogConflictError(
+      json.error ||
+        `Identifier ${input.identifier} is already linked to another item.`,
+      conflictRow ??
+        ({
+          id: "unknown",
+          store_number: input.store_number,
+          item_number: "?",
+          upc: null,
+          description: "",
+          category: "Laundry",
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        } satisfies ApplianceCatalogItem)
+    );
+  }
+  if (!res.ok) {
+    throw new Error(json.error || `Identifier save failed (${res.status})`);
+  }
+}
+
+/**
+ * Teach a scannable identifier onto an existing canonical item (link path).
+ * Does not rewrite catalog metadata or legacy upc.
+ */
+export async function linkApplianceCatalogIdentifier(input: {
+  item: ApplianceCatalogItem;
+  identifier: string;
+}): Promise<{ record: ApplianceCatalogItem; offline: boolean }> {
+  const store = input.item.store_number || getStoreNumber();
+  const identifier = normalizeApplianceIdentifier(input.identifier);
+  if (!identifier) {
+    throw new Error("identifier is required");
+  }
+
+  assertNoIdentifierConflict(
+    store,
+    {
+      id: input.item.id,
+      item_number: input.item.item_number,
+      upc: input.item.upc,
+    },
+    identifier
+  );
+
+  const now = new Date().toISOString();
+  const id = uid();
+  const updated = withIdentifierOnItem(
+    { ...input.item, store_number: store },
+    identifier
+  );
+
+  if (isBrowserOnline()) {
+    let gotHttpResponse = false;
+    try {
+      await persistIdentifierOnline({
+        id,
+        store_number: store,
+        item_number: input.item.item_number,
+        identifier,
+      });
+      gotHttpResponse = true;
+      const existing = readAllLocal().filter(
+        (r) =>
+          !(
+            r.store_number === updated.store_number &&
+            (r.id === updated.id || r.item_number === updated.item_number)
+          )
+      );
+      writeAllLocal(
+        [...existing, { ...updated, offline: false }].sort((a, b) =>
+          a.item_number.localeCompare(b.item_number)
+        )
+      );
+      return { record: { ...updated, offline: false }, offline: false };
+    } catch (err) {
+      if (err instanceof ApplianceCatalogConflictError) throw err;
+      if (gotHttpResponse) throw err;
+      const offlineRecord = { ...updated, offline: true, updated_at: now };
+      upsertLocal(offlineRecord);
+      enqueueSyncAction(
+        "upsert_appliance_catalog_identifier",
+        {
+          id,
+          store_number: store,
+          item_number: input.item.item_number,
+          identifier,
+          created_at: now,
+          updated_at: now,
+        },
+        store
+      );
+      return { record: offlineRecord, offline: true };
+    }
+  }
+
+  const offlineRecord = { ...updated, offline: true, updated_at: now };
+  upsertLocal(offlineRecord);
+  enqueueSyncAction(
+    "upsert_appliance_catalog_identifier",
+    {
+      id,
+      store_number: store,
+      item_number: input.item.item_number,
+      identifier,
+      created_at: now,
+      updated_at: now,
+    },
+    store
+  );
+  return { record: offlineRecord, offline: true };
+}
+
 export async function saveApplianceCatalogItem(
-  input: ApplianceCatalogItemInsert
+  input: ApplianceCatalogItemInsert & { teach_identifier?: string | null }
 ): Promise<{ record: ApplianceCatalogItem; offline: boolean }> {
   const now = new Date().toISOString();
   const store = input.store_number ?? getStoreNumber();
@@ -238,7 +620,13 @@ export async function saveApplianceCatalogItem(
   const upc =
     upcRaw == null || upcRaw === ""
       ? null
-      : sanitizeBarcodeScan(String(upcRaw));
+      : normalizeApplianceIdentifier(upcRaw) ||
+        sanitizeBarcodeScan(String(upcRaw)) ||
+        null;
+  const teachIdentifier =
+    input.teach_identifier == null || input.teach_identifier === ""
+      ? upc
+      : normalizeApplianceIdentifier(input.teach_identifier) || upc;
   const pair = resolveApplianceCategoryPair(
     input.category,
     input.sub_category
@@ -255,15 +643,19 @@ export async function saveApplianceCatalogItem(
     created_at: now,
     updated_at: now,
     offline: false,
+    identifiers: teachIdentifier ? [teachIdentifier] : [],
   };
 
-  assertNoUpcConflict(store, record);
+  if (teachIdentifier) {
+    assertNoIdentifierConflict(store, record, teachIdentifier);
+  } else if (record.upc) {
+    assertNoIdentifierConflict(store, record, record.upc);
+  }
 
   /**
    * Online: actor-bound catalog API only.
-   * Application responses (400/401/403/409/5xx) MUST remain failures —
-   * never fall through to direct client Supabase upsert.
-   * Network unavailable (no HTTP response): intentional offline teach queue.
+   * Application responses MUST remain failures — never fall through to
+   * direct client Supabase upsert. Network unavailable → offline queue.
    */
   if (isBrowserOnline()) {
     let gotHttpResponse = false;
@@ -284,6 +676,7 @@ export async function saveApplianceCatalogItem(
           description: record.description,
           category: record.category,
           sub_category: record.sub_category ?? "",
+          teach_identifier: teachIdentifier,
         }),
       });
       gotHttpResponse = true;
@@ -296,8 +689,7 @@ export async function saveApplianceCatalogItem(
       if (res.status === 409) {
         const conflictRow = json.conflict ? mapRow(json.conflict) : null;
         throw new ApplianceCatalogConflictError(
-          json.error ||
-            `UPC ${record.upc} is already linked to another item.`,
+          json.error || `Identifier is already linked to another item.`,
           conflictRow ??
             ({
               id: "unknown",
@@ -313,37 +705,38 @@ export async function saveApplianceCatalogItem(
       }
 
       if (!res.ok) {
-        const raw = json.error || `Catalog save failed (${res.status})`;
-        if (/store_number/i.test(raw)) {
+        const rawMsg = json.error || `Catalog save failed (${res.status})`;
+        if (/store_number/i.test(rawMsg)) {
           throw new Error(
             "Appliance catalog is missing store_number on the server. Apply migration 20260907_appliance_catalog_store_number.sql, then retry teach."
           );
         }
-        throw new Error(raw);
+        throw new Error(rawMsg);
       }
       if (!json.item) {
         throw new Error("API returned no catalog item");
       }
 
       const saved = mapRow(json.item);
+      const withIds = teachIdentifier
+        ? withIdentifierOnItem(saved, teachIdentifier)
+        : saved;
       const existing = readAllLocal().filter(
         (r) =>
           !(
-            r.store_number === saved.store_number &&
-            (r.id === saved.id || r.item_number === saved.item_number)
+            r.store_number === withIds.store_number &&
+            (r.id === withIds.id || r.item_number === withIds.item_number)
           )
       );
       writeAllLocal(
-        [...existing, saved].sort((a, b) =>
+        [...existing, withIds].sort((a, b) =>
           a.item_number.localeCompare(b.item_number)
         )
       );
-      return { record: saved, offline: false };
+      return { record: withIds, offline: false };
     } catch (err) {
       if (err instanceof ApplianceCatalogConflictError) throw err;
-      // HTTP application/auth/validation failures stay failures.
       if (gotHttpResponse) throw err;
-      // No HTTP response (network down / aborted) → offline teach queue.
       const offlineRecord = { ...record, offline: true };
       upsertLocal(offlineRecord);
       enqueueSyncAction(
@@ -351,11 +744,24 @@ export async function saveApplianceCatalogItem(
         catalogPayload(offlineRecord),
         store
       );
+      if (teachIdentifier) {
+        enqueueSyncAction(
+          "upsert_appliance_catalog_identifier",
+          {
+            id: uid(),
+            store_number: store,
+            item_number: record.item_number,
+            identifier: teachIdentifier,
+            created_at: now,
+            updated_at: now,
+          },
+          store
+        );
+      }
       return { record: offlineRecord, offline: true };
     }
   }
 
-  // Explicit browser offline (or offline-forced): queue for replay.
   const offlineRecord = { ...record, offline: true };
   upsertLocal(offlineRecord);
   enqueueSyncAction(
@@ -363,6 +769,20 @@ export async function saveApplianceCatalogItem(
     catalogPayload(offlineRecord),
     store
   );
+  if (teachIdentifier) {
+    enqueueSyncAction(
+      "upsert_appliance_catalog_identifier",
+      {
+        id: uid(),
+        store_number: store,
+        item_number: record.item_number,
+        identifier: teachIdentifier,
+        created_at: now,
+        updated_at: now,
+      },
+      store
+    );
+  }
   return { record: offlineRecord, offline: true };
 }
 
@@ -386,23 +806,21 @@ export async function deleteApplianceCatalogItem(id: string): Promise<void> {
   }
 }
 
+/**
+ * Resolve raw scan → one canonical catalog item via item_number, legacy upc,
+ * or taught identifiers (APP-CAT-001A). Ambiguous sanitized collapses → undefined.
+ */
 export function findApplianceByItemOrUpc(
   items: ApplianceCatalogItem[],
   raw: string
 ): ApplianceCatalogItem | undefined {
-  const key = sanitizeBarcodeScan(raw);
-  if (!key) return undefined;
-  return items.find(
-    (item) =>
-      sanitizeBarcodeScan(item.item_number) === key ||
-      (item.upc != null &&
-        item.upc !== "" &&
-        sanitizeBarcodeScan(item.upc) === key)
-  );
+  const result = resolveApplianceCatalogItem(items, raw);
+  return result.status === "matched" ? result.item : undefined;
 }
 
 export type ApplianceScanResolution =
   | { kind: "matched"; item: ApplianceCatalogItem; scanned: string }
+  | { kind: "ambiguous"; scanned: string }
   | { kind: "unlinked_barcode"; scanned: string }
   | { kind: "unknown_sku"; scanned: string }
   | { kind: "empty" };
@@ -411,13 +829,23 @@ export function resolveApplianceScan(
   items: ApplianceCatalogItem[],
   raw: string
 ): ApplianceScanResolution {
-  const scanned = sanitizeBarcodeScan(raw);
+  const normalized = normalizeApplianceIdentifier(raw);
+  const digits = sanitizeBarcodeScan(raw);
+  // Prefer preserving exact normalized form for teach/display when present;
+  // wedge transport today usually supplies digits-only already.
+  const scanned = normalized || digits;
   if (!scanned) return { kind: "empty" };
 
-  const item = findApplianceByItemOrUpc(items, scanned);
-  if (item) return { kind: "matched", item, scanned };
+  const result = resolveApplianceCatalogItem(items, scanned);
+  if (result.status === "matched") {
+    return { kind: "matched", item: result.item, scanned };
+  }
+  if (result.status === "ambiguous") {
+    return { kind: "ambiguous", scanned };
+  }
 
-  if (scanned.length >= 8) {
+  const lengthProbe = digits || normalized;
+  if (lengthProbe.length >= 8) {
     return { kind: "unlinked_barcode", scanned };
   }
   return { kind: "unknown_sku", scanned };

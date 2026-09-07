@@ -461,7 +461,7 @@ Public paths: `lib/auth-gate.ts` `isAuthGatePublicPath()` — login, pair, verif
 
 > Check boxes as phases complete. Link PRs/commits inline when closing items.
 
-**Appliance specialty product evolution (directional, not contractual):** [`docs/product/APPLIANCE_EVOLUTION_ROADMAP.md`](docs/product/APPLIANCE_EVOLUTION_ROADMAP.md). Dependency law: reliable controls → audit lifecycle → richer observations → recurrence → longitudinal evidence → deterministic intelligence. **APP-AUD-002A/002B** live (lifecycle + freeze). **APP-OBS-001** fulfillment disposition production migration LIVE (real-hardware validation pending). Next: **APP-CAT-001** multi-identifier. Parking lot items stay out of schedule until prerequisites clear.
+**Appliance specialty product evolution (directional, not contractual):** [`docs/product/APPLIANCE_EVOLUTION_ROADMAP.md`](docs/product/APPLIANCE_EVOLUTION_ROADMAP.md). Dependency law: reliable controls → audit lifecycle → richer observations → recurrence → longitudinal evidence → deterministic intelligence. **APP-AUD-002A/002B** live (lifecycle + freeze). **APP-OBS-001** fulfillment disposition production migration LIVE (real-hardware validation pending). **APP-CAT-001A** multi-identifier resolution implemented (migration apply + field validation pending). **APP-CAT-001B** local promotion deferred. Next after CAT field acceptance: **APP-ROT-001**. Parking lot items stay out of schedule until prerequisites clear.
 
 ### Phase 1: Critical sync hardening & quarantine handling ✅
 

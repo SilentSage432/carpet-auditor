@@ -1,5 +1,14 @@
 # DeptSync Hub — Development Journal
 
+## 2026-09-07 — APP-CAT-001A Multi-identifier resolution & teach
+- Canonical item remains `(store_number, item_number)`; scannable identifiers are resolution keys only.
+- Additive `appliance_catalog_identifiers` (unique store+identifier); legacy `upc` retained + dual-read + idempotent backfill.
+- Unknown scan → Link existing (no metadata re-entry) OR Create new; known identifiers stay quiet.
+- Offline queue `upsert_appliance_catalog_identifier` refuses silent ownership overwrite on replay.
+- No identifier_type; no ESL encoding claims; no bulk local promotion (CAT-001B); no scan rewrite; OBS disposition stays on scan.
+- Migration `20260907_appliance_catalog_identifiers.sql` **not applied this tranche**.
+- Status: **APP-CAT-001A IMPLEMENTED — AWAITING COMMIT / MIGRATION APPLY / FIELD VALIDATION**
+
 ## 2026-09-07 — APP-OBS-001 Appliance fulfillment disposition
 - Per-unit `fulfillment_disposition` on `appliance_scans`: NULL | STAGED_PICKUP | STAGED_DELIVERY.
 - NULL = no staged disposition recorded (not official Lowe's availability). Orthogonal to location_type / condition_tag.

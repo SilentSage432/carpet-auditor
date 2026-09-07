@@ -13,6 +13,7 @@ import {
   ApplianceCatalogConflictError,
   filterApplianceCatalog,
   findApplianceUpcConflict,
+  listApplianceTaughtIdentifiers,
   saveApplianceCatalogItem,
 } from "@/lib/appliance-catalog";
 import { sanitizeBarcodeScan } from "@/lib/barcode";
@@ -223,7 +224,7 @@ export function ApplianceCatalogManageSheet({
           {mode === "list" ? (
             <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 pb-6">
               <p className="text-xs text-slate-400">
-                Teach once — correct UPC, Item #, category, and description here.
+                Teach once — one item may have many scannable identifiers.
                 Known scans stay quiet on the scanner.
               </p>
               <div className="flex gap-2">
@@ -275,11 +276,22 @@ export function ApplianceCatalogManageSheet({
                           <p className="truncate text-sm text-slate-200">
                             {item.description}
                           </p>
-                          {item.upc ? (
-                            <p className="mt-0.5 font-mono text-[11px] text-slate-500">
-                              UPC {item.upc}
-                            </p>
-                          ) : null}
+                          {(() => {
+                            const ids = listApplianceTaughtIdentifiers(item);
+                            if (ids.length === 0) return null;
+                            return (
+                              <div className="mt-1 space-y-0.5">
+                                {item.upc ? (
+                                  <p className="font-mono text-[11px] text-slate-500">
+                                    Primary {item.upc}
+                                  </p>
+                                ) : null}
+                                <p className="font-mono text-[11px] text-slate-500">
+                                  Identifiers: {ids.join(" · ")}
+                                </p>
+                              </div>
+                            );
+                          })()}
                         </div>
                         <button
                           type="button"

@@ -410,6 +410,15 @@ export function ApplianceScanForm({
         return;
       }
 
+      if (resolution.kind === "ambiguous") {
+        flashStatus(
+          "Identifier matches multiple items — fix mappings before counting",
+          "error"
+        );
+        playErrorTone();
+        return;
+      }
+
       setQuickAddBarcode(resolution.scanned);
       flashStatus("Unknown item — teach mapping to continue");
     },

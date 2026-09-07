@@ -413,6 +413,27 @@ create index if not exists appliance_catalog_upc_idx
 create index if not exists appliance_catalog_category_idx
   on public.appliance_catalog (category, sub_category);
 
+-- APP-CAT-001A: taught scannable identifiers (many → one canonical item)
+-- Apply: supabase/migrations/20260907_appliance_catalog_identifiers.sql
+create table if not exists public.appliance_catalog_identifiers (
+  id uuid primary key default gen_random_uuid(),
+  store_number text not null,
+  item_number text not null,
+  identifier text not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  constraint appliance_catalog_identifiers_item_fkey
+    foreign key (store_number, item_number)
+    references public.appliance_catalog (store_number, item_number)
+    on delete cascade
+);
+
+create unique index if not exists appliance_catalog_identifiers_store_identifier_uidx
+  on public.appliance_catalog_identifiers (store_number, identifier);
+
+create index if not exists appliance_catalog_identifiers_store_item_idx
+  on public.appliance_catalog_identifiers (store_number, item_number);
+
 create table if not exists public.appliance_scans (
   id uuid primary key default gen_random_uuid(),
   store_number text not null default '0000',

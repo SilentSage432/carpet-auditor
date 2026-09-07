@@ -25,8 +25,9 @@ describe("APP-UX-001 appliance teach / quiet scan contracts", () => {
     const quick = readRepo("components/barcode/QuickAddApplianceModal.tsx");
     expect(quick).toContain("ApplianceCategoryFields");
     expect(quick).toContain("Lowe's Item # / SKU");
-    expect(quick).toContain("findApplianceUpcConflict");
-    expect(quick).toContain("Teach unknown UPC");
+    expect(quick).toContain("findApplianceIdentifierConflict");
+    expect(quick).toContain("Link to existing item");
+    expect(quick).toContain("Create new item");
   });
 
   it("manage mappings sheet recovers searchable edit of UPC/item/category/description", () => {
@@ -48,6 +49,8 @@ describe("APP-UX-001 appliance teach / quiet scan contracts", () => {
     const api = readRepo("app/api/appliances/catalog/route.ts");
     expect(api).toContain("status: 409");
     expect(api).toContain("already linked");
+    const idApi = readRepo("app/api/appliances/catalog/identifiers/route.ts");
+    expect(idApi).toContain("status: 409");
   });
 
   it("online application failures do not fall through to direct Supabase upsert", () => {

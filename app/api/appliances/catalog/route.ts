@@ -1,5 +1,8 @@
 import { NextResponse } from "next/server";
-import { mapApplianceCatalogRow } from "@/lib/appliance-catalog";
+import {
+  mapApplianceCatalogRow,
+  normalizeApplianceIdentifier,
+} from "@/lib/appliance-catalog";
 import { actorBoundStoreNumber } from "@/lib/store-ops/appliance-store-scope";
 import {
   resolveStoreOpsActor,
@@ -70,6 +73,7 @@ export async function POST(request: Request) {
         { status: 503 }
       );
     }
+    const db = supabase;
 
     const body = (await request.json()) as Record<string, unknown>;
     const store = actorBoundStoreNumber(
@@ -82,7 +86,12 @@ export async function POST(request: Request) {
     const upc =
       upcRaw == null || upcRaw === ""
         ? null
-        : String(upcRaw).replace(/\D/g, "").replace(/^0+/, "") || null;
+        : normalizeApplianceIdentifier(upcRaw) || null;
+    const teachIdentifierRaw = body.teach_identifier;
+    const teach_identifier =
+      teachIdentifierRaw == null || teachIdentifierRaw === ""
+        ? upc
+        : normalizeApplianceIdentifier(teachIdentifierRaw) || upc;
 
     const pair = resolveApplianceCategoryPair(
       body.category,
@@ -104,18 +113,29 @@ export async function POST(request: Request) {
       );
     }
 
-    // Application-layer UPC uniqueness (DB index is non-unique).
-    if (upc) {
-      const { data: upcRows, error: upcError } = await supabase
+    async function findIdentifierOwner(value: string) {
+      const { data: idRows, error: idError } = await db
+        .from("appliance_catalog_identifiers")
+        .select("*")
+        .eq("store_number", store)
+        .eq("identifier", value);
+      if (idError) throw new Error(idError.message);
+      const idHit = (idRows ?? []).find((row) => {
+        const rowItem = String(
+          (row as { item_number?: string }).item_number ?? ""
+        ).trim();
+        return rowItem !== item_number;
+      });
+      if (idHit) return idHit;
+
+      const { data: upcRows, error: upcError } = await db
         .from("appliance_catalog")
         .select("*")
         .eq("store_number", store)
-        .eq("upc", upc);
-      if (upcError) {
-        return NextResponse.json({ error: upcError.message }, { status: 500 });
-      }
+        .eq("upc", value);
+      if (upcError) throw new Error(upcError.message);
       const bodyId = body.id ? String(body.id) : "";
-      const conflict = (upcRows ?? []).find((row) => {
+      return (upcRows ?? []).find((row) => {
         const rowItem = String(
           (row as { item_number?: string }).item_number ?? ""
         ).trim();
@@ -124,12 +144,29 @@ export async function POST(request: Request) {
         if (rowItem === item_number) return false;
         return true;
       });
+    }
+
+    // Application-layer identifier uniqueness (DB unique on identifiers table).
+    const checkValues = [upc, teach_identifier].filter(
+      (v, i, arr): v is string => Boolean(v) && arr.indexOf(v) === i
+    );
+    for (const value of checkValues) {
+      let conflict: unknown;
+      try {
+        conflict = await findIdentifierOwner(value);
+      } catch (e) {
+        return NextResponse.json(
+          { error: e instanceof Error ? e.message : "Lookup failed" },
+          { status: 500 }
+        );
+      }
       if (conflict) {
+        const owner = String(
+          (conflict as { item_number?: string }).item_number ?? "?"
+        ).trim();
         return NextResponse.json(
           {
-            error: `UPC ${upc} is already linked to Item ${String(
-              (conflict as { item_number?: string }).item_number ?? "?"
-            ).trim()}. Clear or change that mapping first.`,
+            error: `Identifier ${value} is already linked to Item ${owner}. Clear or change that mapping first.`,
             conflict,
           },
           { status: 409 }
@@ -160,9 +197,60 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: error.message }, { status: 500 });
     }
 
-    return NextResponse.json({
-      item: mapApplianceCatalogRow((data ?? payload) as Record<string, unknown>),
-    });
+    if (teach_identifier) {
+      const { error: idInsertError } = await supabase
+        .from("appliance_catalog_identifiers")
+        .insert({
+          store_number: store,
+          item_number,
+          identifier: teach_identifier,
+          updated_at: now,
+          created_at: now,
+        });
+      if (idInsertError) {
+        if (/duplicate|unique/i.test(idInsertError.message)) {
+          const { data: existing } = await supabase
+            .from("appliance_catalog_identifiers")
+            .select("item_number")
+            .eq("store_number", store)
+            .eq("identifier", teach_identifier)
+            .maybeSingle();
+          const owner = String(
+            (existing as { item_number?: string } | null)?.item_number ?? ""
+          ).trim();
+          if (owner && owner !== item_number) {
+            return NextResponse.json(
+              {
+                error: `Identifier ${teach_identifier} is already linked to Item ${owner}.`,
+              },
+              { status: 409 }
+            );
+          }
+          // Same-item idempotent teach — OK.
+        } else if (/foreign/i.test(idInsertError.message)) {
+          return NextResponse.json(
+            { error: idInsertError.message },
+            { status: 400 }
+          );
+        } else {
+          return NextResponse.json(
+            { error: idInsertError.message },
+            { status: 500 }
+          );
+        }
+      }
+    }
+
+    const item = mapApplianceCatalogRow(
+      (data ?? payload) as Record<string, unknown>
+    );
+    if (teach_identifier) {
+      item.identifiers = Array.from(
+        new Set([...(item.identifiers ?? []), teach_identifier])
+      );
+    }
+
+    return NextResponse.json({ item });
   } catch (err) {
     if (err instanceof StoreOpsAuthError) {
       return NextResponse.json({ error: err.message }, { status: err.status });

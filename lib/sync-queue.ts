@@ -23,6 +23,7 @@ export type SyncActionType =
   | "upsert_remnant"
   | "upsert_specialist"
   | "upsert_appliance_catalog"
+  | "upsert_appliance_catalog_identifier"
   | "upsert_appliance_scan"
   | "delete_audit"
   | "delete_catalog"
@@ -82,6 +83,7 @@ const LOCAL_KEYS: Record<string, string> = {
   carpet_remnants: "carpet_remnants_offline",
   store_specialists: "carpet_specialists_offline",
   appliance_catalog: "appliance_catalog_offline",
+  appliance_catalog_identifiers: "appliance_catalog_offline",
   appliance_scans: "appliance_scans_offline",
 };
 
@@ -704,6 +706,62 @@ async function replayAction(action: SyncAction): Promise<void> {
           .upsert(payload, { onConflict: "store_number,item_number" });
         if (error) throw error;
         if (entityId) markLocalOnline(LOCAL_KEYS.appliance_catalog, entityId);
+        return;
+      }
+      case "upsert_appliance_catalog_identifier": {
+        const identifier = String(payload.identifier ?? "").trim();
+        const itemNumber = String(payload.item_number ?? "").trim();
+        if (!identifier || !itemNumber) {
+          throw new Error("identifier and item_number are required");
+        }
+        // Do not overwrite server ownership — conflict / quarantine instead.
+        const { data: existing, error: existingError } = await supabase
+          .from("appliance_catalog_identifiers")
+          .select("id, item_number, identifier, updated_at")
+          .eq("store_number", action.store_number)
+          .eq("identifier", identifier)
+          .maybeSingle();
+        if (existingError) throw existingError;
+        if (existing) {
+          const owner = String(
+            (existing as { item_number?: string }).item_number ?? ""
+          ).trim();
+          if (owner !== itemNumber) {
+            throw new SyncConflictError(
+              `Identifier ${identifier} is owned by Item ${owner} on the server`,
+              {
+                action,
+                local: { ...payload },
+                server: existing as Record<string, unknown>,
+              }
+            );
+          }
+          // Same ownership — idempotent success.
+          return;
+        }
+        const { error } = await supabase
+          .from("appliance_catalog_identifiers")
+          .insert({
+            id: payload.id,
+            store_number: action.store_number,
+            item_number: itemNumber,
+            identifier,
+            created_at: payload.created_at ?? new Date().toISOString(),
+            updated_at: payload.updated_at ?? new Date().toISOString(),
+          });
+        if (error) {
+          if (/duplicate|unique/i.test(error.message)) {
+            throw new SyncConflictError(
+              `Identifier ${identifier} conflict on replay`,
+              {
+                action,
+                local: { ...payload },
+                server: { identifier, store_number: action.store_number },
+              }
+            );
+          }
+          throw error;
+        }
         return;
       }
       case "upsert_appliance_scan": {
