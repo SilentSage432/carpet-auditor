@@ -323,10 +323,11 @@ supabase/migrations/20260812_sunday_bay_assignments.sql → sunday specialist↔
    - APP-AUD-002B: explicit `audit_session_id` membership (omit = unbound); ad-hoc/Floor/SIMS unbound; CLOSED freezes WHAT/WHERE/WHEN/WHICH (API + DB trigger); soft classification fields remain mutable; catalog snapshot deferred
    - APP-OBS-001: `fulfillment_disposition` NULL|STAGED_PICKUP|STAGED_DELIVERY (per-unit physical observation; not official availability); last-scan sticker actions; derived recon breakdown
    - APP-CAT-001A: `appliance_catalog_identifiers` + dual-read legacy `upc`; Link/Create teach; canonical item ≠ scannable identifier
+   - APP-ROT-001: pure `audit-consideration` composer (`appliance-audit-consideration-v1`); advisory Consider checking again on Appliances home; no schema/score/cadence; catalog ≠ expected universe
    - APP-FIELD-001: known COUNT local-first + sync queue; scanner Review/Finish; catalog `store_number` restore migration pending apply
    - Scan form is `ApplianceScanForm` (isolated from the accordion log)
    - SIMS bay workflow stamps `location_id` / aisle / bay when opened from Floor
-   - APIs: `/api/appliances/catalog`, `/api/appliances/scans` (`GET|POST|PATCH|DELETE`)
+   - APIs: `/api/appliances/catalog`, `/api/appliances/scans` (`GET|POST|PATCH|DELETE`), `/api/appliances/audits`, `/api/appliances/audits/consideration`
 3. **Universal / Appliance Catalog** — removed from bottom nav; SKU linking via Quick-Add / scan teach + **Manage appliance mappings** sheet (`appliance_catalog`). `/catalog` redirects to `/appliances`.
 4. **Remnant Rack** — Settings accordion (`#remnants`) when RBAC allows
 5. **Settings** — theme, PIN, weekly targets, push, device/sync; Master: bulk / taxonomies / force rotation / store #. Floor Pad lives on Floor.

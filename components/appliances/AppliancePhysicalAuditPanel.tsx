@@ -8,15 +8,18 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { HubPortal } from "@/components/hub/HubPortal";
+import { ApplianceAuditConsiderationList } from "@/components/appliances/ApplianceAuditConsiderationList";
 import { NumberField, TextField } from "@/components/ui/NumberField";
 import {
   closeAppliancePhysicalAudit,
+  fetchApplianceAuditConsiderations,
   fetchApplianceAuditDetail,
   fetchApplianceAuditSessions,
   saveApplianceReconciliation,
   startAppliancePhysicalAudit,
   type ApplianceAuditDetail,
 } from "@/lib/appliances/audit-client";
+import type { ApplianceAuditConsiderationItem } from "@/lib/appliances/audit-consideration";
 import {
   APPLIANCE_RECENT_CLOSED_AUDIT_LIMIT,
   applianceAuditReconciliationToCsv,
@@ -108,6 +111,12 @@ export function AppliancePhysicalAuditPanel({
   const [highlightClosedId, setHighlightClosedId] = useState<string | null>(
     null
   );
+  const [considerationItems, setConsiderationItems] = useState<
+    ApplianceAuditConsiderationItem[]
+  >([]);
+  const [considerationEligible, setConsiderationEligible] = useState(0);
+  const [considerationLoading, setConsiderationLoading] = useState(true);
+  const [considerationExpanded, setConsiderationExpanded] = useState(false);
 
   const refreshPending = useCallback(() => {
     if (!active) {
@@ -118,6 +127,20 @@ export function AppliancePhysicalAuditPanel({
       getPendingApplianceScanSyncForAudit(active.id, getStoreNumber()).length
     );
   }, [active]);
+
+  const loadConsiderations = useCallback(async () => {
+    setConsiderationLoading(true);
+    try {
+      const result = await fetchApplianceAuditConsiderations({ limit: 0 });
+      setConsiderationItems(result.items);
+      setConsiderationEligible(result.eligible_count);
+    } catch {
+      setConsiderationItems([]);
+      setConsiderationEligible(0);
+    } finally {
+      setConsiderationLoading(false);
+    }
+  }, []);
 
   const loadRecentCards = useCallback(
     async (closed: ApplianceAuditSession[]) => {
@@ -170,14 +193,14 @@ export function AppliancePhysicalAuditPanel({
           )
         );
       setClosedSessions(closed);
-      await loadRecentCards(closed);
+      await Promise.all([loadRecentCards(closed), loadConsiderations()]);
     } catch (err) {
       onStatus(
         err instanceof Error ? err.message : "Could not load physical audits",
         "error"
       );
     }
-  }, [loadRecentCards, onActiveSessionChange, onStatus]);
+  }, [loadConsiderations, loadRecentCards, onActiveSessionChange, onStatus]);
 
   useEffect(() => {
     void refresh();
@@ -312,6 +335,36 @@ export function AppliancePhysicalAuditPanel({
     }
   }
 
+  async function openConsiderationHistory(item: ApplianceAuditConsiderationItem) {
+    const id = item.lastClosedAuditId;
+    if (!id) return;
+    const session =
+      closedSessions.find((s) => s.id === id) ??
+      recentCards.find((c) => c.session.id === id)?.session;
+    if (session) {
+      await openHistory(session, { openRecon: true });
+      return;
+    }
+    setBusy(true);
+    try {
+      const loaded = await fetchApplianceAuditDetail(id);
+      setDetail(loaded);
+      setDrafts(seedDrafts(loaded.physical_items, loaded.snapshots));
+      setDetailOpen(true);
+      setReconOpen(loaded.session.status === "CLOSED");
+      if (loaded.session.status === "CLOSED") {
+        setHighlightClosedId(loaded.session.id);
+      }
+    } catch (err) {
+      onStatus(
+        err instanceof Error ? err.message : "Could not open audit",
+        "error"
+      );
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function handleSaveRecon() {
     if (!detail) return;
     setReconSaving(true);
@@ -346,7 +399,10 @@ export function AppliancePhysicalAuditPanel({
       onStatus(
         `Reconciliation saved — ${snapshots.filter((s) => s.declared_lowes_oh != null).length} OH declaration(s). ${formatApplianceReconciliationPhase(progress.phase)}.`
       );
-      await loadRecentCards(closedSessions);
+      await Promise.all([
+        loadRecentCards(closedSessions),
+        loadConsiderations(),
+      ]);
     } catch (err) {
       onStatus(
         err instanceof Error ? err.message : "Reconciliation save failed",
@@ -444,6 +500,15 @@ export function AppliancePhysicalAuditPanel({
             : ""}
         </p>
       ) : null}
+
+      <ApplianceAuditConsiderationList
+        items={considerationItems}
+        eligibleCount={considerationEligible}
+        loading={considerationLoading}
+        expanded={considerationExpanded}
+        onToggleExpanded={() => setConsiderationExpanded((v) => !v)}
+        onOpenHistory={(item) => void openConsiderationHistory(item)}
+      />
 
       {highlightClosedId && !active ? (
         <div

@@ -146,21 +146,28 @@ Soft mutable after CLOSED (APP-AUD-002B soft-field set). Quiet rapid scan + opti
 
 **APP-CAT-001B (deferred):** Review locally taught mappings and **intentionally** promote valid ones into the authoritative store-scoped server catalog. Do **not** automatically upload legacy local mappings.
 
-**Next after CAT-001 field acceptance:** APP-ROT-001.
+#### APP-ROT-001 — Appliance Audit Consideration
+
+**Status:** Implemented (composer + Appliances home strip). Field validation pending. Not a Floor-style rotation engine.
+
+Deterministic **evidence composer** answering: which historically observed appliance items are worth **considering** checking again, and why?
+
+| Does | Does not |
+|------|----------|
+| CLOSED-audit + Option B recon evidence | Persist recommendation / rotation state |
+| Categorical reasons (follow-up, missing OH, repeated/recent nonzero variance) | Risk score, fixed cadence, stale-day threshold |
+| Advisory “Consider checking again” on Appliances home / Start Physical Audit | Mandatory audit targets or catalog-as-expected-universe |
+| Evidence counts for maturity | Cause claims (shrink / SIMS / theft) — APP-INT |
+
+**Universe:** items with CLOSED-audit membership (and/or recon history on those audits). Catalog ≠ expected physical inventory. Days-since is **context only** until an appliance-specific threshold is explicitly established.
+
+CAT-001A ESL field validation is not a blocker. CAT-001B deferred.
+
+**Next later:** APP-INT-001 (longitudinal interpretation — not pulled into ROT).
 
 ---
 
 ### Later
-
-#### APP-ROT-001 — Appliance Audit Rotation Foundation
-
-Likely location-based recurring physical audits.
-
-DeptSync **recommends** which appliance locations should be physically observed next.
-
-Do **not** infer inventory discrepancy merely from physical change.
-
-**Prerequisite:** trustworthy closed audits + history (APP-AUD-002) and stable observation richness.
 
 #### APP-INT-001 — Deterministic Appliance Pattern Intelligence
 

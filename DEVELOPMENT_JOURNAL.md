@@ -1,5 +1,14 @@
 # DeptSync Hub — Development Journal
 
+## 2026-09-07 — APP-ROT-001 Appliance audit consideration
+- Pure composer `lib/appliances/audit-consideration.ts` (`appliance-audit-consideration-v1`): CLOSED audits + audit-bound scans + Option B snapshots → advisory consideration items.
+- Reasons: NEEDS_FOLLOW_UP, MISSING_DECLARED_OH, REPEATED_NONZERO_VARIANCE, RECENT_NONZERO_VARIANCE. No risk score, fixed cadence, or stale-day eligibility (days-since is context only).
+- Universe = CLOSED-audit history (catalog ≠ expected physical inventory). One CLOSED audit = at most one recon observation.
+- UI: compact Consider checking again on Appliances physical-audit panel; tap opens latest CLOSED audit history. Empty-start audits unchanged.
+- API: `GET /api/appliances/audits/consideration` (derived, not persisted).
+- Not Floor rotation; APP-INT / CAT-001B / BULK-AUD deferred.
+- Status: **APP-ROT-001 APPLIANCE AUDIT CONSIDERATIONS — COMMITTED AND PUSHED — REAL-HARDWARE SMOKE PENDING**
+
 ## 2026-09-07 — APP-CAT-001A Multi-identifier resolution & teach
 - Canonical item remains `(store_number, item_number)`; scannable identifiers are resolution keys only.
 - Additive `appliance_catalog_identifiers` (unique store+identifier); legacy `upc` retained + dual-read + idempotent backfill.

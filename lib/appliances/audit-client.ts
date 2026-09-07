@@ -11,6 +11,10 @@ import {
   isBrowserOnline,
 } from "@/lib/sync-queue";
 import {
+  type ApplianceAuditConsiderationItem,
+  type ApplianceAuditConsiderationResult,
+} from "@/lib/appliances/audit-consideration";
+import {
   mapApplianceAuditSessionRow,
   mapApplianceReconciliationSnapshotRow,
   type ApplianceAuditSession,
@@ -227,6 +231,52 @@ export async function fetchApplianceAuditDetail(
       reconciled_item_count: 0,
       snapshot_row_count: 0,
     },
+  };
+}
+
+/**
+ * APP-ROT-001 — fetch derived consideration list (online). Empty offline.
+ */
+export async function fetchApplianceAuditConsiderations(options?: {
+  limit?: number;
+}): Promise<ApplianceAuditConsiderationResult & { store_number?: string }> {
+  if (!isBrowserOnline()) {
+    return {
+      method: "appliance-audit-consideration-v1",
+      items: [],
+      eligible_count: 0,
+    };
+  }
+  const store = getStoreNumber();
+  const authHeaders = await storeOpsAuthHeadersAsync();
+  const qs = new URLSearchParams();
+  const limit = options?.limit;
+  if (limit != null && limit > 0) qs.set("limit", String(limit));
+  if (limit === 0) qs.set("limit", "0");
+  const res = await fetch(
+    `/api/appliances/audits/consideration${qs.toString() ? `?${qs}` : ""}`,
+    {
+      headers: { ...authHeaders, "x-store-number": store },
+      cache: "no-store",
+    }
+  );
+  const json = (await res.json().catch(() => ({}))) as {
+    method?: string;
+    items?: ApplianceAuditConsiderationItem[];
+    eligible_count?: number;
+    store_number?: string;
+    error?: string;
+  };
+  if (!res.ok) {
+    throw new Error(
+      json.error || `Failed to load audit considerations (${res.status})`
+    );
+  }
+  return {
+    method: "appliance-audit-consideration-v1",
+    items: json.items ?? [],
+    eligible_count: json.eligible_count ?? (json.items ?? []).length,
+    store_number: json.store_number,
   };
 }
 

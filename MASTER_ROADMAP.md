@@ -1,8 +1,9 @@
 # DeptSync Hub — Master Roadmap
 
-> **Appliance specialty evolution (directional):** [`docs/product/APPLIANCE_EVOLUTION_ROADMAP.md`](docs/product/APPLIANCE_EVOLUTION_ROADMAP.md) — next: APP-CAT-001A field validation / migration apply; CAT-001B local promotion deferred; later APP-ROT-001 / APP-INT-001. Do not leapfrog evidence foundations.
+> **Appliance specialty evolution (directional):** [`docs/product/APPLIANCE_EVOLUTION_ROADMAP.md`](docs/product/APPLIANCE_EVOLUTION_ROADMAP.md) — APP-ROT-001 consideration composer implemented; CAT-001A ESL field validation pending; CAT-001B deferred; later APP-INT-001. Do not leapfrog evidence foundations.
 
 ## Done
+- [x] APP-ROT-001 Appliance audit consideration — evidence composer + Consider checking again strip (**COMMITTED AND PUSHED — REAL-HARDWARE SMOKE PENDING**; no schema; not Floor rotation)
 - [x] APP-CAT-001A Multi-identifier resolution & teach — alias table + dual-read upc + Link/Create (**PRODUCTION MIGRATION LIVE — ESL / REAL-HARDWARE VALIDATION PENDING**)
 - [x] APP-OBS-001 Appliance fulfillment disposition — per-unit NULL/STAGED_PICKUP/STAGED_DELIVERY; last-scan actions; soft after CLOSED; recon breakdown (**PRODUCTION MIGRATION LIVE — REAL-HARDWARE VALIDATION PENDING**)
 - [x] APP-AUD-002B Physical evidence freeze hardening — Option B: explicit membership; CLOSED WHAT/WHERE/WHEN/WHICH freeze (API + DB); ad-hoc/Floor unbound (**COMMITTED, PUSHED, PRODUCTION MIGRATION LIVE — REAL-HARDWARE VALIDATION PENDING**; `20260907_appliance_scans_closed_evidence_freeze.sql`)
@@ -207,7 +208,9 @@
 ## Next
 - [ ] **Appliances — APP-OBS-001** field validation (migration LIVE on `fmeinlwhixngednabhgy`)
 - [ ] **Appliances — APP-AUD-002** field validation to close tranche after 002A/002B hardware smoke
-- [ ] **Appliances — APP-CAT-001** Local catalog promotion + multi-identifier resolution (queued after OBS)
+- [ ] **Appliances — APP-CAT-001A** ESL / real-hardware identifier validation (migration LIVE; CAT-001B deferred)
+- [ ] **Appliances — APP-ROT-001** field validation of Consider checking again strip
+- [ ] **Appliances — APP-INT-001** Deterministic pattern intelligence (after longitudinal evidence)
 - [x] Apply specialty schema parity (`20260905_store_specialists_home_department.sql`, `20260905_specialty_catalog_remnants_parity.sql`) after fresh backup — **M1+M2 live** 2026-09-05; commit pending
 - [x] Apply Phase 1 JWT/RLS migration in Supabase + enable Custom Access Token Hook
 - [ ] Apply Phase 2 migrations (`20260812_manager_notes.sql`, `20260812_sunday_bay_assignments.sql`, `20260812_manager_notes_archive.sql`, `20260812_fix_manager_notes_rls.sql`, **`20260812_manager_notes_metadata.sql`**, **`enable_rls_flagged_tables.sql`**, **`20260813_p0_query_indexes.sql`**, **`20260814_downstock_queue.sql`**, **`20260814_cabinets_d29.sql`**, **`20260814_bay_velocity_heatmap.sql`**, **`20260814_multi_department_access.sql`**, **`20260815_associate_shift_days.sql`**, **`20260815_carry_over_priority.sql`**, **`20260815_custom_decay_days.sql`**, **`20260815_performance_indexes.sql`**, **`20260815_shift_walk_tasks.sql`**, **`20260815_roster_invite_onboarding.sql`**, **`20260815_unified_auth_token.sql`**, **`20260815_roster_app_access.sql`**, **`20260815_roster_auth_link.sql`**, **`20260815_roster_insert_rls.sql`**, **`20260816_store_locations_read.sql`**, **`20260816_rls_read_write_parity.sql`**, **`20260816_roster_floor_title.sql`**, **`20260816_sunday_rotation_schedule.sql`**, **`20260817_rls_security_lockdown.sql`**, **`20260817_weekly_rotations_location_week_unique.sql`**, **`20260818_weekly_rotation_verification.sql`**, **`20260818_store_location_workflow_type.sql`**, **`20260818_appliance_scans_bay_location.sql`**) + Realtime on notes/assignments/downstock tables
