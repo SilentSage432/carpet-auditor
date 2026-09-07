@@ -1,5 +1,14 @@
 # DeptSync Hub — Development Journal
 
+## 2026-09-07 — UX-005B Department-aware Appliances entry
+- Floor identity header: compact **Appliances** / Physical audit affordance when Supervisor+/Master, `workingDepartment === "appliances"`, and `canAccessSection(..., "appliances")`.
+- Navigates to existing `APPLIANCES_OPERATIONAL_HOME_HREF` (`/appliances` → specialty home). More → Department Tools → Appliances kept as secondary path.
+- Visibility helper `shouldShowFloorAppliancesEntry` in `lib/specialty-tools.ts` (Appliances-only pilot; no Flooring mapping; no name heuristics).
+- No fifth bottom-nav tab; no audit-session fetch on Floor; no dual-shell / specialty-host / schema / API changes.
+- Flooring cycle vs Floor Sunday (Question #6) remains open. Question #1 implemented pending Samsung field evidence — not closed as field-accepted.
+- Contracts: `lib/ux005b.floor-appliances-entry.contract.test.ts`; UX-003 / UX-005A / UX-NAV green. Typecheck + build pass.
+- Status: **UX-005B IMPLEMENTED — SAMSUNG ACCEPTANCE PENDING** (not committed in this session)
+
 ## 2026-09-07 — UX-005 governing backlog preserved
 - Canonical program constraints recorded in `docs/product/UX005_OPERATIONAL_SIMPLICITY_BACKLOG.md`.
 - UX-005A is first tranche only; Questions 1,3–7 remain open; Question 2 owned by 005A; Question 8 demote-only.

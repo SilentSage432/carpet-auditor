@@ -45,7 +45,7 @@ describe("UX-003 Floor decision hierarchy contracts", () => {
     assertOrder("attention < fiscal", attentionIdx, fiscalIdx);
     assertOrder("fiscal < tools", fiscalIdx, analyticsIdx);
 
-    // Command header is identity-only (title), not week telemetry.
+    // Command header is identity (title + optional UX-005B specialty entry).
     const headerSlice = floor.slice(
       identityIdx,
       floor.indexOf("</header>", identityIdx)
@@ -53,6 +53,14 @@ describe("UX-003 Floor decision hierarchy contracts", () => {
     expect(headerSlice).toContain("{rotationTitle}");
     expect(headerSlice).not.toContain("floor-week-progress-line");
     expect(headerSlice).not.toContain("floor-readiness-line");
+    // Specialty entry stays inside identity — never above verification strip.
+    expect(headerSlice).toContain("floor-appliances-entry");
+    expect(headerSlice).toContain("showAppliancesEntry");
+    assertOrder(
+      "appliances entry < verification",
+      floor.indexOf('data-testid="floor-appliances-entry"'),
+      verifyIdx
+    );
   });
 
   it("without verification, identity still precedes week state and work", () => {

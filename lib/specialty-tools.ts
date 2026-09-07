@@ -12,7 +12,11 @@
 
 import { canAccessSection } from "@/lib/rbac";
 import type { NavIconId } from "@/components/hub/NavIcons";
-import type { HubSection, StoreSpecialist } from "@/lib/types";
+import type {
+  DepartmentScope,
+  HubSection,
+  StoreSpecialist,
+} from "@/lib/types";
 
 export const APPLIANCE_SCANNER_HASH = "scan";
 export const REMNANT_CALCULATOR_HASH = "remnants-calculator";
@@ -115,6 +119,25 @@ export function visibleSpecialtyTools(
   member: StoreSpecialist | null | undefined
 ): SpecialtyTool[] {
   return SPECIALTY_TOOLS.filter((tool) => canAccessSection(member, tool.section));
+}
+
+/**
+ * UX-005B — Floor contextual Appliances entry (presentation only).
+ *
+ * Appliances-only pilot: show when Supervisor+/Master is currently working
+ * Appliances and already has appliances section access. Not authorization.
+ * Does not map Flooring or other specialties. Do not infer from name heuristics.
+ */
+export function shouldShowFloorAppliancesEntry(
+  member: StoreSpecialist | null | undefined,
+  working: DepartmentScope
+): boolean {
+  if (!member) return false;
+  if (member.role !== "Supervisor" && member.role !== "MasterAdmin") {
+    return false;
+  }
+  if (working !== "appliances") return false;
+  return canAccessSection(member, "appliances");
 }
 
 export function specialtyToolHref(toolId: SpecialtyToolId): string {

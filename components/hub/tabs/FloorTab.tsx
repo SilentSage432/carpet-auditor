@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, Suspense } from "react";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
-import { Users, Zap } from "lucide-react";
+import { ChevronRight, Users, Zap } from "lucide-react";
 import { SundayAuditStagingCard } from "@/components/admin/SundayAuditStagingCard";
 import { ExceptionFeed } from "@/components/admin/ExceptionFeed";
 import { StoreHealthCard } from "@/components/StoreHealthCard";
@@ -26,9 +26,16 @@ import {
   workingDepartmentId,
 } from "@/lib/admin-department-context";
 import { useWorkingDepartment } from "@/lib/use-working-department";
-import { isMasterAdmin, isSimplifiedAssociateView } from "@/lib/rbac";
+import {
+  isMasterAdmin,
+  isSimplifiedAssociateView,
+} from "@/lib/rbac";
 import { canAccessDepartment } from "@/lib/department-access";
 import { dedupeRoster, fetchSpecialists, isSupervisor } from "@/lib/specialists";
+import {
+  APPLIANCES_OPERATIONAL_HOME_HREF,
+  shouldShowFloorAppliancesEntry,
+} from "@/lib/specialty-tools";
 import { isStoreOpsAuthFailureMessage } from "@/lib/store-ops/auth-soft";
 import {
   fetchDepartments,
@@ -198,6 +205,10 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
   const supervisor = isSupervisor(specialist);
   const master = isMasterAdmin(specialist);
   const canReadAttention = supervisor;
+  const showAppliancesEntry = shouldShowFloorAppliancesEntry(
+    specialist,
+    working
+  );
   const assignmentDept = working === "all" ? "flooring" : working;
 
   const activeDept = useMemo(
@@ -605,11 +616,34 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
   return (
     <>
       <main className="hub-main">
-        {/* UX-003: identity only — week telemetry follows verification when present */}
+        {/* UX-003: identity — week telemetry follows verification when present.
+            UX-005B: optional Appliances specialty entry sits with department identity. */}
         <header className="mb-2" data-testid="floor-command-header">
           <h1 className="text-lg font-bold tracking-tight text-zinc-50">
             {rotationTitle}
           </h1>
+          {showAppliancesEntry ? (
+            <button
+              type="button"
+              data-testid="floor-appliances-entry"
+              onClick={() => router.push(APPLIANCES_OPERATIONAL_HOME_HREF)}
+              className="mt-2 flex min-h-11 w-full max-w-full items-center gap-2 rounded-xl border border-sky-500/40 bg-sky-950/30 px-3 py-2 text-left active:bg-sky-950/50"
+            >
+              <span className="min-w-0 flex-1">
+                <span className="block text-sm font-bold text-sky-50">
+                  Appliances
+                </span>
+                <span className="mt-0.5 block text-[11px] font-medium leading-snug text-sky-200/75">
+                  Physical audit
+                </span>
+              </span>
+              <ChevronRight
+                className="h-4 w-4 shrink-0 text-sky-300/80"
+                strokeWidth={ICON_STROKE}
+                aria-hidden
+              />
+            </button>
+          ) : null}
         </header>
 
         {/* Immediate supervisory obligation — before week telemetry */}
