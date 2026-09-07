@@ -104,7 +104,7 @@ Still pending where noted: **real-hardware validation** for field-facing pieces.
 
 #### APP-AUD-002 — Audit Closure & History Lifecycle
 
-**Status:** **APP-AUD-002A** Option A committed (real-hardware validation pending). **APP-AUD-002B** Option B implemented (migration pending apply; field validation pending).
+**Status:** **APP-AUD-002A** Option A committed (real-hardware validation pending). **APP-AUD-002B** Option B committed + production migration live (real-hardware validation pending).
 
 **Canonical meaning:** `CLOSED` = physical observation closed / physical count frozen. It does **not** mean reconciliation complete. Reconciliation progress is **derived** from existing Option B snapshot rows (mutable current state). No `RECONCILED` session status. No declaration-version history. No hard lock after reconciliation. No auto-delete of historical audits.
 

@@ -234,7 +234,7 @@ supabase/migrations/20260905_weekly_rotation_completion_attempts.sql → child a
 supabase/migrations/20260818_store_location_workflow_type.sql → store_locations.workflow_type (STANDARD_MERCH | APPLIANCE_SIMS_AUDIT | BULK_PALLET_AUDIT)
 supabase/migrations/20260818_appliance_scans_bay_location.sql → appliance_scans.location_id / aisle / bay_number
 supabase/migrations/20260906_appliance_audit_sessions.sql → appliance_audit_sessions + recon snapshots + bind trigger
-supabase/migrations/20260907_appliance_scans_closed_evidence_freeze.sql → CLOSED audit-bound observation freeze (UPDATE; APP-AUD-002B)
+supabase/migrations/20260907_appliance_scans_closed_evidence_freeze.sql → CLOSED audit-bound observation freeze (APP-AUD-002B; production LIVE)
 supabase/migrations/20260812_manager_notes.sql → durable manager_notes (store_number/department/author) + JWT RLS
 supabase/migrations/20260812_sunday_bay_assignments.sql → sunday specialist↔bay assignments + JWT RLS
 
