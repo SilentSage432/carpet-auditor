@@ -58,7 +58,7 @@ describe("APP-QA-001 appliance home contracts", () => {
 
   it("mapping management + reconciliation remain reachable", () => {
     expect(section).toContain("ApplianceCatalogManageSheet");
-    expect(panel).toContain("Close physical audit");
+    expect(panel).toContain("Close physical count");
     expect(panel).toContain("declared_lowes_oh");
     expect(panel).toContain("deriveApplianceVariance");
   });

@@ -461,7 +461,7 @@ Public paths: `lib/auth-gate.ts` `isAuthGatePublicPath()` — login, pair, verif
 
 > Check boxes as phases complete. Link PRs/commits inline when closing items.
 
-**Appliance specialty product evolution (directional, not contractual):** [`docs/product/APPLIANCE_EVOLUTION_ROADMAP.md`](docs/product/APPLIANCE_EVOLUTION_ROADMAP.md). Dependency law: reliable controls → audit lifecycle → richer observations → recurrence → longitudinal evidence → deterministic intelligence. Next: APP-AUD-002 discovery. Parking lot items (Floor SIMS audit bind, More→Tools, etc.) stay out of schedule until prerequisites clear.
+**Appliance specialty product evolution (directional, not contractual):** [`docs/product/APPLIANCE_EVOLUTION_ROADMAP.md`](docs/product/APPLIANCE_EVOLUTION_ROADMAP.md). Dependency law: reliable controls → audit lifecycle → richer observations → recurrence → longitudinal evidence → deterministic intelligence. **APP-AUD-002A** Option A committed (CLOSED = physical count frozen; derived recon; recent history) — real-hardware validation pending. **APP-AUD-002B** freeze hardening deferred. Next after 002 closes: **APP-OBS-001**. Parking lot items stay out of schedule until prerequisites clear.
 
 ### Phase 1: Critical sync hardening & quarantine handling ✅
 

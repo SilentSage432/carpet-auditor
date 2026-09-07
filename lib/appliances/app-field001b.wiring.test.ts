@@ -28,7 +28,7 @@ describe("APP-FIELD-001B physical audit exit wiring", () => {
   it("scanner renders Physical audit active + Review / Finish when session resolved", () => {
     const form = readRepo("components/sections/ApplianceScanForm.tsx");
     expect(form).toContain("Physical audit active");
-    expect(form).toContain("Review / Finish Audit");
+    expect(form).toContain("Review / Finish count");
     expect(form).toContain("resolvedAuditSessionId");
     expect(form).toContain("ignoreCachedAuditSession");
   });

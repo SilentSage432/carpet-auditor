@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { mapApplianceScanRow } from "@/lib/appliance-scans";
 import {
   composeAppliancePhysicalCounts,
+  composeApplianceReconciliationProgress,
   countReconciledItems,
   mapApplianceAuditSessionRow,
   mapApplianceReconciliationSnapshotRow,
@@ -99,6 +100,10 @@ export async function GET(request: Request, context: Ctx) {
     const physical_items = composeAppliancePhysicalCounts(scans, catalog);
     const summary = summarizeAppliancePhysicalAudit(scans);
     const recon = countReconciledItems(snapshots);
+    const progress = composeApplianceReconciliationProgress(
+      physical_items,
+      snapshots
+    );
 
     return NextResponse.json({
       session,
@@ -109,6 +114,7 @@ export async function GET(request: Request, context: Ctx) {
         ...summary,
         reconciled_item_count: recon.with_oh,
         snapshot_row_count: recon.total_snapshot_rows,
+        reconciliation: progress,
       },
     });
   } catch (err) {

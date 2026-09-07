@@ -433,7 +433,7 @@ export function ApplianceScanForm({
                 onClick={onReviewFinishAudit}
                 className="flex min-h-11 w-full items-center justify-center rounded-xl border border-amber-400/50 bg-amber-500/90 px-3 text-xs font-bold text-zinc-950"
               >
-                Review / Finish Audit
+                Review / Finish count
               </button>
             ) : null}
           </div>

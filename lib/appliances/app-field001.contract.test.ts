@@ -77,17 +77,17 @@ describe("APP-FIELD-001 field corrections", () => {
     );
   });
 
-  it("scanner exposes active audit + Review / Finish Audit", () => {
+  it("scanner exposes active audit + Review / Finish count", () => {
     const form = readRepo("components/sections/ApplianceScanForm.tsx");
     expect(form).toContain("Physical audit active");
-    expect(form).toContain("Review / Finish Audit");
+    expect(form).toContain("Review / Finish count");
     expect(form).toContain("onReviewFinishAudit");
 
     const panel = readRepo(
       "components/appliances/AppliancePhysicalAuditPanel.tsx"
     );
     expect(panel).toContain("reviewFinishToken");
-    expect(panel).toContain("Close physical audit");
+    expect(panel).toContain("Close physical count");
   });
 
   it("teach resume logs once via commitScan after mapping save", () => {

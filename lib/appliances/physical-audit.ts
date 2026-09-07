@@ -249,6 +249,92 @@ export function countReconciledItems(
   };
 }
 
+/** How many recent CLOSED audits the Appliance home surfaces before View all. */
+export const APPLIANCE_RECENT_CLOSED_AUDIT_LIMIT = 5;
+
+/**
+ * Derived reconciliation progress for a CLOSED physical audit (APP-AUD-002A).
+ * Not an authoritative lifecycle status — computed from current Option B rows.
+ */
+export type ApplianceReconciliationProgress = {
+  audited_item_count: number;
+  with_declared_oh: number;
+  without_declared_oh: number;
+  non_zero_variance: number;
+  resolved_count: number;
+  needs_follow_up_count: number;
+  /** Every audited item has declared Lowe's OH (≠ workflow finished). */
+  all_oh_entered: boolean;
+  /**
+   * UI phase label only — never stored.
+   * awaiting: no OH yet; in_progress: partial OH; entered: all OH present.
+   */
+  phase: "awaiting_reconciliation" | "reconciliation_in_progress" | "reconciliation_entered";
+};
+
+export function composeApplianceReconciliationProgress(
+  physicalItems: Pick<AppliancePhysicalItemCount, "item_number">[],
+  snapshots: ApplianceReconciliationSnapshot[]
+): ApplianceReconciliationProgress {
+  const byItem = new Map(
+    snapshots.map((s) => [s.item_number.trim(), s] as const)
+  );
+  const audited_item_count = physicalItems.length;
+  let with_declared_oh = 0;
+  let non_zero_variance = 0;
+  let resolved_count = 0;
+  let needs_follow_up_count = 0;
+
+  for (const item of physicalItems) {
+    const snap = byItem.get(item.item_number.trim());
+    if (snap?.declared_lowes_oh != null) {
+      with_declared_oh += 1;
+      if (snap.variance != null && snap.variance !== 0) {
+        non_zero_variance += 1;
+      }
+    }
+    if (snap?.outcome === "RESOLVED") resolved_count += 1;
+    if (snap?.outcome === "NEEDS_FOLLOW_UP") needs_follow_up_count += 1;
+  }
+
+  const without_declared_oh = Math.max(0, audited_item_count - with_declared_oh);
+  const all_oh_entered =
+    audited_item_count > 0 && without_declared_oh === 0;
+  const phase: ApplianceReconciliationProgress["phase"] =
+    audited_item_count === 0 || with_declared_oh === 0
+      ? "awaiting_reconciliation"
+      : all_oh_entered
+        ? "reconciliation_entered"
+        : "reconciliation_in_progress";
+
+  return {
+    audited_item_count,
+    with_declared_oh,
+    without_declared_oh,
+    non_zero_variance,
+    resolved_count,
+    needs_follow_up_count,
+    all_oh_entered,
+    phase,
+  };
+}
+
+export function formatApplianceReconciliationPhase(
+  phase: ApplianceReconciliationProgress["phase"]
+): string {
+  if (phase === "reconciliation_entered") return "Reconciliation entered";
+  if (phase === "reconciliation_in_progress") return "Reconciliation in progress";
+  return "Awaiting reconciliation";
+}
+
+/** Human label for session status — CLOSED ≠ lifecycle complete. */
+export function formatAppliancePhysicalAuditStatus(
+  status: ApplianceAuditStatus
+): string {
+  if (status === "ACTIVE") return "Physical audit active";
+  return "Physical count closed";
+}
+
 /** Build CSV for one physical audit + optional reconciliation snapshots. */
 export function applianceAuditReconciliationToCsv(input: {
   session: ApplianceAuditSession;

@@ -1,5 +1,12 @@
 # DeptSync Hub — Development Journal
 
+## 2026-09-07 — APP-AUD-002A Audit lifecycle clarity & recent history
+- Option A: CLOSED = physical observation closed / count frozen; not reconciliation complete.
+- Derived recon progress from Option B snapshot rows (OH / variance / outcomes); phases awaiting / in progress / entered.
+- Recent Physical Audits (5) with summaries + View all; just-closed banner for recon; Start returns after close.
+- No schema; no hard recon lock; no auto-delete. APP-AUD-002B freeze hardening deferred (auto-bind, CLOSED PATCH, catalog snapshot).
+- Status: **APP-AUD-002A COMMITTED AND PUSHED — REAL-HARDWARE VALIDATION PENDING**
+
 ## 2026-09-07 — APP-ROADMAP-001 Appliance evolution roadmap
 - Added `docs/product/APPLIANCE_EVOLUTION_ROADMAP.md`: product purpose, lifecycle, dependency law, field-validation rule, tranche order (APP-AUD-002 next; APP-OBS-001 / APP-CAT-001 queued; APP-ROT-001 / APP-INT-001 later), parking lot.
 - Pointers in `MASTER_ROADMAP.md`, `CHAT_HANDOFF.md`, `DEPT_SYNC_STATE.md`. No runtime/schema change.

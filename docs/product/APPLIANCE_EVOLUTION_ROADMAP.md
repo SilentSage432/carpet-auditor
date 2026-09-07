@@ -104,46 +104,19 @@ Still pending where noted: **real-hardware validation** for field-facing pieces.
 
 #### APP-AUD-002 — Audit Closure & History Lifecycle
 
-**Discovery first.** Do not implement until discovery answers the product question below.
+**Status:** Discovery complete; **APP-AUD-002A** Option A committed (real-hardware validation pending).
 
-**Trace existing semantics for:**
+**Canonical meaning:** `CLOSED` = physical observation closed / physical count frozen. It does **not** mean reconciliation complete. Reconciliation progress is **derived** from existing Option B snapshot rows (mutable current state). No `RECONCILED` session status. No declaration-version history. No hard lock after reconciliation. No auto-delete of historical audits.
 
-- ACTIVE audit  
-- closing / freezing physical observation  
-- reconciliation after close  
-- Lowe’s OH declarations, derived variance, outcomes, notes  
-- any completed / reconciled state  
-- recent audit presentation vs full history  
-- reopen / read-only behavior  
-- export / email of historical audits  
+**UX shipped in 002A:** two-phase lifecycle language; recent 3–5 CLOSED audits + View all; just-closed reconciliation banner; Start Physical Audit returns after close; export/email remain evidence-only (no lifecycle mutation).
 
-**Product question:**
+**Deferred — APP-AUD-002B Physical Evidence Freeze Hardening:**
 
-How should DeptSync distinguish:
+- server auto-bind when an ACTIVE audit exists  
+- CLOSED audit-bound metadata PATCH restrictions  
+- catalog snapshot/version provenance  
 
-- **“physical observation is finished”**  
-from  
-- **“human reconciliation is finished”**?
-
-Do **not** assume they are the same event.
-
-**Desired UX direction:**
-
-```text
-Active audit
-  → finish scanning
-  → freeze / close physical observation
-  → reconcile against Lowe’s
-  → complete reconciliation
-  → historical record
-```
-
-Exports and Email are **representations of evidence**. They must **not** determine lifecycle state.
-
-Never delete historical audits merely to clear the working UI.  
-Main surface may show a small recent set (e.g. 3–5); complete history remains accessible.
-
----
+**Next after APP-AUD-002 closes:** APP-OBS-001.
 
 ### Queued (after APP-AUD-002 foundations)
 

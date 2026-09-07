@@ -1,6 +1,7 @@
 # DeptSync Hub — Chat Handoff
 
 ## Latest (2026-09-07)
+- **APP-AUD-002A AUDIT LIFECYCLE CLARITY — COMMITTED AND PUSHED — REAL-HARDWARE VALIDATION PENDING:** Option A — CLOSED = physical count frozen (not recon complete); derived recon progress; recent 3–5 CLOSED audits + View all; just-closed recon banner. No schema. APP-AUD-002B freeze hardening deferred. APP-OBS-001 still next after 002 closes.
 - **APP-ROADMAP-001 APPLIANCE EVOLUTION ROADMAP — COMMITTED AND PUSHED:** Canonical appliance product direction + tranche order in [`docs/product/APPLIANCE_EVOLUTION_ROADMAP.md`](docs/product/APPLIANCE_EVOLUTION_ROADMAP.md). Next scheduled discovery: **APP-AUD-002**. APP-OBS-001 queued after lifecycle clarity + field validation. No runtime change.
 - **APP-QA-001 APPLIANCE SURFACE RELIABILITY — COMMITTED AND PUSHED — REAL-HARDWARE VALIDATION PENDING:** Share/Export CSV repaired (DOM-attached download + share abort/fallback). Gemini Scan Anomaly Detection removed from Appliances home. Deterministic reconciliation retained. APP-OBS-001 blue-sticker still deferred pending field validation.
 - **UX-NAV-001 SPECIALTY OPERATIONAL HOME — COMMITTED AND PUSHED:** More → Department Tools; Appliances navigates to audit-aware `/?section=appliances`; Flooring tools grouped; SpecialtyToolsHost retained for contextual/ad-hoc only.

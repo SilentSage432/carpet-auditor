@@ -31,6 +31,7 @@ export type ApplianceAuditDetail = {
     unique_item_count: number;
     reconciled_item_count: number;
     snapshot_row_count: number;
+    reconciliation?: import("@/lib/appliances/physical-audit").ApplianceReconciliationProgress;
   };
 };
 

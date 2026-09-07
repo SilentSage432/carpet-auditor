@@ -259,7 +259,7 @@ export function ApplianceAuditSection({
       setScannerAuditMode("audit");
       setBayLocation(null);
       setScannerOpen(true);
-      flashStatus("Physical audit started — scan appliances, then Review / Finish");
+      flashStatus("Physical audit started — scan appliances, then Finish count");
     } catch (err) {
       flashStatus(
         err instanceof Error ? err.message : "Could not start physical audit",

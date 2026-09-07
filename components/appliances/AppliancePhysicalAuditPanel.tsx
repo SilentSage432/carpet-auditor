@@ -1,11 +1,12 @@
 "use client";
 
 /**
- * Physical audit controls — start / close / history / open reconcile.
- * Destructive Reset remains separate on the action bar.
+ * Physical audit controls — two-phase lifecycle (APP-AUD-002A):
+ * ACTIVE physical observation → Close physical count → reconcile (mutable) → history.
+ * CLOSED ≠ reconciliation complete. Export does not mutate lifecycle.
  */
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { HubPortal } from "@/components/hub/HubPortal";
 import { NumberField, TextField } from "@/components/ui/NumberField";
 import {
@@ -17,10 +18,15 @@ import {
   type ApplianceAuditDetail,
 } from "@/lib/appliances/audit-client";
 import {
+  APPLIANCE_RECENT_CLOSED_AUDIT_LIMIT,
   applianceAuditReconciliationToCsv,
+  composeApplianceReconciliationProgress,
   deriveApplianceVariance,
+  formatAppliancePhysicalAuditStatus,
+  formatApplianceReconciliationPhase,
   type ApplianceAuditSession,
   type AppliancePhysicalItemCount,
+  type ApplianceReconciliationProgress,
   type ApplianceReconciliationSnapshot,
   type ApplianceReconOutcome,
 } from "@/lib/appliances/physical-audit";
@@ -43,6 +49,43 @@ type ReconDraft = {
   notes: string;
 };
 
+type RecentAuditCard = {
+  session: ApplianceAuditSession;
+  physical_unit_count: number;
+  unique_item_count: number;
+  progress: ApplianceReconciliationProgress;
+};
+
+function formatAuditWhen(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso.slice(0, 10);
+  return d.toLocaleString(undefined, {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
+
+function seedDrafts(
+  items: AppliancePhysicalItemCount[],
+  snapshots: ApplianceReconciliationSnapshot[]
+): Record<string, ReconDraft> {
+  const byItem = new Map(snapshots.map((s) => [s.item_number, s]));
+  const next: Record<string, ReconDraft> = {};
+  for (const item of items) {
+    const snap = byItem.get(item.item_number);
+    next[item.item_number] = {
+      declared_lowes_oh:
+        snap?.declared_lowes_oh != null ? String(snap.declared_lowes_oh) : "",
+      outcome: snap?.outcome ?? "",
+      notes: snap?.notes ?? "",
+    };
+  }
+  return next;
+}
+
 export function AppliancePhysicalAuditPanel({
   onActiveSessionChange,
   onStatus,
@@ -50,7 +93,11 @@ export function AppliancePhysicalAuditPanel({
   onStarted,
 }: Props) {
   const [active, setActive] = useState<ApplianceAuditSession | null>(null);
-  const [history, setHistory] = useState<ApplianceAuditSession[]>([]);
+  const [closedSessions, setClosedSessions] = useState<ApplianceAuditSession[]>(
+    []
+  );
+  const [recentCards, setRecentCards] = useState<RecentAuditCard[]>([]);
+  const [showFullHistory, setShowFullHistory] = useState(false);
   const [busy, setBusy] = useState(false);
   const [detail, setDetail] = useState<ApplianceAuditDetail | null>(null);
   const [detailOpen, setDetailOpen] = useState(false);
@@ -58,6 +105,9 @@ export function AppliancePhysicalAuditPanel({
   const [drafts, setDrafts] = useState<Record<string, ReconDraft>>({});
   const [reconSaving, setReconSaving] = useState(false);
   const [pendingAuditScans, setPendingAuditScans] = useState(0);
+  const [highlightClosedId, setHighlightClosedId] = useState<string | null>(
+    null
+  );
 
   const refreshPending = useCallback(() => {
     if (!active) {
@@ -69,6 +119,40 @@ export function AppliancePhysicalAuditPanel({
     );
   }, [active]);
 
+  const loadRecentCards = useCallback(
+    async (closed: ApplianceAuditSession[]) => {
+      const slice = closed.slice(0, APPLIANCE_RECENT_CLOSED_AUDIT_LIMIT);
+      const cards = await Promise.all(
+        slice.map(async (session) => {
+          try {
+            const loaded = await fetchApplianceAuditDetail(session.id);
+            const progress =
+              loaded.summary.reconciliation ??
+              composeApplianceReconciliationProgress(
+                loaded.physical_items,
+                loaded.snapshots
+              );
+            return {
+              session,
+              physical_unit_count: loaded.summary.physical_unit_count,
+              unique_item_count: loaded.summary.unique_item_count,
+              progress,
+            } satisfies RecentAuditCard;
+          } catch {
+            return {
+              session,
+              physical_unit_count: 0,
+              unique_item_count: 0,
+              progress: composeApplianceReconciliationProgress([], []),
+            } satisfies RecentAuditCard;
+          }
+        })
+      );
+      setRecentCards(cards);
+    },
+    []
+  );
+
   const refresh = useCallback(async () => {
     try {
       const [activeRows, all] = await Promise.all([
@@ -78,14 +162,22 @@ export function AppliancePhysicalAuditPanel({
       const current = activeRows[0] ?? null;
       setActive(current);
       onActiveSessionChange(current);
-      setHistory(all.filter((s) => s.status === "CLOSED").slice(0, 20));
+      const closed = all
+        .filter((s) => s.status === "CLOSED")
+        .sort((a, b) =>
+          String(b.closed_at ?? b.started_at).localeCompare(
+            String(a.closed_at ?? a.started_at)
+          )
+        );
+      setClosedSessions(closed);
+      await loadRecentCards(closed);
     } catch (err) {
       onStatus(
         err instanceof Error ? err.message : "Could not load physical audits",
         "error"
       );
     }
-  }, [onActiveSessionChange, onStatus]);
+  }, [loadRecentCards, onActiveSessionChange, onStatus]);
 
   useEffect(() => {
     void refresh();
@@ -121,10 +213,10 @@ export function AppliancePhysicalAuditPanel({
         const loaded = await fetchApplianceAuditDetail(current.id);
         if (cancelled) return;
         setDetail(loaded);
-        seedDrafts(loaded.physical_items, loaded.snapshots);
+        setDrafts(seedDrafts(loaded.physical_items, loaded.snapshots));
         setDetailOpen(true);
         setReconOpen(false);
-        onStatus("Review observed units — then Close physical audit");
+        onStatus("Review observed units — then Close physical count");
       } catch (err) {
         onStatus(
           err instanceof Error ? err.message : "Could not open audit review",
@@ -138,13 +230,25 @@ export function AppliancePhysicalAuditPanel({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- token edge only
   }, [reviewFinishToken]);
 
+  const detailProgress = useMemo(() => {
+    if (!detail) return null;
+    return (
+      detail.summary.reconciliation ??
+      composeApplianceReconciliationProgress(
+        detail.physical_items,
+        detail.snapshots
+      )
+    );
+  }, [detail]);
+
   async function handleStart() {
     setBusy(true);
     try {
       const { session } = await startAppliancePhysicalAudit();
       setActive(session);
       onActiveSessionChange(session);
-      onStatus("Physical audit started — scans will join this audit");
+      setHighlightClosedId(null);
+      onStatus("Physical audit active — scans join this count");
       onStarted?.(session);
       await refresh();
     } catch (err) {
@@ -164,17 +268,19 @@ export function AppliancePhysicalAuditPanel({
       const closed = await closeAppliancePhysicalAudit(active.id);
       setActive(null);
       onActiveSessionChange(null);
+      setHighlightClosedId(closed.id);
       onStatus(
-        `Physical audit closed — ${closed.id.slice(0, 8)}… preserved`
+        "Physical count closed — evidence frozen. Reconcile Lowe's OH when ready."
       );
       await refresh();
       const loaded = await fetchApplianceAuditDetail(closed.id);
       setDetail(loaded);
+      setDrafts(seedDrafts(loaded.physical_items, loaded.snapshots));
       setDetailOpen(true);
-      seedDrafts(loaded.physical_items, loaded.snapshots);
+      setReconOpen(false);
     } catch (err) {
       onStatus(
-        err instanceof Error ? err.message : "Could not close audit",
+        err instanceof Error ? err.message : "Could not close physical count",
         "error"
       );
     } finally {
@@ -182,32 +288,20 @@ export function AppliancePhysicalAuditPanel({
     }
   }
 
-  function seedDrafts(
-    items: AppliancePhysicalItemCount[],
-    snapshots: ApplianceReconciliationSnapshot[]
+  async function openHistory(
+    session: ApplianceAuditSession,
+    opts?: { openRecon?: boolean }
   ) {
-    const byItem = new Map(snapshots.map((s) => [s.item_number, s]));
-    const next: Record<string, ReconDraft> = {};
-    for (const item of items) {
-      const snap = byItem.get(item.item_number);
-      next[item.item_number] = {
-        declared_lowes_oh:
-          snap?.declared_lowes_oh != null ? String(snap.declared_lowes_oh) : "",
-        outcome: snap?.outcome ?? "",
-        notes: snap?.notes ?? "",
-      };
-    }
-    setDrafts(next);
-  }
-
-  async function openHistory(session: ApplianceAuditSession) {
     setBusy(true);
     try {
       const loaded = await fetchApplianceAuditDetail(session.id);
       setDetail(loaded);
-      seedDrafts(loaded.physical_items, loaded.snapshots);
+      setDrafts(seedDrafts(loaded.physical_items, loaded.snapshots));
       setDetailOpen(true);
-      setReconOpen(false);
+      setReconOpen(Boolean(opts?.openRecon) && session.status === "CLOSED");
+      if (session.status === "CLOSED") {
+        setHighlightClosedId(session.id);
+      }
     } catch (err) {
       onStatus(
         err instanceof Error ? err.message : "Could not open audit",
@@ -244,10 +338,15 @@ export function AppliancePhysicalAuditPanel({
       );
       const loaded = await fetchApplianceAuditDetail(detail.session.id);
       setDetail(loaded);
-      seedDrafts(loaded.physical_items, loaded.snapshots);
-      onStatus(
-        `Updated ${snapshots.filter((s) => s.declared_lowes_oh != null).length} Lowe's OH declaration(s)`
+      setDrafts(seedDrafts(loaded.physical_items, loaded.snapshots));
+      const progress = composeApplianceReconciliationProgress(
+        loaded.physical_items,
+        loaded.snapshots
       );
+      onStatus(
+        `Reconciliation saved — ${snapshots.filter((s) => s.declared_lowes_oh != null).length} OH declaration(s). ${formatApplianceReconciliationPhase(progress.phase)}.`
+      );
+      await loadRecentCards(closedSessions);
     } catch (err) {
       onStatus(
         err instanceof Error ? err.message : "Reconciliation save failed",
@@ -276,7 +375,11 @@ export function AppliancePhysicalAuditPanel({
         onStatus("Share cancelled");
         return;
       }
-      onStatus(mode === "shared" ? "Audit CSV shared" : "Audit CSV downloaded");
+      onStatus(
+        mode === "shared"
+          ? "Audit CSV shared (lifecycle unchanged)"
+          : "Audit CSV downloaded (lifecycle unchanged)"
+      );
     } catch (err) {
       onStatus(
         err instanceof Error ? err.message : "Could not export audit",
@@ -289,6 +392,7 @@ export function AppliancePhysicalAuditPanel({
     <section
       aria-label="Appliance physical audit"
       className="space-y-2 rounded-xl border border-cyan-500/35 bg-cyan-950/20 p-3"
+      data-testid="appliance-physical-audit-panel"
     >
       <div className="flex items-start justify-between gap-2">
         <div>
@@ -296,12 +400,13 @@ export function AppliancePhysicalAuditPanel({
             Physical audit
           </p>
           <p className="mt-0.5 text-xs text-slate-400">
-            Observed units only — reconcile declared Lowe&apos;s OH after close.
+            Phase 1: observe &amp; freeze count. Phase 2: declare Lowe&apos;s OH
+            after close. Closing is not reconciliation complete.
           </p>
         </div>
         {active ? (
           <span className="shrink-0 rounded-full border border-emerald-400/40 bg-emerald-950/40 px-2 py-0.5 font-mono text-[10px] font-bold text-emerald-200">
-            ACTIVE
+            Physical audit active
           </span>
         ) : (
           <span className="shrink-0 rounded-full border border-slate-600 px-2 py-0.5 font-mono text-[10px] font-bold text-slate-400">
@@ -315,6 +420,7 @@ export function AppliancePhysicalAuditPanel({
           type="button"
           disabled={busy || active != null}
           onClick={() => void handleStart()}
+          data-testid="start-physical-audit"
           className="flex min-h-11 items-center justify-center rounded-xl border border-cyan-400/50 bg-cyan-600/90 px-2 text-xs font-bold text-zinc-950 disabled:opacity-40"
         >
           Start physical audit
@@ -323,50 +429,130 @@ export function AppliancePhysicalAuditPanel({
           type="button"
           disabled={busy || !active}
           onClick={() => void handleClose()}
+          data-testid="close-physical-count"
           className="flex min-h-11 items-center justify-center rounded-xl border border-amber-400/50 bg-amber-500/90 px-2 text-xs font-bold text-zinc-950 disabled:opacity-40"
         >
-          Close physical audit
+          Close physical count
         </button>
       </div>
 
       {active ? (
         <p className="font-mono text-[11px] text-cyan-100/90">
-          Scans join audit {active.id.slice(0, 8)}…
+          Physical audit active · {active.id.slice(0, 8)}…
           {pendingAuditScans > 0
             ? ` · ${pendingAuditScans} unsynced observation(s) — sync before close`
             : ""}
         </p>
       ) : null}
 
-      {history.length > 0 ? (
-        <div className="space-y-1.5 pt-1">
-          <p className="font-mono text-[10px] font-bold uppercase tracking-wide text-slate-500">
-            Prior audits
+      {highlightClosedId && !active ? (
+        <div
+          data-testid="awaiting-reconciliation-banner"
+          className="rounded-xl border border-amber-500/40 bg-amber-950/30 px-3 py-2"
+        >
+          <p className="text-xs font-semibold text-amber-100">
+            Physical count closed — awaiting reconciliation
           </p>
-          <ul className="max-h-40 space-y-1 overflow-y-auto">
-            {history.map((session) => (
-              <li key={session.id}>
-                <button
-                  type="button"
-                  disabled={busy}
-                  onClick={() => void openHistory(session)}
-                  className="flex min-h-10 w-full items-center justify-between gap-2 rounded-lg border border-slate-800 bg-slate-950/60 px-2.5 text-left text-xs text-slate-200"
-                >
-                  <span className="font-mono">
-                    {session.started_at
-                      ? new Date(session.started_at).toLocaleString(undefined, {
-                          month: "short",
-                          day: "numeric",
-                          hour: "numeric",
-                          minute: "2-digit",
-                        })
-                      : session.id.slice(0, 8)}
-                  </span>
-                  <span className="text-slate-500">View</span>
-                </button>
-              </li>
-            ))}
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => {
+              const session =
+                closedSessions.find((s) => s.id === highlightClosedId) ??
+                recentCards.find((c) => c.session.id === highlightClosedId)
+                  ?.session;
+              if (session) void openHistory(session, { openRecon: true });
+            }}
+            className="mt-2 flex min-h-10 w-full items-center justify-center rounded-xl border border-emerald-400/50 bg-emerald-600/90 px-3 text-xs font-bold text-zinc-950 disabled:opacity-40"
+          >
+            Reconcile just-closed audit
+          </button>
+        </div>
+      ) : null}
+
+      {recentCards.length > 0 ? (
+        <div className="space-y-1.5 pt-1" data-testid="recent-physical-audits">
+          <p className="font-mono text-[10px] font-bold uppercase tracking-wide text-slate-500">
+            Recent physical audits
+          </p>
+          <ul className="space-y-1.5">
+            {recentCards.map((card) => {
+              const highlighted = card.session.id === highlightClosedId;
+              return (
+                <li key={card.session.id}>
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => void openHistory(card.session)}
+                    className={`flex min-h-12 w-full flex-col gap-0.5 rounded-xl border px-2.5 py-2 text-left ${
+                      highlighted
+                        ? "border-amber-400/50 bg-amber-950/25"
+                        : "border-slate-800 bg-slate-950/60"
+                    }`}
+                  >
+                    <span className="flex w-full items-center justify-between gap-2">
+                      <span className="font-mono text-xs font-semibold text-slate-100">
+                        {formatAuditWhen(
+                          card.session.closed_at ?? card.session.started_at
+                        )}
+                      </span>
+                      <span className="font-mono text-[10px] text-slate-500">
+                        Physical count closed
+                      </span>
+                    </span>
+                    <span className="font-mono text-[11px] text-cyan-200/90">
+                      {card.physical_unit_count} units · {card.unique_item_count}{" "}
+                      items · OH {card.progress.with_declared_oh}/
+                      {card.progress.audited_item_count}
+                      {card.progress.non_zero_variance > 0
+                        ? ` · ${card.progress.non_zero_variance} variance`
+                        : ""}
+                      {card.progress.needs_follow_up_count > 0
+                        ? ` · ${card.progress.needs_follow_up_count} follow-up`
+                        : ""}
+                    </span>
+                    <span className="text-[11px] font-medium text-slate-400">
+                      {formatApplianceReconciliationPhase(card.progress.phase)}
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
           </ul>
+          {closedSessions.length > recentCards.length ? (
+            <button
+              type="button"
+              data-testid="view-all-audit-history"
+              onClick={() => setShowFullHistory((v) => !v)}
+              className="flex min-h-10 w-full items-center justify-center rounded-xl border border-slate-700 bg-slate-950/40 px-3 text-xs font-semibold text-slate-300"
+            >
+              {showFullHistory
+                ? "Hide full history"
+                : "View all audit history"}
+            </button>
+          ) : null}
+          {showFullHistory ? (
+            <ul
+              data-testid="full-audit-history"
+              className="max-h-48 space-y-1 overflow-y-auto pt-1"
+            >
+              {closedSessions.map((session) => (
+                <li key={`full-${session.id}`}>
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => void openHistory(session)}
+                    className="flex min-h-10 w-full items-center justify-between gap-2 rounded-lg border border-slate-800 bg-slate-950/60 px-2.5 text-left text-xs text-slate-200"
+                  >
+                    <span className="font-mono">
+                      {formatAuditWhen(session.closed_at ?? session.started_at)}
+                    </span>
+                    <span className="text-slate-500">View</span>
+                  </button>
+                </li>
+              ))}
+            </ul>
+          ) : null}
         </div>
       ) : null}
 
@@ -394,12 +580,16 @@ export function AppliancePhysicalAuditPanel({
                   <h2 className="font-mono text-xs font-bold uppercase tracking-wide text-cyan-200">
                     {reconOpen
                       ? "Reconcile with Lowe's"
-                      : "Physical audit"}
+                      : formatAppliancePhysicalAuditStatus(
+                          detail.session.status
+                        )}
                   </h2>
                   <p className="mt-0.5 font-mono text-[11px] text-slate-400">
                     {detail.summary.physical_unit_count} observed units ·{" "}
-                    {detail.summary.unique_item_count} items ·{" "}
-                    {detail.session.status}
+                    {detail.summary.unique_item_count} items
+                    {detailProgress
+                      ? ` · ${formatApplianceReconciliationPhase(detailProgress.phase)}`
+                      : ""}
                   </p>
                 </div>
                 <button
@@ -428,7 +618,7 @@ export function AppliancePhysicalAuditPanel({
                           onClick={() => void handleClose()}
                           className="flex min-h-11 items-center justify-center rounded-xl border border-amber-400/50 bg-amber-500/90 px-2 text-xs font-bold text-zinc-950 disabled:opacity-40"
                         >
-                          Close physical audit
+                          Close physical count
                         </button>
                       ) : (
                         <button
@@ -449,8 +639,30 @@ export function AppliancePhysicalAuditPanel({
                     </div>
                     {detail.session.status === "ACTIVE" ? (
                       <p className="text-center text-[11px] text-amber-100/80">
-                        Close the physical audit to reconcile declared Lowe&apos;s
-                        OH.
+                        Finish reviewing observed units, then Close physical
+                        count before declaring Lowe&apos;s OH.
+                      </p>
+                    ) : detailProgress ? (
+                      <p
+                        className="text-center text-[11px] text-slate-400"
+                        data-testid="detail-recon-progress"
+                      >
+                        {formatApplianceReconciliationPhase(detailProgress.phase)}
+                        {" · "}
+                        OH {detailProgress.with_declared_oh}/
+                        {detailProgress.audited_item_count}
+                        {detailProgress.without_declared_oh > 0
+                          ? ` · ${detailProgress.without_declared_oh} without OH`
+                          : ""}
+                        {detailProgress.non_zero_variance > 0
+                          ? ` · ${detailProgress.non_zero_variance} non-zero variance`
+                          : ""}
+                        {detailProgress.resolved_count > 0
+                          ? ` · ${detailProgress.resolved_count} resolved`
+                          : ""}
+                        {detailProgress.needs_follow_up_count > 0
+                          ? ` · ${detailProgress.needs_follow_up_count} follow-up`
+                          : ""}
                       </p>
                     ) : null}
                     <ul className="space-y-2">
@@ -484,9 +696,12 @@ export function AppliancePhysicalAuditPanel({
                 ) : (
                   <>
                     <p className="text-xs text-slate-400">
-                      Enter Lowe&apos;s OH from Zebra/computer. Blank OH leaves
-                      variance unset (not zero). Physical count is observed and
-                      not editable.
+                      Enter Lowe&apos;s OH from Zebra/computer. Saving updates the{" "}
+                      <span className="font-semibold text-slate-300">
+                        current reconciliation record
+                      </span>{" "}
+                      only — observed physical counts stay frozen. Blank OH leaves
+                      variance unset (not zero). Outcome is optional.
                     </p>
                     <ul className="space-y-3">
                       {detail.physical_items.map((item) => {
@@ -582,9 +797,7 @@ export function AppliancePhysicalAuditPanel({
                       onClick={() => void handleSaveRecon()}
                       className="flex min-h-12 w-full items-center justify-center rounded-xl bg-emerald-500 text-sm font-bold text-slate-950 disabled:opacity-40"
                     >
-                      {reconSaving
-                        ? "Saving…"
-                        : "Save reconciliation"}
+                      {reconSaving ? "Saving…" : "Save reconciliation"}
                     </button>
                   </>
                 )}
