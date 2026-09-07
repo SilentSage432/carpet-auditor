@@ -17,6 +17,10 @@ import { DepartmentIcon } from "@/components/hub/NavIcons";
 import { LocationStatusIcon } from "@/components/hub/StatusPills";
 import type { ApplianceAuditSession } from "@/lib/appliances/physical-audit";
 import {
+  fetchApplianceAuditSessions,
+  startAppliancePhysicalAudit,
+} from "@/lib/appliances/audit-client";
+import {
   aggregateApplianceScans,
   applianceCategoryEmoji,
   APPLIANCE_SCAN_LOG_FILTERS,
@@ -100,6 +104,11 @@ export function ApplianceAuditSection({
   const [activeAudit, setActiveAudit] =
     useState<ApplianceAuditSession | null>(null);
   const [reviewFinishToken, setReviewFinishToken] = useState(0);
+  const [auditEntryBusy, setAuditEntryBusy] = useState(false);
+  /** When 'adhoc', scanner must not bind to / show durable physical audit. */
+  const [scannerAuditMode, setScannerAuditMode] = useState<"audit" | "adhoc">(
+    "audit"
+  );
   const [bayLocation, setBayLocation] =
     useState<ApplianceScannerLocationContext | null>(null);
 
@@ -187,7 +196,18 @@ export function ApplianceAuditSection({
       } else {
         setBayLocation(null);
       }
-      setScannerOpen(true);
+      // Resume durable ACTIVE audit if one exists (APP-FIELD-001B).
+      void fetchApplianceAuditSessions({ status: "ACTIVE" })
+        .then((rows) => {
+          const current = rows[0] ?? null;
+          setActiveAudit(current);
+          setScannerAuditMode(current ? "audit" : "adhoc");
+          setScannerOpen(true);
+        })
+        .catch(() => {
+          setScannerAuditMode("adhoc");
+          setScannerOpen(true);
+        });
     }
     function applyHash() {
       if (isApplianceScannerHash(window.location.hash)) {
@@ -207,6 +227,53 @@ export function ApplianceAuditSection({
     setStatusTone(tone);
     setStatusMsg(msg);
     window.setTimeout(() => setStatusMsg(null), tone === "error" ? 5000 : 2800);
+  }, []);
+
+  const openScannerWithActiveAudit = useCallback(async () => {
+    setBayLocation(null);
+    setScannerAuditMode("audit");
+    try {
+      const rows = await fetchApplianceAuditSessions({ status: "ACTIVE" });
+      const current = rows[0] ?? null;
+      setActiveAudit(current);
+    } catch {
+      // Still open scanner; banner only if activeAudit already known.
+    }
+    setScannerOpen(true);
+  }, []);
+
+  const handleStartPhysicalAudit = useCallback(async () => {
+    setAuditEntryBusy(true);
+    try {
+      const existing = await fetchApplianceAuditSessions({ status: "ACTIVE" });
+      if (existing[0]) {
+        setActiveAudit(existing[0]);
+        setScannerAuditMode("audit");
+        setBayLocation(null);
+        setScannerOpen(true);
+        flashStatus("Resumed active physical audit — scan to continue");
+        return;
+      }
+      const { session } = await startAppliancePhysicalAudit();
+      setActiveAudit(session);
+      setScannerAuditMode("audit");
+      setBayLocation(null);
+      setScannerOpen(true);
+      flashStatus("Physical audit started — scan appliances, then Review / Finish");
+    } catch (err) {
+      flashStatus(
+        err instanceof Error ? err.message : "Could not start physical audit",
+        "error"
+      );
+    } finally {
+      setAuditEntryBusy(false);
+    }
+  }, [flashStatus]);
+
+  const handleAdHocScan = useCallback(() => {
+    setBayLocation(null);
+    setScannerAuditMode("adhoc");
+    setScannerOpen(true);
   }, []);
 
   const handleLogged = useCallback(
@@ -330,6 +397,12 @@ export function ApplianceAuditSection({
         onActiveSessionChange={setActiveAudit}
         onStatus={(msg, tone = "ok") => flashStatus(msg, tone)}
         reviewFinishToken={reviewFinishToken}
+        onStarted={(session) => {
+          setActiveAudit(session);
+          setScannerAuditMode("audit");
+          setBayLocation(null);
+          setScannerOpen(true);
+        }}
       />
 
       <ApplianceAuditActionBar
@@ -365,17 +438,41 @@ export function ApplianceAuditSection({
         onConfirm={() => void confirmDeleteGroup()}
       />
 
-      <button
-        type="button"
-        onClick={() => {
-          setBayLocation(null);
-          setScannerOpen(true);
-        }}
-        className="btn-primary-glow flex min-h-12 w-full items-center justify-center gap-2 rounded-xl px-4 text-sm font-bold"
-      >
-        <span aria-hidden>📷</span>
-        Scan &amp; Count Appliances
-      </button>
+      <div className="space-y-2">
+        {activeAudit ? (
+          <button
+            type="button"
+            disabled={auditEntryBusy}
+            onClick={() => void openScannerWithActiveAudit()}
+            className="btn-primary-glow flex min-h-12 w-full items-center justify-center gap-2 rounded-xl px-4 text-sm font-bold disabled:opacity-50"
+          >
+            <span aria-hidden>📷</span>
+            Continue Physical Audit
+          </button>
+        ) : (
+          <button
+            type="button"
+            disabled={auditEntryBusy}
+            onClick={() => void handleStartPhysicalAudit()}
+            className="btn-primary-glow flex min-h-12 w-full items-center justify-center gap-2 rounded-xl px-4 text-sm font-bold disabled:opacity-50"
+          >
+            <span aria-hidden>📋</span>
+            {auditEntryBusy ? "Starting…" : "Start Physical Audit"}
+          </button>
+        )}
+        <button
+          type="button"
+          disabled={auditEntryBusy}
+          onClick={handleAdHocScan}
+          className="flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-slate-700 bg-slate-950/60 px-4 text-xs font-semibold text-slate-300 disabled:opacity-50"
+        >
+          Ad-hoc scan (no audit)
+        </button>
+        <p className="text-center text-[11px] text-slate-500">
+          Physical Audit preserves a durable count you can close and reconcile.
+          Ad-hoc scan only adds to the local ledger.
+        </p>
+      </div>
 
       <button
         type="button"
@@ -404,7 +501,10 @@ export function ApplianceAuditSection({
         activeSpecialist={activeSpecialist}
         scannerEnabled={scannerEnabled && scannerOpen && !manageOpen}
         bayLocation={bayLocation}
-        auditSessionId={activeAudit?.id ?? null}
+        auditSessionId={
+          scannerAuditMode === "audit" ? activeAudit?.id ?? null : null
+        }
+        ignoreCachedAuditSession={scannerAuditMode === "adhoc"}
         onReviewFinishAudit={() => {
           setScannerOpen(false);
           setBayLocation(null);

@@ -21,6 +21,8 @@ type Props = {
   bayLocation?: ApplianceScannerLocationContext | null;
   /** Active physical audit — new scans bind when present. */
   auditSessionId?: string | null;
+  /** Ad-hoc path: do not resume cached durable audit. */
+  ignoreCachedAuditSession?: boolean;
   onReviewFinishAudit?: () => void;
   onLogged: (record: ApplianceScan, offline: boolean) => void;
 };
@@ -35,6 +37,7 @@ export function ApplianceScannerModal({
   scannerEnabled = true,
   bayLocation = null,
   auditSessionId = null,
+  ignoreCachedAuditSession = false,
   onReviewFinishAudit,
   onLogged,
 }: Props) {
@@ -86,6 +89,7 @@ export function ApplianceScannerModal({
           focusOnMount
           bayLocation={bayLocation}
           auditSessionId={auditSessionId}
+          ignoreCachedAuditSession={ignoreCachedAuditSession}
           onReviewFinishAudit={onReviewFinishAudit}
           onLogged={onLogged}
         />

@@ -1,6 +1,11 @@
 # DeptSync Hub — Development Journal
 
-## 2026-09-06 — APP-FIELD-001 production migration applied
+## 2026-09-06 — APP-FIELD-001B Missing physical audit exit on production scanner
+- Root cause: Scan & Count opened scanner with `auditSessionId=null` unless Start was used first; banner gated on prop only. Session Total was ad-hoc counter, not durable audit.
+- Production evidence: 0 audit sessions; all scans unbound (`audit_session_id` NULL) — not retroactively attached.
+- Fix: primary Start / Continue Physical Audit → create/resume + open scanner with audit context; Ad-hoc scan retained and labeled; scanner banner uses resolved session id; Review / Finish unchanged.
+- Status: **APP-FIELD-001B AUDIT EXIT WIRING — PRODUCTION CODE LIVE — REAL-HARDWARE VALIDATION PENDING**
+
 - Applied fail-closed `20260907_appliance_catalog_store_number.sql` to `fmeinlwhixngednabhgy` after preflight: catalog rows=0, store_number absent, jwt_matches_store present.
 - Verified: store_number text NOT NULL, no default, unique (store_number,item_number), RLS + store isolation policy, 0 rows, 0 fictional 0000 rows. PostgREST select store_number OK.
 - Pre-migration dump retained under `tmp/production-backups/`.

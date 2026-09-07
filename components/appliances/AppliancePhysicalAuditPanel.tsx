@@ -32,6 +32,8 @@ type Props = {
   onStatus: (message: string, tone?: "ok" | "error") => void;
   /** Incremented by scanner Review / Finish — opens active audit review. */
   reviewFinishToken?: number;
+  /** After Start, parent should open scanner with audit context. */
+  onStarted?: (session: ApplianceAuditSession) => void;
 };
 
 type ReconDraft = {
@@ -44,6 +46,7 @@ export function AppliancePhysicalAuditPanel({
   onActiveSessionChange,
   onStatus,
   reviewFinishToken = 0,
+  onStarted,
 }: Props) {
   const [active, setActive] = useState<ApplianceAuditSession | null>(null);
   const [history, setHistory] = useState<ApplianceAuditSession[]>([]);
@@ -141,6 +144,7 @@ export function AppliancePhysicalAuditPanel({
       setActive(session);
       onActiveSessionChange(session);
       onStatus("Physical audit started — scans will join this audit");
+      onStarted?.(session);
       await refresh();
     } catch (err) {
       onStatus(

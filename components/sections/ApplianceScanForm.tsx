@@ -77,6 +77,8 @@ type Props = {
   bayLocation?: ApplianceScannerLocationContext | null;
   /** Active physical audit session id (APP-AUD-001). */
   auditSessionId?: string | null;
+  /** When true, do not resume cached active audit (ad-hoc ledger path). */
+  ignoreCachedAuditSession?: boolean;
   /** Close scanner and open physical audit review/finish (APP-FIELD-001). */
   onReviewFinishAudit?: () => void;
   onLogged: (record: ApplianceScan, offline: boolean) => void;
@@ -91,6 +93,7 @@ export function ApplianceScanForm({
   focusOnMount = false,
   bayLocation = null,
   auditSessionId = null,
+  ignoreCachedAuditSession = false,
   onReviewFinishAudit,
   onLogged,
 }: Props) {
@@ -203,9 +206,12 @@ export function ApplianceScanForm({
     window.setTimeout(() => itemInputRef.current?.focus(), 50);
   }, [focusOnMount, scannerEnabled, quickAddBarcode, manualEntry]);
 
+  const resolvedAuditSessionId = ignoreCachedAuditSession
+    ? auditSessionId
+    : auditSessionId || loadCachedActiveAuditSessionId();
+
   const refreshAuditCounts = useCallback(() => {
-    const sessionId =
-      auditSessionId || loadCachedActiveAuditSessionId() || null;
+    const sessionId = resolvedAuditSessionId;
     if (!sessionId) {
       setPendingAuditScans(0);
       setAuditUnitCount(0);
@@ -220,7 +226,7 @@ export function ApplianceScanForm({
         (s) => s.audit_session_id === sessionId
       ).length
     );
-  }, [auditSessionId]);
+  }, [resolvedAuditSessionId]);
 
   useEffect(() => {
     refreshAuditCounts();
@@ -254,8 +260,9 @@ export function ApplianceScanForm({
 
       flushApplianceScanDraftSave();
       const capturedAt = new Date().toISOString();
-      const sessionId =
-        auditSessionId || loadCachedActiveAuditSessionId() || undefined;
+      const sessionId = ignoreCachedAuditSession
+        ? auditSessionId || undefined
+        : auditSessionId || loadCachedActiveAuditSessionId() || undefined;
       const serialSnapshot = serialRef.current.trim();
       const locationSnapshot = locationRef.current.trim();
       const locationTypeSnapshot = locationTypeRef.current;
@@ -311,6 +318,7 @@ export function ApplianceScanForm({
       bayLocation,
       clearForNextScan,
       flashStatus,
+      ignoreCachedAuditSession,
       onLogged,
       refreshAuditCounts,
       scannedBy,
@@ -407,7 +415,7 @@ export function ApplianceScanForm({
         aria-live="polite"
         className="sticky top-0 z-30 -mx-1 space-y-2 rounded-2xl border border-cyan-500/40 bg-zinc-900/90 px-3 py-3 shadow-lg shadow-black/30 backdrop-blur-xl"
       >
-        {auditSessionId ? (
+        {resolvedAuditSessionId ? (
           <div className="space-y-2 rounded-xl border border-emerald-500/35 bg-emerald-950/30 px-2.5 py-2">
             <p className="text-center font-mono text-[10px] font-bold uppercase tracking-wide text-emerald-200">
               Physical audit active
@@ -429,7 +437,11 @@ export function ApplianceScanForm({
               </button>
             ) : null}
           </div>
-        ) : null}
+        ) : (
+          <p className="text-center font-mono text-[10px] font-bold uppercase tracking-wide text-slate-500">
+            Ad-hoc scan · not a durable physical audit
+          </p>
+        )}
         <div className="grid grid-cols-2 gap-1.5">
           {APPLIANCE_SCAN_MODES.map((mode) => {
             const active = locationType === mode.id;
@@ -452,8 +464,8 @@ export function ApplianceScanForm({
           })}
         </div>
         <p className="text-center font-mono text-sm font-semibold tabular-nums text-sky-100 sm:text-base">
-          Session Total: {sessionTotal}{" "}
-          {sessionTotal === 1 ? "item" : "items"} scanned
+          {resolvedAuditSessionId ? "Audit count" : "Ad-hoc session"}:{" "}
+          {sessionTotal} {sessionTotal === 1 ? "item" : "items"} scanned
         </p>
         <p className="mt-0.5 text-center text-[11px] font-medium text-sky-300/70">
           {teachBusy

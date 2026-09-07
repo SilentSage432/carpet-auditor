@@ -1,6 +1,7 @@
 # DeptSync Hub — Chat Handoff
 
 ## Latest (2026-09-06)
+- **APP-FIELD-001B AUDIT EXIT WIRING — PRODUCTION CODE LIVE — REAL-HARDWARE VALIDATION PENDING:** Start/Continue Physical Audit primary; ad-hoc labeled secondary; scanner resolves auditSessionId; Review / Finish wired; unbound prior ledger scans not retro-attached.
 - **APP-FIELD-001 APPLIANCE RAPID-FIRE / TEACH / AUDIT EXIT — PRODUCTION LIVE — REAL-HARDWARE REVALIDATION PENDING:** Local-first COUNT; fail-closed catalog `store_number` migration (no fictional 0000); scanner Review / Finish Audit. Local phone catalog preserved; no bulk upload.
 - **APP-AUD-001 APPLIANCE PHYSICAL AUDIT & RECONCILIATION CLOSED — PRODUCTION LIVE:** Sessions + Option B recon state + observation-time CLOSED bind + close flush/block + clear preserves audit-bound scans. Migration `20260906_appliance_audit_sessions.sql` applied + verified on `fmeinlwhixngednabhgy`. Pre-migration dump retained under `tmp/production-backups/`. No Lowe's/SIMS/Zebra integration; not immutable OH history; no fabricated legacy sessions.
 - **APP-UX-001A CATALOG WRITE-PATH VERIFICATION:** Online application failures (400/401/403/409) no longer fall through to direct Supabase; API-only online path; network-unavailable still queues offline teach. Awaiting commit with APP-UX-001.
