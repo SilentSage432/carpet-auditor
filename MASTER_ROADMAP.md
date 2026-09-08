@@ -1,8 +1,14 @@
 # DeptSync Hub — Master Roadmap
 
+> **Operational Intelligence Evolution (canonical program map):** [`docs/product/OPERATIONAL_INTELLIGENCE_EVOLUTION_PLAN.md`](docs/product/OPERATIONAL_INTELLIGENCE_EVOLUTION_PLAN.md) — OIE-000 established from RA-001 archaeology. **Every future tranche in this program must read `DEPTSYNC_CONSTITUTION.md` and that plan before analysis or implementation.** Items recorded there are evidence-backed candidates, not approved work.
+
 > **Appliance specialty evolution (directional):** [`docs/product/APPLIANCE_EVOLUTION_ROADMAP.md`](docs/product/APPLIANCE_EVOLUTION_ROADMAP.md) — APP-ROT-001 consideration composer implemented; CAT-001A ESL field validation pending; CAT-001B deferred; later APP-INT-001. Do not leapfrog evidence foundations.
 
 > **UX-005 Operational Simplicity (active program):** [`docs/product/UX005_OPERATIONAL_SIMPLICITY_BACKLOG.md`](docs/product/UX005_OPERATIONAL_SIMPLICITY_BACKLOG.md) — UX-005A is first tranche only; B–F and open Question Its Place items remain constraints.
+
+## Next (OIE program — documentation foundation only)
+- [x] **OIE-000 Operational Intelligence Evolution Program established** — canonical program map at [`docs/product/OPERATIONAL_INTELLIGENCE_EVOLUTION_PLAN.md`](docs/product/OPERATIONAL_INTELLIGENCE_EVOLUTION_PLAN.md) (**PROGRAM FOUNDATION COMPLETE**; documentation only — no runtime code, tests, API, schema, migration, or Gemini change). Records RA-001 evidence, ten program laws, ten workstreams, the generative-AI decision standard, historical-pattern candidates, five field experiments, and a do-not-build register. Adopts the Constitution's Article IX layer numbering verbatim; introduces no competing terminology.
+- [ ] **GEMINI-001 Generative Cost & Necessity Audit** — next planned discovery tranche. **NOT STARTED.** Supplies the evidence for canonical UX-005F (AI earn-your-place review); does not replace it.
 
 ## Next (UX-005 remainder — do not preempt)
 - [ ] UX-005B Samsung field acceptance (Floor Appliances entry — Question #1 not field-closed yet)

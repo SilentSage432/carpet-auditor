@@ -1,5 +1,87 @@
 # DeptSync Hub — Development Journal
 
+## 2026-09-08 — OIE-000 Operational Intelligence Evolution Program foundation
+
+RA-001 was a read-only archaeology audit that asked what DeptSync has already
+become rather than what it should build next. Its answer reframed the roadmap: the
+product's gap is not missing capability. The repeating repository pattern is that
+evidence exists, deterministic derivation exists, sometimes a recommendation
+exists — and then the chain stops one step before the Department Supervisor.
+Engines return structured output and a surface consumes two integers from it.
+Evidence is persisted permanently and no screen reads it back.
+
+This tranche is documentation only. It creates
+`docs/product/OPERATIONAL_INTELLIGENCE_EVOLUTION_PLAN.md` as the canonical program
+map and adds pointers from the roadmap and handoff. No runtime code, test, API
+route, schema, migration, or Gemini call site was touched. `tmp/` is untouched.
+
+The program thesis is **the next unit of product value is connection, not
+construction** — paired with an equal and deliberately opposing constraint,
+**visibility is not validation** (OIE Law 9). An orphaned capability does not earn
+a surface by virtue of being orphaned. Several of the hidden surfaces RA-001 found
+may be correctly absent, and the plan explicitly prohibits wholesale restoration.
+
+On terminology: the plan adopts the Constitution's Article IX layer numbering
+verbatim rather than inventing a parallel stack. Informal program language
+("signals", "historical patterns") is mapped onto Layers 1–2 in a reconciliation
+table so no second numbering system can take root. Layer 3 (Forecast) is recorded
+as thin-to-absent, which the Constitution permits provided order of authority is
+never inverted.
+
+Three findings are recorded as **strong static inference, not runtime-confirmed**,
+with that qualifier preserved in the document so a later tranche cannot silently
+promote them to fact: the `bay_audit_logs` lifecycle severance (missing
+`rotation_id` linkage and `image_url` persistence, which if correct means the FAIL
+completion gate has never fired), the `sunday_bay_assignments.assigned_week`
+column absent from every migration, and edge protection on `/api/v1/*` which the
+route handlers themselves do not implement. Each requires verification before any
+work proceeds on it.
+
+Existing gates were preserved rather than absorbed:
+
+- **WALK-001 remains deferred.** The UX-005C contract test asserting the read
+  helpers stay unimported from Floor and the drawer remains in force and must not
+  be weakened without an explicitly owning tranche.
+- **APP-TEACH-001 is blocked** on APP-CAT-001A Samsung ESL revalidation plus the
+  teach-ahead field experiment. The three quarantined Samsung records remain
+  preserved and must not be retried, discarded, or cleared.
+- **REC-001 and LAB-001 must not be wired merely because they exist.** Both are
+  recorded as intentional parked foundations. For REC-001 the decisive question is
+  whether Current Attention already answers enough of it — the same reasoning that
+  deferred SI-002. CAP-001 remains rejected; `weekly_bay_target` remains desired
+  staging volume, not capacity.
+- **UX-005 remains independent.** GEMINI-001 supplies evidence for canonical
+  UX-005F rather than replacing it; UX-005D and UX-005E must not be preempted;
+  UX-005B and UX-005C Samsung acceptances remain outstanding and unaffected.
+
+RA-001's appliance finding is worth recording separately because it narrows a
+previously open question. Catalog teaching and physical observation are **already
+separable at the API and data layer** — `POST /api/appliances/catalog/identifiers`
+states in its own header that it does not rewrite scans, and
+`ApplianceCatalogManageSheet` teaches without ever calling `commitScan`. The two
+jobs are fused in exactly one UI callback, `handleQuickAdded`, which calls
+`commitScan` after every teach outcome. The practical gap is therefore input
+method rather than capability: pure teaching exists but requires typed
+identifiers, because wedge scanning is bound only to the observation-producing
+surface. FE-001 is designed to determine whether the value lies in teach-ahead as
+a workflow or specifically in teach-ahead by scanning. The deliberate unbound
+ad-hoc observation path is separately protected under OIE-E2 so a future naming
+change cannot eliminate it by accident.
+
+Five field experiments are registered (FE-001 teach-ahead, FE-002 barrier
+vocabulary, FE-003 send-back history, FE-004 Walk & Talk continuity, FE-005 ad-hoc
+isolation), all **PENDING** with empty result fields. No results were invented and
+none may be back-filled without an actual store run.
+
+Nothing in the plan is approved for implementation. Every workstream item is an
+evidence-backed candidate with a field gate. Next planned discovery is GEMINI-001,
+which is **not** marked started.
+
+**OIE-000 — PROGRAM FOUNDATION COMPLETE.** The documentation foundation was
+reviewed and accepted. Completion here means the program map is canonical and
+binding on future tranches; it does not approve any workstream item for
+implementation, and it carries no field-acceptance claim of any kind.
+
 ## 2026-09-07 — UX-005C Floor operational simplicity
 
 Opening the Floor drawer on a phone used to lead with Snap Bay Photo and a bay
