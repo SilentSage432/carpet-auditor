@@ -1,5 +1,91 @@
 # DeptSync Hub — Development Journal
 
+## 2026-09-08 — AI-REDUCE-002 Deterministic Catalog Taxonomy
+
+The second AI reduction, and the first one where reading the code changed what
+the tranche was actually about.
+
+GEMINI-001 had this filed as the easy one: static input, a shipped registry that
+already covers all ten catalog codes, a model prompted with the defaults and
+asked to expand them, output that lands in `localStorage` and teaches nothing.
+All of that verified at HEAD. Gemini never saw a catalog record, an audit, or
+anything store-specific — it could not classify unstructured input, learn local
+vocabulary, or reconcile an unknown category, because it was never given the
+evidence that would let it. It rephrased a list we already ship.
+
+What GEMINI-001 understated was where the output could travel. The generated
+taxonomy is `localStorage`-only, which is true and sounds harmless. But
+`DepartmentAuditSection` reads the effective tree, renders it as the folder
+drill-down, and on log writes the selected folder into the audit record's
+`sub_category`. The taxonomy was display metadata; its labels were not. A
+model-invented folder name could become part of a persisted audit observation.
+That does not weaken the case for removal — it is the strongest argument in the
+file.
+
+Tracing the department-code concern turned up a live defect rather than a
+theoretical one. `mergeTaxonomies` resolved identity as
+`incoming.department_code || base.department_code`, so stored data won over the
+caller. A blob saved under `D25` carrying `department_code: "D35"` made
+`getTaxonomyForDepartment("D25")` hand back a tree labelled Appliances. The test
+I wrote to prove identity was safe failed on the first run, which is the right
+way to find out. Identity is now pinned in two places: the override map takes
+its code from the storage key, and the effective read restores the caller's
+identity after merging. Stored folders may expand a tree. They may not rename a
+department.
+
+The persisted-state question answered itself once I looked for the writer. There
+was exactly one — the AI generate handler — and no editor anywhere in the
+repository. So the stored overrides are provably machine output, not user work.
+I still left them alone. Nothing is deleted, no migration was invented, and the
+existing clear control stays so an admin can drop stale generated folders on
+purpose. `saveTaxonomyOverride` is gone, so nothing writes new ones.
+
+Removed: the `/api/catalog/ai-taxonomy` route, `lib/catalog/ai-taxonomy.ts`
+entire (prompt, response schema, normalizer, local fallback, defaults compose),
+the Generate button and its handler, the Gemini-specific loading and error
+state, and the exclusively-owned `taxonomy` token budget key. Shared Gemini
+transport is untouched, as are the six other Gemini paths.
+
+The modal now says what it does. It shows the department's folder tree. When a
+device has legacy generated folders it says so plainly and offers to clear them,
+rather than advertising a Generate button that would re-ask a model to restate
+the registry.
+
+No field acceptance under Law 8. The only surface that changed is the
+Master-Admin-only taxonomy manager inside Settings — not a floor surface, not
+rotation, audit, or shift work. What an associate sees during a department audit
+renders byte-identical to the previous default path. Nothing in the aisle
+changed, so there is nothing in the aisle to smoke test.
+
+Validation: 802 tests across 58 files pass, 18 of them new in
+`lib/catalog/taxonomies.test.ts` covering registry determinism for all ten
+codes, code normalization, safe unknown-department behavior, identity
+immutability, legacy-state preservation and clearing, corrupt-payload fallback,
+server-side override exclusion, and repository assertions that no generative
+path remains. Typecheck and build are clean. Lint is byte-identical to the HEAD
+baseline at 114 problems (95 errors, 19 warnings).
+
+One thing this tranche deliberately did not do. Because generated folder labels
+could reach an audit's `sub_category`, devices that used Generate may already
+hold audit rows carrying a model-authored label. Those rows are left exactly as
+they are. Provenance cannot distinguish a model-authored value from an
+operator-selected registry folder or a hand-typed one, and guessing would mean
+manufacturing evidence about evidence — the precise failure this program exists
+to prevent. What changed is that the path which produced them is closed. The
+observation is recorded in the plan as §5 A1.9, framed as historical provenance
+discovery, not remediation. No work item was opened for it.
+
+**AI-REDUCE-002 — IMPLEMENTATION ACCEPTED — CLOSED.** The second closed tranche
+under the program, and the first closed **without** a field gate. That contrast
+is the useful precedent. AI-REDUCE-001 earned a gate because the briefing card
+lives on the supervisor's phone and its refresh gesture changed. This one did
+not, because the surface that changed is a Master-Admin management modal and the
+folder tree an associate sees renders byte-identical. The gate is earned by
+changed field-facing behavior, not by the act of removing AI — and inventing one
+here would have been ceremony, not evidence.
+
+> **Less machinery. Same truth. Same usefulness. Lower dependency.**
+
 ## 2026-09-08 — AI-REDUCE-001 field accepted and closed
 
 The deterministic Shift Briefing was tested on a real DS device after shipping.

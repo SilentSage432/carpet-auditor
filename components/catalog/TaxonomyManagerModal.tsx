@@ -1,14 +1,12 @@
 "use client";
 
 /**
- * Admin Catalog Taxonomy Manager — presentation + local override persistence.
- * Generation owned by /api/catalog/ai-taxonomy; registry by lib/catalog/taxonomies.
+ * Admin Catalog Taxonomy Manager — presentation over the canonical department registry.
+ * Registry owned by lib/catalog/taxonomies. Legacy local overrides are readable and clearable.
  */
 
 import { useCallback, useEffect, useId, useMemo, useState } from "react";
 import { TaxonomyDrillDown } from "@/components/catalog/TaxonomyDrillDown";
-import type { AiTaxonomyResult } from "@/lib/catalog/ai-taxonomy";
-import { storeOpsAuthHeadersAsync } from "@/lib/store-ops/auth";
 import {
   CATALOG_TAXONOMY_CODES,
   clearTaxonomyOverride,
@@ -16,7 +14,6 @@ import {
   getTaxonomyOverride,
   listDefaultTaxonomies,
   normalizeTaxonomyCode,
-  saveTaxonomyOverride,
   TAXONOMY_CODE_META,
   type CatalogTaxonomyCode,
   type DepartmentTaxonomy,
@@ -71,11 +68,7 @@ export function TaxonomyManagerModal({
   const [code, setCode] = useState<string>(CATALOG_TAXONOMY_CODES[4]);
   const [name, setName] = useState(TAXONOMY_CODE_META.D25.name);
   const [taxonomy, setTaxonomy] = useState<DepartmentTaxonomy | null>(null);
-  const [source, setSource] = useState<"registry" | "override" | "gemini" | "local" | null>(
-    null
-  );
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [source, setSource] = useState<"registry" | "override" | null>(null);
   const [status, setStatus] = useState<string | null>(null);
 
   const reloadEffective = useCallback(
@@ -100,7 +93,6 @@ export function TaxonomyManagerModal({
     setCode(initial.code);
     setName(initial.name);
     reloadEffective(initial.code, initial.name);
-    setError(null);
     setStatus(null);
   }, [open, options, reloadEffective]);
 
@@ -130,57 +122,14 @@ export function TaxonomyManagerModal({
       nextCode;
     setCode(nextCode);
     setName(nextName);
-    setError(null);
     setStatus(null);
     reloadEffective(nextCode, nextName);
   }
 
-  async function handleGenerate() {
-    setBusy(true);
-    setError(null);
-    setStatus(null);
-    try {
-      const res = await fetch("/api/catalog/ai-taxonomy", {
-        method: "POST",
-        headers: await storeOpsAuthHeadersAsync(),
-        body: JSON.stringify({
-          department_code: code,
-          department_name: name,
-        }),
-      });
-      const body = (await res.json().catch(() => ({}))) as AiTaxonomyResult & {
-        error?: string;
-      };
-      if (!res.ok) {
-        throw new Error(body.error || `Taxonomy generate failed (${res.status})`);
-      }
-      const next: DepartmentTaxonomy = {
-        department_code: body.department_code || code,
-        department_name: body.department_name || name,
-        categories: Array.isArray(body.categories) ? body.categories : [],
-      };
-      saveTaxonomyOverride(next);
-      setTaxonomy(next);
-      setSource(body.source ?? "gemini");
-      setStatus(
-        body.source === "local"
-          ? "Loaded registry defaults (Gemini key missing)."
-          : `AI taxonomy seeded — ${next.categories.length} categories saved.`
-      );
-    } catch (err) {
-      setError(
-        (err as { message?: string } | null)?.message ||
-          "Could not generate taxonomy"
-      );
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  function handleReset() {
+  function handleClearSaved() {
     clearTaxonomyOverride(code);
     reloadEffective(code, name);
-    setStatus("Cleared AI override — registry defaults restored.");
+    setStatus("Saved folders cleared — showing the standard department folders.");
     setSource("registry");
   }
 
@@ -209,7 +158,7 @@ export function TaxonomyManagerModal({
               Department Taxonomies
             </h2>
             <p className="mt-0.5 text-xs text-zinc-500">
-              Seed or expand folder trees for active store departments.
+              Folder trees used to sort audits by department.
             </p>
           </div>
           <button
@@ -242,29 +191,20 @@ export function TaxonomyManagerModal({
             </select>
           </label>
 
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => void handleGenerate()}
-              className="btn-primary-glow flex min-h-12 flex-1 items-center justify-center rounded-xl px-4 text-sm disabled:opacity-50"
-            >
-              {busy ? "Generating…" : "✨ Generate / Refresh AI Taxonomy"}
-            </button>
-            <button
-              type="button"
-              disabled={busy}
-              onClick={handleReset}
-              className="flex min-h-12 items-center justify-center rounded-xl border border-zinc-700 px-3 text-sm font-semibold text-zinc-300 disabled:opacity-40"
-            >
-              Reset
-            </button>
-          </div>
-
-          {source ? (
-            <p className="font-mono text-[10px] uppercase tracking-wide text-zinc-500">
-              Source · {source}
-            </p>
+          {source === "override" ? (
+            <div className="space-y-2 rounded-xl border border-amber-500/30 bg-amber-950/30 px-3 py-2.5">
+              <p className="text-xs text-amber-100">
+                This department has extra folders saved on this device. They are
+                shown alongside the standard folders and can be cleared.
+              </p>
+              <button
+                type="button"
+                onClick={handleClearSaved}
+                className="flex min-h-11 w-full items-center justify-center rounded-xl border border-amber-500/40 px-3 text-sm font-semibold text-amber-100"
+              >
+                Clear saved folders
+              </button>
+            </div>
           ) : null}
 
           {status ? (
@@ -273,14 +213,6 @@ export function TaxonomyManagerModal({
               className="rounded-xl border border-emerald-500/30 bg-emerald-950/40 px-3 py-2 text-sm text-emerald-200"
             >
               {status}
-            </p>
-          ) : null}
-          {error ? (
-            <p
-              role="alert"
-              className="rounded-xl border border-rose-500/40 bg-rose-950/40 px-3 py-2 text-sm text-rose-200"
-            >
-              {error}
             </p>
           ) : null}
 

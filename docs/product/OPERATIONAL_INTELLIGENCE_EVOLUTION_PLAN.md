@@ -1,9 +1,9 @@
 # DeptSync Operational Intelligence Evolution Plan
 
 **Program ID:** OIE-000
-**Status:** PROGRAM FOUNDATION COMPLETE · GEMINI-001 DISCOVERY COMPLETE · AI-REDUCE-001 FIELD ACCEPTED — CLOSED
+**Status:** PROGRAM FOUNDATION COMPLETE · GEMINI-001 DISCOVERY COMPLETE · AI-REDUCE-001 FIELD ACCEPTED — CLOSED · AI-REDUCE-002 IMPLEMENTATION ACCEPTED — CLOSED
 **Established:** 2026-09-08
-**Last updated:** 2026-09-08 — AI-REDUCE-001 field accepted and closed (§5 A1.2 / A1.5 / A1.7)
+**Last updated:** 2026-09-08 — AI-REDUCE-002 accepted and closed (§5 A1.2 / A1.5 / A1.8 / A1.9)
 **Evidence basis:** RA-001 Repository Archaeology (read-only audit, baseline `25b6ed2`) · GEMINI-001 Generative Cost & Necessity Audit (read-only)
 **Authority:** Subordinate to [`DEPTSYNC_CONSTITUTION.md`](../../DEPTSYNC_CONSTITUTION.md). Where this document and the Constitution conflict, the Constitution governs and the conflict must be flagged, not silently resolved.
 
@@ -274,7 +274,7 @@ Evidence-backed dispositions. Every row is a **recorded finding**, not approved 
 | **5. Flooring Insights** | Explanation over local math | **OPTIONAL AI** | Measurement math is not performed by Gemini; item identity / aging / variance are local authoritative or deterministic; Gemini contributes prose, priority ordering, and a model-selected markdown percentage; model cannot invent new remnant entities because the merge is constrained to local candidates | **FLOORING-AI-001** (discovery pending) | None | `recommended_percent` is a model-originated number that can reach `carpet_remnants` on supervisor Apply |
 | **6. Visual Bay Scan — ephemeral** | Image interpretation | **FIELD EVIDENCE NEEDED** | Image interpretation is genuinely non-deterministic / multimodal; result is not persisted; no correctness feedback loop; no historical comparison; no accuracy capture; output disappears on close | None | **UX-005F / field gate preserved** | Model correctness is structurally unevaluable. **No deterministic computer-vision replacement proposed** |
 | **7. Bay Audit Validate — persisting** | Image interpretation + DB write | **FIELD EVIDENCE NEEDED — WITH CRITICAL LIFECYCLE DEFECT** | Lifecycle state verified **SEVERED** (see A1.3). Product value cannot be judged while the loop is broken | **SNAP-DECISION-001** | **UX-005F / field gate preserved** | Paid inference currently produces orphaned rows no surface can read |
-| **8. Catalog Taxonomy** | Static folder generation | **REPLACE DETERMINISTICALLY** | Input is effectively static; the default deterministic registry already covers all catalog codes; Gemini regeneration does not learn from previous results; stored result is `localStorage`-only; repeated identical inference is possible indefinitely; no human correction mechanism exists | **AI-REDUCE-002** | None | Normalizer validates nothing against authoritative data; the model can set the department code |
+| **8. Catalog Taxonomy** | ~~Static folder generation~~ → **registry displayed directly** | **REPLACE DETERMINISTICALLY — DONE** (AI-REDUCE-002, 2026-09-08) | Input was effectively static; the deterministic registry already covered all catalog codes; regeneration did not learn from previous results; the stored result was `localStorage`-only; repeated identical inference was possible indefinitely; no human correction mechanism existed | **AI-REDUCE-002 — IMPLEMENTATION ACCEPTED — CLOSED** (2026-09-08) | **None required** — no field-facing operational surface changed (A1.8) | Department identity is now pinned to application state; the model-set-department-code defect is closed. **A1.8 records the escalation GEMINI-001 understated:** generated folder names could reach a persisted audit's `sub_category` |
 | **9. Snag Triage** | Orphaned classification | **REMOVE JOB** | Route/helper/dispatcher exist; **zero production invocation path**; deterministic fallback is complete; capability can write to three authoritative tables if dispatch is enabled; no human confirmation boundary exists | **AI-RETIRE-001** | None | **Do NOT replace with a new deterministic UI. Do NOT wire it merely because the local fallback exists** |
 | **10. Note Summary** | — | **RETIRED** | Route returns HTTP 410; no Gemini dependency remains; no paid call is structurally possible | None | None | Verified genuinely dead — no Gemini import in the module graph |
 
@@ -330,7 +330,7 @@ Verified findings:
 Evidence-backed order.
 
 1. **AI-REDUCE-001** — Deterministic Shift Briefing — **FIELD ACCEPTED — CLOSED** (2026-09-08)
-2. **AI-REDUCE-002** — Deterministic Catalog Taxonomy
+2. **AI-REDUCE-002** — Deterministic Catalog Taxonomy — **IMPLEMENTATION ACCEPTED — CLOSED** (2026-09-08)
 3. **AI-RETIRE-001** — Retire Snag Triage
 4. **AI-SAFETY-001** — Bound Gemini Transport Failure
 5. **SNAP-DECISION-001** — Repair-or-Retire Snap Bay
@@ -396,6 +396,60 @@ That was the core requirement for AI-REDUCE-001, and it is met. The deterministi
 **Scope limits on this evidence.** Nothing beyond the four observations above was reported and nothing further may be inferred. This result covers the evidence-response requirement for **this capability only**. It is **not** transferable to any other Gemini capability — Floor-Walk Copilot, Executive Floor Pad, Flooring Insights, Visual Bay Scan, Bay Audit Validate, and Catalog Taxonomy retain their own dispositions and their own gates. It also does not close UX-005F.
 
 > **Less machinery. Same truth. Same usefulness. Lower dependency.**
+
+---
+
+### A1.8 — AI-REDUCE-002 deterministic Catalog Taxonomy (2026-09-08)
+
+**Status: IMPLEMENTATION ACCEPTED — CLOSED.** The second closed implementation tranche under this program, and the first closed **without** a field gate.
+
+**Premise verified at HEAD.** Every GEMINI-001 statement held: the prompt packet was built from `getDefaultTaxonomy` (the model was shown the defaults and asked to expand them), `DEFAULT_DEPARTMENT_TAXONOMIES` covers all ten catalog codes, generated output persisted only to the `deptsync_catalog_taxonomies` localStorage key, generation was repeatable indefinitely, and no correction or teaching loop existed. Gemini contributed **no unique capability** — it never saw catalog records, audit history, or store-specific evidence, so it could not classify unstructured input, learn store-specific vocabulary, reconcile unknown categories, or teach the system anything durable.
+
+**One finding GEMINI-001 understated.** GEMINI-001 recorded the generated taxonomy as `localStorage`-only, which is true of the taxonomy itself but understates the consequence. `DepartmentAuditSection` reads the effective taxonomy — defaults merged with the stored override — renders it as the folder drill-down, and on log writes the selected folder into the audit record:
+
+```
+sub_category: taxonomySelection?.subcategory?.trim() || taxonomySelection?.category.name || ""
+```
+
+So a model-invented folder name could reach a **persisted audit record's `sub_category`**. The taxonomy was display metadata; its labels were not. Under Article "intelligence may interpret evidence but may not manufacture evidence," this strengthened the case for removal rather than weakening it.
+
+**Department-identity defect found and fixed.** GEMINI-001 flagged that the model could set `department_code`. Tracing that through to storage showed it was live, not theoretical: `mergeTaxonomies` resolved identity as `incoming.department_code || base.department_code`, so a stored payload could redefine which department a read returned. A blob stored under `D25` carrying `department_code: "D35"` made `getTaxonomyForDepartment("D25")` return a tree labelled D35. Identity is now pinned to application state in two places — the override map keys identity from the storage key, and `getTaxonomyForDepartment` restores the caller's identity after merging. Stored folders may still **expand** a tree; they may never **rename** the department. A test asserts this directly.
+
+**Persisted-state ownership decision.** The override map had exactly one writer — the AI generate handler — and no editor existed anywhere in the repository. Stored overrides are therefore provably **machine output, not user-authored work**. They are nonetheless left in place: nothing is deleted, no migration was invented, and the existing clear affordance is retained so an admin can drop stale generated folders. `saveTaxonomyOverride` is removed, so nothing can write new overrides; the read and clear paths remain.
+
+**Product behavior chosen (A + D).** The Generate interaction is removed because it performed no useful job, and the canonical department registry is presented directly. No editor was added to compensate, and no new taxonomy engine was built.
+
+**Recorded conclusions:**
+
+- catalog folder browse remains fully functional from the shipped registry
+- department audit folder filtering and `sub_category` capture are unchanged
+- generated folder names can no longer enter audit evidence
+- stored department identity can no longer override application state
+- no user-authored state was destroyed
+- appliance catalog teaching was untouched and does not consume this registry
+
+**Field acceptance: not required, and none was invented.** Under OIE Law 8 the gate applies to changed field-facing operational behavior. The only surface changed is the Master-Admin-only Catalog Taxonomies modal in Settings — not a floor surface, not part of rotation, audit, verification, or shift work. The department-audit consumer continues to read the same deterministic taxonomy contract, and the folder tree an associate sees renders byte-identical to the previous default path. No field-facing gesture or network behavior changed. Nothing in the aisle changed, so there is nothing in the aisle to smoke test.
+
+This establishes the counterpart to AI-REDUCE-001: **the field gate is earned by changed field-facing behavior, not by the act of removing AI.** AI-REDUCE-001 required a gate because the briefing card lives on the supervisor's phone and its refresh gesture changed. AI-REDUCE-002 does not, because an admin-only management surface changed and the floor surface did not.
+
+> **Less machinery. Same truth. Same usefulness. Lower dependency.**
+
+---
+
+### A1.9 — Legacy generated `sub_category` provenance (adjacent finding, NOT a work item)
+
+Recorded from AI-REDUCE-002. **This is a truth/provenance observation, not remediation scope.**
+
+Because the removed generator's folder labels could be selected in the department-audit drill-down and written to a persisted audit's `sub_category` (A1.8), **devices that previously used Generate may already hold audit rows whose `sub_category` came from a model-authored folder name.**
+
+Two facts, and nothing beyond them:
+
+- **No new machine-generated taxonomy labels can be created.** The Gemini generator is removed and no writer for taxonomy overrides remains, so the path that produced them is closed.
+- **Existing historical audit values remain untouched, deliberately.** Provenance is not sufficient to distinguish a model-authored `sub_category` from an operator-selected registry folder or a hand-entered value. Guessing would manufacture evidence about evidence.
+
+**Explicitly out of scope and not performed:** no row migration, no rewriting of historical audit evidence, no inference about which values were AI-generated, no mass-normalization of `sub_category`, no cleanup migration, and no repair UI.
+
+If this is ever picked up, it must be framed narrowly as **historical provenance/truth discovery, not automatic remediation.** No work item is opened here.
 
 ---
 
@@ -844,6 +898,7 @@ During an active physical audit, deliberately ad-hoc scan known units and confir
 | **PHASE 0** — Program Foundation | OIE-000 canonical plan | Complete |
 | **PHASE 1** — Understand AI Cost / Necessity | **GEMINI-001 — DISCOVERY COMPLETE** | Dispositions recorded (A1.2) |
 | **PHASE 1A** — First approved AI reduction | **AI-REDUCE-001 — Deterministic Shift Briefing** | **FIELD ACCEPTED — CLOSED** (2026-09-08) — first fully closed OIE implementation tranche |
+| **PHASE 1B** — Second approved AI reduction | **AI-REDUCE-002 — Deterministic Catalog Taxonomy** | **IMPLEMENTATION ACCEPTED — CLOSED** (2026-09-08) — no field gate required; closed a department-identity defect (A1.8) |
 | **PHASE 2** — Recover Existing Operational Value | FLOOR-HIDDEN-001, HISTORY-001 | **Still queued — priority unchanged**; order within phase may change from evidence |
 | **PHASE 3** — Repair Evidence Quality | Weekly-progress semantics, barrier vocabulary, any proven audit-linkage / data-integrity issue | — |
 | **PHASE 4** — Close Existing Loops | WALK-001 if field proven; historical decision read-back; spatial intelligence placement where earned | — |
@@ -870,7 +925,7 @@ Two standing exceptions: a confirmed **security or truth** finding from Workstre
 | **OIE-000** | Operational Intelligence Evolution Program | Program foundation | RA-001 | PROGRAM FOUNDATION COMPLETE | — | None (docs) | Documentation only |
 | **GEMINI-001** | Generative Cost & Necessity Audit | Discovery | RA-001 §9 | **DISCOVERY COMPLETE — DISPOSITIONS RECORDED** | OIE-000 | Snap Bay + Visual Bay Scan remain field-gated | Discovery only — no runtime change |
 | **AI-REDUCE-001** | Deterministic Shift Briefing | AI reduction | GEMINI-001 A1.2 — zero Gemini-only fields; field evidence A1.7 | **FIELD ACCEPTED — CLOSED** (2026-09-08) | GEMINI-001 | **MET** — real DS-device operational state-change test | Route + client AI path removed; 20 contract tests; 784/784 suite green; field accepted |
-| **AI-REDUCE-002** | Deterministic Catalog Taxonomy | AI reduction | GEMINI-001 A1.2 — static input, registry ships | **APPROVED REDUCTION CANDIDATE — NOT STARTED** | GEMINI-001 | None | Not started |
+| **AI-REDUCE-002** | Deterministic Catalog Taxonomy | AI reduction | GEMINI-001 A1.2 — static input, registry ships; escalation in A1.8 | **IMPLEMENTATION ACCEPTED — CLOSED** (2026-09-08) | GEMINI-001 | **None required** — no field-facing operational surface changed (A1.8) | Route + AI module + Generate interaction removed; department-identity defect fixed; 18 contract tests; 802/802 suite green; accepted without a field gate |
 | **AI-RETIRE-001** | Retire Orphaned Snag Triage | Retirement | GEMINI-001 A1.2 — zero invocation path | **APPROVED RETIREMENT CANDIDATE — NOT STARTED** | GEMINI-001 | None | Not started — do not wire, do not replace with new UI |
 | **AI-SAFETY-001** | Bound Gemini Transport Failure | Resilience | GEMINI-001 A1.4 — no timeout/abort/retry ceiling | **APPROVED SAFETY CANDIDATE — NOT STARTED** | — | None | Not started |
 | **AI-SAFETY-002** | Executive Floor Pad Model-Output Boundary | Safety / truth | GEMINI-001 A1.2 — autosave without confirm; unvalidated metadata | **QUEUED — NOT STARTED** | — | None | Not started |

@@ -383,7 +383,7 @@ export function normalizeDepartmentTaxonomy(
   };
 }
 
-/** Merge AI / override categories into a base tree (expand, never drop existing). */
+/** Merge stored override categories into a base tree (expand, never drop existing). */
 export function mergeTaxonomies(
   base: DepartmentTaxonomy,
   incoming: DepartmentTaxonomy
@@ -433,7 +433,9 @@ function readOverrideMap(): Record<string, DepartmentTaxonomy> {
     )) {
       const code = normalizeTaxonomyCode(key);
       if (!code) continue;
-      out[code] = normalizeDepartmentTaxonomy(value, code);
+      // Identity comes from the storage key, never from the stored payload.
+      const entry = normalizeDepartmentTaxonomy(value, code);
+      out[code] = { ...entry, department_code: code };
     }
     return out;
   } catch {
@@ -457,15 +459,6 @@ export function getTaxonomyOverride(
   return readOverrideMap()[code] ?? null;
 }
 
-export function saveTaxonomyOverride(taxonomy: DepartmentTaxonomy): void {
-  const normalized = normalizeDepartmentTaxonomy(taxonomy);
-  const code = normalizeTaxonomyCode(normalized.department_code);
-  if (!code) return;
-  const map = readOverrideMap();
-  map[code] = { ...normalized, department_code: code };
-  writeOverrideMap(map);
-}
-
 export function clearTaxonomyOverride(departmentCode: string): void {
   const code = normalizeTaxonomyCode(departmentCode);
   if (!code) return;
@@ -475,7 +468,8 @@ export function clearTaxonomyOverride(departmentCode: string): void {
 }
 
 /**
- * Effective taxonomy: default registry merged with optional local AI override.
+ * Effective taxonomy: default registry merged with any legacy local override.
+ * Nothing writes overrides — they are pre-AI-REDUCE-002 residue, readable and clearable.
  * Server callers get defaults only (no localStorage).
  */
 export function getTaxonomyForDepartment(
@@ -489,7 +483,14 @@ export function getTaxonomyForDepartment(
   if (!include) return base;
   const override = getTaxonomyOverride(base.department_code);
   if (!override) return base;
-  return mergeTaxonomies(base, override);
+  const merged = mergeTaxonomies(base, override);
+  // Stored folders may expand the tree; they may never redefine which
+  // department is being read. Identity stays with the caller's request.
+  return {
+    ...merged,
+    department_code: base.department_code,
+    department_name: base.department_name,
+  };
 }
 
 export function getTaxonomyForHubDepartment(

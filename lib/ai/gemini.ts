@@ -46,7 +46,6 @@ export const GEMINI_TOKEN_BUDGET = {
   copilot: 2048,
   insights: 2048,
   parse: 2048,
-  taxonomy: 1024,
   default: 1024,
 } as const;
 
