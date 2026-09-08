@@ -1,5 +1,86 @@
 # DeptSync Hub — Development Journal
 
+## 2026-09-08 — GEMINI-001 Generative Cost & Necessity Audit (discovery complete)
+
+The question GEMINI-001 set out to answer was uncomfortable on purpose: for every
+Gemini-backed capability, does the model supply information DeptSync cannot derive
+itself? The answer, traced call-site by call-site, is that it usually does not.
+
+**Gemini is not the operational intelligence engine.** There is no Gemini call in
+the rotation engine, the attention engine, the appliance consideration composer,
+the health calculations, the velocity decay, or the labor balancer. Every Layer 1,
+Layer 2, and Layer 4 producer in this repository is deterministic TypeScript. What
+Gemini actually does here is interpret unstructured input and write prose.
+
+**Nine live call paths plus one tombstone.** RA-001 named eight candidates; the
+audit found a ninth by noticing that `VisualBayScannerModal` has two different
+backends. Three mount sites call the ephemeral `/api/store-ops/ai-bay-scan`, which
+persists nothing. The Floor mount calls `/api/ai/bay-audit/validate` — a separate
+endpoint with its own schema that writes to `bay_audit_logs`. Same modal, same
+button, two capabilities with genuinely different risk profiles, so they were split
+and given separate dispositions. The tenth path, Note Summary, is a real tombstone:
+the route returns 410 and no Gemini import survives in its module graph.
+
+**The Snap Bay lifecycle is severed, and that was verified rather than inferred.**
+RA-001 flagged it as a strong static reading; this audit enumerated every call site
+and confirmed it. `validateBayAudit` has exactly one caller, and the only mount
+supplying `auditContext` passes `department_id` alone — so `rotation_id` is
+structurally guaranteed null on every write. `image_url` is never passed. The
+supervisor read-back keys on `rotation_id` and therefore cannot join the row. The
+FAIL completion gate cannot fire, because both maps feeding the verdict are
+permanently empty: one is only ever called to delete keys, and the other's callback
+early-returns on the always-absent `rotation_id`. One correction to the original
+reading — the insert happens server-side and unconditionally, so the rows *are*
+written, just orphaned. The consequence is that a Floor scan spends real inference
+money to produce a row nothing can read, which means the model's accuracy on this
+path has never been evaluable and cannot be evaluated retroactively. That finding
+makes the decision urgent without making it obvious, so `SNAP-DECISION-001` is
+recorded as repair-or-retire and deliberately left undecided.
+
+**Shift Briefing has zero Gemini-only fields.** The deterministic and model paths
+produce an identical output shape; hotspot selection is already deterministic
+*before* the call; the local brief is already what renders by default; and the UI
+itself calls the model step an "optional AI rewrite." Nothing is lost by removing
+it except the rewrite, which is why `AI-REDUCE-001` became the first approved
+implementation candidate.
+
+**Catalog Taxonomy pays repeatedly for a static answer.** The input is effectively
+fixed, the shipped deterministic registry already covers every catalog code, the
+model never learns from prior runs, the result is stored only in `localStorage`,
+and there is no human correction mechanism — so identical inference can recur
+indefinitely.
+
+**Snag Triage is an orphan that can still write.** Route, helper, and a three-table
+dispatcher all exist with no production invocation path. Its deterministic fallback
+is complete, which is precisely the trap: the temptation is to wire it because the
+fallback works. The disposition is to retire the job, not to rebuild it a
+different way.
+
+**One safety finding is shared by everything.** No Gemini path has an explicit
+timeout, an `AbortSignal`, a bounded upstream execution time, or a retry ceiling.
+Because all nine funnel through `callGeminiFlash`, that is one change site capping
+worst-case exposure across the whole surface — which is why `AI-SAFETY-001` is
+resilience work rather than AI reduction. Alongside it: `asGeminiSchema` is a
+TypeScript cast, not runtime validation, and the deterministic normalizers are
+doing the real enforcement in several paths.
+
+**The long-term boundary this establishes:** Gemini earns a narrow role at
+unstructured-input boundaries where DeptSync cannot reasonably derive the same
+interpretation from structured evidence — free-text topology, natural-language task
+structuring, possibly image interpretation if its product value and lifecycle are
+ever proven. It should not be doing deterministic math, recurrence detection,
+rotation reasoning, labor balancing, attention signals, health metrics, static
+taxonomy generation, or rewriting already-computed intelligence to sound more
+natural.
+
+**GEMINI-001 — DISCOVERY COMPLETE.** Documentation only; no runtime code, test,
+API, schema, migration, or Gemini behavior was changed, nothing was removed, and no
+reduction was implemented. Every item it created — AI-REDUCE-001, AI-REDUCE-002,
+AI-RETIRE-001, AI-SAFETY-001, AI-SAFETY-002, SNAP-DECISION-001, FLOORING-AI-001 —
+is NOT STARTED. UX-005F receives repository-level evidence from this audit but is
+not closed; its acceptance conditions still require field evidence, and none was
+invented.
+
 ## 2026-09-08 — OIE-000 Operational Intelligence Evolution Program foundation
 
 RA-001 was a read-only archaeology audit that asked what DeptSync has already

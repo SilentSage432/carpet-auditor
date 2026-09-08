@@ -1,9 +1,10 @@
 # DeptSync Operational Intelligence Evolution Plan
 
 **Program ID:** OIE-000
-**Status:** PROGRAM FOUNDATION COMPLETE
+**Status:** PROGRAM FOUNDATION COMPLETE · GEMINI-001 DISCOVERY COMPLETE
 **Established:** 2026-09-08
-**Evidence basis:** RA-001 Repository Archaeology (read-only audit, baseline `25b6ed2`)
+**Last updated:** 2026-09-08 — GEMINI-001 dispositions recorded (§5 Workstream A)
+**Evidence basis:** RA-001 Repository Archaeology (read-only audit, baseline `25b6ed2`) · GEMINI-001 Generative Cost & Necessity Audit (read-only)
 **Authority:** Subordinate to [`DEPTSYNC_CONSTITUTION.md`](../../DEPTSYNC_CONSTITUTION.md). Where this document and the Constitution conflict, the Constitution governs and the conflict must be flagged, not silently resolved.
 
 > **Every future tranche in this program MUST read both `DEPTSYNC_CONSTITUTION.md` and this document before analysis or implementation.**
@@ -160,7 +161,7 @@ DeptSync persists substantial operational history. Several datasets have weak or
 
 `app/api/store-locations/history/route.ts` composes rotations, supersede provenance, and per-rotation completion attempts into a per-bay narrative. Its typed client wrapper `fetchBayLocationHistory` (`lib/store-ops/client.ts:541`) has **zero callers** (verified). The route is `requireSuperAdmin`, which may explain why it was never wired.
 
-**Recorded as strong static inference, not runtime-confirmed:** RA-001 traced three independent breaks in the `bay_audit_logs` lifecycle — `FloorTab.tsx:1002-1008` supplies `auditContext` without `rotation_id`; the callback early-returns on `!payload.rotation_id` (`:1010`); `image_url` is never passed. If correct, the FAIL completion gate at `app/api/rotations/complete/route.ts:101-114` has never fired and audit thumbnails in `SupervisorAuditSummaryModal.tsx:302-312` are dead. **This must be runtime-verified before any tranche acts on it.**
+**Originally recorded as strong static inference. VERIFIED by GEMINI-001 (2026-09-08) — see A1.3.** RA-001 traced three independent breaks in the `bay_audit_logs` lifecycle — `FloorTab.tsx:1002-1008` supplies `auditContext` without `rotation_id`; the callback early-returns on `!payload.rotation_id` (`:1010`); `image_url` is never passed. GEMINI-001 confirmed all three by exhaustive call-site enumeration and additionally proved the FAIL gate is unreachable because both maps feeding the verdict are permanently empty. The lifecycle state is **SEVERED**. One correction to the original reading: the `bay_audit_logs` insert happens **server-side and unconditionally**, so rows *are* written — with `rotation_id: null` — rather than not written at all. Decision ownership moves to **SNAP-DECISION-001**.
 
 ### 3.4 Appliance closed-loop exemplar
 
@@ -228,41 +229,142 @@ Do not build a new intelligence layer while a prerequisite evidence or read-back
 
 ### OIE-A1 / GEMINI-001 — Generative Cost & Necessity Audit
 
-**Status:** NEXT DISCOVERY TRANCHE — **NOT STARTED**
+**Status:** **DISCOVERY COMPLETE — DISPOSITIONS RECORDED** (2026-09-08)
 
 **Relationship to existing IDs:** This is the discovery instrument for **UX-005F (AI earn-your-place review)**, which remains the canonical UX-005 tranche ID. GEMINI-001 does not replace UX-005F; it supplies its evidence. UX-005 Question #3 (Snap Bay Gemini cost) and Question #7 (Predictive Copilot) remain open and owned by UX-005F.
 
 **Purpose:** For every remaining Gemini-backed capability, determine whether Gemini adds information unavailable to deterministic DeptSync logic.
 
-**Required classification per capability:**
+**Audit dimensions applied (all required per capability):** trigger · input · existing structured evidence · deterministic fallback · model-specific value · authoritative consequence · persistence · human confirmation · approximate call frequency / cost exposure · offline behavior · product job · whether the job itself earns its place.
 
-- `RETAIN AI`
-- `OPTIONAL AI`
-- `REPLACE DETERMINISTICALLY`
-- `REMOVE JOB`
-- `FIELD EVIDENCE NEEDED`
+---
 
-**Audit dimensions (all required per capability):** trigger · input · existing structured evidence · deterministic fallback · model-specific value · authoritative consequence · persistence · human confirmation · approximate call frequency / cost exposure · offline behavior · product job · whether the job itself earns its place.
+### A1.1 — Canonical conclusion
 
-**RA-001 preliminary findings carried forward.** These are starting positions, not conclusions.
+> **DeptSync is almost entirely independent of Gemini for operational intelligence. Gemini is used primarily for input interpretation and prose, not for the deterministic intelligence stack.**
 
-| Capability | Preliminary | Reason |
-|---|---|---|
-| **Pre-Flight location parsing** | RETAIN AI | Genuinely unstructured input; deterministic normalization (`normalizeAiParsePayload`); mandatory human confirm; every correction surfaced |
-| **Floor Pad / Walk voice structuring** | RETAIN or OPTIONAL AI | Language parsing is a legitimate AI boundary; local fallback exists and degrades transparently |
-| **Flooring Insights** | FIELD AUDIT REQUIRED | Separate math from interpretation — see OIE-I1 |
-| **Visual Bay Scan** | FIELD EVIDENCE NEEDED | Do not optimize or replace until DS decision value is proven; currently zero persistence so accuracy is unevaluable |
-| **Catalog Taxonomy** | OPTIONAL / REDUCE | Investigate teach-once persistent classification rather than recurring model inference |
-| **Shift Briefing** | REPLACE DETERMINISTICALLY candidate | `buildLocalShiftBriefing` already renders by default; AI appears primarily to rewrite language. UI caption already says "optional AI rewrite" |
-| **Bay Audit / Snap Bay** | QUESTION JOB / FIX LIFECYCLE FIRST | RA-001 found likely broken lifecycle wiring (missing rotation linkage and image persistence). **Do not invest in AI replacement before establishing whether Snap Bay earns continued product value** |
-| **Snag Triage** | REPLACE DETERMINISTICALLY candidate / QUESTION JOB | Deterministic fallback appears substantial (`buildLocalSnagTriage` runs the same normalizer with an empty model response); feature has no reachable trigger |
-| **Note Summary** | RETIRED (410 Gone) | No work unless evidence changes |
+No Gemini call exists anywhere in the rotation engine, the attention engine (SI-001), the appliance consideration composer, the health calculations, the velocity decay, or the labor balancer. Every Layer 1, Layer 2, and Layer 4 producer in this repository is deterministic TypeScript.
 
-**Constraint:** the Floor Pad / Walk distinction must be preserved in any outcome —
+The governing boundary for this program:
+
+> **Generative AI may help interpret evidence or intent, but operational intelligence should remain reproducible from deterministic evidence whenever practical.**
+
+This is subordinate to, and does not replace, the constitutional statements already binding on this program:
+
+> **Intelligence may interpret evidence, but it may not manufacture evidence.**
+
+> **DeptSync identifies the pattern. The DS determines what the pattern means.**
+
+**Scope discovered:** nine live call paths plus one confirmed-dead tombstone. RA-001 named eight candidates; GEMINI-001 found a ninth. `VisualBayScannerModal` has **two** backends — three mount sites call the ephemeral `/api/store-ops/ai-bay-scan`, while the Floor mount calls a separate endpoint, `/api/ai/bay-audit/validate`, with its own schema and a database write. These are distinct capabilities requiring distinct dispositions.
+
+**Shared-helper consequence:** all nine paths funnel through `callGeminiFlash` (`lib/ai/gemini.ts`). Removing any single capability does not reduce transport dependency. Reduction here means fewer calls and less exposure, not less code.
+
+---
+
+### A1.2 — Canonical AI Capability Disposition Map
+
+Evidence-backed dispositions. Every row is a **recorded finding**, not approved implementation work.
+
+| Capability | Current Role | Disposition | Reason | Implementation Action | Field Gate | Safety / Integrity Note |
+|---|---|---|---|---|---|---|
+| **1. Pre-Flight location parse** | Input interpretation — free-text → bay rows | **RETAIN AI** | Genuinely unstructured input; no equivalent deterministic parser exists; model extracts structure rather than calculating intelligence; normalizer validates institutional fields; human confirmation required before DB write; low call exposure | None | None | Aisle validation weak; bay range has no meaningful upper bound; confirmation accepts the generated batch as a whole. **Bounded follow-up evidence only — no work item created** |
+| **2. Floor-Walk Copilot** | Input interpretation — speech text → task structure | **OPTIONAL AI** | Browser speech recognition produces text locally (audio never sent to Gemini); Gemini structures natural language; deterministic parser/fallback already exists; closed enums enforced by deterministic code; human dispatch required before authoritative write | None | **WALK-001 / FE-004 preserved** | Unknown/invented location tags may persist with null foreign keys |
+| **3. Executive Floor Pad extract** | Input interpretation — note text → tasks/tags | **OPTIONAL AI** | Natural-language interpretation is a legitimate AI boundary; deterministic fallback exists for the missing-key path; human-provided aisle/bay outrank model values | **AI-SAFETY-002** (queued) | None | Model output autosaves without a separate confirmation step; `metadata` is effectively unvalidated JSON; configured-Gemini failure has asymmetric fallback behavior |
+| **4. Shift Briefing** | Prose rewrite of computed findings | **REPLACE DETERMINISTICALLY** | Deterministic and Gemini paths have identical output shape; **zero Gemini-only fields**; hotspot selection is already deterministic before the model call; local brief is already the default render; UI itself calls it an "optional AI rewrite" | **AI-REDUCE-001** | None | Display-only — no authoritative write on this path |
+| **5. Flooring Insights** | Explanation over local math | **OPTIONAL AI** | Measurement math is not performed by Gemini; item identity / aging / variance are local authoritative or deterministic; Gemini contributes prose, priority ordering, and a model-selected markdown percentage; model cannot invent new remnant entities because the merge is constrained to local candidates | **FLOORING-AI-001** (discovery pending) | None | `recommended_percent` is a model-originated number that can reach `carpet_remnants` on supervisor Apply |
+| **6. Visual Bay Scan — ephemeral** | Image interpretation | **FIELD EVIDENCE NEEDED** | Image interpretation is genuinely non-deterministic / multimodal; result is not persisted; no correctness feedback loop; no historical comparison; no accuracy capture; output disappears on close | None | **UX-005F / field gate preserved** | Model correctness is structurally unevaluable. **No deterministic computer-vision replacement proposed** |
+| **7. Bay Audit Validate — persisting** | Image interpretation + DB write | **FIELD EVIDENCE NEEDED — WITH CRITICAL LIFECYCLE DEFECT** | Lifecycle state verified **SEVERED** (see A1.3). Product value cannot be judged while the loop is broken | **SNAP-DECISION-001** | **UX-005F / field gate preserved** | Paid inference currently produces orphaned rows no surface can read |
+| **8. Catalog Taxonomy** | Static folder generation | **REPLACE DETERMINISTICALLY** | Input is effectively static; the default deterministic registry already covers all catalog codes; Gemini regeneration does not learn from previous results; stored result is `localStorage`-only; repeated identical inference is possible indefinitely; no human correction mechanism exists | **AI-REDUCE-002** | None | Normalizer validates nothing against authoritative data; the model can set the department code |
+| **9. Snag Triage** | Orphaned classification | **REMOVE JOB** | Route/helper/dispatcher exist; **zero production invocation path**; deterministic fallback is complete; capability can write to three authoritative tables if dispatch is enabled; no human confirmation boundary exists | **AI-RETIRE-001** | None | **Do NOT replace with a new deterministic UI. Do NOT wire it merely because the local fallback exists** |
+| **10. Note Summary** | — | **RETIRED** | Route returns HTTP 410; no Gemini dependency remains; no paid call is structurally possible | None | None | Verified genuinely dead — no Gemini import in the module graph |
+
+**Constraint preserved for capabilities 2 and 3:**
 
 > **AI interprets language. DeptSync determines operational meaning.**
 
-**Goal of Workstream A:** reduce paid AI dependency without reducing useful intelligence.
+---
+
+### A1.3 — Snap Bay lifecycle verification
+
+RA-001 recorded the lifecycle severance as a strong static inference. GEMINI-001 **verified it** by exhaustive call-site enumeration.
+
+**Lifecycle state: SEVERED.**
+
+Verified findings:
+
+- **`rotation_id` is structurally guaranteed `null`** for all current writes. `validateBayAudit` has exactly one caller, and the only mount supplying `auditContext` passes `department_id` alone.
+- **`image_url` is never persisted.** The column exists; the modal never passes a value.
+- **Supervisor read-back cannot join the audit row.** The reader keys on `rotation_id`.
+- **The FAIL completion gate cannot fire.** Both maps feeding the verdict are permanently empty — `setAuditByRotation` is called only to *delete* keys, and the external map is never populated because its callback early-returns on the always-absent `rotation_id`.
+- **Current model output cannot be evaluated later.** The only feedback signal, `supervisor_override`, is written only on a FAIL override that can never occur.
+- **Floor calls can produce paid inference and orphaned DB rows.**
+
+> **This finding does not decide the outcome.** SNAP-DECISION-001 must choose **REPAIR LIFECYCLE** or **RETIRE CAPABILITY** on product value and field evidence. The severance makes the decision urgent; it does not make the answer "repair."
+
+---
+
+### A1.4 — Shared AI safety findings
+
+#### AI-SAFETY-001 — Bounded Gemini Transport
+
+**Evidence:** no Gemini path currently has an explicit timeout, an `AbortSignal`, a bounded upstream execution time, or a retry ceiling. Verified across the shared transport and all eight live routes.
+
+**This is not an AI reduction.** It is resilience / bounded failure behavior, and it caps worst-case exposure across all nine paths at one change site.
+
+#### Model output runtime validation
+
+`asGeminiSchema` is a TypeScript cast, not runtime validation. Deterministic normalizers currently provide the real enforcement in several paths — notably the walk-parse enum coercions and the snag-triage membership tests.
+
+> **Do not create a universal schema architecture without evidence.** Track only where material to authoritative consequences.
+
+#### Config drift
+
+`.env.example` and the code default refer to different Gemini model names.
+
+**Classification: TRUTH / CONFIGURATION DEBT.** Recorded, not changed.
+
+---
+
+### A1.5 — Approved AI reduction sequence
+
+Evidence-backed order. **Nothing here is started.**
+
+1. **AI-REDUCE-001** — Deterministic Shift Briefing
+2. **AI-REDUCE-002** — Deterministic Catalog Taxonomy
+3. **AI-RETIRE-001** — Retire Snag Triage
+4. **AI-SAFETY-001** — Bound Gemini Transport Failure
+5. **SNAP-DECISION-001** — Repair-or-Retire Snap Bay
+
+**This ordering is NOT absolute.** Truth/security defects may preempt it. **SNAP-DECISION-001 is not an implementation task** — it is a product/truth decision.
+
+**Deliberately excluded from the reduction sequence:** the two language copilots (capabilities 2 and 3) and Flooring Insights. They sit at legitimate unstructured-input boundaries, carry low or moderate exposure, and their deterministic fallbacks already prove the product survives without the model. Reducing them would trade real interpretation value for little cost relief.
+
+---
+
+### A1.6 — Long-term AI role
+
+> **Gemini earns a narrow role at unstructured-input boundaries where DeptSync cannot reasonably derive the same interpretation from structured evidence.**
+
+Currently earning or potentially earning that role:
+
+- free-text topology interpretation
+- natural-language task structuring
+- potentially image interpretation, **if** product value and lifecycle are proven
+
+Gemini should generally **NOT** be used for:
+
+- deterministic math
+- recurrence detection
+- rotation reasoning
+- labor balancing
+- attention signals
+- health metrics
+- static taxonomy generation
+- rewriting already-computed intelligence merely to sound more natural
+
+Optional human-readable explanation may still be appropriate where it earns its cost.
+
+**Goal of Workstream A (restated after discovery):** reduce paid AI dependency without reducing useful intelligence.
 
 ---
 
@@ -511,6 +613,10 @@ The label may therefore **overstate cache coverage while understating destructiv
 
 ### OIE-I1 / FLOORING-AI-001 — Flooring Insights AI Necessity
 
+**Status after GEMINI-001:** DISCOVERY PENDING / NOT STARTED. Disposition recorded as **OPTIONAL AI** (see A1.2).
+
+**Open question this item now owns:** should Gemini remain only an explanation layer, and should `recommended_percent` become deterministic or human-declared? GEMINI-001 verified that Gemini performs no measurement math and cannot invent a remnant, but `recommended_percent` is a model-originated number that reaches `carpet_remnants` when a supervisor applies it.
+
 Part of GEMINI-001. Separate the layers explicitly:
 
 - calculations / math (Layer 1)
@@ -610,6 +716,29 @@ Continue existing APP-ROT / APP-INT discipline: variance recurrence, follow-up r
 
 ---
 
+### 6.1 — No-cost intelligence finding (GEMINI-001)
+
+**Seven of eleven audited operational intelligence candidates already have deterministic engines:**
+
+- verification backlog
+- verification lag
+- bay freshness
+- current attention pressure
+- staging consideration
+- labor availability
+- appliance recurrence
+
+> **The absence of Gemini does not reduce these capabilities.**
+
+The remaining four have supporting data but **no engine**, and they remain **candidates only** — this finding does not approve them:
+
+- rework recurrence
+- service burden recurrence
+- restaging instability
+- manual intervention frequency
+
+---
+
 ## 7. Generative AI Decision Standard
 
 A reusable test. Answer all ten before **adding OR retaining** a Gemini call.
@@ -681,9 +810,10 @@ During an active physical audit, deliberately ad-hoc scan known units and confir
 
 | Phase | Contents | Status |
 |---|---|---|
-| **PHASE 0** — Program Foundation | OIE-000 canonical plan | **CURRENT** |
-| **PHASE 1** — Understand AI Cost / Necessity | GEMINI-001 | Next discovery |
-| **PHASE 2** — Recover Existing Operational Value | FLOOR-HIDDEN-001, HISTORY-001 | Order within phase may change from evidence |
+| **PHASE 0** — Program Foundation | OIE-000 canonical plan | Complete |
+| **PHASE 1** — Understand AI Cost / Necessity | **GEMINI-001 — DISCOVERY COMPLETE** | Dispositions recorded (A1.2) |
+| **PHASE 1A** — First approved AI reduction | **AI-REDUCE-001 — Deterministic Shift Briefing** | **RECOMMENDED NEXT IMPLEMENTATION — NOT STARTED** |
+| **PHASE 2** — Recover Existing Operational Value | FLOOR-HIDDEN-001, HISTORY-001 | **Still queued — priority unchanged**; order within phase may change from evidence |
 | **PHASE 3** — Repair Evidence Quality | Weekly-progress semantics, barrier vocabulary, any proven audit-linkage / data-integrity issue | — |
 | **PHASE 4** — Close Existing Loops | WALK-001 if field proven; historical decision read-back; spatial intelligence placement where earned | — |
 | **PHASE 5** — Admit Parked Intelligence | REC-001 review, LAB-001 review — **only after evidence / read-back prerequisites are healthy** | — |
@@ -696,6 +826,8 @@ During an active physical audit, deliberately ad-hoc scan known units and confir
 
 Two standing exceptions: a confirmed **security or truth** finding from Workstream J may preempt any phase; and UX-005 field acceptances (UX-005B, UX-005C) remain independently outstanding and are not blocked by this program.
 
+**Phase 1A note:** the program now has a low-risk AI reduction available before Phase 2. This does **not** demote FLOOR-HIDDEN-001 or HISTORY-001 — both retain their recorded priority, and HISTORY-001 remains a HIGH PRIORITY DISCOVERY. AI-REDUCE-001 is sequenced first only because it is isolated, evidence-complete, and carries no field dependency.
+
 ---
 
 ## 10. Work Item Status Table
@@ -705,7 +837,13 @@ Two standing exceptions: a confirmed **security or truth** finding from Workstre
 | ID | Work Item | Type | Evidence | Status | Dependencies | Field Gate | Implementation Status |
 |---|---|---|---|---|---|---|---|
 | **OIE-000** | Operational Intelligence Evolution Program | Program foundation | RA-001 | PROGRAM FOUNDATION COMPLETE | — | None (docs) | Documentation only |
-| **GEMINI-001** | Generative Cost & Necessity Audit | Discovery | RA-001 §9 | NEXT DISCOVERY TRANCHE — NOT STARTED | OIE-000 review | Some capabilities require field evidence | Not started |
+| **GEMINI-001** | Generative Cost & Necessity Audit | Discovery | RA-001 §9 | **DISCOVERY COMPLETE — DISPOSITIONS RECORDED** | OIE-000 | Snap Bay + Visual Bay Scan remain field-gated | Discovery only — no runtime change |
+| **AI-REDUCE-001** | Deterministic Shift Briefing | AI reduction | GEMINI-001 A1.2 — zero Gemini-only fields | **APPROVED NEXT IMPLEMENTATION CANDIDATE — NOT STARTED** | GEMINI-001 | None | Not started |
+| **AI-REDUCE-002** | Deterministic Catalog Taxonomy | AI reduction | GEMINI-001 A1.2 — static input, registry ships | **APPROVED REDUCTION CANDIDATE — NOT STARTED** | GEMINI-001 | None | Not started |
+| **AI-RETIRE-001** | Retire Orphaned Snag Triage | Retirement | GEMINI-001 A1.2 — zero invocation path | **APPROVED RETIREMENT CANDIDATE — NOT STARTED** | GEMINI-001 | None | Not started — do not wire, do not replace with new UI |
+| **AI-SAFETY-001** | Bound Gemini Transport Failure | Resilience | GEMINI-001 A1.4 — no timeout/abort/retry ceiling | **APPROVED SAFETY CANDIDATE — NOT STARTED** | — | None | Not started |
+| **AI-SAFETY-002** | Executive Floor Pad Model-Output Boundary | Safety / truth | GEMINI-001 A1.2 — autosave without confirm; unvalidated metadata | **QUEUED — NOT STARTED** | — | None | Not started |
+| **SNAP-DECISION-001** | Snap Bay Repair-or-Retire Decision | Product / truth decision | GEMINI-001 A1.3 — lifecycle SEVERED | **HIGH PRIORITY PRODUCT/TRUTH DECISION — NOT STARTED** | UX-005F evidence | **Yes — UX-005 Question #3** | Not started — outcome must be REPAIR LIFECYCLE *or* RETIRE CAPABILITY |
 | **FLOOR-HIDDEN-001** | Suppressed Floor tier product review | Discovery + product decision | RA-001 §3.1 | QUEUED | GEMINI-001 discovery | Yes — per-surface | Not started |
 | **HISTORY-001** | Bay history decision-surface discovery | Discovery | RA-001 §3.3 | HIGH PRIORITY DISCOVERY | — | FE-003 | Not started |
 | **WEEKLY-METRIC-001** | Weekly progress semantic integrity | Truth / semantics | RA-001 §6; Constitution App. A-1 | DISCOVERY NOT STARTED | Review with FLOOR-HIDDEN-001 | Yes | Not started |
@@ -718,8 +856,8 @@ Two standing exceptions: a confirmed **security or truth** finding from Workstre
 | **SYNC-UX-002** | Sync recovery product language | Naming / placement | RA-001 §4.10 | DEFERRED — FIELD EVIDENCE | APP-SYNC-UX-001 acceptance | Yes | Not started |
 | **RESILIENCE-001** | ChunkErrorBoundary wiring | Resilience | RA-001 §11 | RECORDED — NOT PRIORITISED | — | Yes | Not started; component orphaned |
 | **CACHE-SAFETY-001** | Clear Local Cache semantics | Safety / product truth | RA-001 §10 | RECORDED — AUDIT REQUIRED | Focused audit | Yes | Not started |
-| **SNAP-001** | Snap Bay lifecycle + product value | Integrity + product | RA-001 §5.2 | LIFECYCLE UNVERIFIED — RUNTIME CONFIRMATION REQUIRED | Runtime verification before any action | Yes | Not started; UX-005 Question #3 open |
-| **FLOORING-AI-001** | Flooring insights AI necessity | AI necessity | RA-001 §9 | PART OF GEMINI-001 | GEMINI-001 | Yes | Not started |
+| **SNAP-001** | Snap Bay lifecycle + product value | Integrity + product | RA-001 §5.2; **GEMINI-001 A1.3** | **LIFECYCLE VERIFIED SEVERED** — superseded for decision by SNAP-DECISION-001 | — | Yes | Not started; UX-005 Question #3 open |
+| **FLOORING-AI-001** | Flooring insights AI necessity | AI necessity | RA-001 §9; GEMINI-001 A1.2 | **DISCOVERY PENDING — NOT STARTED** (disposition OPTIONAL AI) | GEMINI-001 | Yes | Not started — open question is `recommended_percent` ownership |
 
 **Existing canonical IDs referenced but not owned by this program:** UX-005D, UX-005E, UX-005F (UX-005 backlog) · APP-CAT-001A, APP-CAT-001B, APP-ROT-001, APP-INT-001, APP-OBS-001, APP-AUD-002 (appliance roadmap) · SI-001, SI-002, CAP-001, FS-001A, FS-003 follow-ups (master roadmap).
 
@@ -742,6 +880,14 @@ Two standing exceptions: a confirmed **security or truth** finding from Workstre
 - **No productivity surveillance.**
 - **No universal risk score.**
 - **No new fifth bottom nav tab.**
+
+Added by GEMINI-001 (2026-09-08):
+
+- **No deterministic UI replacement for Snag Triage** — retire the job, do not rebuild it.
+- **No wiring of Snag Triage merely because its local fallback works.**
+- **No universal runtime schema-validation architecture for model output** without evidence that a specific path's authoritative consequence requires it.
+- **No Snap Bay repair before SNAP-DECISION-001** — the answer may be retirement.
+- **No AI reduction of the language copilots or Flooring Insights** — deliberately excluded from the reduction sequence (A1.5).
 
 Inherited prohibitions that remain in force: SI-002 ranking must not be revived · CAP-001 inferred bay capacity remains rejected · APP-CAT-001B bulk promotion remains deferred · the UX-005 do-not-touch guardrails remain active in full.
 

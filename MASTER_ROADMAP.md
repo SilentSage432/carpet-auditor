@@ -1,6 +1,8 @@
 # DeptSync Hub — Master Roadmap
 
 > **Operational Intelligence Evolution (canonical program map):** [`docs/product/OPERATIONAL_INTELLIGENCE_EVOLUTION_PLAN.md`](docs/product/OPERATIONAL_INTELLIGENCE_EVOLUTION_PLAN.md) — OIE-000 established from RA-001 archaeology. **Every future tranche in this program must read `DEPTSYNC_CONSTITUTION.md` and that plan before analysis or implementation.** Items recorded there are evidence-backed candidates, not approved work.
+>
+> **GEMINI-001 — DISCOVERY COMPLETE** (2026-09-08). Canonical AI disposition map recorded in that plan §5 Workstream A. Central finding: **DeptSync is almost entirely independent of Gemini for operational intelligence** — Gemini is used for input interpretation and prose, not for the deterministic intelligence stack. Snap Bay's persisting path is **verified lifecycle-SEVERED** (`SNAP-DECISION-001`, repair *or* retire — undecided). **AI-REDUCE-001 (Deterministic Shift Briefing) — NEXT IMPLEMENTATION CANDIDATE, NOT STARTED.** Also queued and not started: AI-REDUCE-002, AI-RETIRE-001, AI-SAFETY-001, AI-SAFETY-002, FLOORING-AI-001. No runtime, API, schema, or Gemini behavior has changed.
 
 > **Appliance specialty evolution (directional):** [`docs/product/APPLIANCE_EVOLUTION_ROADMAP.md`](docs/product/APPLIANCE_EVOLUTION_ROADMAP.md) — APP-ROT-001 consideration composer implemented; CAT-001A ESL field validation pending; CAT-001B deferred; later APP-INT-001. Do not leapfrog evidence foundations.
 

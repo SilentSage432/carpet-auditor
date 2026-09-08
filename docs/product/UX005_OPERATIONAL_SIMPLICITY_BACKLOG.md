@@ -19,9 +19,11 @@ Do not silently resolve, delete, or discard open questions during an early tranc
 | **UX-005C** | Floor secondary drawer | Implemented — Samsung acceptance pending |
 | **UX-005D** | Map operate vs investigate | Open — do not preempt |
 | **UX-005E** | Operational language | Open — do not preempt |
-| **UX-005F** | AI earn-your-place review | Open — do not preempt |
+| **UX-005F** | AI earn-your-place review | Open — do not preempt. **Repository-level evidence now supplied by GEMINI-001** (see below) |
 
 Do not preempt later tranches inside an earlier one.
+
+**GEMINI-001 coordination (2026-09-08).** The read-only GEMINI-001 audit recorded in [`OPERATIONAL_INTELLIGENCE_EVOLUTION_PLAN.md`](OPERATIONAL_INTELLIGENCE_EVOLUTION_PLAN.md) §5 Workstream A supplies **repository-level** evidence for UX-005F covering Snap Bay, the predictive/AI questions where applicable, and every remaining Gemini surface. It does **not** close UX-005F. UX-005F's own acceptance conditions require **field** evidence, and none has been produced. No field result has been invented or assumed.
 
 ---
 
@@ -31,11 +33,11 @@ Do not preempt later tranches inside an earlier one.
 |---|----------|-----------------|-----------|
 | 1 | Appliances under More vs elevated specialty entry | Do DS users find Floor entry instinctive? Still use More? Interfere with Floor? | **UX-005B implemented** (Floor contextual entry) — **not field-accepted yet**; More remains secondary path |
 | 2 | Dual Start Physical Audit CTAs | Are they always redundant in actual operation? | **Owned by UX-005A** — duplicate competing Start removed; single panel CTA |
-| 3 | Snap Bay multi-promotion + Gemini cost | Does it materially change real verification decisions? | **Not owned** — remains open (UX-005F). UX-005C demoted it to last in the Floor drawer without removing it or its Gemini path |
+| 3 | Snap Bay multi-promotion + Gemini cost | Does it materially change real verification decisions? | **Not owned** — remains open (UX-005F). UX-005C demoted it to last in the Floor drawer without removing it or its Gemini path. **GEMINI-001 sharpened this question:** Snap Bay is two capabilities, and the persisting Floor path's lifecycle is **verified SEVERED** — paid inference writes rows no surface can read, so accuracy is currently unevaluable. Decision ownership sits with **SNAP-DECISION-001** (repair *or* retire). Field evidence still required |
 | 4 | Walk & Talk vs Executive Floor Pad | Two genuine jobs or duplicate mental models? | **Not owned** — remains open (product). **UX-005C did not resolve it**: the two were not merged or renamed |
 | 5 | Velocity Heatmap | Used instead of or alongside Standard Map? | **Not owned** — remains open (UX-005D) |
 | 6 | Flooring cycle audit vs Floor Sunday | Different Flooring jobs or overlapping concepts? | **Not owned** — remains open (product); **UX-005B did not resolve** |
-| 7 | Predictive copilot | Recommendations acted on or routinely ignored? | **Not owned** — remains open (UX-005F) |
+| 7 | Predictive copilot | Recommendations acted on or routinely ignored? | **Not owned** — remains open (UX-005F). **GEMINI-001 narrowed the scope:** the Predictive Copilot surface is deterministic and has no Gemini dependency, so this is a product-value question, not an AI-cost question |
 | 8 | Appliance action bar | Needed in normal counting, or only reset/recovery? | **Partial UX-005A** — demoted under More appliance tools; behavior **not** removed |
 
 ---
