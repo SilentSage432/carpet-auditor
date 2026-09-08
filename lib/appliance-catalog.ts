@@ -471,6 +471,122 @@ export async function fetchApplianceCatalog(): Promise<ApplianceCatalogItem[]> {
   }
 }
 
+/**
+ * The server answered and rejected an appliance identity write (APP-CAT-001A-FIX-001).
+ *
+ * This is the contract that separates "received a server response" from "no server
+ * response". An application rejection must stay a visible failure and must never be
+ * queued as offline intent; only a network/no-response failure may queue.
+ * HTTP 409 keeps its richer ApplianceCatalogConflictError instead.
+ */
+export class ApplianceServerRejectionError extends Error {
+  httpStatus: number;
+
+  constructor(message: string, httpStatus: number) {
+    super(message);
+    this.name = "ApplianceServerRejectionError";
+    this.httpStatus = httpStatus;
+  }
+}
+
+/** Server rejected the identifier alias write. */
+export class ApplianceIdentifierHttpError extends ApplianceServerRejectionError {
+  constructor(message: string, httpStatus: number) {
+    super(message, httpStatus);
+    this.name = "ApplianceIdentifierHttpError";
+  }
+}
+
+/**
+ * Server rejected ensuring the canonical parent catalog item
+ * (APP-CAT-001A-FIX-001A). The identifier alias must not be attempted.
+ */
+export class ApplianceCatalogParentHttpError extends ApplianceServerRejectionError {
+  constructor(message: string, httpStatus: number) {
+    super(message, httpStatus);
+    this.name = "ApplianceCatalogParentHttpError";
+  }
+}
+
+export function isApplianceIdentifierHttpError(
+  err: unknown
+): err is ApplianceIdentifierHttpError {
+  return err instanceof ApplianceIdentifierHttpError;
+}
+
+/**
+ * Positive evidence that a catalog item is persisted server-side for its store.
+ *
+ * `offline` is truthful about what this device believed at write time, but it is not
+ * proof of server presence for `(store_number, item_number)` — the fail-closed
+ * store_number re-stamp (APP-FIELD-001) moved local rows into a new canonical store
+ * scope without re-persisting them. Treat this as a hint only; the authoritative
+ * check is the idempotent ensure-parent call.
+ */
+export function isApplianceCatalogItemLocalOnly(
+  item: Pick<ApplianceCatalogItem, "offline">
+): boolean {
+  return item.offline === true;
+}
+
+/**
+ * Ensure the canonical parent catalog item exists server-side (APP-CAT-001A-FIX-001A).
+ *
+ * `appliance_catalog_identifiers_item_fkey` references
+ * `appliance_catalog (store_number, item_number)`, so an alias written against an
+ * absent parent is rejected — as a 404 through the identifiers API, or as a raw
+ * foreign-key violation when a queued alias replays directly against the database.
+ *
+ * Idempotent: an existing server parent is left untouched. Exactly one explicitly
+ * chosen item is ensured — never bulk device-catalog promotion.
+ */
+async function ensureApplianceCatalogParentOnline(
+  item: ApplianceCatalogItem
+): Promise<{ created: boolean }> {
+  const authHeaders = await storeOpsAuthHeadersAsync();
+  const res = await fetch("/api/appliances/catalog/ensure", {
+    method: "POST",
+    headers: {
+      ...authHeaders,
+      "Content-Type": "application/json",
+      "x-store-number": item.store_number,
+    },
+    body: JSON.stringify({
+      id: item.id,
+      store_number: item.store_number,
+      item_number: item.item_number,
+      upc: item.upc,
+      description: item.description,
+      category: item.category,
+      sub_category: item.sub_category ?? "",
+    }),
+  });
+
+  const json = (await res.json().catch(() => ({}))) as {
+    created?: boolean;
+    error?: string;
+    conflict?: Record<string, unknown>;
+  };
+
+  if (res.status === 409) {
+    const conflictRow = json.conflict ? mapRow(json.conflict) : null;
+    throw new ApplianceCatalogConflictError(
+      json.error ||
+        `Item ${item.item_number} conflicts with an existing catalog item.`,
+      conflictRow ?? item
+    );
+  }
+  if (!res.ok) {
+    throw new ApplianceCatalogParentHttpError(
+      json.error ||
+        `Could not confirm Item ${item.item_number} in the store catalog (${res.status})`,
+      res.status
+    );
+  }
+
+  return { created: Boolean(json.created) };
+}
+
 async function persistIdentifierOnline(input: {
   store_number: string;
   item_number: string;
@@ -515,7 +631,10 @@ async function persistIdentifierOnline(input: {
     );
   }
   if (!res.ok) {
-    throw new Error(json.error || `Identifier save failed (${res.status})`);
+    throw new ApplianceIdentifierHttpError(
+      json.error || `Identifier save failed (${res.status})`,
+      res.status
+    );
   }
 }
 
@@ -550,8 +669,53 @@ export async function linkApplianceCatalogIdentifier(input: {
     identifier
   );
 
+  /**
+   * Queue the teaching intent in FK dependency order: the canonical parent catalog
+   * item must replay before its identifier alias, or the alias hits
+   * `appliance_catalog_identifiers_item_fkey` and quarantines.
+   */
+  const queueOfflineLink = (parentConfirmed: boolean) => {
+    const offlineRecord = { ...updated, offline: true, updated_at: now };
+    upsertLocal(offlineRecord);
+    if (!parentConfirmed) {
+      enqueueSyncAction(
+        "upsert_appliance_catalog",
+        catalogPayload({ ...input.item, store_number: store }),
+        store
+      );
+    }
+    enqueueSyncAction(
+      "upsert_appliance_catalog_identifier",
+      {
+        id,
+        store_number: store,
+        item_number: input.item.item_number,
+        identifier,
+        created_at: now,
+        updated_at: now,
+      },
+      store
+    );
+    return { record: offlineRecord, offline: true };
+  };
+
   if (isBrowserOnline()) {
-    let gotHttpResponse = false;
+    // Parent first: an alias against an absent parent is a guaranteed FK rejection.
+    // Only the network call may be classified as "no response" — a local write
+    // failure after the server accepted must never re-queue the same identifier.
+    try {
+      await ensureApplianceCatalogParentOnline({
+        ...input.item,
+        store_number: store,
+      });
+    } catch (err) {
+      // Server responded and rejected: keep it visible, never attempt the alias.
+      if (err instanceof ApplianceCatalogConflictError) throw err;
+      if (err instanceof ApplianceServerRejectionError) throw err;
+      // No server response — queue parent then alias.
+      return queueOfflineLink(false);
+    }
+
     try {
       await persistIdentifierOnline({
         id,
@@ -559,56 +723,30 @@ export async function linkApplianceCatalogIdentifier(input: {
         item_number: input.item.item_number,
         identifier,
       });
-      gotHttpResponse = true;
-      const existing = readAllLocal().filter(
-        (r) =>
-          !(
-            r.store_number === updated.store_number &&
-            (r.id === updated.id || r.item_number === updated.item_number)
-          )
-      );
-      writeAllLocal(
-        [...existing, { ...updated, offline: false }].sort((a, b) =>
-          a.item_number.localeCompare(b.item_number)
-        )
-      );
-      return { record: { ...updated, offline: false }, offline: false };
     } catch (err) {
+      // Server responded and rejected: keep it a visible failure, never queue.
       if (err instanceof ApplianceCatalogConflictError) throw err;
-      if (gotHttpResponse) throw err;
-      const offlineRecord = { ...updated, offline: true, updated_at: now };
-      upsertLocal(offlineRecord);
-      enqueueSyncAction(
-        "upsert_appliance_catalog_identifier",
-        {
-          id,
-          store_number: store,
-          item_number: input.item.item_number,
-          identifier,
-          created_at: now,
-          updated_at: now,
-        },
-        store
-      );
-      return { record: offlineRecord, offline: true };
+      if (err instanceof ApplianceServerRejectionError) throw err;
+      // No server response, but the parent is already persisted — queue the alias only.
+      return queueOfflineLink(true);
     }
+
+    const existing = readAllLocal().filter(
+      (r) =>
+        !(
+          r.store_number === updated.store_number &&
+          (r.id === updated.id || r.item_number === updated.item_number)
+        )
+    );
+    writeAllLocal(
+      [...existing, { ...updated, offline: false }].sort((a, b) =>
+        a.item_number.localeCompare(b.item_number)
+      )
+    );
+    return { record: { ...updated, offline: false }, offline: false };
   }
 
-  const offlineRecord = { ...updated, offline: true, updated_at: now };
-  upsertLocal(offlineRecord);
-  enqueueSyncAction(
-    "upsert_appliance_catalog_identifier",
-    {
-      id,
-      store_number: store,
-      item_number: input.item.item_number,
-      identifier,
-      created_at: now,
-      updated_at: now,
-    },
-    store
-  );
-  return { record: offlineRecord, offline: true };
+  return queueOfflineLink(false);
 }
 
 export async function saveApplianceCatalogItem(

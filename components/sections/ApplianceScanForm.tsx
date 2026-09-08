@@ -118,6 +118,14 @@ export function ApplianceScanForm({
   const [statusTone, setStatusTone] = useState<"ok" | "error">("ok");
   const [scanFlash, setScanFlash] = useState(false);
   const [quickAddBarcode, setQuickAddBarcode] = useState<string | null>(null);
+  /**
+   * APP-CAT-001A-FIX-001: a resolved canonical item whose classification is
+   * incomplete. Kept separate from quickAddBarcode so a recognised item is never
+   * re-presented as an unknown identifier.
+   */
+  const [classifyItem, setClassifyItem] = useState<ApplianceCatalogItem | null>(
+    null
+  );
   const [sessionTotal, setSessionTotal] = useState(0);
   const [draftRestored, setDraftRestored] = useState(false);
   /** Progressive disclosure — wedge field stays mounted; UI expands on demand. */
@@ -137,6 +145,9 @@ export function ApplianceScanForm({
   locationRef.current = location;
   locationTypeRef.current = locationType;
   teachBusyRef.current = teachBusy;
+
+  /** Any teach/classify dialog is open — continuous scanning must stay paused. */
+  const teachModalOpen = quickAddBarcode != null || classifyItem != null;
 
   const locationSuggestions = useMemo(() => {
     return [
@@ -215,7 +226,7 @@ export function ApplianceScanForm({
     if (!focusOnMount || !scannerEnabled) return;
     // Keep wedge target focused even when visually quiet.
     window.setTimeout(() => itemInputRef.current?.focus(), 50);
-  }, [focusOnMount, scannerEnabled, quickAddBarcode, manualEntry]);
+  }, [focusOnMount, scannerEnabled, teachModalOpen, manualEntry]);
 
   const resolvedAuditSessionId = ignoreCachedAuditSession
     ? auditSessionId
@@ -264,8 +275,9 @@ export function ApplianceScanForm({
   const commitScan = useCallback(
     async (item: ApplianceCatalogItem) => {
       if (!isValidApplianceSubCategory(item.category, item.sub_category)) {
-        setQuickAddBarcode(item.upc || item.item_number);
-        flashStatus("Select a sub-category to finish linking");
+        // Identity already resolved — ask only for the missing classification.
+        setClassifyItem(item);
+        flashStatus(`Item ${item.item_number} needs a sub-category`);
         return;
       }
 
@@ -387,7 +399,7 @@ export function ApplianceScanForm({
       const cleaned = sanitizeBarcodeScan(raw);
       if (!cleaned) return;
       if (teachBusyRef.current) return;
-      if (quickAddBarcode != null) return;
+      if (teachModalOpen) return;
 
       setItemNumber(cleaned);
       const resolution: ApplianceScanResolution = resolveApplianceScan(
@@ -401,8 +413,9 @@ export function ApplianceScanForm({
         setDescription(item.description);
 
         if (!isValidApplianceSubCategory(item.category, item.sub_category)) {
-          setQuickAddBarcode(item.upc || item.item_number);
-          flashStatus("Sub-category required — complete the link");
+          // Recognised scan — complete classification, do not re-teach identity.
+          setClassifyItem(item);
+          flashStatus(`Item ${item.item_number} needs a sub-category`);
           return;
         }
 
@@ -422,10 +435,10 @@ export function ApplianceScanForm({
       setQuickAddBarcode(resolution.scanned);
       flashStatus("Unknown item — teach mapping to continue");
     },
-    [catalog, commitScan, flashStatus, quickAddBarcode]
+    [catalog, commitScan, flashStatus, teachModalOpen]
   );
 
-  useGlobalBarcodeScanner(handleItemLookup, scannerEnabled && quickAddBarcode == null);
+  useGlobalBarcodeScanner(handleItemLookup, scannerEnabled && !teachModalOpen);
 
   async function handleQuickAdded(item: ApplianceCatalogItem) {
     const next = [
@@ -436,6 +449,7 @@ export function ApplianceScanForm({
     ].sort((a, b) => a.item_number.localeCompare(b.item_number));
     onCatalogChange(next);
     setQuickAddBarcode(null);
+    setClassifyItem(null);
     setTeachBusy(true);
     try {
       // Logs the physical unit once — do not require a second scan of the tag.
@@ -447,6 +461,7 @@ export function ApplianceScanForm({
 
   function closeQuickAdd() {
     setQuickAddBarcode(null);
+    setClassifyItem(null);
     clearForNextScan();
   }
 
@@ -458,9 +473,10 @@ export function ApplianceScanForm({
   return (
     <>
       <QuickAddApplianceModal
-        open={quickAddBarcode != null}
+        open={teachModalOpen}
         scannedBarcode={quickAddBarcode ?? ""}
         catalog={catalog}
+        classifyItem={classifyItem}
         onClose={closeQuickAdd}
         onSaved={(item) => void handleQuickAdded(item)}
       />

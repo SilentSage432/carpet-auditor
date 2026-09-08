@@ -245,6 +245,22 @@ export function ApplianceAuditSection({
     setScannerOpen(true);
   }, []);
 
+  /**
+   * APP-CAT-001A-FIX-001: the physical-audit panel keys data loading off callback
+   * identity, so these must be stable. Inline arrows here previously re-triggered
+   * audit GETs on every render of this section.
+   */
+  const handleContinueScanning = useCallback(() => {
+    void openScannerWithActiveAudit();
+  }, [openScannerWithActiveAudit]);
+
+  const handleAuditStarted = useCallback((session: ApplianceAuditSession) => {
+    setActiveAudit(session);
+    setScannerAuditMode("audit");
+    setBayLocation(null);
+    setScannerOpen(true);
+  }, []);
+
   const handleLogged = useCallback(
     (record: ApplianceScan, _offline: boolean) => {
       setScans((prev) => [record, ...prev.filter((s) => s.id !== record.id)]);
@@ -380,15 +396,10 @@ export function ApplianceAuditSection({
     >
       <AppliancePhysicalAuditPanel
         onActiveSessionChange={setActiveAudit}
-        onStatus={(msg, tone = "ok") => flashStatus(msg, tone)}
+        onStatus={flashStatus}
         reviewFinishToken={reviewFinishToken}
-        onContinueScanning={() => void openScannerWithActiveAudit()}
-        onStarted={(session) => {
-          setActiveAudit(session);
-          setScannerAuditMode("audit");
-          setBayLocation(null);
-          setScannerOpen(true);
-        }}
+        onContinueScanning={handleContinueScanning}
+        onStarted={handleAuditStarted}
       />
 
       {statusMsg ? (

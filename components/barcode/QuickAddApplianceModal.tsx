@@ -27,20 +27,29 @@ type Props = {
   scannedBarcode: string;
   /** Current store catalog — used for conflict checks and link search. */
   catalog?: ApplianceCatalogItem[];
+  /**
+   * APP-CAT-001A-FIX-001: a canonical item that already resolved but cannot finish a
+   * physical scan because its classification is incomplete. Presence switches this
+   * modal into classification-only mode — the item's identity is never re-taught and
+   * never treated as an unknown identifier.
+   */
+  classifyItem?: ApplianceCatalogItem | null;
   onClose: () => void;
   onSaved: (item: ApplianceCatalogItem) => void;
 };
 
-type TeachMode = "choose" | "link" | "create";
+type TeachMode = "choose" | "link" | "create" | "classify";
 
 /**
  * Pause continuous scan for NEW / unlinked identifiers (APP-CAT-001A).
  * Link to existing item (no metadata re-entry) OR create new canonical item.
+ * Also completes classification for an already-resolved item (APP-CAT-001A-FIX-001).
  */
 export function QuickAddApplianceModal({
   open,
   scannedBarcode,
   catalog = [],
+  classifyItem = null,
   onClose,
   onSaved,
 }: Props) {
@@ -49,6 +58,10 @@ export function QuickAddApplianceModal({
     sanitizeBarcodeScan(scannedBarcode);
   /** Longer codes are alternate identifiers; short may be typed item #. */
   const isLongIdentifier = cleaned.length >= 8;
+  /** Stable key — avoids re-seeding the form on unrelated object churn. */
+  const classifyKey = classifyItem
+    ? `${classifyItem.id}:${classifyItem.item_number}`
+    : "";
 
   const [mode, setMode] = useState<TeachMode>("choose");
   const [linkQuery, setLinkQuery] = useState("");
@@ -61,16 +74,37 @@ export function QuickAddApplianceModal({
 
   useEffect(() => {
     if (!open) return;
-    setMode(catalog.length > 0 ? "choose" : "create");
     setLinkQuery("");
+    setError(null);
+    setSaving(false);
+
+    if (classifyItem) {
+      // Identity is already settled — collect only the missing classification.
+      // No unknown-identifier prompt: this was a recognised item, not a new scan.
+      setMode("classify");
+      setItemNumber(classifyItem.item_number);
+      setDescription(classifyItem.description);
+      setCategory(normalizeApplianceCategory(classifyItem.category));
+      setSubCategory(
+        isValidApplianceSubCategory(
+          classifyItem.category,
+          classifyItem.sub_category
+        )
+          ? String(classifyItem.sub_category ?? "")
+          : ""
+      );
+      return;
+    }
+
+    setMode(catalog.length > 0 ? "choose" : "create");
     setItemNumber(isLongIdentifier ? "" : cleaned);
     setDescription("");
     setCategory("Laundry");
     setSubCategory("");
-    setError(null);
-    setSaving(false);
     playQuickAddPrompt();
-  }, [open, cleaned, isLongIdentifier, catalog.length]);
+    // classifyKey stands in for classifyItem identity.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, cleaned, isLongIdentifier, catalog.length, classifyKey]);
 
   const linkHits = useMemo(() => {
     const filtered = filterApplianceCatalog(catalog, linkQuery).slice(0, 8);
@@ -114,6 +148,55 @@ export function QuickAddApplianceModal({
       } else {
         setError(
           err instanceof Error ? err.message : "Could not link identifier"
+        );
+      }
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  /**
+   * APP-CAT-001A-FIX-001: finish an already-resolved item's classification so the
+   * physical scan can complete. Reuses the canonical catalog path with the item's
+   * existing id / item # / description / legacy upc, so no new ownership is created
+   * and the alias just taught is preserved.
+   */
+  async function handleCompleteClassification() {
+    if (!classifyItem) return;
+    if (!isValidApplianceSubCategory(category, subCategory)) {
+      setError("Select a sub-category to finish this count");
+      return;
+    }
+
+    setSaving(true);
+    setError(null);
+    try {
+      const { record } = await saveApplianceCatalogItem({
+        id: classifyItem.id,
+        item_number: classifyItem.item_number,
+        description: classifyItem.description,
+        upc: classifyItem.upc,
+        category,
+        sub_category: subCategory.trim(),
+      });
+      // Classification must not drop identifiers already taught for this item.
+      const identifiers = listApplianceTaughtIdentifiers({
+        item_number: record.item_number,
+        upc: record.upc,
+        identifiers: [
+          ...(record.identifiers ?? []),
+          ...listApplianceTaughtIdentifiers(classifyItem),
+        ],
+      });
+      onSaved({ ...record, identifiers });
+    } catch (err) {
+      if (err instanceof ApplianceCatalogConflictError) {
+        setError(err.message);
+      } else {
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Could not save classification"
         );
       }
     } finally {
@@ -201,22 +284,65 @@ export function QuickAddApplianceModal({
           id="quick-add-appliance-title"
           className="text-lg font-bold text-white"
         >
-          {mode === "link"
-            ? "Link to existing item"
-            : mode === "create"
-              ? "Create new item"
-              : "Unknown identifier"}
+          {mode === "classify"
+            ? "Finish item classification"
+            : mode === "link"
+              ? "Link to existing item"
+              : mode === "create"
+                ? "Create new item"
+                : "Unknown identifier"}
         </h2>
         <p className="mt-1 text-sm text-zinc-400">
-          {mode === "choose"
-            ? "Teach once — link to an item you already know, or create a new mapping."
-            : mode === "link"
-              ? "Reuse existing description and category. No metadata re-entry."
-              : "Enter Lowe's item details once — later scans stay quiet."}
+          {mode === "classify"
+            ? "This item is already known. Pick its sub-category once to finish the count."
+            : mode === "choose"
+              ? "Teach once — link to an item you already know, or create a new mapping."
+              : mode === "link"
+                ? "Reuse existing description and category. No metadata re-entry."
+                : "Enter Lowe's item details once — later scans stay quiet."}
         </p>
-        <p className="mt-3 rounded-xl border border-amber-500/30 bg-amber-950/30 px-3 py-2 font-mono text-sm font-semibold text-amber-200">
-          Scanned {cleaned || "—"}
-        </p>
+        {mode === "classify" && classifyItem ? (
+          <div
+            className="mt-3 rounded-xl border border-sky-500/30 bg-sky-950/30 px-3 py-2"
+            data-testid="quick-add-classify-item"
+          >
+            <p className="font-mono text-sm font-bold text-sky-100">
+              Item {classifyItem.item_number}
+            </p>
+            <p className="truncate text-sm text-sky-200/80">
+              {classifyItem.description}
+            </p>
+          </div>
+        ) : (
+          <p className="mt-3 rounded-xl border border-amber-500/30 bg-amber-950/30 px-3 py-2 font-mono text-sm font-semibold text-amber-200">
+            Scanned {cleaned || "—"}
+          </p>
+        )}
+
+        {mode === "classify" && classifyItem ? (
+          <div className="mt-4 space-y-3">
+            <ApplianceCategoryFields
+              category={normalizeApplianceCategory(category)}
+              subCategory={subCategory}
+              onCategoryChange={(next) => {
+                setCategory(next);
+                setSubCategory("");
+              }}
+              onSubCategoryChange={setSubCategory}
+            />
+            <button
+              type="button"
+              data-testid="quick-add-classify-submit"
+              disabled={
+                saving || !isValidApplianceSubCategory(category, subCategory)
+              }
+              onClick={() => void handleCompleteClassification()}
+              className="mt-2 flex min-h-12 w-full items-center justify-center btn-primary-glow rounded-xl text-sm disabled:opacity-40"
+            >
+              {saving ? "Saving…" : "Save classification & log scan"}
+            </button>
+          </div>
+        ) : null}
 
         {mode === "choose" ? (
           <div className="mt-4 space-y-2">

@@ -6,7 +6,7 @@
  * CLOSED ≠ reconciliation complete. Export does not mutate lifecycle.
  */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { HubPortal } from "@/components/hub/HubPortal";
 import { ApplianceAuditConsiderationList } from "@/components/appliances/ApplianceAuditConsiderationList";
 import { NumberField, TextField } from "@/components/ui/NumberField";
@@ -23,6 +23,7 @@ import type { ApplianceAuditConsiderationItem } from "@/lib/appliances/audit-con
 import {
   APPLIANCE_RECENT_CLOSED_AUDIT_LIMIT,
   applianceAuditReconciliationToCsv,
+  applianceAuditSessionSignal,
   composeApplianceReconciliationProgress,
   deriveApplianceVariance,
   formatAppliancePhysicalAuditStatus,
@@ -121,6 +122,38 @@ export function AppliancePhysicalAuditPanel({
   const [considerationLoading, setConsiderationLoading] = useState(true);
   const [considerationExpanded, setConsiderationExpanded] = useState(false);
 
+  /**
+   * APP-CAT-001A-FIX-001: callback props arrive as fresh identities on every parent
+   * render. Reading them through refs keeps `refresh` stable so one mount performs
+   * one load instead of re-firing audit GETs on every parent render.
+   */
+  const onStatusRef = useRef(onStatus);
+  const onActiveSessionChangeRef = useRef(onActiveSessionChange);
+  // Seeded to "no active session" — matching this panel's initial `active` state,
+  // so an idle load is not published as a transition.
+  const activeSignalRef = useRef(applianceAuditSessionSignal(null));
+
+  // Declared before the load effect so the refs are current before refresh runs.
+  useEffect(() => {
+    onStatusRef.current = onStatus;
+    onActiveSessionChangeRef.current = onActiveSessionChange;
+  }, [onStatus, onActiveSessionChange]);
+
+  /**
+   * Publish the active session upward only when its semantic identity changed.
+   * Guards against re-parsed session objects re-rendering the parent forever while
+   * still propagating null → ACTIVE, ACTIVE A → ACTIVE B, and ACTIVE → null.
+   */
+  const publishActiveSession = useCallback(
+    (session: ApplianceAuditSession | null) => {
+      const signal = applianceAuditSessionSignal(session);
+      if (activeSignalRef.current === signal) return;
+      activeSignalRef.current = signal;
+      onActiveSessionChangeRef.current(session);
+    },
+    []
+  );
+
   const refreshPending = useCallback(() => {
     if (!active) {
       setPendingAuditScans(0);
@@ -187,7 +220,7 @@ export function AppliancePhysicalAuditPanel({
       ]);
       const current = activeRows[0] ?? null;
       setActive(current);
-      onActiveSessionChange(current);
+      publishActiveSession(current);
       const closed = all
         .filter((s) => s.status === "CLOSED")
         .sort((a, b) =>
@@ -198,12 +231,12 @@ export function AppliancePhysicalAuditPanel({
       setClosedSessions(closed);
       await Promise.all([loadRecentCards(closed), loadConsiderations()]);
     } catch (err) {
-      onStatus(
+      onStatusRef.current(
         err instanceof Error ? err.message : "Could not load physical audits",
         "error"
       );
     }
-  }, [loadConsiderations, loadRecentCards, onActiveSessionChange, onStatus]);
+  }, [loadConsiderations, loadRecentCards, publishActiveSession]);
 
   useEffect(() => {
     void refresh();
@@ -226,25 +259,25 @@ export function AppliancePhysicalAuditPanel({
     const sessions = await fetchApplianceAuditSessions({ status: "ACTIVE" });
     const current = sessions[0];
     if (!current) {
-      onStatus("No active physical audit to review", "error");
+      onStatusRef.current("No active physical audit to review", "error");
       return;
     }
     setActive(current);
-    onActiveSessionChange(current);
+    publishActiveSession(current);
     try {
       const loaded = await fetchApplianceAuditDetail(current.id);
       setDetail(loaded);
       setDrafts(seedDrafts(loaded.physical_items, loaded.snapshots));
       setDetailOpen(true);
       setReconOpen(false);
-      onStatus("Review observed units — then Close physical count");
+      onStatusRef.current("Review observed units — then Close physical count");
     } catch (err) {
-      onStatus(
+      onStatusRef.current(
         err instanceof Error ? err.message : "Could not open audit review",
         "error"
       );
     }
-  }, [onActiveSessionChange, onStatus, refresh]);
+  }, [publishActiveSession, refresh]);
 
   useEffect(() => {
     if (!reviewFinishToken) return;
@@ -275,7 +308,7 @@ export function AppliancePhysicalAuditPanel({
     try {
       const { session } = await startAppliancePhysicalAudit();
       setActive(session);
-      onActiveSessionChange(session);
+      publishActiveSession(session);
       setHighlightClosedId(null);
       onStatus("Physical audit active — scans join this count");
       onStarted?.(session);
@@ -296,7 +329,7 @@ export function AppliancePhysicalAuditPanel({
     try {
       const closed = await closeAppliancePhysicalAudit(active.id);
       setActive(null);
-      onActiveSessionChange(null);
+      publishActiveSession(null);
       setHighlightClosedId(closed.id);
       onStatus(
         "Physical count closed — evidence frozen. Reconcile Lowe's OH when ready."

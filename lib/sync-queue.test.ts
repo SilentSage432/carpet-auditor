@@ -248,6 +248,122 @@ describe("sync-queue quarantine", () => {
   });
 });
 
+describe("sync-queue replay order (APP-CAT-001A-FIX-001A)", () => {
+  /**
+   * An identifier alias depends on its canonical parent catalog row
+   * (`appliance_catalog_identifiers_item_fkey`), so a flush must never reorder the
+   * alias ahead of the parent. Grouping outcomes as [deferred, failed] used to do
+   * exactly that when the parent failed transiently and the alias was still backing
+   * off.
+   */
+  function seedParentThenAlias(): void {
+    const base = {
+      transaction_id: "txn-parent-first",
+      created_at: "2026-09-07T12:00:00.000Z",
+      optimistic_at: "2026-09-07T12:00:00.000Z",
+      base_updated_at: null,
+      attempts: 0,
+      last_error: null,
+      force_overwrite: false,
+      status: "pending" as const,
+      quarantined_at: null,
+      failure_reason: null,
+      store_number: STORE,
+    };
+    localStorage.setItem(
+      SYNC_QUEUE_KEY,
+      JSON.stringify([
+        {
+          ...base,
+          id: "sync-parent",
+          next_retry_at: null,
+          type: "upsert_appliance_catalog",
+          payload: {
+            id: "item-1",
+            store_number: STORE,
+            item_number: "1234567",
+            upc: "012345678905",
+            description: "Whirlpool Front Load Washer",
+            category: "Laundry",
+            sub_category: "Washer",
+            created_at: "2026-09-06T00:00:00.000Z",
+            updated_at: "2026-09-06T00:00:00.000Z",
+          },
+        },
+        {
+          ...base,
+          id: "sync-alias",
+          // Still backing off — deferred without being attempted this flush.
+          next_retry_at: new Date(Date.now() + 60_000).toISOString(),
+          type: "upsert_appliance_catalog_identifier",
+          payload: {
+            id: "item-1",
+            store_number: STORE,
+            item_number: "1234567",
+            identifier: "ESL9988776655",
+          },
+        },
+      ])
+    );
+  }
+
+  it("keeps the canonical parent ahead of its identifier alias", async () => {
+    seedParentThenAlias();
+    mockUpsert.mockResolvedValue({
+      error: { status: 503, message: "Service Unavailable" },
+    });
+
+    await flushSyncQueue(STORE);
+
+    const queue = getPendingSync(STORE);
+    expect(queue.map((a) => a.id)).toEqual(["sync-parent", "sync-alias"]);
+  });
+
+  it("still drops actions that replayed successfully", async () => {
+    seedParentThenAlias();
+    mockUpsert.mockResolvedValue({ error: null });
+
+    const synced = await flushSyncQueue(STORE);
+
+    expect(synced).toBe(1);
+    expect(getPendingSync(STORE).map((a) => a.id)).toEqual(["sync-alias"]);
+  });
+
+  it("retains held quarantined actions without reordering the queue", async () => {
+    seedParentThenAlias();
+    const queue = JSON.parse(
+      String(localStorage.getItem(SYNC_QUEUE_KEY))
+    ) as SyncAction[];
+    queue.unshift({
+      ...queue[0],
+      id: "sync-held",
+      status: "quarantined",
+      quarantined_at: "2026-09-07T11:00:00.000Z",
+      failure_reason: "unknown",
+      last_error:
+        "insert or update on table appliance_catalog_identifiers violates foreign key constraint appliance_catalog_identifiers_item_fkey",
+      type: "upsert_appliance_catalog_identifier",
+    });
+    localStorage.setItem(SYNC_QUEUE_KEY, JSON.stringify(queue));
+    mockUpsert.mockResolvedValue({
+      error: { status: 503, message: "Service Unavailable" },
+    });
+
+    await flushSyncQueue(STORE);
+
+    const all = JSON.parse(
+      String(localStorage.getItem(SYNC_QUEUE_KEY))
+    ) as SyncAction[];
+    expect(all.map((a) => a.id)).toEqual([
+      "sync-held",
+      "sync-parent",
+      "sync-alias",
+    ]);
+    // Preserved field evidence is never auto-retried or discarded by a flush.
+    expect(countQuarantinedSync(STORE)).toBe(1);
+  });
+});
+
 describe("enqueueSyncAction", () => {
   it("defaults new actions to pending status", () => {
     const action = enqueueSyncAction("upsert_audit", auditPayload(), STORE);

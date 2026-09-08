@@ -246,6 +246,15 @@ export function SettingsSection({
       } else if (hash === "taxonomies") {
         setOpenSection("taxonomies");
         setTaxonomyOpen(true);
+      } else if (hash === "sync-queue") {
+        // APP-SYNC-UX-001: attention banner deep-links straight to the queue.
+        setOpenSection("device");
+        window.setTimeout(() => {
+          document.getElementById("sync-queue")?.scrollIntoView({
+            behavior: "smooth",
+            block: "start",
+          });
+        }, 50);
       } else if (hash === "remnants") {
         setOpenSection("remnants");
       } else if (hash === "remnants-calculator") {
@@ -575,6 +584,7 @@ export function SettingsSection({
         )}
 
         <Accordion
+          id="sync-queue"
           title="Device & sync"
           subtitle={
             syncSummary.quarantined > 0

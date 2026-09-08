@@ -16,6 +16,11 @@ import { uid } from "./uid";
 export const SYNC_QUEUE_KEY = "carpet_hub_sync_queue";
 /** Dispatched whenever the local queue is rewritten — header / Settings must listen. */
 export const SYNC_QUEUE_CHANGED_EVENT = "carpet-sync-queue-changed";
+/**
+ * Canonical destination for inspecting blocked sync operations (APP-SYNC-UX-001).
+ * There is exactly one sync-management surface — SyncQueuePanel in Settings.
+ */
+export const SYNC_QUEUE_INSPECT_HREF = "/settings#sync-queue";
 
 export type SyncActionType =
   | "upsert_audit"
@@ -42,6 +47,12 @@ export type SyncActionStatus = "pending" | "quarantined";
 export type SyncFailureReason =
   | "deterministic_4xx"
   | "max_retries_exceeded"
+  /**
+   * A taught appliance identifier replayed against a store that has no canonical
+   * parent catalog item (APP-CAT-001A-FIX-001B). Proven, not unknown: recovery is
+   * to add the item intentionally, then Retry.
+   */
+  | "blocked_missing_parent"
   | "unknown";
 
 export type SyncAction = {
@@ -135,6 +146,7 @@ function normalizeFailureReason(raw: unknown): SyncFailureReason | null {
   if (
     raw === "deterministic_4xx" ||
     raw === "max_retries_exceeded" ||
+    raw === "blocked_missing_parent" ||
     raw === "unknown"
   ) {
     return raw;
@@ -420,10 +432,53 @@ function quarantineAction(
   };
 }
 
+/** FK guarding appliance_catalog_identifiers → appliance_catalog. */
+const APPLIANCE_IDENTIFIER_PARENT_CONSTRAINT =
+  "appliance_catalog_identifiers_item_fkey";
+const PG_FOREIGN_KEY_VIOLATION = "23503";
+
+/**
+ * The proven canonical-parent gap (APP-CAT-001A-FIX-001B).
+ *
+ * Decided by the constraint name — from a structured `constraint` field when the
+ * driver supplies one, otherwise from message/details — and corroborated by
+ * Postgres 23503 whenever a code is present. Scoped to the identifier action, so an
+ * unrelated foreign-key failure is never reported to a DS as "add this appliance
+ * item". Replay does not create the parent; recovery stays intentional.
+ */
+function isApplianceParentMissingFailure(
+  action: SyncAction,
+  err: unknown
+): boolean {
+  if (action.type !== "upsert_appliance_catalog_identifier") return false;
+  if (isSyncConflictError(err)) return false;
+  if (!err || typeof err !== "object") return false;
+
+  const row = err as {
+    code?: unknown;
+    constraint?: unknown;
+    message?: unknown;
+    details?: unknown;
+  };
+
+  const code = String(row.code ?? "").trim();
+  if (code && code !== PG_FOREIGN_KEY_VIOLATION) return false;
+
+  const constraint = String(row.constraint ?? "").trim();
+  if (constraint) return constraint === APPLIANCE_IDENTIFIER_PARENT_CONSTRAINT;
+
+  const text = `${String(row.message ?? "")} ${String(row.details ?? "")}`;
+  return text.includes(APPLIANCE_IDENTIFIER_PARENT_CONSTRAINT);
+}
+
 function handleReplayFailure(
   action: SyncAction,
   err: unknown
 ): SyncAction {
+  if (isApplianceParentMissingFailure(action, err)) {
+    return quarantineAction(action, err, "blocked_missing_parent");
+  }
+
   if (isDeterministicNonTransientError(err)) {
     return quarantineAction(action, err, classifyFailureReason(err));
   }
@@ -1017,7 +1072,6 @@ export async function flushSyncQueue(
     const now = Date.now();
     const otherStores = snapshot.filter((a) => a.store_number !== storeNumber);
     const forStore = snapshot.filter((a) => a.store_number === storeNumber);
-    const heldQuarantined = forStore.filter((a) => a.status === "quarantined");
     const pending = forStore.filter(isPendingAction);
 
     if (pending.length === 0) {
@@ -1102,13 +1156,31 @@ export async function flushSyncQueue(
       }
     }
 
-    writeQueue([
-      ...otherStores,
-      ...heldQuarantined,
-      ...newlyQuarantined,
-      ...deferred,
-      ...failed,
-    ]);
+    /**
+     * Rewrite the store's queue in its original enqueue order
+     * (APP-CAT-001A-FIX-001A).
+     *
+     * Grouping outcomes as [quarantined, deferred, failed] could move an identifier
+     * alias ahead of the canonical parent catalog write it depends on, so the next
+     * flush would hit `appliance_catalog_identifiers_item_fkey`. Replay order is a
+     * correctness property, not a presentation detail.
+     */
+    const outcomeById = new Map<string, SyncAction>();
+    for (const outcome of [...newlyQuarantined, ...deferred, ...failed]) {
+      outcomeById.set(outcome.id, outcome);
+    }
+    const retainedForStore: SyncAction[] = [];
+    for (const action of forStore) {
+      const outcome = outcomeById.get(action.id);
+      if (outcome) {
+        retainedForStore.push(outcome);
+        continue;
+      }
+      // Held quarantined actions stay; replayed and server-accepted ones drop.
+      if (action.status === "quarantined") retainedForStore.push(action);
+    }
+
+    writeQueue([...otherStores, ...retainedForStore]);
     scheduleRetryFlush([...deferred, ...failed]);
 
     if (failed.length === 0 && deferred.length === 0) {

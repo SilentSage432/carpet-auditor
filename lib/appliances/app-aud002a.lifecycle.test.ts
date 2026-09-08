@@ -179,7 +179,8 @@ describe("APP-AUD-002A UI contracts", () => {
 
   it("Start Physical Audit remains on home after close path", () => {
     expect(panel).toContain("setActive(null)");
-    expect(panel).toContain("onActiveSessionChange(null)");
+    // APP-CAT-001A-FIX-001 routes the write-back through the guarded publisher.
+    expect(panel).toContain("publishActiveSession(null)");
     expect(panel).toContain("Start Physical Audit");
     expect(section).toContain("AppliancePhysicalAuditPanel");
   });

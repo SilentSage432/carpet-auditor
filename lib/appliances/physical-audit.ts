@@ -421,6 +421,21 @@ export function formatApplianceReconciliationPhase(
   return "Awaiting reconciliation";
 }
 
+/**
+ * Stable semantic identity for the active-audit subscription (APP-CAT-001A-FIX-001).
+ *
+ * Sessions re-parsed from the API are never reference-equal, so presentation must
+ * compare this signal before writing an active session back to a parent. Status is
+ * part of the signal so an ACTIVE → CLOSED transition on the same id still
+ * propagates.
+ */
+export function applianceAuditSessionSignal(
+  session: Pick<ApplianceAuditSession, "id" | "status"> | null | undefined
+): string {
+  if (!session) return "none";
+  return `${session.id}:${session.status}`;
+}
+
 /** Human label for session status — CLOSED ≠ lifecycle complete. */
 export function formatAppliancePhysicalAuditStatus(
   status: ApplianceAuditStatus

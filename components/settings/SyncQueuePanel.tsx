@@ -16,7 +16,9 @@ import {
 import { useSyncQueueSummary } from "@/lib/network";
 import { isMasterAdmin, isDepartmentSupervisor } from "@/lib/rbac";
 import {
+  syncActionBlockedExplanation,
   syncActionLabel,
+  syncActionSubject,
   syncFailureReasonLabel,
 } from "@/lib/sync-conflict";
 import { getStoreNumber } from "@/lib/store";
@@ -73,6 +75,8 @@ function SyncActionRow({
 }) {
   const quarantined = action.status === "quarantined";
   const attempts = action.attempts ?? 0;
+  const subject = syncActionSubject(action);
+  const blockedExplanation = syncActionBlockedExplanation(action);
 
   return (
     <li className="rounded-xl border border-slate-800 bg-slate-950/80 p-3">
@@ -96,9 +100,29 @@ function SyncActionRow({
         </p>
       </div>
 
+      {subject.length > 0 ? (
+        <dl
+          className="mt-2 space-y-0.5"
+          data-testid="sync-action-subject"
+        >
+          {subject.map((field) => (
+            <div key={field.label} className="flex flex-wrap gap-x-1.5 text-xs">
+              <dt className="text-slate-500">{field.label}</dt>
+              <dd className="min-w-0 break-words font-medium text-slate-200">
+                {field.value}
+              </dd>
+            </div>
+          ))}
+        </dl>
+      ) : null}
+
       {quarantined && action.failure_reason ? (
-        <p className="mt-2 text-xs text-amber-200/90">
-          {syncFailureReasonLabel(action.failure_reason)}
+        <p
+          className="mt-2 text-xs text-amber-200/90"
+          data-testid="sync-action-blocked-reason"
+        >
+          {blockedExplanation ??
+            syncFailureReasonLabel(action.failure_reason)}
         </p>
       ) : null}
 

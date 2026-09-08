@@ -1,5 +1,163 @@
 # DeptSync Hub — Development Journal
 
+## 2026-09-07 — APP-CAT-001A-FIX-001B Missing-parent sync classification
+
+The historical identifier FK quarantine now has a deterministic product
+classification instead of surfacing as "Unknown sync failure" plus raw SQL. The
+condition was proven by APP-CAT-001A-FIX-001A, so `SyncFailureReason` gains
+`blocked_missing_parent`.
+
+Classification is decided by the constraint name
+`appliance_catalog_identifiers_item_fkey` — read from a structured `constraint`
+field when the driver provides one, otherwise from message/details — and corroborated
+by Postgres `23503` whenever a code is present. It is scoped to
+`upsert_appliance_catalog_identifier`, so an unrelated foreign-key violation is never
+reported to a DS as "add this appliance item". A different Postgres code carrying our
+constraint name is also refused.
+
+`SyncQueuePanel` now leads with `syncActionBlockedExplanation` — "Item 5709242 is not
+on DeptSync for this store yet. Add the item, then Retry." — naming the real item when
+the payload carries it, with a truthful generic fallback otherwise. The raw constraint
+text stays as secondary mono diagnostics, never the primary message. Ownership is
+unchanged: `lib/sync-queue` classifies, `lib/sync-conflict` words it, the panel
+renders. No new module; the briefly-appearing unowned `catalog-sync-dependency.ts` /
+`parent_missing` code was **not** restored, and a contract test asserts it stays gone.
+
+Recovery semantics are unchanged and now tested: **replay never creates the parent**
+and never auto-retries. The path stays intentionally ensure the canonical parent →
+supervisor Retry. Same-owner replay is idempotent success with no second insert;
+different-owner replay still raises a conflict and never steals ownership; the alias
+`id` and `created_at` provenance survive Retry.
+
+- Contracts: `lib/appliances/app-cat001a-fix001b.missing-parent.test.ts` (21).
+  Verified against pre-repair behaviour: 6 cases fail without the classification.
+- No schema change, no migration, no replay transport change. The preserved Samsung
+  records are untouched and still await field validation; APP-CAT-001A is **not**
+  field accepted.
+- 743 tests, typecheck, and build pass; lint at baseline parity (114).
+
+## 2026-09-07 — APP-CAT-001A-FIX-001A Canonical parent before identifier alias
+
+Field inspection of the three quarantined Samsung records (Settings → Device & sync)
+showed a foreign-key violation on `appliance_catalog_identifiers_item_fkey`. That
+constraint is `FOREIGN KEY (store_number, item_number) REFERENCES
+appliance_catalog (store_number, item_number)`, so the alias was rejected because its
+canonical parent catalog row did not exist server-side for that store.
+
+FIX-001 made such failures visible instead of silently queued, but it did not make the
+legitimate workflow succeed. Link Existing could resolve an item from the device
+catalog that was never persisted for the actor's current store — the fail-closed
+`store_number` re-stamp moved local rows into a new canonical store scope without
+re-persisting them, so `offline: false` records what the device believed, not server
+presence. It is a hint only, never proof.
+
+**Repair — parent first, then alias, then observation.** `linkApplianceCatalogIdentifier`
+now ensures the one explicitly chosen canonical parent before teaching the alias, via a
+new idempotent `POST /api/appliances/catalog/ensure`. An existing parent is returned
+untouched (`created: false`, no write, no metadata rewrite); an absent one is inserted
+with only the metadata the device already knows — nothing manufactured, and
+`sub_category` may stay empty because the column defaults to `''`. The route is
+actor/store bound, insert-only so a concurrent creator wins, and refuses to create a
+parent whose legacy UPC another canonical item already owns (409). It teaches no
+identifiers and accepts no bulk input: exactly one item, never device-catalog
+promotion. APP-CAT-001B remains deferred.
+
+Ordering is enforced at the application level across two requests — this is **not** a
+database transaction. Parent rejection → no alias attempt, no observation, visible
+error. Alias rejection → no observation, visible error. Only after both persist does
+`onSaved` fire, which the scan form turns into exactly one `commitScan`.
+`ApplianceServerRejectionError` is now the shared "server answered and refused"
+contract, with `ApplianceCatalogParentHttpError` and `ApplianceIdentifierHttpError`
+beneath it; only a no-response failure may queue.
+
+**Offline dependency ordering.** True-offline teaching is preserved and now queues the
+canonical parent (`upsert_appliance_catalog`) ahead of the alias
+(`upsert_appliance_catalog_identifier`), reusing the existing parent write and its
+`assertNoVersionConflict` guard rather than parallel logic. A parent already confirmed
+online is not re-queued. `flushSyncQueue` no longer rewrites the store's queue as
+`[quarantined, deferred, failed]` — that grouping could move an alias ahead of the
+parent it depends on when the parent failed transiently while the alias was backing
+off, reproducing the same FK violation on the next flush. The queue is now rewritten in
+enqueue order; the retained set is unchanged and quarantined actions are still held.
+
+**Existing three records.** Not mutated, not retried, not discarded. Their exact
+payload identity was not captured and is not claimed. Manual Retry would only succeed
+once the missing canonical parent exists server-side for that store and identifier
+ownership is uncontested; replay still refuses to steal an identifier owned by another
+item, raising a conflict instead.
+
+- Contracts: `lib/appliances/app-cat001a-fix001a.canonical-parent.test.ts` (28),
+  `app-cat001a-fix001a.observation-gate.test.ts` (8), plus queue-order cases in
+  `lib/sync-queue.test.ts`. Verified to fail against the pre-repair behaviour: 14
+  behavioural cases fail without the parent-first sequence, and the order test yields
+  `[alias, parent]` under the old grouping.
+- No schema change; no migration. 722 tests, typecheck, and build pass; lint at baseline.
+- Status: **APP-CAT-001A-FIX-001A IMPLEMENTED — SAMSUNG ACCEPTANCE PENDING.**
+  APP-CAT-001A is **not** field accepted.
+
+## 2026-09-07 — APP-CAT-001A-FIX-001 + APP-SYNC-UX-001 Field repair
+
+Real Samsung showroom use (APP-CAT-001A-FIELD-001) proved the identity model is
+sound — an unrecognised ESL reached Link Existing, the Lowe's item number resolved
+an existing catalog item, and `many identifiers → one canonical Lowe's item` held.
+It also surfaced four defects, repaired here.
+
+**A — Active-audit read/render loop (proven).** With an ACTIVE physical audit,
+`AppliancePhysicalAuditPanel.refresh` depended on caller-supplied `onStatus` /
+`onActiveSessionChange` identity. Every parent render invalidated it, `useEffect`
+re-fired audit GETs, and the freshly parsed session object was written back to the
+parent — which re-rendered. Unbounded. Repaired at both boundaries: callback props
+are read through refs so `refresh` is stable, and the write-back is guarded by
+`applianceAuditSessionSignal` (id + status) so one refresh yields one state update.
+`ApplianceAuditSection` now passes stable `flashStatus` / `handleContinueScanning` /
+`handleAuditStarted`. No polling; audit lifecycle behaviour unchanged.
+
+**C — Online identifier failure misclassification (proven).** `gotHttpResponse` was
+set only after `persistIdentifierOnline` fully succeeded, so an HTTP 404/500 was
+treated as "no server response", queued, and reported to the user as success — a
+deterministically-quarantining queue entry. New `ApplianceIdentifierHttpError`
+carries the status and is the contract separating "received a server response" from
+"no server response". HTTP success / 409 / other 4xx-5xx never queue; only network
+failure and true offline queue.
+
+**D — Quick Add sub-category bounce (proven).** After a successful link, `commitScan`
+found the resolved item lacked a valid sub-category and called
+`setQuickAddBarcode(item.upc || item.item_number)`, demoting a resolved canonical item
+back into the unknown-identifier flow against a *different* identifier, resetting the
+mode and replaying the audible prompt. Replaced with an explicit `classify` completion
+mode in `QuickAddApplianceModal`: canonical identity is kept and shown, only the
+missing classification is requested, the existing catalog path persists it, previously
+taught identifiers are preserved, and exactly one physical observation is committed.
+
+**B — Opaque sync attention (APP-SYNC-UX-001).** "N sync items need supervisor
+attention" described queued mutations as "items", which reads as merchandise inside
+Appliances, and offered no route to inspect them. Copy is now "N sync issues need
+attention"; the attention state is an activatable control routing to
+`SYNC_QUEUE_INSPECT_HREF` (`/settings#sync-queue`), which opens the existing
+`SyncQueuePanel`. New `syncActionSubject` helper renders each queued operation's
+real-world subject (Lowe's item #, taught identifier, location, bay, aisle, week) from
+identifiers already in the payload — never raw JSON, never opaque uuids, never
+manufactured labels. Retry / Discard role safety unchanged.
+
+The three quarantined records on the Samsung were subsequently inspected in
+Settings → Device & sync. Their visible failure was a foreign-key violation on
+`appliance_catalog_identifiers_item_fkey` — see APP-CAT-001A-FIX-001A below. Their
+exact item numbers and identifiers were not captured and are not claimed here. They
+remain **preserved**; nothing clears, retries, discards, or purges queue state.
+
+- Contracts: `lib/appliances/app-cat001a-fix001.audit-loop.test.ts` (renders the real
+  panel under a deliberately unstable parent; hangs against the old behaviour),
+  `app-cat001a-fix001.identifier-failure.test.ts`,
+  `app-cat001a-fix001.subcategory.test.ts`, `lib/app-sync-ux001.attention.test.ts`.
+- No schema change; no migration. 683 tests, typecheck, and build pass.
+- Deferred (recorded, not implemented): `requestConflictResolution` never-settling
+  promise guard; zero-retry quarantine policy for audit-session scan binding;
+  redundant `notifyQueueChanged`; accordion search-effect behaviour; Escape listener
+  resubscription; general queue architecture cleanup; historical vs current quarantine
+  grouping; general retry-policy redesign.
+- Status: **APP-CAT-001A-FIX-001 + APP-SYNC-UX-001 IMPLEMENTED — SAMSUNG ACCEPTANCE
+  PENDING.** APP-CAT-001A is **not** field accepted.
+
 ## 2026-09-07 — UX-005B Department-aware Appliances entry
 - Floor identity header: compact **Appliances** / Physical audit affordance when Supervisor+/Master, `workingDepartment === "appliances"`, and `canAccessSection(..., "appliances")`.
 - Navigates to existing `APPLIANCES_OPERATIONAL_HOME_HREF` (`/appliances` → specialty home). More → Department Tools → Appliances kept as secondary path.
