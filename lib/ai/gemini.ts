@@ -42,7 +42,6 @@ const DEFAULT_MODEL = "gemini-3.5-flash";
 
 /** Per-route output budgets — callers pick; transport does not guess product needs. */
 export const GEMINI_TOKEN_BUDGET = {
-  briefing: 256,
   bayScan: 512,
   copilot: 2048,
   insights: 2048,

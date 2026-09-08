@@ -19,11 +19,7 @@ import {
   putDurable,
 } from "./cache";
 import { createTtlCache } from "./ttl-cache";
-import {
-  buildLocalShiftBriefing,
-  buildSessionRefreshShiftBriefing,
-  isShiftBriefingTransportError,
-} from "./shift-briefing";
+import { buildLocalShiftBriefing } from "./shift-briefing";
 import type { WalkParseResult } from "./ai-walk-parse";
 import type {
   BayServiceIntensity,
@@ -1311,9 +1307,12 @@ export type StoreHealthSnapshotClient = {
 
 export async function fetchStoreHealth(
   specialist: StoreSpecialist,
-  week?: string
+  week?: string,
+  options?: { force?: boolean }
 ): Promise<StoreHealthSnapshotClient> {
   const qs = week ? `?week=${encodeURIComponent(week)}` : "";
+  // Explicit operator refresh must re-read evidence, not replay the SWR entry.
+  if (options?.force) healthCache.invalidate();
   return healthCache.getSWR(
     storeOpsListCacheKey(specialist, `store-health:${qs}`),
     async () => {
@@ -1335,7 +1334,7 @@ export type ShiftBriefingClient = {
   bullets: [string, string, string];
   priority_department: string;
   assigned_week?: string;
-  source?: "gemini" | "local" | "session";
+  source?: "local" | "session";
   auth_required?: boolean;
 };
 
@@ -1369,51 +1368,10 @@ export function localShiftBriefingFromHealth(
   return localBriefingFromSnapshot(snapshot);
 }
 
-/** Zebra Shift Intelligence Briefing from store health metrics + velocity. */
-export async function fetchShiftBriefing(
-  specialist: StoreSpecialist,
-  options?: {
-    week?: string;
-    snapshot?: StoreHealthSnapshotClient;
-    telemetry?: import("@/lib/store-ops/telemetry").StoreAuditTelemetry | null;
-  }
-): Promise<ShiftBriefingClient> {
-  const fallback = options?.snapshot
-    ? localBriefingFromSnapshot(options.snapshot)
-    : null;
-  try {
-    return await storeOpsFetch<ShiftBriefingClient>(
-      "/api/store-health/ai-summary",
-      specialist,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ...(options?.week ? { week: options.week } : {}),
-          ...(options?.snapshot ? { snapshot: options.snapshot } : {}),
-          ...(options?.telemetry !== undefined
-            ? { telemetry: options.telemetry }
-            : {}),
-        }),
-      }
-    );
-  } catch (err) {
-    const message = String((err as { message?: string } | null)?.message ?? "");
-    if (/unauthorized|auth session|sign in|401/i.test(message)) {
-      const soft = buildSessionRefreshShiftBriefing();
-      return {
-        ...soft,
-        assigned_week: options?.week || options?.snapshot?.assigned_week,
-        source: "session",
-        auth_required: true,
-      };
-    }
-    if (fallback) return fallback;
-    if (isShiftBriefingTransportError(err)) {
-      throw new Error("Could not load AI briefing");
-    }
-    throw err;
-  }
+/** True when a Store Ops failure is a missing/expired Auth session, not a transport fault. */
+export function isStoreOpsAuthFailure(error: unknown): boolean {
+  const message = String((error as { message?: string } | null)?.message ?? "");
+  return /unauthorized|auth session|sign in|401/i.test(message);
 }
 
 export type InviteSupervisorResult = {

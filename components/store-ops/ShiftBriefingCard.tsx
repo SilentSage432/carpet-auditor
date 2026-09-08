@@ -2,20 +2,21 @@
 
 /**
  * Zebra Shift Intelligence Briefing — presentation for Store Ops dashboard.
- * On load: deterministic local health brief only (no Gemini).
- * Manual refresh may call Gemini; quota/RPC errors fall back to the local brief.
+ * Deterministic health brief composed from store-health evidence (AI-REDUCE-001).
+ * Tap / pull refresh re-reads the evidence; it does not re-word the briefing.
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState, type TouchEvent } from "react";
 import { HubIcon } from "@/components/hub/NavIcons";
 import {
-  fetchShiftBriefing,
   fetchStoreHealth,
+  isStoreOpsAuthFailure,
   localShiftBriefingFromHealth,
   peekCachedShiftBriefing,
   type ShiftBriefingClient,
   type StoreHealthSnapshotClient,
 } from "@/lib/store-ops/client";
+import { buildSessionRefreshShiftBriefing } from "@/lib/store-ops/shift-briefing";
 import { fingerprintsEqual } from "@/lib/store-ops/cache";
 import { yieldToMain } from "@/lib/store-ops/velocity";
 import type { StoreSpecialist } from "@/lib/types";
@@ -38,62 +39,64 @@ export function ShiftBriefingCard({ specialist, refreshKey }: Props) {
     null
   );
   const [loading, setLoading] = useState(true);
-  const [aiBusy, setAiBusy] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const pullStartY = useRef<number | null>(null);
   const [pullOffset, setPullOffset] = useState(0);
 
-  const loadLocal = useCallback(async (opts?: { silent?: boolean }) => {
-    if (!opts?.silent) setLoading(true);
-    try {
-      await yieldToMain();
-      const nextSnapshot = await fetchStoreHealth(specialist);
-      setSnapshot((prev) =>
-        fingerprintsEqual(prev, nextSnapshot) ? prev : nextSnapshot
-      );
-    } catch {
-      setBriefing({
-        headline: "Shift health unavailable",
-        bullets: [
-          "Focus: could not load open-bay counts for this shift.",
-          "Barriers: local metrics unavailable — check Store Ops Auth.",
-          "Quick-win: unlock with Hub PIN, then pull to refresh.",
-        ],
-        priority_department: "Storewide",
-        source: "local",
-      });
-    } finally {
-      setLoading(false);
-      setPullOffset(0);
-    }
-  }, [specialist]);
+  const loadHealth = useCallback(
+    async (opts?: { silent?: boolean; force?: boolean }) => {
+      if (!opts?.silent) setLoading(true);
+      try {
+        await yieldToMain();
+        const nextSnapshot = await fetchStoreHealth(specialist, undefined, {
+          force: opts?.force === true,
+        });
+        setSnapshot((prev) =>
+          fingerprintsEqual(prev, nextSnapshot) ? prev : nextSnapshot
+        );
+        setBriefing(null);
+      } catch (err) {
+        if (isStoreOpsAuthFailure(err)) {
+          setBriefing({
+            ...buildSessionRefreshShiftBriefing(),
+            source: "session",
+            auth_required: true,
+          });
+        } else {
+          setBriefing({
+            headline: "Shift health unavailable",
+            bullets: [
+              "Focus: could not load open-bay counts for this shift.",
+              "Barriers: local metrics unavailable — check Store Ops Auth.",
+              "Quick-win: unlock with Hub PIN, then pull to refresh.",
+            ],
+            priority_department: "Storewide",
+            source: "local",
+          });
+        }
+      } finally {
+        setLoading(false);
+        setPullOffset(0);
+      }
+    },
+    [specialist]
+  );
 
   const localBriefing = useMemo(
     () => (snapshot ? localShiftBriefingFromHealth(snapshot) : null),
     [snapshot]
   );
-  const shownBriefing = briefing?.source === "gemini" || briefing?.source === "session"
-    ? briefing
-    : (localBriefing ?? briefing);
+  const shownBriefing =
+    briefing?.source === "session" ? briefing : (localBriefing ?? briefing);
 
-  const refreshAi = useCallback(async () => {
-    setAiBusy(true);
+  const refreshHealth = useCallback(async () => {
+    setRefreshing(true);
     try {
-      const nextSnapshot = snapshot ?? (await fetchStoreHealth(specialist));
-      setSnapshot(nextSnapshot);
-      const next = await fetchShiftBriefing(specialist, {
-        snapshot: nextSnapshot,
-        telemetry: nextSnapshot.telemetry ?? null,
-      });
-      setBriefing(next);
-    } catch {
-      if (snapshot) {
-        setBriefing(localShiftBriefingFromHealth(snapshot));
-      }
+      await loadHealth({ silent: true, force: true });
     } finally {
-      setAiBusy(false);
-      setPullOffset(0);
+      setRefreshing(false);
     }
-  }, [specialist, snapshot]);
+  }, [loadHealth]);
 
   useEffect(() => {
     let cancelled = false;
@@ -106,13 +109,13 @@ export function ShiftBriefingCard({ specialist, refreshKey }: Props) {
         );
         setLoading(false);
       }
-      if (!cancelled) void loadLocal({ silent: true });
+      if (!cancelled) void loadHealth({ silent: true });
     }
     void boot();
     return () => {
       cancelled = true;
     };
-  }, [loadLocal, refreshKey, specialist]);
+  }, [loadHealth, refreshKey, specialist]);
 
   function onTouchStart(e: TouchEvent) {
     if (typeof window !== "undefined" && window.scrollY > 8) return;
@@ -120,7 +123,7 @@ export function ShiftBriefingCard({ specialist, refreshKey }: Props) {
   }
 
   function onTouchMove(e: TouchEvent) {
-    if (pullStartY.current == null || loading || aiBusy) return;
+    if (pullStartY.current == null || loading || refreshing) return;
     const y = e.touches[0]?.clientY ?? pullStartY.current;
     const delta = Math.max(0, Math.min(72, y - pullStartY.current));
     setPullOffset(delta);
@@ -128,13 +131,13 @@ export function ShiftBriefingCard({ specialist, refreshKey }: Props) {
 
   function onTouchEnd() {
     if (pullStartY.current == null) return;
-    const shouldRefresh = pullOffset >= 56 && !loading && !aiBusy;
+    const shouldRefresh = pullOffset >= 56 && !loading && !refreshing;
     pullStartY.current = null;
     setPullOffset(0);
-    if (shouldRefresh) void refreshAi();
+    if (shouldRefresh) void refreshHealth();
   }
 
-  const busy = loading || aiBusy;
+  const busy = loading || refreshing;
 
   return (
     <section
@@ -163,22 +166,18 @@ export function ShiftBriefingCard({ specialist, refreshKey }: Props) {
           {shownBriefing?.assigned_week ? (
             <p className="mt-0.5 font-mono text-[10px] text-emerald-500/80">
               Week {shownBriefing.assigned_week}
-              {shownBriefing.source === "local"
-                ? " · local metrics"
-                : shownBriefing.source === "gemini"
-                  ? " · AI refresh"
-                  : shownBriefing.source === "session"
-                    ? " · auth refresh needed"
-                    : ""}
+              {shownBriefing.source === "session"
+                ? " · auth refresh needed"
+                : " · store metrics"}
             </p>
           ) : null}
         </div>
         <button
           type="button"
-          onClick={() => void refreshAi()}
+          onClick={() => void refreshHealth()}
           disabled={busy}
-          aria-label="Re-analyze shift briefing with AI"
-          title="Tap to ask AI · pull down to refresh. Falls back to local metrics if quota is exhausted."
+          aria-label="Refresh shift briefing"
+          title="Tap or pull down to re-read current shift metrics."
           className="btn-icon-touch h-11 w-11 border-emerald-500/40 bg-emerald-950/50 text-emerald-300 shadow-lg shadow-emerald-950/40"
         >
           <HubIcon
@@ -234,7 +233,7 @@ export function ShiftBriefingCard({ specialist, refreshKey }: Props) {
               </p>
             ) : (
               <p className="mt-1.5 text-center text-[10px] font-semibold uppercase tracking-wider text-emerald-600/70">
-                Local health brief · tap refresh for optional AI rewrite
+                Shift health brief · tap or pull to refresh
               </p>
             )}
           </>

@@ -326,41 +326,6 @@ export function buildStoreAuditTelemetry(
   };
 }
 
-/** Compact payload for Gemini / briefing prompts. */
-export function compactTelemetryForPrompt(
-  telemetry: StoreAuditTelemetry | null | undefined
-): Record<string, unknown> | null {
-  if (!telemetry) return null;
-  return {
-    shift_date: telemetry.shift_date,
-    shift_window: `${hourLabel(telemetry.shift_start_hour)}–${hourLabel(telemetry.shift_end_hour)}`,
-    as_of: telemetry.as_of,
-    series: telemetry.series.map((s) => ({
-      key: s.key,
-      label: s.label,
-      daily_target: s.daily_target,
-      completed_today: s.completed_today,
-      current_velocity_pct: s.current_velocity_pct,
-      current_target_pct: s.current_target_pct,
-      ahead_behind_pct: s.ahead_behind_pct,
-      exception_hours: s.points
-        .filter((p) => p.is_exception_spike)
-        .map((p) => ({
-          hour: p.label,
-          exceptions: p.exception_count,
-        })),
-      hourly_velocity: s.points
-        .filter((_, i) => i % 2 === 0 || i === s.points.length - 1)
-        .map((p) => ({
-          hour: p.label,
-          velocity_pct: p.velocity_pct,
-          target_pct: p.target_pct,
-          completions: p.completions,
-        })),
-    })),
-  };
-}
-
 export function findTelemetrySeries(
   telemetry: StoreAuditTelemetry | null | undefined,
   key: string

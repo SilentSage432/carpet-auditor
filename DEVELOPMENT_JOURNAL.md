@@ -1,5 +1,78 @@
 # DeptSync Hub — Development Journal
 
+## 2026-09-08 — AI-REDUCE-001 Deterministic Shift Briefing
+
+The first runtime tranche under OIE, and the smallest possible one on purpose:
+remove a paid dependency that GEMINI-001 proved was contributing nothing the
+repository could not already derive.
+
+**The premise held at HEAD.** Before editing, all seven GEMINI-001 premises were
+re-traced. The deterministic and Gemini responses shared one type; the normalizer
+emitted exactly `headline`, `bullets`, and `priority_department`, each falling back
+to the local builder, so there were no Gemini-only fields; the hotspot arrived from
+`enrichSnapshotBayHealth` *before* the model call, meaning the model was told which
+bay to lead with; the card rendered the local brief on boot; the model ran only on
+manual refresh; the route performed no writes; and `fetchShiftBriefing` had exactly
+one caller. Nothing contradicted the audit, so the reduction proceeded.
+
+**What was removed.** The route `app/api/store-health/ai-summary`, the client's
+`fetchShiftBriefing`, the prompt builder, `SHIFT_BRIEFING_RESPONSE_SCHEMA`,
+`normalizeShiftBriefing`, and `isShiftBriefingTransportError`. Two helpers became
+dead by exclusive ownership and went with them: `compactTelemetryForPrompt`, whose
+only caller was the briefing prompt, and the `briefing` key in
+`GEMINI_TOKEN_BUDGET`. `callGeminiFlash` and every other Gemini path were left
+exactly as they were.
+
+**What the reduction actually simplified.** The interesting part was not deleting
+the call — it was that removing it collapsed a distinction that only existed
+because of the call. `buildLocalShiftBriefing` was documented as the "institutional
+fallback when Gemini is unavailable." It is now just the briefing producer. The
+client's `source` union lost `"gemini"`, and the card no longer arbitrates between
+an AI result and a local fallback. One truthful path.
+
+**Refresh was the honest question.** Tapping refresh looked like it re-read the
+shift's numbers. It did not. `refreshAi` began with `snapshot ?? await
+fetchStoreHealth(...)`, so once a snapshot was in state — which boot always
+guaranteed — refresh skipped the evidence read entirely and posted the *existing*
+evidence to Gemini for re-wording. The gesture the DS performed to "get the latest"
+returned the same facts in different sentences. Deleting it outright would have
+been defensible, but the underlying need is real on the DS's own phone in the
+aisle, so refresh now does
+the job it always appeared to do: `fetchStoreHealth(..., { force: true })`
+invalidates the SWR entry and re-reads store health, and the deterministic brief
+recomposes from fresher evidence. That is the same builder over newer facts, not
+new intelligence.
+
+**Copy made truthful, quietly.** "Local health brief · tap refresh for optional AI
+rewrite" became "Shift health brief · tap or pull to refresh." The `· AI refresh`
+provenance label is gone, `· local metrics` became `· store metrics`, and the
+button's `aria-label` no longer offers to re-analyze anything with AI. There is no
+"AI-free" badge and no implementation language on the surface — the DS cares about
+the briefing, not which helper produced it.
+
+**Nothing operational was given up.** Headline, the three captioned bullets — Focus
+Bay, Pending Barriers, Quick-win — and priority department all still come from the
+same health snapshot, bay-health flags, bottleneck summary, and velocity telemetry.
+The session-refresh auth empty state survived too; it used to arrive through the AI
+endpoint's soft 200, and now reaches the card deterministically through
+`isStoreOpsAuthFailure` on the health read. IndexedDB hydration, SWR, the pull
+gesture, and role behavior are untouched.
+
+**Validation.** 784 tests across 57 files pass, 20 of them new in
+`lib/store-ops/shift-briefing.test.ts` covering the deterministic contract,
+reproducibility, hotspot and priority selection, barrier/flag composition,
+low-signal safety, and repository-level assertions that no Gemini path or dead
+endpoint reference remains. Typecheck and build are clean. Lint is byte-identical
+to the HEAD baseline at 114 problems (95 errors, 19 warnings) — all pre-existing
+and deliberately not touched here.
+
+**AI-REDUCE-001 — IMPLEMENTATION COMPLETE, AWAITING REVIEW.** Engineering complete
+is not field accepted (OIE Law 8): the card is field-facing and the refresh gesture
+now behaves differently, so a narrow **Samsung / real DS-device field smoke**
+remains pending on the supervisor's own phone. GEMINI-001's other
+dispositions are unchanged, and AI-REDUCE-002, AI-RETIRE-001, AI-SAFETY-001,
+AI-SAFETY-002, SNAP-DECISION-001, and FLOORING-AI-001 all remain NOT STARTED.
+
 ## 2026-09-08 — GEMINI-001 Generative Cost & Necessity Audit (discovery complete)
 
 The question GEMINI-001 set out to answer was uncomfortable on purpose: for every
