@@ -1,5 +1,49 @@
 # DeptSync Hub — Development Journal
 
+## 2026-09-08 — AI-REDUCE-001 field accepted and closed
+
+The deterministic Shift Briefing was tested on a real DS device after shipping.
+Twelve bays were staged, the workflow was exercised as though those bays had been
+worked, the staged work was cleared and completed, and DeptSync was observed
+updating itself to reflect the changed operational state.
+
+That is the entire reported evidence, and it is deliberately recorded without
+elaboration. No briefing prose, Focus Bay text, barrier text, bay identity,
+refresh timing, network condition, offline behavior, or verification state was
+reported, so none is claimed here.
+
+**What the test settles** is the one question the tranche actually had to answer:
+
+> When underlying operational evidence changes, DeptSync recomposes its state and
+> intelligence from that evidence rather than depending on a Gemini rewrite.
+
+The removed capability was a prose rewrite sitting on top of computed findings.
+The real risk of removing it was never that the sentences would read differently —
+it was that something in the evidence-to-expression chain had been quietly leaning
+on the model call. Staging twelve bays and then clearing them exercises exactly
+that chain: the evidence changed, and the operational state followed. With no
+Gemini path present, it followed anyway.
+
+So the recorded conclusions are narrow and concrete. The deterministic briefing
+remained operational after Gemini removal. Operational state continued to respond
+to changed evidence. No Gemini dependency was required for that response. No new
+intelligence architecture was needed. The reduction preserved the intended
+operational behavior.
+
+**This result does not generalize.** It is evidence about Shift Briefing, and only
+Shift Briefing. Floor-Walk Copilot, Executive Floor Pad, Flooring Insights, Visual
+Bay Scan, Bay Audit Validate, and Catalog Taxonomy keep their own GEMINI-001
+dispositions and their own gates; nothing here shortens any of them, and UX-005F
+remains open on its own terms.
+
+**AI-REDUCE-001 — FIELD ACCEPTED — CLOSED.** The first fully closed implementation
+tranche under the Operational Intelligence Evolution program: proposed from
+repository evidence in GEMINI-001, implemented against a stated contract, validated
+in the field, and closed. AI-REDUCE-002, AI-RETIRE-001, AI-SAFETY-001,
+AI-SAFETY-002, SNAP-DECISION-001, and FLOORING-AI-001 all remain NOT STARTED.
+
+> **Less machinery. Same truth. Same usefulness. Lower dependency.**
+
 ## 2026-09-08 — AI-REDUCE-001 Deterministic Shift Briefing
 
 The first runtime tranche under OIE, and the smallest possible one on purpose:

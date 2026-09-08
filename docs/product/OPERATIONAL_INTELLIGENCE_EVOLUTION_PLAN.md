@@ -1,9 +1,9 @@
 # DeptSync Operational Intelligence Evolution Plan
 
 **Program ID:** OIE-000
-**Status:** PROGRAM FOUNDATION COMPLETE · GEMINI-001 DISCOVERY COMPLETE · AI-REDUCE-001 IMPLEMENTED (awaiting review)
+**Status:** PROGRAM FOUNDATION COMPLETE · GEMINI-001 DISCOVERY COMPLETE · AI-REDUCE-001 FIELD ACCEPTED — CLOSED
 **Established:** 2026-09-08
-**Last updated:** 2026-09-08 — AI-REDUCE-001 deterministic Shift Briefing implemented (§5 A1.2 / A1.5)
+**Last updated:** 2026-09-08 — AI-REDUCE-001 field accepted and closed (§5 A1.2 / A1.5 / A1.7)
 **Evidence basis:** RA-001 Repository Archaeology (read-only audit, baseline `25b6ed2`) · GEMINI-001 Generative Cost & Necessity Audit (read-only)
 **Authority:** Subordinate to [`DEPTSYNC_CONSTITUTION.md`](../../DEPTSYNC_CONSTITUTION.md). Where this document and the Constitution conflict, the Constitution governs and the conflict must be flagged, not silently resolved.
 
@@ -270,7 +270,7 @@ Evidence-backed dispositions. Every row is a **recorded finding**, not approved 
 | **1. Pre-Flight location parse** | Input interpretation — free-text → bay rows | **RETAIN AI** | Genuinely unstructured input; no equivalent deterministic parser exists; model extracts structure rather than calculating intelligence; normalizer validates institutional fields; human confirmation required before DB write; low call exposure | None | None | Aisle validation weak; bay range has no meaningful upper bound; confirmation accepts the generated batch as a whole. **Bounded follow-up evidence only — no work item created** |
 | **2. Floor-Walk Copilot** | Input interpretation — speech text → task structure | **OPTIONAL AI** | Browser speech recognition produces text locally (audio never sent to Gemini); Gemini structures natural language; deterministic parser/fallback already exists; closed enums enforced by deterministic code; human dispatch required before authoritative write | None | **WALK-001 / FE-004 preserved** | Unknown/invented location tags may persist with null foreign keys |
 | **3. Executive Floor Pad extract** | Input interpretation — note text → tasks/tags | **OPTIONAL AI** | Natural-language interpretation is a legitimate AI boundary; deterministic fallback exists for the missing-key path; human-provided aisle/bay outrank model values | **AI-SAFETY-002** (queued) | None | Model output autosaves without a separate confirmation step; `metadata` is effectively unvalidated JSON; configured-Gemini failure has asymmetric fallback behavior |
-| **4. Shift Briefing** | ~~Prose rewrite of computed findings~~ → **deterministic producer** | **REPLACE DETERMINISTICALLY — DONE** (AI-REDUCE-001, 2026-09-08) | Deterministic and Gemini paths had identical output shape; **zero Gemini-only fields**; hotspot selection was already deterministic before the model call; local brief was already the default render; UI itself called it an "optional AI rewrite" | **AI-REDUCE-001 — implementation complete, awaiting review** | Samsung / real DS-device field smoke (OIE Law 8) | Display-only — no authoritative write on this path. Gemini dependency removed; briefing now derives solely from store-health evidence |
+| **4. Shift Briefing** | ~~Prose rewrite of computed findings~~ → **deterministic producer** | **REPLACE DETERMINISTICALLY — DONE** (AI-REDUCE-001, 2026-09-08) | Deterministic and Gemini paths had identical output shape; **zero Gemini-only fields**; hotspot selection was already deterministic before the model call; local brief was already the default render; UI itself called it an "optional AI rewrite" | **AI-REDUCE-001 — FIELD ACCEPTED — CLOSED** (2026-09-08) | **MET** — real DS-device operational state-change test (A1.7) | Display-only — no authoritative write on this path. Gemini dependency removed; briefing now derives solely from store-health evidence |
 | **5. Flooring Insights** | Explanation over local math | **OPTIONAL AI** | Measurement math is not performed by Gemini; item identity / aging / variance are local authoritative or deterministic; Gemini contributes prose, priority ordering, and a model-selected markdown percentage; model cannot invent new remnant entities because the merge is constrained to local candidates | **FLOORING-AI-001** (discovery pending) | None | `recommended_percent` is a model-originated number that can reach `carpet_remnants` on supervisor Apply |
 | **6. Visual Bay Scan — ephemeral** | Image interpretation | **FIELD EVIDENCE NEEDED** | Image interpretation is genuinely non-deterministic / multimodal; result is not persisted; no correctness feedback loop; no historical comparison; no accuracy capture; output disappears on close | None | **UX-005F / field gate preserved** | Model correctness is structurally unevaluable. **No deterministic computer-vision replacement proposed** |
 | **7. Bay Audit Validate — persisting** | Image interpretation + DB write | **FIELD EVIDENCE NEEDED — WITH CRITICAL LIFECYCLE DEFECT** | Lifecycle state verified **SEVERED** (see A1.3). Product value cannot be judged while the loop is broken | **SNAP-DECISION-001** | **UX-005F / field gate preserved** | Paid inference currently produces orphaned rows no surface can read |
@@ -329,7 +329,7 @@ Verified findings:
 
 Evidence-backed order.
 
-1. **AI-REDUCE-001** — Deterministic Shift Briefing — **IMPLEMENTATION COMPLETE — AWAITING REVIEW** (2026-09-08)
+1. **AI-REDUCE-001** — Deterministic Shift Briefing — **FIELD ACCEPTED — CLOSED** (2026-09-08)
 2. **AI-REDUCE-002** — Deterministic Catalog Taxonomy
 3. **AI-RETIRE-001** — Retire Snag Triage
 4. **AI-SAFETY-001** — Bound Gemini Transport Failure
@@ -365,6 +365,37 @@ Gemini should generally **NOT** be used for:
 Optional human-readable explanation may still be appropriate where it earns its cost.
 
 **Goal of Workstream A (restated after discovery):** reduce paid AI dependency without reducing useful intelligence.
+
+---
+
+### A1.7 — AI-REDUCE-001 field acceptance (2026-09-08)
+
+**Status: FIELD ACCEPTED — CLOSED.** The first fully closed implementation tranche under this program.
+
+**Field test performed** on a real DS device, after the deterministic Shift Briefing shipped:
+
+- 12 bays were staged
+- the workflow was exercised as though those bays had been worked
+- the staged work was cleared / completed
+- DeptSync was observed updating itself to reflect the changed operational state
+
+**What this validates — and only this:**
+
+> **When underlying operational evidence changes, DeptSync recomposes its state and intelligence from that evidence rather than depending on a Gemini rewrite.**
+
+That was the core requirement for AI-REDUCE-001, and it is met. The deterministic briefing and Floor operational state responded correctly to changed evidence with no Gemini path present.
+
+**Recorded conclusions:**
+
+- the deterministic Shift Briefing remained operational after Gemini removal
+- operational state continued to respond to changed evidence
+- no Gemini dependency was required for that response
+- no new intelligence architecture was needed
+- the reduction preserved the intended operational behavior
+
+**Scope limits on this evidence.** Nothing beyond the four observations above was reported and nothing further may be inferred. This result covers the evidence-response requirement for **this capability only**. It is **not** transferable to any other Gemini capability — Floor-Walk Copilot, Executive Floor Pad, Flooring Insights, Visual Bay Scan, Bay Audit Validate, and Catalog Taxonomy retain their own dispositions and their own gates. It also does not close UX-005F.
+
+> **Less machinery. Same truth. Same usefulness. Lower dependency.**
 
 ---
 
@@ -812,7 +843,7 @@ During an active physical audit, deliberately ad-hoc scan known units and confir
 |---|---|---|
 | **PHASE 0** — Program Foundation | OIE-000 canonical plan | Complete |
 | **PHASE 1** — Understand AI Cost / Necessity | **GEMINI-001 — DISCOVERY COMPLETE** | Dispositions recorded (A1.2) |
-| **PHASE 1A** — First approved AI reduction | **AI-REDUCE-001 — Deterministic Shift Briefing** | **IMPLEMENTATION COMPLETE — AWAITING REVIEW** · Samsung / real DS-device field smoke pending |
+| **PHASE 1A** — First approved AI reduction | **AI-REDUCE-001 — Deterministic Shift Briefing** | **FIELD ACCEPTED — CLOSED** (2026-09-08) — first fully closed OIE implementation tranche |
 | **PHASE 2** — Recover Existing Operational Value | FLOOR-HIDDEN-001, HISTORY-001 | **Still queued — priority unchanged**; order within phase may change from evidence |
 | **PHASE 3** — Repair Evidence Quality | Weekly-progress semantics, barrier vocabulary, any proven audit-linkage / data-integrity issue | — |
 | **PHASE 4** — Close Existing Loops | WALK-001 if field proven; historical decision read-back; spatial intelligence placement where earned | — |
@@ -826,7 +857,7 @@ During an active physical audit, deliberately ad-hoc scan known units and confir
 
 Two standing exceptions: a confirmed **security or truth** finding from Workstream J may preempt any phase; and UX-005 field acceptances (UX-005B, UX-005C) remain independently outstanding and are not blocked by this program.
 
-**Phase 1A note:** the program now has a low-risk AI reduction available before Phase 2. This does **not** demote FLOOR-HIDDEN-001 or HISTORY-001 — both retain their recorded priority, and HISTORY-001 remains a HIGH PRIORITY DISCOVERY. AI-REDUCE-001 is sequenced first only because it is isolated, evidence-complete, and carries no field dependency.
+**Phase 1A note:** the program now has a low-risk AI reduction available before Phase 2. This does **not** demote FLOOR-HIDDEN-001 or HISTORY-001 — both retain their recorded priority, and HISTORY-001 remains a HIGH PRIORITY DISCOVERY. AI-REDUCE-001 was sequenced first only because it was isolated, evidence-complete, and required no field evidence *before* starting; it has since been field accepted and closed (A1.7).
 
 ---
 
@@ -838,7 +869,7 @@ Two standing exceptions: a confirmed **security or truth** finding from Workstre
 |---|---|---|---|---|---|---|---|
 | **OIE-000** | Operational Intelligence Evolution Program | Program foundation | RA-001 | PROGRAM FOUNDATION COMPLETE | — | None (docs) | Documentation only |
 | **GEMINI-001** | Generative Cost & Necessity Audit | Discovery | RA-001 §9 | **DISCOVERY COMPLETE — DISPOSITIONS RECORDED** | OIE-000 | Snap Bay + Visual Bay Scan remain field-gated | Discovery only — no runtime change |
-| **AI-REDUCE-001** | Deterministic Shift Briefing | AI reduction | GEMINI-001 A1.2 — zero Gemini-only fields | **IMPLEMENTATION COMPLETE — AWAITING REVIEW** | GEMINI-001 | **Samsung / real DS-device field smoke (OIE Law 8) — pending** | Route + client AI path removed; 20 contract tests; 784/784 suite green |
+| **AI-REDUCE-001** | Deterministic Shift Briefing | AI reduction | GEMINI-001 A1.2 — zero Gemini-only fields; field evidence A1.7 | **FIELD ACCEPTED — CLOSED** (2026-09-08) | GEMINI-001 | **MET** — real DS-device operational state-change test | Route + client AI path removed; 20 contract tests; 784/784 suite green; field accepted |
 | **AI-REDUCE-002** | Deterministic Catalog Taxonomy | AI reduction | GEMINI-001 A1.2 — static input, registry ships | **APPROVED REDUCTION CANDIDATE — NOT STARTED** | GEMINI-001 | None | Not started |
 | **AI-RETIRE-001** | Retire Orphaned Snag Triage | Retirement | GEMINI-001 A1.2 — zero invocation path | **APPROVED RETIREMENT CANDIDATE — NOT STARTED** | GEMINI-001 | None | Not started — do not wire, do not replace with new UI |
 | **AI-SAFETY-001** | Bound Gemini Transport Failure | Resilience | GEMINI-001 A1.4 — no timeout/abort/retry ceiling | **APPROVED SAFETY CANDIDATE — NOT STARTED** | — | None | Not started |
