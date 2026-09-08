@@ -686,6 +686,11 @@ export async function executeCompleteRotationLive(
   if (!actor) {
     throw new Error("Store Operations access denied for this profile");
   }
+  // Art. XIV.3 — only the first-hand live path supplies the acting specialist.
+  // Queue replay calls this with one argument, so absence of `specialist` marks a
+  // deferred completion whose original actor the server cannot re-authenticate.
+  // The flag can only *reduce* the server's granted authority, never raise it.
+  const replayedFromQueue = specialist === undefined;
   const authHeaders = await storeOpsAuthHeadersAsync(actor);
   const res = await fetch("/api/rotations/complete", {
     method: "POST",
@@ -693,7 +698,10 @@ export async function executeCompleteRotationLive(
       ...authHeaders,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ rotation_id: rotationId }),
+    body: JSON.stringify({
+      rotation_id: rotationId,
+      replayed_from_queue: replayedFromQueue,
+    }),
     signal: mutationAbortSignal(),
   });
   const body = (await res.json().catch(() => ({}))) as {
@@ -954,45 +962,6 @@ export async function completeShowroomLocation(
   await invalidateStoreOpsListCaches();
   notifyStoreLocationsChanged();
   return data.location;
-}
-
-/**
- * End-of-week verification batch: verify listed rotation IDs and/or log barriers.
- * Empty `completed_rotation_ids` only stamps department `last_verified_*` —
- * it does NOT verify PENDING_VERIFICATION bays. Bay verification must use
- * `review_action` helpers (`verifyPendingBay` / `verifyAllPendingBays`).
- */
-export async function verifyWeeklyRotationBatch(
-  specialist: StoreSpecialist,
-  input: {
-    department_id: string;
-    assigned_week: string;
-    completed_rotation_ids: string[];
-    incomplete: Array<{
-      rotation_id: string;
-      location_id: string;
-      reason: string;
-      cycle_number: number;
-    }>;
-  }
-): Promise<{
-  completed_count: number;
-  exception_count: number;
-}> {
-  const result = await storeOpsFetch<{
-    completed_count?: number;
-    exception_count?: number;
-  }>("/api/rotations/verify", specialist, {
-    method: "POST",
-    body: JSON.stringify(input),
-  });
-  await invalidateStoreOpsListCaches();
-  // Verification mutates evidence SI-001 reads (last_completed_at / review status).
-  notifyStoreLocationsChanged();
-  return {
-    completed_count: result.completed_count ?? 0,
-    exception_count: result.exception_count ?? 0,
-  };
 }
 
 export type VerificationQueueItem = {

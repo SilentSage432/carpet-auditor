@@ -298,11 +298,18 @@ describe("Floor SI-001C composition source contracts", () => {
       path.resolve(__dirname, "./client.ts"),
       "utf8"
     );
-    const verifyBatch = client.slice(
-      client.indexOf("export async function verifyWeeklyRotationBatch"),
-      client.indexOf("export async function fetchVerificationQueue")
+    // THESIS-001A removed the legacy batch wrapper; the canonical review helpers
+    // now own the verification mutations that SI-001 must refresh behind.
+    const verifyBay = client.slice(
+      client.indexOf("export async function verifyPendingBay"),
+      client.indexOf("export async function sendBackPendingBay")
     );
-    expect(verifyBatch).toMatch(/notifyStoreLocationsChanged/);
+    expect(verifyBay).toMatch(/notifyStoreLocationsChanged/);
+    const verifyAll = client.slice(
+      client.indexOf("export async function verifyAllPendingBays"),
+      client.indexOf("export async function reportRotationBarriers")
+    );
+    expect(verifyAll).toMatch(/notifyStoreLocationsChanged/);
     const barriers = client.slice(
       client.indexOf("export async function reportRotationBarriers"),
       client.indexOf("export async function fetchExceptionSummary")

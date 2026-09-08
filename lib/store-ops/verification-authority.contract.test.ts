@@ -39,6 +39,14 @@ describe("UX-002 verification authority contracts", () => {
     expect(client).toContain("sendBackPendingBay");
   });
 
+  // THESIS-001A: the legacy batch wrapper carried authoritative verification with
+  // no runtime caller. Removed rather than re-gated (A1.10 precedent).
+  it("client must not export the legacy batch verify wrapper", () => {
+    const client = readRepo("lib/store-ops/client.ts");
+    expect(client).not.toContain("verifyWeeklyRotationBatch");
+    expect(client).not.toContain("completed_rotation_ids");
+  });
+
   it("canonical modal owns bay verify / send-back / verify-all review_action path", () => {
     const modal = readRepo(
       "components/store-ops/SupervisorAuditSummaryModal.tsx"
@@ -53,7 +61,8 @@ describe("UX-002 verification authority contracts", () => {
     const route = readRepo("app/api/rotations/verify/route.ts");
     expect(route).toContain('reviewAction === "verify_all"');
     expect(route).toContain("verifyAllPendingRotations");
-    expect(route).toContain("completedRotationIds: []");
-    expect(route).toContain("verifyWeeklyRotations");
+    // The week stamp is now a helper that structurally cannot verify a bay.
+    expect(route).toContain("stampDepartmentWeekVerified");
+    expect(route).not.toContain("verifyWeeklyRotations(");
   });
 });

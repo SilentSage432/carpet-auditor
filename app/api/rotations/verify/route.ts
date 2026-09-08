@@ -15,11 +15,10 @@ import {
   verifyPendingRotation,
 } from "@/lib/store-ops/rotation-review";
 import { resolveStoreByNumber } from "@/lib/store-ops/stores";
-import { verifyWeeklyRotations } from "@/lib/store-ops/verification";
+import { stampDepartmentWeekVerified } from "@/lib/store-ops/verification";
 import { requireSupabaseAdmin } from "@/lib/supabase/admin-response";
 import { isoWeekLabel } from "@/lib/store-ops/week";
 import { sundayStagingWeekLabel } from "@/lib/store-ops/sunday-schedule";
-import type { ExceptionReason } from "@/lib/store-ops/types";
 
 type ReviewAction = "verify" | "send_back" | "verify_all";
 
@@ -126,11 +125,18 @@ export async function GET(request: Request) {
 
 /**
  * POST /api/rotations/verify
- * End-of-week supervisor verification, or DS review_action on the queue.
+ * DS review_action on the verification queue: verify | send_back | verify_all.
+ *
+ * Authority (Art. VI.2 / XVIII.3): supervisor or admin is required for the whole
+ * method, not per branch. An associate may report completion; only an authorized
+ * DS/admin may create VERIFIED_COMPLETE. There is deliberately no request shape
+ * that performs authoritative verification without an explicit `review_action`.
  */
 export async function POST(request: Request) {
   try {
-    const actor = requireStoreOpsActor(await resolveStoreOpsActor(request));
+    const actor = requireSupervisorOrAdmin(
+      requireStoreOpsActor(await resolveStoreOpsActor(request))
+    );
     const { supabase, response } = requireSupabaseAdmin();
     if (!supabase) return response;
 
@@ -142,106 +148,21 @@ export async function POST(request: Request) {
       review_action?: ReviewAction;
       rotation_id?: string;
       note?: string;
-      completed_rotation_ids?: string[];
-      incomplete?: Array<{
-        rotation_id?: string;
-        location_id?: string;
-        reason?: string;
-        cycle_number?: number;
-      }>;
     };
 
     const reviewAction = body.review_action;
-    if (reviewAction) {
-      requireSupervisorOrAdmin(actor);
-      const scoped = await resolveDepartmentForActor(
-        supabase,
-        actor,
-        store.id,
-        body.department_id?.trim() || "",
-        reviewAction === "verify_all" || reviewAction === "verify"
+    if (
+      reviewAction !== "verify" &&
+      reviewAction !== "send_back" &&
+      reviewAction !== "verify_all"
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "review_action is required (verify | send_back | verify_all). Batch verification without an explicit review action is not supported.",
+        },
+        { status: 400 }
       );
-      const week =
-        body.assigned_week?.trim() ||
-        sundayStagingWeekLabel(new Date(), store.timezone) ||
-        isoWeekLabel();
-
-      if (reviewAction === "verify") {
-        const rotationId = body.rotation_id?.trim();
-        if (!rotationId) {
-          return NextResponse.json(
-            { error: "rotation_id is required" },
-            { status: 400 }
-          );
-        }
-        const result = await verifyPendingRotation(
-          supabase,
-          rotationId,
-          actor.specialistId,
-          scoped.expectedDepartmentId
-        );
-        return NextResponse.json({
-          ok: true,
-          action: "verify",
-          store_id: store.id,
-          rotation: result.rotation,
-        });
-      }
-
-      if (reviewAction === "send_back") {
-        const rotationId = body.rotation_id?.trim();
-        if (!rotationId) {
-          return NextResponse.json(
-            { error: "rotation_id is required" },
-            { status: 400 }
-          );
-        }
-        const result = await sendBackWeeklyRotation(
-          supabase,
-          rotationId,
-          body.note ?? "",
-          scoped.expectedDepartmentId,
-          actor.specialistId
-        );
-        return NextResponse.json({
-          ok: true,
-          action: "send_back",
-          store_id: store.id,
-          rotation: result.rotation,
-        });
-      }
-
-      const batch = await verifyAllPendingRotations(supabase, {
-        storeId: store.id,
-        departmentId: scoped.departmentId || null,
-        assignedWeek: week,
-        actorId: actor.specialistId,
-      });
-
-      const stampDepartments =
-        batch.department_ids.length > 0
-          ? batch.department_ids
-          : scoped.departmentId
-            ? [scoped.departmentId]
-            : [];
-
-      for (const departmentId of stampDepartments) {
-        await verifyWeeklyRotations(supabase, {
-          departmentId,
-          assignedWeek: week,
-          completedRotationIds: [],
-          incomplete: [],
-          reportedBy: actor.specialistId,
-        });
-      }
-
-      return NextResponse.json({
-        ok: true,
-        action: "verify_all",
-        store_id: store.id,
-        assigned_week: week,
-        verified_count: batch.verified_count,
-      });
     }
 
     const scoped = await resolveDepartmentForActor(
@@ -249,29 +170,87 @@ export async function POST(request: Request) {
       actor,
       store.id,
       body.department_id?.trim() || "",
-      false
+      reviewAction === "verify_all" || reviewAction === "verify"
     );
+    const week =
+      body.assigned_week?.trim() ||
+      sundayStagingWeekLabel(new Date(), store.timezone) ||
+      isoWeekLabel();
 
-    const incomplete = (body.incomplete ?? [])
-      .map((item) => ({
-        rotationId: String(item.rotation_id ?? ""),
-        locationId: String(item.location_id ?? ""),
-        reason: String(item.reason ?? "Other") as ExceptionReason | string,
-        cycleNumber: Number(item.cycle_number) || 1,
-      }))
-      .filter((item) => item.locationId);
+    if (reviewAction === "verify") {
+      const rotationId = body.rotation_id?.trim();
+      if (!rotationId) {
+        return NextResponse.json(
+          { error: "rotation_id is required" },
+          { status: 400 }
+        );
+      }
+      const result = await verifyPendingRotation(
+        supabase,
+        rotationId,
+        actor.specialistId,
+        scoped.expectedDepartmentId
+      );
+      return NextResponse.json({
+        ok: true,
+        action: "verify",
+        store_id: store.id,
+        rotation: result.rotation,
+      });
+    }
 
-    const completedRotationIds = (body.completed_rotation_ids ?? []).map(String);
+    if (reviewAction === "send_back") {
+      const rotationId = body.rotation_id?.trim();
+      if (!rotationId) {
+        return NextResponse.json(
+          { error: "rotation_id is required" },
+          { status: 400 }
+        );
+      }
+      const result = await sendBackWeeklyRotation(
+        supabase,
+        rotationId,
+        body.note ?? "",
+        scoped.expectedDepartmentId,
+        actor.specialistId
+      );
+      return NextResponse.json({
+        ok: true,
+        action: "send_back",
+        store_id: store.id,
+        rotation: result.rotation,
+      });
+    }
 
-    const result = await verifyWeeklyRotations(supabase, {
-      departmentId: scoped.departmentId,
-      assignedWeek: body.assigned_week?.trim() || isoWeekLabel(),
-      completedRotationIds,
-      incomplete,
-      reportedBy: actor.specialistId,
+    const batch = await verifyAllPendingRotations(supabase, {
+      storeId: store.id,
+      departmentId: scoped.departmentId || null,
+      assignedWeek: week,
+      actorId: actor.specialistId,
     });
 
-    return NextResponse.json({ ok: true, store_id: store.id, ...result });
+    const stampDepartments =
+      batch.department_ids.length > 0
+        ? batch.department_ids
+        : scoped.departmentId
+          ? [scoped.departmentId]
+          : [];
+
+    for (const departmentId of stampDepartments) {
+      await stampDepartmentWeekVerified(supabase, {
+        departmentId,
+        assignedWeek: week,
+        reportedBy: actor.specialistId,
+      });
+    }
+
+    return NextResponse.json({
+      ok: true,
+      action: "verify_all",
+      store_id: store.id,
+      assigned_week: week,
+      verified_count: batch.verified_count,
+    });
   } catch (err) {
     if (err instanceof StoreOpsAuthError) {
       return NextResponse.json({ error: err.message }, { status: err.status });

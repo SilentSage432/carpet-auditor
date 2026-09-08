@@ -1,5 +1,86 @@
 # DeptSync Hub — Development Journal
 
+## 2026-09-08 — THESIS-001A: the two ways verification authority leaked
+
+Two defects, one law. Both let something other than a supervisor's judgment
+create DeptSync's verified-complete state, and each argued for a different kind
+of fix.
+
+**The first was a branch that only checked authority when asked to.**
+`POST /api/rotations/verify` called `requireSupervisorOrAdmin` inside
+`if (reviewAction)`. Omit `review_action` and the request fell through to a
+legacy batch path that wrote `is_completed`, `VERIFIED_COMPLETE`, `verified_at`,
+`verified_by`, and `store_locations.status = COMPLETED` — after requiring nothing
+but an authenticated session. `isDeptFloorActor` includes `associate`, so the
+lowest-privilege actor in the product could close a bay it had just reported.
+
+The tempting fix is one line: move the role check up. That would have left the
+branch alive, and the branch was the problem. It had no runtime caller — its only
+client wrapper, `verifyWeeklyRotationBatch`, was called by nothing — and every
+legitimate job it nominally served already has a better-scoped owner: barrier
+reporting goes through `POST /api/rotations/exceptions`, and bulk close goes
+through `verify_all`. So it was removed, following A1.10's precedent that
+**obscurity is not a control**. The authority gate now wraps the whole method,
+which means the fail-closed property is structural rather than a property of
+whichever branch you happen to land in.
+
+The same reasoning ran one level deeper. The acceptance law named *direct helper
+call* as a bypass, so leaving the `completedRotationIds` loop inside
+`verifyWeeklyRotations` would have satisfied the route-level law while preserving
+the machinery underneath it. The loop is gone, and what remains — the
+`departments.last_verified_*` stamp — is now called `stampDepartmentWeekVerified`,
+because a function named `verifyWeeklyRotations` that cannot verify anything is a
+name that lies about its own authority.
+
+**The second defect was subtler, and it is the one worth remembering.**
+`/api/rotations/complete` derived `autoVerify` from the live session's role. That
+is correct for someone standing at a bay. It is wrong for the offline queue,
+which replays a completion recorded hours earlier, under whatever session happens
+to be signed in when connectivity returns. An associate reports six bays offline;
+a DS picks up the device; the queue flushes; six bays become DS-verified without a
+supervisor ever looking at them. Nothing was forged. Every individual step was
+behaving as written.
+
+The instinct is to make the payload carry its origin — it already holds
+`specialist_id` and `specialist_role`. But Art. XVIII.3 says actor authority
+outranks client assertion, and those are client strings. Trusting them to *grant*
+auto-verify would rebuild the same defect with extra steps. The queue simply does
+not persist anything the server can re-authenticate, and the honest response to
+missing provenance is to stop claiming it: **a replayed completion never
+auto-verifies.** A DS's own offline work now returns as reported-complete and
+waits in their own queue — one extra tap, in exchange for a verification record
+that always means a supervisor decided.
+
+What makes this safe rather than merely conservative is an asymmetry worth
+naming: the `replayed_from_queue` marker can only *withhold* authority. Role
+still comes exclusively from the server-resolved actor, so forging the flag
+de-escalates the forger, and omitting it grants nothing the live session did not
+already have. A client claim that can only reduce privilege is safe to accept;
+one that can raise it never is.
+
+**One guard needed a resolver it was tempting to reuse.** Hardening
+`verifyPendingRotation` and `sendBackWeeklyRotation` against out-of-order
+transitions meant reading current state — and `resolveVerificationStatus` was
+right there. It infers `VERIFIED_COMPLETE` from `is_completed` when the column is
+absent, which is reasonable for reads and wrong for guards: on a pre-migration
+database every associate submit would look already-verified, and DS verification
+would refuse work it should close. The guards read the raw column instead, and
+treat an empty value as "two-stage review isn't represented here" and stand down.
+A guard that infers state can manufacture the transition it exists to prevent.
+
+Production schema was not confirmed — there is no CLI, no `config.toml`, and no
+database tooling in the repository, and reaching for the service-role key in
+`.env.local` is not a code tranche's business. So the repair was built to be
+correct either way, which is a better outcome than a verified assumption. Worth
+recording separately: `supabase/schema.sql` predates verification entirely, so
+the incremental migrations are the declared truth, not that file.
+
+Residual, reported and deliberately not fixed: a Master Admin can still set
+`store_locations.status = "COMPLETED"` through the topology `PATCH` route. That
+writes cool-down state, not `verification_status`, so it cannot forge the
+`verifiedComplete` metric — which reads the raw column — and it sits inside
+Art. III.1 administrative authority. Bounded and recorded beats quietly changed.
+
 ## 2026-09-08 — SNAP-RETIRE-001: retiring Bay Audit Validate
 
 The tempting version of this tranche is one missing prop. Floor opens the

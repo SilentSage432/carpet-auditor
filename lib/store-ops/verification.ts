@@ -1,12 +1,13 @@
 /**
- * End-of-week verification + exception logging.
+ * Department week verification stamp + barrier / exception logging.
  * Incomplete bays become CARRIED_OVER and are prioritized next week.
  *
- * Authority split:
- * - `completedRotationIds` → bay-level VERIFIED_COMPLETE + location COMPLETED
- * - empty `completedRotationIds` → department week stamp only (`last_verified_*`);
- *   does not close PENDING_VERIFICATION rows. Canonical bay review owns
- *   `rotation-review.ts` (`verifyPendingRotation` / `verifyAllPendingRotations`).
+ * Authority boundary (Art. VI.2):
+ * This module MUST NOT create bay-level verification. It stamps department
+ * `last_verified_*` metadata and records barriers only. `VERIFIED_COMPLETE` and
+ * `store_locations.status = COMPLETED` are owned exclusively by
+ * `rotation-review.ts` (`verifyPendingRotation` / `verifyAllPendingRotations`),
+ * reachable only behind an explicit supervisor/admin `review_action`.
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -34,111 +35,30 @@ export const QUICK_BARRIER_REASONS: ExceptionReason[] = [
   "Missing SIMS Tags",
 ];
 
-export type VerifySubmitInput = {
+export type StampDepartmentWeekInput = {
   departmentId: string;
   assignedWeek: string;
-  /** Rotation IDs confirmed complete */
-  completedRotationIds: string[];
-  /** Incomplete reports */
-  incomplete: Array<{
-    rotationId: string;
-    locationId: string;
-    reason: ExceptionReason | string;
-    cycleNumber: number;
-  }>;
   reportedBy?: string | null;
 };
 
-export type VerifySubmitResult = {
+export type StampDepartmentWeekResult = {
   assigned_week: string;
-  completed_count: number;
-  exception_count: number;
-  exceptions: RotationException[];
 };
 
-export async function verifyWeeklyRotations(
+/**
+ * Stamp `departments.last_verified_week` / `last_verified_at` after the caller has
+ * already closed the week's bays through the authorized review path.
+ *
+ * This records that a supervisor reviewed the department week. It deliberately
+ * cannot verify a bay, close a location, or touch `verification_status` — see the
+ * authority boundary in this module's header.
+ */
+export async function stampDepartmentWeekVerified(
   supabase: SupabaseClient,
-  input: VerifySubmitInput
-): Promise<VerifySubmitResult> {
+  input: StampDepartmentWeekInput
+): Promise<StampDepartmentWeekResult> {
   const week = input.assignedWeek || isoWeekLabel();
   const now = new Date().toISOString();
-  let completedCount = 0;
-
-  for (const rotationId of input.completedRotationIds) {
-    const { data: rotation, error: fetchError } = await supabase
-      .from("weekly_rotations")
-      .select("*")
-      .eq("id", rotationId)
-      .eq("department_id", input.departmentId)
-      .maybeSingle();
-
-    if (fetchError) throw new Error(fetchError.message);
-    if (!rotation) continue;
-    const supersededAt = (rotation as { superseded_at?: string | null })
-      .superseded_at;
-    if (supersededAt != null && String(supersededAt).trim() !== "") {
-      continue;
-    }
-
-    if (!rotation.is_completed) {
-      const { error: rotError } = await supabase
-        .from("weekly_rotations")
-        .update({
-          is_completed: true,
-          completed_at: now,
-          verification_status: "VERIFIED_COMPLETE",
-          verified_at: now,
-          verified_by: input.reportedBy ?? null,
-        })
-        .eq("id", rotationId);
-      if (rotError) {
-        const missing =
-          /verification_status|verified_at|verified_by/i.test(
-            rotError.message
-          );
-        if (!missing) throw new Error(rotError.message);
-        const retry = await supabase
-          .from("weekly_rotations")
-          .update({ is_completed: true, completed_at: now })
-          .eq("id", rotationId);
-        if (retry.error) throw new Error(retry.error.message);
-      }
-    } else {
-      const { error: stampError } = await supabase
-        .from("weekly_rotations")
-        .update({
-          verification_status: "VERIFIED_COMPLETE",
-          verified_at: now,
-          verified_by: input.reportedBy ?? null,
-        })
-        .eq("id", rotationId);
-      if (
-        stampError &&
-        !/verification_status|verified_at|verified_by/i.test(stampError.message)
-      ) {
-        throw new Error(stampError.message);
-      }
-    }
-
-    const { error: locError } = await supabase
-      .from("store_locations")
-      .update({
-        status: "COMPLETED",
-        last_completed_at: now,
-        updated_at: now,
-      })
-      .eq("id", rotation.location_id);
-    if (locError) throw new Error(locError.message);
-    completedCount += 1;
-  }
-
-  const barriers = await insertRotationBarriers(supabase, {
-    departmentId: input.departmentId,
-    assignedWeek: week,
-    incomplete: input.incomplete,
-    reportedBy: input.reportedBy,
-    markCarriedOver: true,
-  });
 
   const { error: deptError } = await supabase
     .from("departments")
@@ -149,12 +69,7 @@ export async function verifyWeeklyRotations(
     .eq("id", input.departmentId);
   if (deptError) throw new Error(deptError.message);
 
-  return {
-    assigned_week: week,
-    completed_count: completedCount,
-    exception_count: barriers.exceptions.length,
-    exceptions: barriers.exceptions,
-  };
+  return { assigned_week: week };
 }
 
 export type ReportBarrierInput = {

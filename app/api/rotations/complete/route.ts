@@ -6,17 +6,25 @@ import {
   StoreOpsAuthError,
 } from "@/lib/store-ops/auth-server";
 import { assertActorCanAccessDepartmentId } from "@/lib/store-ops/department-scope";
-import { completeWeeklyRotation } from "@/lib/store-ops/rotations";
+import {
+  completeWeeklyRotation,
+  resolveCompletionAutoVerify,
+} from "@/lib/store-ops/rotations";
 import { resolveStoreByNumber } from "@/lib/store-ops/stores";
 import { getSupabaseAdmin } from "@/lib/store-ops/supabase-admin";
 import { supabaseAdminMissingMessage } from "@/lib/supabase/env";
 
 /**
  * POST /api/rotations/complete
- * Body: { rotation_id: uuid }
+ * Body: { rotation_id: uuid, replayed_from_queue?: boolean }
  *
  * Completion authority is human. SNAP-RETIRE-001 removed the Bay Audit Validate
  * model-verdict gate; no automated verdict may block or force a completion.
+ *
+ * Auto-verify (DS/Master reporting and verifying in one act) requires a first-hand
+ * live completion. A completion replayed from the offline queue never auto-verifies,
+ * because the server cannot re-authenticate the actor who originally did the work
+ * (Art. XIV.3 — reconnection MUST NOT elevate local assumptions).
  */
 export async function POST(request: Request) {
   try {
@@ -33,7 +41,13 @@ export async function POST(request: Request) {
 
     const body = (await request.json()) as {
       rotation_id?: string;
+      replayed_from_queue?: boolean;
     };
+
+    // De-escalation only: this can withhold auto-verify, never grant it. Role still
+    // comes exclusively from the server-resolved actor, so a forged value cannot
+    // raise privilege.
+    const replayedFromQueue = body.replayed_from_queue === true;
 
     const rotationId = body.rotation_id?.trim();
     if (!rotationId) {
@@ -73,9 +87,10 @@ export async function POST(request: Request) {
       rotationId,
       expectedDepartmentId,
       {
-        autoVerify:
-          actor.role === "super_admin" ||
-          actor.role === "department_supervisor",
+        autoVerify: resolveCompletionAutoVerify({
+          role: actor.role,
+          replayedFromQueue,
+        }),
         actorId: actor.specialistId || null,
       }
     );

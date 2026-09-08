@@ -1348,6 +1348,26 @@ export type CompleteWeeklyRotationOptions = {
   actorId?: string | null;
 };
 
+/**
+ * Who may report and verify in a single act.
+ *
+ * Auto-verify is granted only to a supervisor/admin completing the bay first-hand.
+ * A completion replayed from the offline queue is never auto-verified: the server
+ * cannot re-authenticate whoever originally reported the work, and the session
+ * flushing the queue may belong to someone else entirely (Art. XIV.3 —
+ * reconnection MUST NOT elevate local assumptions into authoritative truth).
+ * Such a completion falls back to reported-complete and waits for DS review.
+ */
+export function resolveCompletionAutoVerify(input: {
+  role: string | null | undefined;
+  replayedFromQueue: boolean;
+}): boolean {
+  if (input.replayedFromQueue) return false;
+  return (
+    input.role === "super_admin" || input.role === "department_supervisor"
+  );
+}
+
 export async function completeWeeklyRotation(
   supabase: SupabaseClient,
   rotationId: string,

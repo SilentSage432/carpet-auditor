@@ -136,6 +136,31 @@ async function restoreLocationAssigned(
   return data as StoreLocation;
 }
 
+/**
+ * Raw stored review state, deliberately NOT `resolveVerificationStatus`.
+ *
+ * The resolver infers `VERIFIED_COMPLETE` from `is_completed` when the column is
+ * absent, which would make a pre-migration associate submit look already-verified.
+ * Transition guards must only act on state the database actually recorded, so an
+ * empty value means "two-stage review not represented here" and the guard stands
+ * down rather than inventing a transition.
+ */
+function storedReviewState(row: WeeklyRotation): string {
+  return String(row.verification_status ?? "").toUpperCase();
+}
+
+async function readLocation(
+  supabase: SupabaseClient,
+  locationId: string
+): Promise<StoreLocation | null> {
+  const { data } = await supabase
+    .from("store_locations")
+    .select("*")
+    .eq("id", locationId)
+    .maybeSingle();
+  return (data as StoreLocation) ?? null;
+}
+
 export async function verifyPendingRotation(
   supabase: SupabaseClient,
   rotationId: string,
@@ -164,6 +189,21 @@ export async function verifyPendingRotation(
     rotation.department_id !== expectedDepartmentId
   ) {
     throw new Error("Rotation is outside your assigned department");
+  }
+
+  const stored = storedReviewState(rotation as WeeklyRotation);
+  if (stored === "VERIFIED_COMPLETE") {
+    // Already closed by an authorized verifier — idempotent for double taps and
+    // verify_all races. Do not rewrite existing verification provenance.
+    return {
+      rotation: rotation as WeeklyRotation,
+      location: await readLocation(supabase, String(rotation.location_id)),
+    };
+  }
+  if (stored === "PENDING") {
+    throw new Error(
+      "Bay has not been reported complete — there is nothing to verify"
+    );
   }
 
   const now = new Date().toISOString();
@@ -222,6 +262,18 @@ export async function sendBackWeeklyRotation(
     rotation.department_id !== expectedDepartmentId
   ) {
     throw new Error("Rotation is outside your assigned department");
+  }
+
+  const stored = storedReviewState(rotation as WeeklyRotation);
+  if (stored === "VERIFIED_COMPLETE") {
+    throw new Error(
+      "Bay is already verified complete and cannot be sent back"
+    );
+  }
+  if (stored === "PENDING") {
+    throw new Error(
+      "Bay has not been reported complete — there is nothing to send back"
+    );
   }
 
   const now = new Date().toISOString();
