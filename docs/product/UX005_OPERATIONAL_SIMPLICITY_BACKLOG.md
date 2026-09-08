@@ -16,7 +16,7 @@ Do not silently resolve, delete, or discard open questions during an early tranc
 |---------|-------|--------|
 | **UX-005A** | Appliances operational home simplification | Implemented — real-hardware acceptance pending |
 | **UX-005B** | Specialty findability (Appliances-first Floor entry) | Implemented — Samsung acceptance pending |
-| **UX-005C** | Floor secondary drawer | Open — do not preempt |
+| **UX-005C** | Floor secondary drawer | Implemented — Samsung acceptance pending |
 | **UX-005D** | Map operate vs investigate | Open — do not preempt |
 | **UX-005E** | Operational language | Open — do not preempt |
 | **UX-005F** | AI earn-your-place review | Open — do not preempt |
@@ -31,8 +31,8 @@ Do not preempt later tranches inside an earlier one.
 |---|----------|-----------------|-----------|
 | 1 | Appliances under More vs elevated specialty entry | Do DS users find Floor entry instinctive? Still use More? Interfere with Floor? | **UX-005B implemented** (Floor contextual entry) — **not field-accepted yet**; More remains secondary path |
 | 2 | Dual Start Physical Audit CTAs | Are they always redundant in actual operation? | **Owned by UX-005A** — duplicate competing Start removed; single panel CTA |
-| 3 | Snap Bay multi-promotion + Gemini cost | Does it materially change real verification decisions? | **Not owned** — remains open (UX-005F) |
-| 4 | Walk & Talk vs Executive Floor Pad | Two genuine jobs or duplicate mental models? | **Not owned** — remains open (UX-005C / product) |
+| 3 | Snap Bay multi-promotion + Gemini cost | Does it materially change real verification decisions? | **Not owned** — remains open (UX-005F). UX-005C demoted it to last in the Floor drawer without removing it or its Gemini path |
+| 4 | Walk & Talk vs Executive Floor Pad | Two genuine jobs or duplicate mental models? | **Not owned** — remains open (product). **UX-005C did not resolve it**: the two were not merged or renamed |
 | 5 | Velocity Heatmap | Used instead of or alongside Standard Map? | **Not owned** — remains open (UX-005D) |
 | 6 | Flooring cycle audit vs Floor Sunday | Different Flooring jobs or overlapping concepts? | **Not owned** — remains open (product); **UX-005B did not resolve** |
 | 7 | Predictive copilot | Recommendations acted on or routinely ignored? | **Not owned** — remains open (UX-005F) |
@@ -48,8 +48,9 @@ Do not preempt later tranches inside an earlier one.
 - “Sunday Cycle Audit Engine” language
 - “Predictive copilot” language
 - “Velocity Heatmap” language
-- Verification duplicated in secondary Floor drawer
+- Verification duplicated in secondary Floor drawer (**still open after UX-005C** — Weekly Audit Rollup remains a primary drawer action opening the same verification modal as the Floor strip; UX-005C reordered, it did not de-duplicate verification)
 - Executive Floor Pad has dual mental entry
+- **WALK-001 — Shift Walk Task Read-Back:** Walk & Talk writes `shift_walk_tasks` via `dispatchShiftWalkTasks`, but `fetchShiftWalkTasks` has no UI consumer. **Deferred — explicitly not owned by UX-005C**, which improved placement only
 
 ---
 
@@ -125,6 +126,55 @@ UX-005B implemented a **department-aware Appliances entry on Floor** using exist
 - No appliance audit-state fetch on Floor
 - No dual-shell / specialty-host / schema / API refactor
 - Samsung acceptance pending — **do not close Question #1 as field-accepted yet**
+
+---
+
+## UX-005C compliance note
+
+UX-005C reordered the **existing** `ShiftAnalyticsDrawer` so a DS opening it mid-shift
+sees actions before reports. Presentation / information architecture only.
+
+**Primary action order (drawer open):**
+
+1. Walk & Talk Floor Pad
+2. Flag Downstock
+3. Showroom Quick Touch
+4. Predictive Copilot
+5. Weekly Audit Rollup
+6. Snap Bay Photo
+
+**Secondary — `Reports & insights`, collapsed by default, state not persisted:**
+Audit Velocity → Store Health → Shift Briefing → Exception Feed.
+
+UX-005C did:
+
+- Preserve the drawer, its collapsed default, and its `#floor-pad` /
+  `EXECUTIVE_FLOOR_PAD_OPEN_EVENT` opening mechanism
+- Stack actions full-width (removed the Snap/Downstock two-column grid)
+- Retain **and demote** Snap Bay Photo to last — Gemini, `bay_audit_logs`, and the
+  unwired override helper all left exactly as found
+- Add one nested disclosure (`ShiftAnalyticsReportsGroup`) in the drawer's own file —
+  exactly one secondary level, no new global accordion framework
+- Remove the duplicate `BayFreshnessGrid` **from this drawer only**
+- Suppress Store Health's duplicate `Logged barriers` block **in this context only**,
+  via `showLoggedBarriers={false}`; the prop defaults to `true` everywhere else
+
+UX-005C did **not**, and must not be read as having:
+
+- Deleted any capability, component, or engine
+- Changed schema, migrations, API routes, Gemini helpers, deterministic engines,
+  scoring, rotation/verification semantics, any persistence path, RBAC, or the
+  offline queue
+- Changed Map / Roster / More IA or bottom navigation (Floor · Map · Roster · More)
+- Touched appliance code — **APP-CAT-001A Samsung ESL validation remains pending**
+- Implemented **WALK-001** Shift Walk Task Read-Back
+- Merged or renamed Walk & Talk and Executive Floor Pad (Question #4 stays open)
+- De-duplicated verification (Weekly Audit Rollup still opens the same modal as the
+  primary Floor strip — that UX debt remains open)
+- Resolved Question #3 — Snap Bay's Gemini cost is still a UX-005F / field question
+
+**Engineering complete ≠ field accepted.** Do not mark UX-005C field accepted until
+real-device acceptance is run.
 
 ---
 

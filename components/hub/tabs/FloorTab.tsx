@@ -9,12 +9,14 @@ import { ExceptionFeed } from "@/components/admin/ExceptionFeed";
 import { StoreHealthCard } from "@/components/StoreHealthCard";
 import { ShowroomQuickTouchCard } from "@/components/dashboard/ShowroomQuickTouchCard";
 import { TacticalVoiceFloorPad } from "@/components/dashboard/TacticalVoiceFloorPad";
-import { BayFreshnessGrid } from "@/components/dashboard/BayFreshnessGrid";
 import { FlagDownstockSheet } from "@/components/store-ops/FlagDownstockSheet";
 import { FloorAttentionSummary } from "@/components/store-ops/FloorAttentionSummary";
 import { FloorOperationalContextStrip } from "@/components/store-ops/FloorOperationalContextStrip";
 import { OnDutyAssociateStrip } from "@/components/store-ops/OnDutyAssociateStrip";
-import { ShiftAnalyticsDrawer } from "@/components/store-ops/ShiftAnalyticsDrawer";
+import {
+  ShiftAnalyticsDrawer,
+  ShiftAnalyticsReportsGroup,
+} from "@/components/store-ops/ShiftAnalyticsDrawer";
 import { ExecutiveFloorPadIntentBridge } from "@/components/hub/ExecutiveFloorPadIntentBridge";
 import { ZebraChecklist, type FloorBayFilter } from "@/components/store-ops/ZebraChecklist";
 import { ShiftBriefingCard } from "@/components/store-ops/ShiftBriefingCard";
@@ -887,79 +889,96 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
           />
         ) : null}
 
-        {/* Secondary tools / AI / analytics — collapsed by default */}
+        {/* Secondary tools / AI / analytics — collapsed by default.
+            UX-005C: shift actions first, reports second. Actions stay stacked
+            full-width so a phone never depends on a horizontal strip. */}
         <div className="mt-3">
           <ShiftAnalyticsDrawer>
-            {!simplified ? (
-              <div className="mb-3 grid grid-cols-2 gap-2">
-                <button
-                  type="button"
-                  onClick={() => setBayScanOpen(true)}
-                  className="flex min-h-12 items-center justify-center rounded-xl border border-emerald-500/40 bg-emerald-950/25 px-3 text-sm font-semibold text-emerald-100"
-                >
-                  Snap Bay Photo
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setDownstockOpen(true)}
-                  className="flex min-h-12 items-center justify-center rounded-xl border border-cyan-500/40 bg-cyan-950/30 px-3 text-sm font-semibold text-cyan-100"
-                >
-                  Flag Downstock
-                </button>
-              </div>
-            ) : null}
-            {!simplified ? (
-              <TacticalVoiceFloorPad
-                specialist={specialist}
-                storeNumber={storeNumber}
-                week={week}
-                rotations={displayRotations}
-                departmentId={deptId}
-              />
-            ) : null}
-            <BayFreshnessGrid
-              locations={freshnessLocations}
-              refreshKey={healthKey}
-            />
-            <ShiftBriefingCard specialist={specialist} refreshKey={healthKey} />
-            {!simplified ? (
-              <>
-                <PredictiveCopilotBanner
+            <div data-testid="floor-drawer-actions">
+              {/* 1 — Walk & Talk Floor Pad */}
+              {!simplified ? (
+                <TacticalVoiceFloorPad
                   specialist={specialist}
+                  storeNumber={storeNumber}
                   week={week}
                   rotations={displayRotations}
                   departmentId={deptId}
-                  refreshKey={healthKey}
-                  onApplied={silentRefresh}
                 />
-                <StoreHealthChart
-                  specialist={specialist}
-                  refreshKey={healthKey}
-                />
-                <StoreHealthCard
-                  specialist={specialist}
-                  refreshKey={healthKey}
-                />
-                <ShowroomQuickTouchCard
-                  specialist={specialist}
-                  refreshKey={healthKey}
-                  onTouched={() => setHealthKey((k) => k + 1)}
-                />
-              </>
-            ) : null}
-            {supervisor && !simplified ? (
-              <button
-                type="button"
-                onClick={() => setRollupOpen(true)}
-                className="mb-3 flex min-h-11 w-full items-center justify-center rounded-xl border border-emerald-500/40 bg-emerald-950/30 px-3 text-sm font-bold text-emerald-100"
-              >
-                Weekly audit rollup
-                {pendingVerifyCount > 0 ? ` (${pendingVerifyCount})` : ""}
-              </button>
-            ) : null}
-            {!simplified ? (
-              <ExceptionFeed specialist={specialist} refreshKey={healthKey} />
-            ) : null}
+              ) : null}
+              {/* 2 — Flag Downstock */}
+              {!simplified ? (
+                <button
+                  type="button"
+                  onClick={() => setDownstockOpen(true)}
+                  className="mb-3 flex min-h-12 w-full items-center justify-center rounded-xl border border-cyan-500/40 bg-cyan-950/30 px-3 text-sm font-semibold text-cyan-100"
+                >
+                  Flag Downstock
+                </button>
+              ) : null}
+              {!simplified ? (
+                <>
+                  {/* 3 — Showroom Quick Touch */}
+                  <ShowroomQuickTouchCard
+                    specialist={specialist}
+                    refreshKey={healthKey}
+                    onTouched={() => setHealthKey((k) => k + 1)}
+                  />
+                  {/* 4 — Predictive Copilot */}
+                  <PredictiveCopilotBanner
+                    specialist={specialist}
+                    week={week}
+                    rotations={displayRotations}
+                    departmentId={deptId}
+                    refreshKey={healthKey}
+                    onApplied={silentRefresh}
+                  />
+                </>
+              ) : null}
+              {/* 5 — Weekly audit rollup */}
+              {supervisor && !simplified ? (
+                <button
+                  type="button"
+                  onClick={() => setRollupOpen(true)}
+                  className="mb-3 flex min-h-11 w-full items-center justify-center rounded-xl border border-emerald-500/40 bg-emerald-950/30 px-3 text-sm font-bold text-emerald-100"
+                >
+                  Weekly audit rollup
+                  {pendingVerifyCount > 0 ? ` (${pendingVerifyCount})` : ""}
+                </button>
+              ) : null}
+              {/* 6 — Snap Bay Photo (retained, demoted; UX-005F decides its future) */}
+              {!simplified ? (
+                <button
+                  type="button"
+                  onClick={() => setBayScanOpen(true)}
+                  className="mb-3 flex min-h-12 w-full items-center justify-center rounded-xl border border-emerald-500/40 bg-emerald-950/25 px-3 text-sm font-semibold text-emerald-100"
+                >
+                  Snap Bay Photo
+                </button>
+              ) : null}
+            </div>
+            <ShiftAnalyticsReportsGroup>
+              {!simplified ? (
+                <>
+                  <StoreHealthChart
+                    specialist={specialist}
+                    refreshKey={healthKey}
+                  />
+                  {/* Exception Feed owns the visible barrier list in this drawer. */}
+                  <StoreHealthCard
+                    specialist={specialist}
+                    refreshKey={healthKey}
+                    showLoggedBarriers={false}
+                  />
+                </>
+              ) : null}
+              <ShiftBriefingCard
+                specialist={specialist}
+                refreshKey={healthKey}
+              />
+              {!simplified ? (
+                <ExceptionFeed specialist={specialist} refreshKey={healthKey} />
+              ) : null}
+            </ShiftAnalyticsReportsGroup>
           </ShiftAnalyticsDrawer>
         </div>
         {/* After pad listeners so cold-mount effect order registers them first. */}

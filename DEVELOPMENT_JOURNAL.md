@@ -1,5 +1,60 @@
 # DeptSync Hub — Development Journal
 
+## 2026-09-07 — UX-005C Floor operational simplicity
+
+Opening the Floor drawer on a phone used to lead with Snap Bay Photo and a bay
+freshness grid, so the first screen a DS saw during a shift was a photo button and
+a report. The drawer now answers "what can I do right now?" first and "what is
+going on?" second. This tranche is presentation / information architecture only.
+
+`ShiftAnalyticsDrawer` is unchanged as the container — still collapsed by default,
+still opened by `#floor-pad` hashes and `EXECUTIVE_FLOOR_PAD_OPEN_EVENT`, still
+mounting children only when open. Its children were reordered into six primary
+shift actions: **Walk & Talk Floor Pad → Flag Downstock → Showroom Quick Touch →
+Predictive Copilot → Weekly Audit Rollup → Snap Bay Photo**. Every engine,
+persistence path, permission gate, API contract, and Gemini call site behind those
+surfaces is untouched; only their order and layout moved. The Snap/Downstock
+two-column grid became full-width stacked buttons so a Samsung-sized screen never
+depends on a horizontal action strip.
+
+**Snap Bay Photo is retained and demoted to last**, not deleted and not redesigned.
+Its Gemini path, `bay_audit_logs` write, and unwired override helper are all
+deliberately preserved — whether it earns continued placement is a UX-005F / field
+question, not a UI cleanup decision.
+
+Reports moved behind one nested disclosure, `ShiftAnalyticsReportsGroup`, exported
+from the same drawer file so drawer chrome keeps a single owner. It is labelled
+**Reports & insights**, collapsed on every mount, and its open state is
+intentionally not persisted. It holds Audit Velocity, Store Health, Shift Briefing,
+and Exception Feed. That is exactly one secondary level — drawer → reports — and no
+new global accordion framework was introduced.
+
+Two duplicate presentations were removed. The drawer no longer renders
+`BayFreshnessGrid`; the component and `composeBayFreshness` remain in the
+repository, and Floor's own readiness line and Current Attention strip still carry
+freshness context outside the drawer. Inside this drawer only, Store Health no
+longer repeats its "Logged barriers" block, because Exception Feed is the
+authoritative visible barrier list here. That is a single explicit presentation
+prop, `showLoggedBarriers` (default `true`), so every other Store Health call site
+behaves exactly as before. No health calculation and no barrier persistence changed.
+
+- **WALK-001 — Shift Walk Task Read-Back remains deferred.** Walk & Talk still
+  writes `shift_walk_tasks` through `dispatchShiftWalkTasks` and nothing reads them
+  back; `fetchShiftWalkTasks` has no UI consumer. UX-005C improved Walk & Talk's
+  placement and deliberately did not grow into read-back. A contract test asserts
+  the read helpers stay unimported here.
+- Walk & Talk and Executive Floor Pad were **not** merged or renamed. Their boundary
+  still needs product evidence (Question #4).
+- No schema, migration, API route, Gemini helper, intelligence engine, scoring,
+  rotation/verification semantics, offline queue, RBAC, Map/Roster/More IA, or
+  bottom-navigation change. Bottom nav remains Floor · Map · Roster · More.
+- Appliance code was not touched. APP-CAT-001A's repaired Samsung ESL validation
+  remains pending and is unaffected.
+- Contracts: `lib/ux005c.floor-operational-simplicity.contract.test.ts` (21).
+- 764 tests, typecheck, and build pass; lint at baseline parity (114). UX-005C is
+  **not** field accepted — real-device acceptance is separate from engineering
+  completion.
+
 ## 2026-09-07 — APP-CAT-001A-FIX-001B Missing-parent sync classification
 
 The historical identifier FK quarantine now has a deterministic product

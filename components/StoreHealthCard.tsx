@@ -13,6 +13,11 @@ type Props = {
   specialist: StoreSpecialist;
   /** Bump to refetch after checklist completes */
   refreshKey?: number | string;
+  /**
+   * UX-005C — set false where another surface already owns the visible barrier
+   * list (Floor drawer Exception Feed). Barrier data/persistence is unchanged.
+   */
+  showLoggedBarriers?: boolean;
 };
 
 /**
@@ -20,7 +25,11 @@ type Props = {
  * DS: department pace + barriers. Super Admin: storewide grid + bottleneck summary.
  * Pace % / quota progress use verified complete (Art VI). Reported is labeled separately.
  */
-export function StoreHealthCard({ specialist, refreshKey }: Props) {
+export function StoreHealthCard({
+  specialist,
+  refreshKey,
+  showLoggedBarriers = true,
+}: Props) {
   const [data, setData] = useState<StoreHealthSnapshotClient | null>(null);
   const [loading, setLoading] = useState(true);
   const master = isMasterAdmin(specialist);
@@ -58,13 +67,20 @@ export function StoreHealthCard({ specialist, refreshKey }: Props) {
     return <SuperAdminHealth data={data} />;
   }
 
-  return <DepartmentSupervisorHealth data={data} />;
+  return (
+    <DepartmentSupervisorHealth
+      data={data}
+      showLoggedBarriers={showLoggedBarriers}
+    />
+  );
 }
 
 function DepartmentSupervisorHealth({
   data,
+  showLoggedBarriers,
 }: {
   data: StoreHealthSnapshotClient;
+  showLoggedBarriers: boolean;
 }) {
   const dept = data.department;
   const assigned = dept?.assigned ?? data.totals.assigned;
@@ -124,7 +140,7 @@ function DepartmentSupervisorHealth({
         </p>
       </div>
 
-      {barriers.length > 0 ? (
+      {showLoggedBarriers && barriers.length > 0 ? (
         <div className="mt-3">
           <button
             type="button"

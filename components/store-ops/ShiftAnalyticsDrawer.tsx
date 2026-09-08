@@ -4,6 +4,10 @@
  * Collapsed Floor secondary-tools accordion — presentation chrome only.
  * Snap, velocity, health, and Walk & Talk nest here so the primary Floor
  * viewport stays on verification and active week work (UX-003).
+ *
+ * UX-005C: the drawer owns exactly two disclosure levels — this drawer, then
+ * one nested "Reports & insights" group so shift actions are not outranked by
+ * explanatory reports. No deeper nesting, no persisted open state.
  */
 
 import { useEffect, useId, useState, type ReactNode } from "react";
@@ -76,6 +80,52 @@ export function ShiftAnalyticsDrawer({ children }: Props) {
       </button>
       {open ? (
         <div id={panelId} className="border-t border-zinc-800 px-3 py-3">
+          {children}
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+/**
+ * UX-005C — nested reports disclosure inside the Floor drawer.
+ * Collapsed on every mount; open state is intentionally not persisted.
+ */
+export function ShiftAnalyticsReportsGroup({ children }: Props) {
+  const panelId = useId();
+  const [open, setOpen] = useState(false);
+
+  return (
+    <section
+      className="overflow-hidden rounded-xl border border-zinc-800/70 bg-zinc-950/40"
+      data-testid="floor-reports-insights"
+    >
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-controls={panelId}
+        onClick={() => setOpen((prev) => !prev)}
+        className="flex min-h-11 w-full items-center gap-2 px-3 py-2 text-left"
+      >
+        <span className="min-w-0 flex-1 text-sm font-semibold text-zinc-300">
+          Reports &amp; insights
+        </span>
+        {open ? (
+          <ChevronUp
+            className="h-4 w-4 shrink-0 text-zinc-500"
+            strokeWidth={ICON_STROKE}
+            aria-hidden
+          />
+        ) : (
+          <ChevronDown
+            className="h-4 w-4 shrink-0 text-zinc-500"
+            strokeWidth={ICON_STROKE}
+            aria-hidden
+          />
+        )}
+      </button>
+      {open ? (
+        <div id={panelId} className="border-t border-zinc-800 px-3 pb-1 pt-3">
           {children}
         </div>
       ) : null}
