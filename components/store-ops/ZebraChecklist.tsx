@@ -28,7 +28,6 @@ import { requestApplianceScanner } from "@/lib/specialty-tools";
 import { formatAuditLocationBadge } from "@/lib/store-ops/audit-location-mode";
 import { diagnoseBayHealth } from "@/lib/store-ops/bay-health";
 import {
-  BayCompleteGatedError,
   completeRotation,
   reportRotationBarriers,
 } from "@/lib/store-ops/client";
@@ -106,14 +105,6 @@ export type ZebraChecklistProps = {
   focusSpecialistId?: string | "all";
   /** Today's on-duty roster used to group unassigned bays in-place. */
   onDutyMembers?: OnDutyWorkloadMember[];
-  /** Audits captured by Snap Bay elsewhere on the Floor. */
-  externalAudits?: Record<
-    string,
-    {
-      audit_log_id: string;
-      audit_verdict: "PASS" | "CONDITIONAL" | "FAIL";
-    }
-  >;
   /** Floor-hosted appliance scans for SIMS bay live counts. */
   simsScans?: ApplianceScan[];
   simsCatalog?: ApplianceCatalogItem[];
@@ -132,7 +123,6 @@ export function ZebraChecklist({
   assignmentDepartment = SUNDAY_DEPARTMENT,
   focusSpecialistId = "all",
   onDutyMembers,
-  externalAudits,
   simsScans = [],
   simsCatalog = [],
   floorBayFilter = "all",
@@ -163,16 +153,6 @@ export function ZebraChecklist({
     () => new Set()
   );
   const [audits, setAudits] = useState<CarpetAudit[]>(() => getLocalAudits());
-  const [auditByRotation, setAuditByRotation] = useState<
-    Record<
-      string,
-      {
-        audit_log_id: string;
-        audit_verdict: "PASS" | "CONDITIONAL" | "FAIL";
-      }
-    >
-  >({});
-  const [gatedRotationId, setGatedRotationId] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
   const associateView = isAssociate(specialist);
@@ -423,39 +403,6 @@ export function ZebraChecklist({
     });
   }, [rotations, completedOverlay]);
 
-  function handleSupervisorOverrideComplete(rotationId: string) {
-    const rotation = rotations.find((r) => r.id === rotationId);
-    const locationId =
-      rotation?.location_id || rotation?.store_locations?.id || "";
-    const pending =
-      auditByRotation[rotationId] ?? externalAudits?.[rotationId];
-    setError(null);
-    startTransition(async () => {
-      try {
-        await completeRotation(specialist, rotationId, {
-          bay_id: locationId,
-          audit_verdict: pending?.audit_verdict ?? "FAIL",
-          audit_log_id: pending?.audit_log_id,
-          supervisor_override: true,
-        });
-        setCompletedOverlay((prev) => new Set(prev).add(rotationId));
-        setAuditByRotation((prev) => {
-          const next = { ...prev };
-          delete next[rotationId];
-          return next;
-        });
-        setGatedRotationId(null);
-        onRefresh();
-        playSuccessTone();
-      } catch (err) {
-        setError(
-          err instanceof Error ? err.message : "Supervisor override failed"
-        );
-        playErrorTone();
-      }
-    });
-  }
-
   function handleCheck(rotationId: string) {
     setError(null);
     const remaining = queueOpen.filter((r) => r.id !== rotationId);
@@ -486,20 +433,10 @@ export function ZebraChecklist({
     playSuccessTone();
     startTransition(async () => {
       try {
-        const pending =
-          auditByRotation[rotationId] ?? externalAudits?.[rotationId];
         const outcome = await completeRotation(specialist, rotationId, {
           bay_id: locationId,
-          audit_verdict: pending?.audit_verdict,
-          audit_log_id: pending?.audit_log_id,
         });
         if (outcome === "executed") {
-          setAuditByRotation((prev) => {
-            const next = { ...prev };
-            delete next[rotationId];
-            return next;
-          });
-          setGatedRotationId(null);
           onRefresh();
         }
       } catch (err) {
@@ -509,20 +446,7 @@ export function ZebraChecklist({
           return next;
         });
         setPulseId(null);
-        if (err instanceof BayCompleteGatedError) {
-          setGatedRotationId(rotationId);
-          const issueLines = err.issues
-            .slice(0, 3)
-            .map((i) => i.issue)
-            .filter(Boolean);
-          setError(
-            issueLines.length > 0
-              ? `Audit gate: ${issueLines.join(" · ")}`
-              : err.message
-          );
-        } else {
-          setError(err instanceof Error ? err.message : "Could not complete bay");
-        }
+        setError(err instanceof Error ? err.message : "Could not complete bay");
         playErrorTone();
         onRefresh();
       }
@@ -887,21 +811,9 @@ export function ZebraChecklist({
       ) : null}
 
       {error ? (
-        <div className="space-y-2">
-          <p className="rounded-xl border border-red-500/40 bg-red-950/40 px-3 py-2 text-sm text-red-200">
-            {error}
-          </p>
-          {gatedRotationId &&
-          (isMasterAdmin(specialist) || specialist.role === "Supervisor") ? (
-            <button
-              type="button"
-              onClick={() => handleSupervisorOverrideComplete(gatedRotationId)}
-              className="flex min-h-11 w-full items-center justify-center rounded-xl border border-amber-400/50 bg-amber-500/20 text-sm font-bold text-amber-100"
-            >
-              Supervisor override — complete bay anyway
-            </button>
-          ) : null}
-        </div>
+        <p className="rounded-xl border border-red-500/40 bg-red-950/40 px-3 py-2 text-sm text-red-200">
+          {error}
+        </p>
       ) : null}
 
       {lockedQueue !== "downstock" && open.length === 0 && done.length === 0 ? (

@@ -67,11 +67,6 @@ export const OFFLINE_CAPABILITY_ROWS: OfflineCapabilityRow[] = [
     mode: "online_only",
     summary: "Bay setup via API only",
   },
-  {
-    module: "Snap Bay AI audit persist",
-    mode: "online_only",
-    summary: "Gemini verdict + bay_audit_logs",
-  },
 ];
 
 export function offlineCapabilityModeLabel(mode: OfflineCapabilityMode): string {

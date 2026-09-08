@@ -120,14 +120,6 @@ const SupervisorAuditSummaryModal = dynamic(
   { ssr: false }
 );
 
-const VisualBayScannerModal = dynamic(
-  () =>
-    import("@/components/store-ops/VisualBayScannerModal").then(
-      (mod) => mod.VisualBayScannerModal
-    ),
-  { ssr: false }
-);
-
 function rotationBayRef(rotation: WeeklyRotationWithLocation) {
   return {
     rotationId: rotation.id,
@@ -160,16 +152,6 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
   const [loading, setLoading] = useState(true);
   const [healthKey, setHealthKey] = useState(0);
   const [rollupOpen, setRollupOpen] = useState(false);
-  const [bayScanOpen, setBayScanOpen] = useState(false);
-  const [bayAudits, setBayAudits] = useState<
-    Record<
-      string,
-      {
-        audit_log_id: string;
-        audit_verdict: "PASS" | "CONDITIONAL" | "FAIL";
-      }
-    >
-  >({});
   const [onDuty, setOnDuty] = useState<OnDutyWorkloadMember[]>([]);
   const [onDutyLoading, setOnDutyLoading] = useState(true);
   const [assignments, setAssignments] = useState<SundayAssignmentMap>({});
@@ -822,7 +804,6 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
                 assignmentDepartment={assignmentDept}
                 focusSpecialistId={effectiveFocus}
                 onDutyMembers={onDuty}
-                externalAudits={bayAudits}
                 hideChrome
                 floorBayFilter={floorBayFilter}
                 simsScans={applianceScans}
@@ -945,16 +926,12 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
                   {pendingVerifyCount > 0 ? ` (${pendingVerifyCount})` : ""}
                 </button>
               ) : null}
-              {/* 6 — Snap Bay Photo (retained, demoted; UX-005F decides its future) */}
-              {!simplified ? (
-                <button
-                  type="button"
-                  onClick={() => setBayScanOpen(true)}
-                  className="mb-3 flex min-h-12 w-full items-center justify-center rounded-xl border border-emerald-500/40 bg-emerald-950/25 px-3 text-sm font-semibold text-emerald-100"
-                >
-                  Snap Bay Photo
-                </button>
-              ) : null}
+              {/*
+                SNAP-RETIRE-001 removed the sixth action. It was the sole entry
+                into the retired persisting Bay Audit Validate path. Whether
+                Floor should host an ephemeral Visual Bay Scan entry instead is
+                a UX-005F question, not retirement cleanup.
+              */}
             </div>
             <ShiftAnalyticsReportsGroup>
               {!simplified ? (
@@ -994,28 +971,6 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
         departmentId={deptId}
         onClose={() => setRollupOpen(false)}
         onReviewed={silentRefresh}
-      />
-      <VisualBayScannerModal
-        open={bayScanOpen}
-        onClose={() => setBayScanOpen(false)}
-        specialist={specialist}
-        auditContext={
-          deptId
-            ? {
-                department_id: deptId,
-              }
-            : undefined
-        }
-        onAuditValidated={(payload) => {
-          if (!payload.rotation_id) return;
-          setBayAudits((prev) => ({
-            ...prev,
-            [payload.rotation_id!]: {
-              audit_log_id: payload.audit_log_id,
-              audit_verdict: payload.audit_verdict,
-            },
-          }));
-        }}
       />
       {downstockOpen ? (
         <FlagDownstockSheet

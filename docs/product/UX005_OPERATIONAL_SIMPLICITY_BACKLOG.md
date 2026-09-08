@@ -33,7 +33,7 @@ Do not preempt later tranches inside an earlier one.
 |---|----------|-----------------|-----------|
 | 1 | Appliances under More vs elevated specialty entry | Do DS users find Floor entry instinctive? Still use More? Interfere with Floor? | **UX-005B implemented** (Floor contextual entry) — **not field-accepted yet**; More remains secondary path |
 | 2 | Dual Start Physical Audit CTAs | Are they always redundant in actual operation? | **Owned by UX-005A** — duplicate competing Start removed; single panel CTA |
-| 3 | Snap Bay multi-promotion + Gemini cost | Does it materially change real verification decisions? | **Not owned** — remains open (UX-005F). UX-005C demoted it to last in the Floor drawer without removing it or its Gemini path. **GEMINI-001 sharpened this question:** Snap Bay is two capabilities, and the persisting Floor path's lifecycle is **verified SEVERED** — paid inference writes rows no surface can read, so accuracy is currently unevaluable. Decision ownership sits with **SNAP-DECISION-001** (repair *or* retire). Field evidence still required |
+| 3 | Ephemeral Visual Bay Scan promotion + Gemini cost | Does *ephemeral* visual scanning materially change real DS decisions? | **Narrowed 2026-09-08 — the question now covers only the surviving ephemeral capability.** **Snap Bay persisting path: RETIRED** (SNAP-DECISION-001 chose RETIRE; **SNAP-RETIRE-001 — IMPLEMENTATION ACCEPTED — CLOSED**), which deleted Bay Audit Validate, its completion gate, and the Floor entry that reached it. Repair was rejected because the intended job — a model verdict gating completion — conflicts with Art. X and Appendix B row B, and because no evidence loop existed to repair. That half is no longer an open question. **Visual Bay Scan: FIELD EVIDENCE NEEDED** — its product value at the three surviving mounts, and whether Floor should host an ephemeral entry at all, remain open for **UX-005F**. Retirement of the persisting path does not imply the ephemeral path is retained permanently |
 | 4 | Walk & Talk vs Executive Floor Pad | Two genuine jobs or duplicate mental models? | **Not owned** — remains open (product). **UX-005C did not resolve it**: the two were not merged or renamed |
 | 5 | Velocity Heatmap | Used instead of or alongside Standard Map? | **Not owned** — remains open (UX-005D) |
 | 6 | Flooring cycle audit vs Floor Sunday | Different Flooring jobs or overlapping concepts? | **Not owned** — remains open (product); **UX-005B did not resolve** |
@@ -155,6 +155,10 @@ UX-005C did:
 - Stack actions full-width (removed the Snap/Downstock two-column grid)
 - Retain **and demote** Snap Bay Photo to last — Gemini, `bay_audit_logs`, and the
   unwired override helper all left exactly as found
+  - **Superseded 2026-09-08 by SNAP-RETIRE-001:** this sixth action has since been
+    removed with the capability it opened. The drawer now opens on five actions;
+    every other UX-005C guarantee is unchanged. UX-005C's Samsung acceptance —
+    still pending — must be run against the five-action drawer.
 - Add one nested disclosure (`ShiftAnalyticsReportsGroup`) in the drawer's own file —
   exactly one secondary level, no new global accordion framework
 - Remove the duplicate `BayFreshnessGrid` **from this drawer only**

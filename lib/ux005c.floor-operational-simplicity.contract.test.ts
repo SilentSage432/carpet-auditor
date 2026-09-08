@@ -4,6 +4,12 @@
  * Contract: when the Floor drawer opens, shift actions come first and reports
  * sit behind one nested "Reports & insights" disclosure. No engine, API,
  * schema, persistence, or appliance behaviour may move in this tranche.
+ *
+ * AMENDED by SNAP-RETIRE-001: the drawer opened on six actions when UX-005C
+ * shipped. The sixth, Snap Bay Photo, was the sole entry into the persisting
+ * Bay Audit Validate path, and SNAP-DECISION-001 retired that capability. The
+ * drawer now opens on five. Ordering, the single nested disclosure, the
+ * full-width stacking, and every other UX-005C guarantee are unchanged.
  */
 
 import { existsSync, readFileSync } from "node:fs";
@@ -29,14 +35,13 @@ const reportsSlice = floor.slice(
   floor.indexOf("</ShiftAnalyticsReportsGroup>", reportsIdx)
 );
 
-/** Ordered markers for the six primary shift actions. */
+/** Ordered markers for the five primary shift actions (six before SNAP-RETIRE-001). */
 const PRIMARY_ACTIONS: Array<{ label: string; marker: string }> = [
   { label: "Walk & Talk Floor Pad", marker: "<TacticalVoiceFloorPad" },
   { label: "Flag Downstock", marker: "setDownstockOpen(true)" },
   { label: "Showroom Quick Touch", marker: "<ShowroomQuickTouchCard" },
   { label: "Predictive Copilot", marker: "<PredictiveCopilotBanner" },
   { label: "Weekly Audit Rollup", marker: "Weekly audit rollup" },
-  { label: "Snap Bay Photo", marker: "Snap Bay Photo" },
 ];
 
 /** Ordered markers for the reports behind the nested disclosure. */
@@ -54,7 +59,7 @@ describe("UX-005C primary action hierarchy", () => {
     expect(actionsIdx).toBeLessThan(reportsIdx);
   });
 
-  it("orders the six shift actions Walk & Talk → Snap Bay", () => {
+  it("orders the five shift actions Walk & Talk → Weekly Audit Rollup", () => {
     const positions = PRIMARY_ACTIONS.map((action) => {
       const idx = actionsSlice.indexOf(action.marker);
       expect(idx, `${action.label}: missing from drawer actions`).toBeGreaterThan(
@@ -71,18 +76,17 @@ describe("UX-005C primary action hierarchy", () => {
     }
   });
 
-  it("demotes Snap Bay to last without deleting or rewiring it", () => {
-    const snapIdx = actionsSlice.indexOf("Snap Bay Photo");
-    for (const action of PRIMARY_ACTIONS.slice(0, -1)) {
-      expect(actionsSlice.indexOf(action.marker)).toBeLessThan(snapIdx);
-    }
-    // Capability preserved: same scanner modal, same audit callback.
-    expect(floor).toContain("setBayScanOpen(true)");
-    expect(floor).toContain("<VisualBayScannerModal");
-    expect(floor).toContain("onAuditValidated");
-    expect(existsSync(path.join(root, "components/store-ops/VisualBayScannerModal.tsx"))).toBe(
-      true
-    );
+  it("no longer hosts the retired Snap Bay action (SNAP-RETIRE-001)", () => {
+    // UX-005C demoted it to last; SNAP-DECISION-001 then retired the capability.
+    expect(actionsSlice).not.toContain("Snap Bay Photo");
+    expect(floor).not.toContain("setBayScanOpen");
+    expect(floor).not.toContain("<VisualBayScannerModal");
+    expect(floor).not.toContain("onAuditValidated");
+    expect(floor).not.toContain("auditContext");
+    // The shared ephemeral scanner survives for its other mounts.
+    expect(
+      existsSync(path.join(root, "components/store-ops/VisualBayScannerModal.tsx"))
+    ).toBe(true);
   });
 
   it("keeps actions stacked full-width rather than in a horizontal strip", () => {
@@ -195,7 +199,7 @@ describe("UX-005C duplicate presentation removal", () => {
 });
 
 describe("UX-005C preserved wiring", () => {
-  it("keeps every action callback and host modal intact", () => {
+  it("keeps every surviving action callback and host modal intact", () => {
     for (const wiring of [
       "onApplied={silentRefresh}",
       "onTouched={() => setHealthKey((k) => k + 1)}",
@@ -203,7 +207,6 @@ describe("UX-005C preserved wiring", () => {
       "onReviewed={silentRefresh}",
       "<SupervisorAuditSummaryModal",
       "<FlagDownstockSheet",
-      "<VisualBayScannerModal",
     ]) {
       expect(floor, `${wiring} must remain wired`).toContain(wiring);
     }

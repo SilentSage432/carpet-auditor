@@ -4,8 +4,6 @@
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { BayAuditLogRow } from "@/lib/ai/contracts/bay-audit";
-import { fetchLatestBayAuditLogsByRotationIds } from "./bay-audit-logs";
 import {
   sendBackCompletionAttempt,
   verifyCompletionAttempt,
@@ -30,12 +28,6 @@ export type VerificationQueueItem = {
   associate_name: string | null;
   review_note: string | null;
   assigned_week: string;
-  audit: {
-    id: string;
-    verdict: string;
-    image_url: string | null;
-    created_at: string;
-  } | null;
 };
 
 const REVIEW_COLUMNS = [
@@ -381,18 +373,9 @@ export async function listPendingVerificationQueue(
       | Array<{ id: string; aisle: string; bay: number; type: string | null }>
       | null;
   }>;
-  const rotationIds = rows.map((row) => row.id);
-  let audits = new Map<string, BayAuditLogRow>();
-  try {
-    audits = await fetchLatestBayAuditLogsByRotationIds(supabase, rotationIds);
-  } catch {
-    audits = new Map();
-  }
-
   return rows.map((row) => {
     const locRaw = row.store_locations;
     const loc = Array.isArray(locRaw) ? locRaw[0] ?? null : locRaw;
-    const audit = audits.get(row.id);
     return {
       rotation_id: row.id,
       department_id: row.department_id,
@@ -408,14 +391,6 @@ export async function listPendingVerificationQueue(
         null,
       review_note: row.review_note ?? null,
       assigned_week: row.assigned_week,
-      audit: audit
-        ? {
-            id: audit.id,
-            verdict: audit.verdict,
-            image_url: audit.image_url,
-            created_at: audit.created_at,
-          }
-        : null,
     };
   });
 }

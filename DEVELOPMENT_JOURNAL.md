@@ -1,5 +1,129 @@
 # DeptSync Hub — Development Journal
 
+## 2026-09-08 — SNAP-RETIRE-001: retiring Bay Audit Validate
+
+The tempting version of this tranche is one missing prop. Floor opens the
+scanner with a department id and no rotation id, so every row lands orphaned;
+supply the rotation id and the whole lifecycle appears to snap back into place.
+That reading is wrong, and it is wrong in a way worth writing down, because the
+next person to look at this code will see the same one-line fix.
+
+**Repair is a product build wearing a bug's clothing.**
+
+The decision tranche asked what Snap Bay's job actually was, and the answer came
+back from the prompt, the schema, and the gate all at once: let a Gemini verdict
+block a bay from being marked complete. That is not a broken feature. That is
+Article X — generative AI must not determine "completion state as operational
+truth" — and it is Appendix B row B, which pre-refuses almost this exact
+proposal under the heading "auto-verify bays above 95% confidence." Wiring the
+rotation id would have moved the capability from harmlessly severed to actively
+violating the Constitution. The gate was armed and disconnected, and the fix
+everyone would reach for is the one that connects it.
+
+So the deciding question was never "is the lifecycle broken." It was "does the
+job deserve to exist," and three more findings said no.
+
+The photo is thrown away. Not lost to a bug — never stored, because `rg` for
+`storage.from` and `.upload(` returns nothing in this repository. There is no
+object-storage subsystem at all. So the `image_url` column and the `<img>` in
+the supervisor modal were a facade over a value that could only ever be null,
+and a later DS could learn "the model said FAIL" but never "here is what the bay
+looked like." Repairing provenance was not a repair; it was a subsystem.
+
+There is no field evidence, and — this is the part that closed the door — there
+could not have been. The row was unreadable and the photo discarded, so a DS
+could have used this every day for a month and left no trace of whether it
+helped. That is also why INSUFFICIENT EVIDENCE was not an available answer. You
+cannot run a field experiment on a loop that terminates at a display drawer; you
+would have to build the repair first and validate afterwards, which is exactly
+the leapfrogging the plan prohibits. Choosing "insufficient evidence" would have
+meant authorising the expensive option in order to decide whether to authorise
+the expensive option.
+
+And the decision already has an owner. Article VI.2 makes physical supervisor
+verification the strongest evidence DeptSync recognises, and the two-stage review
+queue with its coaching send-back already asks whether the work was really done
+properly. Snap Bay proposed a weaker, unauditable second opinion on the same
+question.
+
+Before deleting anything I re-verified all fifteen premises at HEAD rather than
+trusting the decision report. `validateBayAudit` still had one caller. Both maps
+feeding the completion gate were still permanently empty — `setAuditByRotation`
+is called twice, only ever to *delete* keys, and the external map's callback
+early-returns on the rotation id it never receives. The dependency still ran
+audit → scan and never the reverse, which is what made the separation safe.
+
+What came out: the route and its now-empty `app/api/ai` tree, the prompt and
+rubric schema and normalizer and local fallback, the contracts and their
+directory, the persistence helper, `validateBayAudit`, `BayCompleteGatedError`,
+the modal's persisting branch and three props, Floor's audit state and its Snap
+Bay action, the checklist's dead gate state and its model-verdict override
+button, the FAIL gate and its 422 response, the rotation-review join, and the
+verdict chip and photo that never rendered.
+
+What deliberately did **not** go in: a replacement. No stricter role check, no
+deterministic score, no other gate. The product job was rejected, not the
+implementation, and it would be easy to reintroduce the same authority wearing
+deterministic clothes, so a contract test now asserts the completion route holds
+no `score` / `verdict` / `rubric` / `threshold` / `confidence` in executable
+code. Two of my first assertions failed against the repository's own prose —
+they matched a comment explaining why the gate was gone — which was a fair catch
+and became a `readCode` helper that strips comments before asserting on
+behaviour. An assertion that a comment can satisfy is not an assertion.
+
+The actor-scope hole the decision tranche found closed itself. The validate route
+scoped the department to the actor's store but never called
+`assertActorCanAccessDepartmentId`, unlike the completion route, so any signed-in
+actor including an associate could write a row against any department in their
+store. It was not patched. The unnecessary authority path was removed, which is
+the same move AI-RETIRE-001 made with the snag dispatcher.
+
+`bay_audit_logs` stays. No migration, no drop, no deleted or rewritten rows, no
+normalised verdicts, no fabricated rotation ids or image URLs, no inferred
+confirmation state, no backfilled provenance. It is historical persistence with
+no runtime owner now, and that is the correct outcome rather than a loose end.
+
+The Floor button was the one genuine judgement call. Three options: remove it,
+convert it to the ephemeral scan, or keep it as-is. Converting looks like the
+gentlest option and is actually the largest — it would hand Visual Bay Scan a
+fourth mount it does not have today, and Visual Bay Scan's own product value is
+still unproven and owned by UX-005F. Deciding it belongs on Floor is a product
+decision, not retirement cleanup. So the entry came out with the capability it
+opened, and whether Floor should host an ephemeral scan is recorded as a UX-005F
+follow-up. The Floor drawer opens on five actions now, and UX-005C's Samsung
+acceptance — already pending — has to be run against five rather than six. I
+amended that contract test instead of deleting it, so the drawer's history stays
+legible.
+
+Visual Bay Scan is untouched and, more importantly, not re-dispositioned.
+Retiring the persisting sibling is not a verdict on the ephemeral one. Its route,
+prompt, schema, shared token budget, and all three mounts survive, the shared
+modal is ephemeral by contract everywhere now, and its status remains FIELD
+EVIDENCE NEEDED.
+
+Gemini is down to five consumers: four API routes plus one Server Action. Six
+and five were both true a week ago for different reasons, and they are still
+different counts, so the test now asserts both numbers separately.
+
+**Accepted and closed 2026-09-08.** Reviewed with no standalone field gate —
+every removed downstream behavior was already dead — but the Floor drawer now
+opens on five actions instead of six, so that change rides on UX-005C's
+still-pending Samsung acceptance rather than a duplicate gate of its own. The
+one thing worth carrying forward from this tranche is not the deletion list. It
+is this:
+
+**A dead capability can still carry architectural risk when a missing
+connection would activate an authority path the product should not have.**
+
+Snap Bay wrote no reachable row, gated no reachable completion, and rendered no
+read-back. By every runtime measure it was inert, which is exactly why it
+survived four prior audits as a low-priority cleanup item. It was in fact the
+most dangerous Gemini surface in the repository, because one missing prop stood
+between it and a model verdict blocking authoritative work — and that prop was
+the fix any reasonable engineer would have shipped on sight. Severance is not
+safety. When auditing dead code, ask what authority it would hold if someone
+connected it, not what it does today.
+
 ## 2026-09-08 — AI-SAFETY-001 bounded Gemini transport
 
 The three tranches before this one asked whether a Gemini capability deserved

@@ -260,7 +260,7 @@ Floor Pad is no longer a Settings tool. Master/DS open **Walk & Talk** from Floo
 | **SimsLocationFinder** | `SimsLocationFinder.tsx` | Catalog CTA + Audit 📍 SIMS Stock | Search drawer / dialog |
 | **ApplyMarkdownModal** | `ApplyMarkdownModal.tsx` | Remnant markdown CTA | % Off / Fixed $ + preview |
 | **Quick-AddCatalogModal** | `QuickAddCatalogModal.tsx` | Cycle Audit / scan flows | Link unlinked barcode → catalog (supersedes retired MarryBarcodeModal) |
-| **VisualBayScannerModal** | `store-ops/VisualBayScannerModal.tsx` | Floor analytics **Snap Bay Photo** / Store Map (below navigator) / bay sheet / Cycle Audit | Camera or upload → Gemini scan beam → results drawer (z-90) |
+| **VisualBayScannerModal** | `store-ops/VisualBayScannerModal.tsx` | Store Map (below navigator) / bay sheet / Cycle Audit — **three mounts**; the Floor entry was removed with SNAP-RETIRE-001 | Camera or upload → Gemini scan beam → results drawer (z-90). Ephemeral — writes nothing. **Note the labels:** all three still read "Snap Bay" / "Snap Bay Photo", but since SNAP-RETIRE-001 that label names *only* ephemeral Visual Bay Scan. No surviving mount persists anything. Relabelling was deliberately not done — it is UX/naming work, not retirement cleanup |
 | **TacticalVoiceFloorPad** | `dashboard/TacticalVoiceFloorPad.tsx` | Floor Shift Analytics → Walk & Talk | Listening pill + bottom sheet voice/scratchpad + Copilot cards (z-80) |
 | **ExecutiveFloorPad** | `manager-notes/ExecutiveFloorPad.tsx` | Floor Pad sheet “full notes” / `#floor-pad` | Full-screen TipTap Floor Pad + Gemini Copilot + archive (z-80) |
 | Pin / Sync toasts | `app/page.tsx` | PIN save / online flush | Fixed top status pills |

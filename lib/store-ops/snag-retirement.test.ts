@@ -145,8 +145,9 @@ describe("Gemini surface after retirement", () => {
   });
 
   it("leaves unrelated Gemini capabilities in place", () => {
+    // Bay Audit Validate was listed here until SNAP-RETIRE-001 retired it on
+    // its own evidence; AI-RETIRE-001's scope is unaffected either way.
     for (const route of [
-      "app/api/ai/bay-audit/validate/route.ts",
       "app/api/copilot/parse-walk/route.ts",
       "app/api/flooring/ai-insights/route.ts",
       "app/api/store-locations/ai-parse/route.ts",
@@ -154,7 +155,6 @@ describe("Gemini surface after retirement", () => {
     ]) {
       expect(repoExists(route)).toBe(true);
     }
-    expect(repoExists("lib/ai/contracts/bay-audit.ts")).toBe(true);
   });
 
   it("keeps prior reductions closed rather than reopening them", () => {

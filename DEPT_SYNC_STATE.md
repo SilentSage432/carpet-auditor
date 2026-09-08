@@ -105,7 +105,7 @@
 | `HUB_GATE_SECRET` | Recommended HMAC for hub gate + QR pair (else `CRON_SECRET` / service role chain) |
 | `BOOTSTRAP_SECRET` | Optional; `POST /api/auth/bootstrap-admin` (else `CRON_SECRET`) |
 | `HUB_BOOTSTRAP_STORE_NUMBER` | Optional store for Master Admin bootstrap |
-| `GEMINI_API_KEY` / `GEMINI_MODEL` | Snap Bay, Copilot, taxonomy AI (optional) |
+| `GEMINI_API_KEY` / `GEMINI_MODEL` | The five live consumers — Pre-Flight parse, Floor-Walk Copilot, Executive Floor Pad, Flooring Insights, Visual Bay Scan (all optional) |
 | VAPID keys | Web Push (`lib/push/*`) |
 | Twilio env / `SMS_INVITE_WEBHOOK_URL` | Roster invite SMS |
 | `CRON_SECRET` | Weekly rotation cron auth (+ signing/bootstrap fallback) |
@@ -172,7 +172,7 @@ Event bus: `carpet-sync-queue-changed` — header/Settings must listen.
 ### Payload safety
 
 - **Bay snap uploads:** client compress in `components/store-ops/VisualBayScannerModal.tsx` — max edge **960px**, JPEG quality **0.70**.
-- **API cap:** `app/api/ai/bay-audit/validate/route.ts` rejects base64 payloads **> 1,500,000** chars.
+- **API cap:** `app/api/store-ops/ai-bay-scan/route.ts` rejects base64 payloads **> 1,500,000** chars. (The Bay Audit Validate route that carried the same cap was retired by SNAP-RETIRE-001.)
 - **Retired:** unbounded canvas synthesis (`/api/store-ops/ai-note-summary` returns **410 Gone**).
 
 ### RBAC & store scoping (dual enforcement)
@@ -242,7 +242,7 @@ Until applied, production Hub falls back to localStorage for catalog/remnants; r
 | 16 | `shift_walk_tasks` | `id` | Floor-walk Copilot dispatched tasks |
 | 17 | `manager_notes` | `id` | Executive Floor Pad persistence |
 | 18 | `bay_service_logs` | — | IRP walk-the-floor service touches |
-| 19 | `bay_audit_logs` | `id` | AI Snap Bay verdict persistence |
+| 19 | `bay_audit_logs` | `id` | ~~AI Snap Bay verdict persistence~~ — **historical persistence with no runtime owner** since SNAP-RETIRE-001 (2026-09-08). Table, indexes, RLS, and rows preserved; nothing writes or reads it |
 
 **Additional table (push, not counted in core 19):** `push_subscriptions`.
 
@@ -341,7 +341,7 @@ Until applied, production Hub falls back to localStorage for catalog/remnants; r
 | Shift walk / Copilot dispatch | Parse works; **persist requires online** | `lib/store-ops/shift-tasks.ts`, `/api/copilot/parse-walk` |
 | Associate schedule / call-out | **Online-only** writes | `lib/store-ops/shift-status.ts`, `AssociateScheduleModal` |
 | Manager notes / Floor Pad | **Online-only** Supabase CRUD | `lib/store-ops/manager-notes.ts`, `ExecutiveFloorPad.tsx` |
-| Snap Bay AI audit | Requires network + Gemini; local fallback verdict | `VisualBayScannerModal`, `/api/ai/bay-audit/validate` |
+| Visual Bay Scan (ephemeral) | Requires network + Gemini; local fallback result; **never persists** | `VisualBayScannerModal`, `/api/store-ops/ai-bay-scan` |
 | Push alerts | Env + permission dependent | `lib/push/usePushNotifications.ts` |
 | SMS invite dispatch | Twilio or webhook; else console stub | `lib/onboarding/sms-dispatch.ts` |
 

@@ -299,19 +299,7 @@ export function SupervisorAuditSummaryModal({
                                 : ""}
                             </p>
                           </div>
-                          {item.audit ? (
-                            <span className="shrink-0 rounded-full border border-cyan-400/40 bg-cyan-950/40 px-2 py-0.5 font-mono text-[10px] font-bold uppercase tracking-wide text-cyan-200">
-                              Audit {item.audit.verdict}
-                            </span>
-                          ) : null}
                         </div>
-                        {item.audit?.image_url ? (
-                          <img
-                            src={item.audit.image_url}
-                            alt={`${tag} audit photo`}
-                            className="mt-2 max-h-40 w-full rounded-lg object-cover"
-                          />
-                        ) : null}
                         {sending ? (
                           <div className="mt-3 space-y-2">
                             <textarea
