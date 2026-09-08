@@ -1,9 +1,9 @@
 # DeptSync Operational Intelligence Evolution Plan
 
 **Program ID:** OIE-000
-**Status:** PROGRAM FOUNDATION COMPLETE · GEMINI-001 DISCOVERY COMPLETE · AI-REDUCE-001 FIELD ACCEPTED — CLOSED · AI-REDUCE-002 IMPLEMENTATION ACCEPTED — CLOSED
+**Status:** PROGRAM FOUNDATION COMPLETE · GEMINI-001 DISCOVERY COMPLETE · AI-REDUCE-001 FIELD ACCEPTED — CLOSED · AI-REDUCE-002 IMPLEMENTATION ACCEPTED — CLOSED · AI-RETIRE-001 IMPLEMENTATION ACCEPTED — CLOSED
 **Established:** 2026-09-08
-**Last updated:** 2026-09-08 — AI-REDUCE-002 accepted and closed (§5 A1.2 / A1.5 / A1.8 / A1.9)
+**Last updated:** 2026-09-08 — AI-RETIRE-001 accepted and closed (§5 A1.2 / A1.5 / A1.10)
 **Evidence basis:** RA-001 Repository Archaeology (read-only audit, baseline `25b6ed2`) · GEMINI-001 Generative Cost & Necessity Audit (read-only)
 **Authority:** Subordinate to [`DEPTSYNC_CONSTITUTION.md`](../../DEPTSYNC_CONSTITUTION.md). Where this document and the Constitution conflict, the Constitution governs and the conflict must be flagged, not silently resolved.
 
@@ -275,7 +275,7 @@ Evidence-backed dispositions. Every row is a **recorded finding**, not approved 
 | **6. Visual Bay Scan — ephemeral** | Image interpretation | **FIELD EVIDENCE NEEDED** | Image interpretation is genuinely non-deterministic / multimodal; result is not persisted; no correctness feedback loop; no historical comparison; no accuracy capture; output disappears on close | None | **UX-005F / field gate preserved** | Model correctness is structurally unevaluable. **No deterministic computer-vision replacement proposed** |
 | **7. Bay Audit Validate — persisting** | Image interpretation + DB write | **FIELD EVIDENCE NEEDED — WITH CRITICAL LIFECYCLE DEFECT** | Lifecycle state verified **SEVERED** (see A1.3). Product value cannot be judged while the loop is broken | **SNAP-DECISION-001** | **UX-005F / field gate preserved** | Paid inference currently produces orphaned rows no surface can read |
 | **8. Catalog Taxonomy** | ~~Static folder generation~~ → **registry displayed directly** | **REPLACE DETERMINISTICALLY — DONE** (AI-REDUCE-002, 2026-09-08) | Input was effectively static; the deterministic registry already covered all catalog codes; regeneration did not learn from previous results; the stored result was `localStorage`-only; repeated identical inference was possible indefinitely; no human correction mechanism existed | **AI-REDUCE-002 — IMPLEMENTATION ACCEPTED — CLOSED** (2026-09-08) | **None required** — no field-facing operational surface changed (A1.8) | Department identity is now pinned to application state; the model-set-department-code defect is closed. **A1.8 records the escalation GEMINI-001 understated:** generated folder names could reach a persisted audit's `sub_category` |
-| **9. Snag Triage** | Orphaned classification | **REMOVE JOB** | Route/helper/dispatcher exist; **zero production invocation path**; deterministic fallback is complete; capability can write to three authoritative tables if dispatch is enabled; no human confirmation boundary exists | **AI-RETIRE-001** | None | **Do NOT replace with a new deterministic UI. Do NOT wire it merely because the local fallback exists** |
+| **9. Snag Triage** | ~~Orphaned classification~~ → **retired** | **REMOVE JOB — DONE** (AI-RETIRE-001, 2026-09-08) | Route/helper/dispatcher existed with **zero invocation path ever**; deterministic fallback was exclusively owned; capability could write three authoritative tables with no human confirmation | **AI-RETIRE-001 — IMPLEMENTATION ACCEPTED — CLOSED** (2026-09-08) | **None required** — no user-reachable surface existed to change (A1.10) | Job retired, not replaced. **A1.10 records the escalation GEMINI-001 understated:** the route required only *any* signed-in actor, so the three-table write was reachable at the lowest auth tier |
 | **10. Note Summary** | — | **RETIRED** | Route returns HTTP 410; no Gemini dependency remains; no paid call is structurally possible | None | None | Verified genuinely dead — no Gemini import in the module graph |
 
 **Constraint preserved for capabilities 2 and 3:**
@@ -331,7 +331,7 @@ Evidence-backed order.
 
 1. **AI-REDUCE-001** — Deterministic Shift Briefing — **FIELD ACCEPTED — CLOSED** (2026-09-08)
 2. **AI-REDUCE-002** — Deterministic Catalog Taxonomy — **IMPLEMENTATION ACCEPTED — CLOSED** (2026-09-08)
-3. **AI-RETIRE-001** — Retire Snag Triage
+3. **AI-RETIRE-001** — Retire Snag Triage — **IMPLEMENTATION ACCEPTED — CLOSED** (2026-09-08)
 4. **AI-SAFETY-001** — Bound Gemini Transport Failure
 5. **SNAP-DECISION-001** — Repair-or-Retire Snap Bay
 
@@ -450,6 +450,36 @@ Two facts, and nothing beyond them:
 **Explicitly out of scope and not performed:** no row migration, no rewriting of historical audit evidence, no inference about which values were AI-generated, no mass-normalization of `sub_category`, no cleanup migration, and no repair UI.
 
 If this is ever picked up, it must be framed narrowly as **historical provenance/truth discovery, not automatic remediation.** No work item is opened here.
+
+---
+
+### A1.10 — AI-RETIRE-001 Snag Triage retired (2026-09-08)
+
+**Status: IMPLEMENTATION ACCEPTED — CLOSED.** The first **retirement** under this program, as distinct from a reduction, and the third closed implementation tranche.
+
+**Orphan status proved, not assumed.** Every GEMINI-001 statement held at HEAD, and the search was run by symbol, route URL, request and response field names, written table names, distinctive prompt text, and the `source: "snag_triage"` marker. Results: the route had **no first-party caller, no hidden or dev trigger, no deep link, no cron or background caller, no documented external integration, and no offline replay path** — the sync queue replays a closed `SyncActionType` enum that never contained a snag action, and the service worker treats `/api/` as network-only rather than replayable. A client helper `triageSnagReport` existed in `lib/store-ops/client.ts` and was **never called by anything**. The whole stack — route, contracts, classifier, fallback, dispatcher, client helper — referenced only itself.
+
+**The escalation GEMINI-001 understated: authorization tier.** GEMINI-001 recorded that dispatch could write three authoritative tables with no human confirmation, and that unreachability mitigated the risk. Reading the route showed the gate was `requireStoreOpsActor` — **any signed-in store-ops actor, including a DeptFloor associate.** Not supervisor, not admin. So the three-table write was reachable at the lowest authenticated tier by anyone who knew the URL, with `dispatch: true` creating operational records directly. The mitigation was obscurity, which is not a control. This is now closed by deletion rather than by adding a role check to a job nobody uses.
+
+**Authoritative write audit.** Each dispatch target was traced separately. `downstock_queue` — upsert guarded by `onConflict: store_number,department,assigned_week,rotation_id`, so retry was idempotent; required a `rotation_id`. `rotation_exceptions` — written indirectly through the **shared** `reportRotationBarriers`, and could set `markCarriedOver` on P1; required a `location_id`. `shift_walk_tasks` — upsert on a freshly generated `id`, tagged `source: "snag_triage"`, making those rows the only distinguishable ones. Writes were **not transactional across targets**, but each dispatch hit exactly one target, so partial multi-table dispatch was not possible.
+
+**Product-job classification: ORPHANED.** The job had evidence input and interpretation, but **no user trigger, no human review, no read-back, no correction path, and no lifecycle closure.** It could create operational state that no surface could attribute back to it. Retirement authorized.
+
+**Overlap is evidence, not a merge instruction.** Every action Snag Triage could take already has a clearer human-owned workflow: Flag Downstock owns `downstock_queue`, the barrier/exception flow owns `rotation_exceptions`, and Walk & Talk owns `shift_walk_tasks`. Those workflows were **not consolidated, extended, or touched**.
+
+**Deterministic fallback retired with the job.** `buildLocalSnagTriage` was `normalizeSnagTriageResult({}, input)` and had no consumer outside the retired route. Per the canonical principle, a deterministic implementation does not justify a product job that has not earned its place. No deterministic Snag Triage UI was built, and the fallback was not wired into Floor, Map, Walk & Talk, or Predictive Copilot.
+
+**Preserved.** Shared Gemini transport and `GEMINI_TOKEN_BUDGET.copilot` (shared with Floor-Walk Copilot and Executive Floor Pad), `reportRotationBarriers`, `createWalkTaskId`, and all five surviving Gemini routes.
+
+**No tombstone.** The repository's one AI tombstone (`ai-note-summary`, 410) exists to redirect **real prior consumers** to a replacement owner. Snag Triage never had a consumer and has no replacement to name, so a tombstone would serve nobody and would falsely imply the job once shipped. Deleted outright.
+
+**Historical state untouched.** No migration, no cleanup SQL, no data rewrite. Existing `downstock_queue`, `rotation_exceptions`, and `shift_walk_tasks` rows belong to their owning tables and keep their existing provenance — including any row carrying `source: "snag_triage"`, which is left exactly as recorded.
+
+**Field acceptance: not required, and not invented.** Law 8 gates changed field-facing behavior. **No user-reachable surface existed to change** — there was no button, screen, deep link, or gesture anywhere in the product that reached this job. Nothing an associate or supervisor can do behaves differently. This is a stronger basis than AI-REDUCE-002's, where an admin surface at least changed.
+
+**Accepted findings.** The authority finding is canonical: the route's `requireStoreOpsActor` gate meant any authenticated Store Ops actor — including the lowest DeptFloor / workforce tier — could invoke it if they knew the URL, and `dispatch: true` could then create operational state with no separate human confirmation. **The removed route must not be reintroduced behind a stricter authorization gate.** The product job was proven unnecessary, so the correct remedy was removing the job, not hardening it. Equally, **no deterministic Snag Triage replacement may be built.**
+
+> **A deterministic implementation does not justify a product job that has not earned its place.**
 
 ---
 
@@ -729,7 +759,7 @@ Recorded for completeness. **Do NOT prioritize over product loops.** These three
 ### PRODUCT VALUE
 | Item | Note |
 |---|---|
-| Snag Triage reachability | Full stack incl. 3-table dispatcher; no UI caller. Disposition is a GEMINI-001 / product question, not cleanup |
+| ~~Snag Triage reachability~~ | **RESOLVED by AI-RETIRE-001 (2026-09-08)** — job retired, not rebuilt; route, classifier, fallback, dispatcher, and client helper deleted (A1.10) |
 | Orphan `POST /api/push/dispatch` | Implemented, Super-Admin gated, no client caller. "Tell the department something now" has no button |
 | `WeeklyRotationList` dead shim | 10-line re-export, zero importers |
 
@@ -899,6 +929,7 @@ During an active physical audit, deliberately ad-hoc scan known units and confir
 | **PHASE 1** — Understand AI Cost / Necessity | **GEMINI-001 — DISCOVERY COMPLETE** | Dispositions recorded (A1.2) |
 | **PHASE 1A** — First approved AI reduction | **AI-REDUCE-001 — Deterministic Shift Briefing** | **FIELD ACCEPTED — CLOSED** (2026-09-08) — first fully closed OIE implementation tranche |
 | **PHASE 1B** — Second approved AI reduction | **AI-REDUCE-002 — Deterministic Catalog Taxonomy** | **IMPLEMENTATION ACCEPTED — CLOSED** (2026-09-08) — no field gate required; closed a department-identity defect (A1.8) |
+| **PHASE 1C** — First approved AI retirement | **AI-RETIRE-001 — Retire Orphaned Snag Triage** | **IMPLEMENTATION ACCEPTED — CLOSED** (2026-09-08) — job retired, not rebuilt; closed a lowest-tier three-table write path (A1.10) |
 | **PHASE 2** — Recover Existing Operational Value | FLOOR-HIDDEN-001, HISTORY-001 | **Still queued — priority unchanged**; order within phase may change from evidence |
 | **PHASE 3** — Repair Evidence Quality | Weekly-progress semantics, barrier vocabulary, any proven audit-linkage / data-integrity issue | — |
 | **PHASE 4** — Close Existing Loops | WALK-001 if field proven; historical decision read-back; spatial intelligence placement where earned | — |
@@ -926,8 +957,8 @@ Two standing exceptions: a confirmed **security or truth** finding from Workstre
 | **GEMINI-001** | Generative Cost & Necessity Audit | Discovery | RA-001 §9 | **DISCOVERY COMPLETE — DISPOSITIONS RECORDED** | OIE-000 | Snap Bay + Visual Bay Scan remain field-gated | Discovery only — no runtime change |
 | **AI-REDUCE-001** | Deterministic Shift Briefing | AI reduction | GEMINI-001 A1.2 — zero Gemini-only fields; field evidence A1.7 | **FIELD ACCEPTED — CLOSED** (2026-09-08) | GEMINI-001 | **MET** — real DS-device operational state-change test | Route + client AI path removed; 20 contract tests; 784/784 suite green; field accepted |
 | **AI-REDUCE-002** | Deterministic Catalog Taxonomy | AI reduction | GEMINI-001 A1.2 — static input, registry ships; escalation in A1.8 | **IMPLEMENTATION ACCEPTED — CLOSED** (2026-09-08) | GEMINI-001 | **None required** — no field-facing operational surface changed (A1.8) | Route + AI module + Generate interaction removed; department-identity defect fixed; 18 contract tests; 802/802 suite green; accepted without a field gate |
-| **AI-RETIRE-001** | Retire Orphaned Snag Triage | Retirement | GEMINI-001 A1.2 — zero invocation path | **APPROVED RETIREMENT CANDIDATE — NOT STARTED** | GEMINI-001 | None | Not started — do not wire, do not replace with new UI |
-| **AI-SAFETY-001** | Bound Gemini Transport Failure | Resilience | GEMINI-001 A1.4 — no timeout/abort/retry ceiling | **APPROVED SAFETY CANDIDATE — NOT STARTED** | — | None | Not started |
+| **AI-RETIRE-001** | Retire Orphaned Snag Triage | Retirement | GEMINI-001 A1.2 — zero invocation path; escalation in A1.10 | **IMPLEMENTATION ACCEPTED — CLOSED** (2026-09-08) | GEMINI-001 | **None required** — no user-reachable surface existed (A1.10) | Route + classifier + fallback + dispatcher + client helper deleted; 14 contract tests; 816/816 suite green; no historical rows touched |
+| **AI-SAFETY-001** | Bound Gemini Transport Failure | Resilience | GEMINI-001 A1.4 — no timeout/abort/retry ceiling | **APPROVED SAFETY CANDIDATE — NOT STARTED** | — | None | Not started. **AI-RETIRE-001 removed one unbounded call site incidentally; this does NOT reduce or close this item** — it still applies in full to every surviving Gemini path |
 | **AI-SAFETY-002** | Executive Floor Pad Model-Output Boundary | Safety / truth | GEMINI-001 A1.2 — autosave without confirm; unvalidated metadata | **QUEUED — NOT STARTED** | — | None | Not started |
 | **SNAP-DECISION-001** | Snap Bay Repair-or-Retire Decision | Product / truth decision | GEMINI-001 A1.3 — lifecycle SEVERED | **HIGH PRIORITY PRODUCT/TRUTH DECISION — NOT STARTED** | UX-005F evidence | **Yes — UX-005 Question #3** | Not started — outcome must be REPAIR LIFECYCLE *or* RETIRE CAPABILITY |
 | **FLOOR-HIDDEN-001** | Suppressed Floor tier product review | Discovery + product decision | RA-001 §3.1 | QUEUED | GEMINI-001 discovery | Yes — per-surface | Not started |

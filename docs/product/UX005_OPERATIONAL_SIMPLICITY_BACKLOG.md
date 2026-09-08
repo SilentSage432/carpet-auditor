@@ -73,7 +73,7 @@ These require product evidence, not just visual simplification.
 
 - Workflow keep-alive tabs vs specialty hub dual shell (**unchanged by UX-005B**)
 - Legacy deep-link aliases
-- Snag triage API with no current UI
+- ~~Snag triage API with no current UI~~ — **RESOLVED (AI-RETIRE-001, 2026-09-08):** the job was retired rather than given a UI; route, classifier, fallback, dispatcher, and client helper deleted
 - Floor + Map independent attention fetches
 - Deterministic “Predictive copilot” named as if generative AI
 

@@ -1,5 +1,92 @@
 # DeptSync Hub — Development Journal
 
+## 2026-09-08 — AI-RETIRE-001 Snag Triage retired
+
+The first retirement under the program, and a different question from the two
+reductions before it. Those asked whether Gemini earned its place in a job that
+users actually do. This one asked whether the job existed at all.
+
+It did not. Snag Triage had a route, a structured contracts module, a Gemini
+classifier with a real prompt, a complete deterministic fallback, a dispatcher
+that could write three authoritative tables, and a typed client helper in
+`lib/store-ops/client.ts` called `triageSnagReport`. Every piece was finished
+work. Nothing called any of it. I searched by symbol, by route URL, by request
+and response field names, by the names of the tables it writes, by distinctive
+prompt text, and by the `source: "snag_triage"` marker it stamps on walk tasks.
+The stack referenced only itself. No button, no screen, no deep link, no cron,
+no background job. The sync queue could not replay it either — that queue takes
+a closed enum of action types and no snag action was ever in it — and the
+service worker treats `/api/` as network-only rather than replayable.
+
+The part GEMINI-001 understated was the authorization tier. It recorded that
+dispatch could write three tables with no human confirmation, and that the lack
+of a caller mitigated the risk. What reading the route actually shows is that
+the gate is `requireStoreOpsActor` — any signed-in store-ops actor, including a
+DeptFloor associate. Not supervisor. Not admin. So the three-table write was
+reachable at the lowest authenticated tier by anyone who knew the URL, and
+`dispatch: true` would create operational records immediately. The mitigation
+was that nobody knew the URL, which is not a control. Deleting the job closes
+it more honestly than adding a role check to something nobody uses.
+
+Tracing the writes separately was worth doing. The downstock path upserts on
+`store_number,department,assigned_week,rotation_id`, so retries were idempotent.
+The exception path goes through the shared `reportRotationBarriers` and could
+set `markCarriedOver` on a P1. The walk-task path upserts a fresh id and tags
+`source: "snag_triage"`, which makes those the only rows attributable to this
+job. Each dispatch hits exactly one target, so partial multi-table dispatch was
+never possible.
+
+The product test settles it. Snag Triage had evidence input and interpretation,
+but no user trigger, no human review, no read-back, no correction, and no
+lifecycle closure. It could create operational state that no surface could trace
+back to it. Orphaned. And every action it could take already has a clearer
+human-owned workflow — Flag Downstock owns the queue, the barrier flow owns
+exceptions, Walk & Talk owns shift tasks. That overlap is the evidence for
+retiring it. It is not permission to merge anything, and I did not touch those
+three workflows.
+
+The deterministic fallback went with the job. `buildLocalSnagTriage` was
+literally `normalizeSnagTriageResult({}, input)`, and it had no consumer outside
+the retired route. Keeping it because it happens to be deterministic would have
+been the exact mistake the tranche exists to avoid: a deterministic
+implementation does not justify a product job that has not earned its place. No
+deterministic Snag Triage UI was built and nothing was wired into Floor, Map,
+Walk & Talk, or Predictive Copilot.
+
+No tombstone. The one AI tombstone we keep, `ai-note-summary`, returns 410 to
+redirect real prior consumers to a named replacement owner. Snag Triage never
+had a consumer and has no replacement to name, so a tombstone would serve nobody
+and would imply the job once shipped. Deleted outright, and the build manifest
+confirms the route is no longer emitted.
+
+Historical rows are untouched. No migration, no cleanup SQL, no data rewrite.
+Any row out there carrying `source: "snag_triage"` belongs to its owning table
+and keeps its provenance exactly as recorded. Retiring the writer is not a
+license to rewrite what was written.
+
+No field acceptance, and this is the clearest case yet for saying so: there was
+never a user-reachable surface to change. Nothing an associate or supervisor can
+do behaves differently, because nothing they could do reached this job in the
+first place.
+
+Validation: 816 tests across 59 files pass, 14 of them new in
+`lib/store-ops/snag-retirement.test.ts` holding the retirement boundary — the
+job is absent, no client helper survives, no deterministic replacement appeared,
+the sync queue has no snag path, and the Downstock, barrier/exception, and
+shift-task workflows still expose their contracts. Typecheck and build are
+clean. Lint is byte-identical to baseline at 114 problems (95 errors, 19
+warnings).
+
+**AI-RETIRE-001 — IMPLEMENTATION ACCEPTED — CLOSED.** The third closed tranche
+under the program and the first retirement. Two constraints travel with it. The
+route must not come back behind a stricter authorization gate — hardening a job
+nobody uses would preserve the concept while pretending to fix it — and no
+deterministic Snag Triage replacement may be built. AI-SAFETY-001 is unchanged
+by this work: removing one unbounded call site was incidental, and the item
+still applies in full to every surviving Gemini path.
+
+> **A deterministic implementation does not justify a product job that has not earned its place.**
+
 ## 2026-09-08 — AI-REDUCE-002 Deterministic Catalog Taxonomy
 
 The second AI reduction, and the first one where reading the code changed what

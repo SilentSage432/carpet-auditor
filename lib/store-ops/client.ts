@@ -1523,42 +1523,6 @@ export async function validateBayAudit(
   );
 }
 
-export type SnagTriageClientResult = import("@/lib/ai/contracts/snag-triage").SnagTriageResult & {
-  ok: boolean;
-  source?: "gemini" | "local";
-  dispatch?: {
-    dispatched: boolean;
-    target: string;
-    record_id?: string;
-  } | null;
-};
-
-/** Parse associate snag report → severity, equipment, dispatch target. */
-export async function triageSnagReport(
-  specialist: StoreSpecialist,
-  input: {
-    text: string;
-    department_code?: string;
-    location_tag?: string;
-    store_number?: string;
-    dispatch?: boolean;
-    rotation_id?: string;
-    location_id?: string;
-    assigned_week?: string;
-    allow_local_fallback?: boolean;
-  }
-): Promise<SnagTriageClientResult> {
-  return storeOpsFetch<SnagTriageClientResult>(
-    "/api/ai/snag/triage",
-    specialist,
-    {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(input),
-    }
-  );
-}
-
 /** Gemini multimodal bay photo → inventory / safety compliance JSON. */
 export async function scanBayVisual(
   specialist: StoreSpecialist,
