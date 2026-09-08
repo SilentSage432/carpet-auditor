@@ -1,5 +1,138 @@
 # DeptSync Hub — Development Journal
 
+## 2026-09-08 — AI-SAFETY-001 bounded Gemini transport
+
+The three tranches before this one asked whether a Gemini capability deserved
+to exist. This one asked nothing about product value at all. It asked what
+happens to a Department Supervisor standing in an aisle when the model simply
+does not answer.
+
+The answer was: they wait, for as long as the platform allows.
+
+I started from code rather than from the previous audit, and the count moved.
+GEMINI-001 recorded nine live call paths; AI-REDUCE-001, AI-REDUCE-002, and
+AI-RETIRE-001 have since closed three, so HEAD has **six** — Pre-Flight parse,
+Floor-Walk Copilot, Executive Floor Pad extract, Flooring Insights, Visual Bay
+Scan, and Bay Audit Validate. Worth stating precisely because the two obvious
+phrasings disagree: that is five API routes plus one Server Action. Six
+consumers, five routes. `callGeminiFlashJson` has exactly six invocation sites,
+and `lib/ai/gemini.ts` is the only runtime importer of `@google/generative-ai`
+in the entire repository. There is no bypass to classify.
+
+The premise held, but the reason it held was not what I expected. DeptSync does
+not hand-roll a REST call to Gemini — it uses the official SDK, so "no timeout"
+is a statement about how the SDK is invoked rather than about a missing
+`AbortSignal` on a `fetch` we wrote. Reading the SDK's `buildFetchOptions`
+settles it: it attaches a signal to `fetch` **only** when the caller supplies
+`signal` or `timeout`. `callGeminiFlash` supplied neither, so the signal was
+`undefined` and the request was bounded by nothing the application owned. Only
+the cron route declares `maxDuration`; the AI routes inherit whatever the
+platform gives them, which makes the real ceiling an accident of deployment
+rather than a product decision.
+
+The part of the work item I had to actively resist was the phrase "retry
+ceiling." It reads like an instruction to add retries and then cap them.
+`makeRequest` in the SDK performs exactly one `fetch` and contains no retry
+logic. No route retries. No consumer retries. The offline sync queue does have
+exponential backoff, but it replays a closed enum of Supabase writes and
+`/api/rotations/complete` — no Gemini endpoint is in it. So there was no retry
+to bound. The safest bounded policy for a repository in that state is **one
+attempt, a finite timeout, and an explicit failure**, and that is what shipped.
+Adding retries here would have multiplied paid inference and called it a safety
+improvement.
+
+Two implementation details are worth recording because both are easy to get
+wrong. First, the SDK accepts a `timeout` option, and using it would have been
+the one-line fix — except that it does
+`setTimeout(() => controller.abort(), timeout)` and never calls
+`clearTimeout`. That satisfies "has a timeout" while leaking a timer on every
+successful call, which fails the cleanup requirement outright. So the transport
+owns its own `AbortController`, passes `signal` to `generateContent`, and clears
+the deadline in `finally`. Second, classification is based on
+`controller.signal.aborted` rather than on the shape of the thrown error. That
+matters because an abort can surface from two different places — the SDK wraps
+`fetch`'s `AbortError` into `GoogleGenerativeAIAbortError`, but an abort during
+the response-body read escapes as a raw `AbortError` from an unwrapped
+`response.json()`. Asking our own controller is correct in both cases.
+
+On the timeout value I did not want to pick a number I liked. DeptSync already
+has exactly one declared network patience for a floor-facing call:
+`STORE_OPS_FETCH_TIMEOUT_MS = 20_000` in `lib/store-ops/client.ts`. Reusing it
+means the app has one answer to "how long before we tell the operator to try
+again" instead of two competing ones, and a test pins the constant to the
+client-side value so they cannot drift apart. The honest limitation is that
+where the serverless ceiling is shorter than 20 s, the platform still kills the
+function first. The transport bound is not a promise about wall-clock latency;
+it is the only ceiling DeptSync controls, and it removes "as long as the
+platform permits" from every environment including local and self-hosted.
+
+The error contract needed more care than I anticipated, and the hazard came
+from an unrelated helper. Four of the six consumers pass Gemini failures through
+`readableError`, whose `humanizeSupabaseMessage` rewrites any message containing
+`does not exist`, `schema cache`, `jwt`, `failed to fetch`, or `networkerror`
+into a schema, credential, or connectivity explanation. A timeout message that
+tripped one of those would be silently relabelled as a missing migration. So
+the copy — *"AI request timed out after 20s — check the connection and try
+again"* — is checked against that list by a test, and it carries no endpoint
+URL, model name, or key wording. `GeminiTimeoutError` is the only new type;
+non-2xx still arrives as the SDK's `GoogleGenerativeAIFetchError` with its
+`.status`, so quota stays distinguishable from a bad request without any string
+matching.
+
+**No consumer file changed.** That was the point. Prompts, schemas,
+normalizers, token budgets, persistence timing, confirmation boundaries, and
+every consumer's own `isGeminiConfigured()` branch are exactly as they were, and
+the transport still throws the same configuration error without ever starting a
+timer on that path. The one behaviour that improves is a consequence of the
+bound rather than an edit: `VisualBayScannerModal` sets its `phase` inside
+`try`/`catch` with no `finally`, so a hung request used to leave the "Scanning
+bay…" overlay up permanently with the shutter and Upload disabled and no way
+back except closing the modal. The request now rejects at 20 s, the existing
+`catch` runs, and the modal returns to `capture` with a visible error. The
+component is untouched — the bound simply gave its error path something to
+catch.
+
+One test-infrastructure change was unavoidable. `lib/ai/gemini.ts` imports
+`server-only`, which throws outside the `react-server` condition, so the module
+could not be imported by Vitest at all — which is why the repository's existing
+convention for server modules is source-text assertions rather than behavioural
+tests. Source text cannot prove that a timeout aborts a fetch, that a timer is
+cleared, or that no retry occurs, so `vitest.config.ts` now aliases
+`server-only` to the package's own empty build. The marker itself is not
+weakened: a contract test asserts `import "server-only"` is still present in
+the transport. That unlocked real tests with mocked `fetch` and fake timers —
+no live Gemini calls, and no test that sleeps for twenty real seconds.
+
+Deliberately not fixed, and recorded instead: Floor-Walk Copilot can produce
+**two** concurrent parse requests from one Stop tap, because `finishListening`
+has no idempotence latch and `runParse` has no in-flight guard, so a throwing
+`recognition.stop()` fires it once synchronously and again from `onend`. The
+sibling `FloorPadEditor` already solves this with a `finishedRef`. That is a
+consumer double-dispatch, not a transport retry — the transport still issues one
+attempt per invocation — and Floor-Walk product behavior is out of scope here.
+Also left alone: Bay Audit Validate still persists server-side before a client
+can abandon (SNAP-DECISION-001), Floor Pad autosave and unvalidated `metadata`
+(AI-SAFETY-002), `recommended_percent` ownership (FLOORING-AI-001), and
+`storeOpsFetch`'s missing client-side timeout, which is a separate resilience
+question now that the paid server leg is capped.
+
+843/843 tests across 60 files (27 new), typecheck clean, build clean, lint
+byte-identical to the baseline at 114 problems / 95 errors / 19 warnings.
+
+**Reviewed and accepted the same day: IMPLEMENTATION ACCEPTED — CLOSED, no
+field gate.** The bounded contract is now canonical — one invocation, at most
+one model attempt, a 20 000 ms transport-owned deadline, `AbortController`
+cancellation, `clearTimeout` in `finally`, zero automatic retries, explicit
+timeout failure, no persistence, no operational authority. The acceptance
+covers transport only; every consumer-side finding above stays with its own
+work item, and the ban on retries, backoff, circuit breakers, retry queues,
+provider abstraction, and AI telemetry architecture carries forward.
+
+> **An optional intelligence dependency may fail. DeptSync's operational
+> workflow may not fail with it.**
+
+---
+
 ## 2026-09-08 — AI-RETIRE-001 Snag Triage retired
 
 The first retirement under the program, and a different question from the two
@@ -353,6 +486,11 @@ worst-case exposure across the whole surface — which is why `AI-SAFETY-001` is
 resilience work rather than AI reduction. Alongside it: `asGeminiSchema` is a
 TypeScript cast, not runtime validation, and the deterministic normalizers are
 doing the real enforcement in several paths.
+
+*(Later note: the timeout / abort / bounded-execution half of that finding was
+closed by AI-SAFETY-001 on 2026-09-08 — see the entry at the top of this file.
+The "retry ceiling" half turned out to be a non-issue: no retry existed, so none
+was bounded and none was added. `asGeminiSchema` remains a cast.)*
 
 **The long-term boundary this establishes:** Gemini earns a narrow role at
 unstructured-input boundaries where DeptSync cannot reasonably derive the same

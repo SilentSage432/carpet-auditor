@@ -6,6 +6,10 @@
  * recommendations. Callers compose prompts and schemas; this module transports
  * and parses model output.
  *
+ * Transport safety (AI-SAFETY-001): one bounded attempt per invocation. The
+ * transport owns a finite deadline and performs no automatic retry. Fallback,
+ * persistence, and product semantics stay with the callers.
+ *
  * Env (never NEXT_PUBLIC_):
  *   GEMINI_API_KEY
  *   GEMINI_MODEL (default: gemini-3.5-flash)
@@ -39,6 +43,31 @@ export type GeminiCallOptions = {
 };
 
 const DEFAULT_MODEL = "gemini-3.5-flash";
+
+/**
+ * Ceiling for one Gemini attempt. Matches `STORE_OPS_FETCH_TIMEOUT_MS` in
+ * `lib/store-ops/client.ts` — DeptSync's existing answer to how long a
+ * floor-facing network call may take before the operator is told to try again.
+ */
+export const GEMINI_REQUEST_TIMEOUT_MS = 20_000;
+
+/**
+ * The bounded attempt expired. Transport does not retry; callers keep their own
+ * fallback and re-request behavior.
+ */
+export class GeminiTimeoutError extends Error {
+  readonly timeoutMs: number;
+
+  constructor(timeoutMs: number) {
+    super(
+      `AI request timed out after ${Math.round(
+        timeoutMs / 1000
+      )}s — check the connection and try again`
+    );
+    this.name = "GeminiTimeoutError";
+    this.timeoutMs = timeoutMs;
+  }
+}
 
 /** Per-route output budgets — callers pick; transport does not guess product needs. */
 export const GEMINI_TOKEN_BUDGET = {
@@ -120,6 +149,10 @@ function getClient(): GoogleGenerativeAI {
 /**
  * Call Gemini Flash with a text prompt and optional inline image.
  * Returns the raw model text response.
+ *
+ * Exactly one request is issued. On expiry the underlying fetch is aborted and
+ * `GeminiTimeoutError` is thrown; every other failure propagates unchanged so
+ * callers keep their existing error handling.
  */
 export async function callGeminiFlash(
   prompt: string,
@@ -144,8 +177,27 @@ export async function callGeminiFlash(
     });
   }
 
-  const result = await model.generateContent(content);
-  return result.response.text();
+  // The SDK's own `timeout` option never clears its timer, so the deadline is
+  // owned here: aborted on expiry, cleared on every exit path.
+  const controller = new AbortController();
+  const deadline = setTimeout(
+    () => controller.abort(),
+    GEMINI_REQUEST_TIMEOUT_MS
+  );
+
+  try {
+    const result = await model.generateContent(content, {
+      signal: controller.signal,
+    });
+    return result.response.text();
+  } catch (err) {
+    if (controller.signal.aborted) {
+      throw new GeminiTimeoutError(GEMINI_REQUEST_TIMEOUT_MS);
+    }
+    throw err;
+  } finally {
+    clearTimeout(deadline);
+  }
 }
 
 const JSON_OBJECT_RE = /\{[\s\S]*\}/;

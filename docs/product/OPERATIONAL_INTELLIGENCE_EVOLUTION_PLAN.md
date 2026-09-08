@@ -1,9 +1,9 @@
 # DeptSync Operational Intelligence Evolution Plan
 
 **Program ID:** OIE-000
-**Status:** PROGRAM FOUNDATION COMPLETE · GEMINI-001 DISCOVERY COMPLETE · AI-REDUCE-001 FIELD ACCEPTED — CLOSED · AI-REDUCE-002 IMPLEMENTATION ACCEPTED — CLOSED · AI-RETIRE-001 IMPLEMENTATION ACCEPTED — CLOSED
+**Status:** PROGRAM FOUNDATION COMPLETE · GEMINI-001 DISCOVERY COMPLETE · AI-REDUCE-001 FIELD ACCEPTED — CLOSED · AI-REDUCE-002 IMPLEMENTATION ACCEPTED — CLOSED · AI-RETIRE-001 IMPLEMENTATION ACCEPTED — CLOSED · AI-SAFETY-001 IMPLEMENTATION ACCEPTED — CLOSED
 **Established:** 2026-09-08
-**Last updated:** 2026-09-08 — AI-RETIRE-001 accepted and closed (§5 A1.2 / A1.5 / A1.10)
+**Last updated:** 2026-09-08 — AI-SAFETY-001 implementation accepted and closed; no field gate required (§5 A1.4 / A1.5 / A1.11 / A1.12)
 **Evidence basis:** RA-001 Repository Archaeology (read-only audit, baseline `25b6ed2`) · GEMINI-001 Generative Cost & Necessity Audit (read-only)
 **Authority:** Subordinate to [`DEPTSYNC_CONSTITUTION.md`](../../DEPTSYNC_CONSTITUTION.md). Where this document and the Constitution conflict, the Constitution governs and the conflict must be flagged, not silently resolved.
 
@@ -307,7 +307,9 @@ Verified findings:
 
 #### AI-SAFETY-001 — Bounded Gemini Transport
 
-**Evidence:** no Gemini path currently has an explicit timeout, an `AbortSignal`, a bounded upstream execution time, or a retry ceiling. Verified across the shared transport and all eight live routes.
+**Evidence as recorded by GEMINI-001:** no Gemini path had an explicit timeout, an `AbortSignal`, a bounded upstream execution time, or a retry ceiling. Verified across the shared transport and all eight live routes.
+
+**Status: IMPLEMENTATION ACCEPTED — CLOSED** (2026-09-08). Every clause of the finding was re-verified at HEAD and held. See **A1.11** for the implementation record, including the correction that "no retry ceiling" meant *no retry existed at all*, so none was added.
 
 **This is not an AI reduction.** It is resilience / bounded failure behavior, and it caps worst-case exposure across all nine paths at one change site.
 
@@ -332,7 +334,7 @@ Evidence-backed order.
 1. **AI-REDUCE-001** — Deterministic Shift Briefing — **FIELD ACCEPTED — CLOSED** (2026-09-08)
 2. **AI-REDUCE-002** — Deterministic Catalog Taxonomy — **IMPLEMENTATION ACCEPTED — CLOSED** (2026-09-08)
 3. **AI-RETIRE-001** — Retire Snag Triage — **IMPLEMENTATION ACCEPTED — CLOSED** (2026-09-08)
-4. **AI-SAFETY-001** — Bound Gemini Transport Failure
+4. **AI-SAFETY-001** — Bound Gemini Transport Failure — **IMPLEMENTATION ACCEPTED — CLOSED** (2026-09-08)
 5. **SNAP-DECISION-001** — Repair-or-Retire Snap Bay
 
 **This ordering is NOT absolute.** Truth/security defects may preempt it. **SNAP-DECISION-001 is not an implementation task** — it is a product/truth decision.
@@ -480,6 +482,50 @@ If this is ever picked up, it must be framed narrowly as **historical provenance
 **Accepted findings.** The authority finding is canonical: the route's `requireStoreOpsActor` gate meant any authenticated Store Ops actor — including the lowest DeptFloor / workforce tier — could invoke it if they knew the URL, and `dispatch: true` could then create operational state with no separate human confirmation. **The removed route must not be reintroduced behind a stricter authorization gate.** The product job was proven unnecessary, so the correct remedy was removing the job, not hardening it. Equally, **no deterministic Snag Triage replacement may be built.**
 
 > **A deterministic implementation does not justify a product job that has not earned its place.**
+
+---
+
+### A1.11 — AI-SAFETY-001 bounded Gemini transport (2026-09-08)
+
+**Status: IMPLEMENTATION ACCEPTED — CLOSED.** The program's first pure **resilience** tranche — not a reduction, not a retirement. No Gemini capability was removed, added, or re-dispositioned. Reviewed and accepted with **no field gate**; the transport contract below is now canonical.
+
+> **An optional intelligence dependency may fail. DeptSync's operational workflow may not fail with it.**
+
+**Surviving Gemini surface confirmed from code: exactly six live consumers, one shared transport, one 410 tombstone.** GEMINI-001 counted nine; AI-REDUCE-001, AI-REDUCE-002, and AI-RETIRE-001 have since closed three. The six are Pre-Flight location parse, Floor-Walk Copilot, Executive Floor Pad extract, Flooring Insights, Visual Bay Scan (ephemeral), and Bay Audit Validate (persisting). Five are API routes; the Floor Pad is a Server Action, not a route — so "five surviving routes" and "six surviving consumers" are both true and must not be conflated. `callGeminiFlashJson` has exactly six invocation sites and `lib/ai/gemini.ts` is the only runtime importer of `@google/generative-ai` (`lib/ai/gemini-schema.ts` is type-only). **No bypass exists.**
+
+**The premise held, with one important correction.** Verified at HEAD: no timeout, no `AbortController`, no `AbortSignal` reaching `fetch`, and no bounded execution time. The correction concerns retry. The work-item language mentions a "retry ceiling," which invites adding retries. Reading the SDK shows `makeRequest` performs exactly one `fetch` and has no retry logic anywhere, and no consumer, route, or the offline sync queue retries a Gemini call. **There was no retry to bound.** The safe policy was therefore **one attempt + finite timeout + explicit failure**, and **zero automatic retry was introduced**. Adding retries would have increased paid exposure while calling it a safety fix.
+
+**Why the fetch was genuinely unbounded — mechanism, not inference.** The SDK builds `fetch` options in `buildFetchOptions`, which attaches a signal *only* when the caller supplies `signal` or `timeout`. `callGeminiFlash` supplied neither, so `fetchOptions.signal` was `undefined` and the request lived as long as the platform allowed. Only the cron route declares `maxDuration`; the five AI routes inherit the platform default, so the effective ceiling was environment-dependent rather than a product decision.
+
+**Transport contract chosen (smallest that bounds failure).** The transport owns its own `AbortController` and deadline, passes `signal` to `generateContent`, and clears the timer in `finally` on every exit path. It deliberately does **not** pass the SDK's own `timeout` option, because that path calls `setTimeout(() => controller.abort(), timeout)` with **no `clearTimeout`** — using it would have satisfied the timeout requirement while leaking a timer on every successful call.
+
+**Abort ownership: timeout only (option D).** No consumer supplies cancellation today, and `GeminiCallOptions` exposes no `signal`. Signal composition was not invented; a contract test asserts it stays uninvented so a future need is a deliberate decision rather than drift.
+
+**Timeout value: 20 000 ms, from repository evidence rather than taste.** `lib/store-ops/client.ts` already declares `STORE_OPS_FETCH_TIMEOUT_MS = 20_000` — DeptSync's own existing answer to how long a floor-facing network call may take before the operator is told to try again. Reusing that number avoids introducing a second, competing network-patience vocabulary. A test pins the constant to the client-side one so the two cannot silently diverge. Honest limitation: where the serverless ceiling is shorter than 20 s the platform still terminates first; the transport bound is the only ceiling DeptSync controls, and it removes "as long as the platform permits" from every environment, including local and self-hosted.
+
+**Error contract: one new type, nothing more.** `GeminiTimeoutError` (with `timeoutMs`) is the only addition, answering the audited gap that callers could not distinguish failure classes. Non-2xx keeps the SDK's `GoogleGenerativeAIFetchError` with its `.status`, so 429/quota remains distinguishable from 400; network failure, malformed JSON, and not-configured messages are byte-identical to before. The timeout message — *"AI request timed out after 20s — check the connection and try again"* — is operational copy carrying no endpoint URL, model name, or key wording. It is also deliberately checked against `humanizeSupabaseMessage`, which relabels any message containing `does not exist`, `schema cache`, `jwt`, `failed to fetch`, or `networkerror` as a schema/credential/connectivity fault; a timeout must pass through unrewritten, and a test asserts it does.
+
+**Request-count safety: one user action → at most one Gemini attempt, per transport invocation.** Proved behaviourally (one `fetch` per helper call, still one after a timeout and after a network failure) and structurally (a single `generateContent` call site, no loop, no backoff).
+
+**Consumer semantics preserved — nothing in any consumer was changed.** No prompt, schema, normalizer, token budget, persistence path, confirmation boundary, or fallback was touched. Each consumer keeps owning its own `isGeminiConfigured()` branch; the transport still throws the same `GEMINI_API_KEY is not configured` error and never starts a timer on that path. The one *behavioural* improvement is a consequence rather than an edit: `VisualBayScannerModal` sets `phase` inside `try`/`catch` with no `finally`, so a hung request previously stranded the "Scanning bay…" overlay permanently with capture controls disabled. The request now rejects at 20 s, the existing `catch` runs, and the modal returns to `capture` with a visible error — the component is unmodified.
+
+**Field acceptance: NOT REQUIRED.** Under OIE Law 8 the gate is earned by changed field-facing operational behavior. The successful path is unchanged — same request, same prompts, same schemas, same parsing, same UI, no added latency. No gesture, screen, or persisted write changed. What changed is only the *failure* boundary, and every part of it is deterministically testable with mocked `fetch` and fake timers, which is how it is tested. The one field-visible difference is strictly recovery from a state that previously had no recovery. Requiring a Samsung gate would mean asking an operator to reproduce a hung upstream request on store Wi-Fi to observe a timeout that unit tests already prove — evidence deterministic tests supply completely.
+
+**Explicitly not done, and still owned elsewhere:** Executive Floor Pad model-output autosave and unvalidated `metadata` remain **AI-SAFETY-002**; Snap Bay's severed lifecycle remains **SNAP-DECISION-001**; `recommended_percent` ownership remains **FLOORING-AI-001**. No exponential backoff, circuit breaker, retry queue, health service, provider abstraction, telemetry platform, fallback model routing, or request scheduler was built. The `.env.example` model-name drift remains recorded configuration debt, unchanged.
+
+> **Transport safety is infrastructure. Fallback behavior is product behavior.** The dependency may now fail on a clock DeptSync controls; what each surface does about that failure is unchanged.
+
+---
+
+### A1.12 — Adjacent findings from AI-SAFETY-001 (NOT work items)
+
+Recorded observations. **No work item is opened here and nothing was changed.**
+
+- **Floor-Walk Copilot can double-dispatch one gesture.** `finishListening` in `TacticalVoiceFloorPad` has no idempotence guard, and `runParse` has no in-flight guard. If `recognition.stop()` throws, the `catch` calls `finishListening` synchronously and the browser's `onend` then calls it again, producing up to **two** concurrent `parseFloorWalk` requests from one Stop tap. `FloorPadEditor` already solves the same problem with a `finishedRef` latch. This is a **consumer** request-count concern, not a transport retry — the transport still issues exactly one attempt per invocation — and Floor-Walk product behavior is out of scope for this tranche. Belongs to whoever next owns Floor-Walk (WALK-001 / FE-004 remain field-gated).
+- **Bay Audit Validate persists before the client can abandon.** `insertBayAuditLog` runs server-side with no confirmation step, so a client that gives up still leaves a row once the server completes. Transport bounding does not change this. Owned by **SNAP-DECISION-001**.
+- **`storeOpsFetch` has no client-side timeout.** The 20 s `mutationAbortSignal` is applied only to `/api/rotations/complete`. Five of the six Gemini calls therefore still have an unbounded *client* wait even though the server leg is now bounded. Not in scope: the server bound caps the paid dependency, which is what AI-SAFETY-001 exists to do. A client-side bound is a separate resilience question.
+- **`ChunkErrorBoundary` matches Gemini quota text but has zero importers** (re-verified). Its `/429|quota|generativelanguage/i` test is currently dead code. Already recorded as **RESILIENCE-001**.
+- **`asGeminiSchema` remains a TypeScript cast, not runtime validation.** Unchanged, as GEMINI-001 recorded. No universal schema architecture was built.
 
 ---
 
@@ -930,6 +976,7 @@ During an active physical audit, deliberately ad-hoc scan known units and confir
 | **PHASE 1A** — First approved AI reduction | **AI-REDUCE-001 — Deterministic Shift Briefing** | **FIELD ACCEPTED — CLOSED** (2026-09-08) — first fully closed OIE implementation tranche |
 | **PHASE 1B** — Second approved AI reduction | **AI-REDUCE-002 — Deterministic Catalog Taxonomy** | **IMPLEMENTATION ACCEPTED — CLOSED** (2026-09-08) — no field gate required; closed a department-identity defect (A1.8) |
 | **PHASE 1C** — First approved AI retirement | **AI-RETIRE-001 — Retire Orphaned Snag Triage** | **IMPLEMENTATION ACCEPTED — CLOSED** (2026-09-08) — job retired, not rebuilt; closed a lowest-tier three-table write path (A1.10) |
+| **PHASE 1D** — Shared AI resilience | **AI-SAFETY-001 — Bound Gemini Transport Failure** | **IMPLEMENTATION ACCEPTED — CLOSED** (2026-09-08) — no field gate required; one bounded attempt, zero retry added, no consumer changed (A1.11) |
 | **PHASE 2** — Recover Existing Operational Value | FLOOR-HIDDEN-001, HISTORY-001 | **Still queued — priority unchanged**; order within phase may change from evidence |
 | **PHASE 3** — Repair Evidence Quality | Weekly-progress semantics, barrier vocabulary, any proven audit-linkage / data-integrity issue | — |
 | **PHASE 4** — Close Existing Loops | WALK-001 if field proven; historical decision read-back; spatial intelligence placement where earned | — |
@@ -958,7 +1005,7 @@ Two standing exceptions: a confirmed **security or truth** finding from Workstre
 | **AI-REDUCE-001** | Deterministic Shift Briefing | AI reduction | GEMINI-001 A1.2 — zero Gemini-only fields; field evidence A1.7 | **FIELD ACCEPTED — CLOSED** (2026-09-08) | GEMINI-001 | **MET** — real DS-device operational state-change test | Route + client AI path removed; 20 contract tests; 784/784 suite green; field accepted |
 | **AI-REDUCE-002** | Deterministic Catalog Taxonomy | AI reduction | GEMINI-001 A1.2 — static input, registry ships; escalation in A1.8 | **IMPLEMENTATION ACCEPTED — CLOSED** (2026-09-08) | GEMINI-001 | **None required** — no field-facing operational surface changed (A1.8) | Route + AI module + Generate interaction removed; department-identity defect fixed; 18 contract tests; 802/802 suite green; accepted without a field gate |
 | **AI-RETIRE-001** | Retire Orphaned Snag Triage | Retirement | GEMINI-001 A1.2 — zero invocation path; escalation in A1.10 | **IMPLEMENTATION ACCEPTED — CLOSED** (2026-09-08) | GEMINI-001 | **None required** — no user-reachable surface existed (A1.10) | Route + classifier + fallback + dispatcher + client helper deleted; 14 contract tests; 816/816 suite green; no historical rows touched |
-| **AI-SAFETY-001** | Bound Gemini Transport Failure | Resilience | GEMINI-001 A1.4 — no timeout/abort/retry ceiling | **APPROVED SAFETY CANDIDATE — NOT STARTED** | — | None | Not started. **AI-RETIRE-001 removed one unbounded call site incidentally; this does NOT reduce or close this item** — it still applies in full to every surviving Gemini path |
+| **AI-SAFETY-001** | Bound Gemini Transport Failure | Resilience | GEMINI-001 A1.4 — no timeout/abort/retry ceiling; premise re-verified at HEAD (A1.11) | **IMPLEMENTATION ACCEPTED — CLOSED** (2026-09-08) | — | **None required** — successful path unchanged; failure semantics fully testable deterministically (A1.11) | 20 s bound + transport-owned `AbortController` + timer cleanup in `finally`; **zero retry added because none existed**; `GeminiTimeoutError` the only new type; 27 transport tests; 843/843 suite green; **no consumer file changed** |
 | **AI-SAFETY-002** | Executive Floor Pad Model-Output Boundary | Safety / truth | GEMINI-001 A1.2 — autosave without confirm; unvalidated metadata | **QUEUED — NOT STARTED** | — | None | Not started |
 | **SNAP-DECISION-001** | Snap Bay Repair-or-Retire Decision | Product / truth decision | GEMINI-001 A1.3 — lifecycle SEVERED | **HIGH PRIORITY PRODUCT/TRUTH DECISION — NOT STARTED** | UX-005F evidence | **Yes — UX-005 Question #3** | Not started — outcome must be REPAIR LIFECYCLE *or* RETIRE CAPABILITY |
 | **FLOOR-HIDDEN-001** | Suppressed Floor tier product review | Discovery + product decision | RA-001 §3.1 | QUEUED | GEMINI-001 discovery | Yes — per-surface | Not started |
@@ -1005,6 +1052,14 @@ Added by GEMINI-001 (2026-09-08):
 - **No universal runtime schema-validation architecture for model output** without evidence that a specific path's authoritative consequence requires it.
 - **No Snap Bay repair before SNAP-DECISION-001** — the answer may be retirement.
 - **No AI reduction of the language copilots or Flooring Insights** — deliberately excluded from the reduction sequence (A1.5).
+
+Added by AI-SAFETY-001 (2026-09-08):
+
+- **No Gemini retries.** The transport performs one bounded attempt. No retry existed before this tranche and none was added; reintroducing one requires evidence that a specific consumer needs it, not the phrase "retry ceiling."
+- **No exponential backoff, circuit breaker, retry queue, AI health service, provider abstraction, AI telemetry platform, fallback model routing, or request scheduler.**
+- **No caller-supplied `AbortSignal` on the transport** until a consumer actually needs cancellation. A contract test asserts it stays uninvented.
+- **No second network-patience constant.** The Gemini bound is pinned to `STORE_OPS_FETCH_TIMEOUT_MS`; do not fork a competing timeout vocabulary.
+- **No persistence, authority, or product decision inside `lib/ai/gemini.ts`.**
 
 Inherited prohibitions that remain in force: SI-002 ranking must not be revived · CAP-001 inferred bay capacity remains rejected · APP-CAT-001B bulk promotion remains deferred · the UX-005 do-not-touch guardrails remain active in full.
 

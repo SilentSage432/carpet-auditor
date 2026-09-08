@@ -286,7 +286,7 @@ supabase/migrations/20260812_sunday_bay_assignments.sql → sunday specialist↔
 | Shift audit velocity telemetry | `lib/store-ops/telemetry.ts`, `StoreHealthChart` |
 | Zebra shift briefing | `lib/store-ops/shift-briefing.ts`, `ShiftBriefingCard` (composes health snapshot + `bay_health`) |
 | Visual bay scan | `lib/store-ops/ai-bay-scan.ts`, `VisualBayScannerModal` (720p stream; JPEG q=0.70 / 960px) |
-| Gemini transport | `lib/ai/gemini.ts` (`responseSchema` per caller + `GEMINI_TOKEN_BUDGET`) |
+| Gemini transport | `lib/ai/gemini.ts` (`responseSchema` per caller + `GEMINI_TOKEN_BUDGET`) — sole runtime SDK importer; **bounded since AI-SAFETY-001**: one attempt, transport-owned `AbortController` + 20 s deadline + timer cleanup, `GeminiTimeoutError`, zero retry. Owns transport safety only — not fallback, persistence, or product semantics |
 | Barcode resolve / Quick-Add | `lib/barcode.ts`, `NumberField` scan hooks, `QuickAddCatalogModal` |
 | Hardware wedge (no soft keyboard) | `lib/hardware-scanner.ts` |
 | Focus / keyboard dismiss | `lib/focus-input.ts` (`blurActiveInput` — never auto-focus on tab switch) |
