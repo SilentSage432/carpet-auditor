@@ -108,23 +108,15 @@ export async function POST(request: Request) {
       accessible_departments: accessible,
     };
 
-    let { error: specialistError } = await supabase
+    /**
+     * No strip-and-retry: dropping accessible_departments here would report
+     * success for a grant that never landed. Production carries the column.
+     */
+    const { error: specialistError } = await supabase
       .from("store_specialists")
       .update(specialistPatch)
       .eq("id", specialistId)
       .eq("store_number", store.store_number);
-
-    if (
-      specialistError &&
-      isMissingColumnError(specialistError, "accessible_departments")
-    ) {
-      const retry = await supabase
-        .from("store_specialists")
-        .update({ assigned_department: primary })
-        .eq("id", specialistId)
-        .eq("store_number", store.store_number);
-      specialistError = retry.error;
-    }
 
     if (specialistError) {
       return NextResponse.json(
@@ -186,10 +178,15 @@ export async function POST(request: Request) {
       .eq("id", specialistId)
       .maybeSingle();
 
+    // Echo what the row actually holds, not what the caller asked for.
+    const persisted = saved
+      ? composeAccessibleDepartments(primary, saved.accessible_departments)
+      : accessible;
+
     return NextResponse.json({
       ok: true,
       specialist: saved,
-      accessible_departments: accessible,
+      accessible_departments: persisted,
     });
   } catch (err) {
     if (err instanceof StoreOpsAuthError) {

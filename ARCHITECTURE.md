@@ -205,6 +205,9 @@ lib/audit-report.ts               → Audit report metrics + email/clipboard com
 lib/hardware-scanner.ts           → Window-level Bluetooth/wedge barcode burst listener
 lib/rbac.ts                       → Department-scoped section / catalog visibility (compose only)
 lib/department-access.ts          → accessible_departments compose (primary + granted)
+                                    Grants are AUTHORITY SCOPE, not workforce roles.
+                                    Roster-mutating client fns MUST invalidateRosterCache()
+                                    or the 45s TTL replays pre-mutation state (ROSTER-ROLE-001).
 lib/store.ts                      → Active store_number session
 lib/store-ops/stores.ts           → Resolve store_number → stores.id; upsert seed (code or store_id,code) + UUID-safe list
 lib/sync-queue.ts                 → Offline queue + backoff + conflict pause + auto-flush

@@ -567,6 +567,9 @@ export async function updateDepartmentAccess(
     body: JSON.stringify(input),
   });
   await invalidateStoreOpsListCaches();
+  // The grant lives on store_specialists, so the roster read-back is stale
+  // until this cache is dropped — same contract as the other roster mutations.
+  invalidateRosterCache();
   return {
     accessible_departments: data.accessible_departments ?? [],
   };

@@ -185,6 +185,8 @@
 - [x] Instant Floor/Map/Roster/Settings keep-alive shell + SWR list cache + shared Realtime + dynamic Snap Bay / Bulk Generate
 - [x] IRP / down-stocking velocity heatmap on `store_locations` + `bay_service_logs` (Map toggle, walk-the-floor log, Sunday velocity-priority draw)
 - [x] Multi-department role & scope access (`accessible_departments`, header switcher, Roster chips)
+- [ ] **ROSTER-ROLE-001 Samsung field acceptance — cross-department grant read-back** (code repair complete, **not** field accepted). `updateDepartmentAccess` now drops the roster cache, so a grant no longer reverts under its own success toast; the grant route fails closed instead of stripping the column and claiming success. Production write path was already correct
+- [ ] **Product decision — is there a workforce "secondary operational capability"?** The cross-department chips grant DeptSync *authority scope*, not workforce skill. Supervisors are reading them as secondary roles. DeptSync has no model for the latter and **none should be built without this decision** (ROSTER-ROLE-001)
 - [x] UX lockdown — 4-tab Floor/Map/Roster/Settings, unified Edit Bay sheet, roster chips + SMS/link invite add, Sonner toasts, exception feed on Floor
 - [x] Chrome consolidation — remove hamburger / More / Admin Tools; Settings owns bulk/taxonomies/force/targets; Floor owns verify+exceptions; dead Catalog/AdminRoster/StockTab pruned
 - [x] Geist + Geist Mono typography (`next/font/google`) + compact bay tags (`formatBayTag`) with `font-mono tracking-tight`

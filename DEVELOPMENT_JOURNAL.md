@@ -1,5 +1,49 @@
 # DeptSync Hub — Development Journal
 
+## 2026-09-08 — ROSTER-ROLE-001: the write was never broken
+
+Reported during live roster setup on the Samsung: selecting a "secondary role"
+chip showed a success toast and then snapped back, so the grant looked lost.
+
+**Production disagreed.** A read-only inspection of `store_specialists` found
+`accessible_departments` present, populated, and holding a real two-department
+grant (`["plumbing","electrical"]`) written during the very session that
+reported the failure. The write path was correct the whole time. Worth saying
+plainly because the obvious hypothesis — production drift, the thing
+RUNTIME-COMPAT-001 just spent a tranche on — was wrong here, and checking cost
+one query.
+
+**The defect is in the read-back.** `fetchSpecialists` serves from a 45-second
+TTL cache. Every other roster mutation in `lib/store-ops/client.ts` —
+`inviteSupervisor`, `issueRosterPairing`, `createRosterMember` — calls
+`invalidateRosterCache()`. `updateDepartmentAccess` invalidated the Store Ops
+list caches and not the roster cache. So the `reload()` that follows the grant
+replayed the pre-toggle roster straight out of the cache and overwrote the fresh
+value in state. Not a race: inside the TTL window `getSWR` returns the entry and
+does not even schedule a refresh, so the revert is deterministic. The fix is one
+line, in the mutation that owns the invalidation, which also repairs the same
+bug in `AssociateRosterPanel` without touching it.
+
+**Two smaller truthfulness repairs came with it**, both the species
+RUNTIME-COMPAT-001 named. The grant route retried the update with
+`accessible_departments` stripped whenever the column looked absent, then
+returned `ok: true` — the retry could only ever write nothing and call it
+success. Production has the column, so that path was dead compatibility code
+that could only lie; it now fails closed. The route also echoed the *requested*
+array back to the client, which the client then stored under the name
+`persisted`. It now echoes what the saved row actually holds.
+
+**Terminology worth fixing before it hardens.** There is no secondary-role model
+in DeptSync. The chips are `DepartmentAccessChips`, labelled "Cross-department
+access", and they grant DeptSync **authority scope** — Floor/Map/Roster
+visibility, JWT `app_metadata`, RLS matching. A supervisor reaching for them to
+record "this associate also works Paint" is recording an access grant, not a
+workforce capability. Those are different things and the roster has no home for
+the second one. Flagged for a product decision; no schema was proposed.
+
+949 tests / 65 files pass (from 938/64), typecheck and build pass, lint at exact
+baseline parity — 114 problems (95 errors, 19 warnings).
+
 ## 2026-09-08 — UX-005G.1: the sixth surface, found the way the first five were
 
 UX-005G came back **field accepted** from the Samsung device, with one exception:
