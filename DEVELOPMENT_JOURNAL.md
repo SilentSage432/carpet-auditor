@@ -1,5 +1,49 @@
 # DeptSync Hub — Development Journal
 
+## 2026-09-08 — UX-005G.1: the sixth surface, found the way the first five were
+
+UX-005G came back **field accepted** from the Samsung device, with one exception:
+**Roster → Add Team Member** still had the bottom nav sitting on its Cancel and
+Add to roster buttons.
+
+That surface was not missed. UX-005G archaeology found it, classified it **D —
+ambiguous**, and deliberately left it alone because there was no device evidence
+yet. The device has now supplied it, so the classification moved from ambiguous
+to focused workspace on evidence rather than on inference. This is the
+classification discipline working as intended: the sixteen remaining A-class
+overlays stay untouched until a device says otherwise.
+
+**The fix is two lines, and that is the point.** `AddTeamMemberSheet` now calls
+`useFocusedWorkspace()`. No new mechanism, no new state, no shell prop, no
+callback. The occupancy store and `NavigationHub`'s single consumption point
+absorbed a sixth surface without changing.
+
+**One placement detail was load-bearing.** `AddTeamMemberSheet` is a local
+function inside `RosterTab.tsx`, not its own file, and `WorkflowTabShell` keeps
+`RosterTab` mounted for the entire session. A claim in the tab body would have
+hidden the nav permanently, everywhere, forever. The claim belongs inside the
+conditionally-rendered sheet, where mount is the open signal — the same pattern
+Edit Bay and the associate editor use. A test asserts the hook sits after the
+sheet's function declaration and appears exactly once in the file, because this
+is the kind of mistake that reads fine in review.
+
+**Safe area needed nothing.** The sheet already carried
+`pb-[max(1rem,env(safe-area-inset-bottom))]`, identical to the three UX-005G
+surfaces that were left alone, so it was never relying on the nav as a spacer.
+Nothing was added; nav compensation in particular was not.
+
+**No nesting.** `DepartmentPicker` and `TextField` are inline form controls, not
+overlays, so the sheet cannot open a child. The refcount handles it either way
+and remains the sole mechanism.
+
+Worth recording as adjacent debt: unlike the other five surfaces, this sheet
+locks no body scroll at all. That belongs with the already-deferred
+body-scroll-lock inconsistency, not here.
+
+938 tests / 64 files pass (from 932/64), typecheck and build pass, lint at exact
+baseline parity — 114 problems (95 errors, 19 warnings). **Samsung field
+acceptance of UX-005G.1 is required and has not been run.**
+
 ## 2026-09-08 — UX-005G: the nav was standing on the work
 
 A Samsung DS device showed the persistent bottom nav sitting on top of five

@@ -10,9 +10,13 @@
  * Two layers of proof:
  *   1. Behavioral — the shared occupancy mechanism and its restoration paths
  *      are rendered for real, including coexisting workspaces.
- *   2. Wiring contract — each of the five field-proven surfaces declares
- *      occupancy from its own open signal, and NavigationHub is the only place
- *      that maps occupancy onto BottomNav.
+ *   2. Wiring contract — each field-proven surface declares occupancy from its
+ *      own open signal, and NavigationHub is the only place that maps occupancy
+ *      onto BottomNav.
+ *
+ * UX-005G.1 added Roster → Add Team Member on later Samsung evidence. It was
+ * classified ambiguous during UX-005G archaeology and deliberately left alone
+ * until the device resolved it. No new mechanism was introduced.
  */
 
 import { readFileSync } from "node:fs";
@@ -276,10 +280,12 @@ describe("UX-005G shell ownership", () => {
       "components/catalog/TaxonomyManagerModal.tsx",
       "components/store-ops/OnDutyAssociateStrip.tsx",
       "components/admin/SundayAuditAssignmentModal.tsx",
+      "components/hub/tabs/RosterTab.tsx",
     ]) {
       const code = readRepo(rel);
       expect(code).not.toContain("hub-bottom-nav");
       expect(code).not.toContain("showBottomNav");
+      expect(code).not.toContain("display: none");
     }
   });
 
@@ -319,6 +325,12 @@ describe("UX-005G surface integration", () => {
       file: "components/admin/SundayAuditAssignmentModal.tsx",
       signal: "useFocusedWorkspace(open)",
     },
+    {
+      // UX-005G.1 — field-proven later; same mount-gated pattern as D and E.
+      label: "K. Add Team Member",
+      file: "components/hub/tabs/RosterTab.tsx",
+      signal: "useFocusedWorkspace()",
+    },
   ];
 
   for (const surface of SURFACES) {
@@ -355,6 +367,66 @@ describe("UX-005G surface integration", () => {
     const css = readRepo("app/globals.css");
     expect(css).toContain(".hub-modal-sheet");
     expect(css).toContain("safe-area-inset-bottom");
+  });
+});
+
+describe("UX-005G.1 Add Team Member", () => {
+  const ROSTER = "components/hub/tabs/RosterTab.tsx";
+
+  it("claims occupancy inside the sheet, not in the always-mounted tab body", () => {
+    const code = readRepo(ROSTER);
+    const sheetAt = code.indexOf("function AddTeamMemberSheet(");
+    const hookAt = code.indexOf("useFocusedWorkspace()");
+    expect(sheetAt).toBeGreaterThan(-1);
+    expect(hookAt).toBeGreaterThan(-1);
+    /**
+     * WorkflowTabShell keeps RosterTab mounted for the whole session, so a
+     * claim in the tab body would hide the nav permanently. It must sit inside
+     * the conditionally-rendered sheet.
+     */
+    expect(hookAt).toBeGreaterThan(sheetAt);
+    expect(code.split("useFocusedWorkspace()").length - 1).toBe(1);
+  });
+
+  it("is mount-gated, which is why it uses the argument-free pattern", () => {
+    const code = readRepo(ROSTER);
+    expect(code).toContain("{addOpen ? (");
+    expect(code).toContain("<AddTeamMemberSheet");
+    expect(code).toContain("onClose={() => setAddOpen(false)}");
+    // No `open` prop exists on this sheet, so there is no signal to pass.
+    expect(code).not.toContain("useFocusedWorkspace(addOpen)");
+  });
+
+  it("routes every exit through onClose so cleanup restores the nav", () => {
+    const code = readRepo(ROSTER);
+    const sheet = code.slice(code.indexOf("function AddTeamMemberSheet("));
+    // Backdrop, Cancel, and a successful add all unmount via the same callback.
+    expect(sheet).toContain('aria-label="Close add team member"');
+    expect(sheet).toContain("onClick={onClose}");
+    expect(sheet).toMatch(/await onCreated\(created\);\s*\n\s*onClose\(\);/);
+    // No bespoke restoration path.
+    expect(sheet).not.toContain("onShowNav");
+    expect(sheet).not.toContain("releaseFocusedWorkspace");
+    expect(sheet).not.toContain("acquireFocusedWorkspace");
+  });
+
+  it("keeps its own device safe-area padding and gains no nav compensation", () => {
+    const code = readRepo(ROSTER);
+    const sheet = code.slice(code.indexOf("function AddTeamMemberSheet("));
+    // Already correct before UX-005G.1 — deliberately left unchanged.
+    expect(sheet).toContain("pb-[max(1rem,env(safe-area-inset-bottom))]");
+    expect(sheet).not.toContain("hub-workspace-pad-bottom");
+    expect(sheet).not.toContain("hub-bottom-nav-stack");
+  });
+
+  it("adds no second occupancy store", () => {
+    const store = readRepo("lib/ui/focused-workspace.ts");
+    expect(store).toContain("let occupancy = 0");
+    // One counter, one subscribe, one hook pair — unchanged by UX-005G.1.
+    expect(store.split("let occupancy").length - 1).toBe(1);
+    const code = readRepo(ROSTER);
+    expect(code).not.toContain("createContext");
+    expect(code).not.toContain("useSyncExternalStore");
   });
 });
 

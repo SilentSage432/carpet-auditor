@@ -20,7 +20,8 @@ Do not silently resolve, delete, or discard open questions during an early tranc
 | **UX-005D** | Map operate vs investigate | Open — do not preempt |
 | **UX-005E** | Operational language | Open — do not preempt |
 | **UX-005F** | AI earn-your-place review | Open — do not preempt. **Repository-level evidence now supplied by GEMINI-001** (see below) |
-| **UX-005G** | Focused workspace navigation suppression | Implemented — Samsung acceptance pending. Bottom nav stands down while a focused workspace owns the viewport (`lib/ui/focused-workspace.ts`; `NavigationHub` is the sole consumer). Added out of sequence from Samsung field evidence, so it preempts nothing: D, E, and F remain untouched |
+| **UX-005G** | Focused workspace navigation suppression | **FIELD ACCEPTED / CLOSED** — bottom nav stands down while a focused workspace owns the viewport (`lib/ui/focused-workspace.ts`; `NavigationHub` is the sole consumer). Added out of sequence from Samsung field evidence, so it preempts nothing: D, E, and F remain untouched. Device acceptance passed for its five surfaces; the single exception is discharged by UX-005G.1 |
+| **UX-005G.1** | Add Team Member focused workspace coverage | Implemented — Samsung acceptance pending. Roster → Add Team Member was classified *ambiguous / unchanged* by UX-005G archaeology and left alone pending evidence; the device resolved the classification, and the surface now claims the **existing** occupancy mechanism. **No new architecture, no additional UX-005 identifier consumed** |
 
 Do not preempt later tranches inside an earlier one.
 

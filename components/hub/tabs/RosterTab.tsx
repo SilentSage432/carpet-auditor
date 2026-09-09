@@ -66,6 +66,7 @@ import {
   type StoreSpecialist,
 } from "@/lib/types";
 import { normalizePhoneE164 } from "@/lib/phone";
+import { useFocusedWorkspace } from "@/lib/ui/focused-workspace";
 import { useWorkingDepartment } from "@/lib/use-working-department";
 import type { WorkflowTabProps } from "@/components/hub/tabs/tab-props";
 
@@ -668,6 +669,9 @@ function AddTeamMemberSheet({
 
   const jobOption = rosterJobOptionById(jobOptionId);
   const departmentLocked = Boolean(jobOption?.department);
+
+  // Mount is the open signal — this sheet is conditionally rendered.
+  useFocusedWorkspace();
 
   async function handleSave() {
     const trimmed = name.trim();

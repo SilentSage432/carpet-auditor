@@ -87,7 +87,7 @@ Master Admin: compact department **dropdown pill** in the header. Close glyphs a
 
 Store Ops pages use `.hub-main` (`px-3 pt-2` + `--hub-workspace-pad-bottom`) so bay lists, status pills, and pace timers clear the fixed bottom dock on handhelds. Quick Touch / filter chips use `.btn-quick-touch` / `.chip-filter` (44px min).
 
-**BottomNav visibility.** The nav is present in normal hub state and **absent while a focused workspace owns the viewport**. `NavigationHub` gates it on `lib/ui/focused-workspace.ts` occupancy (refcounted, released by effect cleanup); the sticky top header is **not** gated. Integrated surfaces: Edit Bay, Team Roster associate editor, Department Taxonomies, Associates On Duty, Sunday Rotation Engine. Focused sheets owe **device safe area only** (`.hub-modal-sheet`) — never `--hub-workspace-pad-bottom`, which compensates tab content beneath an overlay and is correct again as soon as the nav returns.
+**BottomNav visibility.** The nav is present in normal hub state and **absent while a focused workspace owns the viewport**. `NavigationHub` gates it on `lib/ui/focused-workspace.ts` occupancy (refcounted, released by effect cleanup); the sticky top header is **not** gated. Integrated surfaces: Edit Bay, Team Roster associate editor, Department Taxonomies, Associates On Duty, Sunday Rotation Engine, and Roster → Add Team Member (UX-005G.1). Focused sheets owe **device safe area only** (`.hub-modal-sheet`) — never `--hub-workspace-pad-bottom`, which compensates tab content beneath an overlay and is correct again as soon as the nav returns.
 
 ### A.4 Page-level toasts & notices (non-modal)
 
