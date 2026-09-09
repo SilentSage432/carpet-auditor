@@ -331,6 +331,12 @@ describe("UX-005G surface integration", () => {
       file: "components/hub/tabs/RosterTab.tsx",
       signal: "useFocusedWorkspace()",
     },
+    {
+      // ROSTER-LIFE-001 — inline dialog in an always-mounted tab, so state-gated.
+      label: "L. Roster remove-confirm",
+      file: "components/hub/tabs/RosterTab.tsx",
+      signal: "useFocusedWorkspace(Boolean(deleteTarget))",
+    },
   ];
 
   for (const surface of SURFACES) {
@@ -427,6 +433,42 @@ describe("UX-005G.1 Add Team Member", () => {
     const code = readRepo(ROSTER);
     expect(code).not.toContain("createContext");
     expect(code).not.toContain("useSyncExternalStore");
+  });
+});
+
+describe("ROSTER-LIFE-001 roster remove-confirm", () => {
+  const ROSTER = "components/hub/tabs/RosterTab.tsx";
+
+  it("claims occupancy from its own open state, not from mount", () => {
+    const code = readRepo(ROSTER);
+    // The dialog is inline JSX in an always-mounted tab, so a hook cannot be
+    // placed "inside" it — the state flag is the only honest open signal.
+    expect(code).toContain("useFocusedWorkspace(Boolean(deleteTarget))");
+    expect(code).toContain("{deleteTarget ? (");
+  });
+
+  it("clears the device safe area now that the nav stands down", () => {
+    const code = readRepo(ROSTER);
+    const dialogAt = code.indexOf("Remove {deleteTarget.name}?");
+    const dialog = code.slice(dialogAt - 500, dialogAt);
+    expect(dialog).toContain("hub-modal-sheet");
+    expect(dialog).not.toContain("hub-bottom-nav-stack");
+  });
+
+  it("both exits unmount the dialog, so cleanup restores the nav", () => {
+    const code = readRepo(ROSTER);
+    const dialogAt = code.indexOf("Remove {deleteTarget.name}?");
+    const dialog = code.slice(dialogAt - 600, dialogAt + 900);
+    expect(dialog).toContain('aria-label="Cancel remove"');
+    expect(dialog).toContain("onClick={() => setDeleteTarget(null)}");
+    expect(dialog).toContain("void handleDelete()");
+  });
+
+  it("the sibling call-out dialog is deliberately left alone", () => {
+    const code = readRepo(ROSTER);
+    // Same shape, but no device evidence — it stays evidence-gated.
+    expect(code).toContain('aria-label="Cancel call-out"');
+    expect(code).not.toContain("useFocusedWorkspace(Boolean(callOutTarget))");
   });
 });
 

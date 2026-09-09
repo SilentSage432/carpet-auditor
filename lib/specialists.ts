@@ -1596,6 +1596,9 @@ export async function deleteSpecialist(
   const targetId = String(member.id);
 
   deactivateLocal(member, store);
+  // Local roster already changed, so the TTL entry is stale from here on —
+  // without this the post-delete reload replays the member back into the list.
+  invalidateRosterCache();
 
   const active = getActiveSpecialist();
   if (active && sameSpecialistIdentity(active, member)) {

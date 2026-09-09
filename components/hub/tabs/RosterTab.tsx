@@ -133,6 +133,9 @@ export function RosterTab({ specialist, storeNumber }: WorkflowTabProps) {
   const canShift = canManageShiftBoard(specialist);
   const working = useWorkingDepartment(specialist);
 
+  // Remove-confirm owns the viewport while it is open (field-proven on Samsung).
+  useFocusedWorkspace(Boolean(deleteTarget));
+
   const reload = useCallback(async () => {
     const weekEnd = weekDates[6] ?? today;
     try {
@@ -620,7 +623,7 @@ export function RosterTab({ specialist, storeNumber }: WorkflowTabProps) {
           <div
             role="dialog"
             aria-modal="true"
-            className="glass-card theme-modal relative z-10 w-full max-w-md !rounded-t-2xl p-4 sm:!rounded-2xl"
+            className="glass-card theme-modal hub-modal-sheet relative z-10 w-full max-w-md !rounded-t-2xl px-4 pt-4 sm:!rounded-2xl"
           >
             <h2 className="glass-title text-lg">Remove {deleteTarget.name}?</h2>
             <p className="mt-2 text-sm text-zinc-400">

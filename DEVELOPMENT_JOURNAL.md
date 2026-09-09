@@ -1,5 +1,61 @@
 # DeptSync Hub — Development Journal
 
+## 2026-09-08 — ROSTER-LIFE-001: the editor that does not edit
+
+Three field problems from live roster setup, and the third one turned out to be
+the real finding.
+
+**The removal delay is ROSTER-ROLE-001 again, in a second writer.**
+`deleteSpecialist` changed local roster state and never dropped the 45-second
+TTL entry, so the reload that follows a successful delete replayed the removed
+member straight back into the list. `saveSpecialist` was the only writer in
+`lib/specialists.ts` that invalidated; the other eight did not. One line, placed
+right after `deactivateLocal` so the offline, soft-delete, and hard-delete paths
+all benefit. This is now the second tranche in a row where the defect was a
+missing cache invalidation on a mutation, which is worth treating as a pattern
+rather than two coincidences.
+
+**The remove-confirm dialog is a genuine UX-005G surface**, now field-proven.
+It is inline JSX inside the always-mounted `RosterTab`, so it cannot use the
+mount-gated pattern — `useFocusedWorkspace(Boolean(deleteTarget))` is the honest
+open signal. It also had no bottom inset, so with the nav gone the Cancel and
+Remove buttons would sit on the gesture bar; it now uses `.hub-modal-sheet`.
+The sibling call-out dialog has the identical shape and was **left alone**,
+because no device has reported it. Evidence gates the law, not resemblance.
+
+**"Why isn't there an obvious Edit roster member feature?" — because there
+isn't one.** `SpecialistEditSheet` is named like an editor and is not one. It
+renders name, floor title, and home department as read-only text and offers
+schedule, cross-department grants, pairing, PIN reset, and remove. There is no
+form field for name, phone, job title, or department anywhere in the roster.
+The user was not failing to find it.
+
+**I stopped before building it, and the reason is not caution for its own
+sake.** There is no safe server-side write path today. `saveSpecialist` upserts
+on `onConflict: "store_number,name"`, so renaming someone would not match their
+existing row, would attempt an insert carrying their existing primary key, fail,
+and get swallowed by a `catch` that quietly returns `offline: true` — a rename
+that reports success and writes nothing. `persistSpecialistFields` calls
+`setActiveSpecialist` on its offline branch, which would hijack the session
+identity of whoever is editing. Both write directly from the browser client, so
+RLS is the only thing standing between an "Edit Member" form and client-side
+`role` mutation. Editing needs a real server route with explicit authority
+enforcement, and that is a product decision about who may change what, not a
+repair. Contract proposed; nothing built.
+
+Every column an editor would need already exists in production — `name`,
+`phone_number`, `floor_title`, `username`, `assigned_department`,
+`home_department`. **No migration is required when that decision is made.**
+
+962 tests / 66 files pass (from 949/65), typecheck and build pass, lint at exact
+baseline parity — 114 problems (95 errors, 19 warnings).
+
+**Process note worth keeping:** while inspecting production I exported
+`.env.local` into the working shell, and a later `vitest` run inherited it and
+tried to reach the live database. No mutation occurred — the count was 21 before
+and after — but the lesson generalizes: anyone with those variables exported
+runs the suite against production. Tests must not inherit real credentials.
+
 ## 2026-09-08 — ROSTER-ROLE-001: the write was never broken
 
 Reported during live roster setup on the Samsung: selecting a "secondary role"
