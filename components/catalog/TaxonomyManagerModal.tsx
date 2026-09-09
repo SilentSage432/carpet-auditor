@@ -19,6 +19,7 @@ import {
   type DepartmentTaxonomy,
 } from "@/lib/catalog/taxonomies";
 import type { Department } from "@/lib/store-ops/types";
+import { useFocusedWorkspace } from "@/lib/ui/focused-workspace";
 
 type Props = {
   open: boolean;
@@ -96,6 +97,8 @@ export function TaxonomyManagerModal({
     setStatus(null);
   }, [open, options, reloadEffective]);
 
+  useFocusedWorkspace(open);
+
   useEffect(() => {
     if (!open) return;
     function onKey(e: KeyboardEvent) {
@@ -171,7 +174,7 @@ export function TaxonomyManagerModal({
           </button>
         </header>
 
-        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4">
+        <div className="hub-modal-sheet min-h-0 flex-1 space-y-4 overflow-y-auto px-4 pt-4">
           <label className="block space-y-1.5">
             <span className="text-sm font-medium text-zinc-200">Department</span>
             <select

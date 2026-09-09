@@ -1131,7 +1131,7 @@ Two standing exceptions: a confirmed **security or truth** finding from Workstre
 - **No WALK-001 before field evidence (FE-004).**
 - **No APP-TEACH-001 before ESL revalidation + teach-ahead evidence (FE-001).**
 - **No flooring abstraction without a confirmed second consumer.**
-- **No wholesale restoration of `hideChrome` surfaces.**
+- **No wholesale restoration of `hideChrome` surfaces.** *Disambiguation (2026-09-08):* this gate concerns `ZebraChecklist`'s content prop only. The focused-workspace navigation suppression shipped as UX-005G uses a separate mechanism (`lib/ui/focused-workspace.ts`) that hides the **bottom nav** during focused work and **did not touch `hideChrome`** or restore any surface behind it.
 - **No causal employee scoring.**
 - **No productivity surveillance.**
 - **No universal risk score.**

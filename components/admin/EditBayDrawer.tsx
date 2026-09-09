@@ -28,6 +28,7 @@ import {
 } from "@/lib/store-ops/velocity";
 import type { StoreSpecialist } from "@/lib/types";
 import { toastError, toastSuccess } from "@/lib/toast";
+import { useFocusedWorkspace } from "@/lib/ui/focused-workspace";
 import { HubIcon } from "@/components/hub/NavIcons";
 
 type Props = {
@@ -88,6 +89,9 @@ export function EditBayDrawer({
     () => [...departments].sort((a, b) => a.name.localeCompare(b.name)),
     [departments]
   );
+
+  // Mount is the open signal — this drawer is conditionally rendered.
+  useFocusedWorkspace();
 
   useEffect(() => {
     document.body.style.overflow = "hidden";

@@ -16,6 +16,7 @@
 - [ ] UX-005B Samsung field acceptance (Floor Appliances entry — Question #1 not field-closed yet)
 - [ ] UX-005C Samsung field acceptance (Floor drawer action order — engineering complete, not field accepted)
 - [ ] WALK-001 Shift Walk Task Read-Back — Walk & Talk writes `shift_walk_tasks` but no UI reads them (`fetchShiftWalkTasks` has no consumer). Deferred debt; **not** owned by UX-005C
+- [ ] **UX-005G Samsung field acceptance — focused workspace navigation suppression** (engineering complete, **not** field accepted). Bottom nav now stands down while a focused workspace owns the viewport, driven by `lib/ui/focused-workspace.ts` occupancy and consumed only by `NavigationHub`. Five field-proven surfaces integrated: Edit Bay, Team Roster associate editor, Department Taxonomies, Associates On Duty, Sunday Rotation Engine. Top header deliberately retained. Device script prepared and **not** run. Added out of sequence from field evidence — it preempts none of UX-005D/E/F
 - [ ] UX-005D Map operate vs investigate
 - [ ] UX-005E Operational language
 - [ ] UX-005F AI earn-your-place review

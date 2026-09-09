@@ -51,6 +51,7 @@ import { fetchSpecialists } from "@/lib/specialists";
 import { AssociateRosterPanel } from "@/components/admin/AssociateRosterPanel";
 import { formatBayTag, type Department } from "@/lib/store-ops/types";
 import { isMasterAdmin } from "@/lib/rbac";
+import { useFocusedWorkspace } from "@/lib/ui/focused-workspace";
 import { rosterJobTitleLabel, type StoreSpecialist } from "@/lib/types";
 
 const FLOORING_STAGING_DEPT = "flooring" as const;
@@ -139,6 +140,8 @@ export function SundayAuditAssignmentModal({
     window.addEventListener(SUNDAY_AUDIT_EVENT, onAssignEvent);
     return () => window.removeEventListener(SUNDAY_AUDIT_EVENT, onAssignEvent);
   }, [open, reload]);
+
+  useFocusedWorkspace(open);
 
   useEffect(() => {
     if (!open) return;
@@ -399,7 +402,7 @@ export function SundayAuditAssignmentModal({
           </button>
         </header>
 
-        <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-4">
+        <div className="hub-modal-sheet min-h-0 flex-1 space-y-3 overflow-y-auto px-4 pt-4">
           <div className="rounded-xl border border-zinc-700/80 bg-zinc-950/60 px-3 py-2.5">
             <p className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-zinc-400">
               This week&apos;s staged work

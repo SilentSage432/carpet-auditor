@@ -1,5 +1,77 @@
 # DeptSync Hub — Development Journal
 
+## 2026-09-08 — UX-005G: the nav was standing on the work
+
+A Samsung DS device showed the persistent bottom nav sitting on top of five
+focused surfaces — Edit Bay, the Team Roster associate editor, Department
+Taxonomies, Associates On Duty, and the Sunday Rotation Engine — each of which
+already owns an explicit X. Art. XVI is unambiguous: persistent application
+chrome MUST never make operational work unreachable. Five overlapping sheets is
+one interaction-state defect, not five CSS bugs.
+
+**The nav could not be suppressed because nothing could ask it to.** `BottomNav`
+is rendered from exactly one place, `NavigationHub`, and gated on a
+`showBottomNav` prop that has existed since the component was written and that
+**no caller has ever passed**. The escape hatch was there; the state to drive it
+was not. `NavigationHub` is mounted from three separate route shells, and the
+five surfaces sit arbitrarily deep inside keep-alive tab panels, so no prop can
+travel from a sheet up to the nav.
+
+The stacking situation explains why the defect looked like z-index. An active
+`KeepAlivePanel` is `absolute` with `z-10`, which creates a stacking context, so
+a `z-[80]` sheet rendered inside it is clamped below the root-level `z-30` nav no
+matter how large its z-index. `HubPortal` exists to escape exactly this, and four
+sheets use it. None of the five did. Portalling all five would have been the
+other available fix, and it was rejected: it would have made each sheet *cover*
+the nav rather than establish that global navigation does not belong inside a
+focused workspace at all. Covering is a paint trick; suppression is the product
+rule.
+
+**One owner: `lib/ui/focused-workspace.ts`.** It owns occupancy and nothing else
+— it never renders and does not know what BottomNav is. Surfaces declare
+`useFocusedWorkspace(open)`; `NavigationHub` reads occupancy and stands the tabs
+down. Restoration rides effect cleanup, so X, Cancel, save-and-close, Escape,
+backdrop tap, route change, error dismissal, and plain unmount all release the
+claim through the same teardown. There is no "show the nav again" callback for a
+surface to forget, and no exit path that can leave the nav stuck hidden.
+
+**Occupancy is a count because coexistence is proven, not hypothetical.**
+`SpecialistEditSheet` opens its pairing dialog at `z-[90]` while remaining open,
+and `AisleBayManager` holds four independent overlay slots that nothing prevents
+from being truthy together. Under a boolean, closing the pairing QR would restore
+the nav underneath a roster sheet that still owned the screen. A counter is three
+lines more than a boolean and is the difference between correct and wrong, which
+is how Art. XX wants complexity earned.
+
+**The header stays.** The field complaint was specifically the bottom nav; store,
+department, connectivity, and identity remain useful while working, so the sticky
+header carries no occupancy condition.
+
+**Two sheets were relying on the nav as an accidental spacer.** Taxonomies and
+the Sunday Rotation Engine had no bottom inset at all — their content ended
+wherever the nav happened to cover it. With the nav gone they would have sat on
+the gesture bar, so both now use the existing `.hub-modal-sheet`, which pads the
+device safe area only. Nav-stack padding was deliberately not added anywhere: the
+five surfaces are `fixed inset-0`, so the nav never contributed layout to them
+and there is no dead spacer to reclaim. Device safe area and nav compensation are
+different quantities and stayed that way.
+
+Nothing was extended to the other twenty-six overlay surfaces in the repository.
+They are classified in the tranche report and left unchanged, because the
+interaction law is being applied to field-proven surfaces rather than to
+everything that happens to be `fixed inset-0`.
+
+**Identifier.** The mandate called this UX-005D, but that ID was already reserved
+for *Map operate vs investigate* and UX-005E for *Operational language* — both
+still open, both untouched. This tranche is **UX-005G**, added out of sequence
+because Samsung evidence arrived before the D–F questions were answered. Arriving
+early is not authorization to preempt them.
+
+Engineering is complete; **Samsung field acceptance is required and has not been
+run.** 932 tests / 64 files pass (from 911/63), typecheck and build pass, lint at
+exact baseline parity — 114 problems (95 errors, 19 warnings), the new suite
+contributing zero.
+
 ## 2026-09-08 — RUNTIME-COMPAT-001: code that wrote to columns production never had
 
 Three operator-facing actions were broken against the live database, and all

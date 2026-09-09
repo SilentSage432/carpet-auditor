@@ -20,6 +20,7 @@ import { composeAccessibleDepartments } from "@/lib/department-access";
 import { adminResetSpecialistPin, appAccessStatus } from "@/lib/specialists";
 import { issueRosterPairing } from "@/lib/store-ops/client";
 import { toastError, toastSuccess } from "@/lib/toast";
+import { useFocusedWorkspace } from "@/lib/ui/focused-workspace";
 import {
   departmentMeta,
   departmentRosterHeading,
@@ -83,6 +84,9 @@ export function SpecialistEditSheet({
   const pairExpired = pairExpiresAt
     ? Date.parse(pairExpiresAt) <= now
     : false;
+
+  // Mount is the open signal — this sheet is conditionally rendered.
+  useFocusedWorkspace();
 
   useEffect(() => {
     document.body.style.overflow = "hidden";

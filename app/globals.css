@@ -483,6 +483,8 @@ body {
  *   HubPortal          → document.body escape for sheets/modals above nav
  *   .hub-main          → content pad clears fixed bottom nav + safe area
  *   .hub-modal-sheet   → sheet body pad clears device safe area (sheet covers nav)
+ *   .hub-bottom-nav is absent while a focused workspace owns the viewport —
+ *   NavigationHub gates it on lib/ui/focused-workspace.ts occupancy.
  */
 :root {
   /* Floating pill ≈ 48px targets + inner padding + outer chrome. */
@@ -501,9 +503,10 @@ body {
 }
 
 /**
- * Bottom sheets / modal dialogs portaled above BottomNav.
- * Clears device home inset only — sheet covers the nav pill; nav-stack pad
- * would add excessive empty space on short sheets.
+ * Bottom sheets / modal dialogs that own the viewport above BottomNav.
+ * Clears the device home inset only. Nav-stack pad would be dead space: a
+ * focused workspace either covers the nav pill or suppresses it outright
+ * (lib/ui/focused-workspace.ts), so no nav compensation is owed here.
  */
 .hub-modal-sheet {
   padding-bottom: max(1.25rem, env(safe-area-inset-bottom, 0px));

@@ -20,6 +20,7 @@ Do not silently resolve, delete, or discard open questions during an early tranc
 | **UX-005D** | Map operate vs investigate | Open — do not preempt |
 | **UX-005E** | Operational language | Open — do not preempt |
 | **UX-005F** | AI earn-your-place review | Open — do not preempt. **Repository-level evidence now supplied by GEMINI-001** (see below) |
+| **UX-005G** | Focused workspace navigation suppression | Implemented — Samsung acceptance pending. Bottom nav stands down while a focused workspace owns the viewport (`lib/ui/focused-workspace.ts`; `NavigationHub` is the sole consumer). Added out of sequence from Samsung field evidence, so it preempts nothing: D, E, and F remain untouched |
 
 Do not preempt later tranches inside an earlier one.
 

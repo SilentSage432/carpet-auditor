@@ -10,6 +10,7 @@ import { useEffect, useState } from "react";
 import { CheckCircle2, Clock, UserCheck, Users, X } from "lucide-react";
 import { formatCompactShiftRange } from "@/lib/store-ops/shift-status";
 import type { OnDutyWorkloadGroup } from "@/lib/store-ops/weekly-rotations";
+import { useFocusedWorkspace } from "@/lib/ui/focused-workspace";
 
 const ICON_STROKE = 1.75;
 const STOREWIDE_PILL_LIMIT = 6;
@@ -47,6 +48,8 @@ export function OnDutyAssociateStrip({
   const setSheetOpen = onSheetOpenChange ?? setSheetOpenInternal;
   const totalBays = groups.reduce((sum, group) => sum + group.rotationIds.length, 0);
   const compact = storewide && groups.length > STOREWIDE_PILL_LIMIT;
+
+  useFocusedWorkspace(sheetOpen);
 
   useEffect(() => {
     if (!sheetOpen) return;

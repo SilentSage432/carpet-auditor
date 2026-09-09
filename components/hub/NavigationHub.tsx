@@ -20,6 +20,7 @@ import {
   navRoleLinks,
 } from "@/lib/nav-hub";
 import { requestSundayAuditDrawer } from "@/lib/store-ops/sunday-audit";
+import { useFocusedWorkspaceActive } from "@/lib/ui/focused-workspace";
 import { requestUserPreferencesDrawer } from "@/lib/ui/preferences-context";
 import { visibleSpecialtyTools } from "@/lib/specialty-tools";
 import { useDevSandbox } from "@/lib/use-dev-sandbox";
@@ -62,6 +63,12 @@ export function NavigationHub({
   const userMenuId = useId();
   const userRef = useRef<HTMLDivElement>(null);
   const { canOpen, sandbox } = useDevSandbox(sandboxActor ?? specialist);
+  /**
+   * A focused workspace owns the viewport between entry and explicit exit, so
+   * the bottom tabs stand down for its duration. The header stays: store,
+   * department, connectivity, and identity remain useful context while working.
+   */
+  const focusedWorkspaceOpen = useFocusedWorkspaceActive();
 
   useEffect(() => {
     setUserOpen(false);
@@ -212,7 +219,7 @@ export function NavigationHub({
       />
       </div>
 
-      {showBottomNav && primaryLinks.length > 0 ? (
+      {showBottomNav && !focusedWorkspaceOpen && primaryLinks.length > 0 ? (
         <BottomNav
           pathname={pathname}
           search={search}
