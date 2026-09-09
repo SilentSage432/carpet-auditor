@@ -1,5 +1,68 @@
 # DeptSync Hub — Development Journal
 
+## 2026-09-08 — ROSTER-EDIT-001: three fields shipped, one field refused
+
+ROSTER-LIFE-001 ended by saying an Edit Member feature needed an authority
+decision rather than a repair. Most of that decision turned out to be already
+made in the repository; one part of it genuinely is not, and that part is now
+the whole of what was left out.
+
+**Job title does not touch platform role, and the repository says so in two
+places.** `resolveRosterJobSave` maps a job option to `role` **and**
+`floor_title`, but the dependency runs one way only: role decides whether a
+floor title exists at all, storing `null` for Supervisor and MasterAdmin, and
+all four titles (Specialist, CSA, Cashier, Receiving) belong to associate-level
+options. `DEPT_SYNC_STATE.md` had already recorded `floor_title` as "orthogonal
+to platform role". So editing a title cannot escalate anyone — the route never
+writes `role`, and it refuses a title on a non-associate rather than inventing a
+state creation cannot produce. **Stop condition 1 did not fire.** It would have
+been easy to read the creation flow's combined job picker as proof of coupling
+and stop; the coupling is in the *picker*, not the data.
+
+**Home department is a different story, and it is a storage problem rather than
+a policy gap.** `accessible_departments` holds the home department alongside
+granted extras in one flat array, and nothing distinguishes them.
+`composeAccessibleDepartments` always pins the primary first, so on a move there
+are two outcomes and no way to choose correctly: keep the array and the old home
+becomes standing access the member was never granted, or rewrite it and genuine
+cross-department grants disappear. `AssociateRosterPanel` already does the
+former via `updateSpecialistScope`, so there *is* a precedent — but it silently
+broadens access, which is exactly what this tranche's own contract forbids. A
+precedent is not the same as a decided contract. **Stop condition 2 fired for
+that one field**, so name, phone, and job title shipped and the department
+select was not built. The recommendation is to model the home department as its
+own concept and derive access from it, rather than adding a third column.
+
+**The route is the first API test in the repository, and that was cheap rather
+than ambitious.** `vitest.config.ts` already aliases `server-only` to an empty
+build — AI-SAFETY-001 put it there so server modules would be importable — so
+testing `PATCH` directly needed two `vi.mock` calls and a small thenable
+PostgREST stand-in, not new infrastructure. That buys real behavioural proof of
+the things that actually matter here: that an escalation smuggled beside a valid
+edit rejects *both* halves, that the update filters are `{id, store_number}`,
+that `upsert`/`insert`/`delete` are never reached, and that the response is the
+re-read row. The last one is proven by having the fake database upper-case the
+name on write and asserting the response shows the database's value, which is a
+stronger claim than any source-text assertion could make.
+
+**Two lessons from the previous two tranches were applied without being
+rediscovered.** The client mutation drops the roster cache before returning, so
+the corrected name cannot revert under its own success toast; and nothing reuses
+`saveSpecialist`, whose `onConflict: "store_number,name"` upsert is precisely
+the thing that cannot express a rename. Authorization is a copy of the grant
+route's gating rather than a new model: Master Admin protected from everyone,
+supervisors limited to associates, store scope from the actor and never the
+body. Creation remains admin-only, which is unchanged and intentional —
+correcting a typo is closer to granting access, which supervisors already do,
+than to adding a person.
+
+**The discoverability finding was the simplest part.** The user believed no edit
+feature existed because none did. One `Edit details` button beside a `Member
+details` heading is the entire affordance; the sheet's read-only text was never
+tappable and is not now. Authority actions stay under `Administrative actions`
+where they were, so nothing about pairing, PIN, grants, or removal starts
+looking like ordinary profile editing.
+
 ## 2026-09-08 — ROSTER-LIFE-001: the editor that does not edit
 
 Three field problems from live roster setup, and the third one turned out to be

@@ -9,7 +9,16 @@
  */
 
 import { useEffect, useState } from "react";
-import { Clock, KeyRound, QrCode, RefreshCw, ShieldCheck, Trash2, X } from "lucide-react";
+import {
+  Clock,
+  KeyRound,
+  Pencil,
+  QrCode,
+  RefreshCw,
+  ShieldCheck,
+  Trash2,
+  X,
+} from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { AssociateScheduleModal } from "@/components/hub/AssociateScheduleModal";
 import { DepartmentAccessChips } from "@/components/hub/DepartmentAccessChips";
@@ -17,11 +26,16 @@ import { AppAccessBadge, FloorTitleBadge } from "@/components/hub/SpecialistCard
 import { DepartmentIcon } from "@/components/hub/NavIcons";
 import { NumberField } from "@/components/ui/NumberField";
 import { composeAccessibleDepartments } from "@/lib/department-access";
+import { formatPhoneDisplay, normalizePhoneE164 } from "@/lib/phone";
 import { adminResetSpecialistPin, appAccessStatus } from "@/lib/specialists";
-import { issueRosterPairing } from "@/lib/store-ops/client";
+import {
+  issueRosterPairing,
+  updateMemberWorkforceDetails,
+} from "@/lib/store-ops/client";
 import { toastError, toastSuccess } from "@/lib/toast";
 import { useFocusedWorkspace } from "@/lib/ui/focused-workspace";
 import {
+  ROSTER_FLOOR_TITLES,
   departmentMeta,
   departmentRosterHeading,
   specialistHomeDepartment,
@@ -43,6 +57,7 @@ export function SpecialistEditSheet({
   onRemove,
   onScheduleSaved,
   onPaired,
+  onDetailsSaved,
 }: {
   actor: StoreSpecialist;
   member: StoreSpecialist;
@@ -55,6 +70,7 @@ export function SpecialistEditSheet({
   onRemove: () => void;
   onScheduleSaved: () => void;
   onPaired: () => void;
+  onDetailsSaved: () => void;
 }) {
   const [pinOpen, setPinOpen] = useState(false);
   const [newPin, setNewPin] = useState("");
@@ -67,6 +83,12 @@ export function SpecialistEditSheet({
   const [pairBusy, setPairBusy] = useState(false);
   const [pairError, setPairError] = useState<string | null>(null);
   const [now, setNow] = useState(() => Date.now());
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [nameDraft, setNameDraft] = useState(member.name);
+  const [phoneDraft, setPhoneDraft] = useState(member.phone_number ?? "");
+  const [titleDraft, setTitleDraft] = useState(member.floor_title ?? "");
+  const [detailsSaving, setDetailsSaving] = useState(false);
+  const [detailsError, setDetailsError] = useState<string | null>(null);
 
   const home = specialistHomeDepartment(member);
   const grantable =
@@ -79,6 +101,16 @@ export function SpecialistEditSheet({
     member.role !== "MasterAdmin" &&
     (access === "roster_only" || access === "invited");
   const showRemove = canManage && member.role !== "MasterAdmin";
+  /**
+   * Workforce correction, not authority. Mirrors the grant gate: an admin may
+   * correct anyone but Master Admin, a supervisor only associates. The route
+   * re-checks this — client gating is convenience, not security.
+   */
+  const canEditDetails =
+    member.role !== "MasterAdmin" &&
+    (canManage || (canGrant && member.role === "Associate"));
+  // Job title exists for associates only, matching roster creation.
+  const showTitleField = member.role === "Associate";
   const showPin = canManage && member.role !== "MasterAdmin";
   const showSchedule = canShift && member.role !== "MasterAdmin";
   const pairExpired = pairExpiresAt
@@ -148,6 +180,62 @@ export function SpecialistEditSheet({
     }
   }
 
+  function openDetails() {
+    setNameDraft(member.name);
+    setPhoneDraft(member.phone_number ?? "");
+    setTitleDraft(member.floor_title ?? "");
+    setDetailsError(null);
+    setDetailsOpen(true);
+  }
+
+  async function handleSaveDetails() {
+    const name = nameDraft.trim();
+    if (!name) {
+      setDetailsError("Enter a name");
+      return;
+    }
+    const rawPhone = phoneDraft.trim();
+    const phone = rawPhone ? normalizePhoneE164(rawPhone) : null;
+    if (rawPhone && !phone) {
+      setDetailsError("Enter a valid phone number");
+      return;
+    }
+
+    // Send only what actually changed.
+    const patch: {
+      member_id: string;
+      name?: string;
+      phone?: string | null;
+      floor_title?: string;
+    } = { member_id: member.id };
+    if (name !== member.name) patch.name = name;
+    if (phone !== (member.phone_number ?? null)) patch.phone = phone;
+    if (showTitleField && titleDraft && titleDraft !== (member.floor_title ?? "")) {
+      patch.floor_title = titleDraft;
+    }
+    if (Object.keys(patch).length === 1) {
+      setDetailsOpen(false);
+      return;
+    }
+
+    setDetailsSaving(true);
+    setDetailsError(null);
+    try {
+      const saved = await updateMemberWorkforceDetails(actor, patch);
+      toastSuccess(`Updated ${saved.name}`);
+      setDetailsOpen(false);
+      onDetailsSaved();
+    } catch (err) {
+      // The editor stays open holding what was typed — never a false success.
+      const message =
+        err instanceof Error ? err.message : "Could not save member details";
+      setDetailsError(message);
+      toastError(message);
+    } finally {
+      setDetailsSaving(false);
+    }
+  }
+
   return (
     <div className="glass-backdrop fixed inset-0 z-[80] flex flex-col justify-end">
       <button
@@ -190,8 +278,119 @@ export function SpecialistEditSheet({
           </button>
         </div>
 
-        {showSchedule ? (
+        {canEditDetails ? (
           <section className="border-t border-zinc-800/80 pt-3">
+            <div className="flex items-center justify-between gap-2">
+              <p className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-zinc-500">
+                Member details
+              </p>
+              {!detailsOpen ? (
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={openDetails}
+                  className="inline-flex min-h-9 items-center gap-1.5 rounded-lg border border-zinc-700 px-2.5 text-xs font-bold text-slate-200"
+                >
+                  <Pencil
+                    className="h-3.5 w-3.5"
+                    strokeWidth={ICON_STROKE}
+                    aria-hidden
+                  />
+                  Edit details
+                </button>
+              ) : null}
+            </div>
+
+            {detailsOpen ? (
+              <div className="mt-2.5 space-y-2.5">
+                <label className="block space-y-1.5">
+                  <span className="text-sm font-medium text-zinc-200">Name</span>
+                  <input
+                    type="text"
+                    autoComplete="off"
+                    value={nameDraft}
+                    onChange={(e) => setNameDraft(e.target.value)}
+                    className="glass-input min-h-12 w-full"
+                  />
+                </label>
+
+                <label className="block space-y-1.5">
+                  <span className="text-sm font-medium text-zinc-200">
+                    Phone Number (optional)
+                  </span>
+                  <input
+                    type="tel"
+                    inputMode="tel"
+                    autoComplete="tel"
+                    value={phoneDraft}
+                    onChange={(e) => setPhoneDraft(e.target.value)}
+                    placeholder="(555) 123-4567"
+                    className="glass-input min-h-12 w-full font-mono"
+                  />
+                </label>
+
+                {showTitleField ? (
+                  <label className="block space-y-1.5">
+                    <span className="text-sm font-medium text-zinc-200">
+                      Job Title
+                    </span>
+                    <select
+                      value={titleDraft}
+                      onChange={(e) => setTitleDraft(e.target.value)}
+                      className="glass-input min-h-12 w-full"
+                    >
+                      {ROSTER_FLOOR_TITLES.map((title) => (
+                        <option key={title} value={title}>
+                          {title}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                ) : null}
+
+                {detailsError ? (
+                  <p
+                    className="text-center text-sm font-semibold text-rose-300"
+                    role="alert"
+                  >
+                    {detailsError}
+                  </p>
+                ) : null}
+
+                <div className="grid grid-cols-2 gap-2">
+                  <button
+                    type="button"
+                    disabled={detailsSaving}
+                    onClick={() => setDetailsOpen(false)}
+                    className="flex min-h-11 items-center justify-center rounded-xl border border-zinc-700 text-sm font-semibold"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    disabled={detailsSaving}
+                    onClick={() => void handleSaveDetails()}
+                    className="btn-primary-glow flex min-h-11 items-center justify-center rounded-xl text-sm font-bold disabled:opacity-40"
+                  >
+                    {detailsSaving ? "Saving…" : "Save details"}
+                  </button>
+                </div>
+
+                <p className="text-[11px] text-zinc-500">
+                  Corrects who this person is on the floor. App access, PIN, and
+                  pairing stay under administrative actions.
+                </p>
+              </div>
+            ) : (
+              <p className="mt-1 font-mono text-[11px] tracking-tight text-zinc-400">
+                {formatPhoneDisplay(member.phone_number) || "No phone on file"}
+              </p>
+            )}
+          </section>
+        ) : null}
+
+        {showSchedule ? (
+          <section className="mt-4 border-t border-zinc-800/80 pt-3">
             <AssociateScheduleModal
               member={member}
               homeLabel={departmentRosterHeading(home)}

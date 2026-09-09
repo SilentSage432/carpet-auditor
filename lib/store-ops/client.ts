@@ -3,7 +3,7 @@
  */
 
 import type { StoreSpecialist } from "@/lib/types";
-import { invalidateRosterCache } from "@/lib/specialists";
+import { invalidateRosterCache, mapRow } from "@/lib/specialists";
 import { getStoreNumber, normalizeStoreNumber } from "@/lib/store";
 import { enqueueOrExecute, type EnqueueOrExecuteResult } from "@/lib/sync-queue";
 import { actorFromSpecialist, storeOpsAuthHeadersAsync } from "./auth";
@@ -573,6 +573,40 @@ export async function updateDepartmentAccess(
   return {
     accessible_departments: data.accessible_departments ?? [],
   };
+}
+
+/**
+ * Correct an existing member's workforce details (name, phone, job title).
+ *
+ * Authority is untouched — role and accessible_departments are rejected by the
+ * route. Returns the persisted row so callers show what was saved rather than
+ * what was typed.
+ */
+export async function updateMemberWorkforceDetails(
+  specialist: StoreSpecialist,
+  input: {
+    member_id: string;
+    name?: string;
+    phone?: string | null;
+    floor_title?: string;
+  }
+): Promise<StoreSpecialist> {
+  const { member_id: memberId, ...patch } = input;
+  const data = await storeOpsFetch<{
+    specialist?: Record<string, unknown> | null;
+  }>(`/api/roster/members/${encodeURIComponent(memberId)}`, specialist, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(patch),
+  });
+  if (!data.specialist) {
+    throw new Error("Saved, but the updated member could not be read back");
+  }
+  await invalidateStoreOpsListCaches();
+  // Roster reads come off a 45s TTL entry — without this the edit visibly
+  // reverts on the reload that follows (ROSTER-ROLE-001, ROSTER-LIFE-001).
+  invalidateRosterCache();
+  return mapRow(data.specialist);
 }
 
 export async function fetchThisWeekRotations(

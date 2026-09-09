@@ -552,6 +552,7 @@ export function RosterTab({ specialist, storeNumber }: WorkflowTabProps) {
           }}
           onScheduleSaved={() => void reload()}
           onPaired={() => void reload()}
+          onDetailsSaved={() => void reload()}
         />
       ) : null}
 

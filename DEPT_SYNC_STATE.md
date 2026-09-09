@@ -191,6 +191,7 @@ Browser request
 - **Supervisor (DS):** department-scoped via `assigned_department` + `accessible_departments`.
 - **Associate (CSA):** simplified 2-tab nav (My Shift + Map); `floor_title` Specialist vs CSA orthogonal to platform role.
 - **RLS lockdown:** `supabase/migrations/20260817_rls_security_lockdown.sql` — closes anon/open SELECT; JWT helpers: `jwt_matches_store`, `jwt_matches_department_code`, `jwt_is_elevated`, `jwt_app_role`.
+- **Workforce description vs app authority (ROSTER-EDIT-001):** correcting *who someone is on the floor* and changing *what they may do* are separate write paths. `PATCH /api/roster/members/[id]` owns workforce details — `name`, `phone_number`, `floor_title` — and refuses `role`, `accessible_departments`, PIN, invite tokens, auth identity, and store scope outright rather than ignoring them. Authority stays with `POST /api/admin/department-access` and the PIN/pairing surfaces. It updates by immutable `id` + actor `store_number` (never `onConflict: "store_number,name"`, which cannot express a rename) and returns the re-read row, so a caller is told what persisted rather than what it asked for. Gating mirrors the grant route exactly: Master Admin identities are protected from every actor, and a `department_supervisor` may only edit associates. **Home department is deliberately not editable here** — see the parity note in §3.
 
 ### Composition rules (from project philosophy)
 
@@ -283,6 +284,7 @@ Until applied, production Hub falls back to localStorage for catalog/remnants; r
 4. **No multi-device queue merge** — sync queue is device-local; LWW at flush time only.
 5. **Hand-written TS types** — schema drift risk without generated Supabase types.
 6. ~~**Quarantine UI not yet wired**~~ — `SyncQueuePanel` in Settings Device & sync accordion.
+7. **`accessible_departments` cannot distinguish the home department from a granted extra** — `composeAccessibleDepartments` pins the primary first, so the array a member carries mixes *where they work* with *where they were additionally granted access*. Nothing marks which is which. Moving a member's home department therefore has no derivable correct outcome: preserving the array leaves the old home as standing access (a silent broadening), while rewriting it erases genuine grants. This is why **ROSTER-EDIT-001 shipped without home-department editing** — it is an authority decision, not a repair. Both columns (`assigned_department`, `home_department`) exist and are written in lockstep at creation; `home_department` wins wherever they disagree (`specialistHomeDepartment`, `mapRow`, labor availability).
 
 ---
 
