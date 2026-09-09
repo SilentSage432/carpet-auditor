@@ -435,8 +435,10 @@ export async function PATCH(request: Request) {
             { status: 404 }
           );
         }
+        // `department_id` is the only department binding `store_locations`
+        // actually has. There is no `department_code` column, and writing one
+        // failed the whole Edit Bay save.
         patch.department_id = dept.id;
-        patch.department_code = dept.code;
       }
     }
 

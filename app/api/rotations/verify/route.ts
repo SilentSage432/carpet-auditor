@@ -15,9 +15,9 @@ import {
   verifyPendingRotation,
 } from "@/lib/store-ops/rotation-review";
 import { resolveStoreByNumber } from "@/lib/store-ops/stores";
-import { stampDepartmentWeekVerified } from "@/lib/store-ops/verification";
+import { storeNumberQueryValues } from "@/lib/store";
 import { requireSupabaseAdmin } from "@/lib/supabase/admin-response";
-import { isoWeekLabel } from "@/lib/store-ops/week";
+import { isoWeekLabel, isoWeekToMondayDate } from "@/lib/store-ops/week";
 import { sundayStagingWeekLabel } from "@/lib/store-ops/sunday-schedule";
 
 type ReviewAction = "verify" | "send_back" | "verify_all";
@@ -82,10 +82,18 @@ export async function GET(request: Request) {
       sundayStagingWeekLabel(new Date(), store.timezone) ||
       isoWeekLabel();
 
-    const { data: assignmentRows } = await supabase
+    // `sunday_bay_assignments` keys the week by `week_starting` (a date), not by
+    // the ISO week text `weekly_rotations` uses, so the label is converted with
+    // the existing resolver rather than a new one. Store scope matters here:
+    // a bare date is shared by every store.
+    const { data: assignmentRows, error: assignmentError } = await supabase
       .from("sunday_bay_assignments")
       .select("bay_id, specialist_name")
-      .eq("assigned_week", week);
+      .in("store_number", storeNumberQueryValues(store.store_number))
+      .eq("week_starting", isoWeekToMondayDate(week));
+    if (assignmentError) {
+      throw new Error(assignmentError.message);
+    }
 
     const assignments: Record<string, { specialist_name?: string | null }> = {};
     for (const row of assignmentRows ?? []) {
@@ -229,21 +237,9 @@ export async function POST(request: Request) {
       actorId: actor.specialistId,
     });
 
-    const stampDepartments =
-      batch.department_ids.length > 0
-        ? batch.department_ids
-        : scoped.departmentId
-          ? [scoped.departmentId]
-          : [];
-
-    for (const departmentId of stampDepartments) {
-      await stampDepartmentWeekVerified(supabase, {
-        departmentId,
-        assignedWeek: week,
-        reportedBy: actor.specialistId,
-      });
-    }
-
+    // No department-week stamp is written. `departments` has no
+    // `last_verified_*` columns, and the week's verification state is derived
+    // from the rotations this batch just verified (see `buildVerificationSummary`).
     return NextResponse.json({
       ok: true,
       action: "verify_all",

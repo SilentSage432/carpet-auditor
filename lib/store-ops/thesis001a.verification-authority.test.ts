@@ -30,7 +30,6 @@ import {
   completeWeeklyRotation,
   resolveCompletionAutoVerify,
 } from "./rotations";
-import { stampDepartmentWeekVerified } from "./verification";
 
 const root = path.resolve(__dirname, "../..");
 
@@ -270,18 +269,16 @@ describe("A — associate cannot create VERIFIED_COMPLETE", () => {
     expect(code).not.toMatch(/\bverified_by:/);
   });
 
-  it("department week stamp touches only departments", async () => {
-    const db = seededBay();
-    const result = await stampDepartmentWeekVerified(db.client, {
-      departmentId: "dept-1",
-      assignedWeek: "2026-W37",
-      reportedBy: "associate-1",
-    });
-
-    expect(result.assigned_week).toBe("2026-W37");
-    expect(db.writes.map((w) => w.table)).toEqual(["departments"]);
-    expect(db.rotations[0]?.verification_status).toBe("PENDING");
-    expect(db.locations[0]?.status).toBe("ASSIGNED");
+  // RUNTIME-COMPAT-001 retired the department stamp entirely: production
+  // `departments` has no `last_verified_*` columns, so the write always threw
+  // *after* the bays had genuinely been verified. The authority boundary this
+  // block guards is unchanged — verification.ts still cannot verify a bay.
+  it("verification module no longer stamps a department week", () => {
+    const code = readRepoCode("lib/store-ops/verification.ts");
+    expect(code).not.toContain("stampDepartmentWeekVerified");
+    // The summary still reports last_verified_* — it derives them. What must
+    // not exist is any write back to the departments row.
+    expect(code).not.toMatch(/from\("departments"\)[\s\S]{0,200}?\.update\(/);
   });
 });
 

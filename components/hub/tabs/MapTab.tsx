@@ -256,7 +256,7 @@ export function MapTab({ specialist }: WorkflowTabProps) {
           }))
           .filter((row) => row.locationId);
         const nextBarriers = (exceptions.exceptions ?? [])
-          .map((row) => String(row.bay_id ?? ""))
+          .map((row) => String(row.location_id ?? ""))
           .filter(Boolean);
 
         setDepartments((prev) =>

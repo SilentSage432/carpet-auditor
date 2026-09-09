@@ -82,9 +82,9 @@ export function SupervisorAuditSummaryModal({
           rotations: weekData.rotations ?? [],
           assignments,
           shiftHours: hours,
-          exceptionLocationIds: (exceptions.exceptions ?? []).map(
-            (row) => row.bay_id
-          ),
+          exceptionLocationIds: (exceptions.exceptions ?? [])
+            .map((row) => String(row.location_id ?? ""))
+            .filter(Boolean),
         })
       );
       setQueue(queueData.items ?? []);

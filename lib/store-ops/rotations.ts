@@ -259,20 +259,7 @@ async function supersedeWeeklyRotationConflicts(
       .eq("assigned_week", week)
       .is("superseded_at", null);
     if (error) {
-      if (isMissingColumnError(error, "superseded_at")) {
-        const { error: delError } = await supabase
-          .from("weekly_rotations")
-          .delete()
-          .eq("location_id", locationId)
-          .eq("assigned_week", week);
-        if (delError) {
-          throw new Error(
-            readableError(delError, "Weekly rotation clear failed")
-          );
-        }
-      } else {
-        throw new Error(readableError(error, "Weekly rotation clear failed"));
-      }
+      throw new Error(readableError(error, "Weekly rotation clear failed"));
     }
   }
 
@@ -292,19 +279,7 @@ async function supersedeWeeklyRotationConflicts(
       .eq("department_id", departmentId)
       .eq("week_number", Number(weekNumber))
       .is("superseded_at", null);
-    if (error && isMissingColumnError(error, "superseded_at")) {
-      const { error: delError } = await supabase
-        .from("weekly_rotations")
-        .delete()
-        .eq("store_number", storeNumber)
-        .eq("department_id", departmentId)
-        .eq("week_number", Number(weekNumber));
-      if (delError && !isMissingColumnError(delError, "week_number")) {
-        throw new Error(
-          readableError(delError, "Weekly rotation clear failed")
-        );
-      }
-    } else if (error && !isMissingColumnError(error, "week_number")) {
+    if (error && !isMissingColumnError(error, "week_number")) {
       throw new Error(readableError(error, "Weekly rotation clear failed"));
     }
   }
@@ -761,14 +736,11 @@ export async function resetStagedWeekRotations(
     .update(supersedePatch)
     .in("id", rotationIds);
 
+  // Supersede failure fails closed. It must never fall back to DELETE:
+  // retiring a rotation attempt is a history-preserving act, and deleting the
+  // row destroys the coverage evidence superseding exists to keep.
   if (supersedeError) {
-    if (isMissingColumnError(supersedeError, "superseded_at")) {
-      const { error: deleteError } = await supabase
-        .from("weekly_rotations")
-        .delete()
-        .in("id", rotationIds);
-      if (deleteError) throw new Error(deleteError.message);
-    } else if (
+    if (
       isMissingColumnError(supersedeError, "supersede_source") ||
       isMissingColumnError(supersedeError, "superseded_by")
     ) {
@@ -1471,26 +1443,12 @@ export async function completeWeeklyRotation(
     .select("*")
     .single();
 
-  let updatedRotation: WeeklyRotation;
-  if (first.error) {
-    const missingReview =
-      isMissingColumnError(first.error, "verification_status") ||
-      isMissingColumnError(first.error, "completed_by") ||
-      isMissingColumnError(first.error, "verified_by") ||
-      isMissingColumnError(first.error, "verified_at") ||
-      isMissingColumnError(first.error, "review_note");
-    if (!missingReview) throw new Error(first.error.message);
-    const retry = await supabase
-      .from("weekly_rotations")
-      .update({ is_completed: true, completed_at: now })
-      .eq("id", rotationId)
-      .select("*")
-      .single();
-    if (retry.error) throw new Error(retry.error.message);
-    updatedRotation = retry.data as WeeklyRotation;
-  } else {
-    updatedRotation = first.data as WeeklyRotation;
-  }
+  // Fail closed. There is deliberately no retry that drops the review columns:
+  // a row carrying `is_completed` with no `verification_status` resolves as
+  // VERIFIED_COMPLETE, which would close the location as COMPLETED without any
+  // supervisor ever having verified it (Art. VI.2).
+  if (first.error) throw new Error(first.error.message);
+  const updatedRotation = first.data as WeeklyRotation;
 
   const closeLocation =
     autoVerify || resolveVerificationStatus(updatedRotation) !== "PENDING_VERIFICATION";

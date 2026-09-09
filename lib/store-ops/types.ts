@@ -184,14 +184,19 @@ export type ExceptionReason =
   | "High Customer Volume"
   | "Other";
 
+/**
+ * A barrier logged against one weekly rotation attempt.
+ *
+ * Week and cycle are DERIVED through `rotation_id → weekly_rotations`, never
+ * duplicated here — the barrier's identity is the rotation it interrupted.
+ */
 export type RotationException = {
   id: string;
+  rotation_id: string | null;
   department_id: string;
-  bay_id: string;
+  location_id: string | null;
   reason: string;
-  cycle_number: number;
-  assigned_week: string | null;
-  reported_by: string | null;
+  logged_by: string | null;
   created_at: string;
 };
 

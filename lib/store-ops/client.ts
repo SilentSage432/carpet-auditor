@@ -1098,13 +1098,13 @@ export async function fetchExceptionSummary(
   }>;
   exceptions: Array<{
     id: string;
+    rotation_id: string | null;
     department_id: string;
-    bay_id: string;
+    location_id: string | null;
     reason: string;
-    cycle_number: number;
-    assigned_week: string | null;
-    reported_by: string | null;
+    logged_by: string | null;
     created_at: string;
+    weekly_rotations: { assigned_week: string | null } | null;
     store_locations: {
       id: string;
       aisle: string;
@@ -1131,13 +1131,13 @@ export async function fetchExceptionSummary(
       }>;
       exceptions: Array<{
         id: string;
+        rotation_id: string | null;
         department_id: string;
-        bay_id: string;
+        location_id: string | null;
         reason: string;
-        cycle_number: number;
-        assigned_week: string | null;
-        reported_by: string | null;
+        logged_by: string | null;
         created_at: string;
+        weekly_rotations: { assigned_week: string | null } | null;
         store_locations: {
           id: string;
           aisle: string;

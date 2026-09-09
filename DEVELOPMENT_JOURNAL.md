@@ -1,5 +1,74 @@
 # DeptSync Hub — Development Journal
 
+## 2026-09-08 — RUNTIME-COMPAT-001: code that wrote to columns production never had
+
+Three operator-facing actions were broken against the live database, and all
+three broke the same way: the code wrote a column that does not exist. Nothing
+here is a migration. Production's schema was inspected read-only and treated as
+the authority; the code was moved to it.
+
+**Barrier reporting wrote a table shape that was never deployed.**
+`insertRotationBarriers` sent `bay_id`, `cycle_number`, `assigned_week`, and
+`reported_by`. Production's `rotation_exceptions` has `rotation_id`,
+`department_id`, `location_id`, `reason`, and `logged_by`. Every barrier report
+therefore failed, which is why the table holds zero rows — Art. V.1.7 says
+barriers must not silently disappear from operational truth, and they had never
+arrived in the first place.
+
+Production's hand-made shape turned out to be the better one. A barrier belongs
+to the rotation attempt it interrupted; week and cycle are reachable through
+`rotation_id → weekly_rotations` and were only ever denormalized copies. The
+runtime input already carried both `rotationId` and `locationId`, so this was a
+writer correction, not a schema gap. `RotationException` was corrected to match,
+which surfaced two UI readers — the Map barrier overlay and the supervisor
+rollup — that had been reading `bay_id` and getting `undefined` forever. Both
+wanted the location id, and both now say so.
+
+**Verify All worked and then reported that it had failed.**
+The bay loop verified correctly, and then `stampDepartmentWeekVerified` wrote
+`departments.last_verified_week` / `last_verified_at`, which do not exist. The
+supervisor saw an error over genuinely verified work. The stamp was deleted
+rather than replaced: those fields are derived, and `buildVerificationSummary`
+now computes them from the week's active rotations — the week counts as verified
+only when every one of them carries a real `VERIFIED_COMPLETE`, using the
+existing `isRotationVerifiedComplete` predicate rather than a second copy of the
+rule (Art. VII.2). `is_completed` alone is a report, not a verification.
+
+**Edit Bay Save wrote `store_locations.department_code`.** There is no such
+column; there is `department_id`, which the same patch already set. The invalid
+write was removed and nothing was added.
+
+**Two readers were hiding all of this.** `listRotationExceptions` filtered
+`rotation_exceptions.assigned_week` and then treated the resulting
+"does not exist" error as *no exceptions this week* — indistinguishable from a
+clean week. It now resolves the week relationally through the rotation and lets
+errors surface. The verification queue read `sunday_bay_assignments.assigned_week`
+(production has `week_starting`, a date) and discarded the error entirely,
+silently losing every associate name; it now converts the label with the
+existing `isoWeekToMondayDate` helper, scopes by store, and throws.
+
+**Three fallbacks were removed because they had become the hazard they were
+written to prevent.** `completeWeeklyRotation` retried without the review
+columns when they appeared missing — and a row carrying `is_completed` with no
+`verification_status` resolves as `VERIFIED_COMPLETE`, so the location closed as
+`COMPLETED` with nobody having verified it. `updateRotationRow` in
+`rotation-review.ts` had the same strip-and-retry on the verify and send-back
+paths. Superseding fell back to a hard `DELETE` when `superseded_at` looked
+absent, destroying the history that superseding exists to keep. Production has
+all of these columns, so none of the three was still a compatibility path; each
+now fails closed. The surviving `superseded_at` guards are read-side re-queries
+and were left alone.
+
+The new test suite models production's actual column lists and rejects unknown
+columns the way PostgREST does, so the pre-repair payloads fail against it. A
+permissive fake is what let these three defects ship.
+
+911 tests / 63 files pass (from 893/62); typecheck and build pass; lint at exact
+baseline parity, 114 (95 errors, 19 warnings), the new suite contributing zero.
+No migration was written or applied and no production row was mutated.
+
+---
+
 ## 2026-09-08 — THESIS-001A: the two ways verification authority leaked
 
 Two defects, one law. Both let something other than a supervisor's judgment

@@ -30,56 +30,28 @@ export type VerificationQueueItem = {
   assigned_week: string;
 };
 
-const REVIEW_COLUMNS = [
-  "verification_status",
-  "completed_by",
-  "verified_by",
-  "verified_at",
-  "review_note",
-] as const;
-
-function stripReviewColumns<T extends Record<string, unknown>>(
-  patch: T,
-  error: unknown
-): Partial<T> | null {
-  const next = { ...patch };
-  let stripped = false;
-  for (const column of REVIEW_COLUMNS) {
-    if (column in next && isMissingColumnError(error, column)) {
-      delete next[column];
-      stripped = true;
-    }
-  }
-  return stripped ? next : null;
-}
-
+/**
+ * Fail closed. The review columns (`verification_status`, `completed_by`,
+ * `verified_by`, `verified_at`, `review_note`) all exist in production, so
+ * there is no legitimate reason to retry without them — and a retry that drops
+ * `verification_status` would let `markLocationCompleted` close the bay with no
+ * verification evidence behind it, which is the outcome review exists to
+ * prevent (Art. VI.2).
+ */
 async function updateRotationRow(
   supabase: SupabaseClient,
   rotationId: string,
   patch: Record<string, unknown>
 ): Promise<WeeklyRotation> {
-  const first = await supabase
+  const { data, error } = await supabase
     .from("weekly_rotations")
     .update(patch)
     .eq("id", rotationId)
     .select("*")
     .single();
 
-  if (!first.error) return first.data as WeeklyRotation;
-
-  const fallback = stripReviewColumns(patch, first.error);
-  if (!fallback || Object.keys(fallback).length === 0) {
-    throw new Error(first.error.message);
-  }
-
-  const retry = await supabase
-    .from("weekly_rotations")
-    .update(fallback)
-    .eq("id", rotationId)
-    .select("*")
-    .single();
-  if (retry.error) throw new Error(retry.error.message);
-  return retry.data as WeeklyRotation;
+  if (error) throw new Error(error.message);
+  return data as WeeklyRotation;
 }
 
 async function markLocationCompleted(

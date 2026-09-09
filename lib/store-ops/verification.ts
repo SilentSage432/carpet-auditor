@@ -1,13 +1,17 @@
 /**
- * Department week verification stamp + barrier / exception logging.
+ * Barrier / exception logging + the derived department-week verification summary.
  * Incomplete bays become CARRIED_OVER and are prioritized next week.
  *
  * Authority boundary (Art. VI.2):
- * This module MUST NOT create bay-level verification. It stamps department
- * `last_verified_*` metadata and records barriers only. `VERIFIED_COMPLETE` and
+ * This module MUST NOT create bay-level verification. It records barriers and
+ * composes a read-only summary. `VERIFIED_COMPLETE` and
  * `store_locations.status = COMPLETED` are owned exclusively by
  * `rotation-review.ts` (`verifyPendingRotation` / `verifyAllPendingRotations`),
  * reachable only behind an explicit supervisor/admin `review_action`.
+ *
+ * Department-week verification is DERIVED from the week's active
+ * `weekly_rotations` and is never persisted onto `departments` — those columns
+ * do not exist in production and must not be added (RUNTIME-COMPAT-001).
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -16,6 +20,7 @@ import type {
   RotationException,
   WeeklyRotationWithLocation,
 } from "./types";
+import { isRotationVerifiedComplete } from "./rotation-metrics";
 import { isoWeekLabel } from "./week";
 
 export const EXCEPTION_REASONS: ExceptionReason[] = [
@@ -34,43 +39,6 @@ export const QUICK_BARRIER_REASONS: ExceptionReason[] = [
   "Unpalletized Top-Stock",
   "Missing SIMS Tags",
 ];
-
-export type StampDepartmentWeekInput = {
-  departmentId: string;
-  assignedWeek: string;
-  reportedBy?: string | null;
-};
-
-export type StampDepartmentWeekResult = {
-  assigned_week: string;
-};
-
-/**
- * Stamp `departments.last_verified_week` / `last_verified_at` after the caller has
- * already closed the week's bays through the authorized review path.
- *
- * This records that a supervisor reviewed the department week. It deliberately
- * cannot verify a bay, close a location, or touch `verification_status` — see the
- * authority boundary in this module's header.
- */
-export async function stampDepartmentWeekVerified(
-  supabase: SupabaseClient,
-  input: StampDepartmentWeekInput
-): Promise<StampDepartmentWeekResult> {
-  const week = input.assignedWeek || isoWeekLabel();
-  const now = new Date().toISOString();
-
-  const { error: deptError } = await supabase
-    .from("departments")
-    .update({
-      last_verified_week: week,
-      last_verified_at: now,
-    })
-    .eq("id", input.departmentId);
-  if (deptError) throw new Error(deptError.message);
-
-  return { assigned_week: week };
-}
 
 export type ReportBarrierInput = {
   departmentId: string;
@@ -93,8 +61,8 @@ export type ReportBarrierResult = {
 };
 
 /**
- * Mid-week barrier log — does not stamp department last_verified_week.
- * End-of-week verify composes this, then stamps verification.
+ * Mid-week barrier log. Records why a bay could not be finished; it never
+ * completes, verifies, or closes anything.
  */
 export async function reportRotationBarriers(
   supabase: SupabaseClient,
@@ -113,25 +81,34 @@ export async function reportRotationBarriers(
   };
 }
 
+/**
+ * Persist barriers in production's normalized shape.
+ *
+ * The barrier points at the rotation it interrupted and the physical location
+ * it happened to; week and cycle are reachable through `rotation_id` and are
+ * deliberately NOT copied onto the row.
+ *
+ * Ordering is evidence-first: the exception rows are written before the
+ * location's scheduling flags. If the second write fails the caller sees the
+ * error while the historical barrier survives, which is the safer of the two
+ * partial states — re-reporting converges the location without losing evidence.
+ */
 async function insertRotationBarriers(
   supabase: SupabaseClient,
   input: ReportBarrierInput
 ): Promise<{ exceptions: RotationException[] }> {
   const now = new Date().toISOString();
-  const exceptionRows = input.incomplete
-    .filter((item) => item.locationId)
-    .map((item) => ({
-      department_id: input.departmentId,
-      bay_id: item.locationId,
-      reason: item.reason.trim() || "Other",
-      cycle_number: item.cycleNumber || 1,
-      assigned_week: input.assignedWeek,
-      reported_by: input.reportedBy ?? null,
-    }));
+  const reportable = input.incomplete.filter((item) => item.locationId);
+  const exceptionRows = reportable.map((item) => ({
+    rotation_id: item.rotationId || null,
+    department_id: input.departmentId,
+    location_id: item.locationId,
+    reason: item.reason.trim() || "Other",
+    logged_by: input.reportedBy ?? null,
+  }));
 
-  let exceptions: RotationException[] = [];
   if (exceptionRows.length === 0) {
-    return { exceptions };
+    return { exceptions: [] };
   }
 
   const { data, error } = await supabase
@@ -139,26 +116,33 @@ async function insertRotationBarriers(
     .insert(exceptionRows)
     .select("*");
   if (error) throw new Error(error.message);
-  exceptions = (data ?? []) as RotationException[];
+  const exceptions = (data ?? []) as RotationException[];
 
   if (input.markCarriedOver !== false) {
-    for (const item of input.incomplete) {
-      if (!item.locationId) continue;
-      const { error: locError } = await supabase
-        .from("store_locations")
-        .update({
-          status: "CARRIED_OVER",
-          updated_at: now,
-        })
-        .eq("id", item.locationId);
-      if (locError) throw new Error(locError.message);
-    }
+    // One statement, so the partial-failure window is a single write rather
+    // than one per bay. `carried_over` is the next-draw prepend flag and
+    // `last_carried_over_at` is the badge window — both already in production.
+    const { error: locError } = await supabase
+      .from("store_locations")
+      .update({
+        status: "CARRIED_OVER",
+        carried_over: true,
+        last_carried_over_at: now,
+        updated_at: now,
+      })
+      .in(
+        "id",
+        reportable.map((item) => item.locationId)
+      );
+    if (locError) throw new Error(locError.message);
   }
 
   return { exceptions };
 }
 
 export type ExceptionWithLocation = RotationException & {
+  /** Derived week — barriers carry no week of their own. */
+  weekly_rotations: { assigned_week: string | null } | null;
   store_locations: {
     id: string;
     aisle: string;
@@ -172,37 +156,44 @@ export type ExceptionWithLocation = RotationException & {
   } | null;
 };
 
+/**
+ * Barrier history for the Exception Log.
+ *
+ * Both callers scope by week, and `rotation_exceptions` carries no week of its
+ * own, so the week is resolved relationally through
+ * `rotation_id → weekly_rotations.assigned_week`. The inner join is applied
+ * only when a week is requested, so an unscoped read still returns barriers
+ * whose rotation has since been removed.
+ *
+ * A query error is no longer swallowed. Reading a column that does not exist
+ * used to surface as "no barriers this week", which is indistinguishable from a
+ * clean week and is exactly how a broken writer stayed invisible.
+ */
 export async function listRotationExceptions(
   supabase: SupabaseClient,
   opts?: { assignedWeek?: string; departmentId?: string; limit?: number }
 ): Promise<ExceptionWithLocation[]> {
+  const weekJoin = opts?.assignedWeek
+    ? "weekly_rotations!inner(assigned_week)"
+    : "weekly_rotations(assigned_week)";
+
   let query = supabase
     .from("rotation_exceptions")
     .select(
-      "*, store_locations(id, aisle, bay, type), departments(id, name, code)"
+      `*, ${weekJoin}, store_locations(id, aisle, bay, type), departments(id, name, code)`
     )
     .order("created_at", { ascending: false })
     .limit(opts?.limit ?? 200);
 
   if (opts?.assignedWeek) {
-    query = query.eq("assigned_week", opts.assignedWeek);
+    query = query.eq("weekly_rotations.assigned_week", opts.assignedWeek);
   }
   if (opts?.departmentId) {
     query = query.eq("department_id", opts.departmentId);
   }
 
   const { data, error } = await query;
-  if (error) {
-    // Empty week / missing log table → treat as no exceptions yet
-    const msg = error.message ?? "";
-    if (
-      error.code === "PGRST116" ||
-      /0 rows|does not exist|could not find/i.test(msg)
-    ) {
-      return [];
-    }
-    throw new Error(msg);
-  }
+  if (error) throw new Error(error.message);
   return (data ?? []) as ExceptionWithLocation[];
 }
 
@@ -211,7 +202,9 @@ export type DepartmentVerificationSummary = {
   department_name: string;
   department_code: string;
   weekly_bay_target: number;
+  /** Derived, not stored: this week's label once every active bay is verified. */
   last_verified_week: string | null;
+  /** Derived: newest `weekly_rotations.verified_at` in the week. */
   last_verified_at: string | null;
   verified_this_week: boolean;
   exception_count: number;
@@ -243,29 +236,42 @@ export async function buildVerificationSummary(
         weekLabel
       );
 
+      // Barriers hang off the rotation, not the week, so the week's rotations
+      // are the join key. No rotations means no barriers, and no query.
+      const rotationIds = rotations.map((r) => r.id).filter(Boolean);
       let exceptionCount = 0;
-      try {
+      if (rotationIds.length > 0) {
         const { count, error: exError } = await supabase
           .from("rotation_exceptions")
           .select("id", { count: "exact", head: true })
           .eq("department_id", dept.id)
-          .eq("assigned_week", weekLabel);
-        if (!exError) exceptionCount = count ?? 0;
-      } catch {
-        exceptionCount = 0;
+          .in("rotation_id", rotationIds);
+        if (exError) throw new Error(exError.message);
+        exceptionCount = count ?? 0;
       }
 
       const total = rotations.length;
       const incomplete = rotations.filter((r) => !r.is_completed).length;
+
+      // Department-week verification is derived, never stamped. The week counts
+      // as verified only when every active rotation carries a real DS
+      // verification — `is_completed` alone is a report, not a verification.
+      const verified = rotations.filter(isRotationVerifiedComplete);
+      const verifiedThisWeek = total > 0 && verified.length === total;
+      const lastVerifiedAt = verified.reduce<string | null>((latest, row) => {
+        const at = row.verified_at;
+        if (!at) return latest;
+        return latest && latest >= at ? latest : at;
+      }, null);
 
       summaries.push({
         department_id: dept.id,
         department_name: dept.name,
         department_code: dept.code,
         weekly_bay_target: dept.weekly_bay_target ?? 10,
-        last_verified_week: dept.last_verified_week ?? null,
-        last_verified_at: dept.last_verified_at ?? null,
-        verified_this_week: dept.last_verified_week === weekLabel,
+        last_verified_week: verifiedThisWeek ? weekLabel : null,
+        last_verified_at: lastVerifiedAt,
+        verified_this_week: verifiedThisWeek,
         exception_count: exceptionCount,
         incomplete_rotations: incomplete,
         total_rotations: total,
@@ -283,8 +289,14 @@ type WeekRotationRow = {
   department_id: string;
   is_completed: boolean;
   completed_at: string | null;
+  verification_status?: string | null;
+  verified_at?: string | null;
   cycle_number?: number | null;
 };
+
+/** Review columns are required for the derived summary; cycle_number is not. */
+const WEEK_ROTATION_REVIEW_COLUMNS =
+  "id, department_id, is_completed, completed_at, verification_status, verified_at";
 
 /** Prefer full column set; fall back if optional columns (e.g. cycle_number) are absent. */
 async function fetchWeekRotationsForDepartment(
@@ -294,7 +306,7 @@ async function fetchWeekRotationsForDepartment(
 ): Promise<WeekRotationRow[]> {
   const primary = await supabase
     .from("weekly_rotations")
-    .select("id, department_id, cycle_number, is_completed, completed_at")
+    .select(`${WEEK_ROTATION_REVIEW_COLUMNS}, cycle_number`)
     .eq("department_id", departmentId)
     .eq("assigned_week", weekLabel)
     .is("superseded_at", null);
@@ -305,7 +317,7 @@ async function fetchWeekRotationsForDepartment(
 
   const fallback = await supabase
     .from("weekly_rotations")
-    .select("id, department_id, is_completed, completed_at")
+    .select(WEEK_ROTATION_REVIEW_COLUMNS)
     .eq("department_id", departmentId)
     .eq("assigned_week", weekLabel)
     .is("superseded_at", null);
@@ -318,7 +330,7 @@ async function fetchWeekRotationsForDepartment(
   if (/superseded_at/i.test(primary.error.message + (fallback.error?.message ?? ""))) {
     const legacy = await supabase
       .from("weekly_rotations")
-      .select("id, department_id, is_completed, completed_at")
+      .select(WEEK_ROTATION_REVIEW_COLUMNS)
       .eq("department_id", departmentId)
       .eq("assigned_week", weekLabel);
     if (!legacy.error) {

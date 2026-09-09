@@ -57,12 +57,13 @@ describe("UX-002 verification authority contracts", () => {
     expect(modal).not.toContain("verifyAllCompletedBays");
   });
 
-  it("verify_all may stamp department week only after bay review batch", () => {
+  it("verify_all closes the week through the bay review batch and nothing else", () => {
     const route = readRepo("app/api/rotations/verify/route.ts");
     expect(route).toContain('reviewAction === "verify_all"');
     expect(route).toContain("verifyAllPendingRotations");
-    // The week stamp is now a helper that structurally cannot verify a bay.
-    expect(route).toContain("stampDepartmentWeekVerified");
     expect(route).not.toContain("verifyWeeklyRotations(");
+    // The department week stamp is gone: the columns never existed, and the
+    // week's verification state is derived from the rotations themselves.
+    expect(route).not.toContain("stampDepartmentWeekVerified");
   });
 });
