@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Roster tab — department-grouped team, shift board, and call-out rebalance.
+ * Roster tab — department-grouped team, shift board, and call-out exception.
  *
  * Pipeline: "+ Add Team Member" → AddTeamMemberSheet →
  *   POST /api/roster/members → createRosterMember → store_specialists (roster-only).
@@ -24,9 +24,19 @@ import {
   previousStoreLocalWorkDate,
   storeLocalWorkDate,
 } from "@/lib/store-ops/current-availability";
+import {
+  composeNextScheduledOpportunity,
+  countWeeklyOwnership,
+  isoWeekLabelFromStoreDate,
+} from "@/lib/store-ops/next-opportunity";
 import { useStoreClockTick } from "@/lib/store-ops/use-store-clock";
 import { DEFAULT_STORE_TIMEZONE } from "@/lib/store-ops/sunday-schedule";
 import { composeRosterDepartmentGroups } from "@/lib/store-ops/roster-groups";
+import {
+  fetchSundayAssignments,
+  type SundayAssignmentMap,
+} from "@/lib/store-ops/sunday-audit";
+import { isoWeekCalendarRange } from "@/lib/store-ops/week";
 import {
   canAccessDepartment,
   composeAccessibleDepartments,
@@ -81,6 +91,23 @@ import type { WorkflowTabProps } from "@/components/hub/tabs/tab-props";
 
 const ICON_STROKE = 1.75;
 
+function scheduleFetchWindow(input: {
+  storeToday: string;
+  storeYesterday: string;
+  weekStart: string;
+  weekEnd: string;
+}): { isoWeek: string; rangeStart: string; rangeEnd: string } {
+  const isoWeek = isoWeekLabelFromStoreDate(input.storeToday);
+  const iso = isoWeekCalendarRange(isoWeek);
+  const starts = [input.storeYesterday, input.weekStart, iso.startDate].sort();
+  const ends = [input.storeToday, input.weekEnd, iso.endDate].sort();
+  return {
+    isoWeek,
+    rangeStart: starts[0]!,
+    rangeEnd: ends[ends.length - 1]!,
+  };
+}
+
 function homeDepartment(member: StoreSpecialist): DepartmentScope {
   return specialistHomeDepartment(member);
 }
@@ -134,6 +161,13 @@ export function RosterTab({ specialist, storeNumber }: WorkflowTabProps) {
   const [callOutTarget, setCallOutTarget] = useState<StoreSpecialist | null>(
     null
   );
+  const [reassignTarget, setReassignTarget] = useState<StoreSpecialist | null>(
+    null
+  );
+  const [weekAssignments, setWeekAssignments] = useState<SundayAssignmentMap>(
+    {}
+  );
+  const [assignmentsKnown, setAssignmentsKnown] = useState(false);
   const [storeTimezone, setStoreTimezone] = useState(DEFAULT_STORE_TIMEZONE);
   const clockNow = useStoreClockTick();
   const today = localWorkDate();
@@ -151,14 +185,17 @@ export function RosterTab({ specialist, storeNumber }: WorkflowTabProps) {
 
   const reload = useCallback(async () => {
     const weekEnd = weekDates[6] ?? today;
-    const rangeStart =
-      storeYesterday < weekStart ? storeYesterday : weekStart;
-    const rangeEnd = storeToday > weekEnd ? storeToday : weekEnd;
+    const window = scheduleFetchWindow({
+      storeToday,
+      storeYesterday,
+      weekStart,
+      weekEnd,
+    });
     try {
       const [tz, team, saved] = await Promise.all([
         fetchStoreTimezone(storeNumber),
         fetchSpecialists(storeNumber),
-        fetchShiftDaysRange(rangeStart, rangeEnd, storeNumber),
+        fetchShiftDaysRange(window.rangeStart, window.rangeEnd, storeNumber),
       ]);
       setStoreTimezone(tz);
       const nextRoster = dedupeRoster(team);
@@ -167,6 +204,35 @@ export function RosterTab({ specialist, storeNumber }: WorkflowTabProps) {
       setManageTarget((curr) =>
         curr ? nextRoster.find((row) => row.id === curr.id) ?? null : curr
       );
+      const homes = [
+        ...new Set(
+          nextRoster
+            .filter((row) => row.is_active !== false)
+            .map((row) => homeDepartment(row))
+            .filter((home) => home !== "all")
+        ),
+      ];
+      try {
+        const maps = await Promise.all(
+          homes.map(async (dept) => {
+            try {
+              return await fetchSundayAssignments(
+                window.isoWeek,
+                storeNumber,
+                dept
+              );
+            } catch {
+              return {};
+            }
+          })
+        );
+        const merged: SundayAssignmentMap = {};
+        for (const map of maps) Object.assign(merged, map);
+        setWeekAssignments(merged);
+        setAssignmentsKnown(true);
+      } catch {
+        setAssignmentsKnown(false);
+      }
     } catch (err) {
       toastError(
         err instanceof Error ? err.message : "Could not load live roster"
@@ -182,10 +248,13 @@ export function RosterTab({ specialist, storeNumber }: WorkflowTabProps) {
     });
     function onShift() {
       const weekEnd = weekDates[6] ?? today;
-      const rangeStart =
-        storeYesterday < weekStart ? storeYesterday : weekStart;
-      const rangeEnd = storeToday > weekEnd ? storeToday : weekEnd;
-      void fetchShiftDaysRange(rangeStart, rangeEnd, storeNumber)
+      const window = scheduleFetchWindow({
+        storeToday,
+        storeYesterday,
+        weekStart,
+        weekEnd,
+      });
+      void fetchShiftDaysRange(window.rangeStart, window.rangeEnd, storeNumber)
         .then(setWeekRows)
         .catch((err) => {
           toastError(
@@ -237,6 +306,8 @@ export function RosterTab({ specialist, storeNumber }: WorkflowTabProps) {
     if (working === "all") return groups;
     return groups.filter((group) => group.home === working);
   }, [groups, working]);
+
+  const assignmentWeek = isoWeekLabelFromStoreDate(storeToday);
 
   useEffect(() => {
     if (working === "all") return;
@@ -376,11 +447,24 @@ export function RosterTab({ specialist, storeNumber }: WorkflowTabProps) {
     setCallOutTarget(absent);
   }
 
-  async function applyCallOut(
-    mode: "pool" | "auto" | "carry"
-  ) {
+  async function recordCallOut() {
     if (!callOutTarget) return;
     const absent = callOutTarget;
+    const previous = weekRows;
+    const existing = days[String(absent.id)];
+    const optimistic: AssociateShiftDay = {
+      specialist_id: String(absent.id),
+      work_date: storeToday,
+      start_time: existing?.start_time ?? null,
+      end_time: existing?.end_time ?? null,
+      is_scheduled_today: true,
+      is_call_out: true,
+      status: "ABSENT_CALLOUT",
+    };
+    setWeekRows((curr) => ({
+      ...curr,
+      [shiftRowKey(optimistic.specialist_id, storeToday)]: optimistic,
+    }));
     setBusyId(absent.id);
     try {
       const next = await upsertShiftDay(
@@ -396,15 +480,28 @@ export function RosterTab({ specialist, storeNumber }: WorkflowTabProps) {
         ...curr,
         [shiftRowKey(next.specialist_id, next.work_date)]: next,
       }));
+      toastSuccess(`${absent.name} called out`);
+      setCallOutTarget(null);
+    } catch (err) {
+      setWeekRows(previous);
+      toastError(
+        err instanceof Error ? err.message : "Could not record call-out"
+      );
+    } finally {
+      setBusyId(null);
+    }
+  }
+
+  async function applyReassign(mode: "pool" | "auto" | "carry") {
+    if (!reassignTarget) return;
+    const absent = reassignTarget;
+    setBusyId(absent.id);
+    try {
       const result = await redistributeCallOutBays({
         actor: specialist,
         absent,
         peers: roster,
-        days: composeShiftBoard(
-          roster,
-          { ...days, [next.specialist_id]: next },
-          storeToday
-        ),
+        days: composeShiftBoard(roster, days, storeToday),
         mode,
       });
       const label =
@@ -414,14 +511,15 @@ export function RosterTab({ specialist, storeNumber }: WorkflowTabProps) {
             ? "auto-redistributed to on-duty peers"
             : "carried over to the next shift";
       toastSuccess(
-        `${absent.name} marked call-out · ${result.moved} bay${
+        `${absent.name}: ${result.moved} bay${
           result.moved === 1 ? "" : "s"
         } ${label}`
       );
-      setCallOutTarget(null);
+      setReassignTarget(null);
+      await reload();
     } catch (err) {
       toastError(
-        err instanceof Error ? err.message : "Could not rebalance bays"
+        err instanceof Error ? err.message : "Could not reassign bays"
       );
     } finally {
       setBusyId(null);
@@ -524,6 +622,23 @@ export function RosterTab({ specialist, storeNumber }: WorkflowTabProps) {
                         now: clockNow,
                         timeZone: storeTimezone,
                       });
+                      const nextOpportunity = composeNextScheduledOpportunity({
+                        rows: Object.values(weekRows).filter(
+                          (row) => row.specialist_id === String(member.id)
+                        ),
+                        now: clockNow,
+                        timeZone: storeTimezone,
+                        weekLabel: assignmentWeek,
+                      });
+                      const ownedBays = countWeeklyOwnership(
+                        weekAssignments,
+                        String(member.id)
+                      );
+                      const calledOut = availability.reason === "CALLED_OUT";
+                      const showReassign =
+                        calledOut &&
+                        canShift &&
+                        (!assignmentsKnown || ownedBays > 0);
                       const canManageCard =
                         canShift || canGrant || canManage;
                       return (
@@ -536,8 +651,24 @@ export function RosterTab({ specialist, storeNumber }: WorkflowTabProps) {
                           canShift={canShift}
                           canManageCard={canManageCard}
                           callOutArmed={Boolean(scheduledToday)}
+                          nextCaption={
+                            calledOut &&
+                            (!assignmentsKnown || ownedBays > 0)
+                              ? nextOpportunity.caption
+                              : null
+                          }
+                          ownedBayCaption={
+                            calledOut && ownedBays > 0
+                              ? `${ownedBays} bay${ownedBays === 1 ? "" : "s"} still assigned this week`
+                              : null
+                          }
                           onToggleDuty={() =>
                             void markCallOut(member, scheduledToday)
+                          }
+                          onReassign={
+                            showReassign
+                              ? () => setReassignTarget(member)
+                              : undefined
                           }
                           onManage={() => setManageTarget(member)}
                         />
@@ -615,40 +746,79 @@ export function RosterTab({ specialist, storeNumber }: WorkflowTabProps) {
             className="glass-card theme-modal relative z-10 w-full max-w-md !rounded-t-2xl p-4 sm:!rounded-2xl"
           >
             <h2 className="glass-title text-lg">
-              Rebalance {callOutTarget.name}&apos;s bays?
+              Call out {callOutTarget.name}?
             </h2>
             <p className="mt-2 text-sm text-zinc-400">
-              Marks them ABSENT_CALLOUT for today, then moves their open
-              checklist bays.
+              They leave On now. Weekly bay ownership stays.
+            </p>
+            <div className="mt-4 grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => setCallOutTarget(null)}
+                className="flex min-h-12 items-center justify-center rounded-xl border border-zinc-700 text-sm font-semibold"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={busyId === callOutTarget.id}
+                onClick={() => void recordCallOut()}
+                className="flex min-h-12 items-center justify-center rounded-xl bg-amber-600 text-sm font-bold text-white"
+              >
+                Call out
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {reassignTarget ? (
+        <div className="glass-backdrop fixed inset-0 z-[80] flex items-end justify-center sm:items-center">
+          <button
+            type="button"
+            className="absolute inset-0"
+            aria-label="Cancel reassign"
+            onClick={() => setReassignTarget(null)}
+          />
+          <div
+            role="dialog"
+            aria-modal="true"
+            className="glass-card theme-modal relative z-10 w-full max-w-md !rounded-t-2xl p-4 sm:!rounded-2xl"
+          >
+            <h2 className="glass-title text-lg">
+              Reassign {reassignTarget.name}&apos;s bays?
+            </h2>
+            <p className="mt-2 text-sm text-zinc-400">
+              Optional. Weekly ownership stays unless you choose an action.
             </p>
             <div className="mt-4 space-y-2">
               <button
                 type="button"
-                disabled={busyId === callOutTarget.id}
-                onClick={() => void applyCallOut("pool")}
+                disabled={busyId === reassignTarget.id}
+                onClick={() => void applyReassign("pool")}
                 className="flex min-h-12 w-full items-center justify-center rounded-xl border border-zinc-700 text-sm font-bold"
               >
                 Return to Department Pool
               </button>
               <button
                 type="button"
-                disabled={busyId === callOutTarget.id}
-                onClick={() => void applyCallOut("auto")}
+                disabled={busyId === reassignTarget.id}
+                onClick={() => void applyReassign("auto")}
                 className="btn-primary-glow flex min-h-12 w-full items-center justify-center rounded-xl text-sm font-bold"
               >
                 Auto-Redistribute to On-Duty Peers
               </button>
               <button
                 type="button"
-                disabled={busyId === callOutTarget.id}
-                onClick={() => void applyCallOut("carry")}
+                disabled={busyId === reassignTarget.id}
+                onClick={() => void applyReassign("carry")}
                 className="flex min-h-12 w-full items-center justify-center rounded-xl border border-amber-500/40 bg-amber-950/30 text-sm font-bold text-amber-100"
               >
                 Carry Over to Next Shift
               </button>
               <button
                 type="button"
-                onClick={() => setCallOutTarget(null)}
+                onClick={() => setReassignTarget(null)}
                 className="flex min-h-11 w-full items-center justify-center text-sm font-semibold text-zinc-400"
               >
                 Cancel

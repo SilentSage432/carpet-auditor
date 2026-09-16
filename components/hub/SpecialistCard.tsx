@@ -80,7 +80,10 @@ export function SpecialistCard({
   canShift,
   canManageCard,
   callOutArmed,
+  nextCaption,
+  ownedBayCaption,
   onToggleDuty,
+  onReassign,
   onManage,
 }: {
   member: StoreSpecialist;
@@ -91,10 +94,14 @@ export function SpecialistCard({
   canManageCard: boolean;
   /** Persisted ON_DUTY (not called out / not OFF). Exception switch only. */
   callOutArmed: boolean;
+  nextCaption?: string | null;
+  ownedBayCaption?: string | null;
   onToggleDuty: () => void;
+  onReassign?: () => void;
   onManage: () => void;
 }) {
   const showDuty = canShift && member.role !== "MasterAdmin";
+  const calledOut = availability.reason === "CALLED_OUT";
 
   return (
     <li className="flex min-h-12 items-center gap-2 rounded-xl border border-zinc-800 bg-zinc-950/50 px-2.5 py-1.5">
@@ -114,6 +121,16 @@ export function SpecialistCard({
           <span className="mt-0.5 block font-mono text-[11px] font-semibold tracking-tight text-zinc-400">
             {availabilityCaption(availability, day)}
           </span>
+          {calledOut && nextCaption ? (
+            <span className="mt-0.5 block font-mono text-[11px] font-medium tracking-tight text-zinc-500">
+              {nextCaption}
+            </span>
+          ) : null}
+          {calledOut && ownedBayCaption ? (
+            <span className="mt-0.5 block font-mono text-[11px] font-medium tracking-tight text-zinc-500">
+              {ownedBayCaption}
+            </span>
+          ) : null}
         </span>
       </button>
 
@@ -124,8 +141,8 @@ export function SpecialistCard({
           aria-checked={callOutArmed}
           aria-label={
             callOutArmed
-              ? `Call-out exception for ${member.name}`
-              : `Clear call-out exception for ${member.name}`
+              ? `Call out ${member.name}`
+              : `Clear call-out for ${member.name}`
           }
           disabled={busy}
           onClick={(event) => {
@@ -141,6 +158,20 @@ export function SpecialistCard({
               callOutArmed ? "left-[1.35rem]" : "left-0.5"
             }`}
           />
+        </button>
+      ) : null}
+
+      {calledOut && onReassign ? (
+        <button
+          type="button"
+          disabled={busy}
+          onClick={(event) => {
+            event.stopPropagation();
+            onReassign();
+          }}
+          className="shrink-0 rounded-lg px-2 py-1 font-mono text-[10px] font-bold uppercase tracking-wide text-amber-200/90"
+        >
+          Reassign bays
         </button>
       ) : null}
 

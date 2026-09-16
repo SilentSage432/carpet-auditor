@@ -1,5 +1,27 @@
 # DeptSync Hub — Development Journal
 
+## 2026-09-16 — TIME-DUTY-003 Call-out, next opportunity, ownership resilience
+
+**Authorized implementation.** TIME-DUTY-002 derives current expected availability. Explicit call-out still forced pool / auto / carry before the exception could be saved.
+
+**Call-Out Exception Law:** a DS-recorded call-out overrides expected availability for the affected shift/date but does not automatically revoke weekly physical-bay ownership.
+
+**Next-Opportunity Law:** if an associate remains the weekly owner of unresolved physical bays, a later scheduled shift is another opportunity to do that work. Derived from schedule evidence; not a new ownership record; not guaranteed presence.
+
+**Default path:** persist today's `associate_shift_days` (`is_call_out=true`, `status=ABSENT_CALLOUT`, `is_scheduled_today=true`). TIME-DUTY-002 then shows Called out / not On now. `sunday_bay_assignments` unchanged. Concise confirm only; no mandatory rebalance.
+
+**Optional Reassign bays:** existing `redistributeCallOutBays` pool / auto / carry, `knownHoursOnly`, no invented 8h. Auto does not run merely because `is_call_out=true`.
+
+**Next opportunity:** `composeNextScheduledOpportunity` over current ISO week rows + store timezone. Missing/invalid/OFF/call-out rows are not invented. Caption example: `Next scheduled: Thu 10:00 AM`. None: `No remaining scheduled shift this week` — still no auto-redistribute.
+
+**Future shift:** Thursday's own row becomes On now at start. Tuesday's call-out is not cleared and does not poison Thursday.
+
+**Week boundary:** no new debt engine. Call-out does not complete coverage. Existing Stage `reclaimStaleAssignments` still returns stale ASSIGNED physical bays to PENDING.
+
+**Unchanged:** TIME-DUTY-002 clock model; LAB-WEEK-002 planner; BAY-UNIT-002 physical bay; Floor Pad; Seasonal Context; Gemini; no schema.
+
+**Tests:** 1103 → **1120** (+17 TIME-DUTY-003). Samsung field acceptance pending. Do not start another tranche.
+
 ## 2026-09-16 — TIME-DUTY-002 Schedule-derived current availability
 
 **Authorized implementation.** TIME-DUTY-001 proved persisted `associate_shift_days` plus `stores.timezone` already hold the evidence. Mounted Floor/Roster treated `ON_DUTY` as "on now," including after the clock window and when missing rows invented 07:00–15:30.
@@ -16,11 +38,9 @@
 
 **Floor:** On now strip is SCHEDULED_NOW only. Later today is a lightweight count on the work rail. Owned bays remain via `composeOnDutyBayWorkload` assignee map / Other assignments.
 
-**Unchanged:** LAB-WEEK-002 allocation (off today still allocatable later in ISO week); BAY-UNIT-002 physical bay; call-out redistribution; Floor Pad `isOnDutyToday` (protected); Seasonal Context; Gemini; no schema; no `is_on_shift`.
+**Unchanged:** LAB-WEEK-002 allocation (off today still allocatable later in ISO week); BAY-UNIT-002 physical bay; Floor Pad `isOnDutyToday` (protected); Seasonal Context; Gemini; no schema; no `is_on_shift`. Call-out default preserve-ownership is TIME-DUTY-003.
 
-**Deferred:** TIME-DUTY-003 — call-out default preserve-ownership, next scheduled opportunity, week-boundary unresolved work.
-
-**Tests:** 1076 → **1103** (+27 TIME-DUTY-002). Samsung field acceptance pending. Do not start TIME-DUTY-003.
+**Tests:** 1076 → **1103** (+27 TIME-DUTY-002). Samsung field acceptance pending.
 
 ## 2026-09-16 — BAY-UNIT-002 Physical bay coverage grouping
 

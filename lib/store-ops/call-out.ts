@@ -2,6 +2,9 @@
  * Call-out bay redistribution — composes sunday-audit + location status.
  * Does not generate rotations or own the shift board.
  *
+ * TIME-DUTY-003: this is an explicit DS ownership action, not the default
+ * call-out path. Recording Called out persists associate_shift_days only.
+ *
  * LAB-WEEK-002: auto mode uses known persisted day hours only — never default 8,
  * never treat missing schedule row as on-duty.
  */

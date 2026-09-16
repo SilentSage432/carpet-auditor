@@ -151,8 +151,9 @@ lib/store-ops/weekly-rotations.ts → Proportional clustered bay plan (`knownHou
 lib/store-ops/sunday-audit.ts → Persist specialist↔bay; apply balancer plan
 lib/store-ops/shift-status.ts → Weekly Sun–Sat schedule + call-out persistence (`associate_shift_days`; localStorage caches live rows). Day-level `isOnDutyToday` remains for protected Floor Pad / copilot.
 lib/store-ops/current-availability.ts → TIME-DUTY-002 schedule-derived current expected availability (On now / Later today / Off / Called out). Persist evidence; derive from store-local time. Not punch/attendance.
+lib/store-ops/next-opportunity.ts → TIME-DUTY-003 derived next scheduled opportunity in the current ISO week. Not persisted. Not attendance.
 lib/store-ops/use-store-clock.ts → Minute + visibility/focus tick for derived availability. No schedule fetch or write.
-lib/store-ops/call-out.ts → Rebalance absent bays (pool / auto / carry-over; auto uses known peer hours only)
+lib/store-ops/call-out.ts → Explicit Reassign bays (pool / auto / carry-over; auto uses known peer hours only). Not the default call-out writer.
 lib/store-ops/predictive-copilot.ts → Floor shift recommendations (logs + assignments + downstock; no Gemini)
 components/store-ops/PredictiveCopilotBanner.tsx → Dismissible Floor briefing under Shift Briefing
 components/store-ops/CarryOverPriorityBadge.tsx → Amber Geist Mono carry-over badge
@@ -268,7 +269,7 @@ supabase/migrations/20260812_sunday_bay_assignments.sql → sunday specialist↔
 | Whole-week schedule labor (LAB-WEEK-002) | `composeWeekLaborAvailability` + `fetchShiftDaysRange` → Balance Assign (`knownHoursOnly`); ISO Mon–Sun for `assigned_week` |
 | Daily shift board | `lib/store-ops/shift-status.ts` (`associate_shift_days` week matrix; throws on live write failure) |
 | Current expected availability (TIME-DUTY-002) | `composeCurrentAvailability` + `stores.timezone` + store-local now. Floor/Roster On now = in persisted window (start inclusive, end exclusive). Clock passage does not write ownership. Missing/invalid clocks ≠ On now. |
-| Call-out bay rebalance | `lib/store-ops/call-out.ts` (pool / auto / carry-over; known hours only on auto; stamps `carried_over` + Sunday `CARRIED_OVER`; does not generate rotations) |
+| Call-out bay rebalance | `lib/store-ops/call-out.ts` — **explicit** Reassign bays (pool / auto / carry-over; known hours only on auto). Default TIME-DUTY-003 call-out persists `associate_shift_days` only and does not invoke this. |
 | Predictive Shift Copilot | `lib/store-ops/predictive-copilot.ts` + `PredictiveCopilotBanner` (local patterns; 1-tap downstock / assign) |
 | Downstock / packdown queue | `lib/store-ops/downstock.ts` (flags) + Zebra Downstock tab on Floor (assign via sunday-audit) |
 | Shift workload balancer | `lib/store-ops/weekly-rotations.ts` (pure plan: hours, clusters, health-risk via `flagPenalty` from health.ts; `knownHoursOnly` for schedule evidence) |
