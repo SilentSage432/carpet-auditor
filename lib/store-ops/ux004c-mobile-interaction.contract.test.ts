@@ -71,14 +71,14 @@ describe("UX-004C More specialty destinations", () => {
     expect(host).not.toContain("pointer-events-none");
   });
 
-  it("More Department Tools reaches audit home; calculator still uses request helper", () => {
+  it("More keeps Floor Pad; specialty launchers disconnected (REDUCE-004)", () => {
     const settings = readRepo("components/sections/SettingsSection.tsx");
-    expect(settings).toContain('data-testid="more-appliances-home"');
-    expect(settings).toContain("APPLIANCES_OPERATIONAL_HOME_HREF");
+    expect(settings).not.toContain('data-testid="more-appliances-home"');
+    expect(settings).not.toContain("APPLIANCES_OPERATIONAL_HOME_HREF");
     expect(settings).not.toContain("requestApplianceScanner()");
-    expect(settings).toContain('data-testid="more-remnant-calculator"');
+    expect(settings).not.toContain('data-testid="more-remnant-calculator"');
+    expect(settings).not.toContain("requestRemnantCalculator()");
     expect(settings).toContain('data-testid="more-executive-floor-pad"');
-    expect(settings).toContain("requestRemnantCalculator()");
     expect(settings).toContain("router.push(buildExecutiveFloorPadHref())");
     expect(settings).not.toMatch(/href="\/dashboard#floor-pad"/);
   });

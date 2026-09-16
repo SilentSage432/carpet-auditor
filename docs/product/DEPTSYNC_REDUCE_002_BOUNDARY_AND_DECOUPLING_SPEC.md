@@ -71,7 +71,7 @@ Schedule-aware allocation remains a **future CORE** correction (LAB-001 fold), n
 |---|---------|--------|
 | 0 | Boundary lock (this doc + 002A) | Docs |
 | 1 | Delete enterprise stubs | **DONE — REDUCE-003** (routes + contracts removed; no schema) |
-| 2 | Nav/UI disconnect of **non-protected** OOS (appliances, cycle audit, remnants, Visual Bay mounts, Predictive, etc.) | **Must not** remove Walk & Talk / Floor Pad / TacticalVoice / Floor Pad intents / **Seasonal Context** |
+| 2 | Nav/UI disconnect of **non-protected** OOS (appliances, cycle audit, remnants, Visual Bay mounts, Predictive, etc.) | **DONE — REDUCE-004** (mount/link disconnect; runtime dormancy; must not remove Walk & Talk / Floor Pad / Seasonal Context) |
 | 3 | Sync-queue specialty leak break (`physical-audit` import) | Required before appliance code delete |
 | 4 | APP-UPC git capture (commit privacy history) | Before appliance runtime delete |
 | 5 | Specialty runtime retirement batches | **EXCLUDE** protected Walk & Talk / Floor Pad / TacticalVoiceFloorPad / Floor Pad intent infrastructure / Gemini transport **required by** Floor Pad / **Seasonal Context runtime+schema+required presentation** until FLOORPAD-001 (Floor Pad) — seasonality has no retirement gate; keep |

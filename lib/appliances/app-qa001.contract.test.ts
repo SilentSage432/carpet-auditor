@@ -90,10 +90,11 @@ describe("APP-QA-001 appliance home contracts", () => {
     expect(exportLib).not.toContain("gemini");
   });
 
-  it("UX-NAV Appliances path still navigates to operational home", () => {
-    expect(settings).toContain("APPLIANCES_OPERATIONAL_HOME_HREF");
-    expect(settings).toContain('data-testid="more-appliances-home"');
+  it("UX-NAV Appliances everyday path is disconnected (REDUCE-004)", () => {
+    expect(settings).not.toContain("APPLIANCES_OPERATIONAL_HOME_HREF");
+    expect(settings).not.toContain('data-testid="more-appliances-home"');
     expect(settings).not.toContain("requestApplianceScanner()");
+    expect(settings).toContain('data-testid="more-executive-floor-pad"');
   });
 });
 

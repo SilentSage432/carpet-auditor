@@ -1,22 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import dynamic from "next/dynamic";
-import { Camera, X } from "lucide-react";
+import { X } from "lucide-react";
 import { HubPortal } from "@/components/hub/HubPortal";
 import { assignLocationsToWeek, logBayService } from "@/lib/store-ops/client";
 import { toastError, toastSuccess } from "@/lib/toast";
 import { hapticSuccess, playErrorTone, playSuccessTone } from "@/lib/ui/feedback";
 import { recordBayTouch } from "@/lib/heatmap/bay-tracker";
-import type { BayScanMeta } from "@/lib/store-ops/ai-bay-scan";
-
-const VisualBayScannerModal = dynamic(
-  () =>
-    import("@/components/store-ops/VisualBayScannerModal").then(
-      (mod) => mod.VisualBayScannerModal
-    ),
-  { ssr: false }
-);
 import {
   formatBayTag,
   type BayServiceIntensity,
@@ -121,7 +111,6 @@ export function WalkTheFloorSheet({
   );
   const [targetId, setTargetId] = useState(faces[0]?.id ?? "");
   const [busy, setBusy] = useState<BayServiceIntensity | null>(null);
-  const [bayScanOpen, setBayScanOpen] = useState(false);
   const [pinBusy, setPinBusy] = useState(false);
 
   useEffect(() => {
@@ -158,11 +147,6 @@ export function WalkTheFloorSheet({
   const pinTargets = faces.filter(
     (loc) => (loc.location_type ?? "STANDARD") !== "SHOWROOM_STACKOUT"
   );
-  const bayScanMeta: BayScanMeta = {
-    aisle: bay.aisle,
-    bay: bay.pair.bay,
-    department_code: deptCode || undefined,
-  };
 
   async function pinToWeek(loc: StoreLocation) {
     setPinBusy(true);
@@ -399,14 +383,7 @@ export function WalkTheFloorSheet({
                   </span>
                 </button>
               ))}
-              <button
-                type="button"
-                onClick={() => setBayScanOpen(true)}
-                className="btn-primary-glow flex min-h-12 w-full items-center justify-center gap-2 rounded-xl px-4 text-sm"
-              >
-                <Camera className="w-4 h-4 mr-2" strokeWidth={1.75} />
-                Snap Bay Photo
-              </button>
+              {/* REDUCE-004: Snap Bay Photo disconnected; seasonal detail above stays. */}
             </div>
           )}
         </section>
@@ -430,15 +407,6 @@ export function WalkTheFloorSheet({
           </section>
         ) : null}
       </div>
-
-      {bayScanOpen ? (
-        <VisualBayScannerModal
-          open={bayScanOpen}
-          onClose={() => setBayScanOpen(false)}
-          specialist={specialist}
-          meta={bayScanMeta}
-        />
-      ) : null}
     </div>
     </HubPortal>
   );

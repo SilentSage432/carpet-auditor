@@ -185,8 +185,8 @@ describe("APP-AUD-002A UI contracts", () => {
     expect(section).toContain("AppliancePhysicalAuditPanel");
   });
 
-  it("UX-NAV canonical Appliances path remains intact", () => {
-    expect(settings).toContain("APPLIANCES_OPERATIONAL_HOME_HREF");
-    expect(settings).toContain('data-testid="more-appliances-home"');
+  it("UX-NAV Appliances everyday path is disconnected (REDUCE-004)", () => {
+    expect(settings).not.toContain("APPLIANCES_OPERATIONAL_HOME_HREF");
+    expect(settings).not.toContain('data-testid="more-appliances-home"');
   });
 });

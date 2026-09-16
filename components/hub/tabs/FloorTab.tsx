@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, Suspense } from "react";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
-import { ChevronRight, Users, Zap } from "lucide-react";
+import { Users, Zap } from "lucide-react";
 import { SundayAuditStagingCard } from "@/components/admin/SundayAuditStagingCard";
 import { ExceptionFeed } from "@/components/admin/ExceptionFeed";
 import { StoreHealthCard } from "@/components/StoreHealthCard";
@@ -20,7 +20,6 @@ import {
 import { ExecutiveFloorPadIntentBridge } from "@/components/hub/ExecutiveFloorPadIntentBridge";
 import { ZebraChecklist, type FloorBayFilter } from "@/components/store-ops/ZebraChecklist";
 import { ShiftBriefingCard } from "@/components/store-ops/ShiftBriefingCard";
-import { PredictiveCopilotBanner } from "@/components/store-ops/PredictiveCopilotBanner";
 import { StoreHealthChart } from "@/components/store-ops/StoreHealthChart";
 import { fetchApplianceCatalog } from "@/lib/appliance-catalog";
 import { fetchApplianceScans } from "@/lib/appliance-scans";
@@ -34,10 +33,6 @@ import {
 } from "@/lib/rbac";
 import { canAccessDepartment } from "@/lib/department-access";
 import { dedupeRoster, fetchSpecialists, isSupervisor } from "@/lib/specialists";
-import {
-  APPLIANCES_OPERATIONAL_HOME_HREF,
-  shouldShowFloorAppliancesEntry,
-} from "@/lib/specialty-tools";
 import { isStoreOpsAuthFailureMessage } from "@/lib/store-ops/auth-soft";
 import {
   fetchDepartments,
@@ -189,10 +184,6 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
   const supervisor = isSupervisor(specialist);
   const master = isMasterAdmin(specialist);
   const canReadAttention = supervisor;
-  const showAppliancesEntry = shouldShowFloorAppliancesEntry(
-    specialist,
-    working
-  );
   const assignmentDept = working === "all" ? "flooring" : working;
 
   const activeDept = useMemo(
@@ -601,33 +592,11 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
     <>
       <main className="hub-main">
         {/* UX-003: identity — week telemetry follows verification when present.
-            UX-005B: optional Appliances specialty entry sits with department identity. */}
+            REDUCE-004: Appliances specialty entry disconnected from everyday Floor. */}
         <header className="mb-2" data-testid="floor-command-header">
           <h1 className="text-lg font-bold tracking-tight text-zinc-50">
             {rotationTitle}
           </h1>
-          {showAppliancesEntry ? (
-            <button
-              type="button"
-              data-testid="floor-appliances-entry"
-              onClick={() => router.push(APPLIANCES_OPERATIONAL_HOME_HREF)}
-              className="mt-2 flex min-h-11 w-full max-w-full items-center gap-2 rounded-xl border border-sky-500/40 bg-sky-950/30 px-3 py-2 text-left active:bg-sky-950/50"
-            >
-              <span className="min-w-0 flex-1">
-                <span className="block text-sm font-bold text-sky-50">
-                  Appliances
-                </span>
-                <span className="mt-0.5 block text-[11px] font-medium leading-snug text-sky-200/75">
-                  Physical audit
-                </span>
-              </span>
-              <ChevronRight
-                className="h-4 w-4 shrink-0 text-sky-300/80"
-                strokeWidth={ICON_STROKE}
-                aria-hidden
-              />
-            </button>
-          ) : null}
         </header>
 
         {/* Immediate supervisory obligation — before week telemetry */}
@@ -904,18 +873,9 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
                     refreshKey={healthKey}
                     onTouched={() => setHealthKey((k) => k + 1)}
                   />
-                  {/* 4 — Predictive Copilot */}
-                  <PredictiveCopilotBanner
-                    specialist={specialist}
-                    week={week}
-                    rotations={displayRotations}
-                    departmentId={deptId}
-                    refreshKey={healthKey}
-                    onApplied={silentRefresh}
-                  />
                 </>
               ) : null}
-              {/* 5 — Weekly audit rollup */}
+              {/* 4 — Weekly audit rollup */}
               {supervisor && !simplified ? (
                 <button
                   type="button"
@@ -927,10 +887,8 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
                 </button>
               ) : null}
               {/*
-                SNAP-RETIRE-001 removed the sixth action. It was the sole entry
-                into the retired persisting Bay Audit Validate path. Whether
-                Floor should host an ephemeral Visual Bay Scan entry instead is
-                a UX-005F question, not retirement cleanup.
+                SNAP-RETIRE-001 removed Snap Bay from Floor.
+                REDUCE-004 disconnected Predictive Copilot from everyday Floor.
               */}
             </div>
             <ShiftAnalyticsReportsGroup>

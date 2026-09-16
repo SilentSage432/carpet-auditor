@@ -171,17 +171,13 @@ export default function DeptSyncHubPage() {
     }
     const session = readAuthSession();
     if (session) markWorkspaceUnlocked(session.sessionToken);
-    if (fromQuery === "remnants") {
-      router.replace("/settings#remnants");
+    if (fromQuery === "remnants" || fromQuery === "settings") {
+      router.replace(fromQuery === "settings" ? "/settings" : "/dashboard");
       return;
     }
-    if (fromQuery === "settings") {
-      router.replace("/settings");
-      return;
-    }
-    if (fromQuery && shouldStayOnSpecialtyHub(fromQuery) && canAccessSection(member, fromQuery)) {
-      setSection(fromQuery === "catalog" ? "appliances" : fromQuery);
-      setGate("ready");
+    // REDUCE-004: specialty hub sections no longer stay as an everyday product.
+    if (fromQuery && shouldStayOnSpecialtyHub(fromQuery)) {
+      router.replace("/dashboard");
       return;
     }
     router.replace("/dashboard");
@@ -241,21 +237,13 @@ export default function DeptSyncHubPage() {
             new URLSearchParams(window.location.search).get("section")
           )
         : null;
-    if (fromQuery === "remnants") {
-      router.replace("/settings#remnants");
+    if (fromQuery === "remnants" || fromQuery === "settings") {
+      router.replace(fromQuery === "settings" ? "/settings" : "/dashboard");
       return;
     }
-    if (fromQuery === "settings") {
-      router.replace("/settings");
-      return;
-    }
-    if (
-      fromQuery &&
-      shouldStayOnSpecialtyHub(fromQuery) &&
-      canAccessSection(matched, fromQuery)
-    ) {
-      setSection(fromQuery === "catalog" ? "appliances" : fromQuery);
-      setGate("ready");
+    // REDUCE-004: specialty hub sections redirect to Floor.
+    if (fromQuery && shouldStayOnSpecialtyHub(fromQuery)) {
+      router.replace("/dashboard");
       return;
     }
     router.replace("/dashboard");
@@ -454,15 +442,10 @@ export default function DeptSyncHubPage() {
       const next = parseHubSectionParam(
         new URLSearchParams(window.location.search).get("section")
       );
-      if (!next || !shouldStayOnSpecialtyHub(next)) return;
-      const resolved = next === "catalog" ? "appliances" : next;
-      setSection(resolved);
-      setVisitedSections((prev) => {
-        if (prev.has(resolved)) return prev;
-        const copy = new Set(prev);
-        copy.add(resolved);
-        return copy;
-      });
+      // REDUCE-004: specialty hub deep links leave everyday product for Floor.
+      if (next && shouldStayOnSpecialtyHub(next)) {
+        window.location.replace("/dashboard");
+      }
     }
     window.addEventListener("popstate", onPopState);
     return () => window.removeEventListener("popstate", onPopState);

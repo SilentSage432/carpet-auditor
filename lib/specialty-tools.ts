@@ -1,16 +1,15 @@
 /**
  * Specialty tool registry — appliance UPC audit scanner & carpet remnant calculator.
- * Presentation routes live here; scan/calc logic stays in section components.
  *
- * UX-NAV-001 ownership:
- * - Primary More → Department Tools navigates to operational homes (Appliances hub,
- *   Flooring cycle audit). Do not use requestApplianceScanner() as the More primary.
- * - SpecialtyToolsHost + requestApplianceScanner remain for contextual / ad-hoc /
- *   Floor SIMS launches only — not the durable physical-audit product path.
- *   APP-AUD-002B: these opens stay unbound (ignoreCachedAuditSession; no server auto-bind).
+ * REDUCE-004: everyday specialty launchers are disconnected from the reduced
+ * rotation product. Registry constants and open-events remain for dormant
+ * SpecialtyToolsHost / SIMS contextual paths until later runtime retirement.
+ * Primary More / Floor / user-menu specialty homes must not reappear without
+ * an explicit product decision.
+ *
+ * Protected Floor Pad intent helpers live in this module and remain KEEP.
  */
 
-import { canAccessSection } from "@/lib/rbac";
 import type { NavIconId } from "@/components/hub/NavIcons";
 import type {
   DepartmentScope,
@@ -22,9 +21,9 @@ export const APPLIANCE_SCANNER_HASH = "scan";
 export const REMNANT_CALCULATOR_HASH = "remnants-calculator";
 export const EXECUTIVE_FLOOR_PAD_HASH = "floor-pad";
 
-/** Canonical Appliances operational home (audit lifecycle + scanner). */
+/** Historical Appliances operational home (dormant under REDUCE-004). */
 export const APPLIANCES_OPERATIONAL_HOME_HREF = "/appliances";
-/** Canonical Flooring cycle-audit specialty home. */
+/** Historical Flooring cycle-audit specialty home (dormant under REDUCE-004). */
 export const FLOORING_CYCLE_AUDIT_HOME_HREF = "/?section=audit";
 
 /** Durable Floor handoff — survives soft nav and hard reload (UX-004C.1). */
@@ -93,6 +92,7 @@ export type SpecialtyTool = {
   section: HubSection;
 };
 
+/** Historical registry — retained for dormant runtime; not advertised everyday. */
 export const SPECIALTY_TOOLS: SpecialtyTool[] = [
   {
     id: "appliance-scanner",
@@ -114,30 +114,25 @@ export const SPECIALTY_TOOLS: SpecialtyTool[] = [
   },
 ];
 
-/** Tools the active roster member may open (Settings remnants or specialty hub scan). */
+/**
+ * REDUCE-004 — everyday specialty launchers return empty.
+ * Historical SPECIALTY_TOOLS remain for dormant host / later retirement.
+ */
 export function visibleSpecialtyTools(
-  member: StoreSpecialist | null | undefined
+  _member: StoreSpecialist | null | undefined
 ): SpecialtyTool[] {
-  return SPECIALTY_TOOLS.filter((tool) => canAccessSection(member, tool.section));
+  return [];
 }
 
 /**
- * UX-005B — Floor contextual Appliances entry (presentation only).
- *
- * Appliances-only pilot: show when Supervisor+/Master is currently working
- * Appliances and already has appliances section access. Not authorization.
- * Does not map Flooring or other specialties. Do not infer from name heuristics.
+ * REDUCE-004 — Floor Appliances specialty entry disconnected.
+ * Helper retained so contracts can assert permanent false for everyday product.
  */
 export function shouldShowFloorAppliancesEntry(
-  member: StoreSpecialist | null | undefined,
-  working: DepartmentScope
+  _member: StoreSpecialist | null | undefined,
+  _working: DepartmentScope
 ): boolean {
-  if (!member) return false;
-  if (member.role !== "Supervisor" && member.role !== "MasterAdmin") {
-    return false;
-  }
-  if (working !== "appliances") return false;
-  return canAccessSection(member, "appliances");
+  return false;
 }
 
 export function specialtyToolHref(toolId: SpecialtyToolId): string {
@@ -155,7 +150,7 @@ export type ApplianceScannerLocationContext = {
 
 /**
  * Open appliance scanner modal via SpecialtyToolsHost (contextual / ad-hoc).
- * Not the primary More → Appliances entry — that navigates to the audit home.
+ * Not an everyday product entry — REDUCE-004 disconnected primary launchers.
  */
 export function requestApplianceScanner(
   context?: ApplianceScannerLocationContext
@@ -168,7 +163,7 @@ export function requestApplianceScanner(
   );
 }
 
-/** Open remnant calculator — Settings accordion or in-page modal on flooring scan. */
+/** Open remnant calculator — dormant event path for SpecialtyToolsHost. */
 export function requestRemnantCalculator() {
   if (typeof window === "undefined") return;
   window.dispatchEvent(new CustomEvent(REMNANT_CALCULATOR_OPEN_EVENT));

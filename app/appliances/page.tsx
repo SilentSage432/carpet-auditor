@@ -1,6 +1,9 @@
 import { redirect } from "next/navigation";
 
-/** Appliances dashboard entry — opens the hub Appliances section. */
+/**
+ * REDUCE-004 — Appliances specialty home disconnected from everyday product.
+ * Runtime remains dormant under /?section=appliances until later retirement.
+ */
 export default function AppliancesDashboardPage() {
-  redirect("/?section=appliances");
+  redirect("/dashboard");
 }

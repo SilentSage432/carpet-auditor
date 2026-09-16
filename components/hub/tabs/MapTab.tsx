@@ -1,9 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import dynamic from "next/dynamic";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Camera, Focus, Layers, Zap } from "lucide-react";
+import { Focus, Layers, Zap } from "lucide-react";
 import { StoreLocationGrid } from "@/components/admin/StoreLocationGrid";
 import { isMasterAdmin, isSimplifiedAssociateView } from "@/lib/rbac";
 import {
@@ -63,14 +62,6 @@ import {
 
 const ICON_STROKE = 1.75;
 
-const VisualBayScannerModal = dynamic(
-  () =>
-    import("@/components/store-ops/VisualBayScannerModal").then(
-      (mod) => mod.VisualBayScannerModal
-    ),
-  { ssr: false }
-);
-
 export function MapTab({ specialist }: WorkflowTabProps) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -79,7 +70,6 @@ export function MapTab({ specialist }: WorkflowTabProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [authRequired, setAuthRequired] = useState(false);
-  const [bayScanOpen, setBayScanOpen] = useState(false);
   const [mapMode, setMapMode] = useState<"standard" | "heatmap">("standard");
   const [weekRotationLocations, setWeekRotationLocations] = useState<
     Array<{ locationId: string; completed: boolean }>
@@ -557,26 +547,9 @@ export function MapTab({ specialist }: WorkflowTabProps) {
             />
           )}
         </div>
-
-        {!locatorOnly ? (
-          <button
-            type="button"
-            onClick={() => setBayScanOpen(true)}
-            className="btn-primary-glow mt-3 flex min-h-11 w-full items-center justify-center rounded-xl px-4 text-sm"
-          >
-            <Camera className="mr-2 h-4 w-4" strokeWidth={ICON_STROKE} />
-            Snap Bay Photo
-          </button>
-        ) : null}
+        {/* REDUCE-004: Visual Bay Scan (Snap Bay Photo) disconnected from Map.
+            Seasonal / attention Map presentation above is protected. */}
       </main>
-
-      {bayScanOpen ? (
-        <VisualBayScannerModal
-          open={bayScanOpen}
-          onClose={() => setBayScanOpen(false)}
-          specialist={specialist}
-        />
-      ) : null}
     </>
   );
 }

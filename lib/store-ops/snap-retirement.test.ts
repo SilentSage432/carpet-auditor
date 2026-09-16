@@ -6,8 +6,9 @@
  * Appendix B row B forbid, and its evidence loop was severed at every stage.
  *
  * These tests pin the retirement in both directions: the model-authored
- * completion authority is gone, and the ephemeral Visual Bay Scan capability
- * plus the historical `bay_audit_logs` table survive untouched.
+ * completion authority is gone, and the historical `bay_audit_logs` table
+ * survives untouched. REDUCE-004 later disconnected Visual Bay Scan mounts
+ * from everyday Map / Walk / Cycle Audit while leaving scanner runtime dormant.
  */
 
 import { existsSync, readFileSync } from "node:fs";
@@ -203,16 +204,19 @@ describe("SNAP-RETIRE-001 — Visual Bay Scan is preserved, not re-dispositioned
     expect(modal).not.toContain("bay_audit_logs");
   });
 
-  it("keeps its three existing mounts and adds none", () => {
+  it("disconnects Visual Bay Scan mounts from everyday Map / Walk / Cycle Audit", () => {
     const mounts = [
       "components/hub/tabs/MapTab.tsx",
       "components/admin/WalkTheFloorSheet.tsx",
       "components/sections/CycleAuditSection.tsx",
     ];
     for (const mount of mounts) {
-      expect(readRepo(mount)).toContain("VisualBayScannerModal");
+      expect(readRepo(mount)).not.toContain("VisualBayScannerModal");
     }
-    expect(mounts).toHaveLength(3);
+    // Modal runtime may remain dormant until a later retirement tranche.
+    expect(
+      existsSync(path.join(root, "components/store-ops/VisualBayScannerModal.tsx"))
+    ).toBe(true);
   });
 
   it("O. keeps the shared bayScan token budget", () => {

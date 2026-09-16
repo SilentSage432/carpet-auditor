@@ -22,13 +22,6 @@ const AuditReportModal = dynamic(
     import("@/components/hub/AuditReportModal").then((m) => m.AuditReportModal),
   { ssr: false }
 );
-const VisualBayScannerModal = dynamic(
-  () =>
-    import("@/components/store-ops/VisualBayScannerModal").then(
-      (m) => m.VisualBayScannerModal
-    ),
-  { ssr: false }
-);
 import { isSupervisor } from "@/lib/specialists";
 import { isMasterAdmin } from "@/lib/rbac";
 import {
@@ -108,7 +101,6 @@ export function CycleAuditSection({
   const [reportOpen, setReportOpen] = useState(false);
   const [markdownTarget, setMarkdownTarget] = useState<Remnant | null>(null);
   const [simsFinderOpen, setSimsFinderOpen] = useState(false);
-  const [bayScanOpen, setBayScanOpen] = useState(false);
   const [remnantCalcOpen, setRemnantCalcOpen] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [undoToast, setUndoToast] = useState<{
@@ -372,27 +364,9 @@ export function CycleAuditSection({
             <span aria-hidden>📐</span>
             Carpet Remnant Calculator
           </button>
-          {activeSpecialist ? (
-            <button
-              type="button"
-              onClick={() => setBayScanOpen(true)}
-              className="flex min-h-11 shrink-0 items-center gap-1.5 rounded-xl border border-accent/40 bg-zinc-950/70 px-3 font-mono text-[11px] font-bold uppercase tracking-wide text-accent"
-            >
-              <HubIcon id="camera" className="h-4 w-4" />
-              Snap Bay
-            </button>
-          ) : null}
+          {/* REDUCE-004: Snap Bay disconnected from specialty cycle audit. */}
         </div>
       </div>
-
-      {activeSpecialist && bayScanOpen ? (
-        <VisualBayScannerModal
-          open={bayScanOpen}
-          onClose={() => setBayScanOpen(false)}
-          specialist={activeSpecialist}
-          meta={{ department_code: "flooring" }}
-        />
-      ) : null}
 
       {undoToast ? (
         <div

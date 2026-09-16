@@ -1,5 +1,19 @@
 # DeptSync Hub — Development Journal
 
+## 2026-09-15 — REDUCE-004 Everyday product surface reduction
+
+**Nav/mount/presentation disconnection.** No rotation logic, schema, migration, env, Vercel, or specialty runtime retirement beyond safe mount removal.
+
+**Disconnected everyday entry points:** Floor Appliances button; Predictive Copilot drawer action; Visual Bay Scan mounts (Map, Walk sheet, Cycle Audit); More Appliances / remnant calculator / remnant inventory / flooring cycle audit; NavigationHub Specialty Tools menu; `/appliances` + `/catalog` + `/?section=*` specialty hub stay → `/dashboard`.
+
+**Protected preserved:** Walk & Talk / Executive Floor Pad (+ More entry + intent bridge); Seasonal Context (Floor strip, Map seasonal, Walk seasonal detail, OperationalContextCard); Sunday staging/assignment; Flooring as rotation department; Roster; CORE drawer (Downstock, Quick Touch, Weekly rollup, reports).
+
+**Intentionally dormant:** APP-UPC + appliance APIs/UI; SpecialtyToolsHost scanner/remnant modals (SIMS may still event-open); VisualBayScannerModal + `/api/store-ops/ai-bay-scan`; specialty hub section components; flooring AI insights route; Zebra SIMS appliance branch.
+
+**Deferred:** sync-queue ↔ physical-audit decouple before appliance runtime delete; FLOORPAD-001; schedule-aware allocation; final Floor UI redesign.
+
+**Validation:** 1012 tests; build; typecheck.
+
 ## 2026-09-15 — REDUCE-003A Seasonal Context protection + repository reconciliation
 
 **Docs + Git only.** No Seasonal redesign, no schedule-aware allocation, no Floor Pad redesign, no specialty deletion beyond the already-implemented REDUCE-003 stub retirement, no manual deploy.

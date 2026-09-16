@@ -45,7 +45,7 @@ describe("UX-003 Floor decision hierarchy contracts", () => {
     assertOrder("attention < fiscal", attentionIdx, fiscalIdx);
     assertOrder("fiscal < tools", fiscalIdx, analyticsIdx);
 
-    // Command header is identity (title + optional UX-005B specialty entry).
+    // Command header is identity only (REDUCE-004 disconnected Appliances entry).
     const headerSlice = floor.slice(
       identityIdx,
       floor.indexOf("</header>", identityIdx)
@@ -53,14 +53,9 @@ describe("UX-003 Floor decision hierarchy contracts", () => {
     expect(headerSlice).toContain("{rotationTitle}");
     expect(headerSlice).not.toContain("floor-week-progress-line");
     expect(headerSlice).not.toContain("floor-readiness-line");
-    // Specialty entry stays inside identity — never above verification strip.
-    expect(headerSlice).toContain("floor-appliances-entry");
-    expect(headerSlice).toContain("showAppliancesEntry");
-    assertOrder(
-      "appliances entry < verification",
-      floor.indexOf('data-testid="floor-appliances-entry"'),
-      verifyIdx
-    );
+    expect(headerSlice).not.toContain("floor-appliances-entry");
+    expect(headerSlice).not.toContain("showAppliancesEntry");
+    expect(floor).not.toContain('data-testid="floor-appliances-entry"');
   });
 
   it("without verification, identity still precedes week state and work", () => {

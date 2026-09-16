@@ -10,11 +10,12 @@
 
 > **UX-005 Operational Simplicity (active program):** [`docs/product/UX005_OPERATIONAL_SIMPLICITY_BACKLOG.md`](docs/product/UX005_OPERATIONAL_SIMPLICITY_BACKLOG.md) — UX-005A is first tranche only; B–F and open Question Its Place items remain constraints.
 
-## Next (Product reduction — boundary locked; stop before next deletion)
+## Next (Product reduction — boundary locked; everyday surface reduced)
 - [x] **DEPTSYNC-REDUCE-001** — Product reduction safety archaeology (**COMPLETE**; evidence locked into REDUCE-002 docs)
 - [x] **DEPTSYNC-REDUCE-002** — Canonical boundary + decoupling spec (**DOCS LOCKED** — [`DEPTSYNC_REDUCE_002_BOUNDARY_AND_DECOUPLING_SPEC.md`](docs/product/DEPTSYNC_REDUCE_002_BOUNDARY_AND_DECOUPLING_SPEC.md))
 - [x] **DEPTSYNC-REDUCE-002A** — Protect Walk & Talk / Floor Pad (**DOCS LOCKED** — [`DEPTSYNC_REDUCE_002A_FLOOR_PAD_PROTECTION.md`](docs/product/DEPTSYNC_REDUCE_002A_FLOOR_PAD_PROTECTION.md))
 - [x] **DEPTSYNC-REDUCE-003A** — Protect Seasonal Context + Git reconciliation (**COMPLETE** — [`DEPTSYNC_REDUCE_003A_SEASONAL_CONTEXT_PROTECTION.md`](docs/product/DEPTSYNC_REDUCE_003A_SEASONAL_CONTEXT_PROTECTION.md); APP-UPC snapshot + boundary docs + REDUCE-003 deletions in Git)
+- [x] **DEPTSYNC-REDUCE-004** — Everyday product surface reduction (**COMPLETE** — nav/mount disconnect of OOS specialty launchers; Floor Pad + Seasonal Context protected; specialty runtime dormant)
 - [ ] **FLOORPAD-001** — Rotation observational capture archaeology (**DEFERRED / REQUIRED** before Floor Pad retirement or redesign)
 - [x] **REDUCE-003** — Retire isolated enterprise ingest stubs (`/api/v1/topology/ingest`, `/api/v1/freight/stage`, enterprise Zod/transport) — **COMPLETE** (no schema; APP-UPC + Floor Pad + Seasonal Context untouched)
 

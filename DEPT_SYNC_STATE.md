@@ -14,10 +14,10 @@
 |-------|-------|
 | **Product name** | **DeptSync** (PWA `short_name`) |
 | **Repository** | `carpet-auditor` |
-| **Canonical product boundary (REDUCE-002 / 002A / 003A)** | Intelligent continuous-coverage **rotation** system for merchandising aisle/bay work — not a broad store-ops platform. Spec: [`docs/product/DEPTSYNC_REDUCE_002_BOUNDARY_AND_DECOUPLING_SPEC.md`](docs/product/DEPTSYNC_REDUCE_002_BOUNDARY_AND_DECOUPLING_SPEC.md). Floor Pad / Walk & Talk: **PROTECTED — ROTATION OBSERVATIONAL CAPTURE EVALUATION PENDING** ([`DEPTSYNC_REDUCE_002A_FLOOR_PAD_PROTECTION.md`](docs/product/DEPTSYNC_REDUCE_002A_FLOOR_PAD_PROTECTION.md)). Seasonal Context: **PROTECTED — ROTATION CADENCE INPUT** ([`DEPTSYNC_REDUCE_003A_SEASONAL_CONTEXT_PROTECTION.md`](docs/product/DEPTSYNC_REDUCE_003A_SEASONAL_CONTEXT_PROTECTION.md)). |
+| **Canonical product boundary (REDUCE-002 / 002A / 003A / 004)** | Intelligent continuous-coverage **rotation** system for merchandising aisle/bay work — not a broad store-ops platform. Spec: [`docs/product/DEPTSYNC_REDUCE_002_BOUNDARY_AND_DECOUPLING_SPEC.md`](docs/product/DEPTSYNC_REDUCE_002_BOUNDARY_AND_DECOUPLING_SPEC.md). Floor Pad / Walk & Talk: **PROTECTED — ROTATION OBSERVATIONAL CAPTURE EVALUATION PENDING** ([`DEPTSYNC_REDUCE_002A_FLOOR_PAD_PROTECTION.md`](docs/product/DEPTSYNC_REDUCE_002A_FLOOR_PAD_PROTECTION.md)). Seasonal Context: **PROTECTED — ROTATION CADENCE INPUT** ([`DEPTSYNC_REDUCE_003A_SEASONAL_CONTEXT_PROTECTION.md`](docs/product/DEPTSYNC_REDUCE_003A_SEASONAL_CONTEXT_PROTECTION.md)). **REDUCE-004:** everyday specialty launchers disconnected; specialty runtime dormant underneath. |
 | **Description (legacy marketing copy in manifest)** | Department & SIMS Inventory Audit Suite for Lowe's stores — floor bay rotations, specialty scans, roster auth, manager floor pad *(specialty surfaces subject to REDUCE retirement; Floor Pad protected)* |
 | **Default post-login land** | `/dashboard` (Floor checklist) |
-| **Specialty scan hub** | `/` with `?section=audit\|appliances\|department` |
+| **Specialty scan hub** | Historical `/?section=*` paths redirect to `/dashboard` (REDUCE-004); appliance/cycle-audit runtime dormant |
 
 ### History integrity (completion attempts)
 

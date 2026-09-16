@@ -4,8 +4,7 @@
  * Navigation Hub chrome — title, department pill, account/PIN, Floor/Map/Roster/More bar.
  */
 
-import { useEffect, useId, useMemo, useRef, useState } from "react";
-import Link from "next/link";
+import { useEffect, useId, useRef, useState } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import { DevSandboxBanner } from "@/components/hub/DevSandboxBanner";
 import { DevSandboxDrawer } from "@/components/hub/DevSandboxDrawer";
@@ -22,7 +21,6 @@ import {
 import { requestSundayAuditDrawer } from "@/lib/store-ops/sunday-audit";
 import { useFocusedWorkspaceActive } from "@/lib/ui/focused-workspace";
 import { requestUserPreferencesDrawer } from "@/lib/ui/preferences-context";
-import { visibleSpecialtyTools } from "@/lib/specialty-tools";
 import { useDevSandbox } from "@/lib/use-dev-sandbox";
 import { writeDevSandbox } from "@/lib/dev-sandbox";
 import type { StoreSpecialist } from "@/lib/types";
@@ -102,10 +100,6 @@ export function NavigationHub({
 
   const roleBadge = navRoleBadge(specialist);
   const loginId = navLoginIdentity(specialist);
-  const specialtyTools = useMemo(
-    () => visibleSpecialtyTools(specialist),
-    [specialist]
-  );
 
   return (
     <>
@@ -184,24 +178,7 @@ export function NavigationHub({
                     }}
                   />
                 ) : null}
-                {specialtyTools.length > 0 ? (
-                  <div className="my-1 border-t border-zinc-800/80 pt-1">
-                    <p className="px-3 py-1.5 font-mono text-[10px] font-bold uppercase tracking-wide text-zinc-500">
-                      Specialty Tools
-                    </p>
-                    {specialtyTools.map((tool) => (
-                      <Link
-                        key={tool.id}
-                        href={tool.href}
-                        role="menuitem"
-                        onClick={() => setUserOpen(false)}
-                        className="flex h-11 w-full items-center rounded-xl px-3 text-left text-sm font-semibold text-zinc-200 hover:bg-zinc-800/60"
-                      >
-                        {tool.label}
-                      </Link>
-                    ))}
-                  </div>
-                ) : null}
+                {/* REDUCE-004: Specialty Tools user-menu launchers disconnected. */}
                 {onLogout ? (
                   <MenuAction
                     label="Log out"
