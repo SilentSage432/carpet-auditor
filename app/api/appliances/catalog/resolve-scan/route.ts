@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import {
   ApplianceScanFingerprintConfigError,
 } from "@/lib/appliances/scan-fingerprint.server";
-import { teachApplianceScanFingerprint } from "@/lib/appliances/scan-resolve.server";
+import { resolveApplianceScanFingerprint } from "@/lib/appliances/scan-resolve.server";
 import { actorBoundStoreNumber } from "@/lib/store-ops/appliance-store-scope";
 import {
   resolveStoreOpsActor,
@@ -13,10 +13,9 @@ import { getSupabaseAdmin } from "@/lib/store-ops/supabase-admin";
 import { supabaseAdminMissingMessage } from "@/lib/supabase/env";
 
 /**
- * POST /api/appliances/catalog/identifiers
- * Teach a scannable identifier onto an existing canonical item (APP-CAT-001A /
- * APP-UPC-001A). Server fingerprints; plaintext identifier is never inserted.
- * Does not rewrite catalog metadata. Does not echo the raw identifier.
+ * POST /api/appliances/catalog/resolve-scan
+ * Client sends transient raw scan_identifier. Server computes HMAC fingerprint.
+ * Never accepts a client-authored fingerprint as authority.
  */
 export async function POST(request: Request) {
   try {
@@ -34,15 +33,8 @@ export async function POST(request: Request) {
       actor,
       body.store_number != null ? String(body.store_number) : null
     );
-    const item_number = String(body.item_number ?? "").trim();
 
-    if (!item_number) {
-      return NextResponse.json(
-        { error: "item_number is required" },
-        { status: 400 }
-      );
-    }
-
+    // Reject client-supplied fingerprint authority.
     if (body.scan_fingerprint != null && String(body.scan_fingerprint) !== "") {
       return NextResponse.json(
         { error: "Client-supplied scan_fingerprint is not accepted" },
@@ -50,29 +42,28 @@ export async function POST(request: Request) {
       );
     }
 
-    // Prefer scan_identifier; accept legacy `identifier` as the raw scan alias.
-    const rawScan =
-      body.scan_identifier != null && String(body.scan_identifier) !== ""
-        ? body.scan_identifier
-        : body.identifier;
+    const result = await resolveApplianceScanFingerprint(
+      supabase,
+      store,
+      body.scan_identifier
+    );
 
-    if (rawScan == null || String(rawScan) === "") {
+    if (result.status === "empty") {
       return NextResponse.json(
         { error: "scan_identifier is required" },
         { status: 400 }
       );
     }
 
-    const taught = await teachApplianceScanFingerprint(supabase, {
-      store,
-      item_number,
-      rawScanIdentifier: rawScan,
-    });
+    if (result.status === "matched") {
+      return NextResponse.json({
+        status: "matched",
+        item: result.item,
+        // fingerprint omitted from normal response — plumbing only if needed later
+      });
+    }
 
-    return NextResponse.json({
-      item: taught.item,
-      created: taught.created,
-    });
+    return NextResponse.json({ status: "unknown" });
   } catch (err) {
     if (err instanceof ApplianceScanFingerprintConfigError) {
       return NextResponse.json({ error: err.message }, { status: 503 });
@@ -80,18 +71,9 @@ export async function POST(request: Request) {
     if (err instanceof StoreOpsAuthError) {
       return NextResponse.json({ error: err.message }, { status: err.status });
     }
-    const maybe = err as unknown as { status?: unknown; message?: unknown };
-    const status = typeof maybe.status === "number" ? maybe.status : 500;
     return NextResponse.json(
-      {
-        error:
-          err instanceof Error
-            ? err.message
-            : typeof maybe.message === "string"
-              ? maybe.message
-              : "Unknown error",
-      },
-      { status }
+      { error: err instanceof Error ? err.message : "Unknown error" },
+      { status: 500 }
     );
   }
 }

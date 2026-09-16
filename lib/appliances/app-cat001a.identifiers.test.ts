@@ -1,3 +1,10 @@
+/**
+ * APP-CAT-001A / APP-UPC-001A — opaque physical scan identity.
+ *
+ * Client catalog holds public item_number identity only. Physical scan matching
+ * and teach are server-side (fingerprints via teach-scan / resolve-scan).
+ */
+
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -25,18 +32,16 @@ function item(
 ): ApplianceCatalogItem {
   return {
     store_number: "2587",
-    upc: null,
     description: "Test appliance",
     category: "Laundry",
     sub_category: "Washer",
     created_at: "2026-09-06T00:00:00.000Z",
     updated_at: "2026-09-06T00:00:00.000Z",
-    identifiers: [],
     ...partial,
   };
 }
 
-describe("APP-CAT-001A multi-identifier catalog", () => {
+describe("APP-CAT-001A multi-identifier catalog (APP-UPC-001A opaque)", () => {
   beforeEach(() => {
     vi.stubGlobal("localStorage", {
       getItem: () => null,
@@ -49,15 +54,11 @@ describe("APP-CAT-001A multi-identifier catalog", () => {
     item({
       id: "1",
       item_number: "1234567",
-      upc: "012345678905",
-      identifiers: ["012345678905", "999988887777"],
       description: "Whirlpool Washer",
     }),
     item({
       id: "2",
       item_number: "7654321",
-      upc: "098765432109",
-      identifiers: ["098765432109"],
       description: "GE French Door",
       category: "Refrigeration",
       sub_category: "French Door",
@@ -76,39 +77,37 @@ describe("APP-CAT-001A multi-identifier catalog", () => {
     expect(sql).not.toMatch(
       /create table[\s\S]*identifier_type|add column[\s\S]*identifier_type/i
     );
-    expect(sql).not.toMatch(/alter table public\.appliance_catalog[\s\S]*drop column.*upc/i);
+    expect(sql).not.toMatch(
+      /alter table public\.appliance_catalog[\s\S]*drop column.*upc/i
+    );
     expect(sql).not.toMatch(/update public\.appliance_scans/i);
   });
 
-  it("one item may own multiple identifiers", () => {
-    const ids = listApplianceTaughtIdentifiers(catalog[0]!);
-    expect(ids).toContain("012345678905");
-    expect(ids).toContain("999988887777");
-    expect(ids.length).toBeGreaterThanOrEqual(2);
+  it("listApplianceTaughtIdentifiers is always empty on the client", () => {
+    expect(listApplianceTaughtIdentifiers(catalog[0]!)).toEqual([]);
+    expect(listApplianceTaughtIdentifiers()).toEqual([]);
   });
 
-  it("one identifier cannot belong to two items in same store", () => {
-    const conflict = findApplianceIdentifierConflict(catalog, "999988887777", {
+  it("item_number collision helper still detects public identity clashes", () => {
+    const conflict = findApplianceIdentifierConflict(catalog, "1234567", {
       excludeItemNumber: "7654321",
     });
     expect(conflict?.item_number).toBe("1234567");
   });
 
-  it("same identifier may remain store-scoped across different stores", () => {
+  it("same item_number may remain store-scoped across different stores", () => {
     const otherStore = [
       item({
         id: "x",
         store_number: "9999",
-        item_number: "111",
-        identifiers: ["999988887777"],
+        item_number: "1234567",
       }),
     ];
-    // Conflict helper is list-scoped; different store lists are independent.
     expect(
-      findApplianceIdentifierConflict(otherStore, "999988887777")?.item_number
-    ).toBe("111");
+      findApplianceIdentifierConflict(otherStore, "1234567")?.item_number
+    ).toBe("1234567");
     expect(
-      findApplianceIdentifierConflict(catalog, "999988887777")?.item_number
+      findApplianceIdentifierConflict(catalog, "1234567")?.item_number
     ).toBe("1234567");
   });
 
@@ -118,37 +117,19 @@ describe("APP-CAT-001A multi-identifier catalog", () => {
     );
   });
 
-  it("legacy UPC resolution still works", () => {
-    expect(findApplianceByItemOrUpc(catalog, "012345678905")?.item_number).toBe(
-      "1234567"
+  it("physical UPC / alias does not resolve locally", () => {
+    expect(findApplianceByItemOrUpc(catalog, "012345678905")).toBeUndefined();
+    expect(findApplianceByItemOrUpc(catalog, "999988887777")).toBeUndefined();
+    expect(resolveApplianceScan(catalog, "012345678905").kind).toBe(
+      "unlinked_barcode"
+    );
+    expect(resolveApplianceScan(catalog, "999988887777").kind).toBe(
+      "unlinked_barcode"
     );
   });
 
-  it("new identifier resolution works", () => {
-    expect(findApplianceByItemOrUpc(catalog, "999988887777")?.item_number).toBe(
-      "1234567"
-    );
-  });
-
-  it("UPC A + identifier B both resolve same item", () => {
-    const a = findApplianceByItemOrUpc(catalog, "012345678905");
-    const b = findApplianceByItemOrUpc(catalog, "999988887777");
-    expect(a?.id).toBe(b?.id);
-  });
-
-  it("adding B does not require replacing legacy UPC A (model)", () => {
-    const before = catalog[0]!.upc;
-    const linked = {
-      ...catalog[0]!,
-      identifiers: [...(catalog[0]!.identifiers ?? []), "555544443333"],
-    };
-    expect(linked.upc).toBe(before);
-    expect(listApplianceTaughtIdentifiers(linked)).toContain("012345678905");
-    expect(listApplianceTaughtIdentifiers(linked)).toContain("555544443333");
-  });
-
-  it("known alias is quiet; unknown opens teach path", () => {
-    expect(resolveApplianceScan(catalog, "999988887777").kind).toBe("matched");
+  it("known item_number is quiet; unknown physical opens teach path", () => {
+    expect(resolveApplianceScan(catalog, "1234567").kind).toBe("matched");
     expect(resolveApplianceScan(catalog, "111122223333").kind).toBe(
       "unlinked_barcode"
     );
@@ -158,86 +139,30 @@ describe("APP-CAT-001A multi-identifier catalog", () => {
     expect(normalizeApplianceIdentifier("  ABC-123  \n")).toBe("ABC-123");
     expect(normalizeApplianceIdentifier("00123")).toBe("00123");
     const keys = applianceIdentifierLookupKeys("  012345678905 ");
-    expect(keys).toContain("012345678905");
+    expect(keys).toEqual(["012345678905"]);
   });
 
-  it("exact identifier preserves leading zeros and non-digits", () => {
+  it("leading-zero item_number matches exactly (no digit sanitize)", () => {
     const withZeros = [
       item({
         id: "z",
-        item_number: "999",
-        identifiers: ["0012345"],
+        item_number: "0012345",
       }),
     ];
     expect(findApplianceByItemOrUpc(withZeros, "0012345")?.item_number).toBe(
-      "999"
+      "0012345"
     );
-    const withAlpha = [
-      item({
-        id: "a",
-        item_number: "888",
-        identifiers: ["ABC12345"],
-      }),
-    ];
-    expect(findApplianceByItemOrUpc(withAlpha, "ABC12345")?.item_number).toBe(
-      "888"
-    );
+    expect(findApplianceByItemOrUpc(withZeros, "12345")).toBeUndefined();
   });
 
-  it("sanitized fallback cannot misresolve ambiguous collapsed identifiers", () => {
-    // Neither alias equals "12345" exactly; both collapse to 12345 via digit sanitize.
+  it("duplicate item_number rows collapse to a single local match", () => {
     const ambiguous = [
-      item({
-        id: "1",
-        item_number: "111",
-        identifiers: ["ABC12345"],
-      }),
-      item({
-        id: "2",
-        item_number: "222",
-        identifiers: ["XYZ12345"],
-      }),
+      item({ id: "1", item_number: "111", store_number: "2587" }),
+      item({ id: "2", item_number: "111", store_number: "2587" }),
     ];
-    expect(findApplianceByItemOrUpc(ambiguous, "12345")).toBeUndefined();
-    expect(resolveApplianceScan(ambiguous, "12345").kind).toBe("ambiguous");
-
-    const leading = [
-      item({
-        id: "1",
-        item_number: "111",
-        identifiers: ["0012345"],
-      }),
-      item({
-        id: "2",
-        item_number: "222",
-        identifiers: ["XX12345"],
-      }),
-    ];
-    expect(findApplianceByItemOrUpc(leading, "12345")).toBeUndefined();
-    expect(resolveApplianceScan(leading, "12345").kind).toBe("ambiguous");
-  });
-
-  it("exact-match resolution beats compatibility fallback", () => {
-    const catalogLocal = [
-      item({
-        id: "1",
-        item_number: "111",
-        identifiers: ["ABC12345"],
-      }),
-      item({
-        id: "2",
-        item_number: "222",
-        identifiers: ["12345"],
-      }),
-    ];
-    // Exact alias wins for ABC12345 even though digits collapse to 12345.
-    expect(findApplianceByItemOrUpc(catalogLocal, "ABC12345")?.item_number).toBe(
-      "111"
-    );
-    // Exact alias "12345" wins over collapsed ABC12345 (no ambiguous pick).
-    expect(findApplianceByItemOrUpc(catalogLocal, "12345")?.item_number).toBe(
-      "222"
-    );
+    // uniqueCatalogItems keys by store::item_number — duplicates are not ambiguous.
+    expect(findApplianceByItemOrUpc(ambiguous, "111")?.item_number).toBe("111");
+    expect(resolveApplianceScan(ambiguous, "111").kind).toBe("matched");
   });
 
   it("link path skips metadata fields in Quick Add", () => {
@@ -249,30 +174,32 @@ describe("APP-CAT-001A multi-identifier catalog", () => {
     expect(quick).toContain("Reuse existing description and category");
   });
 
-  it("create-new teaches identifier via saveApplianceCatalogItem", () => {
+  it("create-new teaches via teach_scan_identifier (online teach-scan)", () => {
     const quick = readRepo("components/barcode/QuickAddApplianceModal.tsx");
-    expect(quick).toContain("teach_identifier: teachIdentifier");
+    expect(quick).toContain("teach_scan_identifier: teachIdentifier");
     expect(quick).toContain("saveApplianceCatalogItem");
   });
 
   it("API + client refuse silent identifier stealing", () => {
-    const api = readRepo("app/api/appliances/catalog/identifiers/route.ts");
-    expect(api).toContain("status: 409");
-    expect(api).toContain("already linked");
-    expect(api).toContain(".insert(payload)");
-    expect(api).not.toMatch(/\.upsert\([\s\S]*onConflict:\s*"store_number,identifier"/);
+    const teach = readRepo("app/api/appliances/catalog/teach-scan/route.ts");
+    const resolveServer = readRepo("lib/appliances/scan-resolve.server.ts");
+    expect(teach).toContain("teachApplianceScanFingerprint");
+    expect(resolveServer).toContain(".status = 409");
+    expect(resolveServer).toMatch(/already linked/i);
     const client = readRepo("lib/appliance-catalog.ts");
     expect(client).toContain("linkApplianceCatalogIdentifier");
-    expect(client).toContain("upsert_appliance_catalog_identifier");
+    expect(client).toContain("/api/appliances/catalog/teach-scan");
+    expect(client).toContain("scan_identifier");
+    expect(client).toContain("res.status === 409");
   });
 
-  it("offline queue preserves identifier ownership conflict", () => {
-    const queue = readRepo("lib/sync-queue.ts");
-    expect(queue).toContain("upsert_appliance_catalog_identifier");
-    expect(queue).toContain("Do not overwrite server ownership");
-    expect(queue).toContain("SyncConflictError");
-    expect(queue).not.toMatch(
-      /bulk.?promot|upload every legacy local/i
+  it("offline path never queues plaintext physical identifiers", () => {
+    const catalogSrc = readRepo("lib/appliance-catalog.ts");
+    expect(catalogSrc).toContain(
+      "Physical teach requires network — do not enqueue plaintext identifiers"
+    );
+    expect(catalogSrc).toContain(
+      "Teaching scan identity requires a network connection"
     );
   });
 
@@ -291,12 +218,13 @@ describe("APP-CAT-001A multi-identifier catalog", () => {
     expect(freeze).toContain("appliance_scans_enforce_closed_evidence_freeze");
   });
 
-  it("Manage mappings surfaces multiple identifiers", () => {
+  it("Manage mappings does not display upc or taught identifiers", () => {
     const manage = readRepo(
       "components/appliances/ApplianceCatalogManageSheet.tsx"
     );
-    expect(manage).toContain("listApplianceTaughtIdentifiers");
-    expect(manage).toContain("Identifiers:");
+    expect(manage).not.toContain("Identifiers:");
+    expect(manage).not.toContain("UPC / Vendor Barcode");
+    expect(manage).toContain("Teach physical");
   });
 
   it("ApplianceCatalogConflictError still carries conflict row", () => {

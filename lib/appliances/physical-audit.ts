@@ -171,7 +171,6 @@ export type AppliancePhysicalItemCount = {
   description: string;
   category: string;
   sub_category: string;
-  upc: string | null;
   locations: string[];
   /** Derived from location_type / showroom helpers — not official inventory. */
   showroom_count: number;
@@ -309,7 +308,6 @@ export function composeAppliancePhysicalCounts(
       description: cat?.description ?? "",
       category: cat?.category ?? head.category,
       sub_category: cat?.sub_category ?? head.sub_category ?? "",
-      upc: cat?.upc ?? null,
       locations,
       showroom_count,
       staged_pickup_count,
@@ -458,7 +456,6 @@ export function applianceAuditReconciliationToCsv(input: {
     "Audit Started",
     "Audit Status",
     "Item Number",
-    "UPC",
     "Description",
     "Category",
     "Sub-Category",
@@ -483,7 +480,6 @@ export function applianceAuditReconciliationToCsv(input: {
       input.session.started_at,
       input.session.status,
       item.item_number,
-      item.upc ?? "",
       item.description,
       item.category,
       item.sub_category,

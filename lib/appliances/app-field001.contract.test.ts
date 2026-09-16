@@ -19,7 +19,6 @@ function catalogItem(
 ): ApplianceCatalogItem {
   return {
     store_number: "2587",
-    upc: "012345678905",
     description: "Washer",
     category: "Laundry",
     sub_category: "Washer",
@@ -34,22 +33,27 @@ describe("APP-FIELD-001 field corrections", () => {
     vi.restoreAllMocks();
   });
 
-  it("known local UPC resolves without teaching", () => {
-    const catalog = [
-      catalogItem({ id: "1", item_number: "111", upc: "012345678905" }),
-    ];
-    const resolution = resolveApplianceScan(catalog, "012345678905");
+  it("known local item_number resolves without teaching", () => {
+    const catalog = [catalogItem({ id: "1", item_number: "111" })];
+    const resolution = resolveApplianceScan(catalog, "111");
     expect(resolution.kind).toBe("matched");
-    expect(findApplianceByItemOrUpc(catalog, "012345678905")?.item_number).toBe(
-      "111"
-    );
+    expect(findApplianceByItemOrUpc(catalog, "111")?.item_number).toBe("111");
+  });
+
+  it("physical barcode does not resolve locally", () => {
+    const catalog = [catalogItem({ id: "1", item_number: "111" })];
+    const resolution = resolveApplianceScan(catalog, "012345678905");
+    expect(
+      resolution.kind === "unlinked_barcode" || resolution.kind === "unknown_sku"
+    ).toBe(true);
+    expect(findApplianceByItemOrUpc(catalog, "012345678905")).toBeUndefined();
   });
 
   it("unknown UPC opens teach path (unmatched)", () => {
     const resolution = resolveApplianceScan([], "999999999999");
-    expect(resolution.kind === "unlinked_barcode" || resolution.kind === "unknown_sku").toBe(
-      true
-    );
+    expect(
+      resolution.kind === "unlinked_barcode" || resolution.kind === "unknown_sku"
+    ).toBe(true);
   });
 
   it("rapid-fire COUNT uses localFirst save (no await network before ready)", () => {
@@ -94,7 +98,7 @@ describe("APP-FIELD-001 field corrections", () => {
     const form = readRepo("components/sections/ApplianceScanForm.tsx");
     expect(form).toContain("handleQuickAdded");
     expect(form).toContain("await commitScan(item)");
-    expect(form).toMatch(/do not require a second scan/i);
+    expect(form).toContain("flushUnresolvedApplianceScans");
   });
 
   it("catalog store_number migration restores canonical store scoping", () => {

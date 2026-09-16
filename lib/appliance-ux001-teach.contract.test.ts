@@ -20,7 +20,7 @@ describe("APP-UX-001 appliance teach / quiet scan contracts", () => {
 
   it("unknown path opens Quick-Add with category fields; known path auto-logs", () => {
     const form = readRepo("components/sections/ApplianceScanForm.tsx");
-    expect(form).toContain('setQuickAddBarcode(resolution.scanned)');
+    expect(form).toContain("setQuickAddBarcode(cleaned)");
     expect(form).toContain("void commitScan(item)");
     const quick = readRepo("components/barcode/QuickAddApplianceModal.tsx");
     expect(quick).toContain("ApplianceCategoryFields");
@@ -28,37 +28,41 @@ describe("APP-UX-001 appliance teach / quiet scan contracts", () => {
     expect(quick).toContain("findApplianceIdentifierConflict");
     expect(quick).toContain("Link to existing item");
     expect(quick).toContain("Create new item");
+    expect(quick).toContain("teach_scan_identifier");
   });
 
-  it("manage mappings sheet recovers searchable edit of UPC/item/category/description", () => {
+  it("manage mappings sheet edits item/category/description (no upc display)", () => {
     const manage = readRepo(
       "components/appliances/ApplianceCatalogManageSheet.tsx"
     );
     expect(manage).toContain("Manage appliance mappings");
     expect(manage).toContain("filterApplianceCatalog");
     expect(manage).toContain("ApplianceCategoryFields");
-    expect(manage).toContain("UPC / Vendor Barcode");
-    expect(manage).toContain("findApplianceUpcConflict");
+    expect(manage).not.toContain("UPC / Vendor Barcode");
+    expect(manage).toContain("findApplianceIdentifierConflict");
     expect(manage).not.toContain("handleDelete");
     const section = readRepo("components/sections/ApplianceAuditSection.tsx");
     expect(section).toContain("ApplianceCatalogManageSheet");
     expect(section).toContain("Manage appliance mappings");
   });
 
-  it("catalog API refuses ambiguous UPC remaps with 409", () => {
-    const api = readRepo("app/api/appliances/catalog/route.ts");
-    expect(api).toContain("status: 409");
-    expect(api).toContain("already linked");
+  it("catalog / teach-scan APIs refuse ambiguous remaps with 409", () => {
+    const resolveServer = readRepo("lib/appliances/scan-resolve.server.ts");
+    expect(resolveServer).toContain(".status = 409");
+    expect(resolveServer).toMatch(/already linked/i);
+    const teach = readRepo("app/api/appliances/catalog/teach-scan/route.ts");
+    expect(teach).toContain("teachApplianceScanFingerprint");
     const idApi = readRepo("app/api/appliances/catalog/identifiers/route.ts");
-    expect(idApi).toContain("status: 409");
+    expect(idApi).toContain("teachApplianceScanFingerprint");
+    expect(idApi).toContain("typeof maybe.status === \"number\"");
+    const client = readRepo("lib/appliance-catalog.ts");
+    expect(client).toContain("res.status === 409");
   });
-
   it("online application failures do not fall through to direct Supabase upsert", () => {
     const catalog = readRepo("lib/appliance-catalog.ts");
     expect(catalog).toContain("gotHttpResponse");
     expect(catalog).toContain("if (gotHttpResponse) throw err");
     expect(catalog).toContain("actor-bound catalog API only");
-    // Online save must not upsert appliance_catalog via client after API response.
     const saveFnStart = catalog.indexOf("export async function saveApplianceCatalogItem");
     const saveFn = catalog.slice(saveFnStart, saveFnStart + 4500);
     expect(saveFn).not.toMatch(/\.from\(TABLE\)\s*\n?\s*\.upsert/);

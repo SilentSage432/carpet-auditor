@@ -191,6 +191,12 @@ export function clearAuthSession(): void {
   localStorage.removeItem(SESSION_KEY);
   setActiveSpecialist(null);
   void clearHubGateCookie();
+  // APP-UPC-001A: drop temporary device-local raw scan identifiers on logout.
+  try {
+    localStorage.removeItem("appliance_unresolved_scans_v1");
+  } catch {
+    /* ignore */
+  }
   // Drop Supabase Auth phone session (OTP) when the roster wall logs out.
   const supabase = getSupabase();
   if (supabase) {

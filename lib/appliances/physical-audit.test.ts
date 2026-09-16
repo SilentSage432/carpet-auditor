@@ -37,7 +37,6 @@ describe("APP-AUD-001 physical audit composition", () => {
         id: "c1",
         store_number: "2587",
         item_number: "111",
-        upc: "999",
         description: "Washer A",
         category: "Laundry",
         sub_category: "Washer",

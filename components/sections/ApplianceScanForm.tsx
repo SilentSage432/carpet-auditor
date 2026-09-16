@@ -2,8 +2,8 @@
 
 /**
  * Appliance scan/input island — owns form state + drafts.
- * Quiet COUNT path for known UPCs; Quick-Add TEACH for unknowns.
- * Historical scan log stays in ApplianceAuditSection.
+ * APP-UPC-001A: item_number can resolve locally; physical barcodes resolve online
+ * via opaque fingerprints. Offline physical captures go to bounded unresolved queue.
  */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -24,7 +24,13 @@ import {
   updateApplianceScan,
 } from "@/lib/appliance-scans";
 import { loadCachedActiveAuditSessionId } from "@/lib/appliances/audit-client";
-import { sanitizeBarcodeScan } from "@/lib/barcode";
+import {
+  capturePendingApplianceObservation,
+  countUnresolvedApplianceScans,
+  flushUnresolvedApplianceScans,
+  resolveApplianceScanOnline,
+} from "@/lib/appliances/pending-scan-resolve";
+import { canonicalApplianceScanIdentifier } from "@/lib/appliances/scan-identity";
 import { blurActiveInput } from "@/lib/focus-input";
 import { useGlobalBarcodeScanner } from "@/lib/hardware-scanner";
 import { playScanLoggedFeedback } from "@/lib/scan-feedback";
@@ -32,6 +38,7 @@ import { playErrorTone } from "@/lib/ui/feedback";
 import { getStoreNumber } from "@/lib/store";
 import {
   getPendingApplianceScanSyncForAudit,
+  isBrowserOnline,
   SYNC_QUEUE_CHANGED_EVENT,
 } from "@/lib/sync-queue";
 import { useFlushOnLeave } from "@/lib/use-flush-on-leave";
@@ -339,7 +346,7 @@ export function ApplianceScanForm({
       }
     },
     [
-      activeSpecialist?.name,
+      activeSpecialist,
       auditSessionId,
       bayLocation,
       clearForNextScan,
@@ -384,7 +391,7 @@ export function ApplianceScanForm({
   );
 
   function handleItemChange(raw: string) {
-    const next = sanitizeBarcodeScan(raw);
+    const next = canonicalApplianceScanIdentifier(raw);
     setItemNumber(next);
     const hit = findApplianceByItemOrUpc(catalog, next);
     if (hit) {
@@ -394,26 +401,69 @@ export function ApplianceScanForm({
     }
   }
 
+  const captureUnresolvedAndAck = useCallback(
+    (cleaned: string) => {
+      const capturedAt = new Date().toISOString();
+      const sessionId = ignoreCachedAuditSession
+        ? auditSessionId || undefined
+        : auditSessionId || loadCachedActiveAuditSessionId() || undefined;
+      capturePendingApplianceObservation({
+        store_number: getStoreNumber(),
+        scan_identifier: cleaned,
+        captured_at: capturedAt,
+        serial_number: serialRef.current.trim(),
+        location: locationRef.current.trim(),
+        location_type: locationTypeRef.current,
+        condition_tag: defaultApplianceConditionForLocation(
+          locationTypeRef.current
+        ),
+        category: "Laundry",
+        sub_category: "",
+        scanned_by: scannedBy || activeSpecialist?.name || "",
+        location_id: bayLocation?.location_id,
+        aisle: bayLocation?.aisle,
+        bay_number: bayLocation?.bay,
+        audit_session_id: sessionId,
+      });
+      setSessionTotal((n) => n + 1);
+      playScanLoggedFeedback();
+      setScanFlash(true);
+      window.setTimeout(() => setScanFlash(false), 450);
+      clearForNextScan();
+      flashStatus("Captured — pending identification");
+    },
+    [
+      activeSpecialist?.name,
+      auditSessionId,
+      bayLocation,
+      clearForNextScan,
+      flashStatus,
+      ignoreCachedAuditSession,
+      scannedBy,
+    ]
+  );
+
   const handleItemLookup = useCallback(
     (raw: string) => {
-      const cleaned = sanitizeBarcodeScan(raw);
+      const cleaned = canonicalApplianceScanIdentifier(raw);
       if (!cleaned) return;
       if (teachBusyRef.current) return;
       if (teachModalOpen) return;
 
       setItemNumber(cleaned);
-      const resolution: ApplianceScanResolution = resolveApplianceScan(
+
+      // Public item_number may resolve locally (including offline).
+      const localResolution: ApplianceScanResolution = resolveApplianceScan(
         catalog,
         cleaned
       );
-      if (resolution.kind === "empty") return;
+      if (localResolution.kind === "empty") return;
 
-      if (resolution.kind === "matched") {
-        const item = resolution.item;
+      if (localResolution.kind === "matched") {
+        const item = localResolution.item;
         setDescription(item.description);
 
         if (!isValidApplianceSubCategory(item.category, item.sub_category)) {
-          // Recognised scan — complete classification, do not re-teach identity.
           setClassifyItem(item);
           flashStatus(`Item ${item.item_number} needs a sub-category`);
           return;
@@ -423,22 +473,94 @@ export function ApplianceScanForm({
         return;
       }
 
-      if (resolution.kind === "ambiguous") {
+      if (localResolution.kind === "ambiguous") {
         flashStatus(
-          "Identifier matches multiple items — fix mappings before counting",
+          "Item number matches multiple catalog rows — fix catalog before counting",
           "error"
         );
         playErrorTone();
         return;
       }
 
-      setQuickAddBarcode(resolution.scanned);
-      flashStatus("Unknown item — teach mapping to continue");
+      // Physical barcode / unknown — not pretends-known offline.
+      if (!isBrowserOnline()) {
+        captureUnresolvedAndAck(cleaned);
+        return;
+      }
+
+      void (async () => {
+        const online = await resolveApplianceScanOnline(cleaned);
+        if (online.status === "matched") {
+          const item = online.item;
+          setDescription(item.description);
+          if (!isValidApplianceSubCategory(item.category, item.sub_category)) {
+            setClassifyItem(item);
+            flashStatus(`Item ${item.item_number} needs a sub-category`);
+            return;
+          }
+          await commitScan(item);
+          return;
+        }
+        if (online.status === "error") {
+          // Network failure while "online" flag true — bound as unresolved.
+          captureUnresolvedAndAck(cleaned);
+          return;
+        }
+        setQuickAddBarcode(cleaned);
+        flashStatus("Unknown item — teach mapping to continue");
+      })();
     },
-    [catalog, commitScan, flashStatus, teachModalOpen]
+    [
+      captureUnresolvedAndAck,
+      catalog,
+      commitScan,
+      flashStatus,
+      teachModalOpen,
+    ]
   );
 
-  useGlobalBarcodeScanner(handleItemLookup, scannerEnabled && !teachModalOpen);
+  useGlobalBarcodeScanner(handleItemLookup, scannerEnabled && !teachModalOpen, {
+    normalize: canonicalApplianceScanIdentifier,
+  });
+
+  // Reconnect: resolve pending physical captures without re-scanning.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    let busy = false;
+    async function runFlush() {
+      if (busy || !isBrowserOnline()) return;
+      if (countUnresolvedApplianceScans(getStoreNumber()) === 0) return;
+      busy = true;
+      try {
+        const result = await flushUnresolvedApplianceScans();
+        for (const scan of result.savedScans) {
+          onLogged(scan, Boolean(scan.offline));
+        }
+        if (result.resolvedCount > 0) {
+          flashStatus(
+            `Identified ${result.resolvedCount} pending scan${result.resolvedCount === 1 ? "" : "s"}`
+          );
+          refreshAuditCounts();
+        }
+        // One teach for the first unknown identifier group — remaining stay pending.
+        if (result.needsTeach[0] && !teachModalOpen) {
+          setQuickAddBarcode(result.needsTeach[0]!);
+          flashStatus("Pending scans need teaching — link or create item");
+        }
+      } finally {
+        busy = false;
+      }
+    }
+
+    void runFlush();
+    window.addEventListener("online", runFlush);
+    window.addEventListener(SYNC_QUEUE_CHANGED_EVENT, runFlush);
+    return () => {
+      window.removeEventListener("online", runFlush);
+      window.removeEventListener(SYNC_QUEUE_CHANGED_EVENT, runFlush);
+    };
+  }, [flashStatus, onLogged, refreshAuditCounts, teachModalOpen]);
 
   async function handleQuickAdded(item: ApplianceCatalogItem) {
     const next = [
@@ -448,11 +570,25 @@ export function ApplianceScanForm({
       ),
     ].sort((a, b) => a.item_number.localeCompare(b.item_number));
     onCatalogChange(next);
+    const taughtIdentifier = quickAddBarcode;
     setQuickAddBarcode(null);
     setClassifyItem(null);
     setTeachBusy(true);
     try {
-      // Logs the physical unit once — do not require a second scan of the tag.
+      // After teach, flush any offline pending units for this identifier.
+      if (taughtIdentifier) {
+        const flushed = await flushUnresolvedApplianceScans({
+          onlyIdentifier: taughtIdentifier,
+        });
+        for (const scan of flushed.savedScans) {
+          onLogged(scan, Boolean(scan.offline));
+        }
+        if (flushed.resolvedCount > 0) {
+          refreshAuditCounts();
+          return;
+        }
+      }
+      // Live teach with no pending backlog — log the physical unit once.
       await commitScan(item);
     } finally {
       setTeachBusy(false);
@@ -614,18 +750,22 @@ export function ApplianceScanForm({
             value={itemNumber}
             onChange={handleItemChange}
             onScanCommit={handleItemLookup}
+            sanitizeValue={canonicalApplianceScanIdentifier}
+            normalizeScan={canonicalApplianceScanIdentifier}
+            inputMode="text"
             flash={scanFlash}
             placeholder={
               manualEntry
                 ? "Type Item # or scan — Enter to log"
-                : "Hardware scan auto-logs known UPCs"
+                : "Hardware scan auto-logs when identified"
             }
             leftIcon={<BarcodeIcon className="h-5 w-5" />}
             inputRef={itemInputRef}
           />
           {!manualEntry ? (
             <p className="text-center text-[11px] text-slate-500">
-              Known UPCs resolve quietly · unknown opens Teach
+              Known item # resolves quietly · barcodes identify online · offline
+              captures pending
             </p>
           ) : null}
           <button

@@ -13,10 +13,9 @@ import { getSupabaseAdmin } from "@/lib/store-ops/supabase-admin";
 import { supabaseAdminMissingMessage } from "@/lib/supabase/env";
 
 /**
- * POST /api/appliances/catalog/identifiers
- * Teach a scannable identifier onto an existing canonical item (APP-CAT-001A /
- * APP-UPC-001A). Server fingerprints; plaintext identifier is never inserted.
- * Does not rewrite catalog metadata. Does not echo the raw identifier.
+ * POST /api/appliances/catalog/teach-scan
+ * Associate a transient physical scan identifier with a catalog item.
+ * Server fingerprints; raw identifier is not persisted.
  */
 export async function POST(request: Request) {
   try {
@@ -34,14 +33,6 @@ export async function POST(request: Request) {
       actor,
       body.store_number != null ? String(body.store_number) : null
     );
-    const item_number = String(body.item_number ?? "").trim();
-
-    if (!item_number) {
-      return NextResponse.json(
-        { error: "item_number is required" },
-        { status: 400 }
-      );
-    }
 
     if (body.scan_fingerprint != null && String(body.scan_fingerprint) !== "") {
       return NextResponse.json(
@@ -50,23 +41,10 @@ export async function POST(request: Request) {
       );
     }
 
-    // Prefer scan_identifier; accept legacy `identifier` as the raw scan alias.
-    const rawScan =
-      body.scan_identifier != null && String(body.scan_identifier) !== ""
-        ? body.scan_identifier
-        : body.identifier;
-
-    if (rawScan == null || String(rawScan) === "") {
-      return NextResponse.json(
-        { error: "scan_identifier is required" },
-        { status: 400 }
-      );
-    }
-
     const taught = await teachApplianceScanFingerprint(supabase, {
       store,
-      item_number,
-      rawScanIdentifier: rawScan,
+      item_number: String(body.item_number ?? ""),
+      rawScanIdentifier: body.scan_identifier,
     });
 
     return NextResponse.json({

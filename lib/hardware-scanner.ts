@@ -15,6 +15,15 @@ import {
   sanitizeBarcodeScan,
 } from "./barcode";
 
+export type GlobalBarcodeScannerOptions = {
+  /**
+   * Normalize wedge buffer before onScan. Default: sanitizeBarcodeScan (digits,
+   * strip leading zeros) for flooring. Appliance path must pass canonical
+   * physical-scan normalization (APP-UPC-001A) so leading zeros / ESL chars survive.
+   */
+  normalize?: (raw: string) => string;
+};
+
 function isDedicatedScanField(el: EventTarget | null): boolean {
   if (!(el instanceof HTMLElement)) return false;
   return el.closest("[data-barcode-scan='true']") != null;
@@ -32,10 +41,19 @@ function dialogOpen(): boolean {
  */
 export function useGlobalBarcodeScanner(
   onScan: (barcode: string) => void,
-  enabled = true
+  enabled = true,
+  options: GlobalBarcodeScannerOptions = {}
 ): void {
   const onScanRef = useRef(onScan);
-  onScanRef.current = onScan;
+  const normalizeRef = useRef(options.normalize ?? sanitizeBarcodeScan);
+
+  useEffect(() => {
+    onScanRef.current = onScan;
+  }, [onScan]);
+
+  useEffect(() => {
+    normalizeRef.current = options.normalize ?? sanitizeBarcodeScan;
+  }, [options.normalize]);
 
   useEffect(() => {
     if (!enabled || typeof window === "undefined") return;
@@ -56,10 +74,10 @@ export function useGlobalBarcodeScanner(
     }
 
     function commit() {
-      const sanitized = sanitizeBarcodeScan(buffer);
+      const normalized = normalizeRef.current(buffer);
       reset();
-      if (!sanitized || sanitized.length < SCANNER_BURST_MIN_DIGITS) return;
-      onScanRef.current(sanitized);
+      if (!normalized || normalized.length < SCANNER_BURST_MIN_DIGITS) return;
+      onScanRef.current(normalized);
     }
 
     function scheduleCommit() {
@@ -79,7 +97,10 @@ export function useGlobalBarcodeScanner(
       if (isDedicatedScanField(target)) return;
 
       if (e.key === "Enter") {
-        if (burstActive && sanitizeBarcodeScan(buffer).length >= SCANNER_BURST_MIN_DIGITS) {
+        if (
+          burstActive &&
+          normalizeRef.current(buffer).length >= SCANNER_BURST_MIN_DIGITS
+        ) {
           e.preventDefault();
           e.stopPropagation();
           commit();
@@ -125,7 +146,7 @@ export function useGlobalBarcodeScanner(
       e.preventDefault();
       e.stopPropagation();
 
-      if (sanitizeBarcodeScan(buffer).length >= SCANNER_BURST_MIN_DIGITS) {
+      if (normalizeRef.current(buffer).length >= SCANNER_BURST_MIN_DIGITS) {
         scheduleCommit();
       }
     }

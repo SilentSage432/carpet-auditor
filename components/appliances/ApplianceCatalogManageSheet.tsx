@@ -3,6 +3,7 @@
 /**
  * Intentional teach / correct surface for appliance_catalog mappings.
  * Not the quiet continuous scanner — category + description live here.
+ * Physical barcodes are taught by scanning (Quick Add), not typed here (APP-UPC-001A).
  */
 
 import { useEffect, useMemo, useState } from "react";
@@ -12,11 +13,10 @@ import { NumberField, TextField } from "@/components/ui/NumberField";
 import {
   ApplianceCatalogConflictError,
   filterApplianceCatalog,
-  findApplianceUpcConflict,
-  listApplianceTaughtIdentifiers,
+  findApplianceIdentifierConflict,
   saveApplianceCatalogItem,
 } from "@/lib/appliance-catalog";
-import { sanitizeBarcodeScan } from "@/lib/barcode";
+import { canonicalApplianceItemNumber } from "@/lib/appliances/scan-identity";
 import { isBrowserOnline } from "@/lib/sync-queue";
 import {
   isValidApplianceSubCategory,
@@ -57,7 +57,6 @@ export function ApplianceCatalogManageSheet({
   const [editing, setEditing] = useState<ApplianceCatalogItem | null>(null);
   const [itemNumber, setItemNumber] = useState("");
   const [description, setDescription] = useState("");
-  const [upc, setUpc] = useState("");
   const [category, setCategory] = useState<ApplianceCategory>("Laundry");
   const [subCategory, setSubCategory] = useState("");
   const [saving, setSaving] = useState(false);
@@ -85,7 +84,6 @@ export function ApplianceCatalogManageSheet({
     setEditing(null);
     setItemNumber("");
     setDescription("");
-    setUpc("");
     setCategory("Laundry");
     setSubCategory("");
     setError(null);
@@ -96,7 +94,6 @@ export function ApplianceCatalogManageSheet({
     setEditing(item);
     setItemNumber(item.item_number);
     setDescription(item.description);
-    setUpc(item.upc ?? "");
     setCategory(normalizeApplianceCategory(item.category));
     setSubCategory(item.sub_category ?? "");
     setError(null);
@@ -119,23 +116,24 @@ export function ApplianceCatalogManageSheet({
       return;
     }
 
-    const nextUpc = upc.trim() ? sanitizeBarcodeScan(upc) : null;
-    const conflict = findApplianceUpcConflict(catalog, nextUpc, {
+    const nextItem =
+      canonicalApplianceItemNumber(itemNumber) || itemNumber.trim();
+    const conflict = findApplianceIdentifierConflict(catalog, nextItem, {
       excludeId: editing?.id,
-      excludeItemNumber: itemNumber.trim(),
+      excludeItemNumber: editing?.item_number,
     });
     if (conflict) {
       setError(
-        `UPC ${nextUpc} is already linked to Item ${conflict.item_number}. Clear that mapping first.`
+        `Item # ${nextItem} is already used by another mapping. Choose a different Item #.`
       );
       return;
     }
 
     // Intentional corrections: prefer online so conflicts hit the actor-bound API.
-    // Offline teach of unknown UPCs remains on the scanner Quick-Add path.
+    // Offline teach of unknown physical scans remains on the scanner Quick-Add path.
     if (editing && !isBrowserOnline()) {
       setError(
-        "Catalog corrections need connectivity. Unknown-UPC teach still works from the scanner offline."
+        "Catalog corrections need connectivity. Unknown-scan teach still works from the scanner offline for public fields only."
       );
       return;
     }
@@ -145,9 +143,8 @@ export function ApplianceCatalogManageSheet({
     try {
       const { record, offline } = await saveApplianceCatalogItem({
         id: editing?.id,
-        item_number: sanitizeBarcodeScan(itemNumber) || itemNumber.trim(),
+        item_number: nextItem,
         description: description.trim(),
-        upc: nextUpc,
         category,
         sub_category: subCategory.trim(),
       });
@@ -224,15 +221,15 @@ export function ApplianceCatalogManageSheet({
           {mode === "list" ? (
             <div className="flex min-h-0 flex-1 flex-col gap-3 overflow-y-auto px-4 pb-6">
               <p className="text-xs text-slate-400">
-                Teach once — one item may have many scannable identifiers.
-                Known scans stay quiet on the scanner.
+                Edit Item #, description, and category here. Teach physical
+                barcodes by scanning with Quick Add — not by typing them here.
               </p>
               <div className="flex gap-2">
                 <TextField
                   className="min-w-0 flex-1"
                   value={query}
                   onChange={setQuery}
-                  placeholder="Search Item #, UPC, category…"
+                  placeholder="Search Item #, description, category…"
                   aria-label="Search appliance catalog"
                 />
                 <button
@@ -246,7 +243,7 @@ export function ApplianceCatalogManageSheet({
 
               {filtered.length === 0 ? (
                 <p className="rounded-2xl border border-dashed border-slate-700 bg-slate-900/60 px-4 py-8 text-center text-sm text-slate-400">
-                  No appliance mappings yet — scan an unknown UPC or tap Add.
+                  No appliance mappings yet — scan an unknown barcode or tap Add.
                 </p>
               ) : (
                 <ul className="space-y-2 pb-2">
@@ -267,31 +264,10 @@ export function ApplianceCatalogManageSheet({
                                 ? ` · ${item.sub_category}`
                                 : ""}
                             </span>
-                            {item.upc ? (
-                              <span className="text-[9px] font-bold uppercase text-emerald-300">
-                                Linked
-                              </span>
-                            ) : null}
                           </div>
                           <p className="truncate text-sm text-slate-200">
                             {item.description}
                           </p>
-                          {(() => {
-                            const ids = listApplianceTaughtIdentifiers(item);
-                            if (ids.length === 0) return null;
-                            return (
-                              <div className="mt-1 space-y-0.5">
-                                {item.upc ? (
-                                  <p className="font-mono text-[11px] text-slate-500">
-                                    Primary {item.upc}
-                                  </p>
-                                ) : null}
-                                <p className="font-mono text-[11px] text-slate-500">
-                                  Identifiers: {ids.join(" · ")}
-                                </p>
-                              </div>
-                            );
-                          })()}
                         </div>
                         <button
                           type="button"
@@ -309,6 +285,10 @@ export function ApplianceCatalogManageSheet({
           ) : (
             <div className="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 pb-6">
               <div className="space-y-3">
+                <p className="text-xs text-slate-400">
+                  Public catalog fields only. Teach physical barcodes by
+                  scanning (Quick Add), not by typing a UPC here.
+                </p>
                 <NumberField
                   label="Lowe's Item # / SKU"
                   mode="digits"
@@ -321,13 +301,6 @@ export function ApplianceCatalogManageSheet({
                   value={description}
                   onChange={setDescription}
                   placeholder="e.g. Whirlpool French Door"
-                />
-                <NumberField
-                  label="UPC / Vendor Barcode"
-                  mode="digits"
-                  value={upc}
-                  onChange={(v) => setUpc(sanitizeBarcodeScan(v))}
-                  placeholder="Optional — leave blank to unlink"
                 />
                 <ApplianceCategoryFields
                   category={normalizeApplianceCategory(category)}

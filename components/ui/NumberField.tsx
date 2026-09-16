@@ -38,12 +38,20 @@ type NumberFieldProps = {
   placeholder?: string;
   min?: number;
   "aria-label"?: string;
-  inputMode?: "numeric" | "decimal";
+  inputMode?: "numeric" | "decimal" | "text";
   center?: boolean;
   leftIcon?: ReactNode;
   onBlur?: () => void;
   inputRef?: Ref<HTMLInputElement>;
   autoFocus?: boolean;
+  /**
+   * APP-UPC-001A: optional sanitize for scan-capable fields.
+   * Default integer/decimal sanitizers strip leading zeros — appliance physical
+   * scan identity must preserve them via canonicalApplianceScanIdentifier.
+   */
+  sanitizeValue?: (raw: string) => string;
+  /** Normalize value before onScanCommit (defaults to sanitizeBarcodeScan). */
+  normalizeScan?: (raw: string) => string;
 } & ScanCapableProps;
 
 const baseInput =
@@ -61,13 +69,15 @@ function assignRef<T>(ref: Ref<T> | undefined, node: T | null) {
  */
 function useScannerKeyTracking(
   onScanCommit?: (v: string) => void,
-  getCurrentValue?: () => string
+  getCurrentValue?: () => string,
+  normalizeScan: (raw: string) => string = sanitizeBarcodeScan
 ) {
   const lastChangeAt = useRef(0);
   const prevDigitLen = useRef(0);
   const debounceTimer = useRef<number | null>(null);
   const onScanCommitRef = useRef(onScanCommit);
   const getValueRef = useRef(getCurrentValue);
+  const normalizeRef = useRef(normalizeScan);
 
   useEffect(() => {
     onScanCommitRef.current = onScanCommit;
@@ -76,6 +86,10 @@ function useScannerKeyTracking(
   useEffect(() => {
     getValueRef.current = getCurrentValue;
   }, [getCurrentValue]);
+
+  useEffect(() => {
+    normalizeRef.current = normalizeScan;
+  }, [normalizeScan]);
 
   useEffect(() => {
     return () => {
@@ -95,7 +109,7 @@ function useScannerKeyTracking(
   const commit = useCallback(
     (raw: string) => {
       clearDebounce();
-      const sanitized = sanitizeBarcodeScan(raw);
+      const sanitized = normalizeRef.current(raw);
       if (!sanitized || !onScanCommitRef.current) return;
       onScanCommitRef.current(sanitized);
     },
@@ -118,7 +132,7 @@ function useScannerKeyTracking(
     (nextValue: string) => {
       if (!onScanCommitRef.current) return;
 
-      const digits = sanitizeBarcodeScan(nextValue);
+      const digits = normalizeRef.current(nextValue);
       const now = Date.now();
       const gap = lastChangeAt.current > 0 ? now - lastChangeAt.current : 0;
       const digitDelta = digits.length - prevDigitLen.current;
@@ -163,6 +177,8 @@ export function NumberField({
   onBlur,
   inputRef,
   autoFocus,
+  sanitizeValue,
+  normalizeScan,
 }: NumberFieldProps) {
   const localRef = useRef<HTMLInputElement | null>(null);
   const getCurrentValue = useCallback(
@@ -171,12 +187,16 @@ export function NumberField({
   );
   const { onKeyDown, noteValueChange } = useScannerKeyTracking(
     onScanCommit,
-    getCurrentValue
+    getCurrentValue,
+    normalizeScan ?? sanitizeBarcodeScan
   );
 
   function handleChange(raw: string) {
-    const next =
-      mode === "decimal" ? sanitizeDecimalInput(raw) : sanitizeIntegerInput(raw);
+    const next = sanitizeValue
+      ? sanitizeValue(raw)
+      : mode === "decimal"
+        ? sanitizeDecimalInput(raw)
+        : sanitizeIntegerInput(raw);
     onChange(next);
     if (onScanCommit) noteValueChange(next);
   }

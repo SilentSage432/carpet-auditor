@@ -282,7 +282,6 @@ describe("sync-queue replay order (APP-CAT-001A-FIX-001A)", () => {
             id: "item-1",
             store_number: STORE,
             item_number: "1234567",
-            upc: "012345678905",
             description: "Whirlpool Front Load Washer",
             category: "Laundry",
             sub_category: "Washer",

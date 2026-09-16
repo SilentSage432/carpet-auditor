@@ -61,7 +61,6 @@ describe("APP-UX-001A catalog save fallback semantics", () => {
   const baseInput = {
     item_number: "1111111",
     description: "Test Washer",
-    upc: "999988887777",
     category: "Laundry" as const,
     sub_category: "Washer",
   };
@@ -75,7 +74,6 @@ describe("APP-UX-001A catalog save fallback semantics", () => {
           id: "new-id",
           store_number: "2587",
           item_number: "1111111",
-          upc: "999988887777",
           description: "Test Washer",
           category: "Laundry",
           sub_category: "Washer",
@@ -88,6 +86,7 @@ describe("APP-UX-001A catalog save fallback semantics", () => {
     const result = await save(baseInput);
     expect(result.offline).toBe(false);
     expect(result.record.item_number).toBe("1111111");
+    expect(result.record).not.toHaveProperty("upc");
     expect(enqueueSyncAction).not.toHaveBeenCalled();
   });
 
@@ -96,12 +95,11 @@ describe("APP-UX-001A catalog save fallback semantics", () => {
       ok: false,
       status: 409,
       json: async () => ({
-        error: "UPC already linked to Item 2222222",
+        error: "Item already linked to Item 2222222",
         conflict: {
           id: "other",
           store_number: "2587",
           item_number: "2222222",
-          upc: "999988887777",
           description: "Other",
           category: "Laundry",
           sub_category: "Washer",

@@ -1,19 +1,8 @@
 /**
- * APP-CAT-001A-FIX-001A — canonical parent before identifier alias.
+ * APP-CAT-001A-FIX-001A — canonical parent before teach-scan (APP-UPC-001A).
  *
- * Field evidence: the three quarantined Samsung records were inspected in Settings →
- * Device & sync. Their visible failure was
- *
- *   "insert or update on table appliance_catalog_identifiers violates foreign key
- *    constraint appliance_catalog_identifiers_item_fkey"
- *
- * `appliance_catalog_identifiers_item_fkey` is
- * FOREIGN KEY (store_number, item_number) REFERENCES appliance_catalog (store_number,
- * item_number). Link Existing could resolve an item from the device catalog that was
- * never persisted server-side for the actor's store, so the alias had no parent.
- *
- * FIX-001 made that failure visible. FIX-001A makes the legitimate workflow succeed:
- * ensure the one chosen canonical parent, then the alias, then one observation.
+ * Ensure the one chosen canonical parent, then teach-scan, then one observation.
+ * Physical teach is online-only — offline never queues plaintext scan identifiers.
  */
 
 import { readFileSync } from "node:fs";
@@ -36,10 +25,9 @@ vi.mock("@/lib/store-ops/auth", () => ({
 
 const STORE = "2587";
 const ESL = "ESL9988776655";
-const LEGACY_UPC = "012345678905";
 const ITEM_NUMBER = "1234567";
 const ENSURE_URL = "/api/appliances/catalog/ensure";
-const IDENTIFIER_URL = "/api/appliances/catalog/identifiers";
+const TEACH_SCAN_URL = "/api/appliances/catalog/teach-scan";
 
 function readRepo(rel: string): string {
   return readFileSync(join(process.cwd(), rel), "utf8");
@@ -52,13 +40,11 @@ function item(
     id: "item-1",
     store_number: STORE,
     item_number: ITEM_NUMBER,
-    upc: LEGACY_UPC,
     description: "Whirlpool Front Load Washer",
     category: "Laundry",
     sub_category: "Washer",
     created_at: "2026-09-06T00:00:00.000Z",
     updated_at: "2026-09-06T00:00:00.000Z",
-    identifiers: [LEGACY_UPC],
     ...partial,
   };
 }
@@ -91,16 +77,16 @@ const fetchMock = vi.fn();
 /** Route responses per endpoint so ordering failures are unambiguous. */
 function routeFetch(handlers: {
   ensure?: () => Promise<Response> | Response;
-  identifier?: () => Promise<Response> | Response;
+  teachScan?: () => Promise<Response> | Response;
 }) {
   fetchMock.mockImplementation(async (url: string) => {
     if (String(url).includes("/catalog/ensure")) {
       if (!handlers.ensure) throw new Error("unexpected ensure call");
       return handlers.ensure();
     }
-    if (String(url).includes("/catalog/identifiers")) {
-      if (!handlers.identifier) throw new Error("unexpected identifier call");
-      return handlers.identifier();
+    if (String(url).includes("/catalog/teach-scan")) {
+      if (!handlers.teachScan) throw new Error("unexpected teach-scan call");
+      return handlers.teachScan();
     }
     throw new Error(`unexpected fetch: ${url}`);
   });
@@ -114,15 +100,14 @@ beforeEach(() => {
 });
 
 afterEach(() => {
-  // Never unstub all globals — the shared setup owns localStorage.
   setOnline(true);
 });
 
 describe("APP-CAT-001A-FIX-001A parent-first ordering", () => {
-  it("A. server-backed parent needs no create; alias persists once", async () => {
+  it("A. server-backed parent needs no create; teach-scan persists once", async () => {
     routeFetch({
       ensure: () => httpResponse(200, { created: false, item: {} }),
-      identifier: () => httpResponse(200, { ok: true }),
+      teachScan: () => httpResponse(200, { ok: true }),
     });
 
     const result = await linkApplianceCatalogIdentifier({
@@ -131,20 +116,20 @@ describe("APP-CAT-001A-FIX-001A parent-first ordering", () => {
     });
 
     expect(result.offline).toBe(false);
-    expect(result.record.identifiers).toContain(ESL);
-    expect(calledUrls()).toEqual([ENSURE_URL, IDENTIFIER_URL]);
+    expect(result.record).not.toHaveProperty("identifiers");
+    expect(calledUrls()).toEqual([ENSURE_URL, TEACH_SCAN_URL]);
     expect(getSyncQueue()).toHaveLength(0);
   });
 
-  it("B. local-only parent is ensured before the alias is attempted", async () => {
+  it("B. local-only parent is ensured before teach-scan is attempted", async () => {
     const order: string[] = [];
     routeFetch({
       ensure: () => {
         order.push("ensure");
         return httpResponse(200, { created: true, item: {} });
       },
-      identifier: () => {
-        order.push("identifier");
+      teachScan: () => {
+        order.push("teach-scan");
         return httpResponse(200, { ok: true });
       },
     });
@@ -154,15 +139,15 @@ describe("APP-CAT-001A-FIX-001A parent-first ordering", () => {
       identifier: ESL,
     });
 
-    expect(order).toEqual(["ensure", "identifier"]);
+    expect(order).toEqual(["ensure", "teach-scan"]);
     expect(result.offline).toBe(false);
     expect(getSyncQueue()).toHaveLength(0);
   });
 
-  it("ensure carries only the metadata the device already knows", async () => {
+  it("ensure carries only public catalog metadata (no upc / scan id)", async () => {
     routeFetch({
       ensure: () => httpResponse(200, { created: true }),
-      identifier: () => httpResponse(200, { ok: true }),
+      teachScan: () => httpResponse(200, { ok: true }),
     });
 
     await linkApplianceCatalogIdentifier({
@@ -175,16 +160,16 @@ describe("APP-CAT-001A-FIX-001A parent-first ordering", () => {
     ) as Record<string, unknown>;
     expect(body.item_number).toBe(ITEM_NUMBER);
     expect(body.store_number).toBe(STORE);
-    expect(body.upc).toBe(LEGACY_UPC);
+    expect(body.upc).toBeUndefined();
     expect(body.description).toBe("Whirlpool Front Load Washer");
     expect(body.category).toBe("Laundry");
     expect(body.sub_category).toBe("Washer");
-    // No alias is taught through the parent endpoint.
     expect(body.teach_identifier).toBeUndefined();
+    expect(body.scan_identifier).toBeUndefined();
     expect(body.identifier).toBeUndefined();
   });
 
-  it("C. parent failure blocks the alias entirely", async () => {
+  it("C. parent failure blocks teach-scan entirely", async () => {
     routeFetch({
       ensure: () => httpResponse(500, { error: "catalog insert failed" }),
     });
@@ -215,10 +200,10 @@ describe("APP-CAT-001A-FIX-001A parent-first ordering", () => {
     expect(getSyncQueue()).toHaveLength(0);
   });
 
-  it("D. alias failure after parent success queues nothing and stays visible", async () => {
+  it("D. teach-scan failure after parent success queues nothing and stays visible", async () => {
     routeFetch({
       ensure: () => httpResponse(200, { created: true }),
-      identifier: () => httpResponse(500, { error: "identifier save failed" }),
+      teachScan: () => httpResponse(500, { error: "scan teach failed" }),
     });
 
     await expect(
@@ -228,14 +213,14 @@ describe("APP-CAT-001A-FIX-001A parent-first ordering", () => {
       })
     ).rejects.toBeInstanceOf(ApplianceIdentifierHttpError);
 
-    expect(calledUrls()).toEqual([ENSURE_URL, IDENTIFIER_URL]);
+    expect(calledUrls()).toEqual([ENSURE_URL, TEACH_SCAN_URL]);
     expect(getSyncQueue()).toHaveLength(0);
   });
 
   it("G. ensure is idempotent — an existing parent reports created: false", async () => {
     routeFetch({
       ensure: () => httpResponse(200, { created: false, item: {} }),
-      identifier: () => httpResponse(200, { ok: true }),
+      teachScan: () => httpResponse(200, { ok: true }),
     });
 
     await linkApplianceCatalogIdentifier({ item: item(), identifier: ESL });
@@ -248,11 +233,11 @@ describe("APP-CAT-001A-FIX-001A parent-first ordering", () => {
     expect(getSyncQueue()).toHaveLength(0);
   });
 
-  it("H. parent conflict surfaces instead of stealing UPC ownership", async () => {
+  it("H. parent conflict surfaces instead of stealing ownership", async () => {
     routeFetch({
       ensure: () =>
         httpResponse(409, {
-          error: `UPC ${LEGACY_UPC} is already linked to Item 7654321.`,
+          error: `Item ${ITEM_NUMBER} conflicts with an existing catalog item.`,
           conflict: {
             id: "other",
             store_number: STORE,
@@ -279,7 +264,7 @@ describe("APP-CAT-001A-FIX-001A parent-first ordering", () => {
   it("J. online FK/HTTP failure is never relabelled as offline", async () => {
     routeFetch({
       ensure: () => httpResponse(200, { created: false }),
-      identifier: () =>
+      teachScan: () =>
         httpResponse(400, {
           error:
             "insert or update on table appliance_catalog_identifiers violates foreign key constraint appliance_catalog_identifiers_item_fkey",
@@ -299,84 +284,54 @@ describe("APP-CAT-001A-FIX-001A parent-first ordering", () => {
   });
 });
 
-describe("APP-CAT-001A-FIX-001A offline dependency ordering", () => {
-  it("I. true offline queues the canonical parent before the alias", async () => {
+describe("APP-CAT-001A-FIX-001A offline teach requires network", () => {
+  it("I. true offline throws and queues nothing", async () => {
     setOnline(false);
 
-    const result = await linkApplianceCatalogIdentifier({
-      item: item({ offline: true }),
-      identifier: ESL,
-    });
+    await expect(
+      linkApplianceCatalogIdentifier({
+        item: item({ offline: true }),
+        identifier: ESL,
+      })
+    ).rejects.toThrow(/network connection/i);
 
-    expect(result.offline).toBe(true);
     expect(fetchMock).not.toHaveBeenCalled();
-
-    const queue = getPendingSync(STORE);
-    const parentIndex = queue.findIndex(
-      (a) => a.type === "upsert_appliance_catalog"
-    );
-    const aliasIndex = queue.findIndex(
-      (a) => a.type === "upsert_appliance_catalog_identifier"
-    );
-    expect(parentIndex).toBeGreaterThanOrEqual(0);
-    expect(aliasIndex).toBeGreaterThanOrEqual(0);
-    expect(parentIndex).toBeLessThan(aliasIndex);
+    expect(getSyncQueue()).toHaveLength(0);
   });
 
-  it("I. the queued parent carries the canonical identity, not the alias", async () => {
-    setOnline(false);
-
-    await linkApplianceCatalogIdentifier({
-      item: item({ offline: true }),
-      identifier: ESL,
-    });
-
-    const parent = queuedOfType("upsert_appliance_catalog")[0];
-    expect(parent?.payload.item_number).toBe(ITEM_NUMBER);
-    expect(parent?.payload.store_number).toBe(STORE);
-    expect(parent?.payload.upc).toBe(LEGACY_UPC);
-    // The alias belongs to the identifiers table only.
-    expect(parent?.payload.identifier).toBeUndefined();
-    expect(parent?.payload.identifiers).toBeUndefined();
-
-    const alias = queuedOfType("upsert_appliance_catalog_identifier")[0];
-    expect(alias?.payload.identifier).toBe(ESL);
-    expect(alias?.payload.item_number).toBe(ITEM_NUMBER);
-  });
-
-  it("network no-response also queues parent before alias", async () => {
+  it("network no-response throws and queues nothing", async () => {
     fetchMock.mockRejectedValue(new TypeError("Failed to fetch"));
 
-    const result = await linkApplianceCatalogIdentifier({
-      item: item(),
-      identifier: ESL,
-    });
+    await expect(
+      linkApplianceCatalogIdentifier({
+        item: item(),
+        identifier: ESL,
+      })
+    ).rejects.toThrow(/network connection/i);
 
-    expect(result.offline).toBe(true);
-    const queue = getPendingSync(STORE);
-    expect(queue[0]?.type).toBe("upsert_appliance_catalog");
-    expect(queue[1]?.type).toBe("upsert_appliance_catalog_identifier");
+    expect(getSyncQueue()).toHaveLength(0);
   });
 
-  it("a confirmed parent is not re-queued when only the alias loses the network", async () => {
+  it("teach-scan network loss after ensure does not queue plaintext", async () => {
     routeFetch({
       ensure: () => httpResponse(200, { created: true }),
-      identifier: () => {
+      teachScan: () => {
         throw new TypeError("Failed to fetch");
       },
     });
 
-    const result = await linkApplianceCatalogIdentifier({
-      item: item({ offline: true }),
-      identifier: ESL,
-    });
+    await expect(
+      linkApplianceCatalogIdentifier({
+        item: item({ offline: true }),
+        identifier: ESL,
+      })
+    ).rejects.toThrow(/network connection/i);
 
-    expect(result.offline).toBe(true);
     expect(queuedOfType("upsert_appliance_catalog")).toHaveLength(0);
-    expect(queuedOfType("upsert_appliance_catalog_identifier")).toHaveLength(1);
+    expect(queuedOfType("upsert_appliance_catalog_identifier")).toHaveLength(0);
   });
 
-  it("E/F. no bulk promotion — unrelated local catalog items are untouched", async () => {
+  it("E/F. offline refusal leaves unrelated local catalog items untouched", async () => {
     setOnline(false);
     localStorage.setItem(
       "appliance_catalog_offline",
@@ -385,26 +340,22 @@ describe("APP-CAT-001A-FIX-001A offline dependency ordering", () => {
         item({
           id: "item-2",
           item_number: "2222222",
-          upc: "022222222222",
-          identifiers: ["022222222222"],
         }),
         item({
           id: "item-3",
           item_number: "3333333",
-          upc: "033333333333",
-          identifiers: ["033333333333"],
         }),
       ])
     );
 
-    await linkApplianceCatalogIdentifier({
-      item: item({ offline: true }),
-      identifier: ESL,
-    });
+    await expect(
+      linkApplianceCatalogIdentifier({
+        item: item({ offline: true }),
+        identifier: ESL,
+      })
+    ).rejects.toThrow(/network connection/i);
 
-    const parents = queuedOfType("upsert_appliance_catalog");
-    expect(parents).toHaveLength(1);
-    expect(parents[0]?.payload.item_number).toBe(ITEM_NUMBER);
+    expect(queuedOfType("upsert_appliance_catalog")).toHaveLength(0);
 
     const stored = JSON.parse(
       String(localStorage.getItem("appliance_catalog_offline"))
@@ -414,13 +365,12 @@ describe("APP-CAT-001A-FIX-001A offline dependency ordering", () => {
       "2222222",
       "3333333",
     ]);
-    expect(untouched.every((r) => r.offline !== true)).toBe(true);
   });
 
   it("E. online link never issues a bulk catalog request", async () => {
     routeFetch({
       ensure: () => httpResponse(200, { created: true }),
-      identifier: () => httpResponse(200, { ok: true }),
+      teachScan: () => httpResponse(200, { ok: true }),
     });
 
     await linkApplianceCatalogIdentifier({
@@ -432,6 +382,23 @@ describe("APP-CAT-001A-FIX-001A offline dependency ordering", () => {
     expect(calledUrls().some((u) => /bulk|promote|sync-all/i.test(u))).toBe(
       false
     );
+  });
+
+  it("teach-scan body uses scan_identifier", async () => {
+    routeFetch({
+      ensure: () => httpResponse(200, { created: false }),
+      teachScan: () => httpResponse(200, { ok: true }),
+    });
+
+    await linkApplianceCatalogIdentifier({ item: item(), identifier: ESL });
+
+    const body = JSON.parse(
+      String(fetchMock.mock.calls[1]?.[1]?.body)
+    ) as Record<string, unknown>;
+    expect(body.scan_identifier).toBe(ESL);
+    expect(body.item_number).toBe(ITEM_NUMBER);
+    expect(body.identifier).toBeUndefined();
+    expect(body.upc).toBeUndefined();
   });
 });
 
@@ -450,11 +417,9 @@ describe("APP-CAT-001A-FIX-001A provenance signal", () => {
   it("ensure runs regardless of the provenance hint", async () => {
     routeFetch({
       ensure: () => httpResponse(200, { created: false }),
-      identifier: () => httpResponse(200, { ok: true }),
+      teachScan: () => httpResponse(200, { ok: true }),
     });
 
-    // offline:false is only a hint — the store_number re-stamp can invalidate it,
-    // so the authoritative check must still run.
     await linkApplianceCatalogIdentifier({
       item: item({ offline: false }),
       identifier: ESL,
@@ -470,6 +435,7 @@ describe("APP-CAT-001A-FIX-001A schema and route contracts", () => {
   );
   const ensureRoute = readRepo("app/api/appliances/catalog/ensure/route.ts");
   const catalogRoute = readRepo("app/api/appliances/catalog/route.ts");
+  const teachRoute = readRepo("app/api/appliances/catalog/teach-scan/route.ts");
 
   it("the FK parent is appliance_catalog (store_number, item_number)", () => {
     expect(migration).toContain("appliance_catalog_identifiers_item_fkey");
@@ -498,11 +464,19 @@ describe("APP-CAT-001A-FIX-001A schema and route contracts", () => {
     expect(ensureRoute).not.toMatch(/items\s*:|\bfor \(const it\b/);
   });
 
-  it("existing catalog upsert semantics are left intact", () => {
+  it("catalog upsert rejects upc / teach_identifier plaintext", () => {
     expect(catalogRoute).toContain(
       'onConflict: "store_number,item_number"'
     );
     expect(catalogRoute).toContain("teach_identifier");
+    expect(catalogRoute).toContain("Physical scan identifiers are not accepted");
+  });
+
+  it("teach-scan accepts scan_identifier only", () => {
+    expect(teachRoute).toContain("scan_identifier");
+    expect(teachRoute).toContain(
+      "Client-supplied scan_fingerprint is not accepted"
+    );
   });
 });
 

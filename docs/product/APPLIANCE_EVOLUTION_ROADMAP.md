@@ -155,6 +155,21 @@ Soft mutable after CLOSED (APP-AUD-002B soft-field set). Quiet rapid scan + opti
 
 **APP-CAT-001A-FIX-001B (implemented — Samsung acceptance pending):** A queued identifier that replays into the canonical-parent FK is now classified deterministically as `blocked_missing_parent` rather than an unknown failure, and Settings → Device & sync explains it in field language ("Item … is not on DeptSync for this store yet. Add the item, then Retry."), naming the real item when the payload carries it. Replay does **not** create parents and does **not** auto-retry; recovery remains intentionally ensuring the canonical parent, then supervisor Retry. Same-owner replay stays idempotent and different-owner replay still conflicts without stealing ownership. The three preserved Samsung records remain untouched. APP-CAT-001A is **not** field accepted; re-validation on the Samsung is still required.
 
+#### APP-UPC-001A — Opaque Appliance Scan Identity
+
+**Status:** Production complete on `fmeinlwhixngednabhgy` + `deptsync-hub` — opaque schema live, appliance subsystem intentionally empty, `APPLIANCE_SCAN_HMAC_SECRET` provisioned on Vercel (production+preview), production deploy READY. Samsung field acceptance pending.
+
+**Laws:**
+
+- Physical appliance scan identifiers (UPC, ESL, taught aliases) are transient matching inputs, not durable readable business data.
+- Offline physical capture remains available when catalog identity cannot be resolved immediately.
+- Server-owned keyed HMAC-SHA-256 fingerprinting protects durable scan identity (`APPLIANCE_SCAN_HMAC_SECRET`, fail-closed).
+- Temporary readable identifiers exist only in the bounded unresolved offline queue and are removed after successful resolution.
+
+**Tradeoff:** Immediate known-barcode recognition while fully offline was intentionally traded for removal of durable readable barcode mappings. Public Lowe's item numbers may still resolve locally.
+
+**Migration:** `supabase/migrations/20260911_appliance_opaque_scan_identity.sql` — replace plaintext identifier/upc with `scan_fingerprint`. Authorized appliance pilot data reset accompanies first production apply.
+
 **APP-CAT-001B (deferred):** Review locally taught mappings and **intentionally** promote valid ones into the authoritative store-scoped server catalog. Do **not** automatically upload legacy local mappings.
 
 #### APP-ROT-001 — Appliance Audit Consideration

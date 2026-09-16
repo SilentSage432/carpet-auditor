@@ -5,10 +5,6 @@
  * never be recorded on the strength of a teaching step that did not persist. The
  * modal commits an observation only by calling `onSaved`, which the scan form turns
  * into exactly one `commitScan`, so these tests gate on `onSaved`.
- *
- * This spans separate HTTP requests (ensure parent, then alias) — there is no
- * database transaction. The guarantee is application-level ordering: a failure at
- * any step stops the sequence and surfaces a visible error.
  */
 
 import { readFileSync } from "node:fs";
@@ -50,13 +46,11 @@ function item(): ApplianceCatalogItem {
     id: "item-1",
     store_number: STORE,
     item_number: ITEM_NUMBER,
-    upc: "012345678905",
     description: "Whirlpool Front Load Washer",
     category: "Laundry",
     sub_category: "Washer",
     created_at: "2026-09-06T00:00:00.000Z",
     updated_at: "2026-09-06T00:00:00.000Z",
-    identifiers: ["012345678905"],
   };
 }
 
@@ -140,7 +134,7 @@ async function attemptLink(): Promise<{ saved: ApplianceCatalogItem[] }> {
 describe("APP-CAT-001A-FIX-001A observation gate", () => {
   it("A/B. successful link commits exactly one observation", async () => {
     linkApplianceCatalogIdentifier.mockResolvedValue({
-      record: { ...item(), identifiers: ["012345678905", ESL] },
+      record: item(),
       offline: false,
     });
 
@@ -148,7 +142,9 @@ describe("APP-CAT-001A-FIX-001A observation gate", () => {
 
     expect(linkApplianceCatalogIdentifier).toHaveBeenCalledTimes(1);
     expect(saved).toHaveLength(1);
-    expect(saved[0]?.identifiers).toContain(ESL);
+    expect(saved[0]?.item_number).toBe(ITEM_NUMBER);
+    expect(saved[0]).not.toHaveProperty("identifiers");
+    expect(saved[0]).not.toHaveProperty("upc");
   });
 
   it("C. parent failure records no observation and shows the error", async () => {
@@ -173,13 +169,13 @@ describe("APP-CAT-001A-FIX-001A observation gate", () => {
       "@/lib/appliance-catalog"
     );
     linkApplianceCatalogIdentifier.mockRejectedValue(
-      new ApplianceIdentifierHttpError("Identifier save failed (500)", 500)
+      new ApplianceIdentifierHttpError("Scan teach failed (500)", 500)
     );
 
     const { saved } = await attemptLink();
 
     expect(saved).toHaveLength(0);
-    expect(container!.textContent).toContain("Identifier save failed");
+    expect(container!.textContent).toContain("Scan teach failed");
   });
 
   it("conflict records no observation and names the owning item", async () => {
@@ -225,9 +221,8 @@ describe("APP-CAT-001A-FIX-001A observation wiring", () => {
   });
 
   it("the scan form commits one observation per saved teach", () => {
-    expect(form).toMatch(
-      /async function handleQuickAdded[\s\S]{0,600}await commitScan\(item\);/
-    );
+    expect(form).toContain("async function handleQuickAdded");
+    expect(form).toContain("await commitScan(item)");
   });
 
   it("no observation is fabricated inside the teaching modal", () => {

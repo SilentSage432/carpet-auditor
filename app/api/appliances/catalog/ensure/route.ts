@@ -1,8 +1,5 @@
 import { NextResponse } from "next/server";
-import {
-  mapApplianceCatalogRow,
-  normalizeApplianceIdentifier,
-} from "@/lib/appliance-catalog";
+import { mapApplianceCatalogRow } from "@/lib/appliance-catalog";
 import { actorBoundStoreNumber } from "@/lib/store-ops/appliance-store-scope";
 import {
   resolveStoreOpsActor,
@@ -29,6 +26,8 @@ import { normalizeApplianceCategory } from "@/lib/types";
  *
  * Idempotent and non-destructive: an existing parent is returned untouched — its
  * server metadata is never rewritten with device values.
+ *
+ * APP-UPC-001A: public fields only. Physical scan teach is via teach-scan.
  */
 export async function POST(request: Request) {
   try {
@@ -55,6 +54,16 @@ export async function POST(request: Request) {
       );
     }
 
+    if (body.upc != null && String(body.upc) !== "") {
+      return NextResponse.json(
+        {
+          error:
+            "upc is not accepted on catalog ensure — teach physical scans via POST /api/appliances/catalog/teach-scan",
+        },
+        { status: 400 }
+      );
+    }
+
     const { data: existing, error: existingError } = await supabase
       .from("appliance_catalog")
       .select("*")
@@ -77,65 +86,13 @@ export async function POST(request: Request) {
       });
     }
 
-    const upcRaw = body.upc;
-    const upc =
-      upcRaw == null || upcRaw === ""
-        ? null
-        : normalizeApplianceIdentifier(upcRaw) || null;
-
-    // Never steal a legacy upc that another canonical item already owns.
-    if (upc) {
-      const { data: idRows, error: idError } = await supabase
-        .from("appliance_catalog_identifiers")
-        .select("*")
-        .eq("store_number", store)
-        .eq("identifier", upc);
-      if (idError) {
-        return NextResponse.json({ error: idError.message }, { status: 500 });
-      }
-      const idOwner = (idRows ?? []).find(
-        (row) =>
-          String((row as { item_number?: string }).item_number ?? "").trim() !==
-          item_number
-      );
-
-      const { data: upcRows, error: upcError } = await supabase
-        .from("appliance_catalog")
-        .select("*")
-        .eq("store_number", store)
-        .eq("upc", upc);
-      if (upcError) {
-        return NextResponse.json({ error: upcError.message }, { status: 500 });
-      }
-      const upcOwner = (upcRows ?? []).find(
-        (row) =>
-          String((row as { item_number?: string }).item_number ?? "").trim() !==
-          item_number
-      );
-
-      const conflict = idOwner ?? upcOwner;
-      if (conflict) {
-        const owner = String(
-          (conflict as { item_number?: string }).item_number ?? "?"
-        ).trim();
-        return NextResponse.json(
-          {
-            error: `UPC ${upc} is already linked to Item ${owner}. Clear or change that mapping first.`,
-            conflict: upcOwner ?? conflict,
-          },
-          { status: 409 }
-        );
-      }
-    }
-
     const now = new Date().toISOString();
-    // Only metadata the device actually knows — nothing is manufactured.
+    // Public catalog fields only — nothing is manufactured; no upc column write.
     // sub_category may be empty; appliance_catalog defaults it to ''.
     const payload = {
       id: body.id ? String(body.id) : undefined,
       store_number: store,
       item_number,
-      upc,
       description: String(body.description ?? "").trim(),
       category: normalizeApplianceCategory(body.category),
       sub_category: String(body.sub_category ?? "").trim(),

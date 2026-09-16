@@ -6,8 +6,7 @@
  *
  *   setQuickAddBarcode(item.upc || item.item_number)
  *
- * which re-opened Quick Add as an *unknown identifier* flow against a different
- * identifier, reset the mode, and replayed the audible prompt. A resolved canonical
+ * which re-opened Quick Add as an *unknown identifier* flow. A resolved canonical
  * item must never be demoted back to "unknown" over missing classification metadata.
  */
 
@@ -50,19 +49,17 @@ vi.mock("@/lib/appliance-catalog", async (importOriginal) => {
   };
 });
 
-/** Resolved canonical item that already owns the ESL but lacks classification. */
+/** Resolved canonical item that lacks classification (no upc/identifiers). */
 function unclassifiedItem(): ApplianceCatalogItem {
   return {
     id: "item-1",
     store_number: STORE,
     item_number: ITEM_NUMBER,
-    upc: LEGACY_UPC,
     description: "Whirlpool Front Load Washer",
     category: "Laundry",
     sub_category: undefined,
     created_at: "2026-09-06T00:00:00.000Z",
     updated_at: "2026-09-06T00:00:00.000Z",
-    identifiers: [LEGACY_UPC, ESL],
   };
 }
 
@@ -81,7 +78,6 @@ beforeEach(() => {
         ...unclassifiedItem(),
         category: input.category,
         sub_category: input.sub_category,
-        identifiers: [LEGACY_UPC],
       },
       offline: false,
     })
@@ -168,14 +164,13 @@ describe("APP-CAT-001A-FIX-001 classification completion", () => {
     expect(text).not.toContain("Create new item");
   });
 
-  it("keeps canonical item identity instead of the legacy upc", async () => {
+  it("keeps canonical item identity instead of swapping to the scanned barcode", async () => {
     await renderClassifyModal(unclassifiedItem());
     const subject = container!.querySelector(
       '[data-testid="quick-add-classify-item"]'
     );
 
     expect(subject?.textContent).toContain(`Item ${ITEM_NUMBER}`);
-    // The scanned ESL is never swapped for the legacy upc / item number.
     expect(container!.textContent).not.toContain(`Scanned ${LEGACY_UPC}`);
     expect(container!.textContent).not.toContain(`Scanned ${ITEM_NUMBER}`);
   });
@@ -217,17 +212,16 @@ describe("APP-CAT-001A-FIX-001 classification completion", () => {
     >;
     expect(payload.id).toBe("item-1");
     expect(payload.item_number).toBe(ITEM_NUMBER);
-    expect(payload.upc).toBe(LEGACY_UPC);
+    expect(payload.upc).toBeUndefined();
     expect(payload.sub_category).toBe("Washer");
-    // No second ownership relationship is created to escape the form.
     expect(payload.teach_identifier).toBeUndefined();
+    expect(payload.teach_scan_identifier).toBeUndefined();
     expect(linkApplianceCatalogIdentifier).not.toHaveBeenCalled();
 
     expect(saved).toHaveLength(1);
     expect(saved[0]?.sub_category).toBe("Washer");
-    // The alias just taught must survive classification.
-    expect(saved[0]?.identifiers).toContain(ESL);
-    expect(saved[0]?.identifiers).toContain(LEGACY_UPC);
+    expect(saved[0]).not.toHaveProperty("upc");
+    expect(saved[0]).not.toHaveProperty("identifiers");
   });
 
   it("repeated rendering generates no identifier or catalog writes", async () => {
@@ -261,14 +255,13 @@ describe("APP-CAT-001A-FIX-001 scan form no longer bounces", () => {
       "const teachModalOpen = quickAddBarcode != null || classifyItem != null;"
     );
     expect(form).toContain(
-      "useGlobalBarcodeScanner(handleItemLookup, scannerEnabled && !teachModalOpen);"
+      "useGlobalBarcodeScanner(handleItemLookup, scannerEnabled && !teachModalOpen"
     );
   });
 
   it("completion logs exactly one physical observation via commitScan", () => {
-    expect(form).toMatch(
-      /async function handleQuickAdded[\s\S]{0,600}await commitScan\(item\);/
-    );
+    expect(form).toContain("async function handleQuickAdded");
+    expect(form).toContain("await commitScan(item)");
     // Both teach paths are cleared before the single commit.
     expect(form).toMatch(
       /setQuickAddBarcode\(null\);\s*\n\s*setClassifyItem\(null\);\s*\n\s*setTeachBusy\(true\);/

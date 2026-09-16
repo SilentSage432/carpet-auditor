@@ -9,11 +9,13 @@ import {
   findApplianceByItemOrUpc,
   findApplianceIdentifierConflict,
   linkApplianceCatalogIdentifier,
-  listApplianceTaughtIdentifiers,
-  normalizeApplianceIdentifier,
   saveApplianceCatalogItem,
 } from "@/lib/appliance-catalog";
-import { sanitizeBarcodeScan } from "@/lib/barcode";
+import {
+  canonicalApplianceItemNumber,
+  canonicalApplianceScanIdentifier,
+  isPhysicalApplianceScanIdentifier,
+} from "@/lib/appliances/scan-identity";
 import { playQuickAddPrompt } from "@/lib/scan-feedback";
 import {
   isValidApplianceSubCategory,
@@ -44,6 +46,8 @@ type TeachMode = "choose" | "link" | "create" | "classify";
  * Pause continuous scan for NEW / unlinked identifiers (APP-CAT-001A).
  * Link to existing item (no metadata re-entry) OR create new canonical item.
  * Also completes classification for an already-resolved item (APP-CAT-001A-FIX-001).
+ *
+ * APP-UPC-001A: scanned barcode stays in memory for the teach request only.
  */
 export function QuickAddApplianceModal({
   open,
@@ -53,11 +57,9 @@ export function QuickAddApplianceModal({
   onClose,
   onSaved,
 }: Props) {
-  const cleaned =
-    normalizeApplianceIdentifier(scannedBarcode) ||
-    sanitizeBarcodeScan(scannedBarcode);
+  const cleaned = canonicalApplianceScanIdentifier(scannedBarcode);
   /** Longer codes are alternate identifiers; short may be typed item #. */
-  const isLongIdentifier = cleaned.length >= 8;
+  const isLongIdentifier = isPhysicalApplianceScanIdentifier(cleaned);
   /** Stable key — avoids re-seeding the form on unrelated object churn. */
   const classifyKey = classifyItem
     ? `${classifyItem.id}:${classifyItem.item_number}`
@@ -129,7 +131,7 @@ export function QuickAddApplianceModal({
     });
     if (conflict) {
       setError(
-        `Identifier ${cleaned} is already linked to Item ${conflict.item_number}.`
+        `That scan identity is already linked to Item ${conflict.item_number}.`
       );
       return;
     }
@@ -158,8 +160,7 @@ export function QuickAddApplianceModal({
   /**
    * APP-CAT-001A-FIX-001: finish an already-resolved item's classification so the
    * physical scan can complete. Reuses the canonical catalog path with the item's
-   * existing id / item # / description / legacy upc, so no new ownership is created
-   * and the alias just taught is preserved.
+   * existing id / item # / description — no new ownership, no physical teach.
    */
   async function handleCompleteClassification() {
     if (!classifyItem) return;
@@ -175,20 +176,10 @@ export function QuickAddApplianceModal({
         id: classifyItem.id,
         item_number: classifyItem.item_number,
         description: classifyItem.description,
-        upc: classifyItem.upc,
         category,
         sub_category: subCategory.trim(),
       });
-      // Classification must not drop identifiers already taught for this item.
-      const identifiers = listApplianceTaughtIdentifiers({
-        item_number: record.item_number,
-        upc: record.upc,
-        identifiers: [
-          ...(record.identifiers ?? []),
-          ...listApplianceTaughtIdentifiers(classifyItem),
-        ],
-      });
-      onSaved({ ...record, identifiers });
+      onSaved(record);
     } catch (err) {
       if (err instanceof ApplianceCatalogConflictError) {
         setError(err.message);
@@ -215,9 +206,9 @@ export function QuickAddApplianceModal({
     }
 
     const nextItem =
-      sanitizeBarcodeScan(itemNumber) || itemNumber.trim();
+      canonicalApplianceItemNumber(itemNumber) || itemNumber.trim();
 
-    // Existing canonical item → link path (do not overwrite metadata / upc).
+    // Existing canonical item → link path (do not overwrite metadata).
     const existing =
       findApplianceByItemOrUpc(catalog, nextItem) ||
       catalog.find((c) => c.item_number.trim() === nextItem);
@@ -233,7 +224,7 @@ export function QuickAddApplianceModal({
       });
       if (conflict) {
         setError(
-          `Identifier ${teachIdentifier} is already linked to Item ${conflict.item_number}. Use Link to existing or Manage mappings.`
+          `That scan identity is already linked to Item ${conflict.item_number}. Use Link to existing or Manage mappings.`
         );
         return;
       }
@@ -245,10 +236,9 @@ export function QuickAddApplianceModal({
       const { record } = await saveApplianceCatalogItem({
         item_number: nextItem,
         description: description.trim(),
-        upc: teachIdentifier,
-        teach_identifier: teachIdentifier,
         category,
         sub_category: subCategory.trim(),
+        teach_scan_identifier: teachIdentifier,
       });
       onSaved(record);
     } catch (err) {
@@ -397,12 +387,6 @@ export function QuickAddApplianceModal({
                       </span>
                       <span className="truncate text-sm text-zinc-300">
                         {item.description}
-                      </span>
-                      <span className="mt-0.5 text-[10px] uppercase text-zinc-500">
-                        {listApplianceTaughtIdentifiers(item).length} identifier
-                        {listApplianceTaughtIdentifiers(item).length === 1
-                          ? ""
-                          : "s"}
                       </span>
                     </button>
                   </li>
