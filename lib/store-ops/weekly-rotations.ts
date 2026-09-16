@@ -94,8 +94,13 @@ export function clampShiftHours(raw: unknown): number {
 }
 
 export function formatShiftTag(hours: number): string {
-  const h = clampShiftHours(hours);
-  return Number.isInteger(h) ? `${h}h` : `${h}h`;
+  const n = Number(hours);
+  // Display known hours as-is (weekly totals may exceed the daily 16h UI clamp).
+  const h =
+    Number.isFinite(n) && n > 0
+      ? Math.round(n * 10) / 10
+      : DEFAULT_SHIFT_HOURS;
+  return `${h}h`;
 }
 
 export function formatSpecialistShiftLabel(
@@ -279,15 +284,45 @@ function clusterBays(bays: RotationBayRef[]): GeoCluster[] {
 }
 
 /**
+ * Resolve hours for proportional planning.
+ * - Default (UI / legacy localStorage): clampShiftHours (unknown → DEFAULT_SHIFT_HOURS).
+ * - knownHoursOnly (persisted schedule evidence): never invent DEFAULT; ≤0 excluded.
+ *   Does not apply the daily 1–16 shift clamp — weekly known hours may exceed 16.
+ */
+export function resolvePlannerHours(
+  raw: unknown,
+  knownHoursOnly = false
+): number {
+  if (knownHoursOnly) {
+    const n = Number(raw);
+    if (!Number.isFinite(n) || n <= 0) return 0;
+    return Math.round(n * 10) / 10;
+  }
+  return clampShiftHours(raw);
+}
+
+export type PlanProportionalOptions = {
+  /**
+   * When true, treat member.hours as known schedule evidence.
+   * Zero/invalid hours exclude the member; never substitute DEFAULT_SHIFT_HOURS.
+   */
+  knownHoursOnly?: boolean;
+};
+
+/**
  * Distribute open weekly bays by scheduled hours, keeping aisle/face clusters
  * together and feeding high-risk (stale / never / unworked top-stock) clusters
  * into the longest (primary) shifts first.
  */
 export function planProportionalBayAssignments(
   bays: RotationBayRef[],
-  members: ShiftRosterMember[]
+  members: ShiftRosterMember[],
+  options?: PlanProportionalOptions
 ): ProportionalAssignmentPlan {
-  const active = members.filter((m) => m.active && clampShiftHours(m.hours) > 0);
+  const knownHoursOnly = options?.knownHoursOnly === true;
+  const active = members.filter(
+    (m) => m.active && resolvePlannerHours(m.hours, knownHoursOnly) > 0
+  );
   const empty: ProportionalAssignmentPlan = {
     total_hours: 0,
     items: [],
@@ -295,7 +330,7 @@ export function planProportionalBayAssignments(
   };
   if (bays.length === 0 || active.length === 0) return empty;
 
-  const hours = active.map((m) => clampShiftHours(m.hours));
+  const hours = active.map((m) => resolvePlannerHours(m.hours, knownHoursOnly));
   const totalHours = hours.reduce((sum, h) => sum + h, 0);
   const quotas = proportionalQuotas(hours, bays.length);
   const remaining = [...quotas];
@@ -310,7 +345,7 @@ export function planProportionalBayAssignments(
     for (let i = 0; i < active.length; i += 1) {
       if ((remaining[i] ?? 0) <= 0) continue;
       const sameAisle = lastAisle[i] === normalizeAisle(bay.aisle) ? 2 : 0;
-      const score = sameAisle * 1000 + (remaining[i] ?? 0) * 10 + hours[i];
+      const score = sameAisle * 1000 + (remaining[i] ?? 0) * 10 + hours[i]!;
       if (score > best) {
         best = score;
         pick = i;
@@ -323,12 +358,13 @@ export function planProportionalBayAssignments(
     const member = active[pick]!;
     remaining[pick] = (remaining[pick] ?? 0) - 1;
     lastAisle[pick] = normalizeAisle(bay.aisle);
+    const memberHours = resolvePlannerHours(member.hours, knownHoursOnly);
     items.push({
       rotationId: bay.rotationId,
       specialist_id: member.specialist_id,
       specialist_name: member.specialist_name,
-      hours: clampShiftHours(member.hours),
-      shift_tag: formatShiftTag(member.hours),
+      hours: memberHours,
+      shift_tag: formatShiftTag(memberHours),
       aisle: bay.aisle,
       bay: bay.bay,
       riskScore: bay.riskScore,
@@ -340,15 +376,14 @@ export function planProportionalBayAssignments(
     const aisles = [
       ...new Set(mine.map((row) => normalizeAisle(row.aisle)).filter(Boolean)),
     ].sort(compareAisles);
+    const memberHours = resolvePlannerHours(member.hours, knownHoursOnly);
     return {
       specialist_id: member.specialist_id,
       specialist_name: member.specialist_name,
-      hours: clampShiftHours(member.hours),
+      hours: memberHours,
       quota: quotas[i] ?? 0,
       weight_pct:
-        totalHours > 0
-          ? Math.round((clampShiftHours(member.hours) / totalHours) * 100)
-          : 0,
+        totalHours > 0 ? Math.round((memberHours / totalHours) * 100) : 0,
       aisles,
       high_risk: mine.filter((row) => row.riskScore > 0).length,
     };
@@ -380,8 +415,9 @@ export type OnDutyBayWorkload = {
 
 /**
  * Group this week's open bays onto today's on-duty associates.
- * Persisted sunday_bay_assignments win. Unassigned bays are clustered with
- * planProportionalBayAssignments for display only — does not write rows.
+ * Persisted sunday_bay_assignments are authoritative ownership.
+ * Unassigned bays stay unassigned — display fill must not masquerade as ownership.
+ * Off-today owners keep weekly ownership (not moved onto today's on-duty set).
  */
 export function composeOnDutyBayWorkload(input: {
   bays: RotationBayRef[];
@@ -395,48 +431,21 @@ export function composeOnDutyBayWorkload(input: {
   }));
   const byId = new Map(groups.map((row) => [row.specialist_id, row]));
   const assigneeByRotationId: Record<string, string> = {};
-  const unassigned: RotationBayRef[] = [];
+  const unassignedIds: string[] = [];
 
   for (const bay of input.bays) {
     const assignedId = String(
       input.assignments[bay.rotationId]?.specialist_id ?? ""
     ).trim();
     if (!assignedId) {
-      unassigned.push(bay);
+      unassignedIds.push(bay.rotationId);
       continue;
     }
+    // Ownership remains even when the owner is off today (not in onDuty groups).
     assigneeByRotationId[bay.rotationId] = assignedId;
     const group = byId.get(assignedId);
     if (group) group.rotationIds.push(bay.rotationId);
   }
-
-  if (unassigned.length > 0 && groups.length > 0) {
-    const plan = planProportionalBayAssignments(
-      unassigned,
-      groups.map((member) => ({
-        specialist_id: member.specialist_id,
-        specialist_name: member.specialist_name,
-        active: true,
-        hours: member.hours,
-        start: member.start ?? undefined,
-        end: member.end ?? undefined,
-      }))
-    );
-    for (const item of plan.items) {
-      const group = byId.get(item.specialist_id);
-      if (!group) continue;
-      group.rotationIds.push(item.rotationId);
-      group.plannedRotationIds.push(item.rotationId);
-      assigneeByRotationId[item.rotationId] = item.specialist_id;
-    }
-  }
-
-  const planned = new Set(
-    groups.flatMap((group) => group.plannedRotationIds)
-  );
-  const unassignedIds = unassigned
-    .map((bay) => bay.rotationId)
-    .filter((id) => !planned.has(id) && !assigneeByRotationId[id]);
 
   return { groups, unassignedIds, assigneeByRotationId };
 }

@@ -13,7 +13,7 @@ import {
 } from "@/lib/store-ops/client";
 import { readableError } from "@/lib/store-ops/errors";
 import { playErrorTone, playSuccessTone, playTapTone } from "@/lib/ui/feedback";
-import { diagnoseBayHealth } from "@/lib/store-ops/bay-health";
+import { diagnoseBayHealth, type BayHealthFinding } from "@/lib/store-ops/bay-health";
 import { CarryOverPriorityBadge } from "@/components/store-ops/CarryOverPriorityBadge";
 import {
   autoAssignSundayBaysToSpecialist,
@@ -46,6 +46,14 @@ import {
   writeShiftRoster,
   type ShiftRosterMember,
 } from "@/lib/store-ops/weekly-rotations";
+import {
+  composeWeekLaborAvailability,
+  weekLaborToPlannerMembers,
+  type LabPersistedShiftDayInput,
+  type WeekLaborComposition,
+} from "@/lib/store-ops/labor-availability";
+import { isoWeekCalendarRange } from "@/lib/store-ops/week";
+import { fetchShiftDaysRange } from "@/lib/store-ops/shift-status";
 import { getStoreNumber } from "@/lib/store";
 import { fetchSpecialists } from "@/lib/specialists";
 import { AssociateRosterPanel } from "@/components/admin/AssociateRosterPanel";
@@ -55,6 +63,41 @@ import { useFocusedWorkspace } from "@/lib/ui/focused-workspace";
 import { rosterJobTitleLabel, type StoreSpecialist } from "@/lib/types";
 
 const FLOORING_STAGING_DEPT = "flooring" as const;
+
+function shiftDaysToLabRows(
+  days: Record<string, { specialist_id: string; work_date: string; start_time: string | null; end_time: string | null; is_scheduled_today: boolean; is_call_out: boolean; status?: string | null }>
+): LabPersistedShiftDayInput[] {
+  return Object.values(days).map((d) => ({
+    specialist_id: d.specialist_id,
+    work_date: d.work_date,
+    start_time: d.start_time,
+    end_time: d.end_time,
+    is_scheduled_today: d.is_scheduled_today,
+    is_call_out: d.is_call_out,
+    status: d.status ?? null,
+  }));
+}
+
+function buildScheduleBalancePlan(
+  bays: SundayStagedBay[],
+  weekLabor: WeekLaborComposition | null,
+  healthByRotation: Map<string, BayHealthFinding>
+) {
+  const bayRefs = bays.map((bay) => ({
+    rotationId: bay.rotation.id,
+    aisle: bay.aisle,
+    bay: bay.bay,
+    type: bay.rotation.store_locations?.type,
+    riskScore: riskScoreFromFinding(healthByRotation.get(bay.rotation.id)),
+  }));
+  if (!weekLabor || weekLabor.processing_status === "UNAVAILABLE") {
+    return planProportionalBayAssignments(bayRefs, [], { knownHoursOnly: true });
+  }
+  const members = weekLaborToPlannerMembers(weekLabor.allocatable);
+  return planProportionalBayAssignments(bayRefs, members, {
+    knownHoursOnly: true,
+  });
+}
 
 type Props = {
   open: boolean;
@@ -79,6 +122,7 @@ export function SundayAuditAssignmentModal({
   const [error, setError] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
   const [shiftRoster, setShiftRoster] = useState<ShiftRosterMember[]>([]);
+  const [weekLabor, setWeekLabor] = useState<WeekLaborComposition | null>(null);
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -110,11 +154,56 @@ export function SundayAuditAssignmentModal({
           sundayShiftSeedActive(FLOORING_STAGING_DEPT)
         )
       );
+
+      // Persisted whole-week schedule evidence for Balance Assign (not localStorage).
+      const range = isoWeekCalendarRange(rotData.assigned_week);
+      let labor: WeekLaborComposition | null = null;
+      try {
+        const days = await fetchShiftDaysRange(
+          range.startDate,
+          range.endDate,
+          getStoreNumber()
+        );
+        labor = composeWeekLaborAvailability({
+          department: FLOORING_STAGING_DEPT,
+          week_label: rotData.assigned_week,
+          dates: range.dates,
+          workforce: assignable.map((m) => ({
+            id: String(m.id),
+            role: m.role,
+            is_active: m.is_active,
+            home_department: m.home_department,
+            assigned_department: m.assigned_department,
+            name: m.name,
+          })),
+          persisted_shift_days: shiftDaysToLabRows(days),
+          workforce_evidence_available: true,
+          schedule_evidence_available: true,
+          as_of: new Date().toISOString(),
+        });
+      } catch (scheduleErr) {
+        console.error(
+          "[SundayAudit] week schedule labor unavailable",
+          scheduleErr
+        );
+        labor = composeWeekLaborAvailability({
+          department: FLOORING_STAGING_DEPT,
+          week_label: rotData.assigned_week,
+          dates: range.dates,
+          workforce: [],
+          persisted_shift_days: [],
+          workforce_evidence_available: true,
+          schedule_evidence_available: false,
+          as_of: new Date().toISOString(),
+        });
+      }
+      setWeekLabor(labor);
     } catch (err) {
       setError(
         readableError(err, "Could not load Sunday Flooring cycle audits")
       );
       setBays([]);
+      setWeekLabor(null);
     } finally {
       setLoading(false);
     }
@@ -176,18 +265,8 @@ export function SundayAuditAssignmentModal({
   }, [bays]);
 
   const balancerPlan = useMemo(
-    () =>
-      planProportionalBayAssignments(
-        bays.map((bay) => ({
-          rotationId: bay.rotation.id,
-          aisle: bay.aisle,
-          bay: bay.bay,
-          type: bay.rotation.store_locations?.type,
-          riskScore: riskScoreFromFinding(healthByRotation.get(bay.rotation.id)),
-        })),
-        shiftRoster
-      ),
-    [bays, shiftRoster, healthByRotation]
+    () => buildScheduleBalancePlan(bays, weekLabor, healthByRotation),
+    [bays, weekLabor, healthByRotation]
   );
 
   const selectionSummary = useMemo(
@@ -286,13 +365,57 @@ export function SundayAuditAssignmentModal({
   }
 
   async function handleBalanceAssign() {
-    if (!week || balancerPlan.items.length === 0) return;
+    if (!week || bays.length === 0) return;
     setBusy(true);
     setError(null);
+    setStatus(null);
     try {
+      // Recompose from persisted schedule at click time — never localStorage hours.
+      const range = isoWeekCalendarRange(week);
+      const days = await fetchShiftDaysRange(
+        range.startDate,
+        range.endDate,
+        getStoreNumber()
+      );
+      const labor = composeWeekLaborAvailability({
+        department: FLOORING_STAGING_DEPT,
+        week_label: week,
+        dates: range.dates,
+        workforce: roster.map((m) => ({
+          id: String(m.id),
+          role: m.role,
+          is_active: m.is_active,
+          home_department: m.home_department,
+          assigned_department: m.assigned_department,
+          name: m.name,
+        })),
+        persisted_shift_days: shiftDaysToLabRows(days),
+        workforce_evidence_available: true,
+        schedule_evidence_available: true,
+        as_of: new Date().toISOString(),
+      });
+      setWeekLabor(labor);
+
+      if (labor.allocatable.length === 0) {
+        setError(
+          "Balance Assign needs known weekly schedule hours. Complete associate schedules (start/end) for this week, then try again. Missing or unknown durations are not treated as 8 hours."
+        );
+        playErrorTone();
+        return;
+      }
+
+      const plan = buildScheduleBalancePlan(bays, labor, healthByRotation);
+      if (plan.items.length === 0) {
+        setError(
+          "Could not authoritatively allocate staged bays from known schedule hours."
+        );
+        playErrorTone();
+        return;
+      }
+
       const n = await applySundayAssignmentPlan(
         week,
-        balancerPlan.items.map((row) => ({
+        plan.items.map((row) => ({
           rotationId: row.rotationId,
           specialist_id: row.specialist_id,
           specialist_name: formatSpecialistShiftLabel(
@@ -302,16 +425,20 @@ export function SundayAuditAssignmentModal({
           hours: row.hours,
         }))
       );
+      const partialNote =
+        labor.processing_status === "PARTIAL"
+          ? " Partial schedule evidence — only known hours were used."
+          : "";
       setStatus(
-        `Balanced ${n} bay${n === 1 ? "" : "s"} across ${balancerPlan.loads.length} shift${
-          balancerPlan.loads.length === 1 ? "" : "s"
-        } (${balancerPlan.total_hours}h).`
+        `Balanced ${n} bay${n === 1 ? "" : "s"} across ${plan.loads.length} associate${
+          plan.loads.length === 1 ? "" : "s"
+        } from persisted week schedule (${plan.total_hours}h known).${partialNote}`
       );
       await reload();
       onChanged?.();
       playSuccessTone();
     } catch (err) {
-      setError(readableError(err, "Could not apply shift balance"));
+      setError(readableError(err, "Could not apply schedule balance"));
       playErrorTone();
     } finally {
       setBusy(false);
@@ -578,16 +705,18 @@ export function SundayAuditAssignmentModal({
                 </ul>
               ) : (
                 <p className="mt-2 text-[11px] text-amber-200/80">
-                  Turn on at least one specialist with hours to preview quotas.
+                  Balance Assign uses persisted weekly schedule hours. Complete
+                  start/end times for home-department associates this week — missing
+                  or unknown durations are not treated as 8 hours.
                 </p>
               )}
               <button
                 type="button"
-                disabled={busy || balancerPlan.items.length === 0}
+                disabled={busy || bays.length === 0}
                 onClick={() => void handleBalanceAssign()}
                 className="mt-3 flex min-h-[44px] w-full items-center justify-center rounded-xl border border-cyan-400/45 bg-cyan-950/40 px-3 text-sm font-bold text-cyan-50 disabled:opacity-40"
               >
-                {busy ? "Assigning…" : "Balance & Assign clustered zones"}
+                {busy ? "Assigning…" : "Balance & Assign from week schedule"}
               </button>
             </section>
           ) : null}

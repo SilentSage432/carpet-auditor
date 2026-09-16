@@ -31,7 +31,6 @@ import {
   isMasterAdmin,
   isSimplifiedAssociateView,
 } from "@/lib/rbac";
-import { canAccessDepartment } from "@/lib/department-access";
 import { dedupeRoster, fetchSpecialists, isSupervisor } from "@/lib/specialists";
 import { isStoreOpsAuthFailureMessage } from "@/lib/store-ops/auth-soft";
 import {
@@ -215,8 +214,7 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
         if (person.role === "MasterAdmin") continue;
         if (
           scope !== "all" &&
-          specialistHomeDepartment(person) !== scope &&
-          !canAccessDepartment(person, scope)
+          specialistHomeDepartment(person) !== scope
         ) {
           continue;
         }

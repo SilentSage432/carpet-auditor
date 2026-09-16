@@ -1,5 +1,23 @@
 # DeptSync Hub — Development Journal
 
+## 2026-09-15 — LAB-WEEK-002 Whole-week schedule labor → Balance Assign
+
+**Authorized implementation.** Wires persisted whole-week schedule evidence into automatic Balance Assign. Does not build a new scheduling system, assignment architecture, Floor redesign, or staging-volume rule.
+
+**Week boundary:** ISO `assigned_week` / `sunday_bay_assignments.week_starting` = Monday → through following Sunday (`isoWeekCalendarRange`). Operational assignment week is Mon–Sun, not retail Sun–Sat editor week.
+
+**Labor composition:** `composeWeekLaborAvailability` / `weekLaborToPlannerMembers` in `labor-availability.ts` fold LAB-001 day semantics across the week. Known ON_DUTY hours only; OFF / call-out / unknown duration / missing row never invent 8h; Master excluded; home department only (`accessible_departments` unused).
+
+**Balance Assign:** `SundayAuditAssignmentModal` loads `fetchShiftDaysRange` + week labor; `planProportionalBayAssignments(..., { knownHoursOnly: true })`; persists via existing `applySundayAssignmentPlan` → `sunday_bay_assignments`. localStorage Sunday board remains UI/manual state, not primary automatic labor truth.
+
+**Surfacing:** `composeOnDutyBayWorkload` no longer display-fills unassigned bays onto today's on-duty set. Persisted ownership stays even when owner is off today. Floor on-duty pills: home department only (removed `canAccessDepartment` OR leak).
+
+**Call-out:** auto mode uses known peer hours only; missing day ≠ on-duty; no hardcoded `hours: 8`.
+
+**Unchanged:** Seasonal Context; Floor Pad; schema/migrations; `departments.weekly_bay_target`; no `people × 3` quota.
+
+**Tests:** 1012 → **1045** (+33 LAB-WEEK-002). REDUCE-004 1024→1012 presentation drop remains resolved (not restored). Samsung field smoke pending.
+
 ## 2026-09-15 — REDUCE-004 Everyday product surface reduction
 
 **Nav/mount/presentation disconnection.** No rotation logic, schema, migration, env, Vercel, or specialty runtime retirement beyond safe mount removal.

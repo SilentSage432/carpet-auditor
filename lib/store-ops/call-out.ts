@@ -1,6 +1,9 @@
 /**
  * Call-out bay redistribution — composes sunday-audit + location status.
  * Does not generate rotations or own the shift board.
+ *
+ * LAB-WEEK-002: auto mode uses known persisted day hours only — never default 8,
+ * never treat missing schedule row as on-duty.
  */
 
 import { fetchThisWeekRotations, patchStoreLocation } from "@/lib/store-ops/client";
@@ -11,13 +14,14 @@ import {
   isSundayAssignmentForSpecialist,
   markSundayBaysCarriedOver,
 } from "@/lib/store-ops/sunday-audit";
+import { knownShiftHours } from "@/lib/store-ops/labor-availability";
 import {
   planProportionalBayAssignments,
   type RotationBayRef,
   type ShiftRosterMember,
 } from "@/lib/store-ops/weekly-rotations";
 import type { AssociateShiftDay } from "@/lib/store-ops/shift-status";
-import type { StoreSpecialist } from "@/lib/types";
+import { specialistHomeDepartment, type StoreSpecialist } from "@/lib/types";
 import type { DepartmentScope } from "@/lib/types";
 
 export type CallOutRedistributeMode = "pool" | "auto" | "carry";
@@ -28,7 +32,7 @@ export type CallOutRedistributeResult = {
 };
 
 function hubDepartment(member: StoreSpecialist): DepartmentScope {
-  const dept = member.assigned_department;
+  const dept = specialistHomeDepartment(member);
   if (dept && dept !== "all") return dept;
   return "flooring";
 }
@@ -51,6 +55,7 @@ async function stampCarryOverLocations(
 
 /**
  * Rebalance an absent associate's open checklist bays among today's board.
+ * Only the absent person's open bays are considered — week ownership otherwise stable.
  */
 export async function redistributeCallOutBays(input: {
   actor: StoreSpecialist;
@@ -98,17 +103,32 @@ export async function redistributeCallOutBays(input: {
   }
 
   const dayById = new Map(input.days.map((d) => [d.specialist_id, d]));
-  const onDuty = input.peers.filter((peer) => {
-    if (peer.id === input.absent.id) return false;
-    if (peer.is_active === false) return false;
-    if (peer.role === "MasterAdmin") return false;
-    const home = peer.assigned_department;
-    if (home && home !== "all" && home !== department) return false;
-    const day = dayById.get(String(peer.id));
-    return day ? day.status === "ON_DUTY" : true;
-  });
+  const members: ShiftRosterMember[] = [];
 
-  if (onDuty.length === 0) {
+  for (const peer of input.peers) {
+    if (peer.id === input.absent.id) continue;
+    if (peer.is_active === false) continue;
+    if (peer.role === "MasterAdmin") continue;
+    const home = specialistHomeDepartment(peer);
+    if (home !== department) continue;
+
+    const day = dayById.get(String(peer.id));
+    // Missing schedule row ≠ on-duty. Require explicit ON_DUTY evidence.
+    if (!day || day.status !== "ON_DUTY" || day.is_call_out) continue;
+    const hours = knownShiftHours(day.start_time, day.end_time);
+    if (hours == null || hours <= 0) continue;
+
+    members.push({
+      specialist_id: String(peer.id),
+      specialist_name: peer.name,
+      active: true,
+      hours,
+      start: day.start_time ?? undefined,
+      end: day.end_time ?? undefined,
+    });
+  }
+
+  if (members.length === 0) {
     return redistributeCallOutBays({ ...input, mode: "carry" });
   }
 
@@ -120,19 +140,9 @@ export async function redistributeCallOutBays(input: {
     riskScore: 0,
   }));
 
-  const members: ShiftRosterMember[] = onDuty.map((peer) => {
-    const day = dayById.get(String(peer.id));
-    return {
-      specialist_id: String(peer.id),
-      specialist_name: peer.name,
-      active: true,
-      hours: 8,
-      start: day?.start_time ?? undefined,
-      end: day?.end_time ?? undefined,
-    };
+  const plan = planProportionalBayAssignments(bays, members, {
+    knownHoursOnly: true,
   });
-
-  const plan = planProportionalBayAssignments(bays, members);
   if (plan.items.length === 0) {
     return redistributeCallOutBays({ ...input, mode: "carry" });
   }

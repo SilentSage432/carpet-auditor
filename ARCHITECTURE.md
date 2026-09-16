@@ -144,12 +144,13 @@ lib/use-working-department.ts     → React subscription to the working-dept pin
 components/sections/CycleAuditScanForm.tsx → Flooring scan/input island (drafts + scanner; log stays in parent; `ScanActionDock`)
 components/sections/ApplianceScanForm.tsx → Appliance scan/input island (drafts + scanner; log stays in parent)
 components/admin/SundayAuditStagingCard.tsx → Glowing pending Sunday Flooring audit CTA (Sunday even if empty)
-components/admin/SundayAuditAssignmentModal.tsx → Assign specialists + shift-hour balancer; Master Recalculate
+components/admin/SundayAuditAssignmentModal.tsx → Assign specialists; Balance Assign from persisted week schedule labor (not localStorage hours as primary truth); Master Recalculate
 components/admin/SundayScheduleCard.tsx → Settings Sunday auto-stage time + auto-run toggle
-lib/store-ops/weekly-rotations.ts → Proportional clustered bay assignment plan + on-duty display grouping (`composeOnDutyBayWorkload`; does not persist)
+lib/store-ops/labor-availability.ts → LAB-001 day labor evidence + LAB-WEEK-002 `composeWeekLaborAvailability` whole-week fold
+lib/store-ops/weekly-rotations.ts → Proportional clustered bay plan (`knownHoursOnly` for schedule evidence) + on-duty grouping (`composeOnDutyBayWorkload`; persisted ownership only — no display fill)
 lib/store-ops/sunday-audit.ts → Persist specialist↔bay; apply balancer plan
 lib/store-ops/shift-status.ts → Weekly Sun–Sat schedule + on-duty / call-out (`associate_shift_days`; localStorage caches live rows)
-lib/store-ops/call-out.ts → Rebalance absent bays (pool / auto / carry-over loop; composes sunday-audit)
+lib/store-ops/call-out.ts → Rebalance absent bays (pool / auto / carry-over; auto uses known peer hours only)
 lib/store-ops/predictive-copilot.ts → Floor shift recommendations (logs + assignments + downstock; no Gemini)
 components/store-ops/PredictiveCopilotBanner.tsx → Dismissible Floor briefing under Shift Briefing
 components/store-ops/CarryOverPriorityBadge.tsx → Amber Geist Mono carry-over badge
@@ -261,11 +262,12 @@ supabase/migrations/20260812_sunday_bay_assignments.sql → sunday specialist↔
 | Location seasonal relevance (FS-003) | `operational_context_location_relevance` + Settings assign — declared bay emphasis; no SI / rotation / priority mutation |
 | Map context surface (FS-003B) | `map-location-context.ts` + Map badges / walk detail — explicit location relevance only; no inheritance / scores |
 | Sunday assignments | `lib/store-ops/sunday-audit.ts` (persist + department seed `associateMatchesSundayDepartment`) + `SundayAuditAssignmentModal` + `AssociateRosterPanel` |
+| Whole-week schedule labor (LAB-WEEK-002) | `composeWeekLaborAvailability` + `fetchShiftDaysRange` → Balance Assign (`knownHoursOnly`); ISO Mon–Sun for `assigned_week` |
 | Daily shift board | `lib/store-ops/shift-status.ts` (`associate_shift_days` week matrix; throws on live write failure) |
-| Call-out bay rebalance | `lib/store-ops/call-out.ts` (pool / auto / carry-over loop; stamps `carried_over` + Sunday `CARRIED_OVER`; does not generate rotations) |
+| Call-out bay rebalance | `lib/store-ops/call-out.ts` (pool / auto / carry-over; known hours only on auto; stamps `carried_over` + Sunday `CARRIED_OVER`; does not generate rotations) |
 | Predictive Shift Copilot | `lib/store-ops/predictive-copilot.ts` + `PredictiveCopilotBanner` (local patterns; 1-tap downstock / assign) |
 | Downstock / packdown queue | `lib/store-ops/downstock.ts` (flags) + Zebra Downstock tab on Floor (assign via sunday-audit) |
-| Shift workload balancer | `lib/store-ops/weekly-rotations.ts` (pure plan: hours, clusters, health-risk via `flagPenalty` from health.ts) |
+| Shift workload balancer | `lib/store-ops/weekly-rotations.ts` (pure plan: hours, clusters, health-risk via `flagPenalty` from health.ts; `knownHoursOnly` for schedule evidence) |
 | Bay health / floor discrepancies | `lib/store-ops/bay-health.ts` + `BayHealthScorecard` (diagnoses flags; scoring weights owned by `health.ts`) |
 | Selling vs Topstock audit mode | `lib/store-ops/audit-location-mode.ts` + `AuditLocationModeToggle` (Cycle/Department forms + Zebra filter) |
 | Rotation verification / barriers | `lib/store-ops/verification.ts` + Floor **Verify completed bays** + `ExceptionFeed` + `POST /api/rotations/exceptions` |

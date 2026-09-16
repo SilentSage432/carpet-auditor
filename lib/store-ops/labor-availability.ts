@@ -549,3 +549,236 @@ export function attachLaborAvailabilityGeneratedAt(
 ): DepartmentLaborAvailabilitySignal {
   return { ...assessment, generated_at };
 }
+
+/* ─── LAB-WEEK-002: whole-week fold over LAB-001 day evidence ─────────────── */
+
+export type WeekLaborMemberInput = LabWorkforceMemberInput & {
+  name?: string | null;
+};
+
+export type WeekLaborMemberEvidence = {
+  specialist_id: string;
+  specialist_name: string;
+  /**
+   * Sum of known ON_DUTY (non-call-out) hours across the assignment week.
+   * OFF / call-out / unknown duration / missing rows contribute 0 — never invented.
+   */
+  known_available_hours: number;
+  scheduled_day_count: number;
+  off_day_count: number;
+  callout_day_count: number;
+  unknown_duration_day_count: number;
+  missing_day_count: number;
+  /** True when known_available_hours > 0 — safe for automatic Balance Assign. */
+  has_allocatable_hours: boolean;
+};
+
+export type WeekLaborCompositionInput = {
+  department: string;
+  /** ISO week label matching weekly_rotations.assigned_week / sunday week_starting. */
+  week_label: string;
+  /** Monday–Sunday YYYY-MM-DD from isoWeekCalendarRange(week_label). */
+  dates: ReadonlyArray<string>;
+  workforce: ReadonlyArray<WeekLaborMemberInput>;
+  /** Persisted associate_shift_days across dates (any order). */
+  persisted_shift_days: ReadonlyArray<LabPersistedShiftDayInput>;
+  workforce_evidence_available: boolean;
+  schedule_evidence_available: boolean;
+  as_of: string;
+};
+
+export type WeekLaborComposition = {
+  department: string;
+  week_label: string;
+  start_date: string;
+  end_date: string;
+  dates: string[];
+  members: WeekLaborMemberEvidence[];
+  /** Subset with known_available_hours > 0. */
+  allocatable: WeekLaborMemberEvidence[];
+  processing_status: LaborEvidenceProcessingStatus;
+  reasons: LaborAvailabilityReason[];
+  method: "department-week-scheduled-labor-v1";
+  method_version: 1;
+  as_of: string;
+};
+
+/**
+ * Fold LAB-001 day semantics across the ISO assignment week (Mon–Sun).
+ * Does not invent hours for missing rows or unknown durations.
+ * accessible_departments is never consulted — home department only.
+ */
+export function composeWeekLaborAvailability(
+  input: WeekLaborCompositionInput
+): WeekLaborComposition {
+  const department = String(input.department ?? "").trim();
+  const week_label = String(input.week_label ?? "").trim();
+  const dates = [...input.dates].map((d) => String(d).trim()).filter(Boolean);
+  const start_date = dates[0] ?? "";
+  const end_date = dates[dates.length - 1] ?? "";
+  const reasons: LaborAvailabilityReason[] = [];
+
+  if (!input.workforce_evidence_available) {
+    reasons.push({ code: "WORKFORCE_UNAVAILABLE" });
+  }
+  if (!input.schedule_evidence_available) {
+    reasons.push({ code: "SCHEDULE_UNAVAILABLE" });
+  }
+
+  if (!input.workforce_evidence_available || !input.schedule_evidence_available) {
+    return {
+      department,
+      week_label,
+      start_date,
+      end_date,
+      dates,
+      members: [],
+      allocatable: [],
+      processing_status: "UNAVAILABLE",
+      reasons: sortReasons(reasons),
+      method: "department-week-scheduled-labor-v1",
+      method_version: 1,
+      as_of: input.as_of,
+    };
+  }
+
+  const workforce = [...input.workforce].sort((a, b) =>
+    String(a.id).localeCompare(String(b.id))
+  );
+  const eligible = workforce.filter((m) =>
+    isEligibleAggregateMember(m, department)
+  );
+
+  const dateSet = new Set(dates);
+  const buckets = resolvePersistedShiftDayBuckets(
+    input.persisted_shift_days.filter((r) => dateSet.has(String(r.work_date)))
+  );
+
+  const factualByKey = new Map<string, LabPersistedShiftDayInput>();
+  let hasPartial = false;
+  for (const bucket of buckets) {
+    if (bucket.kind === "conflict") {
+      reasons.push({
+        code: "CONFLICTING_SHIFT_DAY",
+        specialist_id: bucket.specialist_id,
+        work_date: bucket.work_date,
+      });
+      hasPartial = true;
+      continue;
+    }
+    factualByKey.set(
+      `${String(bucket.row.specialist_id)}|${String(bucket.row.work_date)}`,
+      bucket.row
+    );
+  }
+
+  const members: WeekLaborMemberEvidence[] = eligible.map((member) => {
+    const sid = String(member.id);
+    let known_available_hours = 0;
+    let scheduled_day_count = 0;
+    let off_day_count = 0;
+    let callout_day_count = 0;
+    let unknown_duration_day_count = 0;
+    let missing_day_count = 0;
+
+    for (const work_date of dates) {
+      const row = factualByKey.get(`${sid}|${work_date}`);
+      if (!row) {
+        missing_day_count += 1;
+        continue;
+      }
+      if (!isPersistedScheduledRow(row)) {
+        off_day_count += 1;
+        continue;
+      }
+      scheduled_day_count += 1;
+      const callOut = isPersistedCallOutRow(row);
+      if (callOut) {
+        callout_day_count += 1;
+        const hours = knownShiftHours(row.start_time, row.end_time);
+        if (hours == null) {
+          unknown_duration_day_count += 1;
+          hasPartial = true;
+          reasons.push({
+            code: "CALLOUT_DURATION_UNKNOWN",
+            specialist_id: sid,
+            work_date,
+          });
+        }
+        // Call-out: not available for new allocation that day.
+        continue;
+      }
+
+      const hours = knownShiftHours(row.start_time, row.end_time);
+      if (hours == null) {
+        unknown_duration_day_count += 1;
+        hasPartial = true;
+        reasons.push({
+          code: "MISSING_SHIFT_DURATION",
+          specialist_id: sid,
+          work_date,
+        });
+        continue;
+      }
+      if (isExpectedOnDutyRow(row)) {
+        known_available_hours += hours;
+      }
+    }
+
+    known_available_hours = Math.round(known_available_hours * 10) / 10;
+    if (unknown_duration_day_count > 0 || missing_day_count > 0) {
+      hasPartial = true;
+    }
+
+    return {
+      specialist_id: sid,
+      specialist_name: String(member.name ?? "").trim() || "Associate",
+      known_available_hours,
+      scheduled_day_count,
+      off_day_count,
+      callout_day_count,
+      unknown_duration_day_count,
+      missing_day_count,
+      has_allocatable_hours: known_available_hours > 0,
+    };
+  });
+
+  const allocatable = members.filter((m) => m.has_allocatable_hours);
+
+  return {
+    department,
+    week_label,
+    start_date,
+    end_date,
+    dates,
+    members,
+    allocatable,
+    processing_status: hasPartial ? "PARTIAL" : "OK",
+    reasons: sortReasons(reasons),
+    method: "department-week-scheduled-labor-v1",
+    method_version: 1,
+    as_of: input.as_of,
+  };
+}
+
+/**
+ * Map allocatable week-labor members into ShiftRosterMember shape for the
+ * proportional planner (known hours only — never invent default daily hours).
+ */
+export function weekLaborToPlannerMembers(
+  allocatable: ReadonlyArray<WeekLaborMemberEvidence>
+): Array<{
+  specialist_id: string;
+  specialist_name: string;
+  active: boolean;
+  hours: number;
+}> {
+  return allocatable
+    .filter((m) => m.known_available_hours > 0)
+    .map((m) => ({
+      specialist_id: m.specialist_id,
+      specialist_name: m.specialist_name,
+      active: true,
+      hours: m.known_available_hours,
+    }));
+}

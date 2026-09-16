@@ -78,6 +78,33 @@ export function isoWeekToMondayDate(weekLabel: string): string {
   return monday.toISOString().slice(0, 10);
 }
 
+/**
+ * Monday–Sunday calendar dates (YYYY-MM-DD, UTC date parts) for an ISO week label.
+ * Matches `sunday_bay_assignments.week_starting` (= Monday) through the following Sunday —
+ * the seven days that operationally support staged rotations for `assigned_week`.
+ */
+export function isoWeekCalendarRange(weekLabel: string): {
+  startDate: string;
+  endDate: string;
+  dates: string[];
+} {
+  const startDate = isoWeekToMondayDate(weekLabel);
+  const dates: string[] = [];
+  const [y, m, d] = startDate.split("-").map(Number);
+  const cursor = new Date(Date.UTC(y!, m! - 1, d!));
+  for (let i = 0; i < 7; i += 1) {
+    const day = new Date(cursor);
+    day.setUTCDate(cursor.getUTCDate() + i);
+    dates.push(day.toISOString().slice(0, 10));
+  }
+  return {
+    startDate,
+    endDate: dates[6]!,
+    dates,
+  };
+}
+
+
 /** Fisher–Yates shuffle (in place) then return first `count` items. */
 export function pickRandom<T>(items: T[], count: number): T[] {
   const pool = [...items];
