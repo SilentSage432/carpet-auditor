@@ -14,7 +14,8 @@
 |-------|-------|
 | **Product name** | **DeptSync** (PWA `short_name`) |
 | **Repository** | `carpet-auditor` |
-| **Description** | Department & SIMS Inventory Audit Suite for Lowe's stores — floor bay rotations, specialty scans, roster auth, manager floor pad |
+| **Canonical product boundary (REDUCE-002 / 002A / 003A)** | Intelligent continuous-coverage **rotation** system for merchandising aisle/bay work — not a broad store-ops platform. Spec: [`docs/product/DEPTSYNC_REDUCE_002_BOUNDARY_AND_DECOUPLING_SPEC.md`](docs/product/DEPTSYNC_REDUCE_002_BOUNDARY_AND_DECOUPLING_SPEC.md). Floor Pad / Walk & Talk: **PROTECTED — ROTATION OBSERVATIONAL CAPTURE EVALUATION PENDING** ([`DEPTSYNC_REDUCE_002A_FLOOR_PAD_PROTECTION.md`](docs/product/DEPTSYNC_REDUCE_002A_FLOOR_PAD_PROTECTION.md)). Seasonal Context: **PROTECTED — ROTATION CADENCE INPUT** ([`DEPTSYNC_REDUCE_003A_SEASONAL_CONTEXT_PROTECTION.md`](docs/product/DEPTSYNC_REDUCE_003A_SEASONAL_CONTEXT_PROTECTION.md)). |
+| **Description (legacy marketing copy in manifest)** | Department & SIMS Inventory Audit Suite for Lowe's stores — floor bay rotations, specialty scans, roster auth, manager floor pad *(specialty surfaces subject to REDUCE retirement; Floor Pad protected)* |
 | **Default post-login land** | `/dashboard` (Floor checklist) |
 | **Specialty scan hub** | `/` with `?section=audit\|appliances\|department` |
 
@@ -109,6 +110,7 @@
 | VAPID keys | Web Push (`lib/push/*`) |
 | Twilio env / `SMS_INVITE_WEBHOOK_URL` | Roster invite SMS |
 | `CRON_SECRET` | Weekly rotation cron auth (+ signing/bootstrap fallback) |
+| `APPLIANCE_SCAN_HMAC_SECRET` | APP-UPC-001A server-only HMAC for opaque appliance scan fingerprints (fail closed; never NEXT_PUBLIC / never reuse gate/cron/auth) |
 | Hub gate HMAC | `lib/auth-gate.ts` — `deptsync_hub_gate` cookie |
 
 Canonical env comments live in `.env.example`. Placeholder detection: `lib/supabase/env.ts` rejects obvious placeholder URLs/keys.
@@ -353,8 +355,8 @@ Until applied, production Hub falls back to localStorage for catalog/remnants; r
 
 | Item | Status | Location |
 |------|--------|----------|
-| Enterprise topology ingest | **Stub** — validates, does not write | `app/api/v1/topology/ingest/route.ts` |
-| Enterprise freight stage | **Stub** — validates, does not queue | `app/api/v1/freight/stage/route.ts` |
+| Enterprise topology ingest | **RETIRED (REDUCE-003)** — route deleted | was `app/api/v1/topology/ingest` |
+| Enterprise freight stage | **RETIRED (REDUCE-003)** — route deleted | was `app/api/v1/freight/stage` |
 | Automated test suite | **Missing** | No vitest/jest/playwright in `package.json` |
 | Sync queue quarantine | **Resolved (Phase 1)** | `lib/sync-queue.ts`, `components/settings/SyncQueuePanel.tsx` |
 | Generated DB types | **Missing** | No `database.types.ts` |
@@ -439,7 +441,7 @@ Public paths: `lib/auth-gate.ts` `isAuthGatePublicPath()` — login, pair, verif
 | P1-1 | **No sync queue quarantine** | `lib/sync-queue.ts`, Settings panel | **Resolved** |
 | P1-2 | **`carpet_audits` missing `updated_at`** | `20260825_carpet_audits_updated_at.sql` | **Resolved** |
 | P1-3 | **Hand-written TS types** | `lib/types.ts`, `lib/store-ops/types.ts` | No `database.types.ts`; drift risk |
-| P1-4 | **Enterprise ingest stubs** | `/api/v1/topology/ingest`, `/api/v1/freight/stage` | External systems cannot feed data |
+| P1-4 | ~~**Enterprise ingest stubs**~~ | ~~`/api/v1/*`~~ | **Closed by REDUCE-003** — stubs removed; external enterprise feed remains out of product scope |
 
 ### P2 — feature gaps
 
@@ -465,7 +467,7 @@ Public paths: `lib/auth-gate.ts` `isAuthGatePublicPath()` — login, pair, verif
 
 > Check boxes as phases complete. Link PRs/commits inline when closing items.
 
-**Appliance specialty product evolution (directional, not contractual):** [`docs/product/APPLIANCE_EVOLUTION_ROADMAP.md`](docs/product/APPLIANCE_EVOLUTION_ROADMAP.md). Dependency law: reliable controls → audit lifecycle → richer observations → recurrence → longitudinal evidence → deterministic intelligence. **APP-AUD-002A/002B** live (lifecycle + freeze). **APP-OBS-001** fulfillment disposition production migration LIVE (real-hardware validation pending). **APP-CAT-001A** multi-identifier resolution production migration LIVE (ESL / real-hardware validation pending). **APP-ROT-001** evidence-based Consider checking again composer implemented (no schema / score / cadence; not Floor rotation). **APP-CAT-001B** local promotion deferred. Later: **APP-INT-001**. Parking lot items stay out of schedule until prerequisites clear.
+**Appliance specialty product evolution (directional, not contractual):** [`docs/product/APPLIANCE_EVOLUTION_ROADMAP.md`](docs/product/APPLIANCE_EVOLUTION_ROADMAP.md). Dependency law: reliable controls → audit lifecycle → richer observations → recurrence → longitudinal evidence → deterministic intelligence. **APP-AUD-002A/002B** live (lifecycle + freeze). **APP-OBS-001** fulfillment disposition production migration LIVE (real-hardware validation pending). **APP-CAT-001A** multi-identifier resolution production migration LIVE (ESL / real-hardware validation pending). **APP-UPC-001A** opaque scan identity PRODUCTION COMPLETE (HMAC secret on Vercel; appliance pilot tables empty; Samsung field acceptance pending). **APP-ROT-001** evidence-based Consider checking again composer implemented (no schema / score / cadence; not Floor rotation). **APP-CAT-001B** local promotion deferred. Later: **APP-INT-001**. Parking lot items stay out of schedule until prerequisites clear.
 
 ### Phase 1: Critical sync hardening & quarantine handling ✅
 
@@ -533,7 +535,7 @@ Public paths: `lib/auth-gate.ts` `isAuthGatePublicPath()` — login, pair, verif
 
 ## Appendix C — API route index (48 handlers)
 
-`app/api/admin/*`, `app/api/appliances/*`, `app/api/auth/*`, `app/api/catalog/*`, `app/api/copilot/*`, `app/api/cron/*`, `app/api/departments`, `app/api/flooring/*`, `app/api/invite/*`, `app/api/push/*`, `app/api/roster/*`, `app/api/rotations/*`, `app/api/showroom-locations`, `app/api/store-health/*`, `app/api/store-locations/*`, `app/api/store-ops/*`, `app/api/stores/settings`, `app/api/v1/freight/stage`, `app/api/v1/topology/ingest`, `app/api/weekly-rotations`, `app/api/ai/*`
+`app/api/admin/*`, `app/api/appliances/*`, `app/api/auth/*`, `app/api/catalog/*`, `app/api/copilot/*`, `app/api/cron/*`, `app/api/departments`, `app/api/flooring/*`, `app/api/invite/*`, `app/api/push/*`, `app/api/roster/*`, `app/api/rotations/*`, `app/api/showroom-locations`, `app/api/store-health/*`, `app/api/store-locations/*`, `app/api/store-ops/*`, `app/api/stores/settings`, `app/api/weekly-rotations`, `app/api/ai/*` (enterprise `/api/v1/*` stubs **RETIRED** by REDUCE-003)
 
 ---
 

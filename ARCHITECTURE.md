@@ -183,10 +183,10 @@ app/sunday-audit/page.tsx             → Redirect → /dashboard + Sunday drawe
 app/sunday-rotation/page.tsx          → Redirect → /dashboard + Sunday drawer
 components/admin/AssociateRosterPanel.tsx → Sunday drawer roster (Flooring seed, job-title badges, Master override)
 lib/types.ts                          → Cabinets D29 + SPECIALTY/CORE + associateFloorTitle
-src/types/enterpriseIntegration.ts    → Enterprise ingest Zod contracts (topology / freight / floor-touch)
-lib/enterprise-integration/ingest.ts  → JSON + safeParse transport (standardized 400; no persistence)
-app/api/v1/topology/ingest/route.ts   → POST bay topology ingest stub
-app/api/v1/freight/stage/route.ts     → POST freight stage event stub
+src/types/enterpriseIntegration.ts    → RETIRED (REDUCE-003) — was enterprise ingest Zod contracts
+lib/enterprise-integration/ingest.ts  → RETIRED (REDUCE-003) — was JSON + safeParse transport
+app/api/v1/topology/ingest/route.ts   → RETIRED (REDUCE-003) — was POST bay topology ingest stub
+app/api/v1/freight/stage/route.ts     → RETIRED (REDUCE-003) — was POST freight stage event stub
 supabase/migrations/20260814_cabinets_d29.sql → Seed Cabinets per store
 supabase/migrations/20260814_bay_velocity_heatmap.sql → store_locations IRP columns + bay_service_logs
 supabase/migrations/20260814_multi_department_access.sql → profiles + store_specialists accessible_departments + JWT match
@@ -299,7 +299,7 @@ supabase/migrations/20260812_sunday_bay_assignments.sql → sunday specialist↔
 | Roster QR pairing + PIN setup | `lib/auth/invite-token.ts` + `lib/onboarding/qr-pair.ts` + `/pair?t=` + `POST /api/auth/redeem-invite`. After PIN, `lib/pwa-install.ts` prompts standalone then `/`. Roster-only insert is `POST /api/roster/members`. Issue pairing is `POST /api/roster/pair` (Master). PIN-reset SMS remains `/auth/verify/[token]`. Authenticated RLS: `20260815_roster_insert_rls.sql` (includes `auth_user_id IS NULL`). Signup claims `store_specialists.auth_user_id` (`claim-roster-auth.ts` + `20260815_roster_auth_link.sql`). `SpecialistModal` does not create members. |
 | Zero-access auth wall / idle lock | `lib/auth-session.ts`, `components/auth/AuthWall.tsx`, `components/auth/AccessGate.tsx` (`/login`) |
 | Edge auth + stealth gate | `lib/auth-gate.ts` + `proxy.ts` + `POST /api/auth/gate` (HttpOnly cookie) |
-| Enterprise ingest contracts | `src/types/enterpriseIntegration.ts` (Zod schemas). Transport: `lib/enterprise-integration/ingest.ts`. Stubs: `POST /api/v1/topology/ingest`, `POST /api/v1/freight/stage`. Does not write Store Ops tables or change hub UI. |
+| Enterprise ingest contracts | **RETIRED (REDUCE-003)** — Zod stubs + `/api/v1/topology/ingest` + `/api/v1/freight/stage` deleted; never wrote Store Ops tables |
 | Store Ops Auth (JWT → profiles) | `lib/store-ops/auth.ts`, `lib/supabase/server.ts`, `lib/supabase/browser.ts`, `link-auth-profile.ts` |
 | JWT / RLS policies | `20260812_jwt_rls_policies.sql` + `20260814_multi_department_access.sql` (`jwt_matches_department_code` ORs `app_metadata.accessible_departments`) + **`20260817_rls_security_lockdown.sql`** (drop anon/open SELECT; authenticated store isolation). Supersedes `20260816_store_locations_read.sql` open reads. |
 | Phone SMS OTP recovery + profile link | `lib/phone-auth.ts`, `lib/phone.ts`, `POST /api/auth/phone-reset/*` |

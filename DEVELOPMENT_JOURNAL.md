@@ -1,5 +1,89 @@
 # DeptSync Hub — Development Journal
 
+## 2026-09-15 — REDUCE-003A Seasonal Context protection + repository reconciliation
+
+**Docs + Git only.** No Seasonal redesign, no schedule-aware allocation, no Floor Pad redesign, no specialty deletion beyond the already-implemented REDUCE-003 stub retirement, no manual deploy.
+
+**Product-boundary correction:** Seasonal Context / seasonality intelligence is **PROTECTED — ROTATION CADENCE INPUT**. Seasonality may change how soon / how often a location deserves coverage; it must not revoke the coverage obligation owed to everything else. Seasonal UI is protected from generic specialty deletion; presentation may be reconsidered later.
+
+**Canonical:** [`docs/product/DEPTSYNC_REDUCE_003A_SEASONAL_CONTEXT_PROTECTION.md`](docs/product/DEPTSYNC_REDUCE_003A_SEASONAL_CONTEXT_PROTECTION.md) amending REDUCE-002. Floor Pad protection (002A) unchanged.
+
+**Runtime owners (unchanged):** `lib/store-ops/operational-context.ts`, Floor strip / Map location context, `OperationalContextCard`, operational-context APIs, `operational_contexts*` schema. Seam: Map/Walk sheet also host Visual Bay Scan — future Snap removal must not strip seasonal detail.
+
+**Git reconciliation (preferred chronological truth):**
+1. APP-UPC-001A historical/security snapshot (privacy/opaque identity production already ran — not a renewed Appliances product commitment)
+2. REDUCE-002 / 002A / 003A product-boundary lock (living docs included; mixed reduction narrative not fake-split)
+3. REDUCE-003 enterprise stub file deletions
+
+**`tmp/`** (incl. production backups) remains untracked. Secret values never staged.
+
+**Do not start the next reduction tranche.**
+
+## 2026-09-15 — REDUCE-003 Retire isolated enterprise ingest stubs
+
+**First authorized product-reduction deletion.** Arts. I–II / XX: remove capability that does not serve the continuous-coverage rotation thesis; no replacement architecture.
+
+**Removed:**
+- `app/api/v1/topology/ingest/route.ts` (stub returned `processed_bays: 1` without writing topology)
+- `app/api/v1/freight/stage/route.ts` (stub returned `queued_items` without Store Ops queue)
+- `lib/enterprise-integration/ingest.ts`
+- `src/types/enterpriseIntegration.ts`
+- Empty `app/api/v1/**`, `lib/enterprise-integration/`, `src/` trees
+
+**Safety:** Repo-wide search found no CORE/UI/Floor Pad/APP-UPC/sync-queue/cron/SW importers — only historical docs. No schema/migrations/env/secrets/Vercel. APP-UPC workspace and protected Walk & Talk / Floor Pad untouched.
+
+**Docs:** `DEPT_SYNC_STATE`, `MASTER_ROADMAP`, `CHAT_HANDOFF`, this journal, REDUCE-002 disposition/sequence, `ARCHITECTURE.md` ownership lines.
+
+**Committed as part of REDUCE-003A repository reconciliation.** Do not auto-start next reduction tranche.
+
+## 2026-09-15 — REDUCE-002A Walk & Talk / Floor Pad protection (docs only)
+
+**Docs-only product-boundary amendment.** No runtime, schema, migration, Vercel, env, navigation, Floor Pad behavior, Gemini behavior, or APP-UPC-001A workspace changes.
+
+**Problem corrected:** REDUCE-002 had classified Walk & Talk / Executive Floor Pad for eventual specialty retirement. That disposition risked accidental deletion during early reduction before evaluating a coherent rotation-adjacent role.
+
+**New law for reduction:** Walk & Talk / Executive Floor Pad / `TacticalVoiceFloorPad` / Floor Pad intent seams are **PROTECTED — ROTATION OBSERVATIONAL CAPTURE EVALUATION PENDING**. Capability idea: DS speech while walking → AI interprets into **proposed** structured evidence → DS confirm/edit/ignore → confirmed evidence may feed deterministic rotation (Art. VII.3 / X). Not a task system; implementation not auto-kept.
+
+**Canonical files added:**
+- `docs/product/DEPTSYNC_REDUCE_002_BOUNDARY_AND_DECOUPLING_SPEC.md` (session REDUCE-002 locked into repo, already reflecting 002A)
+- `docs/product/DEPTSYNC_REDUCE_002A_FLOOR_PAD_PROTECTION.md`
+
+**Living docs updated:** `DEPT_SYNC_STATE.md`, `MASTER_ROADMAP.md`, `CHAT_HANDOFF.md`, this journal.
+
+**Gate recorded:** **FLOORPAD-001** — required before Floor Pad retirement or redesign; **not started**.
+
+**Reduction sequence:** specialty retirement must exclude protected Floor Pad surfaces and Gemini transport required by them until FLOORPAD-001. Enterprise stubs removed by **REDUCE-003** (captured in Git via 003A reconciliation).
+
+## 2026-09-11 — APP-UPC-001A Opaque Appliance Scan Identity (Option C)
+
+**Production DB (2026-09-11):** Migration `20260911_appliance_opaque_scan_identity.sql` applied to `fmeinlwhixngednabhgy` via Management API password rotate + psql. Appliance pilot data intentionally reset (catalog 9→0, identifiers 9→0, scans 50→0, sessions 7→0, recon 16→0). Controls unchanged (roster 33, departments 12, locations 584). Pre-migration dump under `tmp/production-backups/`. Flooring `carpet_catalog.upc_barcode` preserved.
+
+**Production unblock (2026-09-11):** After restored `vercel login`, dedicated `APPLIANCE_SCAN_HMAC_SECRET` provisioned on Vercel project `deptsync-hub` (targets production+preview, type sensitive; value never committed/logged). Current APP-UPC-001A workspace deployed with `vercel deploy --prod` → aliased `https://deptsync-hub.vercel.app` (deployment READY). Post-deploy: `/` and `/appliances` load; resolve/teach return auth 401 without session (not secret-missing 503). Reconfirmed appliance tables still 0; controls still 33/12/584. Samsung field acceptance pending.
+
+**Laws enacted in code:**
+
+**Laws enacted in code:**
+
+> Physical appliance scan identifiers — including UPC, ESL, and taught barcode aliases — are transient matching inputs, not durable readable business data.
+
+> Offline capture remains available even when catalog identity cannot be resolved immediately.
+
+> Server-owned keyed fingerprinting protects durable scan identity.
+
+> Temporary readable identifiers may exist only in the bounded unresolved offline queue and are removed after successful resolution.
+
+**Architecture (refined Option C):** Physical scan → canonical normalize → online server HMAC-SHA-256 fingerprint → catalog match / teach → public item identity → observation by `item_number`. Offline: capture into device-local `appliance_unresolved_scans_v1` (7-day TTL); reconnect resolves without re-scan; unknowns teach once for all pending units of that identifier. Immediate offline known-barcode recognition was intentionally traded away.
+
+**Canonical normalization:** `canonicalApplianceScanIdentifier` — trim control/whitespace only; preserve leading zeros and non-digits (field evidence from APP-CAT-001A). Digits-only `sanitizeBarcodeScan` is no longer used for appliance physical identity.
+
+**Secret:** `APPLIANCE_SCAN_HMAC_SECRET` (server-only, fail-closed, no fallback to gate/cron/auth). Documented in `.env.example`.
+
+**Schema migration authored:** `supabase/migrations/20260911_appliance_opaque_scan_identity.sql` — drops durable plaintext `upc` / `identifier`; adds `scan_fingerprint` unique per store.
+
+**Validation:** 1024 tests / 68 files; tsc clean; production build clean; lint 113 (93e/20w) vs prior baseline 114 (95e/19w).
+
+**Status:** `APP-UPC-001A — PRODUCTION COMPLETE / SAMSUNG FIELD ACCEPTANCE PENDING`
+
 ## 2026-09-08 — ROSTER-EDIT-001: three fields shipped, one field refused
 
 ROSTER-LIFE-001 ended by saying an Edit Member feature needed an authority
