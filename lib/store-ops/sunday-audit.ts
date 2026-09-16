@@ -9,7 +9,7 @@ import { departmentCodeQueryValues } from "@/lib/store-ops/department-codes";
 import { subscribePostgresChanges } from "@/lib/store-ops/realtime";
 import { createTtlCache } from "@/lib/store-ops/ttl-cache";
 import {
-  formatLocationLabel,
+  formatBayTag,
   type Department,
   type WeeklyRotationWithLocation,
 } from "@/lib/store-ops/types";
@@ -600,7 +600,7 @@ export function buildSundayStagedBays(
     .map((rotation) => {
       const loc = rotation.store_locations;
       const label = loc
-        ? formatLocationLabel(loc)
+        ? formatBayTag(loc)
         : `Location ${rotation.location_id.slice(0, 8)}`;
       return {
         rotation,

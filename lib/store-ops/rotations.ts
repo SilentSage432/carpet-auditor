@@ -7,14 +7,18 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { normalizeStoreNumber, storeNumberQueryValues } from "@/lib/store";
 import type { Department, StoreLocation, WeeklyRotation } from "./types";
 import { resolveVerificationStatus } from "./types";
-import { verifyPendingRotation } from "./rotation-review";
+import {
+  loadPhysicalBaySurfaces,
+  markPhysicalBayCompleted,
+  verifyPendingRotation,
+} from "./rotation-review";
 import {
   openPendingCompletionAttempt,
   recordAutoVerifiedCompletionAttempt,
   recoverAutoVerifiedAttemptFromParent,
 } from "./completion-attempt-history";
 import { listActiveStores } from "./stores";
-import { pickSundayCarryOverFirst, pickSundayVelocityPrioritized } from "./rotation";
+import { physicalBayKey, selectPhysicalBayCoverage } from "./physical-bay";
 import {
   isoWeekLabel,
   parseIsoWeekLabel,
@@ -476,11 +480,28 @@ export async function reclaimStaleAssignments(
 
   if (openError) throw new Error(openError.message);
 
-  const keep = new Set((openThisWeek ?? []).map((r) => r.location_id as string));
+  const keepIds = [...new Set((openThisWeek ?? []).map((r) => r.location_id as string))];
+  const keepKeys = new Set<string>();
+  if (keepIds.length > 0) {
+    const { data: keepLocs, error: keepError } = await supabase
+      .from("store_locations")
+      .select("id, department_id, aisle, bay")
+      .in("id", keepIds);
+    if (keepError) throw new Error(keepError.message);
+    for (const loc of keepLocs ?? []) {
+      keepKeys.add(
+        physicalBayKey({
+          department_id: String(loc.department_id),
+          aisle: String(loc.aisle),
+          bay: Number(loc.bay) || 0,
+        })
+      );
+    }
+  }
 
   const { data: assigned, error: assignedError } = await supabase
     .from("store_locations")
-    .select("id")
+    .select("id, department_id, aisle, bay")
     .eq("department_id", departmentId)
     .eq("is_active", true)
     .eq("status", "ASSIGNED");
@@ -488,8 +509,15 @@ export async function reclaimStaleAssignments(
   if (assignedError) throw new Error(assignedError.message);
 
   const staleIds = (assigned ?? [])
-    .map((r) => r.id as string)
-    .filter((id) => !keep.has(id));
+    .filter((row) => {
+      const key = physicalBayKey({
+        department_id: String(row.department_id),
+        aisle: String(row.aisle),
+        bay: Number(row.bay) || 0,
+      });
+      return !keepKeys.has(key);
+    })
+    .map((r) => r.id as string);
 
   if (staleIds.length === 0) return 0;
 
@@ -973,34 +1001,19 @@ async function finishGenerate(
   carried: StoreLocation[],
   upsertOptions: UpsertWeeklyRotationsOptions = {}
 ): Promise<GenerateRotationsResult> {
-  const pool: StoreLocation[] = [];
-
-  const carriedPick = pickSundayCarryOverFirst(
+  const selected = selectPhysicalBayCoverage(
+    pending.filter(isStandardAisleLocation),
     carried.filter(isStandardAisleLocation),
     drawCount
   );
-  pool.push(...carriedPick);
 
-  const remaining = drawCount - pool.length;
-  if (remaining > 0) {
-    const pendingAvailable = pending.filter(isStandardAisleLocation);
-    pool.push(
-      ...pickSundayVelocityPrioritized(
-        pendingAvailable,
-        remaining,
-        pool.map((s) => s.id)
-      )
-    );
-  }
-
-  if (pool.length === 0) {
+  if (selected.length === 0) {
     throw new Error(
       "No PENDING or CARRIED_OVER locations available for this department. Map bays in Store Map first, or finish ASSIGNED work."
     );
   }
 
-  const selected = pool;
-  const ids = selected.map((loc) => loc.id);
+  const ids = [...new Set(selected.flatMap((row) => row.assignIds))];
   const now = new Date().toISOString();
 
   const { error: assignError } = await supabase
@@ -1011,15 +1024,18 @@ async function finishGenerate(
   if (assignError) throw new Error(assignError.message);
   await clearCarryOverFlags(supabase, ids);
 
-  const rows = selected.map((loc) => ({
-    ...storeScope,
-    store_id: loc.store_id || storeScope.store_id,
-    store_number: locationStoreNumber(loc) || storeScope.store_number,
-    department_id: departmentId,
-    location_id: loc.id,
-    assigned_week: weekLabel,
-    is_completed: false,
-  }));
+  const rows = selected.map((row) => {
+    const loc = row.representative;
+    return {
+      ...storeScope,
+      store_id: loc.store_id || storeScope.store_id,
+      store_number: locationStoreNumber(loc) || storeScope.store_number,
+      department_id: departmentId,
+      location_id: loc.id,
+      assigned_week: weekLabel,
+      is_completed: false,
+    };
+  });
 
   const rotations = await upsertWeeklyRotations(supabase, rows, upsertOptions);
 
@@ -1103,9 +1119,22 @@ export async function assignLocationsToCurrentWeek(
     );
   }
 
-  const now = new Date().toISOString();
-
+  const expandedById = new Map<string, StoreLocation>();
   for (const loc of locations) {
+    const siblings = await loadPhysicalBaySurfaces(supabase, loc);
+    for (const sibling of siblings.length > 0 ? siblings : [loc]) {
+      expandedById.set(sibling.id, sibling);
+    }
+  }
+  const expanded = [...expandedById.values()];
+  const grouped = selectPhysicalBayCoverage(expanded, [], Math.max(expanded.length, 1));
+  if (grouped.length === 0) {
+    throw new Error("No eligible physical bays to assign");
+  }
+  const now = new Date().toISOString();
+  const assignIds = [...new Set(grouped.flatMap((row) => row.assignIds))];
+
+  for (const loc of expanded.filter((row) => assignIds.includes(row.id))) {
     const nextCount = Math.max(0, Number(loc.manual_priority_count) || 0) + 1;
     const { error: bumpError } = await supabase
       .from("store_locations")
@@ -1117,24 +1146,27 @@ export async function assignLocationsToCurrentWeek(
       .eq("id", loc.id);
     if (bumpError) throw new Error(bumpError.message);
   }
-  await clearCarryOverFlags(supabase, ids);
+  await clearCarryOverFlags(supabase, assignIds);
 
-  const rows = locations.map((loc) => ({
-    ...storeScope,
-    store_id: loc.store_id || storeScope.store_id,
-    store_number: locationStoreNumber(loc) || storeScope.store_number,
-    department_id: departmentId,
-    location_id: loc.id,
-    assigned_week: weekLabel,
-    is_completed: false,
-  }));
+  const rows = grouped.map((row) => {
+    const loc = row.representative;
+    return {
+      ...storeScope,
+      store_id: loc.store_id || storeScope.store_id,
+      store_number: locationStoreNumber(loc) || storeScope.store_number,
+      department_id: departmentId,
+      location_id: loc.id,
+      assigned_week: weekLabel,
+      is_completed: false,
+    };
+  });
 
   const rotations = await upsertWeeklyRotations(supabase, rows);
 
   const { data: refreshed, error: refreshError } = await supabase
     .from("store_locations")
     .select("*")
-    .in("id", ids);
+    .in("id", assignIds);
 
   if (refreshError) throw new Error(refreshError.message);
 
@@ -1476,38 +1508,15 @@ export async function completeWeeklyRotation(
     actorId: options.actorId ?? null,
   });
 
-  let { data: location, error: locError } = await supabase
-    .from("store_locations")
-    .update({
-      status: "COMPLETED",
-      last_completed_at: now,
-      carried_over: false,
-      updated_at: now,
-    })
-    .eq("id", rotation.location_id)
-    .select("*")
-    .single();
-
-  if (locError && isMissingColumnError(locError, "carried_over")) {
-    const retry = await supabase
-      .from("store_locations")
-      .update({
-        status: "COMPLETED",
-        last_completed_at: now,
-        updated_at: now,
-      })
-      .eq("id", rotation.location_id)
-      .select("*")
-      .single();
-    location = retry.data;
-    locError = retry.error;
-  }
-
-  if (locError) throw new Error(locError.message);
+  const location = await markPhysicalBayCompleted(
+    supabase,
+    String(rotation.location_id),
+    now
+  );
 
   return {
     rotation: updatedRotation,
-    location: location as StoreLocation,
+    location,
   };
 }
 

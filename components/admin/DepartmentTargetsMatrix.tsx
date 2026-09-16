@@ -189,8 +189,8 @@ export function DepartmentTargetsMatrix({ specialist }: Props) {
         </h2>
         <p className="mt-1 text-sm text-zinc-400">
           {master
-            ? "Weekly bay quotas for weekly auto-stage. Toggle pauses a department. Changes save on blur or Save All."
-            : "How many bays Sunday should assign for your department (default 10)."}
+            ? "Weekly physical-bay quotas for weekly auto-stage. Toggle pauses a department. Changes save on blur or Save All."
+            : "How many physical bays Sunday should stage for your department (default 10)."}
         </p>
       </div>
 

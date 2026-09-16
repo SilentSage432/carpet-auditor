@@ -546,7 +546,7 @@ export function SundayAuditAssignmentModal({
               {bays.length === 0
                 ? "Prepare this week's coverage first. Assignment comes after the bays are selected."
                 : pending > 0
-                  ? "These bays are selected but not yet owned. Review the proposed distribution, then confirm."
+                  ? "These bays are selected but not yet owned. Review the proposed distribution, then confirm. One assignment covers the full physical bay, including its selling and topstock work."
                   : "Weekly ownership is set. Recalculate only if you need a new bay set."}
             </p>
           </div>

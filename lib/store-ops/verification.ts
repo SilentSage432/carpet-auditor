@@ -18,9 +18,11 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import type {
   ExceptionReason,
   RotationException,
+  StoreLocation,
   WeeklyRotationWithLocation,
 } from "./types";
 import { isRotationVerifiedComplete } from "./rotation-metrics";
+import { loadPhysicalBaySurfaces } from "./rotation-review";
 import { isoWeekLabel } from "./week";
 
 export const EXCEPTION_REASONS: ExceptionReason[] = [
@@ -122,6 +124,22 @@ async function insertRotationBarriers(
     // One statement, so the partial-failure window is a single write rather
     // than one per bay. `carried_over` is the next-draw prepend flag and
     // `last_carried_over_at` is the badge window — both already in production.
+    // Sibling surfaces of the same physical bay stay one owed obligation.
+    const coverageIds = new Set(reportable.map((item) => item.locationId));
+    for (const item of reportable) {
+      const { data: origin, error: originError } = await supabase
+        .from("store_locations")
+        .select("*")
+        .eq("id", item.locationId)
+        .maybeSingle();
+      if (originError) throw new Error(originError.message);
+      if (!origin) continue;
+      const siblings = await loadPhysicalBaySurfaces(
+        supabase,
+        origin as StoreLocation
+      );
+      for (const sibling of siblings) coverageIds.add(sibling.id);
+    }
     const { error: locError } = await supabase
       .from("store_locations")
       .update({
@@ -130,10 +148,7 @@ async function insertRotationBarriers(
         last_carried_over_at: now,
         updated_at: now,
       })
-      .in(
-        "id",
-        reportable.map((item) => item.locationId)
-      );
+      .in("id", [...coverageIds]);
     if (locError) throw new Error(locError.message);
   }
 

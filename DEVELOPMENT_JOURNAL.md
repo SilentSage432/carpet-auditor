@@ -1,5 +1,21 @@
 # DeptSync Hub — Development Journal
 
+## 2026-09-16 — BAY-UNIT-002 Physical bay coverage grouping
+
+**Authorized implementation.** BAY-UNIT-001 proved SELLING and TOPSTOCK were separate topology rows counted as two rotation obligations. One physical aisle/bay is now one staging, allocation, and verification unit.
+
+**Physical Bay Coverage Law:** `department_id + aisle + bay` is the coverage key (`lib/store-ops/physical-bay.ts`). Topology rows stay. No parent table, no migration, no historical rewrite.
+
+**Generation:** `selectPhysicalBayCoverage` groups surfaces before `weekly_bay_target` is applied. One `weekly_rotations` row per physical bay; representative is the owed SELLING surface when present. Sibling urgency (velocity / priority / carry-over) composes onto that candidate.
+
+**Verification:** DS verify / live auto-verify fans out `COMPLETED` + `last_completed_at` to both active sibling surfaces. Associate report and offline replay still do not close coverage (THESIS-001A intact).
+
+**Unchanged:** LAB-WEEK-002 labor composition; STAGE-ASSIGN-CUE interaction; Map DualTypePill; Seasonal Context; Floor Pad; Gemini; no people×3; no Lowe's task states.
+
+**Deferred:** TIME-DUTY-001 (schedule-derived current availability) — archaeology only, not started.
+
+**Tests:** 1051 → **1076** (+25 BAY-UNIT-002). Samsung field acceptance pending.
+
 ## 2026-09-16 — STAGE-ASSIGN-CUE-001 Make weekly assignment the clear post-Stage action
 
 **Authorized implementation.** Fixes the LAB-WEEK-002F field workflow gap: Stage selected bays with no obvious next step to ownership. Does not rewrite LAB-WEEK-002, staging volume, schema, DS generate-auth, or W38 production rows.

@@ -5,7 +5,9 @@
 import { decayDrawMultiplier } from "./velocity";
 import type { VelocityTier } from "./types";
 
-/** Safe draw size from departments.weekly_bay_target (null/0/invalid → 10). */
+/** Safe draw size from departments.weekly_bay_target (null/0/invalid → 10).
+ *  One unit is one distinct physical aisle/bay, not a SELLING/TOPSTOCK row.
+ */
 export function resolveWeeklyBayTarget(raw: unknown): number {
   const n = Number(raw);
   if (!Number.isFinite(n) || n <= 0) return 10;

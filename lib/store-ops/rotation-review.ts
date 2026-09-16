@@ -9,6 +9,7 @@ import {
   verifyCompletionAttempt,
 } from "./completion-attempt-history";
 import { isMissingColumnError } from "./errors";
+import { isPhysicalBaySurface } from "./physical-bay";
 import type { StoreLocation, WeeklyRotation } from "./types";
 
 export type ReviewRotationResult = {
@@ -54,6 +55,34 @@ async function updateRotationRow(
   return data as WeeklyRotation;
 }
 
+/**
+ * Active standard-merch surfaces that share department + aisle + bay.
+ * SHOWROOM / inactive rows are not coverage siblings.
+ */
+export async function loadPhysicalBaySurfaces(
+  supabase: SupabaseClient,
+  location: Pick<
+    StoreLocation,
+    "id" | "department_id" | "aisle" | "bay"
+  >
+): Promise<StoreLocation[]> {
+  const { data, error } = await supabase
+    .from("store_locations")
+    .select("*")
+    .eq("department_id", location.department_id)
+    .eq("aisle", location.aisle)
+    .eq("bay", location.bay)
+    .eq("is_active", true);
+
+  if (error) throw new Error(error.message);
+  const rows = ((data ?? []) as StoreLocation[]).filter(isPhysicalBaySurface);
+  if (rows.length === 0) {
+    const self = await readLocation(supabase, String(location.id));
+    return self ? [self] : [];
+  }
+  return rows;
+}
+
 async function markLocationCompleted(
   supabase: SupabaseClient,
   locationId: string,
@@ -90,6 +119,26 @@ async function markLocationCompleted(
   return location as StoreLocation;
 }
 
+/** Authoritative physical-bay close — both SELLING and TOPSTOCK advance together. */
+export async function markPhysicalBayCompleted(
+  supabase: SupabaseClient,
+  locationId: string,
+  now: string
+): Promise<StoreLocation> {
+  const origin = await readLocation(supabase, locationId);
+  if (!origin) {
+    return markLocationCompleted(supabase, locationId, now);
+  }
+  const siblings = await loadPhysicalBaySurfaces(supabase, origin);
+  const ids = [...new Set(siblings.map((row) => row.id).concat(locationId))];
+  let representative: StoreLocation | null = null;
+  for (const id of ids) {
+    const closed = await markLocationCompleted(supabase, id, now);
+    if (id === locationId) representative = closed;
+  }
+  return representative ?? (await markLocationCompleted(supabase, locationId, now));
+}
+
 async function restoreLocationAssigned(
   supabase: SupabaseClient,
   locationId: string,
@@ -106,6 +155,23 @@ async function restoreLocationAssigned(
     .single();
   if (error) throw new Error(error.message);
   return data as StoreLocation;
+}
+
+async function restorePhysicalBayAssigned(
+  supabase: SupabaseClient,
+  locationId: string,
+  now: string
+): Promise<StoreLocation | null> {
+  const origin = await readLocation(supabase, locationId);
+  if (!origin) return restoreLocationAssigned(supabase, locationId, now);
+  const siblings = await loadPhysicalBaySurfaces(supabase, origin);
+  const ids = [...new Set(siblings.map((row) => row.id).concat(locationId))];
+  let representative: StoreLocation | null = null;
+  for (const id of ids) {
+    const restored = await restoreLocationAssigned(supabase, id, now);
+    if (id === locationId) representative = restored;
+  }
+  return representative;
 }
 
 /**
@@ -192,7 +258,7 @@ export async function verifyPendingRotation(
     reviewedAt: now,
     reviewedBy: actorId ?? null,
   });
-  const location = await markLocationCompleted(
+  const location = await markPhysicalBayCompleted(
     supabase,
     String(rotation.location_id),
     now
@@ -264,7 +330,7 @@ export async function sendBackWeeklyRotation(
     reviewedBy: actorId ?? null,
     reviewNote: trimmed,
   });
-  const location = await restoreLocationAssigned(
+  const location = await restorePhysicalBayAssigned(
     supabase,
     String(rotation.location_id),
     now
