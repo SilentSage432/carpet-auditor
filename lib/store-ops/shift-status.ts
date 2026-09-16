@@ -10,6 +10,10 @@ import { getSupabase } from "@/lib/supabase";
 import { liveWriteError } from "@/lib/store-ops/errors";
 import { isoWeekLabel } from "@/lib/store-ops/week";
 import {
+  DEFAULT_STORE_TIMEZONE,
+  normalizeStoreTimezone,
+} from "@/lib/store-ops/sunday-schedule";
+import {
   hoursBetween,
   mergeShiftRoster,
   readShiftRoster,
@@ -181,6 +185,28 @@ export function formatCompactShiftRange(
   return `${a}–${b}`;
 }
 
+/** Known clocks only — never invents 07:00–15:30. */
+export function formatKnownShiftClockRange(
+  start: string | null | undefined,
+  end: string | null | undefined
+): string | null {
+  const a = normalizeClock(start);
+  const b = normalizeClock(end);
+  if (!a || !b) return null;
+  return `${a} – ${b}`;
+}
+
+/** Compact known clocks only: "7a–3:30p", or null. */
+export function formatKnownCompactShiftRange(
+  start: string | null | undefined,
+  end: string | null | undefined
+): string | null {
+  const a = formatCompactClock(start);
+  const b = formatCompactClock(end);
+  if (!a || !b) return null;
+  return `${a}–${b}`;
+}
+
 export function normalizeClock(raw: string | null | undefined): string | null {
   const m = /^(\d{1,2}):(\d{2})(?::\d{2})?/.exec(String(raw ?? "").trim());
   if (!m) return null;
@@ -330,6 +356,31 @@ export function composeShiftBoard(
 
 export function isOnDutyToday(day: AssociateShiftDay | undefined): boolean {
   return Boolean(day && day.status === "ON_DUTY" && !day.is_call_out);
+}
+
+/**
+ * Persisted stores.timezone for current-availability derivation.
+ * Fallback: normalizeStoreTimezone → America/Denver. Does not invent duty.
+ */
+export async function fetchStoreTimezone(
+  store = getStoreNumber()
+): Promise<string> {
+  if (!store) return DEFAULT_STORE_TIMEZONE;
+  try {
+    const supabase = requireClient();
+    const { data, error } = await supabase
+      .from("stores")
+      .select("timezone")
+      .in("store_number", storeKeys(store))
+      .limit(1)
+      .maybeSingle();
+    if (error || !data) return DEFAULT_STORE_TIMEZONE;
+    return normalizeStoreTimezone(
+      (data as { timezone?: string | null }).timezone
+    );
+  } catch {
+    return DEFAULT_STORE_TIMEZONE;
+  }
 }
 
 export async function fetchShiftDays(

@@ -2,15 +2,17 @@
 
 /**
  * Compact roster row — presentation only.
- * Duty persist stays in associate_shift_days; grants stay on store_specialists.
+ * Derived availability is schedule + store-local time.
+ * The switch remains the call-out exception action, not On now.
  */
 
 import { SlidersHorizontal } from "lucide-react";
 import {
-  formatShiftClockRange,
+  formatKnownShiftClockRange,
   isScheduledShiftDay,
   type AssociateShiftDay,
 } from "@/lib/store-ops/shift-status";
+import type { CurrentAvailability } from "@/lib/store-ops/current-availability";
 import {
   appAccessLabel,
   appAccessStatus,
@@ -58,28 +60,37 @@ export function AppAccessBadge({ member }: { member: StoreSpecialist }) {
   );
 }
 
-function todayShiftLabel(day: AssociateShiftDay | null | undefined): string {
-  if (day?.is_call_out) return "Call-out";
-  if (!isScheduledShiftDay(day)) return "Off";
-  return formatShiftClockRange(day?.start_time, day?.end_time);
+function availabilityCaption(
+  availability: CurrentAvailability,
+  day: AssociateShiftDay | null | undefined
+): string {
+  const clocks =
+    isScheduledShiftDay(day) && availability.reason !== "CALLED_OUT"
+      ? formatKnownShiftClockRange(day?.start_time, day?.end_time)
+      : null;
+  if (clocks) return `${availability.label} · ${clocks}`;
+  return availability.label;
 }
 
 export function SpecialistCard({
   member,
   day,
+  availability,
   busy,
   canShift,
   canManageCard,
-  onDuty,
+  callOutArmed,
   onToggleDuty,
   onManage,
 }: {
   member: StoreSpecialist;
   day: AssociateShiftDay | null | undefined;
+  availability: CurrentAvailability;
   busy: boolean;
   canShift: boolean;
   canManageCard: boolean;
-  onDuty: boolean;
+  /** Persisted ON_DUTY (not called out / not OFF). Exception switch only. */
+  callOutArmed: boolean;
   onToggleDuty: () => void;
   onManage: () => void;
 }) {
@@ -101,7 +112,7 @@ export function SpecialistCard({
             <FloorTitleBadge member={member} />
           </span>
           <span className="mt-0.5 block font-mono text-[11px] font-semibold tracking-tight text-zinc-400">
-            {todayShiftLabel(day)}
+            {availabilityCaption(availability, day)}
           </span>
         </span>
       </button>
@@ -110,20 +121,24 @@ export function SpecialistCard({
         <button
           type="button"
           role="switch"
-          aria-checked={onDuty}
-          aria-label={`${member.name} on duty`}
+          aria-checked={callOutArmed}
+          aria-label={
+            callOutArmed
+              ? `Call-out exception for ${member.name}`
+              : `Clear call-out exception for ${member.name}`
+          }
           disabled={busy}
           onClick={(event) => {
             event.stopPropagation();
             onToggleDuty();
           }}
           className={`relative h-7 w-12 shrink-0 rounded-full transition ${
-            onDuty ? "bg-emerald-500" : "bg-zinc-600"
+            callOutArmed ? "bg-emerald-500" : "bg-zinc-600"
           } disabled:opacity-40`}
         >
           <span
             className={`absolute top-0.5 h-6 w-6 rounded-full bg-white transition ${
-              onDuty ? "left-[1.35rem]" : "left-0.5"
+              callOutArmed ? "left-[1.35rem]" : "left-0.5"
             }`}
           />
         </button>

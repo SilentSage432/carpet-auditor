@@ -75,8 +75,8 @@ lib/push/*                        → Web Push subscribe + VAPID dispatch for ro
 app/admin/store-map/page.tsx      → Map keep-alive tab (visual navigator; CRUD in Settings)
 app/admin/supervisors/page.tsx    → Redirect → /roster
 app/admin/roles/page.tsx          → Redirect → /roster
-components/hub/tabs/FloorTab.tsx → Floor rotation viewport (Floor Rotation vs dept name; on-duty strip + bay queue)
-components/store-ops/OnDutyAssociateStrip.tsx → Department-scoped on-duty pills; storewide summary sheet when >6
+components/hub/tabs/FloorTab.tsx → Floor rotation viewport (Floor Rotation vs dept name; schedule-derived On now strip + bay queue)
+components/store-ops/OnDutyAssociateStrip.tsx → Department-scoped On now pills; storewide summary sheet when >6
 components/store-ops/FlagDownstockSheet.tsx → Aisle/bay search + Needs Top-stock Drop (composes flagForDownstock)
 components/store-ops/ShiftAnalyticsDrawer.tsx → Collapsed Floor accordion for velocity / health / Walk & Talk
 components/store-ops/ZebraChecklist.tsx → Floor bay checklist (optimistic complete, Quick Touch, downstock, Sunday handoff, on-duty grouping; routes APPLIANCE_SIMS_AUDIT to ApplianceSimsChecklist)
@@ -149,7 +149,9 @@ components/admin/SundayScheduleCard.tsx → Settings Sunday auto-stage time + au
 lib/store-ops/labor-availability.ts → LAB-001 day labor evidence + LAB-WEEK-002 `composeWeekLaborAvailability` whole-week fold
 lib/store-ops/weekly-rotations.ts → Proportional clustered bay plan (`knownHoursOnly` for schedule evidence) + on-duty grouping (`composeOnDutyBayWorkload`; persisted ownership only — no display fill)
 lib/store-ops/sunday-audit.ts → Persist specialist↔bay; apply balancer plan
-lib/store-ops/shift-status.ts → Weekly Sun–Sat schedule + on-duty / call-out (`associate_shift_days`; localStorage caches live rows)
+lib/store-ops/shift-status.ts → Weekly Sun–Sat schedule + call-out persistence (`associate_shift_days`; localStorage caches live rows). Day-level `isOnDutyToday` remains for protected Floor Pad / copilot.
+lib/store-ops/current-availability.ts → TIME-DUTY-002 schedule-derived current expected availability (On now / Later today / Off / Called out). Persist evidence; derive from store-local time. Not punch/attendance.
+lib/store-ops/use-store-clock.ts → Minute + visibility/focus tick for derived availability. No schedule fetch or write.
 lib/store-ops/call-out.ts → Rebalance absent bays (pool / auto / carry-over; auto uses known peer hours only)
 lib/store-ops/predictive-copilot.ts → Floor shift recommendations (logs + assignments + downstock; no Gemini)
 components/store-ops/PredictiveCopilotBanner.tsx → Dismissible Floor briefing under Shift Briefing
@@ -265,6 +267,7 @@ supabase/migrations/20260812_sunday_bay_assignments.sql → sunday specialist↔
 | Sunday assignments | `lib/store-ops/sunday-audit.ts` (persist + department seed `associateMatchesSundayDepartment`) + `SundayAuditAssignmentModal` + `AssociateRosterPanel` |
 | Whole-week schedule labor (LAB-WEEK-002) | `composeWeekLaborAvailability` + `fetchShiftDaysRange` → Balance Assign (`knownHoursOnly`); ISO Mon–Sun for `assigned_week` |
 | Daily shift board | `lib/store-ops/shift-status.ts` (`associate_shift_days` week matrix; throws on live write failure) |
+| Current expected availability (TIME-DUTY-002) | `composeCurrentAvailability` + `stores.timezone` + store-local now. Floor/Roster On now = in persisted window (start inclusive, end exclusive). Clock passage does not write ownership. Missing/invalid clocks ≠ On now. |
 | Call-out bay rebalance | `lib/store-ops/call-out.ts` (pool / auto / carry-over; known hours only on auto; stamps `carried_over` + Sunday `CARRIED_OVER`; does not generate rotations) |
 | Predictive Shift Copilot | `lib/store-ops/predictive-copilot.ts` + `PredictiveCopilotBanner` (local patterns; 1-tap downstock / assign) |
 | Downstock / packdown queue | `lib/store-ops/downstock.ts` (flags) + Zebra Downstock tab on Floor (assign via sunday-audit) |
@@ -275,7 +278,7 @@ supabase/migrations/20260812_sunday_bay_assignments.sql → sunday specialist↔
 | Manager notes / Executive Floor Pad | `lib/store-ops/ai-note-extract.ts`, `manager-notes.ts`, `app/actions/manager-notes.ts`, `components/manager-notes/*` (opened from Floor `TacticalVoiceFloorPad`; `ai-note-summary` retired 410) |
 | Floor-walk Copilot / shift dispatch | `lib/store-ops/ai-walk-parse.ts` + `POST /api/copilot/parse-walk` + `lib/store-ops/shift-tasks.ts` (`TacticalVoiceFloorPad`) |
 | Bay freshness overlay | `lib/heatmap/bay-tracker.ts` + `BayFreshnessGrid` (composes last_serviced_at / last_completed_at / walk touches; not velocity or bay-health) |
-| Team roster (Master Admin) | `RosterTab` + `SpecialistCard` + `SpecialistEditSheet` + `AddTeamMemberSheet` → `POST /api/roster/members` → `store_specialists`; accordion read via `fetchSpecialists`; grouping via `roster-groups.ts` (home dept, Specialist and CSA together); weekly matrix via `shift-status.ts` (`canManageShiftBoard`). Job options / `floor_title` owned by `lib/types.ts`. |
+| Team roster (Master Admin) | `RosterTab` + `SpecialistCard` + `SpecialistEditSheet` + `AddTeamMemberSheet` → `POST /api/roster/members` → `store_specialists`; accordion read via `fetchSpecialists`; grouping via `roster-groups.ts` (home dept, Specialist and CSA together); weekly matrix via `shift-status.ts` (`canManageShiftBoard`). Derived availability caption is separate from the call-out exception switch. Job options / `floor_title` owned by `lib/types.ts`. |
 | Cross-department grants | `lib/department-access.ts` + `POST /api/admin/department-access` + Roster `SpecialistEditSheet` chips |
 | Working department pin | `lib/admin-department-context.ts` (Master full-store; multi-dept clamped to grants) |
 | Personal theme / density / contrast / sound / haptics | `lib/theme.ts` + `lib/ui/preferences-context.tsx` + `UserPreferencesDrawer` (all roles) |

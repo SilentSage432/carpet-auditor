@@ -8,7 +8,7 @@
 
 import { useEffect, useState } from "react";
 import { CheckCircle2, Clock, UserCheck, Users, X } from "lucide-react";
-import { formatCompactShiftRange } from "@/lib/store-ops/shift-status";
+import { formatKnownCompactShiftRange } from "@/lib/store-ops/shift-status";
 import type { OnDutyWorkloadGroup } from "@/lib/store-ops/weekly-rotations";
 import { useFocusedWorkspace } from "@/lib/ui/focused-workspace";
 
@@ -69,14 +69,14 @@ export function OnDutyAssociateStrip({
       {!hideStrip ? (
         <section className="mb-3" aria-label="On-duty associates">
           <p className="mb-1.5 font-mono text-[10px] font-semibold uppercase tracking-[0.14em] text-zinc-500">
-            On duty today
+            On now
           </p>
           {loading && groups.length === 0 ? (
-            <p className="text-sm text-zinc-400">Loading today&apos;s specialists…</p>
+            <p className="text-sm text-zinc-400">Loading scheduled associates…</p>
           ) : groups.length === 0 ? (
             <p className="flex min-h-11 items-center gap-2 rounded-xl border border-dashed border-zinc-700 px-3 text-sm text-zinc-400">
               <Clock className="h-4 w-4 shrink-0" strokeWidth={ICON_STROKE} aria-hidden />
-              No associates on duty for this department today
+              No associates on now for this department
             </p>
           ) : compact ? (
             <button
@@ -85,7 +85,7 @@ export function OnDutyAssociateStrip({
               className="flex min-h-11 w-full items-center justify-center rounded-xl border border-cyan-500/40 bg-cyan-950/25 px-3 text-sm font-bold text-cyan-100"
             >
               <Users className="w-4 h-4 mr-2" strokeWidth={ICON_STROKE} aria-hidden />
-              {groups.length} Associates On Duty
+              {groups.length} On Now
             </button>
           ) : (
             <div className="flex gap-1.5 overflow-x-auto pb-0.5 no-scrollbar">
@@ -138,7 +138,7 @@ export function OnDutyAssociateStrip({
                   id="on-duty-sheet-title"
                   className="mt-1 text-lg font-bold text-white"
                 >
-                  {groups.length} Associates On Duty
+                  {groups.length} On Now
                 </h2>
               </div>
               <button
@@ -176,7 +176,7 @@ export function OnDutyAssociateStrip({
               </li>
               {groups.map((group) => {
                 const selected = selectedId === group.specialist_id;
-                const hours = formatCompactShiftRange(group.start, group.end);
+                const hours = formatKnownCompactShiftRange(group.start, group.end);
                 const count = group.rotationIds.length;
                 return (
                   <li key={group.specialist_id}>
@@ -192,7 +192,8 @@ export function OnDutyAssociateStrip({
                       <span>
                         {group.specialist_name}
                         <span className="mt-0.5 block font-mono text-[11px] font-medium text-zinc-500">
-                          {hours} · {count} {count === 1 ? "Bay" : "Bays"}
+                          {hours ? `${hours} · ` : ""}
+                          {count} {count === 1 ? "Bay" : "Bays"}
                         </span>
                       </span>
                       {selected ? (
@@ -224,7 +225,7 @@ function AssociatePill({
   onSelect: () => void;
 }) {
   const count = group.rotationIds.length;
-  const hours = formatCompactShiftRange(group.start, group.end);
+  const hours = formatKnownCompactShiftRange(group.start, group.end);
   return (
     <button
       type="button"
@@ -242,7 +243,8 @@ function AssociatePill({
         strokeWidth={ICON_STROKE}
         aria-hidden
       />
-      {givenName(group.specialist_name)} ({hours}) · {count}{" "}
+      {givenName(group.specialist_name)}
+      {hours ? ` (${hours})` : ""} · {count}{" "}
       {count === 1 ? "Bay" : "Bays"}
     </button>
   );

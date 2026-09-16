@@ -1,5 +1,27 @@
 # DeptSync Hub — Development Journal
 
+## 2026-09-16 — TIME-DUTY-002 Schedule-derived current availability
+
+**Authorized implementation.** TIME-DUTY-001 proved persisted `associate_shift_days` plus `stores.timezone` already hold the evidence. Mounted Floor/Roster treated `ON_DUTY` as "on now," including after the clock window and when missing rows invented 07:00–15:30.
+
+**Schedule-Derived Availability Law:** current expected availability = persisted schedule + store-local time + explicit call-out/off. Normal shift start/end does not require a database toggle.
+
+**Ownership Persistence Law:** a normal shift ending changes current availability, not weekly bay ownership.
+
+**Derivation:** `lib/store-ops/current-availability.ts` (`composeCurrentAvailability`). States: SCHEDULED_NOW / LATER_TODAY / OFF. Reasons: IN_WINDOW / BEFORE_SHIFT / AFTER_SHIFT / OFF_TODAY / CALLED_OUT / UNKNOWN. Labels: On now / Later today / Off / Called out. Start inclusive, end exclusive. Call-out overrides the window. Missing/invalid clocks never become On now. Same-day overnight wrap (22:00→06:00) is On now from start through midnight; post-midnight uses yesterday's persisted wrap row when Floor/Roster already load that range. Not Lowe's punch/attendance.
+
+**Clock:** `useStoreClockTick` (minute boundary + visibility/focus). Timezone from `stores.timezone` via `fetchStoreTimezone`; fallback `normalizeStoreTimezone` → `America/Denver`. Client instant interpreted in store zone. No per-minute network. `SHIFT_STATUS_EVENT` still reloads evidence.
+
+**Roster:** derived caption is separate from the call-out exception switch. Switch persistence (pool/auto/carry) unchanged.
+
+**Floor:** On now strip is SCHEDULED_NOW only. Later today is a lightweight count on the work rail. Owned bays remain via `composeOnDutyBayWorkload` assignee map / Other assignments.
+
+**Unchanged:** LAB-WEEK-002 allocation (off today still allocatable later in ISO week); BAY-UNIT-002 physical bay; call-out redistribution; Floor Pad `isOnDutyToday` (protected); Seasonal Context; Gemini; no schema; no `is_on_shift`.
+
+**Deferred:** TIME-DUTY-003 — call-out default preserve-ownership, next scheduled opportunity, week-boundary unresolved work.
+
+**Tests:** 1076 → **1103** (+27 TIME-DUTY-002). Samsung field acceptance pending. Do not start TIME-DUTY-003.
+
 ## 2026-09-16 — BAY-UNIT-002 Physical bay coverage grouping
 
 **Authorized implementation.** BAY-UNIT-001 proved SELLING and TOPSTOCK were separate topology rows counted as two rotation obligations. One physical aisle/bay is now one staging, allocation, and verification unit.

@@ -65,16 +65,24 @@ import {
   type SundayAssignmentMap,
 } from "@/lib/store-ops/sunday-audit";
 import {
-  composeShiftBoard,
-  fetchShiftDays,
-  isOnDutyToday,
-  localWorkDate,
+  fetchShiftDaysRange,
+  fetchStoreTimezone,
   SHIFT_STATUS_EVENT,
+  shiftRowKey,
+  type AssociateShiftDay,
 } from "@/lib/store-ops/shift-status";
 import {
+  composeCurrentAvailability,
+  isLaterToday,
+  isScheduledNow,
+  previousStoreLocalWorkDate,
+  storeLocalWorkDate,
+} from "@/lib/store-ops/current-availability";
+import { useStoreClockTick } from "@/lib/store-ops/use-store-clock";
+import { DEFAULT_STORE_TIMEZONE } from "@/lib/store-ops/sunday-schedule";
+import { knownShiftHours } from "@/lib/store-ops/labor-availability";
+import {
   composeOnDutyBayWorkload,
-  DEFAULT_SHIFT_HOURS,
-  hoursBetween,
   type OnDutyWorkloadMember,
 } from "@/lib/store-ops/weekly-rotations";
 import { getStoreNumber } from "@/lib/store";
@@ -95,6 +103,7 @@ import {
   specialistHomeDepartment,
   type ApplianceCatalogItem,
   type ApplianceScan,
+  type StoreSpecialist,
 } from "@/lib/types";
 import {
   isApplianceSimsWorkflow,
@@ -146,8 +155,13 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
   const [loading, setLoading] = useState(true);
   const [healthKey, setHealthKey] = useState(0);
   const [rollupOpen, setRollupOpen] = useState(false);
-  const [onDuty, setOnDuty] = useState<OnDutyWorkloadMember[]>([]);
+  const [shiftTeam, setShiftTeam] = useState<StoreSpecialist[]>([]);
+  const [shiftDays, setShiftDays] = useState<Record<string, AssociateShiftDay>>(
+    {}
+  );
+  const [storeTimezone, setStoreTimezone] = useState(DEFAULT_STORE_TIMEZONE);
   const [onDutyLoading, setOnDutyLoading] = useState(true);
+  const clockNow = useStoreClockTick();
   const [assignments, setAssignments] = useState<SundayAssignmentMap>({});
   const [pickedAssociateId, setPickedAssociateId] = useState<
     string | "all" | null
@@ -198,44 +212,99 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
   const focusAssociateId =
     pickedAssociateId ?? (simplified ? String(specialist.id) : "all");
 
+  const storeToday = storeLocalWorkDate(clockNow, storeTimezone);
+  const storeYesterday = previousStoreLocalWorkDate(clockNow, storeTimezone);
+
   const loadOnDuty = useCallback(async () => {
     setOnDutyLoading(true);
     try {
-      const date = localWorkDate();
-      const team = dedupeRoster(await fetchSpecialists());
-      const days = await fetchShiftDays(date, storeNumber || getStoreNumber());
-      const board = composeShiftBoard(team, days, date);
-      const scope = working;
-      const next: OnDutyWorkloadMember[] = [];
-      for (const day of board) {
-        if (!isOnDutyToday(day)) continue;
-        const person = team.find((row) => String(row.id) === day.specialist_id);
-        if (!person || person.is_active === false) continue;
-        if (person.role === "MasterAdmin") continue;
-        if (
-          scope !== "all" &&
-          specialistHomeDepartment(person) !== scope
-        ) {
-          continue;
-        }
-        next.push({
-          specialist_id: String(person.id),
-          specialist_name: person.name,
-          hours:
-            hoursBetween(day.start_time ?? undefined, day.end_time ?? undefined) ??
-            DEFAULT_SHIFT_HOURS,
-          start: day.start_time,
-          end: day.end_time,
-        });
-      }
-      setOnDuty(next);
+      const store = storeNumber || getStoreNumber();
+      const [tz, team, days] = await Promise.all([
+        fetchStoreTimezone(store),
+        fetchSpecialists().then(dedupeRoster),
+        fetchShiftDaysRange(storeYesterday, storeToday, store),
+      ]);
+      setStoreTimezone(tz);
+      setShiftTeam(team);
+      setShiftDays(days);
     } catch (err) {
       console.error("[FloorTab] on-duty specialists failed", err);
-      setOnDuty([]);
+      setShiftTeam([]);
+      setShiftDays({});
     } finally {
       setOnDutyLoading(false);
     }
-  }, [specialist, storeNumber, working]);
+  }, [storeNumber, storeToday, storeYesterday]);
+
+  const onDuty = useMemo(() => {
+    const scope = working;
+    const next: OnDutyWorkloadMember[] = [];
+    for (const person of shiftTeam) {
+      if (person.is_active === false) continue;
+      if (person.role === "MasterAdmin") continue;
+      if (scope !== "all" && specialistHomeDepartment(person) !== scope) {
+        continue;
+      }
+      const todayRow = shiftDays[shiftRowKey(String(person.id), storeToday)];
+      const yesterdayRow =
+        shiftDays[shiftRowKey(String(person.id), storeYesterday)];
+      const availability = composeCurrentAvailability({
+        row: todayRow,
+        previousDay: yesterdayRow,
+        now: clockNow,
+        timeZone: storeTimezone,
+      });
+      if (!isScheduledNow(availability)) continue;
+      const hours = knownShiftHours(
+        todayRow?.start_time ?? yesterdayRow?.start_time,
+        todayRow?.end_time ?? yesterdayRow?.end_time
+      );
+      next.push({
+        specialist_id: String(person.id),
+        specialist_name: person.name,
+        hours: hours ?? 0,
+        start: todayRow?.start_time ?? yesterdayRow?.start_time,
+        end: todayRow?.end_time ?? yesterdayRow?.end_time,
+      });
+    }
+    return next;
+  }, [
+    shiftTeam,
+    shiftDays,
+    working,
+    clockNow,
+    storeTimezone,
+    storeToday,
+    storeYesterday,
+  ]);
+
+  const laterTodayCount = useMemo(() => {
+    const scope = working;
+    let count = 0;
+    for (const person of shiftTeam) {
+      if (person.is_active === false) continue;
+      if (person.role === "MasterAdmin") continue;
+      if (scope !== "all" && specialistHomeDepartment(person) !== scope) {
+        continue;
+      }
+      const availability = composeCurrentAvailability({
+        row: shiftDays[shiftRowKey(String(person.id), storeToday)],
+        previousDay: shiftDays[shiftRowKey(String(person.id), storeYesterday)],
+        now: clockNow,
+        timeZone: storeTimezone,
+      });
+      if (isLaterToday(availability)) count += 1;
+    }
+    return count;
+  }, [
+    shiftTeam,
+    shiftDays,
+    working,
+    clockNow,
+    storeTimezone,
+    storeToday,
+    storeYesterday,
+  ]);
 
   const loadAssignments = useCallback(
     async (assignedWeek: string) => {
@@ -675,9 +744,14 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
                 aria-hidden
               />
               {onDutyLoading
-                ? "On duty…"
-                : `On duty · ${workload.groups.length}`}
+                ? "On now…"
+                : `On now · ${workload.groups.length}`}
             </button>
+            {laterTodayCount > 0 ? (
+              <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.12em] text-zinc-500">
+                {laterTodayCount} later today
+              </span>
+            ) : null}
           </div>
 
           <div className="border-b border-zinc-800/80 px-3 py-2">

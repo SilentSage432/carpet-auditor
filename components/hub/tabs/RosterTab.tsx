@@ -7,7 +7,7 @@
  *   POST /api/roster/members → createRosterMember → store_specialists (roster-only).
  * Device pairing: SpecialistEditSheet → POST /api/roster/pair (10-minute QR).
  * Accordions: fetchSpecialists(storeNumber) SELECTs store_specialists, then
- *   composeRosterDepartmentGroups. On-duty counts come from associate_shift_days.
+ *   composeRosterDepartmentGroups. On-now counts come from derived availability.
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -18,6 +18,14 @@ import { SpecialistCard } from "@/components/hub/SpecialistCard";
 import { SpecialistEditSheet } from "@/components/hub/SpecialistEditSheet";
 import { TextField } from "@/components/ui/NumberField";
 import { redistributeCallOutBays } from "@/lib/store-ops/call-out";
+import {
+  composeCurrentAvailability,
+  isScheduledNow,
+  previousStoreLocalWorkDate,
+  storeLocalWorkDate,
+} from "@/lib/store-ops/current-availability";
+import { useStoreClockTick } from "@/lib/store-ops/use-store-clock";
+import { DEFAULT_STORE_TIMEZONE } from "@/lib/store-ops/sunday-schedule";
 import { composeRosterDepartmentGroups } from "@/lib/store-ops/roster-groups";
 import {
   canAccessDepartment,
@@ -45,6 +53,7 @@ import {
   DEFAULT_SHIFT_END,
   DEFAULT_SHIFT_START,
   fetchShiftDaysRange,
+  fetchStoreTimezone,
   localWorkDate,
   retailWeekDates,
   retailWeekStart,
@@ -125,7 +134,11 @@ export function RosterTab({ specialist, storeNumber }: WorkflowTabProps) {
   const [callOutTarget, setCallOutTarget] = useState<StoreSpecialist | null>(
     null
   );
+  const [storeTimezone, setStoreTimezone] = useState(DEFAULT_STORE_TIMEZONE);
+  const clockNow = useStoreClockTick();
   const today = localWorkDate();
+  const storeToday = storeLocalWorkDate(clockNow, storeTimezone);
+  const storeYesterday = previousStoreLocalWorkDate(clockNow, storeTimezone);
   const weekStart = retailWeekStart(today);
   const weekDates = useMemo(() => retailWeekDates(weekStart), [weekStart]);
   const canManage = canManageTeamRoster(specialist);
@@ -138,11 +151,16 @@ export function RosterTab({ specialist, storeNumber }: WorkflowTabProps) {
 
   const reload = useCallback(async () => {
     const weekEnd = weekDates[6] ?? today;
+    const rangeStart =
+      storeYesterday < weekStart ? storeYesterday : weekStart;
+    const rangeEnd = storeToday > weekEnd ? storeToday : weekEnd;
     try {
-      const [team, saved] = await Promise.all([
+      const [tz, team, saved] = await Promise.all([
+        fetchStoreTimezone(storeNumber),
         fetchSpecialists(storeNumber),
-        fetchShiftDaysRange(weekStart, weekEnd),
+        fetchShiftDaysRange(rangeStart, rangeEnd, storeNumber),
       ]);
+      setStoreTimezone(tz);
       const nextRoster = dedupeRoster(team);
       setRoster(nextRoster);
       setWeekRows(saved);
@@ -154,7 +172,7 @@ export function RosterTab({ specialist, storeNumber }: WorkflowTabProps) {
         err instanceof Error ? err.message : "Could not load live roster"
       );
     }
-  }, [today, weekDates, weekStart, storeNumber]);
+  }, [today, weekDates, weekStart, storeNumber, storeToday, storeYesterday]);
 
   useEffect(() => {
     let cancelled = false;
@@ -164,7 +182,10 @@ export function RosterTab({ specialist, storeNumber }: WorkflowTabProps) {
     });
     function onShift() {
       const weekEnd = weekDates[6] ?? today;
-      void fetchShiftDaysRange(weekStart, weekEnd)
+      const rangeStart =
+        storeYesterday < weekStart ? storeYesterday : weekStart;
+      const rangeEnd = storeToday > weekEnd ? storeToday : weekEnd;
+      void fetchShiftDaysRange(rangeStart, rangeEnd, storeNumber)
         .then(setWeekRows)
         .catch((err) => {
           toastError(
@@ -177,21 +198,22 @@ export function RosterTab({ specialist, storeNumber }: WorkflowTabProps) {
       cancelled = true;
       window.removeEventListener(SHIFT_STATUS_EVENT, onShift);
     };
-  }, [reload, storeNumber, today, weekDates, weekStart]);
+  }, [reload, storeNumber, today, weekDates, weekStart, storeToday, storeYesterday]);
 
   const days = useMemo(
-    () => sliceShiftDaysForDate(weekRows, today),
-    [weekRows, today]
+    () => sliceShiftDaysForDate(weekRows, storeToday),
+    [weekRows, storeToday]
   );
 
   const board = useMemo(
-    () => composeShiftBoard(roster, days, today),
-    [roster, days, today]
+    () => composeShiftBoard(roster, days, storeToday),
+    [roster, days, storeToday]
   );
-  const dayById = useMemo(
-    () => new Map(board.map((row) => [row.specialist_id, row])),
-    [board]
-  );
+  const boardById = useMemo(() => {
+    const map: Record<string, AssociateShiftDay> = {};
+    for (const row of board) map[row.specialist_id] = row;
+    return map;
+  }, [board]);
 
   const groups = useMemo(() => {
     const visible = roster.filter((m) => {
@@ -201,10 +223,15 @@ export function RosterTab({ specialist, storeNumber }: WorkflowTabProps) {
       return home !== "all" && canAccessDepartment(specialist, home);
     });
     return composeRosterDepartmentGroups(visible, (m) => {
-      const day = dayById.get(String(m.id));
-      return day?.status === "ON_DUTY";
+      const availability = composeCurrentAvailability({
+        row: weekRows[shiftRowKey(String(m.id), storeToday)],
+        previousDay: weekRows[shiftRowKey(String(m.id), storeYesterday)],
+        now: clockNow,
+        timeZone: storeTimezone,
+      });
+      return isScheduledNow(availability);
     });
-  }, [roster, dayById, specialist]);
+  }, [roster, weekRows, specialist, clockNow, storeTimezone, storeToday, storeYesterday]);
 
   const displayGroups = useMemo(() => {
     if (working === "all") return groups;
@@ -306,31 +333,36 @@ export function RosterTab({ specialist, storeNumber }: WorkflowTabProps) {
   async function markCallOut(absent: StoreSpecialist, nextCallOut: boolean) {
     if (!nextCallOut) {
       const previous = weekRows;
+      const existing = days[String(absent.id)];
       const optimistic: AssociateShiftDay = {
         specialist_id: String(absent.id),
-        work_date: today,
-        start_time: dayById.get(String(absent.id))?.start_time ?? DEFAULT_SHIFT_START,
-        end_time: dayById.get(String(absent.id))?.end_time ?? DEFAULT_SHIFT_END,
+        work_date: storeToday,
+        start_time: existing?.start_time ?? DEFAULT_SHIFT_START,
+        end_time: existing?.end_time ?? DEFAULT_SHIFT_END,
         is_scheduled_today: true,
         is_call_out: false,
         status: "ON_DUTY",
       };
       setWeekRows((curr) => ({
         ...curr,
-        [shiftRowKey(optimistic.specialist_id, today)]: optimistic,
+        [shiftRowKey(optimistic.specialist_id, storeToday)]: optimistic,
       }));
       setBusyId(absent.id);
       try {
-        const next = await upsertShiftDay({
-          specialist_id: String(absent.id),
-          is_call_out: false,
-          is_scheduled_today: true,
-        });
+        const next = await upsertShiftDay(
+          {
+            specialist_id: String(absent.id),
+            is_call_out: false,
+            is_scheduled_today: true,
+          },
+          storeToday,
+          storeNumber
+        );
         setWeekRows((curr) => ({
           ...curr,
           [shiftRowKey(next.specialist_id, next.work_date)]: next,
         }));
-        toastSuccess(`${absent.name} is on-duty`);
+        toastSuccess(`${absent.name} is scheduled today`);
       } catch (err) {
         setWeekRows(previous);
         toastError(
@@ -351,11 +383,15 @@ export function RosterTab({ specialist, storeNumber }: WorkflowTabProps) {
     const absent = callOutTarget;
     setBusyId(absent.id);
     try {
-      const next = await upsertShiftDay({
-        specialist_id: String(absent.id),
-        is_call_out: true,
-        is_scheduled_today: true,
-      });
+      const next = await upsertShiftDay(
+        {
+          specialist_id: String(absent.id),
+          is_call_out: true,
+          is_scheduled_today: true,
+        },
+        storeToday,
+        storeNumber
+      );
       setWeekRows((curr) => ({
         ...curr,
         [shiftRowKey(next.specialist_id, next.work_date)]: next,
@@ -367,7 +403,7 @@ export function RosterTab({ specialist, storeNumber }: WorkflowTabProps) {
         days: composeShiftBoard(
           roster,
           { ...days, [next.specialist_id]: next },
-          today
+          storeToday
         ),
         mode,
       });
@@ -400,7 +436,7 @@ export function RosterTab({ specialist, storeNumber }: WorkflowTabProps) {
             Team roster
           </p>
           <p className="mt-1 text-sm text-zinc-400">
-            Grouped by home department · today {today}
+            Grouped by home department · {storeToday}
           </p>
         </div>
         {canManage ? (
@@ -457,7 +493,7 @@ export function RosterTab({ specialist, storeNumber }: WorkflowTabProps) {
                         {group.heading}
                       </span>
                       <span className="font-mono text-[11px] tracking-tight text-zinc-500">
-                        {group.members.length} roster · {group.onDuty} on-duty
+                        {group.members.length} roster · {group.onDuty} on now
                       </span>
                     </span>
                   </span>
@@ -478,21 +514,30 @@ export function RosterTab({ specialist, storeNumber }: WorkflowTabProps) {
                 {open ? (
                   <ul className="space-y-2 border-t border-zinc-800/80 px-2 py-2">
                     {group.members.map((member) => {
-                      const day = dayById.get(String(member.id));
-                      const onDuty = day?.status === "ON_DUTY";
+                      const persistedDay = days[String(member.id)];
+                      const exceptionDay = boardById[String(member.id)];
+                      const scheduledToday = exceptionDay?.status === "ON_DUTY";
+                      const availability = composeCurrentAvailability({
+                        row: persistedDay,
+                        previousDay:
+                          weekRows[shiftRowKey(String(member.id), storeYesterday)],
+                        now: clockNow,
+                        timeZone: storeTimezone,
+                      });
                       const canManageCard =
                         canShift || canGrant || canManage;
                       return (
                         <SpecialistCard
                           key={member.id}
                           member={member}
-                          day={day}
+                          day={persistedDay}
+                          availability={availability}
                           busy={busyId === member.id}
                           canShift={canShift}
                           canManageCard={canManageCard}
-                          onDuty={onDuty}
+                          callOutArmed={Boolean(scheduledToday)}
                           onToggleDuty={() =>
-                            void markCallOut(member, onDuty)
+                            void markCallOut(member, scheduledToday)
                           }
                           onManage={() => setManageTarget(member)}
                         />

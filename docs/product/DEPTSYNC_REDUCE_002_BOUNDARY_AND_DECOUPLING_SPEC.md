@@ -39,7 +39,7 @@ Store · department · topology · eligibility · roster · schedules/labor · c
 
 1. **Coverage selection** — which bays this week (`rotations.ts` / cron / Force Draw)  
 2. **Weekly workforce allocation** — who owns them (`sunday_bay_assignments` + future week-labor Balance Assign)  
-3. **Shift-aware surfacing** — what to emphasize today (stable ownership; do not Monday-dump)
+3. **Shift-aware surfacing** — current expected availability is derived from persisted `associate_shift_days` + store-local time (TIME-DUTY-002: On now / Later today / Off / Called out). Weekly ownership stays; not Lowe's punch/attendance. Do not Monday-dump.
 
 Schedule-aware allocation remains a **future CORE** correction (LAB-001 fold), not a specialty issue.
 
