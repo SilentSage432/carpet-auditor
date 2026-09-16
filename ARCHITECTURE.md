@@ -144,7 +144,7 @@ lib/use-working-department.ts     → React subscription to the working-dept pin
 components/sections/CycleAuditScanForm.tsx → Flooring scan/input island (drafts + scanner; log stays in parent; `ScanActionDock`)
 components/sections/ApplianceScanForm.tsx → Appliance scan/input island (drafts + scanner; log stays in parent)
 components/admin/SundayAuditStagingCard.tsx → Glowing pending Sunday Flooring audit CTA (Sunday even if empty)
-components/admin/SundayAuditAssignmentModal.tsx → Assign specialists; Balance Assign from persisted week schedule labor (not localStorage hours as primary truth); Master Recalculate
+components/admin/SundayAuditAssignmentModal.tsx → After Stage, schedule-informed preview + **Assign this week** (`handleBalanceAssign` / LAB-WEEK-002); Auto-Assign All to Me demoted; Master Recalculate; localStorage Sunday board is not automatic labor truth
 components/admin/SundayScheduleCard.tsx → Settings Sunday auto-stage time + auto-run toggle
 lib/store-ops/labor-availability.ts → LAB-001 day labor evidence + LAB-WEEK-002 `composeWeekLaborAvailability` whole-week fold
 lib/store-ops/weekly-rotations.ts → Proportional clustered bay plan (`knownHoursOnly` for schedule evidence) + on-duty grouping (`composeOnDutyBayWorkload`; persisted ownership only — no display fill)

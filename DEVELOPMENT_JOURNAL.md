@@ -1,5 +1,19 @@
 # DeptSync Hub — Development Journal
 
+## 2026-09-16 — STAGE-ASSIGN-CUE-001 Make weekly assignment the clear post-Stage action
+
+**Authorized implementation.** Fixes the LAB-WEEK-002F field workflow gap: Stage selected bays with no obvious next step to ownership. Does not rewrite LAB-WEEK-002, staging volume, schema, DS generate-auth, or W38 production rows.
+
+**Stage remains selection-only.** `handleGenerateFlooring` still only calls `generateRotations` + reload. It does not call `handleBalanceAssign` / `applySundayAssignmentPlan`.
+
+**Post-Stage cue:** When staged bays exist and ownership is pending, `SundayAuditAssignmentModal` shows `balancerPlan.loads` (person → N bays from persisted week schedules) immediately after the staged summary, then **Assign this week** (primary). Insufficient schedule evidence stays fail-closed (no invented 8h; no ready-to-confirm allocation). Floor empty copy no longer claims Stage assigns bays.
+
+**Hierarchy:** Auto-Assign All to Me retained as a secondary exception. Sunday hour chips remain below and now state they do not set automatic distribution.
+
+**Unchanged:** Seasonal Context; Floor Pad; planner; `sunday_bay_assignments` writer; `requireSuperAdmin` on generate; no migration.
+
+**Tests:** 1045 → **1051** (+6 STAGE-ASSIGN-CUE-001). Build and typecheck pass. Samsung field acceptance pending.
+
 ## 2026-09-15 — LAB-WEEK-002 Whole-week schedule labor → Balance Assign
 
 **Authorized implementation.** Wires persisted whole-week schedule evidence into automatic Balance Assign. Does not build a new scheduling system, assignment architecture, Floor redesign, or staging-volume rule.

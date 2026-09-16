@@ -743,7 +743,7 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
                   {simplified
                     ? "No bays on your rotation yet — see your supervisor."
                     : supervisor
-                      ? "Stage this week to build the floor plan and assign bays."
+                      ? "Prepare this week's coverage to select the bays."
                       : "Ask your supervisor to stage this week's bays."}
                 </p>
                 {supervisor && !simplified ? (

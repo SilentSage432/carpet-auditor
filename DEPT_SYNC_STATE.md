@@ -14,7 +14,7 @@
 |-------|-------|
 | **Product name** | **DeptSync** (PWA `short_name`) |
 | **Repository** | `carpet-auditor` |
-| **Canonical product boundary (REDUCE-002 / 002A / 003A / 004 + LAB-WEEK-002)** | Intelligent continuous-coverage **rotation** system for merchandising aisle/bay work — not a broad store-ops platform. Spec: [`docs/product/DEPTSYNC_REDUCE_002_BOUNDARY_AND_DECOUPLING_SPEC.md`](docs/product/DEPTSYNC_REDUCE_002_BOUNDARY_AND_DECOUPLING_SPEC.md). Floor Pad / Walk & Talk: **PROTECTED — ROTATION OBSERVATIONAL CAPTURE EVALUATION PENDING** ([`DEPTSYNC_REDUCE_002A_FLOOR_PAD_PROTECTION.md`](docs/product/DEPTSYNC_REDUCE_002A_FLOOR_PAD_PROTECTION.md)). Seasonal Context: **PROTECTED — ROTATION CADENCE INPUT** ([`DEPTSYNC_REDUCE_003A_SEASONAL_CONTEXT_PROTECTION.md`](docs/product/DEPTSYNC_REDUCE_003A_SEASONAL_CONTEXT_PROTECTION.md)). **REDUCE-004:** everyday specialty launchers disconnected; specialty runtime dormant underneath. **LAB-WEEK-002:** Balance Assign allocates from persisted whole-week `associate_shift_days` known hours (ISO Mon–Sun); `sunday_bay_assignments` remains weekly ownership; localStorage Sunday hours are not primary automatic labor truth. |
+| **Canonical product boundary (REDUCE-002 / 002A / 003A / 004 + LAB-WEEK-002 + STAGE-ASSIGN-CUE-001)** | Intelligent continuous-coverage **rotation** system for merchandising aisle/bay work — not a broad store-ops platform. Spec: [`docs/product/DEPTSYNC_REDUCE_002_BOUNDARY_AND_DECOUPLING_SPEC.md`](docs/product/DEPTSYNC_REDUCE_002_BOUNDARY_AND_DECOUPLING_SPEC.md). Floor Pad / Walk & Talk: **PROTECTED — ROTATION OBSERVATIONAL CAPTURE EVALUATION PENDING** ([`DEPTSYNC_REDUCE_002A_FLOOR_PAD_PROTECTION.md`](docs/product/DEPTSYNC_REDUCE_002A_FLOOR_PAD_PROTECTION.md)). Seasonal Context: **PROTECTED — ROTATION CADENCE INPUT** ([`DEPTSYNC_REDUCE_003A_SEASONAL_CONTEXT_PROTECTION.md`](docs/product/DEPTSYNC_REDUCE_003A_SEASONAL_CONTEXT_PROTECTION.md)). **REDUCE-004:** everyday specialty launchers disconnected; specialty runtime dormant underneath. **LAB-WEEK-002:** automatic week allocation uses persisted whole-week `associate_shift_days` known hours (ISO Mon–Sun); `sunday_bay_assignments` remains weekly ownership; localStorage Sunday hours are not primary automatic labor truth. **STAGE-ASSIGN-CUE-001:** Stage remains selection-only; after staged/unowned bays, the Sunday drawer shows schedule-informed preview + visible **Assign this week** confirm (`handleBalanceAssign`); Auto-Assign All to Me is secondary. |
 | **Description (legacy marketing copy in manifest)** | Department & SIMS Inventory Audit Suite for Lowe's stores — floor bay rotations, specialty scans, roster auth, manager floor pad *(specialty surfaces subject to REDUCE retirement; Floor Pad protected)* |
 | **Default post-login land** | `/dashboard` (Floor checklist) |
 | **Specialty scan hub** | Historical `/?section=*` paths redirect to `/dashboard` (REDUCE-004); appliance/cycle-audit runtime dormant |
@@ -326,7 +326,7 @@ Until applied, production Hub falls back to localStorage for catalog/remnants; r
 | Roster / PIN / invite / QR pair | `lib/specialists.ts`, `app/pair/page.tsx`, `app/auth/verify/[token]`, `/api/roster/*` | End-to-end onboarding |
 | Floor bay rotations (Zebra) | `ZebraChecklist.tsx`, `completeRotation()`, `/api/rotations/complete` | Optimistic UI + offline queue |
 | Weekly rotation generate | `lib/store-ops/rotations.ts`, `/api/rotations/generate`, cron | Vercel Sunday cron |
-| Sunday audit balancer | `lib/store-ops/sunday-audit.ts`, `SundayAuditStagingCard` | Queued assignments |
+| Sunday audit balancer | `lib/store-ops/sunday-audit.ts`, `SundayAuditStagingCard`, `SundayAuditAssignmentModal` | Queued assignments; STAGE-ASSIGN-CUE-001: **Assign this week** confirm after Stage |
 | Downstock flags | `lib/store-ops/downstock.ts`, `FlagDownstockSheet` | Queued adds |
 | Rotation barriers | `BarrierReasonChips`, `/api/rotations/exceptions` | Online persist — **REPAIRED by RUNTIME-COMPAT-001**: the writer targeted `bay_id` / `cycle_number` / `assigned_week` / `reported_by`, none of which exist, so every report failed and `rotation_exceptions` holds zero production rows. Now writes production's normalized shape (`rotation_id`, `department_id`, `location_id`, `reason`, `logged_by`) and stamps `carried_over` / `last_carried_over_at` with `status = CARRIED_OVER`. Week is derived through `rotation_id → weekly_rotations.assigned_week`; the reader no longer reports a broken query as an empty week |
 | Store map / heatmap | `MapTab.tsx`, `lib/heatmap/bay-tracker.ts` | IndexedDB SWR |
@@ -573,7 +573,7 @@ Operational configuration only — do **not** hardcode store numbers, PINs, or t
 ### First week loop
 
 - [ ] Floor → Stage Weekly Rotation / Sunday drawer → Stage/Draw (Master) or use cron auto-stage
-- [ ] Review person ↔ bay share (`hours → N bays`); Balance & Assign
+- [ ] Review proposed person → bay share; **Assign this week** (does not auto-assign on Stage)
 - [ ] DS copies assignments into Lowe's existing dashboard (outside DeptSync)
 - [ ] Associates execute on Zebra; DS physically validates bays
 - [ ] DS verifies completion in DeptSync (Awaiting DS → Verified)

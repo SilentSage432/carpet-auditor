@@ -228,7 +228,7 @@ export function AssociateRosterPanel({
         </p>
         <p className="mt-1 text-[11px] leading-snug text-zinc-400">
           {stagingDepartment
-            ? `Who is in the ${departmentMeta(stagingDepartment).shortLabel} Sunday pool. Cross-department access is collapsed below each name. Hours and bay share are set in “Who gets which share” above.`
+            ? `Who is in the ${departmentMeta(stagingDepartment).shortLabel} Sunday pool. Cross-department access is collapsed below each name. Weekly assignment uses persisted schedules, not the local hour chips.`
             : "Specialty depts can be Specialist or CSA (Flooring CSA still groups under D23). Core depts default to CSA. Cashier and Receiving stay on the chosen home department. On-duty names feed the Sunday shift balancer."}
         </p>
         {selectionSummary ? (

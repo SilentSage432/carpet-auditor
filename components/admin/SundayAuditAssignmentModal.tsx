@@ -398,7 +398,7 @@ export function SundayAuditAssignmentModal({
 
       if (labor.allocatable.length === 0) {
         setError(
-          "Balance Assign needs known weekly schedule hours. Complete associate schedules (start/end) for this week, then try again. Missing or unknown durations are not treated as 8 hours."
+          "This week cannot be assigned from known schedules. Complete associate start and end times for this week, then try again. Missing times are not treated as 8 hours."
         );
         playErrorTone();
         return;
@@ -536,50 +536,133 @@ export function SundayAuditAssignmentModal({
             </p>
             <p className="mt-1 text-sm font-semibold text-zinc-50">
               {bays.length} Flooring bay{bays.length === 1 ? "" : "s"} staged
-              {pending > 0 ? ` · ${pending} still need a person` : ""}
+              {pending > 0
+                ? ` · ${pending} still need a person`
+                : bays.length > 0
+                  ? " · owners set"
+                  : ""}
             </p>
             <p className="mt-1.5 text-[11px] leading-snug text-zinc-400">
-              Shift hours influence each associate&apos;s share of the staged
-              bays. The 4h / 6h / 8h chips set hours — not a fixed bay count.
+              {bays.length === 0
+                ? "Prepare this week's coverage first. Assignment comes after the bays are selected."
+                : pending > 0
+                  ? "These bays are selected but not yet owned. Review the proposed distribution, then confirm."
+                  : "Weekly ownership is set. Recalculate only if you need a new bay set."}
             </p>
           </div>
 
-          <div className="grid gap-2 sm:grid-cols-2">
-            <button
-              type="button"
-              disabled={busy || bays.length === 0}
-              onClick={() => void handleAutoAssignMe()}
-              className="btn-primary-glow flex min-h-[44px] items-center justify-center rounded-xl px-3 text-sm disabled:opacity-40"
+          {status ? (
+            <p
+              role="status"
+              className="rounded-xl border border-emerald-500/30 bg-emerald-950/40 px-3 py-2 text-sm text-emerald-200"
             >
-              Auto-Assign All to Me (Flooring DS)
-            </button>
+              {status}
+            </p>
+          ) : null}
+          {error ? (
+            <p
+              role="alert"
+              className="rounded-xl border border-rose-500/40 bg-rose-950/40 px-3 py-2 text-sm text-rose-200"
+            >
+              {error}
+            </p>
+          ) : null}
+
+          {bays.length === 0 ? (
             <button
               type="button"
               disabled={busy || !flooringDept || !isMasterAdmin(specialist)}
               onClick={() => void handleGenerateFlooring()}
-              className="flex min-h-[44px] items-center justify-center rounded-xl border border-amber-400/45 bg-amber-950/35 px-3 text-sm font-bold text-amber-100 disabled:opacity-40"
+              className="flex min-h-[44px] w-full items-center justify-center rounded-xl border border-amber-400/45 bg-amber-950/35 px-3 text-sm font-bold text-amber-100 disabled:opacity-40"
             >
-              {busy
-                ? "Staging…"
-                : bays.length > 0
-                  ? "Recalculate Flooring rotation"
-                  : "Stage / Draw 12 Flooring Bays"}
+              {busy ? "Staging…" : "Stage / Draw 12 Flooring Bays"}
             </button>
-          </div>
+          ) : null}
+
+          {bays.length > 0 && pending > 0 ? (
+            <section
+              data-testid="week-assign-cue"
+              className="rounded-xl border border-cyan-500/30 bg-cyan-950/20 p-3"
+            >
+              <p className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-cyan-300">
+                Who owns these bays this week?
+              </p>
+              {balancerPlan.loads.length > 0 ? (
+                <>
+                  <p className="mt-1 text-[11px] text-cyan-100/70">
+                    Proposed distribution from this week&apos;s known schedules
+                    {` across ${bays.length} staged bay${
+                      bays.length === 1 ? "" : "s"
+                    }`}
+                    .
+                  </p>
+                  <ul
+                    data-testid="week-assign-preview"
+                    className="mt-2 space-y-1 text-sm text-cyan-50"
+                  >
+                    {balancerPlan.loads.map((load) => (
+                      <li key={load.specialist_id}>
+                        {load.specialist_name} → {load.quota} bay
+                        {load.quota === 1 ? "" : "s"}
+                        {load.aisles.length
+                          ? ` · Aisle ${load.aisles.join(", ")}`
+                          : ""}
+                      </li>
+                    ))}
+                  </ul>
+                  <button
+                    type="button"
+                    data-testid="week-assign-confirm"
+                    disabled={busy}
+                    onClick={() => void handleBalanceAssign()}
+                    className="btn-primary-glow mt-3 flex min-h-[44px] w-full items-center justify-center rounded-xl px-3 text-sm disabled:opacity-40"
+                  >
+                    {busy ? "Assigning…" : "Assign this week"}
+                  </button>
+                </>
+              ) : (
+                <p
+                  data-testid="week-assign-insufficient"
+                  className="mt-1.5 text-[13px] leading-snug text-amber-100"
+                >
+                  Schedules for this week are incomplete, so DeptSync cannot
+                  propose owners. Confirm start and end times on Roster first.
+                  Missing times are not treated as 8 hours.
+                </p>
+              )}
+            </section>
+          ) : null}
+
+          {bays.length > 0 ? (
+            <div className="grid gap-2 sm:grid-cols-2">
+              <button
+                type="button"
+                disabled={busy || !flooringDept || !isMasterAdmin(specialist)}
+                onClick={() => void handleGenerateFlooring()}
+                className="flex min-h-[44px] items-center justify-center rounded-xl border border-amber-400/45 bg-amber-950/35 px-3 text-sm font-bold text-amber-100 disabled:opacity-40"
+              >
+                {busy ? "Staging…" : "Recalculate Flooring rotation"}
+              </button>
+              <button
+                type="button"
+                data-testid="auto-assign-me"
+                disabled={busy}
+                onClick={() => void handleAutoAssignMe()}
+                className="flex min-h-[44px] items-center justify-center rounded-xl border border-zinc-700 bg-zinc-950/70 px-3 text-sm font-semibold text-zinc-300 disabled:opacity-40"
+              >
+                Auto-Assign All to Me (Flooring DS)
+              </button>
+            </div>
+          ) : null}
 
           {shiftRoster.length > 0 ? (
-            <section className="rounded-xl border border-cyan-500/30 bg-cyan-950/20 p-3">
-              <p className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-cyan-300">
-                Who gets which share
+            <section className="rounded-xl border border-zinc-800/80 bg-zinc-950/40 p-3">
+              <p className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-zinc-500">
+                Sunday shift board
               </p>
-              <p className="mt-1 text-[11px] text-cyan-100/70">
-                Selected people and their bay share from shift hours
-                {bays.length > 0
-                  ? ` across ${bays.length} staged bay${
-                      bays.length === 1 ? "" : "s"
-                    }`
-                  : ""}
-                .
+              <p className="mt-1 text-[11px] text-zinc-500">
+                Local hour chips for this device. They do not set this
+                week&apos;s automatic distribution.
               </p>
               <ul className="mt-2 space-y-2">
                 {shiftRoster.map((row) => {
@@ -624,14 +707,8 @@ export function SundayAuditAssignmentModal({
                           </span>
                         ) : null}
                       </span>
-                      <span className="shrink-0 font-mono text-[10px] text-cyan-300">
-                        {row.active
-                          ? `${row.hours}h → ${
-                              balancerPlan.loads.find(
-                                (l) => l.specialist_id === row.specialist_id
-                              )?.quota ?? 0
-                            } bays`
-                          : "off"}
+                      <span className="shrink-0 font-mono text-[10px] text-zinc-400">
+                        {row.active ? `${row.hours}h` : "off"}
                       </span>
                     </label>
                     {row.active ? (
@@ -688,36 +765,6 @@ export function SundayAuditAssignmentModal({
                   );
                 })}
               </ul>
-              {balancerPlan.loads.length > 0 ? (
-                <ul className="mt-2 space-y-1 text-[11px] text-cyan-100/80">
-                  {balancerPlan.loads.map((load) => (
-                    <li key={load.specialist_id}>
-                      {load.specialist_name}: {load.quota} bays ({load.weight_pct}
-                      %)
-                      {load.aisles.length
-                        ? ` · Aisle ${load.aisles.join(", ")}`
-                        : ""}
-                      {load.high_risk
-                        ? ` · ${load.high_risk} high-risk`
-                        : ""}
-                    </li>
-                  ))}
-                </ul>
-              ) : (
-                <p className="mt-2 text-[11px] text-amber-200/80">
-                  Balance Assign uses persisted weekly schedule hours. Complete
-                  start/end times for home-department associates this week — missing
-                  or unknown durations are not treated as 8 hours.
-                </p>
-              )}
-              <button
-                type="button"
-                disabled={busy || bays.length === 0}
-                onClick={() => void handleBalanceAssign()}
-                className="mt-3 flex min-h-[44px] w-full items-center justify-center rounded-xl border border-cyan-400/45 bg-cyan-950/40 px-3 text-sm font-bold text-cyan-50 disabled:opacity-40"
-              >
-                {busy ? "Assigning…" : "Balance & Assign from week schedule"}
-              </button>
             </section>
           ) : null}
 
@@ -769,23 +816,6 @@ export function SundayAuditAssignmentModal({
               });
             }}
           />
-
-          {status ? (
-            <p
-              role="status"
-              className="rounded-xl border border-emerald-500/30 bg-emerald-950/40 px-3 py-2 text-sm text-emerald-200"
-            >
-              {status}
-            </p>
-          ) : null}
-          {error ? (
-            <p
-              role="alert"
-              className="rounded-xl border border-rose-500/40 bg-rose-950/40 px-3 py-2 text-sm text-rose-200"
-            >
-              {error}
-            </p>
-          ) : null}
 
           {loading ? (
             <p className="py-8 text-center text-sm text-zinc-400">

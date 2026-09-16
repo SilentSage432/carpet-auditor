@@ -16,7 +16,8 @@
 - [x] **DEPTSYNC-REDUCE-002A** — Protect Walk & Talk / Floor Pad (**DOCS LOCKED** — [`DEPTSYNC_REDUCE_002A_FLOOR_PAD_PROTECTION.md`](docs/product/DEPTSYNC_REDUCE_002A_FLOOR_PAD_PROTECTION.md))
 - [x] **DEPTSYNC-REDUCE-003A** — Protect Seasonal Context + Git reconciliation (**COMPLETE** — [`DEPTSYNC_REDUCE_003A_SEASONAL_CONTEXT_PROTECTION.md`](docs/product/DEPTSYNC_REDUCE_003A_SEASONAL_CONTEXT_PROTECTION.md); APP-UPC snapshot + boundary docs + REDUCE-003 deletions in Git)
 - [x] **DEPTSYNC-REDUCE-004** — Everyday product surface reduction (**COMPLETE** — nav/mount disconnect of OOS specialty launchers; Floor Pad + Seasonal Context protected; specialty runtime dormant)
-- [x] **LAB-WEEK-002** — Whole-week persisted schedule labor → Balance Assign (**COMPLETE** engineering; Samsung field smoke pending). Ownership remains `sunday_bay_assignments`; staging target unchanged; Seasonal/Floor Pad/schema untouched
+- [x] **STAGE-ASSIGN-CUE-001** — Post-Stage **Assign this week** cue (**COMPLETE** engineering; Samsung field acceptance pending). Stage remains selection-only; human confirm still required; LAB-WEEK-002 allocator reused unchanged
+- [x] **LAB-WEEK-002** — Whole-week persisted schedule labor → Balance Assign (**COMPLETE** engineering; Samsung field smoke pending until STAGE-ASSIGN-CUE-001 field re-test). Ownership remains `sunday_bay_assignments`; staging target unchanged; Seasonal/Floor Pad/schema untouched
 - [ ] **FLOORPAD-001** — Rotation observational capture archaeology (**DEFERRED / REQUIRED** before Floor Pad retirement or redesign)
 - [x] **REDUCE-003** — Retire isolated enterprise ingest stubs (`/api/v1/topology/ingest`, `/api/v1/freight/stage`, enterprise Zod/transport) — **COMPLETE** (no schema; APP-UPC + Floor Pad + Seasonal Context untouched)
 
