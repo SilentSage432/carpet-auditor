@@ -17,8 +17,11 @@ function authorizeCron(request: Request): boolean {
 
 /**
  * GET /api/cron/weekly-rotation
- * Vercel Cron — Sunday 11:00 UTC (Hobby: once per day). Per-store auto-stage
- * still honors stores.sunday_auto_stage_time + timezone. Protected by CRON_SECRET.
+ * Vercel Cron — Sunday 11:00 UTC (Hobby: once per day ≈ 05:00 America/Denver MDT).
+ * ENGINE-PROD-002: Stage+Assign zero-touch weekly plans (not stage-only).
+ * Per-store gate honors sunday_auto_stage_time + timezone, with cron-compatible
+ * fallback when a late stage time can never be reached by this single cron.
+ * Protected by CRON_SECRET.
  */
 export async function GET(request: Request) {
   try {
@@ -62,13 +65,20 @@ export async function GET(request: Request) {
     if (isWebPushConfigured()) {
       for (const row of results) {
         if (!row.ok || row.skipped || !row.created) continue;
+        if (
+          row.dispatch_status &&
+          row.dispatch_status !== "COMPLETE" &&
+          row.dispatch_status !== "INSUFFICIENT_BAYS"
+        ) {
+          continue;
+        }
         try {
           const push = await notifyDepartmentRotationBatch(supabase, {
             departmentId: row.department_id,
             departmentCode: row.department_code,
             departmentName: row.department_name,
             assignedWeek: row.assigned_week ?? sundayStagingWeekLabel(now),
-            bayCount: row.created,
+            bayCount: row.owned ?? row.created,
           });
           pushSummaries.push({
             department_code: row.department_code,
@@ -90,15 +100,21 @@ export async function GET(request: Request) {
       (sum, r) => sum + (r.created ?? 0),
       0
     );
+    const ownedTotal = results.reduce((sum, r) => sum + (r.owned ?? 0), 0);
     const skippedTotal = results.filter((r) => r.skipped).length;
+    const failed = results.filter((r) => !r.ok);
 
     return NextResponse.json({
-      ok: true,
+      ok: failed.length === 0,
       evaluated_at: now.toISOString(),
       departments_processed: results.length,
       departments_ok: okCount,
+      departments_failed: failed.length,
       skipped: skippedTotal,
-      bays_assigned: createdTotal,
+      bays_staged: createdTotal,
+      bays_owned: ownedTotal,
+      /** @deprecated use bays_owned — historically meant staged count, not person ownership */
+      bays_assigned: ownedTotal,
       results,
       push: pushSummaries,
     });

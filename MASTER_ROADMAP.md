@@ -26,6 +26,7 @@
 - [x] **REDUCE-003** — Retire isolated enterprise ingest stubs (`/api/v1/topology/ingest`, `/api/v1/freight/stage`, enterprise Zod/transport) — **COMPLETE** (no schema; APP-UPC + Floor Pad + Seasonal Context untouched)
 
 ## Next (OIE program — documentation foundation only)
+- [x] **ENGINE-PROD-002 Zero-touch three-bay Sunday dispatch** — Stage+Assign orchestration; flat base quota 3; cron-compatible Sunday gate; idempotent failure truth (**engineering complete / Samsung acceptance pending**; PILOT-STATE-RECONCILE required)
 - [x] **OIE-000 Operational Intelligence Evolution Program established** — canonical program map at [`docs/product/OPERATIONAL_INTELLIGENCE_EVOLUTION_PLAN.md`](docs/product/OPERATIONAL_INTELLIGENCE_EVOLUTION_PLAN.md) (**PROGRAM FOUNDATION COMPLETE**; documentation only — no runtime code, tests, API, schema, migration, or Gemini change). Records RA-001 evidence, ten program laws, ten workstreams, the generative-AI decision standard, historical-pattern candidates, five field experiments, and a do-not-build register. Adopts the Constitution's Article IX layer numbering verbatim; introduces no competing terminology.
 - [ ] **GEMINI-001 Generative Cost & Necessity Audit** — next planned discovery tranche. **NOT STARTED.** Supplies the evidence for canonical UX-005F (AI earn-your-place review); does not replace it.
 

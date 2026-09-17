@@ -1,5 +1,32 @@
 # DeptSync Hub — Development Journal
 
+## 2026-09-17 — ENGINE-PROD-002 Zero-touch three-bay Sunday dispatch
+
+**Authorized implementation.** ENGINE-PROD-001 proved Sunday cron auto-staged only, proportional allocation conflicted with the declared 3-bay rule, and production `sunday_auto_stage_time=23:59` never opened under the single Sunday `11:00 UTC` cron.
+
+**BASE WEEKLY QUOTA LAW:** Normal automatic weekly dispatch assigns **three distinct physical bays** to each eligible associate when truthful owed work and schedule evidence permit. This is a **dispatch quota**, not inferred capacity (CAP-001 remains rejected).
+
+**ZERO-TOUCH SUNDAY LAW:** Sunday automation produces the persisted weekly ownership plan. Staging without ownership is not a successful automatic dispatch.
+
+**FAILURE TRUTH LAW:** If DeptSync cannot truthfully produce the weekly plan, it reports the incomplete condition rather than inventing labor, work, or success.
+
+**Eligibility:** LAB-WEEK-002 preserved — active, home department, non-Master (Supervisor included), known ON_DUTY hours somewhere in ISO Mon–Sun. Not Sunday On now. Not localStorage. Not accessible_departments.
+
+**Insufficient-labor decision:** No product-authoritative minimum-hours threshold exists. Strict **3 for every allocatable (known hours > 0)** associate. Documented explicitly; not proportional.
+
+**Staging volume:** `eligible × 3` via `resolveAutomaticWeeklyBayTarget`. `departments.weekly_bay_target` retained as legacy/manual/admin override only.
+
+**Allocator:** `planFlatBayAssignments` / `planFlatBayAssignmentsWithCaps` for Sunday base. `planProportionalBayAssignments` remains for explicit call-out auto redistribution.
+
+**Orchestration:** `lib/store-ops/sunday-dispatch.ts` — Stage+Assign idempotent per store+department+ISO week. Cron → `runSundayDispatchForAllDepartments`. Statuses: COMPLETE / ALREADY_COMPLETE / INCOMPLETE_SCHEDULE / INSUFFICIENT_BAYS / NO_ELIGIBLE_WORKFORCE / PARTIAL / ERROR / SKIPPED_SCHEDULE.
+
+**Cron timing:** Keep `0 11 * * 0` UTC. Gate opens at default 05:00 window when configured stage time is unreachable by that single Sunday cron (e.g. 23:59 Denver).
+
+**Unchanged:** BAY-UNIT-002, TIME-DUTY-002/003, verification, carryover, seasonal (deferred ENGINE-PROD-004), manual +1 (deferred ENGINE-PROD-003), Floor Pad, Gemini, no schema, no production mutation. W38 pilot reconcile not performed.
+
+**Tests:** ENGINE-PROD-002 suite + LAB-WEEK-002 contract amendment. Samsung field acceptance pending after PILOT-STATE-RECONCILE.
+
+
 ## 2026-09-16 — TIME-DUTY-003 Call-out, next opportunity, ownership resilience
 
 **Authorized implementation.** TIME-DUTY-002 derives current expected availability. Explicit call-out still forced pool / auto / carry before the exception could be saved.

@@ -15,6 +15,12 @@ import type { StoreSpecialist } from "@/lib/types";
 export const SHIFT_HOUR_PRESETS = [4, 6, 8] as const;
 export const DEFAULT_SHIFT_HOURS = 8;
 
+/**
+ * ENGINE-PROD-002 — declared normal automatic weekly dispatch quota.
+ * One unit = one distinct physical bay (BAY-UNIT-002). Not inferred capacity.
+ */
+export const BASE_WEEKLY_BAY_QUOTA = 3;
+
 export type ShiftRosterMember = {
   specialist_id: string;
   specialist_name: string;
@@ -310,9 +316,233 @@ export type PlanProportionalOptions = {
 };
 
 /**
+ * Flat per-person quotas for normal automatic Sunday base dispatch.
+ * Each eligible member receives up to `quotaPerPerson` (default 3) physical bays
+ * when enough staged bays exist. Hours establish eligibility only — they do not
+ * scale the base quota. Deterministic: members sorted by specialist_id; bays
+ * keep the same geo/risk cluster order as the proportional planner.
+ *
+ * When bayCount < members × quota, distribute as evenly as possible (each still
+ * capped at quotaPerPerson) — never invent bays or reopen completed work.
+ */
+export function flatQuotas(
+  memberCount: number,
+  bayCount: number,
+  quotaPerPerson: number = BASE_WEEKLY_BAY_QUOTA
+): number[] {
+  const n = Math.max(0, Math.floor(memberCount));
+  const bays = Math.max(0, Math.floor(bayCount));
+  const cap = Math.max(0, Math.floor(quotaPerPerson));
+  if (n <= 0 || bays <= 0 || cap <= 0) return Array.from({ length: n }, () => 0);
+  const ideal = n * cap;
+  if (bays >= ideal) return Array.from({ length: n }, () => cap);
+  const base = Math.floor(bays / n);
+  const rem = bays - base * n;
+  return Array.from({ length: n }, (_, i) =>
+    Math.min(cap, base + (i < rem ? 1 : 0))
+  );
+}
+
+export type PlanFlatOptions = {
+  /** Default BASE_WEEKLY_BAY_QUOTA (3). */
+  quotaPerPerson?: number;
+  /**
+   * When true (default), zero/invalid hours exclude the member and never invent
+   * DEFAULT_SHIFT_HOURS. Matches LAB-WEEK-002 evidence semantics.
+   */
+  knownHoursOnly?: boolean;
+};
+
+/**
+ * Normal automatic base-quota allocator (ENGINE-PROD-002).
+ * Prefer this over planProportionalBayAssignments for Sunday Stage+Assign.
+ * Call-out redistribution may still use the proportional planner explicitly.
+ */
+export function planFlatBayAssignments(
+  bays: RotationBayRef[],
+  members: ShiftRosterMember[],
+  options?: PlanFlatOptions
+): ProportionalAssignmentPlan {
+  const quotaPerPerson = Math.max(
+    0,
+    Math.floor(options?.quotaPerPerson ?? BASE_WEEKLY_BAY_QUOTA)
+  );
+  const knownHoursOnly = options?.knownHoursOnly !== false;
+  const active = members
+    .filter((m) => m.active && resolvePlannerHours(m.hours, knownHoursOnly) > 0)
+    .slice()
+    .sort((a, b) =>
+      String(a.specialist_id).localeCompare(String(b.specialist_id))
+    );
+  const empty: ProportionalAssignmentPlan = {
+    total_hours: 0,
+    items: [],
+    loads: [],
+  };
+  if (bays.length === 0 || active.length === 0 || quotaPerPerson <= 0) {
+    return empty;
+  }
+
+  const hours = active.map((m) => resolvePlannerHours(m.hours, knownHoursOnly));
+  const totalHours = hours.reduce((sum, h) => sum + h, 0);
+  const quotas = flatQuotas(active.length, bays.length, quotaPerPerson);
+  const remaining = [...quotas];
+  const lastAisle = active.map(() => "");
+  const items: BayAssignmentPlanItem[] = [];
+  const queue = clusterBays(bays).flatMap((c) => c.bays);
+
+  for (const bay of queue) {
+    let pick = -1;
+    let best = -1;
+    for (let i = 0; i < active.length; i += 1) {
+      if ((remaining[i] ?? 0) <= 0) continue;
+      const sameAisle = lastAisle[i] === normalizeAisle(bay.aisle) ? 2 : 0;
+      // Prefer remaining quota, then stable id order (hours do not scale quota).
+      const score =
+        sameAisle * 1000 + (remaining[i] ?? 0) * 10 + (active.length - i);
+      if (score > best) {
+        best = score;
+        pick = i;
+      }
+    }
+    if (pick < 0) {
+      pick = remaining.findIndex((q) => q > 0);
+    }
+    if (pick < 0) break;
+    const member = active[pick]!;
+    remaining[pick] = (remaining[pick] ?? 0) - 1;
+    lastAisle[pick] = normalizeAisle(bay.aisle);
+    const memberHours = resolvePlannerHours(member.hours, knownHoursOnly);
+    items.push({
+      rotationId: bay.rotationId,
+      specialist_id: member.specialist_id,
+      specialist_name: member.specialist_name,
+      hours: memberHours,
+      shift_tag: formatShiftTag(memberHours),
+      aisle: bay.aisle,
+      bay: bay.bay,
+      riskScore: bay.riskScore,
+    });
+  }
+
+  const loads: AssociateLoadPreview[] = active.map((member, i) => {
+    const mine = items.filter((row) => row.specialist_id === member.specialist_id);
+    const aisles = [
+      ...new Set(mine.map((row) => normalizeAisle(row.aisle)).filter(Boolean)),
+    ].sort(compareAisles);
+    const memberHours = resolvePlannerHours(member.hours, knownHoursOnly);
+    return {
+      specialist_id: member.specialist_id,
+      specialist_name: member.specialist_name,
+      hours: memberHours,
+      quota: quotas[i] ?? 0,
+      weight_pct:
+        totalHours > 0 ? Math.round((memberHours / totalHours) * 100) : 0,
+      aisles,
+      high_risk: mine.filter((row) => row.riskScore > 0).length,
+    };
+  });
+
+  return { total_hours: totalHours, items, loads };
+}
+
+/**
+ * Flat base-quota assign with per-person remaining caps (idempotent retry when
+ * some ownership already exists). Caps never exceed BASE_WEEKLY_BAY_QUOTA.
+ */
+export function planFlatBayAssignmentsWithCaps(
+  bays: RotationBayRef[],
+  members: ShiftRosterMember[],
+  remainingCaps: ReadonlyMap<string, number>,
+  options?: { knownHoursOnly?: boolean }
+): ProportionalAssignmentPlan {
+  const knownHoursOnly = options?.knownHoursOnly !== false;
+  const active = members
+    .filter((m) => {
+      if (!m.active || resolvePlannerHours(m.hours, knownHoursOnly) <= 0) {
+        return false;
+      }
+      return Math.max(0, Math.floor(remainingCaps.get(m.specialist_id) ?? 0)) > 0;
+    })
+    .slice()
+    .sort((a, b) =>
+      String(a.specialist_id).localeCompare(String(b.specialist_id))
+    );
+  const empty: ProportionalAssignmentPlan = {
+    total_hours: 0,
+    items: [],
+    loads: [],
+  };
+  if (bays.length === 0 || active.length === 0) return empty;
+
+  const hours = active.map((m) => resolvePlannerHours(m.hours, knownHoursOnly));
+  const totalHours = hours.reduce((sum, h) => sum + h, 0);
+  const remaining = active.map((m) =>
+    Math.max(0, Math.floor(remainingCaps.get(m.specialist_id) ?? 0))
+  );
+  const quotas = [...remaining];
+  const lastAisle = active.map(() => "");
+  const items: BayAssignmentPlanItem[] = [];
+  const queue = clusterBays(bays).flatMap((c) => c.bays);
+
+  for (const bay of queue) {
+    let pick = -1;
+    let best = -1;
+    for (let i = 0; i < active.length; i += 1) {
+      if ((remaining[i] ?? 0) <= 0) continue;
+      const sameAisle = lastAisle[i] === normalizeAisle(bay.aisle) ? 2 : 0;
+      const score =
+        sameAisle * 1000 + (remaining[i] ?? 0) * 10 + (active.length - i);
+      if (score > best) {
+        best = score;
+        pick = i;
+      }
+    }
+    if (pick < 0) break;
+    const member = active[pick]!;
+    remaining[pick] = (remaining[pick] ?? 0) - 1;
+    lastAisle[pick] = normalizeAisle(bay.aisle);
+    const memberHours = resolvePlannerHours(member.hours, knownHoursOnly);
+    items.push({
+      rotationId: bay.rotationId,
+      specialist_id: member.specialist_id,
+      specialist_name: member.specialist_name,
+      hours: memberHours,
+      shift_tag: formatShiftTag(memberHours),
+      aisle: bay.aisle,
+      bay: bay.bay,
+      riskScore: bay.riskScore,
+    });
+  }
+
+  const loads: AssociateLoadPreview[] = active.map((member, i) => {
+    const mine = items.filter((row) => row.specialist_id === member.specialist_id);
+    const aisles = [
+      ...new Set(mine.map((row) => normalizeAisle(row.aisle)).filter(Boolean)),
+    ].sort(compareAisles);
+    const memberHours = resolvePlannerHours(member.hours, knownHoursOnly);
+    return {
+      specialist_id: member.specialist_id,
+      specialist_name: member.specialist_name,
+      hours: memberHours,
+      quota: quotas[i] ?? 0,
+      weight_pct:
+        totalHours > 0 ? Math.round((memberHours / totalHours) * 100) : 0,
+      aisles,
+      high_risk: mine.filter((row) => row.riskScore > 0).length,
+    };
+  });
+
+  return { total_hours: totalHours, items, loads };
+}
+
+/**
  * Distribute open weekly bays by scheduled hours, keeping aisle/face clusters
  * together and feeding high-risk (stale / never / unworked top-stock) clusters
  * into the longest (primary) shifts first.
+ *
+ * Explicit redistribution contexts only (e.g. call-out auto). Normal Sunday
+ * base dispatch uses planFlatBayAssignments.
  */
 export function planProportionalBayAssignments(
   bays: RotationBayRef[],

@@ -35,12 +35,13 @@ import {
   type SundayStagedBay,
 } from "@/lib/store-ops/sunday-audit";
 import {
+  BASE_WEEKLY_BAY_QUOTA,
   SHIFT_HOUR_PRESETS,
   clampShiftHours,
   formatSpecialistShiftLabel,
   hoursBetween,
   mergeShiftRoster,
-  planProportionalBayAssignments,
+  planFlatBayAssignments,
   readShiftRoster,
   riskScoreFromFinding,
   writeShiftRoster,
@@ -52,7 +53,10 @@ import {
   type LabPersistedShiftDayInput,
   type WeekLaborComposition,
 } from "@/lib/store-ops/labor-availability";
-import { isoWeekCalendarRange } from "@/lib/store-ops/week";
+import {
+  isoWeekCalendarRange,
+  resolveAutomaticWeeklyBayTarget,
+} from "@/lib/store-ops/week";
 import { fetchShiftDaysRange } from "@/lib/store-ops/shift-status";
 import { getStoreNumber } from "@/lib/store";
 import { fetchSpecialists } from "@/lib/specialists";
@@ -78,6 +82,7 @@ function shiftDaysToLabRows(
   }));
 }
 
+/** Recovery Assign this week — flat base quota (ENGINE-PROD-002), not proportional. */
 function buildScheduleBalancePlan(
   bays: SundayStagedBay[],
   weekLabor: WeekLaborComposition | null,
@@ -91,11 +96,12 @@ function buildScheduleBalancePlan(
     riskScore: riskScoreFromFinding(healthByRotation.get(bay.rotation.id)),
   }));
   if (!weekLabor || weekLabor.processing_status === "UNAVAILABLE") {
-    return planProportionalBayAssignments(bayRefs, [], { knownHoursOnly: true });
+    return planFlatBayAssignments(bayRefs, [], { knownHoursOnly: true });
   }
   const members = weekLaborToPlannerMembers(weekLabor.allocatable);
-  return planProportionalBayAssignments(bayRefs, members, {
+  return planFlatBayAssignments(bayRefs, members, {
     knownHoursOnly: true,
+    quotaPerPerson: BASE_WEEKLY_BAY_QUOTA,
   });
 }
 
@@ -430,7 +436,7 @@ export function SundayAuditAssignmentModal({
           ? " Partial schedule evidence — only known hours were used."
           : "";
       setStatus(
-        `Balanced ${n} bay${n === 1 ? "" : "s"} across ${plan.loads.length} associate${
+        `Assigned ${n} physical bay${n === 1 ? "" : "s"} — base ${BASE_WEEKLY_BAY_QUOTA} each across ${plan.loads.length} eligible associate${
           plan.loads.length === 1 ? "" : "s"
         } from persisted week schedule (${plan.total_hours}h known).${partialNote}`
       );
@@ -465,16 +471,26 @@ export function SundayAuditAssignmentModal({
     setError(null);
     setStatus(null);
     try {
-      const result = await generateRotations(specialist, flooringDept.id, 12, {
+      const eligible =
+        weekLabor?.processing_status !== "UNAVAILABLE"
+          ? weekLabor?.allocatable.length ?? 0
+          : 0;
+      const drawCount =
+        eligible > 0
+          ? resolveAutomaticWeeklyBayTarget(eligible, BASE_WEEKLY_BAY_QUOTA)
+          : 12;
+      const result = await generateRotations(specialist, flooringDept.id, drawCount, {
         force: replacing,
       });
       if (result.skipped) {
         setStatus(result.reason || "Week already staged.");
       } else {
         setStatus(
-          `Staged week ${result.assigned_week}: ${result.created} Flooring bay${
+          `Staged week ${result.assigned_week}: ${result.created} Flooring physical bay${
             result.created === 1 ? "" : "s"
-          } drawn${result.replaced ? ` (replaced ${result.replaced})` : ""}.`
+          } drawn (target ${drawCount} = ${eligible || "?"} × ${BASE_WEEKLY_BAY_QUOTA})${
+            result.replaced ? ` (replaced ${result.replaced})` : ""
+          }. Use Assign this week if automatic ownership did not run.`
         );
       }
       await reload();
@@ -544,10 +560,10 @@ export function SundayAuditAssignmentModal({
             </p>
             <p className="mt-1.5 text-[11px] leading-snug text-zinc-400">
               {bays.length === 0
-                ? "Prepare this week's coverage first. Assignment comes after the bays are selected."
+                ? "Sunday automatic dispatch should leave a complete person → bay plan. Use Stage only for recovery when the cron missed or failed."
                 : pending > 0
-                  ? "These bays are selected but not yet owned. Review the proposed distribution, then confirm. One assignment covers the full physical bay, including its selling and topstock work."
-                  : "Weekly ownership is set. Recalculate only if you need a new bay set."}
+                  ? "Staged but unowned — automatic dispatch did not finish ownership. Confirm the three-bay base plan, or wait for retry. One assignment covers the full physical bay."
+                  : "Weekly ownership is set (normal base = 3 physical bays per eligible associate). Recalculate only if you need a new bay set."}
             </p>
           </div>
 
@@ -590,11 +606,13 @@ export function SundayAuditAssignmentModal({
               {balancerPlan.loads.length > 0 ? (
                 <>
                   <p className="mt-1 text-[11px] text-cyan-100/70">
-                    Proposed distribution from this week&apos;s known schedules
+                    Base quota {BASE_WEEKLY_BAY_QUOTA} physical bays each from
+                    this week&apos;s known schedules
                     {` across ${bays.length} staged bay${
                       bays.length === 1 ? "" : "s"
                     }`}
-                    .
+                    {" "}
+                    (not proportional hours).
                   </p>
                   <ul
                     data-testid="week-assign-preview"

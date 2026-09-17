@@ -133,16 +133,16 @@ describe("Balance Assign authoritative labor boundary", () => {
     expect(audit).toMatch(/sunday_bay_assignments/);
   });
 
-  it("no people × 3 staging quota introduced", () => {
-    const files = [
-      "labor-availability.ts",
-      "weekly-rotations.ts",
-      "call-out.ts",
-      path.join("../../components/admin/SundayAuditAssignmentModal.tsx"),
-    ];
-    for (const rel of files) {
-      const source = fs.readFileSync(path.join(__dirname, rel), "utf8");
-      expect(source).not.toMatch(/people\s*\*\s*3|weekly_bay_target\s*\*\s*3|target\s*=\s*.*3/);
-    }
+  it("people × 3 is a declared dispatch quota (ENGINE-PROD-002), not capacity inference", () => {
+    // CAP-001 rejected inferred capacity. ENGINE-PROD-002 authorizes eligible × 3
+    // as the normal automatic weekly dispatch quota in sunday-dispatch / week helpers.
+    const callOut = fs.readFileSync(path.join(__dirname, "call-out.ts"), "utf8");
+    expect(callOut).not.toMatch(/resolveAutomaticWeeklyBayTarget|BASE_WEEKLY_BAY_QUOTA/);
+    const labor = fs.readFileSync(
+      path.join(__dirname, "labor-availability.ts"),
+      "utf8"
+    );
+    // Labor composition still does not invent staging volume.
+    expect(labor).not.toMatch(/resolveAutomaticWeeklyBayTarget/);
   });
 });

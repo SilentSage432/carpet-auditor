@@ -26,7 +26,13 @@ export type SundayScheduleSettings = {
 };
 
 export type SundayAutoRunDecision =
-  | { run: true; weekLabel: string; localTime: string; timezone: string }
+  | {
+      run: true;
+      weekLabel: string;
+      localTime: string;
+      timezone: string;
+      reason?: string;
+    }
   | {
       run: false;
       weekLabel: string;
@@ -219,6 +225,13 @@ export function isSundayInTimeZone(
 /**
  * Whether the scheduled runner should generate for this store right now.
  * Does not inspect existing rotations — callers skip-if-exists separately.
+ *
+ * ENGINE-PROD-002: Hobby Vercel fires one Sunday cron at 11:00 UTC
+ * (`vercel.json`). A store stage time later than that Sunday local instant
+ * (e.g. 23:59 America/Denver while cron is 05:00 local) can never open.
+ * When the configured time is later than DEFAULT_SUNDAY_AUTO_STAGE_TIME and
+ * local Sunday time has already reached the default window, open the gate so
+ * automatic dispatch remains reachable before the DS needs the plan.
  */
 export function evaluateSundayAutoRun(
   settings: Partial<SundayScheduleSettings> | null | undefined,
@@ -251,14 +264,40 @@ export function evaluateSundayAutoRun(
   }
 
   const nowMinutes = parts.hour * 60 + parts.minute;
-  const stageMinutes = sundayStageMinutes(schedule.sunday_auto_stage_time);
-  if (nowMinutes < stageMinutes) {
+  const configuredMinutes = sundayStageMinutes(schedule.sunday_auto_stage_time);
+  const defaultMinutes = sundayStageMinutes(DEFAULT_SUNDAY_AUTO_STAGE_TIME);
+
+  let effectiveStageMinutes = configuredMinutes;
+  let usedCronCompatibleDefault = false;
+  if (
+    configuredMinutes > nowMinutes &&
+    configuredMinutes > defaultMinutes &&
+    nowMinutes >= defaultMinutes
+  ) {
+    // Configured time is unreachable by the single Sunday UTC cron after this hit.
+    effectiveStageMinutes = defaultMinutes;
+    usedCronCompatibleDefault = true;
+  }
+
+  if (nowMinutes < effectiveStageMinutes) {
     return {
       run: false,
       reason: `Before auto-stage time (${formatSundayStageTimeDisplay(
         schedule.sunday_auto_stage_time
       )} ${schedule.timezone})`,
       ...base,
+    };
+  }
+
+  if (usedCronCompatibleDefault) {
+    return {
+      run: true,
+      ...base,
+      reason: `Cron-compatible window: configured ${formatSundayStageTimeDisplay(
+        schedule.sunday_auto_stage_time
+      )} is after the single Sunday UTC cron local instant; opened at default ${formatSundayStageTimeDisplay(
+        DEFAULT_SUNDAY_AUTO_STAGE_TIME
+      )}`,
     };
   }
 

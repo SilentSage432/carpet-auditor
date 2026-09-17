@@ -17,7 +17,6 @@ import {
   recordAutoVerifiedCompletionAttempt,
   recoverAutoVerifiedAttemptFromParent,
 } from "./completion-attempt-history";
-import { listActiveStores } from "./stores";
 import { physicalBayKey, selectPhysicalBayCoverage } from "./physical-bay";
 import {
   isoWeekLabel,
@@ -35,7 +34,6 @@ import {
   readableError,
 } from "./errors";
 import { departmentCodesMatch } from "./department-codes";
-import { evaluateSundayAutoRun } from "./sunday-schedule";
 import type { RotationSupersedeSource } from "./rotation-history";
 
 function isStandardAisleLocation(loc: StoreLocation): boolean {
@@ -1229,6 +1227,10 @@ export type DepartmentCronResult = {
   skipped?: boolean;
   reason?: string;
   created?: number;
+  /** ENGINE-PROD-002 — ownership rows present after dispatch. */
+  owned?: number;
+  /** ENGINE-PROD-002 dispatch status. */
+  dispatch_status?: string;
   cycle_number?: number;
   cycle_reset?: boolean;
   assigned_week?: string;
@@ -1237,113 +1239,39 @@ export type DepartmentCronResult = {
 };
 
 /**
- * Sunday cron: for every active store whose schedule window is open, queue
- * weekly targets per active department. Never overwrites an already-staged week.
+ * Sunday cron: Stage+Assign zero-touch weekly plans per active department.
+ * Never force-overwrites an already-complete week (ENGINE-PROD-002).
  */
 export async function runWeeklyRotationForAllDepartments(
   supabase: SupabaseClient,
   weekLabel?: string,
   now: Date = new Date()
 ): Promise<DepartmentCronResult[]> {
-  const stores = await listActiveStores(supabase);
-  const results: DepartmentCronResult[] = [];
-
-  for (const store of stores) {
-    const decision = evaluateSundayAutoRun(store, now);
-    const targetWeek = weekLabel ?? decision.weekLabel;
-
-    if (!decision.run) {
-      results.push({
-        department_id: store.id,
-        department_code: "_schedule",
-        department_name: store.name || `Store ${store.store_number}`,
-        weekly_bay_target: 0,
-        ok: true,
-        skipped: true,
-        reason: decision.reason,
-        assigned_week: targetWeek,
-        store_id: store.id,
-        store_number: store.store_number,
-      });
-      continue;
-    }
-
-    const { data: departments, error } = await supabase
-      .from("departments")
-      .select("*")
-      .eq("store_id", store.id)
-      .eq("is_active", true)
-      .order("name");
-
-    if (error) throw new Error(error.message);
-
-    for (const dept of (departments ?? []) as Department[]) {
-      const target = resolveWeeklyBayTarget(dept.weekly_bay_target);
-      const base: DepartmentCronResult = {
-        department_id: dept.id,
-        department_code: dept.code,
-        department_name: dept.name,
-        weekly_bay_target: target,
-        ok: false,
-        store_id: store.id,
-        store_number: store.store_number,
-      };
-
-      try {
-        const { count, error: locCountError } = await supabase
-          .from("store_locations")
-          .select("id", { count: "exact", head: true })
-          .eq("department_id", dept.id)
-          .eq("store_id", store.id)
-          .eq("is_active", true);
-
-        if (locCountError) throw new Error(locCountError.message);
-        if (!count) {
-          results.push({
-            ...base,
-            ok: true,
-            skipped: true,
-            reason: "No mapped store locations",
-            assigned_week: targetWeek,
-          });
-          continue;
-        }
-
-        const generated = await generateWeeklyRotations(
-          supabase,
-          dept.id,
-          null,
-          targetWeek,
-          {
-            skipIfExists: true,
-            store_id: store.id,
-            store_number: store.store_number,
-          }
-        );
-
-        results.push({
-          ...base,
-          ok: true,
-          skipped: generated.skipped,
-          reason: generated.reason,
-          weekly_bay_target: generated.weekly_bay_target || target,
-          created: generated.skipped ? 0 : generated.rotations.length,
-          cycle_number: generated.cycle_number,
-          cycle_reset: generated.cycle_reset,
-          assigned_week: generated.assigned_week,
-        });
-      } catch (err) {
-        results.push({
-          ...base,
-          ok: false,
-          reason: err instanceof Error ? err.message : "Unknown error",
-          assigned_week: targetWeek,
-        });
-      }
-    }
-  }
-
-  return results;
+  const { runSundayDispatchForAllDepartments } = await import(
+    "./sunday-dispatch"
+  );
+  const results = await runSundayDispatchForAllDepartments(
+    supabase,
+    weekLabel,
+    now
+  );
+  return results.map((row) => ({
+    department_id: row.department_id,
+    department_code: row.department_code,
+    department_name: row.department_name,
+    weekly_bay_target: row.target_bays || row.weekly_bay_target || 0,
+    ok: row.ok,
+    skipped: row.skipped,
+    reason: row.reason,
+    created: row.created_rotations ?? (row.skipped ? 0 : row.staged_count),
+    owned: row.owned_count,
+    dispatch_status: row.status,
+    cycle_number: row.cycle_number,
+    cycle_reset: row.cycle_reset,
+    assigned_week: row.assigned_week,
+    store_id: row.store_id,
+    store_number: row.store_number,
+  }));
 }
 
 export type CompleteWeeklyRotationOptions = {

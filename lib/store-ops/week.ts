@@ -7,11 +7,28 @@ import type { VelocityTier } from "./types";
 
 /** Safe draw size from departments.weekly_bay_target (null/0/invalid → 10).
  *  One unit is one distinct physical aisle/bay, not a SELLING/TOPSTOCK row.
+ *
+ *  ENGINE-PROD-002: normal automatic Sunday dispatch uses
+ *  resolveAutomaticWeeklyBayTarget(eligibleCount) instead. This helper remains
+ *  for legacy/manual/admin override and Force Draw recovery paths.
  */
 export function resolveWeeklyBayTarget(raw: unknown): number {
   const n = Number(raw);
   if (!Number.isFinite(n) || n <= 0) return 10;
   return Math.floor(n);
+}
+
+/**
+ * Normal automatic staging volume: eligible associates × base quota (3).
+ * Caller still bounds by truthful owed physical bays at selection time.
+ */
+export function resolveAutomaticWeeklyBayTarget(
+  eligibleAssociateCount: number,
+  quotaPerPerson = 3
+): number {
+  const n = Math.max(0, Math.floor(Number(eligibleAssociateCount) || 0));
+  const q = Math.max(0, Math.floor(Number(quotaPerPerson) || 0));
+  return n * q;
 }
 
 /** True when an ISO timestamp falls in the given ISO week label (e.g. 2026-W33). */
