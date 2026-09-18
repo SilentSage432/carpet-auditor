@@ -291,7 +291,7 @@ supabase/migrations/20260812_sunday_bay_assignments.sql → sunday specialist↔
 | Team roster (Master Admin) | `RosterTab` + `SpecialistCard` + `SpecialistEditSheet` + `AddTeamMemberSheet` → `POST /api/roster/members` → `store_specialists`; accordion read via `fetchSpecialists`; grouping via `roster-groups.ts` (home dept, Specialist and CSA together); weekly matrix via `shift-status.ts` (`canManageShiftBoard`). Derived availability caption is separate from the call-out exception switch. Job options / `floor_title` owned by `lib/types.ts`. |
 | Cross-department grants | `lib/department-access.ts` + `POST /api/admin/department-access` + Roster `SpecialistEditSheet` chips |
 | Working department pin | `lib/admin-department-context.ts` (Master full-store; multi-dept clamped to grants) |
-| Personal theme / density / contrast / sound / haptics | `lib/theme.ts` + `lib/ui/preferences-context.tsx` + `UserPreferencesDrawer` (all roles) |
+| Personal theme / density / contrast / sound / haptics | `lib/theme.ts` + `lib/ui/preferences-context.tsx` + `UserPreferencesDrawer` (all roles). Device-local `deptsync_theme_prefs`; not store/user-scoped. Archaeology: [`docs/product/HANDHELD_UX_001_APPEARANCE_FLOOR_EXPERIENCE_ARCHAEOLOGY.md`](docs/product/HANDHELD_UX_001_APPEARANCE_FLOOR_EXPERIENCE_ARCHAEOLOGY.md). **HANDHELD-UX-002 not started.** |
 | Audio & haptics playback | `lib/ui/feedback.ts` (`HapticsListener` taps; scan/bay/Sunday compose) |
 | Store context | `lib/store.ts` + `lib/store-ops/stores.ts` (registry + Sunday schedule columns) |
 | Offline sync queue | `lib/sync-queue.ts` (`enqueueOrExecute` for Hub + Store Ops: complete rotation, downstock add, Sunday assign), `lib/sync-conflict.ts`, `ConflictResolutionModal` |

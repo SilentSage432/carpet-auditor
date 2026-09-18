@@ -91,7 +91,8 @@
 │                                                                 │
 │  EPHEMERAL / SESSION                                            │
 │    carpet_hub_store_number, carpet_hub_auth_session,            │
-│    theme prefs, admin dept pin, shift/downstock task caches     │
+│    deptsync_theme_prefs (device-global localStorage;            │
+│    not user-scoped), admin dept pin, shift/downstock caches     │
 └─────────────────────────────────────────────────────────────────┘
 ```
 

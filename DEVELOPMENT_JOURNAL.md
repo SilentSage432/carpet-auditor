@@ -1,5 +1,13 @@
 # DeptSync Hub — Development Journal
 
+## 2026-09-18 — HANDHELD-UX-001 Appearance & floor experience archaeology
+
+**Read-only.** No theme/density/contrast/sound/haptic/Wake Lock/operational UI mutation. Baseline `main @ d47c280`. PRIORITY-UX-002 not modified.
+
+**Finding:** one prefs blob (`deptsync_theme_prefs`), one document apply path, one drawer. Personality is CSS tokens; operational meaning is Tailwind/hex literals. Safe expansion is one purple theme (Royal Amethyst) without touching semantics. Compact is partial shrink. Sound/haptics are real. Device-global, not user-scoped. HANDHELD-UX-002 not started.
+
+Canonical: [`docs/product/HANDHELD_UX_001_APPEARANCE_FLOOR_EXPERIENCE_ARCHAEOLOGY.md`](docs/product/HANDHELD_UX_001_APPEARANCE_FLOOR_EXPERIENCE_ARCHAEOLOGY.md).
+
 ## 2026-09-18 — PRIORITY-UX-002 Manual coverage priority + Map placement
 
 **Authorized implementation.** Baseline `main @ 9db22ac`. Evidence: PRIORITY-UX-001.
