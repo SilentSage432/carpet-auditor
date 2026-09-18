@@ -475,7 +475,7 @@ describe("ROSTER-EDIT-001 the editor surface", () => {
 
   it("offers a discoverable Edit details affordance", () => {
     expect(sheet).toContain("Edit details");
-    expect(sheet).toContain("Member details");
+    expect(sheet).toContain("Member settings");
     expect(sheet).toContain("openDetails");
   });
 
@@ -508,9 +508,10 @@ describe("ROSTER-EDIT-001 the editor surface", () => {
   });
 
   it("keeps authority actions visually separate from workforce editing", () => {
-    expect(sheet).toContain("Administrative actions");
+    expect(sheet).toContain("Device access");
     expect(sheet).toContain("DepartmentAccessChips");
-    expect(sheet).toContain("Remove Specialist");
+    expect(sheet).toContain("Remove team member");
+    expect(sheet).toContain("DeptSync access");
     // UX-005G occupancy is still owned by the sheet.
     expect(sheet).toContain("useFocusedWorkspace()");
   });

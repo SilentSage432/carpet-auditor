@@ -33,7 +33,8 @@ export type CurrentAvailabilityLabel =
   | "On now"
   | "Later today"
   | "Off"
-  | "Called out";
+  | "Called out"
+  | "Schedule unknown";
 
 export type CurrentAvailabilityShiftInput = {
   work_date?: string | null;
@@ -181,7 +182,9 @@ function availabilityFromScheduledRow(
 ): CurrentAvailability {
   const start = parseClockMinutes(row.start_time ?? undefined);
   const end = parseClockMinutes(row.end_time ?? undefined);
-  if (start == null || end == null) return off("UNKNOWN");
+  if (start == null || end == null) {
+    return off("UNKNOWN", "Schedule unknown");
+  }
   return availabilityFromWindow(start, end, nowMinutes);
 }
 
@@ -230,8 +233,8 @@ export function composeCurrentAvailability(
     return off("CALLED_OUT", "Called out");
   }
   if (continued) return continued;
-  if (!row) return off("UNKNOWN");
-  if (!rowIsToday) return off("UNKNOWN");
+  if (!row) return off("UNKNOWN", "Schedule unknown");
+  if (!rowIsToday) return off("UNKNOWN", "Schedule unknown");
   if (isExplicitOffRow(row)) return off("OFF_TODAY");
   return availabilityFromScheduledRow(row, nowMinutes);
 }

@@ -52,6 +52,10 @@ components/hub/SpecialistCard.tsx → Compact specialist row (duty switch + mana
 components/hub/SpecialistEditSheet.tsx → Schedule, grants, Pair Device via QR, PIN, remove
 app/api/roster/members/route.ts   → Canonical roster-only INSERT into store_specialists
 components/hub/AssociateScheduleModal.tsx → Sun–Sat shift matrix (composes shift-status.ts)
+components/hub/tabs/RosterTab.tsx → People + schedule/availability (UX-REDUCE-004)
+components/hub/SpecialistCard.tsx → Person row (TIME-DUTY + explicit call-out; internal name retained)
+components/hub/SpecialistEditSheet.tsx → Schedule → settings → DeptSync access → device admin
+lib/store-ops/roster-people-presentation.ts → Derived People captions (UX-REDUCE-004)
 components/hub/tabs/MapTab.tsx    → Department coverage geography (physical bays; Advanced · Service cadence)
 components/admin/StoreLocationGrid.tsx → Physical-bay navigator + WalkTheFloorSheet (canMutate=false)
 lib/store-ops/map-coverage-presentation.ts → Derived Map physical-bay counts/labels/summary (UX-REDUCE-003)

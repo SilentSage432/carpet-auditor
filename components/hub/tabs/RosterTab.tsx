@@ -1,13 +1,16 @@
 "use client";
 
 /**
- * Roster tab — department-grouped team, shift board, and call-out exception.
+ * People tab — rotation participation and schedule evidence.
  *
  * Pipeline: "+ Add Team Member" → AddTeamMemberSheet →
  *   POST /api/roster/members → createRosterMember → store_specialists (roster-only).
  * Device pairing: SpecialistEditSheet → POST /api/roster/pair (10-minute QR).
  * Accordions: fetchSpecialists(storeNumber) SELECTs store_specialists, then
  *   composeRosterDepartmentGroups. On-now counts come from derived availability.
+ *
+ * UX-REDUCE-004: People + schedule first. Access/device admin secondary.
+ * Capability is not availability. accessible_departments is authority scope.
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -29,6 +32,10 @@ import {
   countWeeklyOwnership,
   isoWeekLabelFromStoreDate,
 } from "@/lib/store-ops/next-opportunity";
+import {
+  formatOwnedBayCaption,
+  formatPeopleCount,
+} from "@/lib/store-ops/roster-people-presentation";
 import { useStoreClockTick } from "@/lib/store-ops/use-store-clock";
 import { DEFAULT_STORE_TIMEZONE } from "@/lib/store-ops/sunday-schedule";
 import { composeRosterDepartmentGroups } from "@/lib/store-ops/roster-groups";
@@ -530,11 +537,16 @@ export function RosterTab({ specialist, storeNumber }: WorkflowTabProps) {
     <main className="hub-main">
       <div className="mb-3 flex items-start justify-between gap-3">
         <div>
-          <p className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-accent">
-            Team roster
-          </p>
-          <p className="mt-1 text-sm text-zinc-400">
-            Grouped by home department · {storeToday}
+          <h1 className="text-base font-bold tracking-tight text-white">
+            People
+          </h1>
+          <p className="mt-1 font-mono text-[11px] text-zinc-400">
+            Schedule &amp; availability · {storeToday}
+            {displayGroups.length > 0
+              ? ` · ${formatPeopleCount(
+                  displayGroups.reduce((n, g) => n + g.members.length, 0)
+                )}`
+              : ""}
           </p>
         </div>
         {canManage ? (
@@ -550,7 +562,7 @@ export function RosterTab({ specialist, storeNumber }: WorkflowTabProps) {
       </div>
 
       {loading ? (
-        <p className="text-sm text-zinc-400">Loading roster…</p>
+        <p className="text-sm text-zinc-400">Loading people…</p>
       ) : displayGroups.length === 0 ? (
         <p className="glass-card border-dashed px-4 py-8 text-center text-sm text-zinc-400">
           {working === "all"
@@ -591,7 +603,8 @@ export function RosterTab({ specialist, storeNumber }: WorkflowTabProps) {
                         {group.heading}
                       </span>
                       <span className="font-mono text-[11px] tracking-tight text-zinc-500">
-                        {group.members.length} roster · {group.onDuty} on now
+                        {formatPeopleCount(group.members.length)} ·{" "}
+                        {group.onDuty} on now
                       </span>
                     </span>
                   </span>
@@ -658,8 +671,8 @@ export function RosterTab({ specialist, storeNumber }: WorkflowTabProps) {
                               : null
                           }
                           ownedBayCaption={
-                            calledOut && ownedBays > 0
-                              ? `${ownedBays} bay${ownedBays === 1 ? "" : "s"} still assigned this week`
+                            calledOut
+                              ? formatOwnedBayCaption(ownedBays)
                               : null
                           }
                           onToggleDuty={() =>
@@ -720,6 +733,28 @@ export function RosterTab({ specialist, storeNumber }: WorkflowTabProps) {
           canShift={canShift}
           canGrant={canGrant}
           canManage={canManage}
+          availability={composeCurrentAvailability({
+            row: days[String(manageTarget.id)],
+            previousDay:
+              weekRows[
+                shiftRowKey(String(manageTarget.id), storeYesterday)
+              ],
+            now: clockNow,
+            timeZone: storeTimezone,
+          })}
+          ownedBayCaption={formatOwnedBayCaption(
+            countWeeklyOwnership(weekAssignments, String(manageTarget.id))
+          )}
+          nextCaption={
+            composeNextScheduledOpportunity({
+              rows: Object.values(weekRows).filter(
+                (row) => row.specialist_id === String(manageTarget.id)
+              ),
+              now: clockNow,
+              timeZone: storeTimezone,
+              weekLabel: assignmentWeek,
+            }).caption
+          }
           onClose={() => setManageTarget(null)}
           onAccessChange={(next) => void handleAccess(manageTarget, next)}
           onRemove={() => {
@@ -729,6 +764,28 @@ export function RosterTab({ specialist, storeNumber }: WorkflowTabProps) {
           onScheduleSaved={() => void reload()}
           onPaired={() => void reload()}
           onDetailsSaved={() => void reload()}
+          onReassign={
+            canShift &&
+            composeCurrentAvailability({
+              row: days[String(manageTarget.id)],
+              previousDay:
+                weekRows[
+                  shiftRowKey(String(manageTarget.id), storeYesterday)
+                ],
+              now: clockNow,
+              timeZone: storeTimezone,
+            }).reason === "CALLED_OUT" &&
+            (!assignmentsKnown ||
+              countWeeklyOwnership(
+                weekAssignments,
+                String(manageTarget.id)
+              ) > 0)
+              ? () => {
+                  setReassignTarget(manageTarget);
+                  setManageTarget(null);
+                }
+              : undefined
+          }
         />
       ) : null}
 
@@ -958,8 +1015,8 @@ function AddTeamMemberSheet({
           Add Team Member
         </h2>
         <p className="mt-1 text-sm text-zinc-400">
-          Name, role, and home department add them to the floor roster. Pair their
-          device later from the specialist sheet.
+          Adds this person to DeptSync&apos;s rotation workforce — not a Lowe&apos;s
+          employee record. Pair their device later from member settings.
         </p>
 
         <div className="mt-4 space-y-3">

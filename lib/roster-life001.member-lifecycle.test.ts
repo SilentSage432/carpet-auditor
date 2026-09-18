@@ -135,7 +135,7 @@ describe("ROSTER-LIFE-001 records what the member editor cannot do", () => {
     expect(sheet).toContain("issueRosterPairing");
     expect(sheet).toContain("adminResetSpecialistPin");
     expect(sheet).toContain("DepartmentAccessChips");
-    expect(sheet).toContain("Remove Specialist");
+    expect(sheet).toContain("Remove team member");
   });
 
   it("authority gating on the sheet is unchanged", () => {

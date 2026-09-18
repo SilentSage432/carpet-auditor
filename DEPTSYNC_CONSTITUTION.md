@@ -374,6 +374,14 @@ Everyday Map identity is department coverage geography. Service/velocity evidenc
 
 Floor answers who has what this week. Map answers where coverage stands across the department.
 
+### Roster participation law (UX-REDUCE-004)
+
+> **Roster represents rotation participation and schedule evidence, not employment administration.**
+
+Capability is not availability. Schedule says when someone is expected; current time determines whether now falls inside the schedule interval; call-out/absence evidence overrides expected availability. DeptSync MUST NOT pretend it has Lowe’s actual punch data.
+
+`accessible_departments` is DeptSync app authority scope — not proof of secondary workforce capability or labor allocation (WORKFORCE-SCOPE-001 remains unresolved; do not invent policy in presentation).
+
 ---
 
 ## Article XVI — Mobile-First Law

@@ -1,9 +1,9 @@
 "use client";
 
 /**
- * Compact roster row — presentation only.
+ * Compact People row — presentation only.
  * Derived availability is schedule + store-local time.
- * The switch remains the call-out exception action, not On now.
+ * Call-out is an explicit exception action, not a presence toggle.
  */
 
 import { SlidersHorizontal } from "lucide-react";
@@ -13,6 +13,7 @@ import {
   type AssociateShiftDay,
 } from "@/lib/store-ops/shift-status";
 import type { CurrentAvailability } from "@/lib/store-ops/current-availability";
+import { rosterAvailabilityToneClass } from "@/lib/store-ops/roster-people-presentation";
 import {
   appAccessLabel,
   appAccessStatus,
@@ -92,7 +93,7 @@ export function SpecialistCard({
   busy: boolean;
   canShift: boolean;
   canManageCard: boolean;
-  /** Persisted ON_DUTY (not called out / not OFF). Exception switch only. */
+  /** Persisted scheduled today (not called out / not OFF). Exception action only. */
   callOutArmed: boolean;
   nextCaption?: string | null;
   ownedBayCaption?: string | null;
@@ -102,9 +103,18 @@ export function SpecialistCard({
 }) {
   const showDuty = canShift && member.role !== "MasterAdmin";
   const calledOut = availability.reason === "CALLED_OUT";
+  const availabilityTone = rosterAvailabilityToneClass(availability);
 
   return (
-    <li className="flex min-h-12 items-center gap-2 rounded-xl border border-zinc-800 bg-zinc-950/50 px-2.5 py-1.5">
+    <li
+      className={`flex min-h-12 items-center gap-2 rounded-xl border px-2.5 py-1.5 ${
+        calledOut
+          ? "border-amber-500/35 bg-amber-950/20"
+          : "border-zinc-800 bg-zinc-950/50"
+      }`}
+      data-testid="roster-person-row"
+      data-availability={availability.reason}
+    >
       <button
         type="button"
         onClick={onManage}
@@ -118,7 +128,9 @@ export function SpecialistCard({
             </span>
             <FloorTitleBadge member={member} />
           </span>
-          <span className="mt-0.5 block font-mono text-[11px] font-semibold tracking-tight text-zinc-400">
+          <span
+            className={`mt-0.5 block font-mono text-[11px] font-semibold tracking-tight ${availabilityTone}`}
+          >
             {availabilityCaption(availability, day)}
           </span>
           {calledOut && nextCaption ? (
@@ -134,30 +146,33 @@ export function SpecialistCard({
         </span>
       </button>
 
-      {showDuty ? (
+      {showDuty && calledOut ? (
         <button
           type="button"
-          role="switch"
-          aria-checked={callOutArmed}
-          aria-label={
-            callOutArmed
-              ? `Call out ${member.name}`
-              : `Clear call-out for ${member.name}`
-          }
           disabled={busy}
           onClick={(event) => {
             event.stopPropagation();
             onToggleDuty();
           }}
-          className={`relative h-7 w-12 shrink-0 rounded-full transition ${
-            callOutArmed ? "bg-emerald-500" : "bg-zinc-600"
-          } disabled:opacity-40`}
+          className="shrink-0 rounded-lg border border-zinc-700/80 px-2 py-1.5 font-mono text-[10px] font-semibold text-zinc-300"
+          data-testid="roster-clear-call-out"
         >
-          <span
-            className={`absolute top-0.5 h-6 w-6 rounded-full bg-white transition ${
-              callOutArmed ? "left-[1.35rem]" : "left-0.5"
-            }`}
-          />
+          Clear call-out
+        </button>
+      ) : null}
+
+      {showDuty && !calledOut && callOutArmed ? (
+        <button
+          type="button"
+          disabled={busy}
+          onClick={(event) => {
+            event.stopPropagation();
+            onToggleDuty();
+          }}
+          className="shrink-0 rounded-lg border border-amber-500/40 bg-amber-950/25 px-2 py-1.5 font-mono text-[10px] font-semibold text-amber-100"
+          data-testid="roster-mark-called-out"
+        >
+          Mark called out
         </button>
       ) : null}
 
@@ -169,9 +184,10 @@ export function SpecialistCard({
             event.stopPropagation();
             onReassign();
           }}
-          className="shrink-0 rounded-lg px-2 py-1 font-mono text-[10px] font-bold uppercase tracking-wide text-amber-200/90"
+          className="shrink-0 rounded-lg px-1.5 py-1 font-mono text-[10px] font-medium text-zinc-500 underline-offset-2 hover:text-zinc-300 hover:underline"
+          data-testid="roster-reassign-recovery"
         >
-          Reassign bays
+          Reassign
         </button>
       ) : null}
 
@@ -180,7 +196,7 @@ export function SpecialistCard({
           type="button"
           onClick={onManage}
           className="btn-icon-touch text-zinc-300"
-          aria-label={`Manage ${member.name}`}
+          aria-label={`Open ${member.name}`}
         >
           <SlidersHorizontal
             className="w-4 h-4"

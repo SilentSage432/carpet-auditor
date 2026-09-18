@@ -1,5 +1,19 @@
 # DeptSync Hub — Development Journal
 
+## 2026-09-18 — UX-REDUCE-004 Roster → People & Schedules
+
+**Authorized UI tranche.** Roster is rotation participation + schedule evidence — not HR/timeclock/admin directory.
+
+### ROSTER PARTICIPATION LAW
+
+> Roster represents rotation participation and schedule evidence, not employment administration.
+
+**Presentation:** People header; home-department groups; TIME-DUTY labels including Schedule unknown for missing evidence; explicit Mark called out / Clear call-out; quiet Reassign recovery; person sheet Schedule → Member settings → DeptSync access → Device access. `accessible_departments` copy clarifies app authority, not workforce capability. WORKFORCE-SCOPE-001 not invented.
+
+**Unchanged:** schedule storage, TIME-DUTY derivation semantics (state/reason), call-out writers, reassignment modes, home department, role gates, Floor/Map, engine, schema.
+
+**Tests:** 1196 (+UX-REDUCE-004 contracts; amended TIME-DUTY/ROSTER-EDIT/LIFE). Samsung field acceptance pending. Do not start UX-REDUCE-005 automatically.
+
 ## 2026-09-18 — UX-REDUCE-003 Map → Department Coverage
 
 **Authorized UI tranche.** Map is department coverage geography / spatial coverage memory — not a second Floor, not topology implementation.

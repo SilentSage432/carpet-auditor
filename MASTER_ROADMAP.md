@@ -19,7 +19,7 @@
 - [x] **UX-REDUCE-001** — Operational UI archaeology & reduction spec (**COMPLETE** — read-only; people-first Floor recommended)
 - [x] **UX-REDUCE-002** — Floor → This Week operational simplification (**COMPLETE** engineering; Samsung field acceptance pending). People→physical-bays ownership; healthy state quieter; recovery/Floor Pad/+1 preserved; no engine/schema change
 - [x] **UX-REDUCE-003** — Map → department coverage (**COMPLETE** engineering; Samsung field acceptance pending). Physical-bay counts/language; Velocity demoted to advanced service cadence; Sell/Top secondary; investigation + seasonal preserved; Map non-mutating
-- [ ] **UX-REDUCE-004** — Roster simplification (**NOT STARTED**)
+- [x] **UX-REDUCE-004** — Roster → People & schedules (**COMPLETE** engineering; Samsung field acceptance pending). People + TIME-DUTY; schedule-first detail; call-out exception; access/device demoted; authority ≠ capability; no WORKFORCE-SCOPE-001 invention
 - [ ] **UX-REDUCE-005** — More/Admin hierarchy (**NOT STARTED**)
 - [ ] **UX-REDUCE-006** — Legacy surface retirement (**NOT STARTED**)
 - [x] **BAY-UNIT-002** — Physical bay coverage grouping (**COMPLETE** engineering; Samsung field acceptance pending). One `(department_id, aisle, bay)` = one rotation/allocation/verification unit; SELLING/TOPSTOCK remain topology surfaces; no schema; LAB-WEEK-002 labor math unchanged

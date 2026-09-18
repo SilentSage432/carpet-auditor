@@ -29,7 +29,7 @@ export function DepartmentAccessChips({
   value,
   onChange,
   disabled,
-  label = "Cross-department access",
+  label = "DeptSync access",
 }: Props) {
   const home =
     primary !== "all" && OPERATIONAL_DEPARTMENTS.includes(primary as OperationalDepartment)
@@ -51,8 +51,9 @@ export function DepartmentAccessChips({
         {label}
       </legend>
       <p className="mb-2 text-[11px] leading-snug text-zinc-500">
-        Primary department stays on.         Extra chips grant Floor / Map / Roster
-        access without changing home department.
+        Grants DeptSync app authority for Floor / Map / People. Does not mean
+        secondary workforce capability or labor allocation. Home department
+        stays locked.
       </p>
       <div className="flex flex-wrap gap-1.5">
         {OPERATIONAL_DEPARTMENTS.map((dept) => {

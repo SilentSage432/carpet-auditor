@@ -99,7 +99,7 @@ describe("explicit OFF and call-out", () => {
 });
 
 describe("missing and invalid evidence", () => {
-  it("missing schedule row never becomes On now", () => {
+  it("missing schedule row never becomes On now and labels Schedule unknown", () => {
     const result = composeCurrentAvailability({
       row: null,
       now: AT_0800,
@@ -107,7 +107,9 @@ describe("missing and invalid evidence", () => {
     });
     expect(isScheduledNow(result)).toBe(false);
     expect(result.reason).toBe("UNKNOWN");
+    expect(result.label).toBe("Schedule unknown");
     expect(result.label).not.toBe("On now");
+    expect(result.label).not.toBe("Off");
   });
 
   it("scheduled row with null clocks does not invent a shift or On now", () => {
@@ -118,6 +120,7 @@ describe("missing and invalid evidence", () => {
     });
     expect(isScheduledNow(result)).toBe(false);
     expect(result.reason).toBe("UNKNOWN");
+    expect(result.label).toBe("Schedule unknown");
   });
 
   it("does not treat missing evidence as explicit OFF_TODAY", () => {
@@ -411,11 +414,13 @@ describe("physical bay + mounted consumers", () => {
     expect(floor).not.toMatch(/DEFAULT_SHIFT_HOURS/);
   });
 
-  it("Roster shows derived availability separately from the call-out switch", () => {
+  it("Roster shows derived availability separately from explicit call-out actions", () => {
     const card = readRepo("components/hub/SpecialistCard.tsx");
     const roster = readRepo("components/hub/tabs/RosterTab.tsx");
     expect(card).toMatch(/availability\.label/);
-    expect(card).toMatch(/call out|Call-out exception/i);
+    expect(card).toMatch(/Mark called out/);
+    expect(card).toMatch(/Clear call-out/);
+    expect(card).not.toMatch(/role=\"switch\"/);
     expect(roster).toMatch(/composeCurrentAvailability/);
     expect(roster).toMatch(/markCallOut/);
   });

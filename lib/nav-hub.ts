@@ -123,7 +123,7 @@ export function workflowTabTitle(
   working?: ReturnType<typeof workingDepartment>
 ): string {
   if (href === "/admin/store-map") return "Store Map";
-  if (href === "/roster") return "Team Roster";
+  if (href === "/roster") return "People";
   if (href === "/settings") return "More";
   const scope =
     working ?? (specialist ? workingDepartment(specialist) : "all");
@@ -172,10 +172,10 @@ const PRIMARY_LINKS: NavHubLink[] = [
   },
   {
     href: "/roster",
-    label: "Team Roster",
+    label: "People",
     shortLabel: "Roster",
     icon: "users",
-    description: "Team, PINs, and department access",
+    description: "People, schedules, and availability",
   },
   {
     href: "/settings",

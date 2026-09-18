@@ -1,11 +1,13 @@
 "use client";
 
 /**
- * Specialist management sheet — presentation + action wiring.
+ * Member management sheet — presentation + action wiring.
  * Schedule persist: AssociateScheduleModal → associate_shift_days.
  * Grants persist: POST /api/admin/department-access → store_specialists.
  * Pairing: POST /api/roster/pair → invite_token_hash (QR overlay).
  * PIN persist: adminResetSpecialistPin → store_specialists.
+ *
+ * UX-REDUCE-004: Schedule before settings/access. Authority scope ≠ workforce capability.
  */
 
 import { useEffect, useState } from "react";
@@ -28,6 +30,7 @@ import { NumberField } from "@/components/ui/NumberField";
 import { composeAccessibleDepartments } from "@/lib/department-access";
 import { formatPhoneDisplay, normalizePhoneE164 } from "@/lib/phone";
 import { adminResetSpecialistPin, appAccessStatus } from "@/lib/specialists";
+import type { CurrentAvailability } from "@/lib/store-ops/current-availability";
 import {
   issueRosterPairing,
   updateMemberWorkforceDetails,
@@ -52,12 +55,16 @@ export function SpecialistEditSheet({
   canShift,
   canGrant,
   canManage,
+  availability = null,
+  ownedBayCaption = null,
+  nextCaption = null,
   onClose,
   onAccessChange,
   onRemove,
   onScheduleSaved,
   onPaired,
   onDetailsSaved,
+  onReassign,
 }: {
   actor: StoreSpecialist;
   member: StoreSpecialist;
@@ -65,12 +72,16 @@ export function SpecialistEditSheet({
   canShift: boolean;
   canGrant: boolean;
   canManage: boolean;
+  availability?: CurrentAvailability | null;
+  ownedBayCaption?: string | null;
+  nextCaption?: string | null;
   onClose: () => void;
   onAccessChange: (next: OperationalDepartment[]) => void;
   onRemove: () => void;
   onScheduleSaved: () => void;
   onPaired: () => void;
   onDetailsSaved: () => void;
+  onReassign?: () => void;
 }) {
   const [pinOpen, setPinOpen] = useState(false);
   const [newPin, setNewPin] = useState("");
@@ -254,7 +265,7 @@ export function SpecialistEditSheet({
         <div className="mb-3 flex items-start justify-between gap-3">
           <div className="min-w-0">
             <p className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-accent">
-              Specialist management
+              Team member
             </p>
             <h2
               id="specialist-edit-title"
@@ -262,11 +273,40 @@ export function SpecialistEditSheet({
             >
               <span className="truncate">{member.name}</span>
               <FloorTitleBadge member={member} />
-              <AppAccessBadge member={member} />
             </h2>
             <p className="mt-0.5 font-mono text-[11px] tracking-tight text-zinc-400">
               {departmentRosterHeading(home)}
+              {availability ? ` · ${availability.label}` : ""}
             </p>
+            {availability?.reason === "CALLED_OUT" ? (
+              <div className="mt-2 space-y-1 rounded-xl border border-amber-500/30 bg-amber-950/20 px-2.5 py-2">
+                {ownedBayCaption ? (
+                  <p className="font-mono text-[11px] text-amber-100/90">
+                    {ownedBayCaption}
+                  </p>
+                ) : (
+                  <p className="font-mono text-[11px] text-amber-100/90">
+                    Weekly bay ownership stays unless you reassign.
+                  </p>
+                )}
+                {nextCaption ? (
+                  <p className="font-mono text-[11px] text-zinc-400">
+                    {nextCaption}
+                  </p>
+                ) : null}
+                {onReassign ? (
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={onReassign}
+                    className="mt-1 font-mono text-[11px] font-semibold text-zinc-300 underline-offset-2 hover:underline"
+                    data-testid="member-reassign-recovery"
+                  >
+                    Reassign bays (recovery)
+                  </button>
+                ) : null}
+              </div>
+            ) : null}
           </div>
           <button
             type="button"
@@ -278,11 +318,26 @@ export function SpecialistEditSheet({
           </button>
         </div>
 
-        {canEditDetails ? (
+        {showSchedule ? (
           <section className="border-t border-zinc-800/80 pt-3">
+            <p className="mb-2 font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-zinc-500">
+              Schedule
+            </p>
+            <AssociateScheduleModal
+              member={member}
+              homeLabel={departmentRosterHeading(home)}
+              embedded
+              onClose={onClose}
+              onSaved={onScheduleSaved}
+            />
+          </section>
+        ) : null}
+
+        {canEditDetails ? (
+          <section className="mt-4 border-t border-zinc-800/80 pt-3">
             <div className="flex items-center justify-between gap-2">
               <p className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-zinc-500">
-                Member details
+                Member settings
               </p>
               {!detailsOpen ? (
                 <button
@@ -348,6 +403,11 @@ export function SpecialistEditSheet({
                   </label>
                 ) : null}
 
+                <p className="text-[11px] text-zinc-500">
+                  Home department is read-only. Changing home department is a
+                  workforce-scope decision, not a detail edit.
+                </p>
+
                 {detailsError ? (
                   <p
                     className="text-center text-sm font-semibold text-rose-300"
@@ -375,11 +435,6 @@ export function SpecialistEditSheet({
                     {detailsSaving ? "Saving…" : "Save details"}
                   </button>
                 </div>
-
-                <p className="text-[11px] text-zinc-500">
-                  Corrects who this person is on the floor. App access, PIN, and
-                  pairing stay under administrative actions.
-                </p>
               </div>
             ) : (
               <p className="mt-1 font-mono text-[11px] tracking-tight text-zinc-400">
@@ -389,21 +444,9 @@ export function SpecialistEditSheet({
           </section>
         ) : null}
 
-        {showSchedule ? (
-          <section className="mt-4 border-t border-zinc-800/80 pt-3">
-            <AssociateScheduleModal
-              member={member}
-              homeLabel={departmentRosterHeading(home)}
-              embedded
-              onClose={onClose}
-              onSaved={onScheduleSaved}
-            />
-          </section>
-        ) : null}
-
         {member.role === "MasterAdmin" ? (
           <p className="mt-3 text-[11px] text-zinc-500">
-            Full-store access — chips are not required.
+            Full-store DeptSync access — department grants are not required.
           </p>
         ) : grantable ? (
           <section className="mt-4 border-t border-zinc-800/80 pt-3">
@@ -415,12 +458,17 @@ export function SpecialistEditSheet({
               )}
               disabled={busy}
               onChange={onAccessChange}
+              label="DeptSync access"
             />
           </section>
         ) : (
           <section className="mt-4 border-t border-zinc-800/80 pt-3">
             <p className="mb-1.5 text-sm font-medium text-slate-200">
-              Cross-department access
+              DeptSync access
+            </p>
+            <p className="mb-2 text-[11px] leading-snug text-zinc-500">
+              App authority scope for Floor / Map / People — not proof of
+              secondary workforce capability.
             </p>
             <div className="flex flex-wrap gap-1">
               {composeAccessibleDepartments(
@@ -446,8 +494,11 @@ export function SpecialistEditSheet({
         {showInvite || showPin || showRemove ? (
           <section className="mt-4 space-y-2 border-t border-zinc-800/80 pt-3">
             <p className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-zinc-500">
-              Administrative actions
+              Device access
             </p>
+            <div className="mb-1 flex items-center gap-1.5">
+              <AppAccessBadge member={member} />
+            </div>
             {showInvite ? (
               <button
                 type="button"
@@ -513,7 +564,7 @@ export function SpecialistEditSheet({
                 className="flex min-h-11 w-full items-center justify-center gap-1.5 rounded-xl border border-rose-500/40 bg-rose-950/30 text-sm font-bold text-rose-100"
               >
                 <Trash2 className="h-4 w-4" strokeWidth={ICON_STROKE} aria-hidden />
-                Remove Specialist
+                Remove team member
               </button>
             ) : null}
           </section>

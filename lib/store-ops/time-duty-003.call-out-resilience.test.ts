@@ -234,7 +234,12 @@ describe("mounted contract", () => {
     const reassignAt = roster.indexOf("async function applyReassign");
     const reassignFn = roster.slice(reassignAt, reassignAt + 1200);
     expect(reassignFn).toMatch(/redistributeCallOutBays/);
-    expect(readRepo("components/hub/SpecialistCard.tsx")).toMatch(/Reassign bays/);
+    expect(readRepo("components/hub/SpecialistCard.tsx")).toMatch(
+      /roster-reassign-recovery/
+    );
+    expect(readRepo("components/hub/SpecialistEditSheet.tsx")).toMatch(
+      /Reassign bays \(recovery\)/
+    );
     expect(roster).toMatch(/setReassignTarget/);
     expect(roster).toMatch(/composeNextScheduledOpportunity/);
     expect(roster).not.toMatch(/Attendance|no-show|Missed work|Failed shift/i);
