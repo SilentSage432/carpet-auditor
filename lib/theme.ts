@@ -13,6 +13,7 @@ export const THEME_IDS = [
   "obsidian",
   "cobalt",
   "solar",
+  "amethyst",
 ] as const;
 
 export type ThemeId = (typeof THEME_IDS)[number];
@@ -22,6 +23,7 @@ export const PRIMARY_THEME_IDS = [
   "midnight",
   "cobalt",
   "emerald",
+  "amethyst",
   "solar",
 ] as const;
 
@@ -92,6 +94,18 @@ export const THEME_PRESETS: readonly ThemePreset[] = [
       surface: "#18181b",
       accent: "#34d399",
       secondary: "#10b981",
+    },
+  },
+  {
+    id: "amethyst",
+    label: "Royal Amethyst",
+    description: "Deep charcoal / royal violet handheld theme",
+    themeColor: "#0a0712",
+    swatch: {
+      void: "#0a0712",
+      surface: "#15101c",
+      accent: "#c4b5fd",
+      secondary: "#7c3aed",
     },
   },
   {

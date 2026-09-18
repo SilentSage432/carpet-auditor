@@ -55,6 +55,32 @@
   --shadow: rgb(0 0 0 / 0.5);
 }
 
+[data-theme="amethyst"] {
+  --background: #0a0712;
+  --foreground: #f4f1f8;
+  --surface: #15101c;
+  --surface-raised: #22182f;
+  --surface-glass: rgb(21 16 28 / 0.84);
+  --panel-bg: rgb(21 16 28 / 0.94);
+  --input-bg: rgb(10 7 18 / 0.86);
+  --border: #3a2d4e;
+  --border-strong: #c4b5fd;
+  --accent: #c4b5fd;
+  --accent-strong: #7c3aed;
+  --accent-fg: #f5f3ff;
+  --accent-fg-soft: #ede9fe;
+  --accent-cyan: #a78bfa;
+  --success: #34d399;
+  --warning: #fbbf24;
+  --danger: #f87171;
+  --muted: #b0a9c2;
+  --wash-primary: rgb(124 58 237 / 0.16);
+  --wash-secondary: rgb(46 16 80 / 0.36);
+  --wash-void: rgb(10 7 18 / 0.93);
+  --glow-accent: rgb(196 181 253 / 0.38);
+  --shadow: rgb(0 0 0 / 0.55);
+}
+
 [data-theme="amber"] {
   --background: #0a0906;
   --foreground: #faf6eb;

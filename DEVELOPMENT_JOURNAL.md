@@ -1,5 +1,11 @@
 # DeptSync Hub — Development Journal
 
+## 2026-09-18 — HANDHELD-UX-002 Royal Amethyst theme
+
+**Authorized bounded implementation.** Baseline `main @ d5a6b24`. Fifth mounted theme: internal id `amethyst`, label Royal Amethyst. Existing `lib/theme.ts` catalog + `[data-theme]` tokens only. Semantic `--success/--warning/--danger` stay emerald/amber/rose. Operational UI literals not remapped. Default Cyber-Dark. Device-local persistence. Samsung visual acceptance pending.
+
+Canonical: [`docs/product/HANDHELD_UX_002_ROYAL_AMETHYST_THEME.md`](docs/product/HANDHELD_UX_002_ROYAL_AMETHYST_THEME.md). Do not start HANDHELD-UX-003 / UX-REDUCE-006 / PERF-LOAD-003.
+
 ## 2026-09-18 — HANDHELD-UX-001 Appearance & floor experience archaeology
 
 **Read-only.** No theme/density/contrast/sound/haptic/Wake Lock/operational UI mutation. Baseline `main @ d47c280`. PRIORITY-UX-002 not modified.

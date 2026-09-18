@@ -404,6 +404,15 @@ Exact CSS is implementation. Reachability, one-handed usability, and appropriate
 
 Primary elevated chrome (conceptual): **Floor · Map · Roster · More** (route implementation MAY use `/settings` while labeling **More**). Associates MAY see a reduced operate set (e.g. My Shift + Map).
 
+### Handheld personalization law (HANDHELD-UX-002)
+
+> **Personalization may change how DeptSync feels. It may not change what DeptSync means.**
+
+> **Theme changes personality. Semantic state preserves meaning.**
+
+Appearance, density, contrast, sound, and haptics MAY change device-local feel. They MUST NOT change operational meaning. Theme accent MAY own navigation, selection, primary actions, decorative glow, and focus personality. Theme accent MUST NOT own Covered, This week, Needs attention, Remaining, High priority, Seasonal, Called out, On now, destructive, success, warning, failure, or offline/sync state. Visual personalization MUST NOT regress operational P0 render.
+
+
 ---
 
 ## Article XVII — Configuration vs Operation Law
