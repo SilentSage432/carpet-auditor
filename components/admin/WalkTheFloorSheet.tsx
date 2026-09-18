@@ -67,7 +67,7 @@ const INTENSITY_ACTIONS: ReadonlyArray<{
   },
   {
     intensity: "critical_hole",
-    label: "True Hole / High Priority",
+    label: "True hole",
     hint: "Empty or critical gap",
     className:
       "border-rose-500/45 bg-rose-950/40 text-rose-100 hover:bg-rose-900/50",

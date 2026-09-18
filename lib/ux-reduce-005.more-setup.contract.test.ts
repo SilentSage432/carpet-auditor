@@ -71,16 +71,9 @@ describe("UX-REDUCE-005 More setup & administration", () => {
     expect(settings).toMatch(/Coverage cadence inputs/);
   });
 
-  it("weekly targets are Master Admin advanced, not DS primary", () => {
-    expect(settings).toMatch(
-      /more-master-admin[\s\S]*WeeklyBayTargetCard/
-    );
-    // Not mounted in Department Setup / Rotation Setup primary cards.
-    const deptBlock = settings.slice(
-      settings.indexOf('data-testid="more-department-setup"'),
-      settings.indexOf('data-testid="more-rotation-setup"')
-    );
-    expect(deptBlock).not.toContain("WeeklyBayTargetCard");
+  it("weekly targets are not a mounted More control", () => {
+    expect(settings).not.toContain("WeeklyBayTargetCard");
+    expect(settings).toMatch(/three physical bays per eligible[\s\S]*associate/);
     expect(matrix).toMatch(/three physical bays per eligible associate/);
   });
 
@@ -91,10 +84,10 @@ describe("UX-REDUCE-005 More setup & administration", () => {
     expect(settings).toMatch(/not everyday DS workflow/);
   });
 
-  it("fiscal and taxonomies sit under collapsed Master Admin", () => {
-    expect(settings).toMatch(/more-master-admin[\s\S]*FiscalCoverageCard/);
-    expect(settings).toMatch(/Catalog taxonomies/);
-    expect(settings).toMatch(/retirement candidate/);
+  it("fiscal and taxonomies are unmounted from More", () => {
+    expect(settings).not.toMatch(/FiscalCoverageCard/);
+    expect(settings).not.toMatch(/Catalog taxonomies/);
+    expect(settings).not.toMatch(/TaxonomyManagerModal/);
   });
 
   it("specialty residue stays disconnected from primary More", () => {

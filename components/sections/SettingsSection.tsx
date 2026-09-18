@@ -14,7 +14,6 @@ import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import {
   ChevronDown,
-  ChevronRight,
   ChevronUp,
   Layers,
   NotebookPen,
@@ -31,12 +30,11 @@ import { ThemeSelector } from "@/components/settings/ThemeSelector";
 import { SyncQueuePanel } from "@/components/settings/SyncQueuePanel";
 import {
   clearLocalApplianceScans,
-  countLocalApplianceScans,
 } from "@/lib/appliance-scans";
 import { usePendingSyncCount, useSyncQueueSummary } from "@/lib/network";
 import { selectOnFocus } from "@/lib/number-input";
 import { canManageMapConsole, isMasterAdmin } from "@/lib/rbac";
-import { clearLocalRemnants, countLocalRemnants } from "@/lib/remnants";
+import { clearLocalRemnants } from "@/lib/remnants";
 import { buildExecutiveFloorPadHref } from "@/lib/specialty-tools";
 import { isSupervisor } from "@/lib/specialists";
 import {
@@ -73,24 +71,10 @@ const AisleBayManager = dynamic(
     ),
   { ssr: false }
 );
-const WeeklyBayTargetCard = dynamic(
-  () =>
-    import("@/components/hub/WeeklyBayTargetCard").then(
-      (mod) => mod.WeeklyBayTargetCard
-    ),
-  { ssr: false }
-);
 const SundayScheduleCard = dynamic(
   () =>
     import("@/components/admin/SundayScheduleCard").then(
       (mod) => mod.SundayScheduleCard
-    ),
-  { ssr: false }
-);
-const FiscalCoverageCard = dynamic(
-  () =>
-    import("@/components/admin/FiscalCoverageCard").then(
-      (mod) => mod.FiscalCoverageCard
     ),
   { ssr: false }
 );
@@ -108,13 +92,6 @@ const ForceRotationModal = dynamic(
     ),
   { ssr: false }
 );
-const TaxonomyManagerModal = dynamic(
-  () =>
-    import("@/components/catalog/TaxonomyManagerModal").then(
-      (mod) => mod.TaxonomyManagerModal
-    ),
-  { ssr: false }
-);
 
 type Props = {
   activeSpecialist: StoreSpecialist | null;
@@ -128,7 +105,6 @@ type SettingsAccordion =
   | "device"
   | "store"
   | "bulk"
-  | "taxonomies"
   | null;
 
 const ICON_STROKE = 1.75;
@@ -150,12 +126,10 @@ export function SettingsSection({
   const [openSection, setOpenSection] = useState<SettingsAccordion>(null);
   const [masterOpen, setMasterOpen] = useState(false);
   const [seasonalMounted, setSeasonalMounted] = useState(false);
-  const [cacheTick, setCacheTick] = useState(0);
   const [cacheMsg, setCacheMsg] = useState<string | null>(null);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [locations, setLocations] = useState<StoreLocation[]>([]);
   const [forceOpen, setForceOpen] = useState(false);
-  const [taxonomyOpen, setTaxonomyOpen] = useState(false);
   const [adminGraphLoaded, setAdminGraphLoaded] = useState(false);
 
   const configured = isSupabaseConfigured();
@@ -170,18 +144,9 @@ export function SettingsSection({
   const pathname = usePathname();
   const router = useRouter();
 
-  void cacheTick;
-  const applianceAuditCache = countLocalApplianceScans(storeNumber);
-  const remnantInventoryCache = countLocalRemnants();
-
-  const refreshCacheCounts = useCallback(() => {
-    setCacheTick((n) => n + 1);
-  }, []);
-
   const needTopologyGraph =
     openSection === "bulk" ||
     forceOpen ||
-    taxonomyOpen ||
     (masterOpen && masterSession);
 
   const reloadDepts = useCallback(async () => {
@@ -260,9 +225,7 @@ export function SettingsSection({
       ) {
         router.replace(buildExecutiveFloorPadHref());
       } else if (hash === "taxonomies") {
-        setMasterOpen(true);
-        setOpenSection("taxonomies");
-        setTaxonomyOpen(true);
+        // UX-REDUCE-007: catalog taxonomy manager unmounted from More.
       } else if (hash === "sync-queue") {
         setOpenSection("device");
         window.setTimeout(() => {
@@ -309,7 +272,7 @@ export function SettingsSection({
     }
     try {
       const { error } = await client
-        .from("appliance_scans")
+        .from("store_locations")
         .select("count", { count: "exact", head: true });
       setPing(error ? "fail" : "ok");
     } catch {
@@ -336,7 +299,6 @@ export function SettingsSection({
     clearLocalApplianceScans(storeNumber);
     clearLocalRemnants(storeNumber);
     purgeSyncQueue(storeNumber);
-    refreshCacheCounts();
     setCacheMsg("Local operational caches cleared.");
     window.setTimeout(() => setCacheMsg(null), 3000);
   }
@@ -589,18 +551,6 @@ export function SettingsSection({
               </div>
               <ul className="mt-2 space-y-1.5 text-sm text-slate-300">
                 <li className="flex justify-between gap-3 rounded-lg bg-slate-950/70 px-3 py-2">
-                  <span>Appliance audit cache</span>
-                  <span className="font-mono text-emerald-400">
-                    {applianceAuditCache}
-                  </span>
-                </li>
-                <li className="flex justify-between gap-3 rounded-lg bg-slate-950/70 px-3 py-2">
-                  <span>Remnant inventory cache</span>
-                  <span className="font-mono text-emerald-400">
-                    {remnantInventoryCache}
-                  </span>
-                </li>
-                <li className="flex justify-between gap-3 rounded-lg bg-slate-950/70 px-3 py-2">
                   <span>Pending queue</span>
                   <span className="font-mono text-amber-300">{pending}</span>
                 </li>
@@ -641,14 +591,12 @@ export function SettingsSection({
           <div id="settings-targets" className="space-y-4">
             <p className="text-[11px] leading-snug text-zinc-500">
               Automatic Sunday plans use three physical bays per eligible
-              associate. Controls below are recovery and legacy-compatible
-              administration — not everyday DS workflow.
+              associate. Controls below are recovery and store configuration —
+              not everyday DS workflow.
             </p>
-            <WeeklyBayTargetCard specialist={activeSpecialist} />
             <div id="sunday-schedule">
               <SundayScheduleCard specialist={activeSpecialist} />
             </div>
-            <FiscalCoverageCard specialist={activeSpecialist} />
             <button
               type="button"
               onClick={() => setForceOpen(true)}
@@ -662,28 +610,6 @@ export function SettingsSection({
               Advanced recovery · Generate this week
             </button>
           </div>
-
-          <Accordion
-            title="Catalog taxonomies"
-            subtitle="Legacy folder trees · retirement candidate"
-            open={openSection === "taxonomies"}
-            onToggle={() => toggleSection("taxonomies")}
-          >
-            <button
-              type="button"
-              onClick={() => setTaxonomyOpen(true)}
-              className="flex min-h-12 w-full items-center justify-between rounded-xl border border-slate-700 bg-slate-950 px-4 text-left"
-            >
-              <span className="text-sm font-semibold text-slate-100">
-                Open taxonomy manager
-              </span>
-              <ChevronRight
-                className="h-4 w-4 text-slate-500"
-                strokeWidth={ICON_STROKE}
-                aria-hidden
-              />
-            </button>
-          </Accordion>
 
           <Accordion
             id="store"
@@ -713,13 +639,6 @@ export function SettingsSection({
             setForceOpen(false);
             void reloadDepts();
           }}
-        />
-      ) : null}
-      {taxonomyOpen ? (
-        <TaxonomyManagerModal
-          open={taxonomyOpen}
-          onClose={() => setTaxonomyOpen(false)}
-          departments={departments}
         />
       ) : null}
     </div>

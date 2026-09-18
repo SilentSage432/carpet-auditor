@@ -374,6 +374,8 @@ Everyday Map identity is department coverage geography. Service/velocity evidenc
 
 Manual coverage priority (PRIORITY-UX-002) MAY appear on Map as a narrow operational declaration (Standard / High) on existing physical bays. That capability MUST NOT be implemented by enabling generic topology mutation (`canMutate=true`). High MUST increase selection pressure among currently owed/eligible coverage and MUST NOT independently re-admit completed coverage into the active cycle.
 
+Call-out and absence evidence MUST NOT write `priority_override`. Existing High remains High; Standard remains Standard. Unresolved coverage remains owed through weekly ownership and carryover — not by manufacturing manual High.
+
 Floor answers who has what this week. Map answers where coverage stands across the department.
 
 ### Roster participation law (UX-REDUCE-004)

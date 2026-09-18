@@ -47,9 +47,10 @@ async function stampCarryOverLocations(
   const now = new Date().toISOString();
   const unique = [...new Set(locationIds.filter(Boolean))];
   for (const locId of unique) {
+    // TIME-DUTY / PRIORITY-UX-002: carry preserves unresolved obligation.
+    // It MUST NOT manufacture manual High (priority_override).
     await patchStoreLocation(actor, locId, {
       status: "CARRIED_OVER",
-      priority_override: true,
       carried_over: true,
       last_carried_over_at: now,
     });

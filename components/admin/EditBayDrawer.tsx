@@ -12,11 +12,7 @@ import {
 } from "@/lib/store-ops/client";
 import {
   formatBayTag,
-  LOCATION_WORKFLOW_TYPES,
-  locationWorkflowLabel,
-  parseLocationWorkflowType,
   type Department,
-  type LocationWorkflowType,
   type StoreLocation,
 } from "@/lib/store-ops/types";
 import type { StoreSpecialist } from "@/lib/types";
@@ -47,9 +43,6 @@ export function EditBayDrawer({
   );
   const [departmentId, setDepartmentId] = useState(
     primary?.department_id ?? departments[0]?.id ?? ""
-  );
-  const [workflowType, setWorkflowType] = useState<LocationWorkflowType>(() =>
-    parseLocationWorkflowType(primary?.workflow_type)
   );
   const [saving, setSaving] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -95,7 +88,6 @@ export function EditBayDrawer({
           aisle: aisleCode,
           bay: bayNumber,
           department_id: departmentId,
-          workflow_type: workflowType,
         });
       }
       toastSuccess(`Saved ${formatBayTag({ aisle: aisleCode, bay: bayNumber })}`);
@@ -207,23 +199,6 @@ export function EditBayDrawer({
             {sortedDepts.map((row) => (
               <option key={row.id} value={row.id}>
                 {row.name} ({row.code})
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label className="mt-3 block space-y-1.5">
-          <span className="text-sm font-medium text-zinc-200">Bay workflow</span>
-          <select
-            value={workflowType}
-            onChange={(e) =>
-              setWorkflowType(parseLocationWorkflowType(e.target.value))
-            }
-            className="min-h-12 w-full rounded-xl border border-zinc-700 bg-zinc-900 px-3 text-sm text-zinc-100"
-          >
-            {LOCATION_WORKFLOW_TYPES.map((value) => (
-              <option key={value} value={value}>
-                {locationWorkflowLabel(value)}
               </option>
             ))}
           </select>

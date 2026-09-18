@@ -166,12 +166,12 @@ describe("TOPO-UX-001 continuous mapping source contracts", () => {
     expect(generator).toContain('data-testid="bulk-generator-status"');
   });
 
-  it("preserves close-on-success for CSV, AI, cleanup, and apply-workflow", () => {
+  it("preserves close-on-success for CSV, AI, and cleanup", () => {
     const generator = readRepo("components/admin/BulkLocationGenerator.tsx");
     expect(generator).toContain('onGenerated({ source: "csv" })');
     expect(generator).toContain('onGenerated({ source: "ai" })');
     expect(generator).toContain('onGenerated({ source: "cleanup" })');
-    expect(generator).toContain('onGenerated({ source: "apply_workflow" })');
+    expect(generator).not.toContain('onGenerated({ source: "apply_workflow" })');
     expect(generator).not.toMatch(/onGenerated\(\)/);
   });
 

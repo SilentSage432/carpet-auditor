@@ -83,10 +83,10 @@ function worstTier(pair: BayPair): VelocityTier {
   return "standard";
 }
 
-function tierLabel(tier: VelocityTier): string {
-  if (tier === "critical_hotspot") return "CRITICAL";
-  if (tier === "high") return "HIGH";
-  return "STANDARD";
+function cadenceLabel(tier: VelocityTier): string | null {
+  if (tier === "critical_hotspot") return "Service hotspot";
+  if (tier === "high") return "Fast cadence";
+  return null;
 }
 
 function aisleTitle(aisle: string): string {
@@ -417,9 +417,11 @@ export function AisleBayManager({
                                     Topstock
                                   </span>
                                 ) : null}
-                                <span className="inline-flex items-center rounded-full border border-zinc-700 px-2 py-0.5 font-mono text-[10px] font-bold tracking-tight text-zinc-300">
-                                  {tierLabel(tier)}
-                                </span>
+                                {cadenceLabel(tier) ? (
+                                  <span className="inline-flex items-center rounded-full border border-zinc-700 px-2 py-0.5 font-mono text-[10px] font-bold tracking-tight text-zinc-300">
+                                    {cadenceLabel(tier)}
+                                  </span>
+                                ) : null}
                                 {pair.selling?.priority_override ||
                                 pair.topstock?.priority_override ? (
                                   <span className="inline-flex items-center rounded-full border border-amber-500/40 bg-amber-950/40 px-2 py-0.5 font-mono text-[10px] font-bold tracking-tight text-amber-100">

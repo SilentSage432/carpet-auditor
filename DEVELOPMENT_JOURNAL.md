@@ -1,5 +1,13 @@
 # DeptSync Hub — Development Journal
 
+## 2026-09-18 — UX-REDUCE-007 final legacy surface & residue retirement
+
+**Authorized bounded implementation.** Baseline `main @ c49709f`. Not a redesign. Handheld theme untouched.
+
+Retired mounted residue: Bulk Priority Lock + velocity radios, Edit Bay/Bulk Bay Workflow, More taxonomy/fiscal/weekly-target cards, specialty cache chrome. Call-out carry no longer writes `priority_override`. Walk “True hole”; Floor Pad observation labels. SpecialtyToolsHost deferred. Schema retained.
+
+Canonical: [`docs/product/UX_REDUCE_007_FINAL_LEGACY_SURFACE_RESIDUE_RETIREMENT.md`](docs/product/UX_REDUCE_007_FINAL_LEGACY_SURFACE_RESIDUE_RETIREMENT.md). Do not start UX-REDUCE-008 / PERF-LOAD-003 / HANDHELD-UX-003.
+
 ## 2026-09-18 — HANDHELD-UX-002 Royal Amethyst theme
 
 **Authorized bounded implementation.** Baseline `main @ d5a6b24`. Fifth mounted theme: internal id `amethyst`, label Royal Amethyst. Existing `lib/theme.ts` catalog + `[data-theme]` tokens only. Semantic `--success/--warning/--danger` stay emerald/amber/rose. Operational UI literals not remapped. Default Cyber-Dark. Device-local persistence. Samsung visual acceptance pending.

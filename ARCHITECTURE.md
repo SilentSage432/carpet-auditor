@@ -122,7 +122,7 @@ components/admin/WalkTheFloorSheet.tsx → seasonal context detail
 lib/store-ops/fiscal-calendar.ts  → FS-001 authority (import/validate/resolve) + FS-001A `computeFiscalCoverage` (derived; Master signal)
 app/api/fiscal-calendar/route.ts  → GET Supervisor+ fiscal context for store-local date (additive; rotations unaffected)
 app/api/admin/fiscal-calendar/coverage/route.ts → GET Master-only coverage status (HEALTHY/ATTENTION/URGENT/EXPIRED)
-components/admin/FiscalCoverageCard.tsx → More→Settings Master coverage signal
+components/admin/FiscalCoverageCard.tsx → retained; UX-REDUCE-007 unmounted the Master Admin card (engine/fiscal context still used)
 supabase/migrations/20260905_fiscal_calendar.sql → `fiscal_years` + `fiscal_weeks` (**LIVE**; FY2026 COMPANY_PUBLISHED seeded)
 data/fiscal-calendars/lowes-fy2026-company-published.json → Versioned Lowe's FY2026 import artifact (not runtime hard-code)
 supabase/migrations/20260816_sunday_rotation_schedule.sql → stores.sunday_auto_generate / sunday_auto_stage_time / timezone
@@ -350,7 +350,7 @@ supabase/migrations/20260812_sunday_bay_assignments.sql → sunday specialist↔
    - APIs: `/api/appliances/catalog`, `/api/appliances/scans` (`GET|POST|PATCH|DELETE`), `/api/appliances/audits`, `/api/appliances/audits/consideration`
 3. **Universal / Appliance Catalog** — removed from bottom nav; SKU linking via Quick-Add / scan teach + **Manage appliance mappings** sheet (`appliance_catalog`). `/catalog` redirects to `/appliances`.
 4. **Remnant Rack** — Settings accordion (`#remnants`) when RBAC allows
-5. **Settings** — theme, PIN, weekly targets, push, device/sync; Master: bulk / taxonomies / force rotation / store #. Floor Pad lives on Floor.
+5. **Settings** — theme, PIN, push, device/sync (pending + quarantined); Master: aisles/bays, Seasonal Context, Sunday schedule, Force recovery, store #. Floor Pad lives under More. Weekly targets / fiscal admin / taxonomies unmounted (UX-REDUCE-007); fields retained.
 
 ## Dual audit modes
 

@@ -227,6 +227,7 @@ describe("mounted contract", () => {
     expect(recordFn).not.toMatch(/applySundayAssignmentPlan/);
     expect(recordFn).not.toMatch(/clearSundayBayAssignment/);
     expect(recordFn).not.toMatch(/markSundayBaysCarriedOver/);
+    expect(recordFn).not.toMatch(/priority_override/);
   });
 
   it("optional reassign remains explicit and reuses existing pool/auto/carry", () => {

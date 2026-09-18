@@ -520,7 +520,7 @@ describe("PRIORITY-UX-002 Map / More contracts", () => {
     expect(edit).not.toMatch(/Lock Priority Override/);
     expect(edit).not.toMatch(/High-Velocity Hotspot/);
     expect(edit).not.toMatch(/Custom decay/);
-    expect(edit).toMatch(/Bay workflow/);
+    expect(edit).not.toMatch(/Bay workflow/);
     expect(edit).toMatch(/Save bay/);
     expect(edit).toMatch(/Delete bay/);
     expect(more).toMatch(/Edit/);

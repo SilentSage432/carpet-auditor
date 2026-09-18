@@ -97,6 +97,12 @@ function priorityClass(priority: WalkTaskPriority): string {
   return "border-zinc-600/60 bg-zinc-900/70 text-zinc-200";
 }
 
+function observationPriorityLabel(priority: WalkTaskPriority): string {
+  if (priority === "P1_CRITICAL") return "Urgent observation";
+  if (priority === "P2_HIGH") return "Elevated observation";
+  return "Routine note";
+}
+
 function categoryLabel(category: string): string {
   return category.replaceAll("_", " ");
 }
@@ -664,7 +670,7 @@ export function TacticalVoiceFloorPad({
                           ) : (
                             <CheckCircle2 className="w-4 h-4" strokeWidth={1.75} />
                           )}
-                          {card.priority.replace("_", " ")}
+                          {observationPriorityLabel(card.priority)}
                         </button>
                         <button
                           type="button"

@@ -20,18 +20,7 @@ import type {
   StoreLocation,
   StoreLocationType,
 } from "@/lib/store-ops/types";
-import {
-  LOCATION_WORKFLOW_TYPES,
-  locationWorkflowLabel,
-  parseLocationWorkflowType,
-} from "@/lib/store-ops/types";
-import type { StoreSpecialist } from "@/lib/types";
-import {
-  parseVelocitySeedPreset,
-  type VelocitySeedPreset,
-  VELOCITY_CADENCE_HIGH_DAYS,
-  VELOCITY_CADENCE_STANDARD_DAYS,
-} from "@/lib/store-ops/velocity";
+import { parseVelocitySeedPreset } from "@/lib/store-ops/velocity";
 import {
   formatManualBulkSavedMessage,
   workflowTypeForDepartmentCode,
@@ -39,12 +28,12 @@ import {
 } from "@/lib/store-ops/bulk-mapping-session";
 import {
   aiParseLocations,
-  applyDepartmentWorkflowType,
   bulkGenerateLocations,
   deleteStoreLocations,
   fetchStoreLocationsDetailed,
   type AiParsedLocationClient,
 } from "@/lib/store-ops/client";
+import type { StoreSpecialist } from "@/lib/types";
 
 type LocationMode = "BOTH" | "SELLING" | "TOPSTOCK";
 type GeneratorTab = "manual" | "ai" | "cleanup";
@@ -85,8 +74,7 @@ export function BulkLocationGenerator({
   const [locationMode, setLocationMode] = useState<LocationMode>("BOTH");
   const [bayPattern, setBayPattern] =
     useState<BayNumberingPattern>(DEFAULT_BAY_PATTERN);
-  const [velocitySeed, setVelocitySeed] =
-    useState<VelocitySeedPreset>("standard");
+  const velocitySeed = parseVelocitySeedPreset("standard");
   const [workflowType, setWorkflowType] = useState<LocationWorkflowType>(() =>
     workflowTypeForDepartmentCode(departments[0]?.code)
   );
@@ -167,32 +155,6 @@ export function BulkLocationGenerator({
     locationMode,
     cleanupEntireAisle,
   ]);
-
-  async function handleApplyDepartmentWorkflow() {
-    if (!departmentId) return;
-    setBusy(true);
-    setError(null);
-    setMessage(null);
-    try {
-      const result = await applyDepartmentWorkflowType(
-        specialist,
-        departmentId,
-        workflowType
-      );
-      setMessage(
-        `Tagged ${result.updated} mapped bay${
-          result.updated === 1 ? "" : "s"
-        } in ${selectedDepartment?.name ?? "this department"} as ${locationWorkflowLabel(
-          workflowType
-        )}.`
-      );
-      onGenerated({ source: "apply_workflow" });
-    } catch (err) {
-      setError(bulkAuthFriendlyError(err, "Could not tag department workflow"));
-    } finally {
-      setBusy(false);
-    }
-  }
 
   const bayPreview = useMemo(() => {
     try {
@@ -661,98 +623,6 @@ export function BulkLocationGenerator({
             </div>
           </fieldset>
 
-          <fieldset className="mt-4">
-            <legend className="mb-2 text-sm text-zinc-300">
-              Default velocity tier
-            </legend>
-            <p className="mb-2 text-xs text-zinc-500">
-              Seeds `velocity_tier`, Sunday-draw weight, and cadence days on
-              every generated tag.
-            </p>
-            <div className="space-y-2">
-              {(
-                [
-                  {
-                    value: "standard" as const,
-                    label: `Standard (${VELOCITY_CADENCE_STANDARD_DAYS}-day cadence)`,
-                  },
-                  {
-                    value: "high" as const,
-                    label: `High Velocity / Fast Mover (${VELOCITY_CADENCE_HIGH_DAYS}-day cadence)`,
-                  },
-                  {
-                    value: "priority_lock" as const,
-                    label: "Priority Lock (always eligible for weekly Sunday draw)",
-                  },
-                ]
-              ).map((option) => {
-                const selected = velocitySeed === option.value;
-                return (
-                  <label
-                    key={option.value}
-                    className={`flex min-h-12 cursor-pointer items-center gap-2 rounded-xl border px-3 text-sm transition ${
-                      selected
-                        ? "border-amber-500/50 bg-amber-950/40 text-amber-100 ring-1 ring-amber-500/30"
-                        : "border-zinc-800/80 bg-zinc-950/50 text-zinc-100"
-                    }`}
-                  >
-                    <input
-                      type="radio"
-                      name="bulk-velocity-seed"
-                      checked={selected}
-                      onChange={() => setVelocitySeed(option.value)}
-                      className="h-5 w-5 accent-amber-500"
-                    />
-                    {option.label}
-                  </label>
-                );
-              })}
-            </div>
-          </fieldset>
-
-          <fieldset className="mt-4">
-            <legend className="mb-2 text-sm text-zinc-300">Bay workflow</legend>
-            <p className="mb-2 text-xs text-zinc-500">
-              Tags generated bays with the Floor checklist they should run.
-              Appliances defaults to SIMS / placard audit.
-            </p>
-            <div className="space-y-2">
-              {LOCATION_WORKFLOW_TYPES.map((value) => {
-                const selected = workflowType === value;
-                return (
-                  <label
-                    key={value}
-                    className={`flex min-h-12 cursor-pointer items-center gap-2 rounded-xl border px-3 text-sm transition ${
-                      selected
-                        ? "border-cyan-500/50 bg-cyan-950/40 text-cyan-100 ring-1 ring-cyan-500/30"
-                        : "border-zinc-800/80 bg-zinc-950/50 text-zinc-100"
-                    }`}
-                  >
-                    <input
-                      type="radio"
-                      name="bulk-workflow-type"
-                      checked={selected}
-                      onChange={() =>
-                        setWorkflowType(parseLocationWorkflowType(value))
-                      }
-                      className="h-5 w-5 accent-cyan-500"
-                    />
-                    {locationWorkflowLabel(value)}
-                  </label>
-                );
-              })}
-            </div>
-            <button
-              type="button"
-              disabled={busy || !departmentId}
-              onClick={() => void handleApplyDepartmentWorkflow()}
-              className="mt-3 flex min-h-11 w-full items-center justify-center rounded-xl border border-cyan-500/40 bg-cyan-950/30 px-3 text-sm font-semibold text-cyan-100 disabled:opacity-50"
-            >
-              Apply {locationWorkflowLabel(workflowType)} to all mapped bays in{" "}
-              {selectedDepartment?.name ?? "this department"}
-            </button>
-          </fieldset>
-
           <button
             type="button"
             data-testid="bulk-manual-generate"
@@ -836,51 +706,6 @@ export function BulkLocationGenerator({
               ))}
             </select>
           </label>
-
-          <fieldset>
-            <legend className="mb-2 text-sm text-zinc-300">
-              Default velocity tier
-            </legend>
-            <div className="space-y-2">
-              {(
-                [
-                  {
-                    value: "standard" as const,
-                    label: `Standard (${VELOCITY_CADENCE_STANDARD_DAYS}-day)`,
-                  },
-                  {
-                    value: "high" as const,
-                    label: `High Velocity (${VELOCITY_CADENCE_HIGH_DAYS}-day)`,
-                  },
-                  {
-                    value: "priority_lock" as const,
-                    label: "Priority Lock",
-                  },
-                ]
-              ).map((option) => {
-                const selected = velocitySeed === option.value;
-                return (
-                  <label
-                    key={option.value}
-                    className={`flex min-h-11 cursor-pointer items-center gap-2 rounded-xl border px-3 text-sm ${
-                      selected
-                        ? "border-amber-500/50 bg-amber-950/40 text-amber-100"
-                        : "border-zinc-800/80 bg-zinc-950/50 text-zinc-100"
-                    }`}
-                  >
-                    <input
-                      type="radio"
-                      name="ai-velocity-seed"
-                      checked={selected}
-                      onChange={() => setVelocitySeed(option.value)}
-                      className="h-5 w-5 accent-amber-500"
-                    />
-                    {option.label}
-                  </label>
-                );
-              })}
-            </div>
-          </fieldset>
 
           <div className="rounded-2xl border border-dashed border-cyan-500/30 bg-zinc-950/60 p-3 focus-within:border-cyan-500/50 focus-within:ring-1 focus-within:ring-cyan-500/30">
             <textarea

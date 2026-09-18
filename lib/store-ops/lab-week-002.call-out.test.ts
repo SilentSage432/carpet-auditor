@@ -18,7 +18,7 @@ vi.mock("@/lib/store-ops/sunday-audit", () => ({
 }));
 
 import { redistributeCallOutBays } from "./call-out";
-import { fetchThisWeekRotations } from "@/lib/store-ops/client";
+import { fetchThisWeekRotations, patchStoreLocation } from "@/lib/store-ops/client";
 import {
   applySundayAssignmentPlan,
   fetchSundayAssignments,
@@ -154,5 +154,48 @@ describe("redistributeCallOutBays auto", () => {
     expect(result.mode).toBe("carry");
     expect(markSundayBaysCarriedOver).toHaveBeenCalled();
     expect(applySundayAssignmentPlan).not.toHaveBeenCalled();
+    expect(patchStoreLocation).toHaveBeenCalledWith(
+      actor,
+      "loc1",
+      expect.objectContaining({
+        status: "CARRIED_OVER",
+        carried_over: true,
+      })
+    );
+    const patch = vi.mocked(patchStoreLocation).mock.calls[0]![2] as Record<
+      string,
+      unknown
+    >;
+    expect(patch).not.toHaveProperty("priority_override");
+  });
+
+  it("explicit carry stamps CARRIED_OVER without manufacturing High", async () => {
+    const result = await redistributeCallOutBays({
+      actor,
+      absent,
+      peers: [peerKnown],
+      days: [
+        {
+          specialist_id: "peer1",
+          work_date: "2026-03-16",
+          start_time: "07:00",
+          end_time: "11:00",
+          is_scheduled_today: true,
+          is_call_out: false,
+          status: "ON_DUTY",
+        },
+      ],
+      mode: "carry",
+    });
+    expect(result.mode).toBe("carry");
+    expect(result.moved).toBe(1);
+    expect(applySundayAssignmentPlan).not.toHaveBeenCalled();
+    const patch = vi.mocked(patchStoreLocation).mock.calls[0]![2] as Record<
+      string,
+      unknown
+    >;
+    expect(patch.status).toBe("CARRIED_OVER");
+    expect(patch.carried_over).toBe(true);
+    expect(patch).not.toHaveProperty("priority_override");
   });
 });
