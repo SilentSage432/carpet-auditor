@@ -18,14 +18,7 @@ import {
   type Department,
   type LocationWorkflowType,
   type StoreLocation,
-  type VelocityTier,
 } from "@/lib/store-ops/types";
-import {
-  CUSTOM_DECAY_MAX_DAYS,
-  CUSTOM_DECAY_MIN_DAYS,
-  parseVelocityTier,
-  resolveDecayDays,
-} from "@/lib/store-ops/velocity";
 import type { StoreSpecialist } from "@/lib/types";
 import { toastError, toastSuccess } from "@/lib/toast";
 import { useFocusedWorkspace } from "@/lib/ui/focused-workspace";
@@ -39,16 +32,7 @@ type Props = {
   onChanged: () => void;
 };
 
-function nextVelocityTierForToggle(
-  current: VelocityTier | null | undefined,
-  high: boolean
-): VelocityTier {
-  if (!high) return "standard";
-  if (parseVelocityTier(current) === "critical_hotspot") return "critical_hotspot";
-  return "high";
-}
-
-/** Manage-console edit drawer — aisle / bay / department / priority. */
+/** Topology identity only — operational High/Standard lives on Map. */
 export function EditBayDrawer({
   specialist,
   departments,
@@ -63,20 +47,6 @@ export function EditBayDrawer({
   );
   const [departmentId, setDepartmentId] = useState(
     primary?.department_id ?? departments[0]?.id ?? ""
-  );
-  const [priorityOverride, setPriorityOverride] = useState(
-    faces.some((loc) => loc.priority_override)
-  );
-  const [highVelocity, setHighVelocity] = useState(
-    faces.some((loc) => {
-      const tier = parseVelocityTier(loc.velocity_tier);
-      return tier === "high" || tier === "critical_hotspot";
-    })
-  );
-  const [decayDays, setDecayDays] = useState(() =>
-    resolveDecayDays(
-      primary ?? { velocity_tier: "standard", custom_decay_days: 14 }
-    )
   );
   const [workflowType, setWorkflowType] = useState<LocationWorkflowType>(() =>
     parseLocationWorkflowType(primary?.workflow_type)
@@ -125,12 +95,6 @@ export function EditBayDrawer({
           aisle: aisleCode,
           bay: bayNumber,
           department_id: departmentId,
-          priority_override: priorityOverride,
-          velocity_tier: nextVelocityTierForToggle(
-            loc.velocity_tier,
-            highVelocity
-          ),
-          custom_decay_days: decayDays,
           workflow_type: workflowType,
         });
       }
@@ -246,77 +210,6 @@ export function EditBayDrawer({
               </option>
             ))}
           </select>
-        </label>
-
-        <button
-          type="button"
-          role="switch"
-          aria-checked={highVelocity}
-          onClick={() => setHighVelocity((v) => !v)}
-          className="mt-3 flex min-h-12 w-full items-center justify-between rounded-xl border border-zinc-700/80 bg-zinc-950/60 px-3"
-        >
-          <span className="inline-flex items-center gap-2 text-sm font-semibold text-zinc-100">
-            <HubIcon id="zap" className="h-4 w-4 text-amber-300" />
-            High-Velocity Hotspot
-          </span>
-          <span
-            className={`relative h-7 w-12 shrink-0 rounded-full transition ${
-              highVelocity ? "bg-rose-500" : "bg-zinc-600"
-            }`}
-          >
-            <span
-              className={`absolute top-0.5 h-6 w-6 rounded-full bg-white transition ${
-                highVelocity ? "left-[1.35rem]" : "left-0.5"
-              }`}
-            />
-          </span>
-        </button>
-
-        <button
-          type="button"
-          role="switch"
-          aria-checked={priorityOverride}
-          onClick={() => setPriorityOverride((v) => !v)}
-          className="mt-2 flex min-h-12 w-full items-center justify-between rounded-xl border border-zinc-700/80 bg-zinc-950/60 px-3"
-        >
-          <span className="inline-flex items-center gap-2 text-sm font-semibold text-zinc-100">
-            <HubIcon id="lock" className="h-4 w-4 text-amber-300" />
-            Lock Priority Override
-          </span>
-          <span
-            className={`relative h-7 w-12 shrink-0 rounded-full transition ${
-              priorityOverride ? "bg-amber-500" : "bg-zinc-600"
-            }`}
-          >
-            <span
-              className={`absolute top-0.5 h-6 w-6 rounded-full bg-white transition ${
-                priorityOverride ? "left-[1.35rem]" : "left-0.5"
-              }`}
-            />
-          </span>
-        </button>
-
-        <label className="mt-3 block space-y-1.5">
-          <span className="flex items-center justify-between text-sm font-medium text-zinc-200">
-            Custom decay threshold
-            <span className="font-mono text-xs tracking-tight text-amber-200">
-              {decayDays} day{decayDays === 1 ? "" : "s"}
-            </span>
-          </span>
-          <input
-            type="range"
-            min={CUSTOM_DECAY_MIN_DAYS}
-            max={CUSTOM_DECAY_MAX_DAYS}
-            step={1}
-            value={decayDays}
-            onChange={(e) => setDecayDays(Number(e.target.value))}
-            className="w-full accent-amber-500"
-            aria-label="Custom decay days"
-          />
-          <p className="font-mono text-[11px] tracking-tight text-zinc-500">
-            {CUSTOM_DECAY_MIN_DAYS}–{CUSTOM_DECAY_MAX_DAYS} days · Sunday draw
-            weights overdue bays first
-          </p>
         </label>
 
         <label className="mt-3 block space-y-1.5">

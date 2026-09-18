@@ -5,7 +5,7 @@
  * priority_override=true (both SELLING/TOPSTOCK siblings).
  *
  * CLEAR (Approach A — disclosed): clears priority_override for ALL surfaces
- * in that aisle. Cannot distinguish individual bay locks from aisle bulk —
+ * in that aisle. Cannot distinguish individual High bays from aisle bulk —
  * no provenance column exists. Callers must disclose this to the DS.
  *
  * No schema. No seasonal write path (seasonal uses operational_context
@@ -20,7 +20,7 @@ export type AislePriorityResult = {
   department_id: string;
   priority: boolean;
   surfaces_updated: number;
-  /** True when clear may have removed individually set bay locks. */
+  /** True when clear may have removed individually set High bays. */
   clear_erases_individual_locks: boolean;
   reason: string;
 };
@@ -90,6 +90,6 @@ export async function setAislePriorityOverride(
     clear_erases_individual_locks: !input.priority,
     reason: input.priority
       ? `Aisle ${aisle} marked high priority (${targetIds.length} surfaces).`
-      : `Aisle ${aisle} priority cleared on all ${targetIds.length} surfaces. This also clears any individual bay locks in that aisle.`,
+      : `Aisle ${aisle} returned to Standard on all ${targetIds.length} surfaces. This also clears any individually marked High bays in that aisle.`,
   };
 }

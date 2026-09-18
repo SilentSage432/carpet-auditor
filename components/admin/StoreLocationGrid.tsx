@@ -13,9 +13,9 @@ import {
 import { compareAisles } from "@/lib/store-ops/aisle";
 import { formatBayTag, type Department, type StoreLocation } from "@/lib/store-ops/types";
 import type { StoreSpecialist } from "@/lib/types";
-import { patchStoreLocation } from "@/lib/store-ops/client";
+import { patchStoreLocation, setAislePriority } from "@/lib/store-ops/client";
 import { toastError, toastSuccess } from "@/lib/toast";
-import { canManageMapConsole } from "@/lib/rbac";
+import { canManageMapConsole, canMutateRotationPriority } from "@/lib/rbac";
 import { WalkTheFloorSheet } from "@/components/admin/WalkTheFloorSheet";
 import {
   BAY_READINESS_EVENT,
@@ -53,6 +53,10 @@ import {
   attentionCellMarkerForPair,
   type MapAttentionClientStatus,
 } from "@/lib/store-ops/location-attention-presentation";
+import {
+  composeAisleManualPriority,
+  composePhysicalBayManualPriority,
+} from "@/lib/store-ops/physical-bay-priority";
 
 const AISLE_CHUNK = 16;
 const BAY_CHUNK = 24;
@@ -260,6 +264,10 @@ export function StoreLocationGrid({
   activeOverlayRef.current = activeOverlay;
   const [aisleVisible, setAisleVisible] = useState<Record<string, number>>({});
   const [bayVisible, setBayVisible] = useState<Record<string, number>>({});
+  const [aislePriorityBusy, setAislePriorityBusy] = useState<string | null>(
+    null
+  );
+  const allowRotationPriority = canMutateRotationPriority(specialist);
 
   const weekByLocation = useMemo(() => {
     const map = new Map<string, { assigned: boolean; completed: boolean }>();
@@ -419,6 +427,40 @@ export function StoreLocationGrid({
     setWalkBay(bay);
   }, []);
 
+  async function handleAislePriority(
+    departmentId: string,
+    aisle: string,
+    priority: boolean
+  ) {
+    if (!allowRotationPriority || aislePriorityBusy) return;
+    if (
+      !priority &&
+      !window.confirm(
+        `Clear high priority for all physical bays in aisle ${aisle}? This also clears any individually marked High bays in that aisle.`
+      )
+    ) {
+      return;
+    }
+    setAislePriorityBusy(`${departmentId}:${aisle}`);
+    setError(null);
+    try {
+      const result = await setAislePriority(specialist, {
+        department_id: departmentId,
+        aisle,
+        priority,
+      });
+      toastSuccess(result.reason);
+      onChanged();
+    } catch (err) {
+      const msg =
+        err instanceof Error ? err.message : "Could not update aisle priority";
+      setError(msg);
+      toastError(msg);
+    } finally {
+      setAislePriorityBusy(null);
+    }
+  }
+
   if (locations.length === 0) {
     const canSetup = canManageMapConsole(specialist);
     return (
@@ -545,6 +587,10 @@ export function StoreLocationGrid({
                         )
                       )
                     : composePhysicalBayTone(aisleTones);
+                  const aisleManual = composeAisleManualPriority(
+                    aisle.locations,
+                    aisle.aisle
+                  );
                   const bayLimit = bayVisible[aisleKey] ?? BAY_CHUNK;
                   const visibleBays = aisleOpen
                     ? aisle.bays.slice(0, bayLimit)
@@ -573,6 +619,15 @@ export function StoreLocationGrid({
                                 ? ` · ${formatAisleCoverageProgress(aisleCoverage)}`
                                 : ""}
                             </span>
+                            {aisleManual === "high" ? (
+                              <span className="ml-1.5 shrink-0 rounded-full border border-amber-500/35 bg-amber-950/30 px-1.5 py-0.5 font-mono text-[9px] font-bold tracking-tight text-amber-200/90">
+                                High
+                              </span>
+                            ) : aisleManual === "mixed" ? (
+                              <span className="ml-1.5 shrink-0 rounded-full border border-zinc-500/45 bg-zinc-950/40 px-1.5 py-0.5 font-mono text-[9px] font-bold tracking-tight text-zinc-300">
+                                Mixed priority
+                              </span>
+                            ) : null}
                           </span>
                         </p>
                         <AisleCadenceHeatmap
@@ -616,6 +671,44 @@ export function StoreLocationGrid({
                           />
                         )}
                       </button>
+
+                      {aisleOpen && allowRotationPriority ? (
+                        <div
+                          className="flex flex-wrap gap-1.5 border-t border-zinc-800/60 px-3 py-2"
+                          data-testid="map-aisle-priority"
+                        >
+                          <button
+                            type="button"
+                            disabled={Boolean(aislePriorityBusy)}
+                            onClick={() =>
+                              void handleAislePriority(
+                                dept.departmentId,
+                                aisle.aisle,
+                                true
+                              )
+                            }
+                            className="rounded-lg border border-amber-500/40 bg-amber-950/30 px-2 py-1 font-mono text-[10px] font-bold text-amber-100 disabled:opacity-40"
+                          >
+                            {aislePriorityBusy === aisleKey
+                              ? "…"
+                              : "Mark aisle high priority"}
+                          </button>
+                          <button
+                            type="button"
+                            disabled={Boolean(aislePriorityBusy)}
+                            onClick={() =>
+                              void handleAislePriority(
+                                dept.departmentId,
+                                aisle.aisle,
+                                false
+                              )
+                            }
+                            className="rounded-lg border border-zinc-600 px-2 py-1 font-mono text-[10px] font-bold text-zinc-300 disabled:opacity-40"
+                          >
+                            Clear aisle priority
+                          </button>
+                        </div>
+                      ) : null}
 
                       {aisleOpen ? (
                         <ul className="divide-y divide-zinc-800/80 border-t border-zinc-800/80">
@@ -666,6 +759,13 @@ export function StoreLocationGrid({
                                   : null
                               }
                               emphasizeAttention={emphasizeAttentionMarkers}
+                              highPriority={
+                                composePhysicalBayManualPriority(
+                                  [pair.selling, pair.topstock].filter(
+                                    (loc): loc is StoreLocation => Boolean(loc)
+                                  )
+                                ) === "high"
+                              }
                               departmentId={dept.departmentId}
                               departmentName={dept.departmentName}
                               onOpenWalk={openWalkSheet}
@@ -734,6 +834,7 @@ export function StoreLocationGrid({
           departments={departments}
           bay={liveWalkBay}
           canMutate={false}
+          canMutateRotationPriority={allowRotationPriority}
           seasonalByLocationId={seasonalByLocationId}
           attentionByLocationId={attentionByLocationId}
           attentionStatus={attentionStatus}
@@ -812,6 +913,7 @@ const BayRow = memo(function BayRow({
   seasonalBadge,
   attentionMarker,
   emphasizeAttention = false,
+  highPriority = false,
   departmentId,
   departmentName,
   onOpenWalk,
@@ -828,6 +930,7 @@ const BayRow = memo(function BayRow({
   seasonalBadge?: string | null;
   attentionMarker?: ReturnType<typeof attentionCellMarkerForPair>;
   emphasizeAttention?: boolean;
+  highPriority?: boolean;
   departmentId: string;
   departmentName: string;
   onOpenWalk: (bay: SheetBay) => void;
@@ -865,6 +968,8 @@ const BayRow = memo(function BayRow({
         onClick={() => onOpenWalk(sheetPayload)}
         className="min-w-0 flex-1 rounded-xl px-1 py-1 text-left active:bg-zinc-800/80"
         aria-label={`Bay ${pair.bay} ${rowToneLabel}${
+          highPriority ? " · High priority" : ""
+        }${
           seasonalBadge ? ` · ${seasonalBadge}` : ""
         }${attentionMarker ? ` · ${attentionMarker.a11y_suffix}` : ""}`}
       >
@@ -876,6 +981,15 @@ const BayRow = memo(function BayRow({
               bay: pair.bay,
             })}
           </span>
+          {highPriority ? (
+            <span
+              title="High priority"
+              data-testid="bay-high-priority-marker"
+              className="shrink-0 rounded-full border border-amber-500/35 bg-amber-950/30 px-1.5 py-0.5 font-mono text-[9px] font-bold tracking-tight text-amber-200/90"
+            >
+              High
+            </span>
+          ) : null}
           {seasonalBadge ? (
             <span
               title="Seasonal relevance"

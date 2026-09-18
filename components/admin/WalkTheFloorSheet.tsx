@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { X } from "lucide-react";
 import { HubPortal } from "@/components/hub/HubPortal";
-import { assignLocationsToWeek, logBayService } from "@/lib/store-ops/client";
+import { assignLocationsToWeek, logBayService, setPhysicalBayRotationPriority } from "@/lib/store-ops/client";
 import { toastError, toastSuccess } from "@/lib/toast";
 import { hapticSuccess, playErrorTone, playSuccessTone } from "@/lib/ui/feedback";
 import { recordBayTouch } from "@/lib/heatmap/bay-tracker";
@@ -30,6 +30,7 @@ import {
   formatAttentionAsOf,
   type MapAttentionClientStatus,
 } from "@/lib/store-ops/location-attention-presentation";
+import { composePhysicalBayManualPriority } from "@/lib/store-ops/physical-bay-priority";
 
 type BayPair = {
   bay: number;
@@ -78,6 +79,7 @@ export function WalkTheFloorSheet({
   departments,
   bay,
   canMutate = false,
+  canMutateRotationPriority = false,
   seasonalByLocationId,
   attentionByLocationId,
   attentionStatus = "IDLE",
@@ -92,6 +94,7 @@ export function WalkTheFloorSheet({
   departments: Department[];
   bay: WalkTheFloorBay;
   canMutate?: boolean;
+  canMutateRotationPriority?: boolean;
   seasonalByLocationId?: Map<string, MapLocationSeasonalView>;
   attentionByLocationId?: Map<string, LocationAttentionSignal>;
   attentionStatus?: MapAttentionClientStatus;
@@ -112,6 +115,7 @@ export function WalkTheFloorSheet({
   const [targetId, setTargetId] = useState(faces[0]?.id ?? "");
   const [busy, setBusy] = useState<BayServiceIntensity | null>(null);
   const [pinBusy, setPinBusy] = useState(false);
+  const [priorityBusy, setPriorityBusy] = useState(false);
 
   useEffect(() => {
     document.body.style.overflow = "hidden";
@@ -147,6 +151,31 @@ export function WalkTheFloorSheet({
   const pinTargets = faces.filter(
     (loc) => (loc.location_type ?? "STANDARD") !== "SHOWROOM_STACKOUT"
   );
+  const manualPriority = composePhysicalBayManualPriority(faces);
+  const isHigh = manualPriority === "high";
+
+  async function setBayPriority(priority: "standard" | "high") {
+    if (!canMutateRotationPriority || faces.length === 0 || priorityBusy) return;
+    setPriorityBusy(true);
+    onError(null);
+    try {
+      const result = await setPhysicalBayRotationPriority(specialist, {
+        department_id: bay.departmentId,
+        aisle: bay.aisle,
+        bay: bay.pair.bay,
+        priority,
+      });
+      toastSuccess(result.reason);
+      onChanged();
+    } catch (err) {
+      const msg =
+        err instanceof Error ? err.message : "Could not update priority";
+      onError(msg);
+      toastError(msg);
+    } finally {
+      setPriorityBusy(false);
+    }
+  }
 
   async function pinToWeek(loc: StoreLocation) {
     setPinBusy(true);
@@ -359,6 +388,53 @@ export function WalkTheFloorSheet({
           </section>
         ) : null}
 
+        {canMutateRotationPriority && faces.length > 0 ? (
+          <section
+            className="mb-4 rounded-xl border border-zinc-700/50 bg-zinc-950/40 px-3 py-2.5"
+            data-testid="map-bay-priority"
+          >
+            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-accent">
+              Priority
+            </p>
+            <p className="mt-1 text-xs text-zinc-400">
+              High prefers this bay among owed coverage. It does not skip
+              completion.
+            </p>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={isHigh}
+              aria-label={
+                isHigh ? "Return to standard priority" : "Mark high priority"
+              }
+              disabled={priorityBusy}
+              onClick={() =>
+                void setBayPriority(isHigh ? "standard" : "high")
+              }
+              className="mt-2 flex min-h-12 w-full items-center justify-between rounded-xl border border-zinc-700/80 bg-zinc-950/60 px-3 disabled:opacity-50"
+            >
+              <span className="text-sm font-semibold text-zinc-100">
+                {priorityBusy
+                  ? "Saving…"
+                  : isHigh
+                    ? "High priority"
+                    : "Mark high priority"}
+              </span>
+              <span
+                className={`relative h-7 w-12 shrink-0 rounded-full transition ${
+                  isHigh ? "bg-amber-500" : "bg-zinc-600"
+                }`}
+              >
+                <span
+                  className={`absolute top-0.5 h-6 w-6 rounded-full bg-white transition ${
+                    isHigh ? "left-[1.35rem]" : "left-0.5"
+                  }`}
+                />
+              </span>
+            </button>
+          </section>
+        ) : null}
+
         <section className="mb-4">
           <p className="mb-2 font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-accent">
             Walk the floor
@@ -373,7 +449,7 @@ export function WalkTheFloorSheet({
                 <button
                   key={action.intensity}
                   type="button"
-                  disabled={Boolean(busy) || pinBusy || !target}
+                  disabled={Boolean(busy) || pinBusy || priorityBusy || !target}
                   onClick={() => void submit(action.intensity)}
                   className={`flex min-h-14 w-full flex-col items-center justify-center rounded-xl border px-4 text-sm font-bold disabled:opacity-50 ${action.className}`}
                 >

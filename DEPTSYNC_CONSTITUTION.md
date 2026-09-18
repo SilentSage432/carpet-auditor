@@ -372,6 +372,8 @@ The DS thinks in department / aisle / physical bay — not raw `store_locations`
 
 Everyday Map identity is department coverage geography. Service/velocity evidence MAY remain as secondary advanced disclosure; it MUST NOT compete as an equal peer Map identity. Ordinary owed / remaining coverage is normal continuous-coverage state, not failure. Exceptional attention (barrier / truthful investigation) SHOULD be louder than healthy remaining.
 
+Manual coverage priority (PRIORITY-UX-002) MAY appear on Map as a narrow operational declaration (Standard / High) on existing physical bays. That capability MUST NOT be implemented by enabling generic topology mutation (`canMutate=true`). High MUST increase selection pressure among currently owed/eligible coverage and MUST NOT independently re-admit completed coverage into the active cycle.
+
 Floor answers who has what this week. Map answers where coverage stands across the department.
 
 ### Roster participation law (UX-REDUCE-004)

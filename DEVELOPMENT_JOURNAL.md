@@ -1,5 +1,29 @@
 # DeptSync Hub — Development Journal
 
+## 2026-09-18 — PRIORITY-UX-002 Manual coverage priority + Map placement
+
+**Authorized implementation.** Baseline `main @ 9db22ac`. Evidence: PRIORITY-UX-001.
+
+**Selector (Model A):** `priority_override` is no longer a carry-bucket pin. High participates only among owed/eligible physical bays (after true carry and seasonal HIGH). COMPLETED High is not re-admitted. Quota unchanged.
+
+**Map:** `canMutateRotationPriority` for Standard/High (bay sheet + aisle Mark/Clear). Topology `canMutate=false` preserved. Pin-to-week stays gated.
+
+**Auth:** Master + DS via `requireSupervisorOrAdmin` + `assertActorCanAccessDepartmentId`. Associates cannot. Topology PATCH Master-only fields unchanged.
+
+**More:** Lock Priority Override, High-Velocity Hotspot, and Custom decay unmounted from Edit Bay. Fields retained. Bay workflow left. Aisle Mark/Clear moved to Map.
+
+No schema/migration/production mutation. Canonical: [`docs/product/PRIORITY_UX_002_MANUAL_COVERAGE_PRIORITY.md`](docs/product/PRIORITY_UX_002_MANUAL_COVERAGE_PRIORITY.md). Samsung acceptance pending. Do not start UX-REDUCE-006 / PERF-LOAD-003.
+
+## 2026-09-18 — PRIORITY-UX-001 Operational priority archaeology
+
+**Read-only.** No UI/engine/schema/production mutation. Baseline `main @ 9db22ac` (UX-REDUCE-005 complete; not modified).
+
+**Question:** how should a DS tell DeptSync that existing geography deserves increased coverage cadence, without digging into topology editing?
+
+**Finding:** four Edit Bay controls are four models. Durable “work more often” = `priority_override` (carry-bucket pin; aisle fan-out; COMPLETED re-admit). Hotspot = `velocity_tier` (service-velocity class + hot pool). Decay = numeric overdue pressure. Workflow = checklist routing. Seasonal HIGH is ephemeral and already Model A. SI-001 does not select. Map `canMutate=false` must stay; a **narrow rotation-priority capability** is the seam. Production: 0 pins, all decay 14.
+
+Canonical: [`docs/product/PRIORITY_UX_001_OPERATIONAL_PRIORITY_ARCHAEOLOGY.md`](docs/product/PRIORITY_UX_001_OPERATIONAL_PRIORITY_ARCHAEOLOGY.md). Do not implement PRIORITY-UX-002 or UX-REDUCE-006 in this tranche.
+
 ## 2026-09-18 — UX-REDUCE-005 More → Setup & Administration
 
 **Authorized IA tranche.** More = configure/administer DeptSync — not an operational dashboard. PERF-LOAD-002 locked (Samsung-accepted).

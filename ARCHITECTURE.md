@@ -272,6 +272,7 @@ supabase/migrations/20260812_sunday_bay_assignments.sql → sunday specialist↔
 | Floor context strip (FS-002B) | `floor-operational-context.ts` + `FloorOperationalContextStrip` — fiscal + active season/event + current dept relevance; empty valid; no rotation effect |
 | Location seasonal relevance (FS-003) | `operational_context_location_relevance` + Settings assign — declared bay emphasis; ENGINE-PROD-004 HIGH elevates selection (Model A) while active |
 | ENGINE-PROD-004 seasonal selection | `seasonal-selection.ts` → `selectPhysicalBayCoverage`; ephemeral HIGH keys; no `priority_override` write |
+| Durable operational priority (PRIORITY-UX-002) | `store_locations.priority_override` (`true` = High). Selector pressure among owed/eligible physical bays; does **not** re-admit COMPLETED. Map `canMutateRotationPriority`; topology `canMutate` stays false. Distinct from `velocity_tier` / `custom_decay_days` / SI-001 / seasonal HIGH |
 | Map context surface (FS-003B) | `map-location-context.ts` + Map badges / walk detail — explicit location relevance only; no inheritance / scores |
 | Sunday assignments | `lib/store-ops/sunday-audit.ts` (persist + department seed `associateMatchesSundayDepartment`) + `SundayAuditAssignmentModal` + `AssociateRosterPanel` |
 | Whole-week schedule labor (LAB-WEEK-002) | `composeWeekLaborAvailability` + `fetchShiftDaysRange` → Balance Assign (`knownHoursOnly`); ISO Mon–Sun for `assigned_week` |

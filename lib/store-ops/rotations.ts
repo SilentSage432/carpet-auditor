@@ -943,6 +943,7 @@ export async function generateWeeklyRotations(
   return replaced > 0 ? { ...generated, replaced } : generated;
 }
 
+/** True incomplete-work carry pool. Manual High is not loaded as carry. */
 async function loadCarryOverPriorityPool(
   supabase: SupabaseClient,
   departmentId: string
@@ -955,7 +956,7 @@ async function loadCarryOverPriorityPool(
       .eq("is_active", true);
 
   const withType = await base()
-    .or("status.eq.CARRIED_OVER,carried_over.eq.true,priority_override.eq.true")
+    .or("status.eq.CARRIED_OVER,carried_over.eq.true")
     .neq("location_type", "SHOWROOM_STACKOUT");
 
   if (!withType.error) {
@@ -964,7 +965,7 @@ async function loadCarryOverPriorityPool(
 
   if (isMissingColumnError(withType.error, "carried_over")) {
     const pins = await base()
-      .or("status.eq.CARRIED_OVER,priority_override.eq.true")
+      .eq("status", "CARRIED_OVER")
       .neq("location_type", "SHOWROOM_STACKOUT");
     if (!pins.error) return (pins.data ?? []) as StoreLocation[];
     if (/location_type/i.test(pins.error.message)) {

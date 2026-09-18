@@ -102,12 +102,12 @@ describe("ENGINE-PROD-004 manual bay priority (sibling semantics)", () => {
     expect(composed?.priority_override).toBe(true);
   });
 
-  it("priority_override enters carry bucket ahead of ordinary PENDING", () => {
+  it("priority_override prefers owed High ahead of ordinary PENDING, not as carry", () => {
     const pending = [
       loc({ id: "n1", aisle: "10", bay: 1, status: "PENDING" }),
       loc({ id: "n2", aisle: "10", bay: 2, status: "PENDING" }),
     ];
-    const pinned = [
+    const high = [
       loc({
         id: "p1",
         aisle: "41",
@@ -116,11 +116,29 @@ describe("ENGINE-PROD-004 manual bay priority (sibling semantics)", () => {
         priority_override: true,
       }),
     ];
-    const selected = selectPhysicalBayCoverage(pending, pinned, 1);
+    const selected = selectPhysicalBayCoverage(pending, high, 1);
     expect(selected).toHaveLength(1);
     expect(selected[0].key).toBe(
       physicalBayKey({ department_id: "dept-1", aisle: "41", bay: 9 })
     );
+  });
+
+  it("COMPLETED High is not re-admitted solely due to priority_override", () => {
+    const ordinary = loc({ id: "n1", aisle: "10", bay: 1, status: "PENDING" });
+    const completedHigh = loc({
+      id: "p1",
+      aisle: "41",
+      bay: 9,
+      status: "COMPLETED",
+      priority_override: true,
+    });
+    const selected = selectPhysicalBayCoverage(
+      [ordinary],
+      [completedHigh],
+      1
+    );
+    expect(selected).toHaveLength(1);
+    expect(selected[0].key).toBe(physicalBayKey(ordinary));
   });
 });
 
@@ -342,7 +360,13 @@ describe("ENGINE-PROD-004 aisle priority + UI wiring", () => {
   });
 
   it("UI surfaces exist for aisle priority and seasonal aisle assign", () => {
-    expect(readRepo("components/admin/AisleBayManager.tsx")).toMatch(
+    expect(readRepo("components/admin/StoreLocationGrid.tsx")).toMatch(
+      /Mark aisle high priority/
+    );
+    expect(readRepo("components/admin/StoreLocationGrid.tsx")).toMatch(
+      /canMutateRotationPriority/
+    );
+    expect(readRepo("components/admin/AisleBayManager.tsx")).not.toMatch(
       /Mark aisle high priority/
     );
     expect(readRepo("components/admin/OperationalContextCard.tsx")).toMatch(

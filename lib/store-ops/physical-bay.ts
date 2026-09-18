@@ -12,6 +12,7 @@ import { normalizeAisle } from "./aisle";
 import { isEligibleRotationLocation } from "./location-eligibility";
 import {
   isCarryOverDrawLocation,
+  isManualHighPriorityLocation,
   pickSundayCarryOverFirst,
   pickSundayVelocityPrioritized,
 } from "./rotation";
@@ -77,6 +78,7 @@ export function groupLocationsByPhysicalBay(
 /**
  * Surfaces that still owe coverage. COMPLETED siblings stay complete until
  * a later physical-bay verification fans out; they do not consume a slot.
+ * True carry-over remains owed. Manual High does not re-admit COMPLETED.
  */
 export function owedPhysicalBaySurfaces(
   surfaces: StoreLocation[]
@@ -89,8 +91,8 @@ export function owedPhysicalBaySurfaces(
 }
 
 /**
- * Conservative: a physical bay is owed unless every eligible surface is
- * COMPLETED and none carries carry-over / priority evidence.
+ * A physical bay is owed unless every eligible surface is COMPLETED and
+ * none carries true carry-over evidence. Durable High is not owed evidence.
  */
 export function physicalBayIsOwed(surfaces: StoreLocation[]): boolean {
   return owedPhysicalBaySurfaces(surfaces).length > 0;
@@ -194,13 +196,15 @@ export function composePhysicalBayCandidate(
  * Group surfaces, compose sibling evidence, then draw N physical bays.
  * Existing carry-over / velocity pickers run on one candidate per physical bay.
  *
- * ENGINE-PROD-004 precedence (Model A — earlier within universal cycle):
- * 1. True carryover + sticky manual priority_override (carry bucket)
- * 2. Active seasonal HIGH (ephemeral; still-owed PENDING only)
- * 3. Velocity / cadence-due hot pool
- * 4. Remaining aging + manual_priority_count weights
+ * PRIORITY-UX-002 / ENGINE-PROD-004 Model A — earlier within universal cycle:
+ * 1. True carry-over (incomplete-work debt; not manual High)
+ * 2. Active seasonal HIGH (ephemeral; still-owed only)
+ * 3. Durable manual High among remaining owed/eligible
+ * 4. Velocity / cadence-due hot pool
+ * 5. Remaining aging + manual_priority_count weights
  *
- * Seasonal keys never mutate rows and never re-admit COMPLETED bays.
+ * Manual High and seasonal keys never re-admit COMPLETED bays.
+ * Seasonal keys never mutate rows.
  */
 export type SelectPhysicalBayCoverageOptions = {
   /** Physical-bay keys (`dept|aisle|bay`) with active seasonal HIGH. */
@@ -262,6 +266,21 @@ export function selectPhysicalBayCoverage(
   for (const loc of seasonalPick) pickedIds.add(loc.id);
   remaining = n - carryPick.length - seasonalPick.length;
 
+  const highCandidates = pendingLocs.filter(
+    (loc) =>
+      !pickedIds.has(loc.id) && isManualHighPriorityLocation(loc)
+  );
+  const highPick =
+    remaining > 0 && highCandidates.length > 0
+      ? pickWeightedByPriorityAndAge(
+          highCandidates,
+          Math.min(remaining, highCandidates.length)
+        )
+      : [];
+  for (const loc of highPick) pickedIds.add(loc.id);
+  remaining =
+    n - carryPick.length - seasonalPick.length - highPick.length;
+
   const pendingPick =
     remaining > 0
       ? pickSundayVelocityPrioritized(pendingLocs, remaining, pickedIds)
@@ -273,7 +292,7 @@ export function selectPhysicalBayCoverage(
   const seen = new Set<string>();
   const selected: PhysicalBaySelection[] = [];
 
-  for (const loc of [...carryPick, ...seasonalPick, ...pendingPick]) {
+  for (const loc of [...carryPick, ...seasonalPick, ...highPick, ...pendingPick]) {
     const group = byComposedId.get(loc.id);
     if (!group || seen.has(group.key)) continue;
     const representative = representativePhysicalBayLocation(group.surfaces);

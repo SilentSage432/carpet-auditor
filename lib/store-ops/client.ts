@@ -1693,7 +1693,7 @@ export async function setOperationalContextAisleRelevance(
   );
 }
 
-/** ENGINE-PROD-004 — set/clear sticky aisle priority_override (disclosed clear). */
+/** ENGINE-PROD-004 — set/clear aisle High via existing priority_override (disclosed clear). */
 export async function setAislePriority(
   specialist: StoreSpecialist,
   input: {
@@ -1713,6 +1713,37 @@ export async function setAislePriority(
     reason: string;
     clear_erases_individual_locks: boolean;
   }>("/api/store-locations/aisle-priority", specialist, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+  await invalidateStoreOpsListCaches();
+  notifyStoreLocationsChanged();
+  return result;
+}
+
+/** PRIORITY-UX-002 — Standard / High on one physical bay (sibling fan-out). Online-only. */
+export async function setPhysicalBayRotationPriority(
+  specialist: StoreSpecialist,
+  input: {
+    department_id: string;
+    aisle: string;
+    bay: number | string;
+    priority: "standard" | "high";
+  }
+): Promise<{
+  ok: true;
+  priority: "standard" | "high";
+  surfaces_updated: number;
+  reason: string;
+  physical_bay_key: string;
+}> {
+  const result = await storeOpsFetch<{
+    ok: true;
+    priority: "standard" | "high";
+    surfaces_updated: number;
+    reason: string;
+    physical_bay_key: string;
+  }>("/api/store-locations/physical-bay-priority", specialist, {
     method: "POST",
     body: JSON.stringify(input),
   });

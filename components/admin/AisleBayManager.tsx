@@ -5,9 +5,9 @@ import dynamic from "next/dynamic";
 import { AddBaySheet } from "@/components/admin/AddBaySheet";
 import { EditBayDrawer } from "@/components/admin/EditBayDrawer";
 import { HubPortal } from "@/components/hub/HubPortal";
-import { ChevronDown, ChevronUp, Lock, Pencil, Plus, Sparkles, Trash2, X } from "lucide-react";
+import { ChevronDown, ChevronUp, Pencil, Plus, Sparkles, Trash2, X } from "lucide-react";
 import { compareAisles } from "@/lib/store-ops/aisle";
-import { deleteStoreLocations, setAislePriority } from "@/lib/store-ops/client";
+import { deleteStoreLocations } from "@/lib/store-ops/client";
 import {
   findDuplicateLegacyBays,
   pruneIdsFromDuplicateGroups,
@@ -124,8 +124,6 @@ export function AisleBayManager({
   const [bulkOpen, setBulkOpen] = useState(false);
   const [editFaces, setEditFaces] = useState<StoreLocation[] | null>(null);
   const [deleteFaces, setDeleteFaces] = useState<StoreLocation[] | null>(null);
-  const [aislePriorityBusy, setAislePriorityBusy] = useState<string | null>(null);
-  const [aislePriorityNote, setAislePriorityNote] = useState<string | null>(null);
 
   const groups = useMemo((): AisleGroup[] => {
     const byAisle = new Map<string, StoreLocation[]>();
@@ -163,35 +161,6 @@ export function AisleBayManager({
 
   function toggleAisle(aisle: string) {
     setOpenAisles((prev) => ({ ...prev, [aisle]: !prev[aisle] }));
-  }
-
-  async function handleAislePriority(aisle: string, priority: boolean) {
-    if (!canMutate || !defaultDeptId || aislePriorityBusy) return;
-    if (
-      !priority &&
-      !window.confirm(
-        `Clear high priority for all bays in aisle ${aisle}? This also clears any individually locked bays in that aisle.`
-      )
-    ) {
-      return;
-    }
-    setAislePriorityBusy(aisle);
-    setAislePriorityNote(null);
-    try {
-      const result = await setAislePriority(specialist, {
-        department_id: defaultDeptId,
-        aisle,
-        priority,
-      });
-      setAislePriorityNote(result.reason);
-      onChanged();
-    } catch (err) {
-      setAislePriorityNote(
-        err instanceof Error ? err.message : "Could not update aisle priority"
-      );
-    } finally {
-      setAislePriorityBusy(null);
-    }
   }
 
   function togglePair(pair: BayPair) {
@@ -368,12 +337,6 @@ export function AisleBayManager({
         </div>
       ) : null}
 
-      {aislePriorityNote ? (
-        <p className="text-[11px] text-amber-100/90" role="status">
-          {aislePriorityNote}
-        </p>
-      ) : null}
-
       {locations.length === 0 ? (
         <p className="glass-card border-dashed px-4 py-8 text-center text-sm text-zinc-400">
           No aisles mapped for {contextLabel} yet.
@@ -412,28 +375,6 @@ export function AisleBayManager({
                     <ChevronDown className="h-4 w-4 text-zinc-400" strokeWidth={1.75} aria-hidden />
                   )}
                 </button>
-                {canMutate && open ? (
-                  <div className="flex flex-wrap gap-1.5 border-t border-zinc-800/60 px-3 py-2">
-                    <button
-                      type="button"
-                      disabled={Boolean(aislePriorityBusy)}
-                      onClick={() => void handleAislePriority(group.aisle, true)}
-                      className="rounded-lg border border-amber-500/40 bg-amber-950/30 px-2 py-1 font-mono text-[10px] font-bold text-amber-100 disabled:opacity-40"
-                    >
-                      {aislePriorityBusy === group.aisle
-                        ? "…"
-                        : "Mark aisle high priority"}
-                    </button>
-                    <button
-                      type="button"
-                      disabled={Boolean(aislePriorityBusy)}
-                      onClick={() => void handleAislePriority(group.aisle, false)}
-                      className="rounded-lg border border-zinc-600 px-2 py-1 font-mono text-[10px] font-bold text-zinc-300 disabled:opacity-40"
-                    >
-                      Clear aisle priority
-                    </button>
-                  </div>
-                ) : null}
                 {open ? (
                   <ul className="space-y-1.5 border-t border-zinc-800/80 px-2 py-2">
                     {visibleBays.map((pair) => {
@@ -481,9 +422,8 @@ export function AisleBayManager({
                                 </span>
                                 {pair.selling?.priority_override ||
                                 pair.topstock?.priority_override ? (
-                                  <span className="inline-flex items-center gap-0.5 rounded-full border border-amber-500/40 bg-amber-950/40 px-2 py-0.5 font-mono text-[10px] font-bold tracking-tight text-amber-100">
-                                    <Lock className="h-3 w-3" strokeWidth={1.75} aria-hidden />
-                                    LOCK
+                                  <span className="inline-flex items-center rounded-full border border-amber-500/40 bg-amber-950/40 px-2 py-0.5 font-mono text-[10px] font-bold tracking-tight text-amber-100">
+                                    High
                                   </span>
                                 ) : null}
                                 {isPendingDrawLocation(pair.selling) ||

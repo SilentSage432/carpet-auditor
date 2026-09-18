@@ -13,23 +13,23 @@ import { pickWeightedByPriorityAndAge } from "./week";
 
 export { isRotationVelocityPriority };
 
-/** Locations that must sit at the top of the next Sunday staging list. */
+/** True incomplete-work carry-over. Manual High is not carry-over. */
 export function isCarryOverDrawLocation(
-  loc: Pick<
-    StoreLocation,
-    "status" | "carried_over" | "priority_override"
-  >
+  loc: Pick<StoreLocation, "status" | "carried_over">
 ): boolean {
-  return (
-    loc.status === "CARRIED_OVER" ||
-    loc.carried_over === true ||
-    loc.priority_override === true
-  );
+  return loc.status === "CARRIED_OVER" || loc.carried_over === true;
+}
+
+/** Durable manual High among currently owed/eligible coverage. */
+export function isManualHighPriorityLocation(
+  loc: Pick<StoreLocation, "priority_override">
+): boolean {
+  return loc.priority_override === true;
 }
 
 /**
- * Prepend call-out carry-over + priority pins before cadence decay.
- * Deterministic: recent last_carried_over_at first, then status, then pin.
+ * Prepend true call-out carry-over before cadence / High / seasonal pressure.
+ * Deterministic: recent last_carried_over_at first, then aisle, bay.
  */
 export function pickSundayCarryOverFirst(
   candidates: StoreLocation[],
@@ -42,8 +42,7 @@ export function pickSundayCarryOverFirst(
     .filter(isCarryOverDrawLocation)
     .sort((a, b) => {
       const rank = (loc: StoreLocation) => {
-        if (loc.status === "CARRIED_OVER" || loc.carried_over === true) return 2;
-        if (loc.priority_override === true) return 1;
+        if (loc.status === "CARRIED_OVER" || loc.carried_over === true) return 1;
         return 0;
       };
       const d = rank(b) - rank(a);
@@ -61,8 +60,9 @@ export function pickSundayCarryOverFirst(
 }
 
 /**
- * After carry-over prepend, draw velocity_tier high/critical_hotspot,
- * priority_override, and bays past custom_decay_days before remaining PENDING.
+ * After carry-over / seasonal / manual High, draw velocity_tier
+ * high/critical_hotspot, remaining High, and bays past custom_decay_days
+ * before remaining PENDING.
  */
 export function pickSundayVelocityPrioritized(
   pending: StoreLocation[],

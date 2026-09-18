@@ -126,6 +126,16 @@ export function canMutateStoreMap(
   return canManageMapConsole(member);
 }
 
+/**
+ * PRIORITY-UX-002 — Master + DS may declare Map High/Standard.
+ * Does not grant topology mutation (`canMutate` / Sell/Top / Pin-to-week).
+ */
+export function canMutateRotationPriority(
+  member: StoreSpecialist | null | undefined
+): boolean {
+  return isMasterAdmin(member) || isDepartmentSupervisor(member);
+}
+
 /** Elevated roles that manage PINs / markdown / filters. */
 export function hasElevatedAccess(
   member: StoreSpecialist | null | undefined
