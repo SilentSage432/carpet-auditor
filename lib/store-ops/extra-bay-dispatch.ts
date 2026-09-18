@@ -25,6 +25,7 @@ import {
   assignLocationsToCurrentWeek,
   loadOwedLocationPools,
 } from "@/lib/store-ops/rotations";
+import { loadActiveSeasonalHighPhysicalKeys } from "@/lib/store-ops/seasonal-selection";
 import { applySundayAssignmentPlanAdmin } from "@/lib/store-ops/sunday-dispatch";
 import { BASE_WEEKLY_BAY_QUOTA } from "@/lib/store-ops/weekly-rotations";
 import { isoWeekLabel, isoWeekToMondayDate } from "@/lib/store-ops/week";
@@ -206,11 +207,13 @@ function ownerCounts(
 /**
  * Pure: select the next owed physical bay using the same selector as Sunday draw.
  * Excludes physical keys already present in the active week.
+ * ENGINE-PROD-004: optional seasonal HIGH keys (same Model A pressure as Sunday).
  */
 export function selectNextExtraPhysicalBay(
   pending: StoreLocation[],
   carried: StoreLocation[],
-  excludePhysicalKeys: Iterable<string>
+  excludePhysicalKeys: Iterable<string>,
+  options?: { seasonalHighPhysicalKeys?: Iterable<string> | null }
 ): PhysicalBaySelection | null {
   const exclude = new Set(excludePhysicalKeys);
   const pendingFiltered = pending.filter((loc) => {
@@ -226,7 +229,8 @@ export function selectNextExtraPhysicalBay(
   const selected = selectPhysicalBayCoverage(
     pendingFiltered,
     carriedFiltered,
-    1
+    1,
+    { seasonalHighPhysicalKeys: options?.seasonalHighPhysicalKeys }
   );
   return selected[0] ?? null;
 }
@@ -429,10 +433,15 @@ export async function suggestExtraPhysicalBay(
         .filter((k): k is string => Boolean(k))
     );
     const pools = await loadOwedLocationPools(supabase, options.department_id);
+    const seasonalKeys = await loadActiveSeasonalHighPhysicalKeys(supabase, {
+      storeId: options.store_id,
+      locations: [...pools.pending, ...pools.carried],
+    });
     const next = selectNextExtraPhysicalBay(
       pools.pending,
       pools.carried,
-      exclude
+      exclude,
+      { seasonalHighPhysicalKeys: seasonalKeys }
     );
     if (!next) {
       return {
@@ -816,10 +825,15 @@ export async function dispatchExtraPhysicalBay(
         .filter((k): k is string => Boolean(k))
     );
     const pools = await loadOwedLocationPools(supabase, options.department_id);
+    const seasonalKeys = await loadActiveSeasonalHighPhysicalKeys(supabase, {
+      storeId: options.store_id,
+      locations: [...pools.pending, ...pools.carried],
+    });
     const next = selectNextExtraPhysicalBay(
       pools.pending,
       pools.carried,
-      exclude
+      exclude,
+      { seasonalHighPhysicalKeys: seasonalKeys }
     );
     if (!next) {
       return {

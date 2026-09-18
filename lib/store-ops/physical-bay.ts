@@ -15,6 +15,8 @@ import {
   pickSundayCarryOverFirst,
   pickSundayVelocityPrioritized,
 } from "./rotation";
+import { isSeasonalHighPhysicalBay } from "./seasonal-selection";
+import { pickWeightedByPriorityAndAge } from "./week";
 import type { StoreLocation, VelocityTier } from "./types";
 
 export type PhysicalBayFields = {
@@ -191,14 +193,32 @@ export function composePhysicalBayCandidate(
 /**
  * Group surfaces, compose sibling evidence, then draw N physical bays.
  * Existing carry-over / velocity pickers run on one candidate per physical bay.
+ *
+ * ENGINE-PROD-004 precedence (Model A — earlier within universal cycle):
+ * 1. True carryover + sticky manual priority_override (carry bucket)
+ * 2. Active seasonal HIGH (ephemeral; still-owed PENDING only)
+ * 3. Velocity / cadence-due hot pool
+ * 4. Remaining aging + manual_priority_count weights
+ *
+ * Seasonal keys never mutate rows and never re-admit COMPLETED bays.
  */
+export type SelectPhysicalBayCoverageOptions = {
+  /** Physical-bay keys (`dept|aisle|bay`) with active seasonal HIGH. */
+  seasonalHighPhysicalKeys?: Iterable<string> | null;
+};
+
 export function selectPhysicalBayCoverage(
   pending: StoreLocation[],
   carried: StoreLocation[],
-  drawCount: number
+  drawCount: number,
+  options?: SelectPhysicalBayCoverageOptions
 ): PhysicalBaySelection[] {
   const n = Math.max(0, drawCount);
   if (n === 0) return [];
+
+  const seasonalKeys = new Set(
+    [...(options?.seasonalHighPhysicalKeys ?? [])].map(String).filter(Boolean)
+  );
 
   const byId = new Map<string, StoreLocation>();
   for (const loc of [...carried, ...pending]) {
@@ -224,14 +244,27 @@ export function selectPhysicalBayCoverage(
     .map((row) => row.loc);
 
   const carryPick = pickSundayCarryOverFirst(carryLocs, n);
-  const remaining = n - carryPick.length;
+  let remaining = n - carryPick.length;
+  const pickedIds = new Set(carryPick.map((loc) => loc.id));
+
+  const seasonalCandidates = pendingLocs.filter(
+    (loc) =>
+      !pickedIds.has(loc.id) &&
+      isSeasonalHighPhysicalBay(loc, seasonalKeys)
+  );
+  const seasonalPick =
+    remaining > 0 && seasonalCandidates.length > 0
+      ? pickWeightedByPriorityAndAge(
+          seasonalCandidates,
+          Math.min(remaining, seasonalCandidates.length)
+        )
+      : [];
+  for (const loc of seasonalPick) pickedIds.add(loc.id);
+  remaining = n - carryPick.length - seasonalPick.length;
+
   const pendingPick =
     remaining > 0
-      ? pickSundayVelocityPrioritized(
-          pendingLocs,
-          remaining,
-          carryPick.map((loc) => loc.id)
-        )
+      ? pickSundayVelocityPrioritized(pendingLocs, remaining, pickedIds)
       : [];
 
   const byComposedId = new Map(
@@ -240,7 +273,7 @@ export function selectPhysicalBayCoverage(
   const seen = new Set<string>();
   const selected: PhysicalBaySelection[] = [];
 
-  for (const loc of [...carryPick, ...pendingPick]) {
+  for (const loc of [...carryPick, ...seasonalPick, ...pendingPick]) {
     const group = byComposedId.get(loc.id);
     if (!group || seen.has(group.key)) continue;
     const representative = representativePhysicalBayLocation(group.surfaces);

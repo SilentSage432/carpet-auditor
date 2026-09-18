@@ -263,7 +263,8 @@ supabase/migrations/20260812_sunday_bay_assignments.sql → sunday specialist↔
 | Fiscal calendar (FS-001 / FS-001A min) | `lib/store-ops/fiscal-calendar.ts` + `fiscal_years`/`fiscal_weeks` + `GET /api/fiscal-calendar` + Master `GET /api/admin/fiscal-calendar/coverage` — ISO rotation unchanged; FY2026 seeded; coverage derived on read |
 | Operational seasons/events (FS-002) | `operational-context.ts` + tables + Master Settings — declared Gregorian contexts + dept relevance; no SI / location priority |
 | Floor context strip (FS-002B) | `floor-operational-context.ts` + `FloorOperationalContextStrip` — fiscal + active season/event + current dept relevance; empty valid; no rotation effect |
-| Location seasonal relevance (FS-003) | `operational_context_location_relevance` + Settings assign — declared bay emphasis; no SI / rotation / priority mutation |
+| Location seasonal relevance (FS-003) | `operational_context_location_relevance` + Settings assign — declared bay emphasis; ENGINE-PROD-004 HIGH elevates selection (Model A) while active |
+| ENGINE-PROD-004 seasonal selection | `seasonal-selection.ts` → `selectPhysicalBayCoverage`; ephemeral HIGH keys; no `priority_override` write |
 | Map context surface (FS-003B) | `map-location-context.ts` + Map badges / walk detail — explicit location relevance only; no inheritance / scores |
 | Sunday assignments | `lib/store-ops/sunday-audit.ts` (persist + department seed `associateMatchesSundayDepartment`) + `SundayAuditAssignmentModal` + `AssociateRosterPanel` |
 | Whole-week schedule labor (LAB-WEEK-002) | `composeWeekLaborAvailability` + `fetchShiftDaysRange` → Balance Assign (`knownHoursOnly`); ISO Mon–Sun for `assigned_week` |

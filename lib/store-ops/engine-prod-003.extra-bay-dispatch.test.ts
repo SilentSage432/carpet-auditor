@@ -840,9 +840,10 @@ describe("ENGINE-PROD-003 dispatch orchestration (mocked writers)", () => {
 });
 
 describe("ENGINE-PROD-003 regression source contracts", () => {
-  it("does not invent seasonal / Gemini / Floor Pad / schema work", () => {
+  it("does not invent Gemini / Floor Pad / schema work (seasonal reuse is ENGINE-PROD-004)", () => {
     const src = readRepo("lib/store-ops/extra-bay-dispatch.ts");
-    expect(src).not.toMatch(/gemini|seasonal|floor.?pad|create table|rpc\(/i);
+    expect(src).toMatch(/loadActiveSeasonalHighPhysicalKeys/);
+    expect(src).not.toMatch(/gemini|floor.?pad|create table|rpc\(/i);
     expect(src).not.toMatch(/accessible_departments/);
     expect(src).not.toMatch(/localStorage/);
   });

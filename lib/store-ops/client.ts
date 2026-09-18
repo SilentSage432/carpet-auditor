@@ -1663,6 +1663,64 @@ export async function setOperationalContextLocationRelevance(
   );
 }
 
+/** ENGINE-PROD-004 — assign seasonal relevance to every surface in an aisle. */
+export async function setOperationalContextAisleRelevance(
+  specialist: StoreSpecialist,
+  id: string,
+  input: {
+    department_id: string;
+    aisle: string;
+    relevance: "UNSET" | "NONE" | "LOW" | "MEDIUM" | "HIGH";
+  }
+): Promise<{
+  ok: true;
+  surfaces_written: number;
+  reason: string;
+  clear_erases_individual_locks?: boolean;
+}> {
+  return storeOpsFetch(
+    `/api/admin/operational-contexts/${encodeURIComponent(id)}/aisle-relevance`,
+    specialist,
+    {
+      method: "PUT",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        department_id: input.department_id,
+        aisle: input.aisle,
+        relevance: input.relevance === "UNSET" ? null : input.relevance,
+      }),
+    }
+  );
+}
+
+/** ENGINE-PROD-004 — set/clear sticky aisle priority_override (disclosed clear). */
+export async function setAislePriority(
+  specialist: StoreSpecialist,
+  input: {
+    department_id: string;
+    aisle: string;
+    priority: boolean;
+  }
+): Promise<{
+  ok: true;
+  surfaces_updated: number;
+  reason: string;
+  clear_erases_individual_locks: boolean;
+}> {
+  const result = await storeOpsFetch<{
+    ok: true;
+    surfaces_updated: number;
+    reason: string;
+    clear_erases_individual_locks: boolean;
+  }>("/api/store-locations/aisle-priority", specialist, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+  await invalidateStoreOpsListCaches();
+  notifyStoreLocationsChanged();
+  return result;
+}
+
 /** FS-002B Floor resolve — active seasons/events for a date + optional dept. */
 export type OperationalContextsResolveClient = {
   operational_date: string;

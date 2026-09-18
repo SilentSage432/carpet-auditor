@@ -206,7 +206,13 @@ describe("weekly target counts physical bays", () => {
     const generate = readRepo("lib/store-ops/rotations.ts");
     expect(generate).toMatch(/selectPhysicalBayCoverage\(/);
     expect(generate).toMatch(
-      /pending\.filter\(isStandardAisleLocation\)[\s\S]{0,80}carried\.filter\(isStandardAisleLocation\)[\s\S]{0,40}drawCount/
+      /pending\.filter\(isStandardAisleLocation\)/
+    );
+    expect(generate).toMatch(
+      /carried\.filter\(isStandardAisleLocation\)/
+    );
+    expect(generate).toMatch(
+      /selectPhysicalBayCoverage\(\s*aislePending,\s*aisleCarried,\s*drawCount/
     );
     const week = readRepo("lib/store-ops/week.ts");
     expect(week).toMatch(/distinct physical aisle\/bay/);

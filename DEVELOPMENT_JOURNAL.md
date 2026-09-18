@@ -1,5 +1,30 @@
 # DeptSync Hub — Development Journal
 
+## 2026-09-17 — ENGINE-PROD-004 Priority + seasonal cadence intelligence
+
+**Authorized implementation.** Completes declared selection intelligence required before rotation-engine field acceptance. Cadence model is **A — earlier within the universal coverage cycle**, not B (true elevated recurrence before the department finishes).
+
+### DECLARED PRIORITY LAW
+
+> A DS may explicitly elevate a physical bay or aisle. Priority changes selection pressure, not coverage truth.
+
+### DECLARED SEASONAL LAW
+
+> A time-bounded seasonal context may temporarily elevate relevant physical areas while active. Seasonal influence ends automatically when the declared window ends.
+
+### UNIVERSAL COVERAGE LAW
+
+> Elevated priority may alter cadence/order, but it may not erase the coverage obligation owed to ordinary physical bays.
+
+**Selector precedence (Model A):** true carryover → sticky `priority_override` (carry bucket) → active seasonal HIGH (ephemeral, still-owed only) → velocity/cadence → aging + `manual_priority_count`. Seasonal never writes `priority_override`. Sibling SELLING/TOPSTOCK HIGH collapses to one physical-bay key. Inclusive Gregorian window via existing operational-context date resolve (`start_date` ≤ op ≤ `end_date`).
+
+**Manual aisle priority:** bulk set/clear of existing `priority_override` (Approach A — clear disclosed as erasing individual locks; no provenance column, no schema). **Seasonal aisle convenience:** writes existing `operational_context_location_relevance` for all eligible surfaces in the aisle.
+
+**Quota:** `BASE_WEEKLY_BAY_QUOTA = 3` unchanged; ENGINE-PROD-002 volume and ENGINE-PROD-003 +1 reuse the same selector and inherit seasonal pressure. No completion/verification/attendance/Gemini/Floor Pad changes. No migration. No production mutation.
+
+**Tests:** `engine-prod-004.seasonal-priority.test.ts`. Year-over-year learning deferred. UI reduction not started. Samsung field acceptance pending natural DS configuration.
+
+
 ## 2026-09-17 — ENGINE-PROD-003 Manual extra-bay dispatch (+1)
 
 **Authorized implementation.** After ENGINE-PROD-002 base weekly plan (eligible × 3), a DS may deliberately give one associate one additional owed physical bay without redrawing the week.
@@ -14,7 +39,7 @@
 
 **UI:** Sunday Cycle Audit drawer — **Add another bay** per owner when the base plan is fully owned. Confirm suggested aisle/bay. No Stage/rotation language in the action.
 
-**Unchanged:** `BASE_WEEKLY_BAY_QUOTA = 3`, Sunday flat allocator, LAB-WEEK, TIME-DUTY-002/003, BAY-UNIT-002, verification lifecycle, call-out, seasonal (ENGINE-PROD-004), no schema, no production mutation.
+**Unchanged:** `BASE_WEEKLY_BAY_QUOTA = 3`, Sunday flat allocator, LAB-WEEK, TIME-DUTY-002/003, BAY-UNIT-002, verification lifecycle, call-out, no schema, no production mutation. Seasonal selection pressure is ENGINE-PROD-004.
 
 **Tests:** `engine-prod-003.extra-bay-dispatch.test.ts`. Samsung field acceptance pending natural operational use.
 

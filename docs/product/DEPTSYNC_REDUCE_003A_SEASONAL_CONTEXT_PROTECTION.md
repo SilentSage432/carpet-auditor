@@ -47,6 +47,7 @@ Laws preserved:
 | Floor presentation | `floor-operational-context.ts`, `FloorOperationalContextStrip` |
 | Map presentation | `map-location-context.ts`, Map badges / Walk sheet detail |
 | Attention coupling | SI-001 may consume seasonal **effect** as evidence (deterministic); does not write rotation |
+| Rotation selection (ENGINE-PROD-004) | `loadActiveSeasonalHighPhysicalKeys` → `selectPhysicalBayCoverage` — active HIGH elevates owed physical bays **earlier within the universal cycle (Model A)**; does not inflate quota, complete coverage, or re-admit COMPLETED bays mid-cycle |
 | Admin UI | `OperationalContextCard` (More → Settings, Master) |
 | APIs | `GET /api/operational-contexts`, `/api/admin/operational-contexts*` |
 | Schema | `operational_contexts`, `operational_context_department_relevance`, `operational_context_location_relevance` (**LIVE**; empty seed valid) |

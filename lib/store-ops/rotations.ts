@@ -18,6 +18,7 @@ import {
   recoverAutoVerifiedAttemptFromParent,
 } from "./completion-attempt-history";
 import { physicalBayKey, selectPhysicalBayCoverage } from "./physical-bay";
+import { loadActiveSeasonalHighPhysicalKeys } from "./seasonal-selection";
 import {
   isoWeekLabel,
   parseIsoWeekLabel,
@@ -1019,10 +1020,29 @@ async function finishGenerate(
   carried: StoreLocation[],
   upsertOptions: UpsertWeeklyRotationsOptions = {}
 ): Promise<GenerateRotationsResult> {
+  const aislePending = pending.filter(isStandardAisleLocation);
+  const aisleCarried = carried.filter(isStandardAisleLocation);
+  let seasonalKeys = new Set<string>();
+  if (storeScope.store_id) {
+    let timeZone: string | null = null;
+    const { data: storeRow } = await supabase
+      .from("stores")
+      .select("timezone")
+      .eq("id", storeScope.store_id)
+      .maybeSingle();
+    timeZone = (storeRow?.timezone as string | null) ?? null;
+    seasonalKeys = await loadActiveSeasonalHighPhysicalKeys(supabase, {
+      storeId: storeScope.store_id,
+      timeZone,
+      locations: [...aislePending, ...aisleCarried],
+    });
+  }
+
   const selected = selectPhysicalBayCoverage(
-    pending.filter(isStandardAisleLocation),
-    carried.filter(isStandardAisleLocation),
-    drawCount
+    aislePending,
+    aisleCarried,
+    drawCount,
+    { seasonalHighPhysicalKeys: seasonalKeys }
   );
 
   if (selected.length === 0) {

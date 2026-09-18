@@ -11,6 +11,7 @@ import {
   deleteOperationalContext,
   fetchOperationalContextsList,
   fetchStoreLocationsDetailed,
+  setOperationalContextAisleRelevance,
   setOperationalContextLocationRelevance,
   setOperationalContextRelevance,
   updateOperationalContext,
@@ -18,6 +19,7 @@ import {
   type OperationalContextLocationRelevanceClient,
   type OperationalContextRelevanceClient,
 } from "@/lib/store-ops/client";
+import { normalizeAisle } from "@/lib/store-ops/aisle";
 import { STORE_DEPARTMENT_TEMPLATES } from "@/lib/store-ops/stores";
 import { isMasterAdmin } from "@/lib/rbac";
 import { readableError } from "@/lib/store-ops/errors";
@@ -66,6 +68,11 @@ export function OperationalContextCard({ specialist }: Props) {
   const [endDate, setEndDate] = useState("");
   const [locPick, setLocPick] = useState<Record<string, string>>({});
   const [locLevel, setLocLevel] = useState<Record<string, RelevanceChoice>>({});
+  const [aislePick, setAislePick] = useState<Record<string, string>>({});
+  const [aisleDept, setAisleDept] = useState<Record<string, string>>({});
+  const [aisleLevel, setAisleLevel] = useState<Record<string, RelevanceChoice>>(
+    {}
+  );
 
   const declaredOnly = useMemo(
     () =>
@@ -97,6 +104,29 @@ export function OperationalContextCard({ specialist }: Props) {
     for (const loc of locations) map.set(loc.id, loc);
     return map;
   }, [locations]);
+
+  const aisleOptions = useMemo(() => {
+    const aisles = new Set<string>();
+    for (const loc of locations) {
+      if (loc.is_active === false) continue;
+      if ((loc.location_type ?? "STANDARD") === "SHOWROOM_STACKOUT") continue;
+      aisles.add(normalizeAisle(loc.aisle));
+    }
+    return [...aisles].sort((a, b) =>
+      a.localeCompare(b, undefined, { numeric: true })
+    );
+  }, [locations]);
+
+  function departmentIdForAisle(aisle: string): string {
+    const target = normalizeAisle(aisle);
+    const hit = locations.find(
+      (loc) =>
+        loc.is_active !== false &&
+        normalizeAisle(loc.aisle) === target &&
+        (loc.location_type ?? "STANDARD") !== "SHOWROOM_STACKOUT"
+    );
+    return String(hit?.department_id ?? "");
+  }
 
   useEffect(() => {
     if (!master) return;
@@ -242,6 +272,30 @@ export function OperationalContextCard({ specialist }: Props) {
     }
   }
 
+  async function onAisleRelevance(contextId: string) {
+    const aisle = aislePick[contextId] ?? "";
+    const deptId =
+      aisleDept[contextId] || departmentIdForAisle(aisle);
+    const level = (aisleLevel[contextId] ?? "HIGH") as RelevanceChoice;
+    if (!aisle || !deptId) return;
+    setBusy(true);
+    setError(null);
+    try {
+      await setOperationalContextAisleRelevance(specialist, contextId, {
+        department_id: deptId,
+        aisle,
+        relevance: level,
+      });
+      setAislePick((prev) => ({ ...prev, [contextId]: "" }));
+      setAisleLevel((prev) => ({ ...prev, [contextId]: "HIGH" }));
+      await reload();
+    } catch (err) {
+      setError(readableError(err, "Aisle seasonal relevance update failed"));
+    } finally {
+      setBusy(false);
+    }
+  }
+
   function beginEdit(c: OperationalContextClient) {
     setEditingId(c.id);
     setKind(c.kind);
@@ -256,9 +310,10 @@ export function OperationalContextCard({ specialist }: Props) {
         Seasonal Context
       </p>
       <p className="mt-1 text-xs text-slate-500">
-        Master-declared seasons and events for this store. Source is always
-        MASTER_ADMIN_DECLARED. Location relevance is optional bay-level emphasis
-        — it does not change Sunday draw or velocity.
+        Master-declared seasons and events for this store. While a window is
+        active, HIGH bay/aisle relevance elevates those owed physical bays
+        earlier in the weekly draw — it does not add extra bays or change the
+        three-bay base quota. Influence ends automatically after the end date.
       </p>
 
       {loading ? (
@@ -436,6 +491,56 @@ export function OperationalContextCard({ specialist }: Props) {
                   className="min-h-9 rounded-lg border border-emerald-500/35 px-2 text-xs font-semibold text-emerald-300 disabled:opacity-40"
                 >
                   Assign
+                </button>
+              </div>
+              <div className="mt-2 flex flex-col gap-1.5 sm:flex-row sm:items-center">
+                <select
+                  value={aislePick[c.id] ?? ""}
+                  disabled={busy || aisleOptions.length === 0}
+                  onChange={(e) => {
+                    const aisle = e.target.value;
+                    setAislePick((prev) => ({ ...prev, [c.id]: aisle }));
+                    setAisleDept((prev) => ({
+                      ...prev,
+                      [c.id]: departmentIdForAisle(aisle),
+                    }));
+                  }}
+                  className="min-h-9 flex-1 rounded border border-slate-700 bg-slate-950 px-2 font-mono text-[11px] text-slate-200"
+                >
+                  <option value="">Select aisle…</option>
+                  {aisleOptions.map((aisle) => (
+                    <option key={aisle} value={aisle}>
+                      Aisle {aisle}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  value={aisleLevel[c.id] ?? "HIGH"}
+                  disabled={busy}
+                  onChange={(e) =>
+                    setAisleLevel((prev) => ({
+                      ...prev,
+                      [c.id]: e.target.value as RelevanceChoice,
+                    }))
+                  }
+                  className="min-h-9 rounded border border-slate-700 bg-slate-950 px-2 font-mono text-[11px] text-emerald-300"
+                >
+                  {(["NONE", "LOW", "MEDIUM", "HIGH", "UNSET"] as const).map(
+                    (opt) => (
+                      <option key={opt} value={opt}>
+                        {opt}
+                      </option>
+                    )
+                  )}
+                </select>
+                <button
+                  type="button"
+                  data-testid={`seasonal-aisle-assign-${c.id}`}
+                  disabled={busy || !(aislePick[c.id] ?? "")}
+                  onClick={() => void onAisleRelevance(c.id)}
+                  className="min-h-9 rounded-lg border border-cyan-500/35 px-2 text-xs font-semibold text-cyan-200 disabled:opacity-40"
+                >
+                  Assign aisle
                 </button>
               </div>
             </div>
