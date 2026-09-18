@@ -1,5 +1,21 @@
 # DeptSync Hub — Development Journal
 
+## 2026-09-18 — UX-REDUCE-003 Map → Department Coverage
+
+**Authorized UI tranche.** Map is department coverage geography / spatial coverage memory — not a second Floor, not topology implementation.
+
+### MAP COVERAGE GEOGRAPHY LAW
+
+> Map represents coverage geography, not topology implementation.
+
+**Composition:** `lib/store-ops/map-coverage-presentation.ts` + readiness tones from unchanged `classifyMapReadiness`. Physical bay = BAY-UNIT-002 grouping. DS labels: Covered / This week / Needs attention / Remaining.
+
+**Presentation:** `MapTab` + `StoreLocationGrid` — department **N physical bays** (not tags); aisle physical bay progress; one cell per physical bay; Sell/Top secondary non-mutating presence; Velocity/service cadence under Advanced disclosure; seasonal badges + attention investigation preserved; `WalkTheFloorSheet` `canMutate=false` (Pin-to-week stays orphaned/gated).
+
+**Unchanged:** rotation engine, schema, topology storage, verification, quota, +1, schedules, call-out, seasonal selector, Floor/Roster/More structure, production.
+
+**Tests:** 1184 (+UX-REDUCE-003 unit/contract). Samsung field acceptance pending. Do not start UX-REDUCE-004 automatically.
+
 ## 2026-09-18 — UX-REDUCE-002 Floor → This Week operational simplification
 
 **Authorized UI tranche.** Floor is the primary “This Week” surface: people → physical bays from existing `sunday_bay_assignments` + `weekly_rotations`.

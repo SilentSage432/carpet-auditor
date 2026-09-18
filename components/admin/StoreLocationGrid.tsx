@@ -11,7 +11,7 @@ import {
   Focus,
 } from "lucide-react";
 import { compareAisles } from "@/lib/store-ops/aisle";
-import { formatBayTag, isPendingDrawLocation, type Department, type StoreLocation } from "@/lib/store-ops/types";
+import { formatBayTag, type Department, type StoreLocation } from "@/lib/store-ops/types";
 import type { StoreSpecialist } from "@/lib/types";
 import { patchStoreLocation } from "@/lib/store-ops/client";
 import { toastError, toastSuccess } from "@/lib/toast";
@@ -20,11 +20,18 @@ import { WalkTheFloorSheet } from "@/components/admin/WalkTheFloorSheet";
 import {
   BAY_READINESS_EVENT,
   classifyMapReadiness,
-  mapReadinessLabel,
-  worstMapReadiness,
   type BayReadinessEventDetail,
   type MapReadinessTone,
 } from "@/lib/store-ops/map-readiness";
+import {
+  composeMapCoverageSummary,
+  composePhysicalBayTone,
+  formatAisleBayCount,
+  formatAisleCoverageProgress,
+  formatMapCoverageSummaryLine,
+  formatPhysicalBayCount,
+  mapCoverageToneLabel,
+} from "@/lib/store-ops/map-coverage-presentation";
 import {
   classifyVelocityHeat,
   VELOCITY_HEAT_LEGEND,
@@ -66,7 +73,7 @@ type Props = {
   attentionGeneratedAt?: string | null;
   attentionDegraded?: boolean;
   attentionUnavailableEvidence?: AttentionEvidenceDimension[];
-  /** Velocity heatmap overlay. Standard Map is the default navigator. */
+  /** Advanced service-cadence overlay (demoted; coverage geography is primary). */
   heatmap?: boolean;
   /** UX-004: emphasize existing MEDIUM/HIGH markers during Floor investigation. */
   emphasizeAttentionMarkers?: boolean;
@@ -87,7 +94,7 @@ type AisleGroup = {
 type DepartmentGroup = {
   departmentId: string;
   departmentName: string;
-  tagCount: number;
+  physicalBayCount: number;
   aisles: AisleGroup[];
 };
 
@@ -119,22 +126,17 @@ function buildBayPairs(locs: StoreLocation[]): BayPair[] {
   return [...byBay.values()].sort((a, b) => a.bay - b.bay);
 }
 
-function aisleReadinessCounts(
+function aislePhysicalBayTones(
   aisle: AisleGroup,
   cadence: Map<string, CadenceEntry>
-): { complete: number; stale: number } {
-  let complete = 0;
-  let stale = 0;
-  for (const pair of aisle.bays) {
-    const ready = worstMapReadiness(
+): MapReadinessTone[] {
+  return aisle.bays.map((pair) =>
+    composePhysicalBayTone(
       [pair.selling, pair.topstock].map(
         (loc) => toneFor(loc, cadence, false) as MapReadinessTone
       )
-    );
-    if (ready === "verified") complete += 1;
-    else if (ready === "attention") stale += 1;
-  }
-  return { complete, stale };
+    )
+  );
 }
 
 function ReadinessGlyph({
@@ -223,8 +225,8 @@ function toneFor(
 }
 
 /**
- * Visual floor navigator — aisle accordions + walk/heatmap.
- * Bay CRUD lives in Settings Store Topology (`AisleBayManager`).
+ * Department coverage geography — aisle accordions + physical-bay cells.
+ * Topology CRUD lives in Settings Store Topology (`AisleBayManager`).
  */
 export function StoreLocationGrid({
   specialist,
@@ -341,7 +343,7 @@ export function StoreLocationGrid({
       groups.push({
         departmentId,
         departmentName: nameById.get(departmentId) ?? "Unknown",
-        tagCount: locs.length,
+        physicalBayCount: aisles.reduce((n, a) => n + a.bays.length, 0),
         aisles,
       });
     }
@@ -366,6 +368,16 @@ export function StoreLocationGrid({
       pair,
     };
   }, [walkBay, departmentGroups]);
+
+  const coverageSummary = useMemo(() => {
+    const tones: MapReadinessTone[] = [];
+    for (const dept of departmentGroups) {
+      for (const aisle of dept.aisles) {
+        tones.push(...aislePhysicalBayTones(aisle, cadenceById));
+      }
+    }
+    return composeMapCoverageSummary(tones);
+  }, [departmentGroups, cadenceById]);
 
   function toggleDept(id: string) {
     setOpenDepts((prev) => ({ ...prev, [id]: !prev[id] }));
@@ -432,26 +444,33 @@ export function StoreLocationGrid({
     <section className="space-y-3">
       <div>
         <h2 className="font-mono text-xs font-semibold uppercase tracking-[0.16em] text-accent">
-          Floor navigator
+          Department coverage
         </h2>
-        <p className="mt-2 text-sm text-zinc-400">
+        <p
+          className="mt-2 font-mono text-[11px] text-zinc-400"
+          data-testid="map-coverage-summary"
+        >
           {heatmap
-            ? "IRP cadence by last walk. Expand an aisle, then tap a bay to log or scan."
-            : "Expand an aisle. Verified this week, scheduled on rotation, or stale / barrier. Tap a bay to walk, downstock, or Snap Bay."}
+            ? "Service cadence by last walk — advanced view."
+            : formatMapCoverageSummaryLine(coverageSummary)}
         </p>
         {!heatmap ? (
           <div className="mt-2 flex flex-wrap gap-3">
             <span className="inline-flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wide text-zinc-400">
               <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" strokeWidth={ICON_STROKE} />
-              Verified
+              Covered
             </span>
             <span className="inline-flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wide text-zinc-400">
               <Clock className="h-3.5 w-3.5 text-amber-400" strokeWidth={ICON_STROKE} />
-              Scheduled
+              This week
             </span>
             <span className="inline-flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wide text-zinc-400">
               <AlertTriangle className="h-3.5 w-3.5 text-rose-400" strokeWidth={ICON_STROKE} />
-              Stale / barrier
+              Needs attention
+            </span>
+            <span className="inline-flex items-center gap-1.5 font-mono text-[10px] uppercase tracking-wide text-zinc-500">
+              <span className="inline-block h-2 w-2 rounded-full bg-zinc-600" aria-hidden />
+              Remaining
             </span>
           </div>
         ) : null}
@@ -487,7 +506,7 @@ export function StoreLocationGrid({
                 <p className="text-sm font-bold text-white">
                   {dept.departmentName}
                   <span className="ml-2 font-mono text-xs font-semibold text-accent">
-                    · {dept.tagCount} tag{dept.tagCount === 1 ? "" : "s"}
+                    · {formatPhysicalBayCount(dept.physicalBayCount)}
                   </span>
                 </p>
                 <p className="font-mono text-[11px] text-zinc-500">
@@ -516,16 +535,16 @@ export function StoreLocationGrid({
                   const aisleKey = `${dept.departmentId}:${aisle.aisle}`;
                   const aisleOpen = Boolean(openAisles[aisleKey]);
                   const bayCount = aisle.bays.length;
-                  const { complete, stale } = aisleReadinessCounts(
-                    aisle,
-                    cadenceById
-                  );
-                  const aisleTones = aisle.locations.map((loc) =>
-                    toneFor(loc, cadenceById, heatmap)
-                  );
+                  const aisleTones = aislePhysicalBayTones(aisle, cadenceById);
+                  const aisleCoverage = composeMapCoverageSummary(aisleTones);
                   const aisleTone = heatmap
-                    ? worstVelocityHeat(aisleTones as VelocityHeatTone[])
-                    : worstMapReadiness(aisleTones as MapReadinessTone[]);
+                    ? worstVelocityHeat(
+                        aisle.locations.map(
+                          (loc) =>
+                            toneFor(loc, cadenceById, true) as VelocityHeatTone
+                        )
+                      )
+                    : composePhysicalBayTone(aisleTones);
                   const bayLimit = bayVisible[aisleKey] ?? BAY_CHUNK;
                   const visibleBays = aisleOpen
                     ? aisle.bays.slice(0, bayLimit)
@@ -549,23 +568,37 @@ export function StoreLocationGrid({
                           <span className="min-w-0 truncate">
                             Aisle {aisle.aisle}
                             <span className="ml-1 text-xs font-medium text-zinc-400">
-                              · {bayCount} Bay{bayCount === 1 ? "" : "s"} ·{" "}
-                              {complete} Verified / {stale} Stale
+                              · {formatAisleBayCount(bayCount)}
+                              {!heatmap
+                                ? ` · ${formatAisleCoverageProgress(aisleCoverage)}`
+                                : ""}
                             </span>
                           </span>
                         </p>
                         <AisleCadenceHeatmap
                           tones={aisle.bays.map((pair) => {
-                            const pairTones = [pair.selling, pair.topstock].map(
-                              (loc) => toneFor(loc, cadenceById, heatmap)
-                            );
-                            return heatmap
-                              ? worstVelocityHeat(
-                                  pairTones as VelocityHeatTone[]
+                            if (heatmap) {
+                              return worstVelocityHeat(
+                                [pair.selling, pair.topstock].map(
+                                  (loc) =>
+                                    toneFor(
+                                      loc,
+                                      cadenceById,
+                                      true
+                                    ) as VelocityHeatTone
                                 )
-                              : worstMapReadiness(
-                                  pairTones as MapReadinessTone[]
-                                );
+                              );
+                            }
+                            return composePhysicalBayTone(
+                              [pair.selling, pair.topstock].map(
+                                (loc) =>
+                                  toneFor(
+                                    loc,
+                                    cadenceById,
+                                    false
+                                  ) as MapReadinessTone
+                              )
+                            );
                           })}
                           heatmap={heatmap}
                         />
@@ -681,7 +714,7 @@ export function StoreLocationGrid({
       {heatmap ? (
         <div
           className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1 rounded-xl border border-zinc-800/80 bg-zinc-950/60 px-3 py-2"
-          aria-label="Velocity heatmap legend"
+          aria-label="Service cadence legend"
         >
           {VELOCITY_HEAT_LEGEND.map((item) => (
             <span
@@ -800,7 +833,7 @@ const BayRow = memo(function BayRow({
   onOpenWalk: (bay: SheetBay) => void;
   onToggle: (loc: StoreLocation) => void;
 }) {
-  const pairTone = worstMapReadiness(
+  const pairTone = composePhysicalBayTone(
     [pair.selling, pair.topstock].map(
       (loc) => toneFor(loc, cadence, false) as MapReadinessTone
     )
@@ -812,7 +845,7 @@ const BayRow = memo(function BayRow({
   );
   const rowToneLabel = heatmap
     ? velocityHeatLabel(pairHeat)
-    : mapReadinessLabel(pairTone);
+    : mapCoverageToneLabel(pairTone);
   const rowTone = heatmap ? pairHeat : pairTone;
   const sheetPayload: SheetBay = {
     departmentId,
@@ -843,18 +876,9 @@ const BayRow = memo(function BayRow({
               bay: pair.bay,
             })}
           </span>
-          {isPendingDrawLocation(pair.selling) ||
-          isPendingDrawLocation(pair.topstock) ? (
-            <span
-              title="Mapped — available for Sunday draw"
-              className="shrink-0 rounded-full border border-amber-500/45 bg-amber-950/35 px-1.5 py-0.5 font-mono text-[9px] font-bold tracking-tight text-amber-100"
-            >
-              Pending
-            </span>
-          ) : null}
           {seasonalBadge ? (
             <span
-              title="Declared seasonal location relevance"
+              title="Seasonal relevance"
               className="shrink-0 rounded-full border border-sky-500/35 bg-sky-950/30 px-1.5 py-0.5 font-mono text-[9px] font-bold tracking-tight text-sky-200/90"
             >
               {seasonalBadge}
@@ -880,11 +904,19 @@ const BayRow = memo(function BayRow({
             </span>
           ) : null}
         </span>
-        <span className="mt-0.5 block truncate font-mono text-[10px] font-semibold tracking-tight text-zinc-500">
+        <span
+          className={`mt-0.5 block truncate font-mono text-[10px] font-semibold tracking-tight ${
+            pairTone === "attention" && !heatmap
+              ? "text-rose-300/90"
+              : pairTone === "idle" && !heatmap
+                ? "text-zinc-600"
+                : "text-zinc-500"
+          }`}
+        >
           {rowToneLabel}
         </span>
       </button>
-      <DualTypePill
+      <SurfacePresence
         selling={pair.selling}
         topstock={pair.topstock}
         pendingId={pendingId}
@@ -904,7 +936,7 @@ const BayRow = memo(function BayRow({
   );
 });
 
-const DualTypePill = memo(function DualTypePill({
+const SurfacePresence = memo(function SurfacePresence({
   selling,
   topstock,
   pendingId,
@@ -931,6 +963,26 @@ const DualTypePill = memo(function DualTypePill({
   canMutate: boolean;
   onToggle: (loc: StoreLocation) => void;
 }) {
+  if (!canMutate) {
+    return (
+      <div
+        className="inline-flex shrink-0 items-center gap-1 font-mono text-[9px] font-semibold uppercase tracking-wide text-zinc-600"
+        aria-label="Selling and topstock surfaces"
+        data-testid="bay-surface-presence"
+      >
+        <span className={selling ? "text-zinc-500" : "text-zinc-700/80"}>
+          {selling ? "Sell" : "Sell ·"}
+        </span>
+        <span className="text-zinc-700" aria-hidden>
+          /
+        </span>
+        <span className={topstock ? "text-zinc-500" : "text-zinc-700/80"}>
+          {topstock ? "Top" : "· Top"}
+        </span>
+      </div>
+    );
+  }
+
   return (
     <div className="inline-flex h-9 shrink-0 items-center rounded-full border border-zinc-700/80 bg-zinc-950/70 p-0.5">
       <TypePill

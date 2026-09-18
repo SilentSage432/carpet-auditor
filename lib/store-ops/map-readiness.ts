@@ -93,9 +93,10 @@ export function mapReadinessDotClass(tone: MapReadinessTone): string {
   return "bg-zinc-600";
 }
 
+/** DS-facing Map coverage labels (UX-REDUCE-003). Idle = ordinary remaining. */
 export function mapReadinessLabel(tone: MapReadinessTone): string {
-  if (tone === "verified") return "Verified this week";
-  if (tone === "scheduled") return "Scheduled / pending";
-  if (tone === "attention") return "Stale or barrier";
-  return "Mapped";
+  if (tone === "verified") return "Covered";
+  if (tone === "scheduled") return "This week";
+  if (tone === "attention") return "Needs attention";
+  return "Remaining";
 }

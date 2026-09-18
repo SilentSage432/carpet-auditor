@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Focus, Layers, Zap } from "lucide-react";
+import { ChevronDown, Focus } from "lucide-react";
 import { StoreLocationGrid } from "@/components/admin/StoreLocationGrid";
 import { isMasterAdmin, isSimplifiedAssociateView } from "@/lib/rbac";
 import {
@@ -407,13 +407,18 @@ export function MapTab({ specialist }: WorkflowTabProps) {
   return (
     <>
       <main className="hub-main">
-        <p className="mb-2 font-mono text-[11px] text-zinc-400">
-          {locatorOnly
-            ? formatMapCalendarWeekChrome(currentWeek, "locator")
-            : master
-              ? formatMapCalendarWeekChrome(currentWeek, "master")
-              : "This week's bay map"}
-        </p>
+        <header className="mb-3">
+          <h1 className="text-base font-bold tracking-tight text-white">
+            {locatorOnly ? "Bay locator" : "Department coverage"}
+          </h1>
+          <p className="mt-1 font-mono text-[11px] text-zinc-400">
+            {locatorOnly
+              ? formatMapCalendarWeekChrome(currentWeek, "locator")
+              : master
+                ? formatMapCalendarWeekChrome(currentWeek, "master")
+                : `This week's coverage · ${currentWeek}`}
+          </p>
+        </header>
 
         {attentionStatusLabel ? (
           <p
@@ -457,42 +462,58 @@ export function MapTab({ specialist }: WorkflowTabProps) {
           </div>
         ) : null}
 
-        <div
-          className="mb-3 inline-flex h-11 w-full items-center rounded-full border border-zinc-700/80 bg-zinc-950/70 p-0.5"
-          role="group"
-          aria-label="Map view mode"
-        >
-          <button
-            type="button"
-            aria-pressed={!heatmap}
-            onClick={() => setMapMode("standard")}
-            className={`inline-flex h-10 flex-1 items-center justify-center rounded-full px-3 font-mono text-[11px] font-bold ${
-              !heatmap ? "bg-accent/25 text-accent" : "text-zinc-400"
-            }`}
+        {!locatorOnly ? (
+          <details
+            className="mb-3 rounded-xl border border-zinc-800/80 bg-zinc-950/40"
+            data-testid="map-advanced-service-cadence"
+            open={heatmap || undefined}
+            onToggle={(e) => {
+              const open = (e.currentTarget as HTMLDetailsElement).open;
+              if (!open && heatmap) setMapMode("standard");
+            }}
           >
-            <Layers
-              className="mr-1.5 h-3.5 w-3.5"
-              strokeWidth={ICON_STROKE}
-              aria-hidden
-            />
-            Standard Map
-          </button>
-          <button
-            type="button"
-            aria-pressed={heatmap}
-            onClick={() => setMapMode("heatmap")}
-            className={`inline-flex h-10 flex-1 items-center justify-center rounded-full px-3 font-mono text-[11px] font-bold ${
-              heatmap ? "bg-accent/25 text-accent" : "text-zinc-400"
-            }`}
-          >
-            <Zap
-              className="mr-1.5 h-3.5 w-3.5"
-              strokeWidth={ICON_STROKE}
-              aria-hidden
-            />
-            Velocity Heatmap
-          </button>
-        </div>
+            <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 px-3 py-2 font-mono text-[11px] font-semibold text-zinc-400 [&::-webkit-details-marker]:hidden">
+              <span>Advanced · Service cadence</span>
+              <ChevronDown
+                className="h-3.5 w-3.5 shrink-0 text-zinc-500"
+                strokeWidth={ICON_STROKE}
+                aria-hidden
+              />
+            </summary>
+            <div className="border-t border-zinc-800/80 px-3 py-2">
+              <p className="mb-2 text-[11px] leading-snug text-zinc-500">
+                Last-walk service evidence. Does not change weekly coverage
+                obligations.
+              </p>
+              <div
+                className="inline-flex h-10 w-full items-center rounded-full border border-zinc-700/80 bg-zinc-950/70 p-0.5"
+                role="group"
+                aria-label="Coverage vs service cadence"
+              >
+                <button
+                  type="button"
+                  aria-pressed={!heatmap}
+                  onClick={() => setMapMode("standard")}
+                  className={`inline-flex h-9 flex-1 items-center justify-center rounded-full px-3 font-mono text-[11px] font-bold ${
+                    !heatmap ? "bg-accent/25 text-accent" : "text-zinc-400"
+                  }`}
+                >
+                  Coverage
+                </button>
+                <button
+                  type="button"
+                  aria-pressed={heatmap}
+                  onClick={() => setMapMode("heatmap")}
+                  className={`inline-flex h-9 flex-1 items-center justify-center rounded-full px-3 font-mono text-[11px] font-bold ${
+                    heatmap ? "bg-accent/25 text-accent" : "text-zinc-400"
+                  }`}
+                >
+                  Service cadence
+                </button>
+              </div>
+            </div>
+          </details>
+        ) : null}
 
         {authRequired ? (
           <p className="glass-card mb-3 border-amber-500/40 bg-amber-950/25 px-3 py-2.5 text-sm text-amber-100">

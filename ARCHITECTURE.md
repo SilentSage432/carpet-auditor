@@ -52,7 +52,10 @@ components/hub/SpecialistCard.tsx → Compact specialist row (duty switch + mana
 components/hub/SpecialistEditSheet.tsx → Schedule, grants, Pair Device via QR, PIN, remove
 app/api/roster/members/route.ts   → Canonical roster-only INSERT into store_specialists
 components/hub/AssociateScheduleModal.tsx → Sun–Sat shift matrix (composes shift-status.ts)
-components/hub/tabs/MapTab.tsx    → Visual floor navigator (Standard Map | Velocity Heatmap)
+components/hub/tabs/MapTab.tsx    → Department coverage geography (physical bays; Advanced · Service cadence)
+components/admin/StoreLocationGrid.tsx → Physical-bay navigator + WalkTheFloorSheet (canMutate=false)
+lib/store-ops/map-coverage-presentation.ts → Derived Map physical-bay counts/labels/summary (UX-REDUCE-003)
+lib/store-ops/map-readiness.ts → Coverage readiness tones (Covered / This week / Needs attention / Remaining)
 components/admin/AisleBayManager.tsx → Settings Store Topology (aisle CRUD, batch, prune, bulk)
 components/admin/AddBaySheet.tsx  → Single-bay Selling+Topstock sheet (Manage console)
 components/admin/EditBayDrawer.tsx → Aisle / bay / department / priority patch

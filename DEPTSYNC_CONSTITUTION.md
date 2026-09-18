@@ -364,6 +364,16 @@ Operational surfaces SHOULD answer, in order:
 
 Configuration MUST NOT visually compete with daily execution on primary operate surfaces. Intelligence SHOULD augment these levels (Article XI).
 
+### Map coverage geography law (UX-REDUCE-003)
+
+> **Map represents coverage geography, not topology implementation.**
+
+The DS thinks in department / aisle / physical bay — not raw `store_locations` rows, SELLING/TOPSTOCK record counts, or topology tags. Sibling SELLING and TOPSTOCK surfaces MAY appear as secondary detail under one physical bay; they MUST NOT present as two independent coverage obligations on everyday Map.
+
+Everyday Map identity is department coverage geography. Service/velocity evidence MAY remain as secondary advanced disclosure; it MUST NOT compete as an equal peer Map identity. Ordinary owed / remaining coverage is normal continuous-coverage state, not failure. Exceptional attention (barrier / truthful investigation) SHOULD be louder than healthy remaining.
+
+Floor answers who has what this week. Map answers where coverage stands across the department.
+
 ---
 
 ## Article XVI — Mobile-First Law
