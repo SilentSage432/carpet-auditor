@@ -7,9 +7,11 @@
 
 import { useCallback, useEffect, useMemo, useId, useState } from "react";
 import {
+  dispatchExtraBay,
   fetchDepartments,
   fetchThisWeekRotations,
   generateRotations,
+  suggestExtraBay,
 } from "@/lib/store-ops/client";
 import { readableError } from "@/lib/store-ops/errors";
 import { playErrorTone, playSuccessTone, playTapTone } from "@/lib/ui/feedback";
@@ -129,6 +131,13 @@ export function SundayAuditAssignmentModal({
   const [status, setStatus] = useState<string | null>(null);
   const [shiftRoster, setShiftRoster] = useState<ShiftRosterMember[]>([]);
   const [weekLabor, setWeekLabor] = useState<WeekLaborComposition | null>(null);
+  const [extraBusyId, setExtraBusyId] = useState<string | null>(null);
+  const [extraConfirm, setExtraConfirm] = useState<{
+    specialistId: string;
+    specialistName: string;
+    locationId: string;
+    label: string;
+  } | null>(null);
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -280,6 +289,115 @@ export function SundayAuditAssignmentModal({
       sundaySelectionSummary(roster, shiftRoster, FLOORING_STAGING_DEPT),
     [roster, shiftRoster]
   );
+
+  /** Owners already in the complete base plan — candidates for manual +1. */
+  const extraBayOwners = useMemo(() => {
+    if (pending > 0 || bays.length === 0) return [];
+    const counts = new Map<string, { name: string; count: number }>();
+    for (const bay of bays) {
+      const id = String(bay.assignment?.specialist_id ?? "").trim();
+      if (!id) continue;
+      const name = bay.assignment?.specialist_name ?? "Associate";
+      const prev = counts.get(id);
+      counts.set(id, {
+        name: prev?.name ?? name,
+        count: (prev?.count ?? 0) + 1,
+      });
+    }
+    return [...counts.entries()]
+      .filter(([, row]) => row.count >= BASE_WEEKLY_BAY_QUOTA)
+      .map(([specialistId, row]) => ({
+        specialistId,
+        specialistName: row.name,
+        count: row.count,
+      }))
+      .sort((a, b) => a.specialistName.localeCompare(b.specialistName));
+  }, [bays, pending]);
+
+  async function handleSuggestExtraBay(
+    specialistId: string,
+    specialistName: string
+  ) {
+    if (!flooringDept || busy || extraBusyId) return;
+    playTapTone();
+    setExtraBusyId(specialistId);
+    setError(null);
+    setStatus(null);
+    setExtraConfirm(null);
+    try {
+      const suggestion = await suggestExtraBay(
+        specialist,
+        flooringDept.id,
+        specialistId
+      );
+      if (!suggestion.ok || !suggestion.selection) {
+        playErrorTone();
+        setError(
+          suggestion.reason ||
+            suggestion.error ||
+            "Could not find another owed bay"
+        );
+        return;
+      }
+      const sel = suggestion.selection;
+      const aisle = String(sel.aisle ?? "");
+      const bayNum = Number(sel.bay) || 0;
+      setExtraConfirm({
+        specialistId,
+        specialistName,
+        locationId: sel.location_id,
+        label: formatBayTag({ aisle, bay: bayNum }),
+      });
+      setStatus(
+        `Suggested ${formatBayTag({ aisle, bay: bayNum })} for ${specialistName}. Confirm to assign.`
+      );
+    } catch (err) {
+      playErrorTone();
+      setError(readableError(err, "Could not suggest another bay"));
+    } finally {
+      setExtraBusyId(null);
+    }
+  }
+
+  async function handleConfirmExtraBay() {
+    if (!flooringDept || !extraConfirm || busy || extraBusyId) return;
+    playTapTone();
+    setExtraBusyId(extraConfirm.specialistId);
+    setError(null);
+    try {
+      const result = await dispatchExtraBay(specialist, {
+        departmentId: flooringDept.id,
+        specialistId: extraConfirm.specialistId,
+        specialistName: extraConfirm.specialistName,
+        locationId: extraConfirm.locationId,
+      });
+      if (!result.ok && result.status !== "ALREADY_COMPLETE") {
+        playErrorTone();
+        setError(result.reason || result.error || "Could not add another bay");
+        return;
+      }
+      playSuccessTone();
+      const after =
+        typeof result.owner_count_after === "number"
+          ? result.owner_count_after
+          : null;
+      setStatus(
+        result.status === "ALREADY_COMPLETE"
+          ? `${extraConfirm.specialistName} already owns ${extraConfirm.label}.`
+          : after != null
+            ? `Added ${extraConfirm.label} for ${extraConfirm.specialistName} (${after} this week).`
+            : `Added ${extraConfirm.label} for ${extraConfirm.specialistName}.`
+      );
+      setExtraConfirm(null);
+      await reload();
+      onChanged?.();
+    } catch (err) {
+      playErrorTone();
+      setError(readableError(err, "Could not add another bay"));
+    } finally {
+      setExtraBusyId(null);
+    }
+  }
 
   function persistRoster(next: ShiftRosterMember[]) {
     setShiftRoster(next);
@@ -648,6 +766,93 @@ export function SundayAuditAssignmentModal({
                   Missing times are not treated as 8 hours.
                 </p>
               )}
+            </section>
+          ) : null}
+
+          {extraBayOwners.length > 0 ? (
+            <section
+              data-testid="extra-bay-dispatch"
+              className="rounded-xl border border-emerald-500/30 bg-emerald-950/20 p-3"
+            >
+              <p className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-emerald-300">
+                Add another bay
+              </p>
+              <p className="mt-1 text-[11px] text-emerald-100/70">
+                Base plan is set ({BASE_WEEKLY_BAY_QUOTA} each). Give one more
+                owed bay to someone who has capacity — others stay unchanged.
+              </p>
+              <ul className="mt-2 space-y-2">
+                {extraBayOwners.map((owner) => (
+                  <li
+                    key={owner.specialistId}
+                    className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-emerald-500/20 bg-zinc-950/40 px-2.5 py-2"
+                  >
+                    <span className="min-w-0 truncate text-sm font-semibold text-white">
+                      {owner.specialistName}
+                      <span className="ml-1.5 font-mono text-[10px] font-normal text-emerald-200/80">
+                        {owner.count} this week
+                      </span>
+                    </span>
+                    <button
+                      type="button"
+                      data-testid={`extra-bay-add-${owner.specialistId}`}
+                      disabled={
+                        busy ||
+                        Boolean(extraBusyId) ||
+                        !flooringDept
+                      }
+                      onClick={() =>
+                        void handleSuggestExtraBay(
+                          owner.specialistId,
+                          owner.specialistName
+                        )
+                      }
+                      className="shrink-0 rounded-lg border border-emerald-400/50 bg-emerald-950/50 px-2.5 py-1.5 text-[11px] font-bold text-emerald-100 disabled:opacity-40"
+                    >
+                      {extraBusyId === owner.specialistId
+                        ? "Looking…"
+                        : "Add another bay"}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+              {extraConfirm ? (
+                <div
+                  data-testid="extra-bay-confirm"
+                  className="mt-3 rounded-lg border border-amber-400/40 bg-amber-950/30 p-2.5"
+                >
+                  <p className="text-[13px] text-amber-50">
+                    Assign{" "}
+                    <span className="font-mono font-semibold">
+                      {extraConfirm.label}
+                    </span>{" "}
+                    to {extraConfirm.specialistName}?
+                  </p>
+                  <div className="mt-2 flex gap-2">
+                    <button
+                      type="button"
+                      data-testid="extra-bay-confirm-yes"
+                      disabled={busy || Boolean(extraBusyId)}
+                      onClick={() => void handleConfirmExtraBay()}
+                      className="btn-primary-glow flex min-h-[40px] flex-1 items-center justify-center rounded-xl px-3 text-sm disabled:opacity-40"
+                    >
+                      {extraBusyId ? "Assigning…" : "Confirm"}
+                    </button>
+                    <button
+                      type="button"
+                      data-testid="extra-bay-confirm-cancel"
+                      disabled={Boolean(extraBusyId)}
+                      onClick={() => {
+                        setExtraConfirm(null);
+                        setStatus(null);
+                      }}
+                      className="flex min-h-[40px] flex-1 items-center justify-center rounded-xl border border-zinc-600 px-3 text-sm text-zinc-300 disabled:opacity-40"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ) : null}
             </section>
           ) : null}
 

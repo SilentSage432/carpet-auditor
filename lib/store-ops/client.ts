@@ -967,6 +967,79 @@ export async function assignLocationsToWeek(
   return result;
 }
 
+export type ExtraBayClientResult = {
+  ok: boolean;
+  status: string;
+  reason?: string;
+  assigned_week?: string;
+  physical_bay_key?: string;
+  location_id?: string;
+  rotation_id?: string;
+  aisle?: string | number;
+  bay?: number | string;
+  owner_count_before?: number;
+  owner_count_after?: number;
+  selection?: {
+    location_id: string;
+    physical_bay_key: string;
+    aisle: string | number;
+    bay: number | string;
+  };
+  error?: string;
+};
+
+/** Suggest the next owed physical bay for a manual +1 (ENGINE-PROD-003). */
+export async function suggestExtraBay(
+  specialist: StoreSpecialist,
+  departmentId: string,
+  specialistId: string
+): Promise<ExtraBayClientResult> {
+  return storeOpsFetch<ExtraBayClientResult>(
+    "/api/rotations/extra-bay",
+    specialist,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        department_id: departmentId,
+        specialist_id: specialistId,
+        suggest: true,
+      }),
+    }
+  );
+}
+
+/**
+ * Confirm manual +1: stage (if needed) + persist ownership for one associate.
+ * Pass location_id from suggestExtraBay for idempotent confirm.
+ */
+export async function dispatchExtraBay(
+  specialist: StoreSpecialist,
+  input: {
+    departmentId: string;
+    specialistId: string;
+    specialistName?: string;
+    locationId?: string;
+  }
+): Promise<ExtraBayClientResult> {
+  const result = await storeOpsFetch<ExtraBayClientResult>(
+    "/api/rotations/extra-bay",
+    specialist,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        department_id: input.departmentId,
+        specialist_id: input.specialistId,
+        ...(input.specialistName
+          ? { specialist_name: input.specialistName }
+          : {}),
+        ...(input.locationId ? { location_id: input.locationId } : {}),
+      }),
+    }
+  );
+  await invalidateStoreOpsListCaches();
+  return result;
+}
+
 export async function fetchShowroomLocations(
   specialist: StoreSpecialist,
   departmentId?: string

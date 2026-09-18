@@ -389,6 +389,26 @@ async function upsertWeeklyRotations(
 
 export { resolveWeeklyBayTarget };
 
+/**
+ * PENDING + carry-over pools used by weekly draw and ENGINE-PROD-003 +1.
+ * Exported so extra-bay dispatch reuses the same owed-surface query as generate.
+ */
+export async function loadOwedLocationPools(
+  supabase: SupabaseClient,
+  departmentId: string
+): Promise<{
+  pending: StoreLocation[];
+  carried: StoreLocation[];
+  cycleNumber: number;
+}> {
+  const { locations: pending, cycleNumber } = await loadPendingLocations(
+    supabase,
+    departmentId
+  );
+  const carried = await loadCarryOverPriorityPool(supabase, departmentId);
+  return { pending, carried, cycleNumber };
+}
+
 async function loadPendingLocations(
   supabase: SupabaseClient,
   departmentId: string

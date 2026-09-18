@@ -4,6 +4,10 @@
 > Single source of truth for architecture, parity, routes, and operational status **beneath** `DEPTSYNC_CONSTITUTION.md` (governing laws).  
 > Ground-truth audit baseline: **2026-08-25**. Update this file whenever schema, sync behavior, or route structure changes.
 
+## MANUAL EXPANSION LAW
+
+> The automatic weekly base quota remains three physical bays per eligible associate. Additional weekly coverage is explicitly dispatched by the DS and does not alter the base quota or redistribute existing ownership.
+
 ---
 
 ## 1. System Identity & Tech Stack Snapshot

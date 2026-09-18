@@ -1,5 +1,24 @@
 # DeptSync Hub — Development Journal
 
+## 2026-09-17 — ENGINE-PROD-003 Manual extra-bay dispatch (+1)
+
+**Authorized implementation.** After ENGINE-PROD-002 base weekly plan (eligible × 3), a DS may deliberately give one associate one additional owed physical bay without redrawing the week.
+
+## MANUAL EXPANSION LAW
+
+> The automatic weekly base quota remains three physical bays per eligible associate. Additional weekly coverage is explicitly dispatched by the DS and does not alter the base quota or redistribute existing ownership.
+
+**Operation:** suggest next owed physical bay via existing `selectPhysicalBayCoverage` → DS confirms → `assignLocationsToCurrentWeek` (stage) + `applySundayAssignmentPlanAdmin` (own). Idempotent on same `location_id`. Partial stage-without-ownership recovers on retry without selecting a different bay.
+
+**Preconditions:** complete owned base plan; associate already owns ≥ 3; not MasterAdmin; home department match. Incomplete/unowned week → fail and direct Sunday recovery / Assign this week.
+
+**UI:** Sunday Cycle Audit drawer — **Add another bay** per owner when the base plan is fully owned. Confirm suggested aisle/bay. No Stage/rotation language in the action.
+
+**Unchanged:** `BASE_WEEKLY_BAY_QUOTA = 3`, Sunday flat allocator, LAB-WEEK, TIME-DUTY-002/003, BAY-UNIT-002, verification lifecycle, call-out, seasonal (ENGINE-PROD-004), no schema, no production mutation.
+
+**Tests:** `engine-prod-003.extra-bay-dispatch.test.ts`. Samsung field acceptance pending natural operational use.
+
+
 ## 2026-09-17 — ENGINE-PROD-002 Zero-touch three-bay Sunday dispatch
 
 **Authorized implementation.** ENGINE-PROD-001 proved Sunday cron auto-staged only, proportional allocation conflicted with the declared 3-bay rule, and production `sunday_auto_stage_time=23:59` never opened under the single Sunday `11:00 UTC` cron.
@@ -22,7 +41,7 @@
 
 **Cron timing:** Keep `0 11 * * 0` UTC. Gate opens at default 05:00 window when configured stage time is unreachable by that single Sunday cron (e.g. 23:59 Denver).
 
-**Unchanged:** BAY-UNIT-002, TIME-DUTY-002/003, verification, carryover, seasonal (deferred ENGINE-PROD-004), manual +1 (deferred ENGINE-PROD-003), Floor Pad, Gemini, no schema, no production mutation. W38 pilot reconcile not performed.
+**Unchanged:** BAY-UNIT-002, TIME-DUTY-002/003, verification, carryover, seasonal (deferred ENGINE-PROD-004), Floor Pad, Gemini, no schema, no production mutation. Manual +1 is ENGINE-PROD-003.
 
 **Tests:** ENGINE-PROD-002 suite + LAB-WEEK-002 contract amendment. Samsung field acceptance pending after PILOT-STATE-RECONCILE.
 
