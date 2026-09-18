@@ -1,5 +1,15 @@
 # DeptSync Hub — Development Journal
 
+## 2026-09-18 — PERF-LOAD-001 Operational load path audit
+
+**Read-only diagnostic.** No application behavior changes.
+
+Samsung field latency after UX-REDUCE-002/003/004 made Floor ownership and Roster People waits obvious. Audit reconstructs boot/keep-alive/Floor/Roster/Map/auth/cache waterfalls.
+
+**Headline:** `WorkflowTabShell` initializes `visited` with every allowed tab → Map + Roster + Settings mount and fetch during Floor cold open. Floor “who has what” needs rotations then live `sunday_bay_assignments` (not durable-cached). Roster keeps `loading` until sunday assignments finish after specialists+shifts. IndexedDB SWR covers rotations/locations, not owners/people/schedules.
+
+Canonical: [`docs/product/PERF_LOAD_001_OPERATIONAL_LOAD_PATH_AUDIT.md`](docs/product/PERF_LOAD_001_OPERATIONAL_LOAD_PATH_AUDIT.md). Next candidate PERF-LOAD-002 (visit-on-demand + P0 unlock). Do not start UX-REDUCE-005 yet.
+
 ## 2026-09-18 — UX-REDUCE-004 Roster → People & Schedules
 
 **Authorized UI tranche.** Roster is rotation participation + schedule evidence — not HR/timeclock/admin directory.

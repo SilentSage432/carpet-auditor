@@ -20,7 +20,9 @@
 - [x] **UX-REDUCE-002** — Floor → This Week operational simplification (**COMPLETE** engineering; Samsung field acceptance pending). People→physical-bays ownership; healthy state quieter; recovery/Floor Pad/+1 preserved; no engine/schema change
 - [x] **UX-REDUCE-003** — Map → department coverage (**COMPLETE** engineering; Samsung field acceptance pending). Physical-bay counts/language; Velocity demoted to advanced service cadence; Sell/Top secondary; investigation + seasonal preserved; Map non-mutating
 - [x] **UX-REDUCE-004** — Roster → People & schedules (**COMPLETE** engineering; Samsung field acceptance pending). People + TIME-DUTY; schedule-first detail; call-out exception; access/device demoted; authority ≠ capability; no WORKFORCE-SCOPE-001 invention
-- [ ] **UX-REDUCE-005** — More/Admin hierarchy (**NOT STARTED**)
+- [x] **PERF-LOAD-001** — Operational load path archaeology (**COMPLETE** read-only). Eager multi-tab boot contention + Floor/Roster P0 waterfalls documented — [`docs/product/PERF_LOAD_001_OPERATIONAL_LOAD_PATH_AUDIT.md`](docs/product/PERF_LOAD_001_OPERATIONAL_LOAD_PATH_AUDIT.md). No runtime change
+- [ ] **PERF-LOAD-002** — Boot contention + P0 unlock (**NOT STARTED**)
+- [ ] **UX-REDUCE-005** — More/Admin hierarchy (**NOT STARTED** — wait for PERF-LOAD-002)
 - [ ] **UX-REDUCE-006** — Legacy surface retirement (**NOT STARTED**)
 - [x] **BAY-UNIT-002** — Physical bay coverage grouping (**COMPLETE** engineering; Samsung field acceptance pending). One `(department_id, aisle, bay)` = one rotation/allocation/verification unit; SELLING/TOPSTOCK remain topology surfaces; no schema; LAB-WEEK-002 labor math unchanged
 - [x] **STAGE-ASSIGN-CUE-001** — Post-Stage **Assign this week** cue (**COMPLETE** engineering; Samsung field acceptance pending). Stage remains selection-only; human confirm still required; LAB-WEEK-002 allocator reused unchanged
