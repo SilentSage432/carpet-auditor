@@ -97,6 +97,6 @@ See final report §34 / CHAT_HANDOFF. Engineering complete ≠ perceived success
 |------|--------|
 | Engineering | COMPLETE |
 | Tests | PERF-LOAD-002 contracts + regression suites |
-| Samsung acceptance | PENDING |
-| PERF-LOAD-003 | NOT STARTED — decide after device acceptance |
-| UX-REDUCE-005 | NOT STARTED |
+| Samsung acceptance | **ACCEPTED** (field-tested; cold Floor + Roster materially faster) |
+| PERF-LOAD-003 | NOT STARTED — only if still warranted |
+| UX-REDUCE-005 | Implemented after acceptance — More IA only |

@@ -5,7 +5,7 @@
 > **Worktree:** clean except untracked `tmp/`  
 > **Date:** 2026-09-18  
 > **Production timings:** Not measured from this Cursor environment. Findings are **code-path reconstructed** unless noted.  
-> **Follow-on:** PERF-LOAD-002 implemented visit-on-demand + Floor/Roster P0 unlock — see [`PERF_LOAD_002_VISIT_ON_DEMAND_P0_RENDER.md`](./PERF_LOAD_002_VISIT_ON_DEMAND_P0_RENDER.md). Original evidence below is preserved.
+> **Follow-on:** PERF-LOAD-002 implemented and **Samsung field-accepted**. UX-REDUCE-005 reorganized More afterward — see [`UX_REDUCE_005_MORE_SETUP_ADMINISTRATION.md`](./UX_REDUCE_005_MORE_SETUP_ADMINISTRATION.md). Original evidence below is preserved.
 
 ---
 

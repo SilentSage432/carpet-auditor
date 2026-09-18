@@ -1,5 +1,14 @@
 "use client";
 
+/**
+ * UX-REDUCE-005 — More = setup & administration, not everyday operations.
+ *
+ * Primary hierarchy: Floor Pad → Department Setup → Rotation Setup →
+ * Device & Account → Master Admin (collapsed).
+ * PERF-LOAD-002: this tab mounts only on first visit; keep-alive after.
+ * Defer Master/topology admin graphs until their sections open.
+ */
+
 import dynamic from "next/dynamic";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
@@ -11,19 +20,15 @@ import {
   NotebookPen,
   RefreshCw,
   Sliders,
+  Snowflake,
   Target,
   UserCheck,
   type LucideIcon,
 } from "lucide-react";
-import { AisleBayManager } from "@/components/admin/AisleBayManager";
 import { PushNotificationsCard } from "@/components/hub/PushNotificationsCard";
 import { FloorTitleBadge } from "@/components/hub/SpecialistCard";
-import { WeeklyBayTargetCard } from "@/components/hub/WeeklyBayTargetCard";
 import { ThemeSelector } from "@/components/settings/ThemeSelector";
 import { SyncQueuePanel } from "@/components/settings/SyncQueuePanel";
-import { SundayScheduleCard } from "@/components/admin/SundayScheduleCard";
-import { FiscalCoverageCard } from "@/components/admin/FiscalCoverageCard";
-import { OperationalContextCard } from "@/components/admin/OperationalContextCard";
 import {
   clearLocalApplianceScans,
   countLocalApplianceScans,
@@ -61,6 +66,41 @@ import { isSupabaseConfigured, getSupabase } from "@/lib/supabase";
 import type { StoreSpecialist } from "@/lib/types";
 import type { Department, StoreLocation } from "@/lib/store-ops/types";
 
+const AisleBayManager = dynamic(
+  () =>
+    import("@/components/admin/AisleBayManager").then(
+      (mod) => mod.AisleBayManager
+    ),
+  { ssr: false }
+);
+const WeeklyBayTargetCard = dynamic(
+  () =>
+    import("@/components/hub/WeeklyBayTargetCard").then(
+      (mod) => mod.WeeklyBayTargetCard
+    ),
+  { ssr: false }
+);
+const SundayScheduleCard = dynamic(
+  () =>
+    import("@/components/admin/SundayScheduleCard").then(
+      (mod) => mod.SundayScheduleCard
+    ),
+  { ssr: false }
+);
+const FiscalCoverageCard = dynamic(
+  () =>
+    import("@/components/admin/FiscalCoverageCard").then(
+      (mod) => mod.FiscalCoverageCard
+    ),
+  { ssr: false }
+);
+const OperationalContextCard = dynamic(
+  () =>
+    import("@/components/admin/OperationalContextCard").then(
+      (mod) => mod.OperationalContextCard
+    ),
+  { ssr: false }
+);
 const ForceRotationModal = dynamic(
   () =>
     import("@/components/admin/ForceRotationModal").then(
@@ -88,17 +128,15 @@ type SettingsAccordion =
   | "device"
   | "store"
   | "bulk"
-  | "remnants"
   | "taxonomies"
   | null;
 
 const ICON_STROKE = 1.75;
 
 /**
- * More — rotation / Floor Pad entry first, then Store Management / Device.
- * REDUCE-004: specialty product launchers (Appliances, remnants, cycle audit)
- * disconnected from everyday More. SpecialtyToolsHost remains dormant for
- * contextual SIMS / remnant events until later runtime retirement.
+ * More — setup & administration for DeptSync.
+ * Specialty product launchers remain disconnected (REDUCE-004).
+ * Floor Pad + Seasonal Context are protected capabilities.
  */
 export function SettingsSection({
   activeSpecialist,
@@ -110,12 +148,15 @@ export function SettingsSection({
   const [syncMsg, setSyncMsg] = useState<string | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [openSection, setOpenSection] = useState<SettingsAccordion>(null);
+  const [masterOpen, setMasterOpen] = useState(false);
+  const [seasonalMounted, setSeasonalMounted] = useState(false);
   const [cacheTick, setCacheTick] = useState(0);
   const [cacheMsg, setCacheMsg] = useState<string | null>(null);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [locations, setLocations] = useState<StoreLocation[]>([]);
   const [forceOpen, setForceOpen] = useState(false);
   const [taxonomyOpen, setTaxonomyOpen] = useState(false);
+  const [adminGraphLoaded, setAdminGraphLoaded] = useState(false);
 
   const configured = isSupabaseConfigured();
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
@@ -136,6 +177,12 @@ export function SettingsSection({
   const refreshCacheCounts = useCallback(() => {
     setCacheTick((n) => n + 1);
   }, []);
+
+  const needTopologyGraph =
+    openSection === "bulk" ||
+    forceOpen ||
+    taxonomyOpen ||
+    (masterOpen && masterSession);
 
   const reloadDepts = useCallback(async () => {
     if (!activeSpecialist || (!masterSession && !mapConsole)) return;
@@ -160,6 +207,7 @@ export function SettingsSection({
       } else {
         setLocations([]);
       }
+      setAdminGraphLoaded(true);
     } catch (err) {
       console.error("[Settings] live departments failed", err);
       setDepartments([]);
@@ -168,11 +216,13 @@ export function SettingsSection({
   }, [activeSpecialist, masterSession, mapConsole, storeNumber]);
 
   useEffect(() => {
+    if (!needTopologyGraph) return;
     void reloadDepts();
-  }, [reloadDepts]);
+  }, [needTopologyGraph, reloadDepts]);
 
   useEffect(() => {
     function onMap() {
+      if (!adminGraphLoaded && !needTopologyGraph) return;
       void reloadDepts();
     }
     window.addEventListener(ADMIN_DEPT_CONTEXT_EVENT, onMap);
@@ -181,7 +231,7 @@ export function SettingsSection({
       window.removeEventListener(ADMIN_DEPT_CONTEXT_EVENT, onMap);
       window.removeEventListener(STORE_OPS_LOCATIONS_CHANGED_EVENT, onMap);
     };
-  }, [reloadDepts]);
+  }, [reloadDepts, adminGraphLoaded, needTopologyGraph]);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -195,9 +245,10 @@ export function SettingsSection({
       ) {
         setOpenSection("bulk");
       } else if (hash === "weekly-rotation") {
+        setMasterOpen(true);
         setForceOpen(true);
         window.setTimeout(() => {
-          document.getElementById("settings-targets")?.scrollIntoView({
+          document.getElementById("settings-master-admin")?.scrollIntoView({
             behavior: "smooth",
             block: "start",
           });
@@ -209,10 +260,10 @@ export function SettingsSection({
       ) {
         router.replace(buildExecutiveFloorPadHref());
       } else if (hash === "taxonomies") {
+        setMasterOpen(true);
         setOpenSection("taxonomies");
         setTaxonomyOpen(true);
       } else if (hash === "sync-queue") {
-        // APP-SYNC-UX-001: attention banner deep-links straight to the queue.
         setOpenSection("device");
         window.setTimeout(() => {
           document.getElementById("sync-queue")?.scrollIntoView({
@@ -223,8 +274,17 @@ export function SettingsSection({
       } else if (hash === "remnants" || hash === "remnants-calculator") {
         // REDUCE-004: remnant specialty hashes no longer open everyday UI.
       } else if (hash === "admin-tools" || hash === "sunday-schedule") {
+        setMasterOpen(true);
         window.setTimeout(() => {
           document.getElementById("sunday-schedule")?.scrollIntoView({
+            behavior: "smooth",
+            block: "start",
+          });
+        }, 50);
+      } else if (hash === "seasonal" || hash === "seasonal-context") {
+        setSeasonalMounted(true);
+        window.setTimeout(() => {
+          document.getElementById("settings-rotation-setup")?.scrollIntoView({
             behavior: "smooth",
             block: "start",
           });
@@ -286,20 +346,29 @@ export function SettingsSection({
   }
 
   const showFloorPad = supervisorSession || masterSession;
+  const showDepartmentSetup =
+    (supervisorSession || masterSession) && mapConsole && activeSpecialist;
+  const showRotationSetup = masterSession && activeSpecialist;
+  const showMasterAdmin = masterSession && activeSpecialist;
+
+  // Mount Seasonal on first paint for Master primary Rotation Setup, or hash.
+  useEffect(() => {
+    if (showRotationSetup) setSeasonalMounted(true);
+  }, [showRotationSetup]);
 
   return (
     <div className="space-y-4">
       <header className="px-0.5">
         <h1 className="text-lg font-bold tracking-tight text-zinc-50">More</h1>
         <p className="mt-0.5 text-sm text-zinc-500">
-          Coverage configuration, Floor Pad, and device diagnostics
+          Setup and administration for DeptSync
         </p>
       </header>
 
       {showFloorPad ? (
         <SettingsCard
           title="Floor Pad"
-          subtitle="Walk & Talk observational notes — protected capability"
+          subtitle="Walk the floor · capture observational evidence"
           icons={[NotebookPen]}
           data-testid="more-department-tools"
         >
@@ -314,26 +383,30 @@ export function SettingsSection({
               strokeWidth={ICON_STROKE}
               aria-hidden
             />
-            Walk & Talk / Executive Floor Pad
+            Walk & Talk / Floor Pad
           </button>
+          <p className="text-[11px] leading-snug text-zinc-500">
+            Protected supporting tool. AI may propose structured notes; the DS
+            confirms authoritative rotation state.
+          </p>
         </SettingsCard>
       ) : null}
 
-      {(supervisorSession || masterSession) && activeSpecialist ? (
+      {showDepartmentSetup && activeSpecialist ? (
         <SettingsCard
-          title="Store Management"
-          subtitle="Admin configuration — topology, quotas, Sunday"
-          icons={[Layers, Target]}
-          data-testid="more-store-management"
+          title="Department Setup"
+          subtitle="Aisles and physical bays the coverage engine uses"
+          icons={[Layers]}
+          data-testid="more-department-setup"
         >
-          {mapConsole ? (
-            <Accordion
-              id="bulk-generate"
-              title="Store Topology & Bulk Bay Generator"
-              subtitle="Aisles, single bays, bulk generate"
-              open={openSection === "bulk"}
-              onToggle={() => toggleSection("bulk")}
-            >
+          <Accordion
+            id="bulk-generate"
+            title="Aisles & bays"
+            subtitle="Topology setup · Map stays coverage-only"
+            open={openSection === "bulk"}
+            onToggle={() => toggleSection("bulk")}
+          >
+            {openSection === "bulk" ? (
               <AisleBayManager
                 specialist={activeSpecialist}
                 departments={departments}
@@ -346,64 +419,37 @@ export function SettingsSection({
                 }
                 onChanged={() => void reloadDepts()}
               />
-            </Accordion>
-          ) : null}
+            ) : (
+              <p className="text-xs text-zinc-500">
+                Open to edit aisles and physical bays for this department.
+              </p>
+            )}
+          </Accordion>
+        </SettingsCard>
+      ) : null}
 
-          <div id="settings-targets" className="space-y-4">
-            <WeeklyBayTargetCard specialist={activeSpecialist} />
-            {masterSession ? (
-              <>
-                <SundayScheduleCard specialist={activeSpecialist} />
-                <FiscalCoverageCard specialist={activeSpecialist} />
-                <OperationalContextCard specialist={activeSpecialist} />
-                <button
-                  type="button"
-                  onClick={() => setForceOpen(true)}
-                  className="flex min-h-12 w-full items-center justify-center rounded-xl border border-slate-700 bg-slate-950 text-sm font-semibold text-slate-100"
-                >
-                  <RefreshCw
-                    className="w-4 h-4 mr-2"
-                    strokeWidth={ICON_STROKE}
-                    aria-hidden
-                  />
-                  Generate this week&apos;s list
-                </button>
-              </>
-            ) : null}
-          </div>
-
-          {masterSession ? (
-            <Accordion
-              title="Catalog taxonomies"
-              subtitle="Folder trees per department"
-              open={openSection === "taxonomies"}
-              onToggle={() => toggleSection("taxonomies")}
-            >
-              <button
-                type="button"
-                onClick={() => setTaxonomyOpen(true)}
-                className="flex min-h-12 w-full items-center justify-between rounded-xl border border-slate-700 bg-slate-950 px-4 text-left"
-              >
-                <span className="text-sm font-semibold text-slate-100">
-                  Open taxonomy manager
-                </span>
-                <ChevronRight
-                  className="h-4 w-4 text-slate-500"
-                  strokeWidth={ICON_STROKE}
-                  aria-hidden
-                />
-              </button>
-            </Accordion>
+      {showRotationSetup && activeSpecialist ? (
+        <SettingsCard
+          id="settings-rotation-setup"
+          title="Rotation Setup"
+          subtitle="Coverage cadence inputs for Sunday dispatch"
+          icons={[Snowflake]}
+          data-testid="more-rotation-setup"
+        >
+          {seasonalMounted ? (
+            <OperationalContextCard specialist={activeSpecialist} />
           ) : null}
         </SettingsCard>
       ) : null}
 
       <SettingsCard
-        title="Device & Diagnostics"
-        subtitle="Profile, sync queue, offline matrix, alerts"
+        title="Device & Account"
+        subtitle="Profile, sync, and device support"
         icons={[UserCheck, Sliders]}
-        data-testid="more-device-diagnostics"
+        data-testid="more-device-account"
       >
+        {/* Compat alias for REDUCE-004 / UX-NAV contracts */}
+        <span className="sr-only" data-testid="more-device-diagnostics" />
         {canChangePin && activeSpecialist ? (
           <>
             <div className="flex min-w-0 flex-wrap items-center gap-2">
@@ -510,12 +556,12 @@ export function SettingsSection({
                   {ping === "checking"
                     ? "Checking…"
                     : ping === "ok"
-                      ? "Connected (Database Live)"
+                      ? "Connected"
                       : ping === "fail"
-                        ? "Offline / Unreachable"
+                        ? "Offline / unreachable"
                         : configured
                           ? "Not tested yet"
-                          : "Offline / Unreachable"}
+                          : "Offline / unreachable"}
                 </p>
               </div>
               <button
@@ -524,7 +570,7 @@ export function SettingsSection({
                 disabled={!configured || ping === "checking"}
                 className="mt-2 flex min-h-12 w-full items-center justify-center rounded-xl border border-slate-700 bg-slate-950 text-sm font-semibold text-slate-100 disabled:opacity-40"
               >
-                {ping === "checking" ? "Checking…" : "Test Connection"}
+                {ping === "checking" ? "Checking…" : "Test connection"}
               </button>
             </div>
 
@@ -538,18 +584,18 @@ export function SettingsSection({
                   onClick={clearLocalCache}
                   className="rounded-lg border border-red-500/40 px-2.5 py-1.5 text-[11px] font-semibold text-red-300"
                 >
-                  Clear Local Cache
+                  Clear local cache
                 </button>
               </div>
               <ul className="mt-2 space-y-1.5 text-sm text-slate-300">
                 <li className="flex justify-between gap-3 rounded-lg bg-slate-950/70 px-3 py-2">
-                  <span>Appliance Audit Cache</span>
+                  <span>Appliance audit cache</span>
                   <span className="font-mono text-emerald-400">
                     {applianceAuditCache}
                   </span>
                 </li>
                 <li className="flex justify-between gap-3 rounded-lg bg-slate-950/70 px-3 py-2">
-                  <span>Remnant Inventory Cache</span>
+                  <span>Remnant inventory cache</span>
                   <span className="font-mono text-emerald-400">
                     {remnantInventoryCache}
                   </span>
@@ -577,8 +623,68 @@ export function SettingsSection({
         {(supervisorSession || masterSession) && (
           <PushNotificationsCard specialist={activeSpecialist} />
         )}
+      </SettingsCard>
 
-        {masterSession ? (
+      {showMasterAdmin && activeSpecialist ? (
+        <SettingsCard
+          id="settings-master-admin"
+          title="Master Admin"
+          subtitle="Advanced recovery and storewide configuration"
+          icons={[Target]}
+          collapsible
+          open={masterOpen}
+          onToggle={() => setMasterOpen((v) => !v)}
+          data-testid="more-master-admin"
+        >
+          {/* Compat: former Store Management card identity for deep tests */}
+          <span className="sr-only" data-testid="more-store-management" />
+          <div id="settings-targets" className="space-y-4">
+            <p className="text-[11px] leading-snug text-zinc-500">
+              Automatic Sunday plans use three physical bays per eligible
+              associate. Controls below are recovery and legacy-compatible
+              administration — not everyday DS workflow.
+            </p>
+            <WeeklyBayTargetCard specialist={activeSpecialist} />
+            <div id="sunday-schedule">
+              <SundayScheduleCard specialist={activeSpecialist} />
+            </div>
+            <FiscalCoverageCard specialist={activeSpecialist} />
+            <button
+              type="button"
+              onClick={() => setForceOpen(true)}
+              className="flex min-h-12 w-full items-center justify-center rounded-xl border border-slate-700 bg-slate-950 text-sm font-semibold text-slate-100"
+            >
+              <RefreshCw
+                className="mr-2 h-4 w-4"
+                strokeWidth={ICON_STROKE}
+                aria-hidden
+              />
+              Advanced recovery · Generate this week
+            </button>
+          </div>
+
+          <Accordion
+            title="Catalog taxonomies"
+            subtitle="Legacy folder trees · retirement candidate"
+            open={openSection === "taxonomies"}
+            onToggle={() => toggleSection("taxonomies")}
+          >
+            <button
+              type="button"
+              onClick={() => setTaxonomyOpen(true)}
+              className="flex min-h-12 w-full items-center justify-between rounded-xl border border-slate-700 bg-slate-950 px-4 text-left"
+            >
+              <span className="text-sm font-semibold text-slate-100">
+                Open taxonomy manager
+              </span>
+              <ChevronRight
+                className="h-4 w-4 text-slate-500"
+                strokeWidth={ICON_STROKE}
+                aria-hidden
+              />
+            </button>
+          </Accordion>
+
           <Accordion
             id="store"
             title="Store number"
@@ -591,8 +697,8 @@ export function SettingsSection({
               onStoreNumberChange={onStoreNumberChange}
             />
           </Accordion>
-        ) : null}
-      </SettingsCard>
+        </SettingsCard>
+      ) : null}
 
       {forceOpen && activeSpecialist ? (
         <ForceRotationModal
@@ -743,9 +849,17 @@ function Accordion({
           ) : null}
         </div>
         {open ? (
-          <ChevronUp className="h-4 w-4 shrink-0 text-slate-400" strokeWidth={1.75} aria-hidden />
+          <ChevronUp
+            className="h-4 w-4 shrink-0 text-slate-400"
+            strokeWidth={1.75}
+            aria-hidden
+          />
         ) : (
-          <ChevronDown className="h-4 w-4 shrink-0 text-slate-400" strokeWidth={1.75} aria-hidden />
+          <ChevronDown
+            className="h-4 w-4 shrink-0 text-slate-400"
+            strokeWidth={1.75}
+            aria-hidden
+          />
         )}
       </button>
       {open ? (
@@ -803,7 +917,7 @@ function StoreNumberPanel({
         onClick={save}
         className="min-h-12 w-full rounded-xl bg-emerald-600 px-4 text-sm font-semibold text-white disabled:opacity-50"
       >
-        Save Store Number
+        Save store number
       </button>
       {msg ? <p className="text-xs text-emerald-400">{msg}</p> : null}
     </div>

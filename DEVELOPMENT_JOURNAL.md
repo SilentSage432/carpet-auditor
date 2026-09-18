@@ -1,5 +1,15 @@
 # DeptSync Hub — Development Journal
 
+## 2026-09-18 — UX-REDUCE-005 More → Setup & Administration
+
+**Authorized IA tranche.** More = configure/administer DeptSync — not an operational dashboard. PERF-LOAD-002 locked (Samsung-accepted).
+
+**Hierarchy:** Floor Pad (protected) → Department Setup (aisles & bays) → Rotation Setup / Seasonal Context (Master, protected cadence input) → Device & Account → Master Admin collapsed (legacy weekly targets, Sunday schedule, fiscal signal, Force recovery, taxonomies, store number).
+
+**Deferred load:** topology/admin graph until aisles accordion or Master Admin open. Dynamic imports for heavy admin widgets.
+
+**Unchanged:** Floor/Map/Roster, shell visit-on-demand, engine, seasonal selector, quota, schema, auth. Canonical: [`docs/product/UX_REDUCE_005_MORE_SETUP_ADMINISTRATION.md`](docs/product/UX_REDUCE_005_MORE_SETUP_ADMINISTRATION.md). Samsung acceptance pending. Do not start UX-REDUCE-006 / PERF-LOAD-003 automatically.
+
 ## 2026-09-18 — PERF-LOAD-002 Visit-on-demand + P0 operational render
 
 Samsung latency after UX reduction: eager multi-tab boot + Floor/Roster P0 waterfalls (PERF-LOAD-001).

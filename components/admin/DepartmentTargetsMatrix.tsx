@@ -185,11 +185,11 @@ export function DepartmentTargetsMatrix({ specialist }: Props) {
     <section className="space-y-3">
       <div>
         <h2 className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-accent">
-          Department targets
+          Weekly bay targets
         </h2>
         <p className="mt-1 text-sm text-zinc-400">
           {master
-            ? "Weekly physical-bay quotas for weekly auto-stage. Toggle pauses a department. Changes save on blur or Save All."
+            ? "Legacy weekly staging targets and department pause. Automatic Sunday plans use three physical bays per eligible associate — not this matrix as everyday quota."
             : "How many physical bays Sunday should stage for your department (default 10)."}
         </p>
       </div>

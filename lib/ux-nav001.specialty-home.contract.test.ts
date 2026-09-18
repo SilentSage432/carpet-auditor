@@ -48,10 +48,12 @@ describe("UX-NAV-001 More / specialty homes — REDUCE-004 disconnected", () => 
   });
 
   it("admin and device tools remain in More", () => {
-    expect(settings).toContain('title="Store Management"');
-    expect(settings).toContain('data-testid="more-store-management"');
-    expect(settings).toContain('title="Device & Diagnostics"');
-    expect(settings).toContain('data-testid="more-device-diagnostics"');
+    expect(settings).toContain('title="Department Setup"');
+    expect(settings).toContain('data-testid="more-department-setup"');
+    expect(settings).toContain('title="Device & Account"');
+    expect(settings).toContain('data-testid="more-device-account"');
+    expect(settings).toContain('title="Master Admin"');
+    expect(settings).toContain('data-testid="more-master-admin"');
     expect(settings).toContain("OperationalContextCard");
   });
 
