@@ -4,7 +4,8 @@
 > **Baseline:** `main @ b494b02` — `feat: simplify Roster around people and schedules`  
 > **Worktree:** clean except untracked `tmp/`  
 > **Date:** 2026-09-18  
-> **Production timings:** Not measured from this Cursor environment. Findings are **code-path reconstructed** unless noted.
+> **Production timings:** Not measured from this Cursor environment. Findings are **code-path reconstructed** unless noted.  
+> **Follow-on:** PERF-LOAD-002 implemented visit-on-demand + Floor/Roster P0 unlock — see [`PERF_LOAD_002_VISIT_ON_DEMAND_P0_RENDER.md`](./PERF_LOAD_002_VISIT_ON_DEMAND_P0_RENDER.md). Original evidence below is preserved.
 
 ---
 
@@ -565,4 +566,4 @@ The delay is **primarily network/data-dependency under boot contention**, not Re
 
 ---
 
-*End of PERF-LOAD-001. Do not implement PERF-LOAD-002 in this tranche. Do not begin UX-REDUCE-005.*
+*End of PERF-LOAD-001 evidence record. First recommended correction (visit-on-demand + Floor/Roster P0 unlock) implemented in PERF-LOAD-002 — [`PERF_LOAD_002_VISIT_ON_DEMAND_P0_RENDER.md`](./PERF_LOAD_002_VISIT_ON_DEMAND_P0_RENDER.md). Do not begin UX-REDUCE-005 until Samsung acceptance of PERF-LOAD-002.*

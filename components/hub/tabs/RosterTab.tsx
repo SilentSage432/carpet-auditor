@@ -199,6 +199,7 @@ export function RosterTab({ specialist, storeNumber }: WorkflowTabProps) {
       weekEnd,
     });
     try {
+      // P0: people + schedule/TIME-DUTY truth — unlock People paint here.
       const [tz, team, saved] = await Promise.all([
         fetchStoreTimezone(storeNumber),
         fetchSpecialists(storeNumber),
@@ -211,6 +212,9 @@ export function RosterTab({ specialist, storeNumber }: WorkflowTabProps) {
       setManageTarget((curr) =>
         curr ? nextRoster.find((row) => row.id === curr.id) ?? null : curr
       );
+      setLoading(false);
+
+      // P1: weekly ownership captions / call-out recovery — progressive.
       const homes = [
         ...new Set(
           nextRoster
@@ -244,6 +248,7 @@ export function RosterTab({ specialist, storeNumber }: WorkflowTabProps) {
       toastError(
         err instanceof Error ? err.message : "Could not load live roster"
       );
+      setLoading(false);
     }
   }, [today, weekDates, weekStart, storeNumber, storeToday, storeYesterday]);
 
@@ -648,10 +653,12 @@ export function RosterTab({ specialist, storeNumber }: WorkflowTabProps) {
                         String(member.id)
                       );
                       const calledOut = availability.reason === "CALLED_OUT";
+                      // Reassign requires known ownership evidence — never while pending.
                       const showReassign =
                         calledOut &&
                         canShift &&
-                        (!assignmentsKnown || ownedBays > 0);
+                        assignmentsKnown &&
+                        ownedBays > 0;
                       const canManageCard =
                         canShift || canGrant || canManage;
                       return (
@@ -671,7 +678,7 @@ export function RosterTab({ specialist, storeNumber }: WorkflowTabProps) {
                               : null
                           }
                           ownedBayCaption={
-                            calledOut
+                            calledOut && assignmentsKnown
                               ? formatOwnedBayCaption(ownedBays)
                               : null
                           }
@@ -742,9 +749,16 @@ export function RosterTab({ specialist, storeNumber }: WorkflowTabProps) {
             now: clockNow,
             timeZone: storeTimezone,
           })}
-          ownedBayCaption={formatOwnedBayCaption(
-            countWeeklyOwnership(weekAssignments, String(manageTarget.id))
-          )}
+          ownedBayCaption={
+            assignmentsKnown
+              ? formatOwnedBayCaption(
+                  countWeeklyOwnership(
+                    weekAssignments,
+                    String(manageTarget.id)
+                  )
+                )
+              : null
+          }
           nextCaption={
             composeNextScheduledOpportunity({
               rows: Object.values(weekRows).filter(
@@ -775,11 +789,11 @@ export function RosterTab({ specialist, storeNumber }: WorkflowTabProps) {
               now: clockNow,
               timeZone: storeTimezone,
             }).reason === "CALLED_OUT" &&
-            (!assignmentsKnown ||
-              countWeeklyOwnership(
-                weekAssignments,
-                String(manageTarget.id)
-              ) > 0)
+            assignmentsKnown &&
+            countWeeklyOwnership(
+              weekAssignments,
+              String(manageTarget.id)
+            ) > 0
               ? () => {
                   setReassignTarget(manageTarget);
                   setManageTarget(null);

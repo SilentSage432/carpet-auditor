@@ -2,8 +2,8 @@
 
 /**
  * Keep-alive shell for Floor / Map / Roster / More.
- * All primary tabs stay mounted; switches use opacity/visibility (no remount).
- * URL still updates via BottomNav Links.
+ * PERF-LOAD-002: visit-on-demand first mount, then keep-alive after visit.
+ * Unvisited tabs do not mount or fetch. URL still updates via BottomNav Links.
  */
 
 import { usePathname, useRouter } from "next/navigation";
@@ -33,6 +33,11 @@ import {
   syncActiveSpecialistFromRoster,
 } from "@/lib/specialists";
 import type { StoreSpecialist } from "@/lib/types";
+import {
+  reconcileVisitedTabs,
+  seedVisitedTabs,
+  visitedSetsEqual,
+} from "@/lib/workflow-tab-visit";
 
 /**
  * Per-tab scroll owner: absolute inset fills the constrained workspace so
@@ -79,8 +84,8 @@ export function WorkflowTabShell(props: WorkflowTabProps) {
       ),
     [view]
   );
-  const [visited, setVisited] = useState<Set<WorkflowTabHref>>(
-    () => new Set<WorkflowTabHref>(allowedTabs)
+  const [visited, setVisited] = useState<Set<WorkflowTabHref>>(() =>
+    seedVisitedTabs(active, allowedTabs)
   );
 
   useEffect(() => {
@@ -91,27 +96,10 @@ export function WorkflowTabShell(props: WorkflowTabProps) {
 
   useEffect(() => {
     setVisited((prev) => {
-      if (!canAccessWorkflowTab(view, active)) return prev;
-      if (prev.has(active)) return prev;
-      const next = new Set(prev);
-      next.add(active);
-      return next;
+      const next = reconcileVisitedTabs(prev, active, allowedTabs);
+      return visitedSetsEqual(prev, next) ? prev : next;
     });
-  }, [active, view]);
-
-  useEffect(() => {
-    setVisited((prev) => {
-      let changed = false;
-      const next = new Set(prev);
-      for (const href of allowedTabs) {
-        if (!next.has(href)) {
-          next.add(href);
-          changed = true;
-        }
-      }
-      return changed ? next : prev;
-    });
-  }, [allowedTabs]);
+  }, [active, allowedTabs]);
 
   useEffect(() => {
     setStore(props.storeNumber);
@@ -175,9 +163,11 @@ export function WorkflowTabShell(props: WorkflowTabProps) {
       {/* Outside keep-alive `inert` panels so More utilities can open tools. */}
       <SpecialtyToolsHost specialist={view} storeNumber={storeNumber} />
       <div className="hub-app-workspace relative min-h-0 flex-1">
-        <KeepAlivePanel active={active === "/dashboard"}>
-          <FloorTab {...tabProps} />
-        </KeepAlivePanel>
+        {visited.has("/dashboard") ? (
+          <KeepAlivePanel active={active === "/dashboard"}>
+            <FloorTab {...tabProps} />
+          </KeepAlivePanel>
+        ) : null}
         {visited.has("/admin/store-map") ? (
           <KeepAlivePanel active={active === "/admin/store-map"}>
             <Suspense fallback={null}>

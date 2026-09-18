@@ -304,12 +304,11 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
     async (member: typeof specialist, opts?: { silent?: boolean }) => {
       if (!opts?.silent) setLoading(true);
       try {
+        // P0 gate: departments → weekly rotations → sunday_bay_assignments.
+        // store_locations is P2 topology hint only — must not block ownership paint.
         const depts = await fetchDepartments(member);
         const nextDeptId = workingDepartmentId(member, depts);
-        const [data, locs] = await Promise.all([
-          fetchThisWeekRotations(member, nextDeptId),
-          fetchStoreLocationsDetailed(member, nextDeptId),
-        ]);
+        const data = await fetchThisWeekRotations(member, nextDeptId);
         const nextWeek = data.assigned_week || "";
         const nextRotations = data.rotations ?? [];
         const nextFlooring = findFlooringDepartment(depts)?.id ?? null;
@@ -321,15 +320,29 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
         setRotations((prev) =>
           fingerprintsEqual(prev, nextRotations) ? prev : nextRotations
         );
-        setMappedLocations((prev) =>
-          fingerprintsEqual(prev, locs.items) ? prev : locs.items
-        );
         setFlooringDeptId((prev) =>
           prev === nextFlooring ? prev : nextFlooring
         );
         setHealthKey((k) => k + 1);
+
+        // P1/P2 supporting — do not contend with ownership resolution.
         void loadOnDuty();
-        if (nextWeek) void loadAssignments(nextWeek);
+        void fetchStoreLocationsDetailed(member, nextDeptId)
+          .then((locs) => {
+            setMappedLocations((prev) =>
+              fingerprintsEqual(prev, locs.items) ? prev : locs.items
+            );
+          })
+          .catch((err) => {
+            console.error("[FloorTab] store locations failed (non-blocking)", err);
+          });
+
+        // P0 ownership: await authoritative sunday_bay_assignments before unlock.
+        if (nextWeek) {
+          await loadAssignments(nextWeek);
+        } else {
+          setAssignments({});
+        }
       } catch (err) {
         console.error("[FloorTab] live rotations failed", err);
       } finally {
@@ -469,23 +482,23 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
         setDeptId(nextDeptId ?? null);
         setFlooringDeptId(findFlooringDepartment(deptItems)?.id ?? null);
       }
-      const cachedWeek = await peekCachedRotations(
-        specialist,
-        nextDeptId ?? undefined
-      );
-      const cachedLocs = await peekCachedStoreLocations(
-        specialist,
-        nextDeptId ?? undefined
-      );
+      // Parallel peeks: rotations are P0; locations are supporting topology.
+      const [cachedWeek, cachedLocs] = await Promise.all([
+        peekCachedRotations(specialist, nextDeptId ?? undefined),
+        peekCachedStoreLocations(specialist, nextDeptId ?? undefined),
+      ]);
       if (cancelled) return;
       if (cachedWeek) {
-        setWeek(cachedWeek.assigned_week || "");
+        const peekWeek = cachedWeek.assigned_week || "";
+        setWeek(peekWeek);
         setRotations((prev) =>
           fingerprintsEqual(prev, cachedWeek.rotations ?? [])
             ? prev
             : (cachedWeek.rotations ?? [])
         );
-        setLoading(false);
+        // Start ownership fetch from durable rotation week without waiting
+        // for the full live reload (still authoritative live assignments).
+        if (peekWeek) void loadAssignments(peekWeek);
       }
       if (cachedLocs?.items.length) {
         setMappedLocations((prev) =>
@@ -498,7 +511,7 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
     return () => {
       cancelled = true;
     };
-  }, [specialist, reload, working]);
+  }, [specialist, reload, working, loadAssignments]);
 
   useEffect(() => {
     function onFloorOpsReload() {

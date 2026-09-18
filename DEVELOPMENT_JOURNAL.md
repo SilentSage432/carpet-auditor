@@ -1,5 +1,17 @@
 # DeptSync Hub — Development Journal
 
+## 2026-09-18 — PERF-LOAD-002 Visit-on-demand + P0 operational render
+
+Samsung latency after UX reduction: eager multi-tab boot + Floor/Roster P0 waterfalls (PERF-LOAD-001).
+
+**Shell:** `visited` seeds active allowed tab only; reconcile adds on navigate and prunes on role/scope; Floor/Map/Roster/Settings mount only when visited; keep-alive after first visit.
+
+**Floor:** `store_locations` no longer in critical `Promise.all` with rotations; `await loadAssignments` before `loading` clear; locations/on-duty non-blocking; boot peeks parallel + early assignment start from peeked week.
+
+**Roster:** `setLoading(false)` after specialists+shifts+tz; sunday assignments P1; Reassign/owned-bay captions require `assignmentsKnown`.
+
+No durable cache expansion. No schema/RLS. Canonical: [`docs/product/PERF_LOAD_002_VISIT_ON_DEMAND_P0_RENDER.md`](docs/product/PERF_LOAD_002_VISIT_ON_DEMAND_P0_RENDER.md). Samsung acceptance pending. Do not start PERF-LOAD-003 or UX-REDUCE-005 automatically.
+
 ## 2026-09-18 — PERF-LOAD-001 Operational load path audit
 
 **Read-only diagnostic.** No application behavior changes.
@@ -8,7 +20,7 @@ Samsung field latency after UX-REDUCE-002/003/004 made Floor ownership and Roste
 
 **Headline:** `WorkflowTabShell` initializes `visited` with every allowed tab → Map + Roster + Settings mount and fetch during Floor cold open. Floor “who has what” needs rotations then live `sunday_bay_assignments` (not durable-cached). Roster keeps `loading` until sunday assignments finish after specialists+shifts. IndexedDB SWR covers rotations/locations, not owners/people/schedules.
 
-Canonical: [`docs/product/PERF_LOAD_001_OPERATIONAL_LOAD_PATH_AUDIT.md`](docs/product/PERF_LOAD_001_OPERATIONAL_LOAD_PATH_AUDIT.md). Next candidate PERF-LOAD-002 (visit-on-demand + P0 unlock). Do not start UX-REDUCE-005 yet.
+Canonical: [`docs/product/PERF_LOAD_001_OPERATIONAL_LOAD_PATH_AUDIT.md`](docs/product/PERF_LOAD_001_OPERATIONAL_LOAD_PATH_AUDIT.md). First correction implemented as PERF-LOAD-002. Do not start UX-REDUCE-005 until Samsung acceptance.
 
 ## 2026-09-18 — UX-REDUCE-004 Roster → People & Schedules
 
