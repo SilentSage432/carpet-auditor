@@ -39,21 +39,21 @@ describe("TOPO-UX-001 bulk mapping session helpers", () => {
   it("formats upsert-safe success copy from captured aisle (not live cleared state)", () => {
     expect(
       formatManualBulkSavedMessage({
-        saved: 20,
+        physicalBays: 10,
         departmentName: "Flooring",
         aisle: "A41",
       })
-    ).toBe("20 locations saved · Flooring · A41");
+    ).toBe("10 physical bays saved · Flooring · A41");
     expect(
       formatManualBulkSavedMessage({
-        saved: 1,
+        physicalBays: 1,
         departmentName: "Flooring",
         aisle: "39",
       })
-    ).toBe("1 location saved · Flooring · 39");
+    ).toBe("1 physical bay saved · Flooring · 39");
     expect(
       formatManualBulkSavedMessage({
-        saved: 20,
+        physicalBays: 10,
         departmentName: "Flooring",
         aisle: "A41",
       })
@@ -62,17 +62,17 @@ describe("TOPO-UX-001 bulk mapping session helpers", () => {
 
   it("updates acknowledgement per successive aisle (A39 → A40)", () => {
     const first = formatManualBulkSavedMessage({
-      saved: 16,
+      physicalBays: 8,
       departmentName: "Flooring",
       aisle: "A39",
     });
     const second = formatManualBulkSavedMessage({
-      saved: 16,
+      physicalBays: 8,
       departmentName: "Flooring",
       aisle: "A40",
     });
-    expect(first).toBe("16 locations saved · Flooring · A39");
-    expect(second).toBe("16 locations saved · Flooring · A40");
+    expect(first).toBe("8 physical bays saved · Flooring · A39");
+    expect(second).toBe("8 physical bays saved · Flooring · A40");
     expect(second).not.toBe(first);
   });
 
@@ -136,9 +136,6 @@ describe("TOPO-UX-001 continuous mapping source contracts", () => {
       /onGenerated\(\{\s*source:\s*"manual"\s*\}\)[\s\S]{0,200}setEndBay/
     );
     expect(generator).not.toMatch(
-      /onGenerated\(\{\s*source:\s*"manual"\s*\}\)[\s\S]{0,200}setLocationMode/
-    );
-    expect(generator).not.toMatch(
       /onGenerated\(\{\s*source:\s*"manual"\s*\}\)[\s\S]{0,200}setVelocitySeed/
     );
     expect(generator).not.toMatch(
@@ -166,10 +163,10 @@ describe("TOPO-UX-001 continuous mapping source contracts", () => {
     expect(generator).toContain('data-testid="bulk-generator-status"');
   });
 
-  it("preserves close-on-success for CSV, AI, and cleanup", () => {
+  it("preserves close-on-success for CSV and cleanup", () => {
     const generator = readRepo("components/admin/BulkLocationGenerator.tsx");
     expect(generator).toContain('onGenerated({ source: "csv" })');
-    expect(generator).toContain('onGenerated({ source: "ai" })');
+    expect(generator).not.toContain('onGenerated({ source: "ai" })');
     expect(generator).toContain('onGenerated({ source: "cleanup" })');
     expect(generator).not.toContain('onGenerated({ source: "apply_workflow" })');
     expect(generator).not.toMatch(/onGenerated\(\)/);

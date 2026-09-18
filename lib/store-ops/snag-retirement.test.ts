@@ -146,15 +146,15 @@ describe("Gemini surface after retirement", () => {
 
   it("leaves unrelated Gemini capabilities in place", () => {
     // Bay Audit Validate was listed here until SNAP-RETIRE-001 retired it on
-    // its own evidence; AI-RETIRE-001's scope is unaffected either way.
+    // its own evidence; Bulk AI Pre-Flight retired later in BULK-SETUP-002.
     for (const route of [
       "app/api/copilot/parse-walk/route.ts",
       "app/api/flooring/ai-insights/route.ts",
-      "app/api/store-locations/ai-parse/route.ts",
       "app/api/store-ops/ai-bay-scan/route.ts",
     ]) {
       expect(repoExists(route)).toBe(true);
     }
+    expect(repoExists("app/api/store-locations/ai-parse/route.ts")).toBe(false);
   });
 
   it("keeps prior reductions closed rather than reopening them", () => {

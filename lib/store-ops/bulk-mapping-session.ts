@@ -1,18 +1,27 @@
 /**
- * TOPO-UX-001 — continuous manual Bulk Generator mapping session.
+ * TOPO-UX-001 / BULK-SETUP-002 — continuous manual Bulk Generator mapping session.
  * Presentation owns open/close; this module owns session event semantics
- * and upsert-safe success copy. No browser storage persistence.
+ * and physical-bay success copy. No browser storage persistence.
+ *
+ * Normal bulk create always uses SELLING + TOPSTOCK (BOTH) internally.
  */
 
 import { departmentCodesMatch } from "@/lib/store-ops/department-codes";
-import type { LocationWorkflowType } from "@/lib/store-ops/types";
+import type { LocationWorkflowType, StoreLocationType } from "@/lib/store-ops/types";
+
+/** Canonical normal surface representation for physical-bay topology create. */
+export const NORMAL_BULK_SURFACE_TYPES: StoreLocationType[] = [
+  "SELLING",
+  "TOPSTOCK",
+];
 
 export type BulkGeneratorActionSource =
   | "manual"
   | "csv"
-  | "ai"
   | "cleanup"
-  | "apply_workflow";
+  | "apply_workflow"
+  /** @deprecated BULK-SETUP-002 retired AI Pre-Flight; retained for fail-closed close policy. */
+  | "ai";
 
 export type BulkGeneratedEvent = {
   source: BulkGeneratorActionSource;
@@ -39,18 +48,18 @@ export function shouldCloseBulkGeneratorAfterGenerated(
 }
 
 /**
- * Upsert-safe acknowledgement — API returns upserted row count as `created`.
+ * Upsert-safe acknowledgement — speak physical bays, not surface-row count.
  * Capture aisle before clearing the input so copy names the submitted range.
  */
 export function formatManualBulkSavedMessage(input: {
-  saved: number;
+  physicalBays: number;
   departmentName: string;
   aisle: string;
 }): string {
-  const n = Math.max(0, Math.floor(Number(input.saved) || 0));
+  const n = Math.max(0, Math.floor(Number(input.physicalBays) || 0));
   const dept = String(input.departmentName ?? "").trim() || "department";
   const aisle = String(input.aisle ?? "").trim() || "?";
-  const noun = n === 1 ? "location" : "locations";
+  const noun = n === 1 ? "physical bay" : "physical bays";
   return `${n} ${noun} saved · ${dept} · ${aisle}`;
 }
 

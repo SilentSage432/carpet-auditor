@@ -391,9 +391,8 @@ describe("bounded Gemini transport — not-configured behavior is unchanged", ()
   });
 
   it("M. leaves each consumer owning its own not-configured branch", () => {
-    // Bay Audit Validate was a seventh owner until SNAP-RETIRE-001 retired it.
+    // Bulk AI Pre-Flight retired in BULK-SETUP-002; Bay Audit in SNAP-RETIRE-001.
     const owners = [
-      "app/api/store-locations/ai-parse/route.ts",
       "app/api/copilot/parse-walk/route.ts",
       "app/api/store-ops/ai-bay-scan/route.ts",
       "app/api/flooring/ai-insights/route.ts",
@@ -407,10 +406,9 @@ describe("bounded Gemini transport — not-configured behavior is unchanged", ()
 
 describe("bounded Gemini transport — boundary of ownership", () => {
   it("L. keeps every surviving Gemini consumer on the shared transport", () => {
-    // Five after SNAP-RETIRE-001 (six under AI-SAFETY-001): four API routes
+    // Four after BULK-SETUP-002 (five after SNAP-RETIRE-001): three API routes
     // plus one Server Action. Do not conflate the two counts.
     const consumers = [
-      "app/api/store-locations/ai-parse/route.ts",
       "app/api/copilot/parse-walk/route.ts",
       "app/api/store-ops/ai-bay-scan/route.ts",
       "app/api/flooring/ai-insights/route.ts",
@@ -421,8 +419,8 @@ describe("bounded Gemini transport — boundary of ownership", () => {
       expect(source).toContain('from "@/lib/ai/gemini"');
       expect(source).toContain("callGeminiFlashJson");
     }
-    expect(consumers).toHaveLength(5);
-    expect(consumers.filter((c) => c.startsWith("app/api/"))).toHaveLength(4);
+    expect(consumers).toHaveLength(4);
+    expect(consumers.filter((c) => c.startsWith("app/api/"))).toHaveLength(3);
     expect(consumers.filter((c) => c.startsWith("app/actions/"))).toHaveLength(1);
   });
 

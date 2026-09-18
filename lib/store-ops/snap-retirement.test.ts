@@ -238,9 +238,8 @@ describe("SNAP-RETIRE-001 — shared transport and inventory", () => {
     expect(code.match(/generateContent\(/g) ?? []).toHaveLength(1);
   });
 
-  it("Q. leaves exactly five live Gemini consumers", () => {
+  it("Q. leaves exactly four live Gemini consumers after BULK-SETUP-002", () => {
     const consumers = [
-      "app/api/store-locations/ai-parse/route.ts",
       "app/api/copilot/parse-walk/route.ts",
       "app/api/store-ops/ai-bay-scan/route.ts",
       "app/api/flooring/ai-insights/route.ts",
@@ -250,17 +249,17 @@ describe("SNAP-RETIRE-001 — shared transport and inventory", () => {
       expect(repoExists(consumer)).toBe(true);
       expect(readRepo(consumer)).toContain("callGeminiFlashJson");
     }
-    expect(consumers).toHaveLength(5);
+    expect(repoExists("app/api/store-locations/ai-parse/route.ts")).toBe(false);
+    expect(consumers).toHaveLength(4);
   });
 
-  it("R. preserves the four-route / one-Server-Action distinction", () => {
+  it("R. preserves the three-route / one-Server-Action distinction", () => {
     const routes = [
-      "app/api/store-locations/ai-parse/route.ts",
       "app/api/copilot/parse-walk/route.ts",
       "app/api/store-ops/ai-bay-scan/route.ts",
       "app/api/flooring/ai-insights/route.ts",
     ];
-    expect(routes).toHaveLength(4);
+    expect(routes).toHaveLength(3);
     for (const route of routes) {
       expect(readRepo(route)).toMatch(/export async function (POST|GET)/);
     }

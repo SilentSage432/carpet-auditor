@@ -1,5 +1,13 @@
 # DeptSync Hub — Development Journal
 
+## 2026-09-18 — BULK-SETUP-002 physical-bay-first Bulk topology
+
+**Authorized implementation.** Baseline `main @ 93b88b0`. Evidence: BULK-SETUP-001.
+
+Normal Bulk Generator no longer asks Location Type or AI Pre-Flight. Creates physical bays with internal SELLING+TOPSTOCK. Preview/success speak physical bays. Unique Gemini consumer (`/api/store-locations/ai-parse`, `ai-parse.ts`) removed; Floor Pad / Walk & Talk / shared transport preserved. No schema, RBAC, engine, Map, Floor, or production mutation. RBAC-TOPO-001 untouched.
+
+Canonical: [`docs/product/BULK_SETUP_002_PHYSICAL_BAY_FIRST_BULK_TOPOLOGY.md`](docs/product/BULK_SETUP_002_PHYSICAL_BAY_FIRST_BULK_TOPOLOGY.md). Do not start BULK-SETUP-003 / RBAC-TOPO-001 / UX-REDUCE-008.
+
 ## 2026-09-18 — BULK-SETUP-001 Bulk Bay Generator archaeology
 
 **Read-only.** Baseline `main @ 78ec5a1`. No Bulk Generator / Location Type / AI Pre-Flight / Map / Floor / Gemini / schema / production mutation. UX-REDUCE-008 not opened. BULK-SETUP-002 not started.
