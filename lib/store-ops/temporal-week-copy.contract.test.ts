@@ -62,11 +62,13 @@ describe("temporal week copy contracts", () => {
     expect(floor).not.toEqual(map);
   });
 
-  it("FloorTab wires staging-week composer; MapTab wires calendar chrome", () => {
+  it("FloorTab wires This Week progress; MapTab wires calendar chrome", () => {
+    // UX-REDUCE-002: Floor dropped staging-week composer language for DS-facing progress.
     const floor = readSrc("components/hub/tabs/FloorTab.tsx");
     const map = readSrc("components/hub/tabs/MapTab.tsx");
-    expect(floor).toContain("composeFloorWeekProgressWithStagingWeek");
-    expect(floor).not.toMatch(/` · week \$\{week\}`/);
+    expect(floor).toContain("composeThisWeekProgressLine");
+    expect(floor).not.toContain("composeFloorWeekProgressWithStagingWeek");
+    expect(floor).not.toMatch(/Staging week/);
     expect(map).toContain("formatMapCalendarWeekChrome");
     expect(map).not.toMatch(/`Week \$\{currentWeek\}`/);
   });

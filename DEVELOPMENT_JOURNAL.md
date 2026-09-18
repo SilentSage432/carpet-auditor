@@ -1,5 +1,25 @@
 # DeptSync Hub — Development Journal
 
+## 2026-09-18 — UX-REDUCE-002 Floor → This Week operational simplification
+
+**Authorized UI tranche.** Floor is the primary “This Week” surface: people → physical bays from existing `sunday_bay_assignments` + `weekly_rotations`.
+
+### HEALTHY STATE LAW
+
+> Healthy state should be quieter than exceptional state.
+
+When ownership is complete and nothing needs intervention, Floor does not advertise Stage/Assign/analytics. Verification, incomplete ownership, barriers, and no-plan recovery become prominent only when truthful.
+
+**Composition:** `lib/store-ops/this-week-ownership.ts` + `ThisWeekOwnershipBoard`. Physical-bay dedupe (BAY-UNIT-002). Base quota language = eligible × 3 (not `weekly_bay_target` on Floor).
+
+**Preserved:** verification modal; Sunday recovery modal; Assign this week (unowned); Add another bay (ENGINE-PROD-003); barrier actions; Floor Pad mount; seasonal strip (fiscal omitted); TIME-DUTY On now / Later today; associate simplified scope.
+
+**Demoted/removed from everyday Floor:** ShiftAnalyticsDrawer analytics (velocity/health/briefing/exception feed), duplicate Weekly audit rollup, Flag Downstock drawer, ZebraChecklist as primary composition, Stage chrome on healthy weeks.
+
+**Unchanged:** rotation engine, schema, cron, call-out, verification writers, seasonal selection, Gemini, Map/Roster/More structure.
+
+**Tests:** 1171 (+UX-REDUCE-002 unit/contract; amended Floor hierarchy / UX-005C / related contracts). Samsung field acceptance pending.
+
 ## 2026-09-17 — ENGINE-PROD-004 Priority + seasonal cadence intelligence
 
 **Authorized implementation.** Completes declared selection intelligence required before rotation-engine field acceptance. Cadence model is **A — earlier within the universal coverage cycle**, not B (true elevated recurrence before the department finishes).

@@ -31,6 +31,8 @@ type Props = {
   departmentCode?: string | null;
   departmentLabel?: string | null;
   refreshKey?: number | string;
+  /** UX-REDUCE-002: fiscal is supporting — omit from everyday Floor strip. */
+  omitFiscal?: boolean;
 };
 
 function mapFiscal(
@@ -75,6 +77,7 @@ export function FloorOperationalContextStrip({
   departmentCode,
   departmentLabel,
   refreshKey,
+  omitFiscal = false,
 }: Props) {
   const canRead = isSupervisor(specialist);
 
@@ -154,13 +157,21 @@ export function FloorOperationalContextStrip({
       });
     }
     return composeFloorOperationalContextView({
-      fiscal: mapFiscal(fiscal),
+      fiscal: omitFiscal ? null : mapFiscal(fiscal),
       active_seasons: mapItems(contexts?.active_seasons ?? []),
       active_events: mapItems(contexts?.active_events ?? []),
       department_code: resolvedCode,
       department_label: resolvedLabel,
     });
-  }, [canRead, failed, fiscal, contexts, resolvedCode, resolvedLabel]);
+  }, [
+    canRead,
+    failed,
+    fiscal,
+    contexts,
+    resolvedCode,
+    resolvedLabel,
+    omitFiscal,
+  ]);
 
   if (!canRead || !view.visible) return null;
 

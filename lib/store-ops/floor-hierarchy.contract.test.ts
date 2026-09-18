@@ -1,5 +1,7 @@
 /**
  * UX-003 Floor decision hierarchy — source contracts.
+ * Amended by UX-REDUCE-002: people-first This Week ownership;
+ * verification remains conditional ahead of week state / ownership.
  */
 
 import { readFileSync } from "node:fs";
@@ -19,72 +21,57 @@ function assertOrder(label: string, earlier: number, later: number) {
 }
 
 describe("UX-003 Floor decision hierarchy contracts", () => {
-  it("identity < verification < week state < work < attention < context < tools", () => {
+  it("identity < needs-attention/verify < week state < ownership < tools", () => {
     const floor = readRepo("components/hub/tabs/FloorTab.tsx");
 
     const identityIdx = floor.indexOf('data-testid="floor-command-header"');
+    const needsIdx = floor.indexOf('data-testid="floor-needs-attention"');
     const verifyIdx = floor.indexOf('data-testid="floor-verification-strip"');
     const weekStateIdx = floor.indexOf('data-testid="floor-week-state"');
     const weekProgressIdx = floor.indexOf(
       'data-testid="floor-week-progress-line"'
     );
-    const freshnessIdx = floor.indexOf('data-testid="floor-readiness-line"');
-    const workIdx = floor.indexOf('data-testid="floor-work-surface"');
-    const attentionIdx = floor.indexOf("<FloorAttentionSummary");
+    const ownershipIdx = floor.indexOf("<ThisWeekOwnershipBoard");
     const fiscalIdx = floor.indexOf("<FloorOperationalContextStrip");
-    const analyticsIdx = floor.indexOf("<ShiftAnalyticsDrawer");
+    const toolsIdx = floor.indexOf('data-testid="floor-secondary-tools"');
 
-    assertOrder("identity < verification", identityIdx, verifyIdx);
-    assertOrder("verification < week state", verifyIdx, weekStateIdx);
+    assertOrder("identity < needs attention", identityIdx, needsIdx);
+    assertOrder("needs attention < week state", needsIdx, weekStateIdx);
     assertOrder("week state < week progress", weekStateIdx, weekProgressIdx);
-    assertOrder("week progress < freshness", weekProgressIdx, freshnessIdx);
-    assertOrder("week state < work", weekStateIdx, workIdx);
-    assertOrder("work < attention", workIdx, attentionIdx);
-    assertOrder("work < fiscal", workIdx, fiscalIdx);
-    assertOrder("work < tools", workIdx, analyticsIdx);
-    assertOrder("attention < fiscal", attentionIdx, fiscalIdx);
-    assertOrder("fiscal < tools", fiscalIdx, analyticsIdx);
+    assertOrder("week state < ownership", weekStateIdx, ownershipIdx);
+    assertOrder("ownership < fiscal/season", ownershipIdx, fiscalIdx);
+    assertOrder("fiscal < tools", fiscalIdx, toolsIdx);
+    // Verification remains nested inside needs-attention when pending.
+    expect(verifyIdx).toBeGreaterThan(needsIdx);
 
-    // Command header is identity only (REDUCE-004 disconnected Appliances entry).
     const headerSlice = floor.slice(
       identityIdx,
       floor.indexOf("</header>", identityIdx)
     );
-    expect(headerSlice).toContain("{rotationTitle}");
+    expect(headerSlice).toContain("{weekTitle}");
     expect(headerSlice).not.toContain("floor-week-progress-line");
-    expect(headerSlice).not.toContain("floor-readiness-line");
     expect(headerSlice).not.toContain("floor-appliances-entry");
-    expect(headerSlice).not.toContain("showAppliancesEntry");
-    expect(floor).not.toContain('data-testid="floor-appliances-entry"');
   });
 
-  it("without verification, identity still precedes week state and work", () => {
+  it("without verification, identity still precedes week state and ownership", () => {
     const floor = readRepo("components/hub/tabs/FloorTab.tsx");
     const identityIdx = floor.indexOf('data-testid="floor-command-header"');
     const weekStateIdx = floor.indexOf('data-testid="floor-week-state"');
-    const workIdx = floor.indexOf('data-testid="floor-work-surface"');
+    const ownershipIdx = floor.indexOf("<ThisWeekOwnershipBoard");
 
     assertOrder("identity < week state", identityIdx, weekStateIdx);
-    assertOrder("week state < work", weekStateIdx, workIdx);
+    assertOrder("week state < ownership", weekStateIdx, ownershipIdx);
 
-    // Verification remains conditional — no reserved blank when absent.
     expect(floor).toMatch(
       /pendingVerifyCount > 0 \? \([\s\S]*data-testid="floor-verification-strip"/
     );
   });
 
-  it("renames bay filter away from SI Current Attention collision", () => {
+  it("UX-REDUCE-002: people-first ownership replaces bay-filter SI collision", () => {
     const floor = readRepo("components/hub/tabs/FloorTab.tsx");
-    expect(floor).toContain('label: "Open issues"');
+    expect(floor).not.toContain('label: "Open issues"');
     expect(floor).not.toContain('label: "Needs Attention"');
     expect(floor).toContain("shouldShowFloorAttentionSummary");
-    expect(floor).toContain("composeFloorFreshnessLine");
-  });
-
-  it("demotes Shift Analytics chrome to secondary More tools", () => {
-    const drawer = readRepo("components/store-ops/ShiftAnalyticsDrawer.tsx");
-    expect(drawer).toContain("More tools");
-    expect(drawer).toContain("Secondary");
-    expect(drawer).not.toContain(">Shift Analytics<");
+    expect(floor).toContain("ThisWeekOwnershipBoard");
   });
 });

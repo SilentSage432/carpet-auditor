@@ -27,8 +27,9 @@ describe("UX-002 verification authority contracts", () => {
     const floor = readRepo("components/hub/tabs/FloorTab.tsx");
     expect(floor).toContain("floor-verification-strip");
     expect(floor).toContain("SupervisorAuditSummaryModal");
-    expect(floor).toContain("Awaiting your verification");
-    expect(floor).toContain("Weekly audit rollup");
+    // UX-REDUCE-002: single top-level Needs Attention path (no drawer rollup duplicate).
+    expect(floor).toContain("awaiting verification");
+    expect(floor).not.toContain("Weekly audit rollup");
   });
 
   it("client must not export empty-ID bay-verify helper verifyAllCompletedBays", () => {

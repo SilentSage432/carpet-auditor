@@ -83,11 +83,11 @@ describe("UX-004C.1 Executive Floor Pad durable handoff", () => {
 
   it("Floor mounts bridge after Walk & Talk listeners for effect order", () => {
     const floor = readRepo("components/hub/tabs/FloorTab.tsx");
-    const drawerIdx = floor.indexOf("</ShiftAnalyticsDrawer>");
+    // UX-REDUCE-002: ShiftAnalyticsDrawer retired; Floor Pad mounts directly.
+    const padIdx = floor.indexOf("<TacticalVoiceFloorPad");
     const bridgeIdx = floor.indexOf("<ExecutiveFloorPadIntentBridge");
-    expect(drawerIdx).toBeGreaterThan(-1);
-    expect(bridgeIdx).toBeGreaterThan(drawerIdx);
-    expect(floor).toContain("TacticalVoiceFloorPad");
+    expect(padIdx).toBeGreaterThan(-1);
+    expect(bridgeIdx).toBeGreaterThan(padIdx);
   });
 
   it("More button soft-navigates with durable href", () => {

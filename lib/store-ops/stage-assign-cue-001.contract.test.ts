@@ -42,8 +42,11 @@ describe("STAGE-ASSIGN-CUE-001 user-journey contracts", () => {
   });
 
   it("Floor Stage copy no longer promises assignment", () => {
+    // UX-REDUCE-002: healthy Floor hides Stage chrome; recovery says Assign this week.
     expect(floor).not.toMatch(/build the floor plan and assign bays/);
-    expect(floor).toMatch(/Prepare this week's coverage to select the bays/);
+    expect(floor).not.toMatch(/Stage this week/);
+    expect(floor).toContain("Assign this week");
+    expect(floor).toContain("floor-ownership-recovery");
   });
 
   it("staged/unowned state exposes schedule-informed confirm as Assign this week", () => {

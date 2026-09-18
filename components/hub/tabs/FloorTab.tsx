@@ -1,31 +1,24 @@
 "use client";
 
+/**
+ * Floor — UX-REDUCE-002 "This Week" operational surface.
+ * People → physical bays from sunday_bay_assignments + weekly_rotations.
+ * Engine / verification / schedule / call-out semantics unchanged.
+ */
+
 import { useCallback, useEffect, useMemo, useRef, useState, Suspense } from "react";
 import dynamic from "next/dynamic";
 import { useRouter } from "next/navigation";
 import { Users, Zap } from "lucide-react";
 import { SundayAuditStagingCard } from "@/components/admin/SundayAuditStagingCard";
-import { ExceptionFeed } from "@/components/admin/ExceptionFeed";
-import { StoreHealthCard } from "@/components/StoreHealthCard";
 import { ShowroomQuickTouchCard } from "@/components/dashboard/ShowroomQuickTouchCard";
 import { TacticalVoiceFloorPad } from "@/components/dashboard/TacticalVoiceFloorPad";
-import { FlagDownstockSheet } from "@/components/store-ops/FlagDownstockSheet";
 import { FloorAttentionSummary } from "@/components/store-ops/FloorAttentionSummary";
 import { FloorOperationalContextStrip } from "@/components/store-ops/FloorOperationalContextStrip";
 import { OnDutyAssociateStrip } from "@/components/store-ops/OnDutyAssociateStrip";
-import {
-  ShiftAnalyticsDrawer,
-  ShiftAnalyticsReportsGroup,
-} from "@/components/store-ops/ShiftAnalyticsDrawer";
+import { ThisWeekOwnershipBoard } from "@/components/store-ops/ThisWeekOwnershipBoard";
 import { ExecutiveFloorPadIntentBridge } from "@/components/hub/ExecutiveFloorPadIntentBridge";
-import { ZebraChecklist, type FloorBayFilter } from "@/components/store-ops/ZebraChecklist";
-import { ShiftBriefingCard } from "@/components/store-ops/ShiftBriefingCard";
-import { StoreHealthChart } from "@/components/store-ops/StoreHealthChart";
-import { fetchApplianceCatalog } from "@/lib/appliance-catalog";
-import { fetchApplianceScans } from "@/lib/appliance-scans";
-import {
-  workingDepartmentId,
-} from "@/lib/admin-department-context";
+import { workingDepartmentId } from "@/lib/admin-department-context";
 import { useWorkingDepartment } from "@/lib/use-working-department";
 import {
   isMasterAdmin,
@@ -35,6 +28,7 @@ import { dedupeRoster, fetchSpecialists, isSupervisor } from "@/lib/specialists"
 import { isStoreOpsAuthFailureMessage } from "@/lib/store-ops/auth-soft";
 import {
   fetchDepartments,
+  fetchExceptionSummary,
   fetchLocationAttention,
   fetchStoreLocationsDetailed,
   fetchThisWeekRotations,
@@ -55,11 +49,9 @@ import {
   type LocationAttentionSummary,
 } from "@/lib/store-ops/location-attention-summary";
 import {
-  buildSundayStagedBays,
   fetchSundayAssignments,
   filterFlooringRotations,
   findFlooringDepartment,
-  pendingSundayAssignmentCount,
   requestSundayAuditDrawer,
   SUNDAY_AUDIT_EVENT,
   type SundayAssignmentMap,
@@ -77,6 +69,7 @@ import {
   isScheduledNow,
   previousStoreLocalWorkDate,
   storeLocalWorkDate,
+  type CurrentAvailability,
 } from "@/lib/store-ops/current-availability";
 import { useStoreClockTick } from "@/lib/store-ops/use-store-clock";
 import { DEFAULT_STORE_TIMEZONE } from "@/lib/store-ops/sunday-schedule";
@@ -88,25 +81,16 @@ import {
 import { getStoreNumber } from "@/lib/store";
 import { shouldShowFloorAttentionSummary } from "@/lib/store-ops/floor-attention-visibility";
 import { buildMapCurrentAttentionHref } from "@/lib/store-ops/map-attention-investigation";
-import { composeFloorFreshnessLine } from "@/lib/store-ops/floor-readiness";
 import {
-  composeFloorWeekProgressWithStagingWeek,
-  composeWeeklyRotationMetrics,
-} from "@/lib/store-ops/rotation-metrics";
-import {
-  composeBayFreshness,
-  readBayTouches,
-} from "@/lib/heatmap/bay-tracker";
-import { resolveWeeklyBayTarget } from "@/lib/store-ops/week";
+  composeThisWeekOwnership,
+  composeThisWeekProgressLine,
+} from "@/lib/store-ops/this-week-ownership";
 import {
   departmentMeta,
   specialistHomeDepartment,
-  type ApplianceCatalogItem,
-  type ApplianceScan,
   type StoreSpecialist,
 } from "@/lib/types";
 import {
-  isApplianceSimsWorkflow,
   type Department,
   type StoreLocation,
   type WeeklyRotationWithLocation,
@@ -133,17 +117,6 @@ function rotationBayRef(rotation: WeeklyRotationWithLocation) {
   };
 }
 
-/**
- * Open-issues filter unions health flags, downstock, notes, and pending verify.
- * Label must not collide with SI-001 “Current attention” (UX-003).
- */
-const FLOOR_FILTERS: Array<{ id: FloorBayFilter; label: string }> = [
-  { id: "all", label: "All Bays" },
-  { id: "mine", label: "My Bays" },
-  { id: "attention", label: "Open issues" },
-  { id: "completed", label: "Completed" },
-];
-
 export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
   const router = useRouter();
   const [week, setWeek] = useState("");
@@ -163,23 +136,13 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
   const [onDutyLoading, setOnDutyLoading] = useState(true);
   const clockNow = useStoreClockTick();
   const [assignments, setAssignments] = useState<SundayAssignmentMap>({});
-  const [pickedAssociateId, setPickedAssociateId] = useState<
-    string | "all" | null
-  >(null);
-  const [downstockOpen, setDownstockOpen] = useState(false);
-  const [applianceCatalog, setApplianceCatalog] = useState<
-    ApplianceCatalogItem[]
-  >([]);
-  const [applianceScans, setApplianceScans] = useState<ApplianceScan[]>([]);
-  const [floorBayFilter, setFloorBayFilter] = useState<FloorBayFilter>("all");
+  const [pickedAssociateId, setPickedAssociateId] = useState<string | "all">(
+    "all"
+  );
   const [rosterSheetOpen, setRosterSheetOpen] = useState(false);
+  const [secondaryOpen, setSecondaryOpen] = useState(false);
+  const [barrierRotationIds, setBarrierRotationIds] = useState<string[]>([]);
 
-  /**
-   * SI-001C — Floor owns an independent attention fetch (pilot isolation).
-   * Keep-alive may also keep Map mounted → ~1 Map GET + 1 Floor GET on common
-   * department/evidence refresh. Not shared/synchronized snapshot state.
-   * Staging/Sunday and shift-status do NOT trigger this path.
-   */
   const [attentionStatus, setAttentionStatus] =
     useState<MapAttentionClientStatus>("IDLE");
   const [attentionSummary, setAttentionSummary] =
@@ -203,14 +166,12 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
     () => departments.find((dept) => dept.id === deptId) ?? null,
     [departments, deptId]
   );
-  const rotationTitle =
+  const weekTitle =
     working === "all"
-      ? "Floor Rotation"
+      ? "This Week"
       : `${
           activeDept?.name?.trim() || departmentMeta(working).shortLabel
-        } Rotation`;
-  const focusAssociateId =
-    pickedAssociateId ?? (simplified ? String(specialist.id) : "all");
+        } · This Week`;
 
   const storeToday = storeLocalWorkDate(clockNow, storeTimezone);
   const storeYesterday = previousStoreLocalWorkDate(clockNow, storeTimezone);
@@ -306,6 +267,19 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
     storeYesterday,
   ]);
 
+  const availabilityById = useMemo(() => {
+    const map: Record<string, CurrentAvailability> = {};
+    for (const person of shiftTeam) {
+      map[String(person.id)] = composeCurrentAvailability({
+        row: shiftDays[shiftRowKey(String(person.id), storeToday)],
+        previousDay: shiftDays[shiftRowKey(String(person.id), storeYesterday)],
+        now: clockNow,
+        timeZone: storeTimezone,
+      });
+    }
+    return map;
+  }, [shiftTeam, shiftDays, storeToday, storeYesterday, clockNow, storeTimezone]);
+
   const loadAssignments = useCallback(
     async (assignedWeek: string) => {
       if (!assignedWeek) {
@@ -341,7 +315,9 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
         const nextFlooring = findFlooringDepartment(depts)?.id ?? null;
         setDepartments((prev) => (fingerprintsEqual(prev, depts) ? prev : depts));
         setWeek((prev) => (prev === nextWeek ? prev : nextWeek));
-        setDeptId((prev) => (prev === (nextDeptId ?? null) ? prev : nextDeptId ?? null));
+        setDeptId((prev) =>
+          prev === (nextDeptId ?? null) ? prev : nextDeptId ?? null
+        );
         setRotations((prev) =>
           fingerprintsEqual(prev, nextRotations) ? prev : nextRotations
         );
@@ -373,14 +349,8 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
     setAttentionDegraded(false);
   }, []);
 
-  /**
-   * SI-001C attention reload — independent of Floor rotation reload.
-   * Triggers: dept resolve/switch, STORE_OPS_LOCATIONS_CHANGED only.
-   * Does not run on SUNDAY_AUDIT_EVENT or SHIFT_STATUS_EVENT.
-   */
   const reloadAttention = useCallback(
     async (departmentId: string | null) => {
-      // Yield so effect-driven loads are not synchronous cascading setState.
       await Promise.resolve();
 
       if (!canReadAttention) {
@@ -522,7 +492,6 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
           fingerprintsEqual(prev, cachedLocs.items) ? prev : cachedLocs.items
         );
       }
-      // Keep painted rows visible; never flash a blank skeleton on tab return.
       if (!cancelled) void reload(specialist, { silent: true });
     }
     void boot();
@@ -535,7 +504,6 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
     function onFloorOpsReload() {
       void reload(specialist, { silent: true });
     }
-    // Sunday staging + shift status refresh Floor ops lists only — not SI-001C.
     window.addEventListener(SUNDAY_AUDIT_EVENT, onFloorOpsReload);
     window.addEventListener(STORE_OPS_LOCATIONS_CHANGED_EVENT, onFloorOpsReload);
     window.addEventListener(SHIFT_STATUS_EVENT, onFloorOpsReload);
@@ -549,6 +517,29 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
     };
   }, [reload, specialist]);
 
+  useEffect(() => {
+    if (!supervisor || simplified) {
+      setBarrierRotationIds([]);
+      return;
+    }
+    let cancelled = false;
+    void fetchExceptionSummary(specialist, week || undefined)
+      .then((payload) => {
+        if (cancelled) return;
+        const ids = (payload.exceptions ?? [])
+          .map((row) => String(row.rotation_id ?? "").trim())
+          .filter(Boolean);
+        setBarrierRotationIds(ids);
+      })
+      .catch((err) => {
+        console.error("[FloorTab] exceptions failed (non-blocking)", err);
+        if (!cancelled) setBarrierRotationIds([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [supervisor, simplified, specialist, week, healthKey]);
+
   const displayRotations = useMemo(() => {
     const scoped =
       working !== "all" && deptId
@@ -558,80 +549,22 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
     return filterFlooringRotations(scoped, flooringDeptId);
   }, [rotations, flooringFocus, flooringDeptId, working, deptId]);
 
-  const weekMetrics = useMemo(
+  const ownershipPlan = useMemo(
     () =>
-      composeWeeklyRotationMetrics({
+      composeThisWeekOwnership({
         rotations: displayRotations,
-        weeklyTarget: activeDept?.weekly_bay_target,
-        locations: mappedLocations,
+        assignments,
+        roster: shiftTeam,
+        barrierRotationIds,
       }),
-    [displayRotations, activeDept?.weekly_bay_target, mappedLocations]
-  );
-  const pendingVerifyCount = weekMetrics.pendingVerification;
-  const reportedCompleteCount = weekMetrics.reportedComplete;
-  const weekProgressLine = composeFloorWeekProgressWithStagingWeek(
-    weekMetrics,
-    week
+    [displayRotations, assignments, shiftTeam, barrierRotationIds]
   );
 
-  const sundayPending = useMemo(() => {
-    const bays = buildSundayStagedBays(displayRotations, assignments);
-    return pendingSundayAssignmentCount(bays);
-  }, [displayRotations, assignments]);
+  const weekProgressLine = composeThisWeekProgressLine(ownershipPlan);
+  const pendingVerifyCount = ownershipPlan.pendingVerificationCount;
 
-  const showSundayRail =
-    !simplified && (flooringFocus || master || supervisor);
-
-  const effectiveFocus = useMemo(() => {
-    if (floorBayFilter === "mine") return String(specialist.id);
-    return focusAssociateId;
-  }, [floorBayFilter, specialist.id, focusAssociateId]);
-
-  const hasSimsBays = useMemo(
-    () =>
-      displayRotations.some((row) =>
-        isApplianceSimsWorkflow(row.store_locations)
-      ),
-    [displayRotations]
-  );
-
-  const loadApplianceLedger = useCallback(async () => {
-    try {
-      const [catalog, scans] = await Promise.all([
-        fetchApplianceCatalog(),
-        fetchApplianceScans(),
-      ]);
-      setApplianceCatalog(catalog);
-      setApplianceScans(scans);
-    } catch (err) {
-      console.error("[FloorTab] appliance SIMS ledger failed", err);
-    }
-  }, []);
-
-  useEffect(() => {
-    if (!hasSimsBays) return;
-    void loadApplianceLedger();
-  }, [hasSimsBays, loadApplianceLedger, healthKey]);
-
-  const freshnessLocations = useMemo(() => {
-    if (mappedLocations.length > 0) return mappedLocations;
-    return displayRotations
-      .map((row) => row.store_locations)
-      .filter((loc): loc is NonNullable<typeof loc> => Boolean(loc));
-  }, [mappedLocations, displayRotations]);
-
-  const freshnessLine = useMemo(() => {
-    const summary = composeBayFreshness({
-      locations: freshnessLocations,
-      overlay: readBayTouches(storeNumber || getStoreNumber()),
-    });
-    return composeFloorFreshnessLine({
-      totalBays: summary.cells.length,
-      staleCount: summary.staleCount,
-      weeklyTarget:
-        activeDept?.weekly_bay_target ?? resolveWeeklyBayTarget(null),
-    });
-  }, [freshnessLocations, storeNumber, activeDept?.weekly_bay_target]);
+  const showMasterAdvancedRecovery =
+    !simplified && master && ownershipPlan.isHealthyOwnedPlan;
 
   const showAttentionStrip =
     canReadAttention &&
@@ -640,8 +573,6 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
       summary: attentionSummary,
       degraded: attentionDegraded,
     });
-
-  const hasActiveWeekWork = displayRotations.length > 0;
 
   const workload = useMemo(
     () =>
@@ -655,206 +586,200 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
     [displayRotations, assignments, onDuty]
   );
 
+  const mappedPhysicalHint =
+    mappedLocations.length === 0 && !loading
+      ? "No mapped locations yet — ask Master Admin to set up topology."
+      : null;
+
+  const needsAttention =
+    supervisor &&
+    !simplified &&
+    (pendingVerifyCount > 0 ||
+      ownershipPlan.needsOwnershipRecovery ||
+      ownershipPlan.barrierBayCount > 0 ||
+      (ownershipPlan.needsDispatchRecovery && !loading));
+
   return (
     <>
       <main className="hub-main">
-        {/* UX-003: identity — week telemetry follows verification when present.
-            REDUCE-004: Appliances specialty entry disconnected from everyday Floor. */}
         <header className="mb-2" data-testid="floor-command-header">
           <h1 className="text-lg font-bold tracking-tight text-zinc-50">
-            {rotationTitle}
+            {weekTitle}
           </h1>
+          {week ? (
+            <p className="mt-0.5 font-mono text-[11px] text-zinc-500">
+              Week {week}
+            </p>
+          ) : null}
         </header>
 
-        {/* Immediate supervisory obligation — before week telemetry */}
-        {supervisor && !simplified && pendingVerifyCount > 0 ? (
-          <div
-            className="mb-2 flex items-center gap-2 rounded-xl border border-amber-500/35 bg-amber-950/30 px-3 py-2.5"
-            data-testid="floor-verification-strip"
+        {/* Needs Attention — exceptional state only */}
+        {needsAttention ? (
+          <section
+            className="mb-2 space-y-2"
+            data-testid="floor-needs-attention"
           >
-            <div className="min-w-0 flex-1">
-              <p className="font-mono text-[9px] font-bold uppercase tracking-wide text-amber-300/95">
-                Awaiting your verification
-              </p>
-              <p className="truncate text-xs font-semibold text-amber-50">
-                {pendingVerifyCount} bay
-                {pendingVerifyCount === 1 ? "" : "s"} ready for review
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={() => setRollupOpen(true)}
-              className="inline-flex min-h-10 shrink-0 items-center justify-center rounded-xl border border-amber-400/45 bg-amber-950/40 px-3 text-xs font-bold text-amber-50"
-            >
-              Review
-            </button>
-          </div>
-        ) : null}
-
-        {/* Compact week state / Layer-1 freshness — after obligation, before work */}
-        <div className="mb-2" data-testid="floor-week-state">
-          <p
-            className="text-xs text-zinc-400"
-            data-testid="floor-week-progress-line"
-          >
-            {weekProgressLine}
-          </p>
-          <p
-            className="mt-0.5 font-mono text-[11px] leading-snug text-zinc-500"
-            data-testid="floor-readiness-line"
-          >
-            {freshnessLine}
-          </p>
-        </div>
-
-        {/* Active week work (+ thin planning / people chrome) */}
-        <section
-          className="overflow-hidden rounded-2xl border border-zinc-800/90 bg-zinc-950/70"
-          data-testid="floor-work-surface"
-        >
-          <div className="flex flex-wrap items-center gap-2 border-b border-zinc-800/80 px-3 py-2">
-            {showSundayRail ? (
-              <button
-                type="button"
-                onClick={() => requestSundayAuditDrawer()}
-                className="inline-flex min-h-10 items-center gap-1.5 rounded-full border border-emerald-500/35 bg-emerald-950/25 px-3 text-xs font-semibold text-emerald-100"
-              >
-                <Zap
-                  className="h-3.5 w-3.5"
-                  strokeWidth={ICON_STROKE}
-                  aria-hidden
-                />
-                {hasActiveWeekWork
-                  ? sundayPending > 0
-                    ? `Assign (${sundayPending})`
-                    : "Stage / assign"
-                  : sundayPending > 0
-                    ? `Stage · ${sundayPending} pending`
-                    : "Stage this week"}
-              </button>
-            ) : null}
-            <button
-              type="button"
-              onClick={() => setRosterSheetOpen(true)}
-              className="inline-flex min-h-10 items-center gap-1.5 rounded-full border border-zinc-700/90 bg-zinc-900/60 px-3 text-xs font-semibold text-zinc-200"
-            >
-              <Users
-                className="h-3.5 w-3.5 text-zinc-400"
-                strokeWidth={ICON_STROKE}
-                aria-hidden
-              />
-              {onDutyLoading
-                ? "On now…"
-                : `On now · ${workload.groups.length}`}
-            </button>
-            {laterTodayCount > 0 ? (
-              <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.12em] text-zinc-500">
-                {laterTodayCount} later today
-              </span>
-            ) : null}
-          </div>
-
-          <div className="border-b border-zinc-800/80 px-3 py-2">
-            <div
-              role="tablist"
-              aria-label="Bay filters"
-              data-testid="floor-bay-filters"
-              className="grid grid-cols-2 gap-1.5 sm:flex sm:flex-wrap sm:overflow-visible"
-            >
-              {FLOOR_FILTERS.map((filter) => {
-                const active = floorBayFilter === filter.id;
-                const badge =
-                  filter.id === "completed"
-                    ? reportedCompleteCount
-                    : filter.id === "attention"
-                      ? pendingVerifyCount
-                      : null;
-                return (
-                  <button
-                    key={filter.id}
-                    type="button"
-                    role="tab"
-                    aria-selected={active}
-                    onClick={() => setFloorBayFilter(filter.id)}
-                    className={`chip-filter min-h-11 w-full rounded-xl px-3 sm:w-auto sm:shrink-0 sm:rounded-full ${
-                      active
-                        ? "border-cyan-400/55 bg-cyan-950/45 text-cyan-100 shadow-[0_0_12px_-4px_rgba(34,211,238,0.55)]"
-                        : "border-zinc-700 text-zinc-300"
-                    }`}
-                  >
-                    {filter.label}
-                    {badge && badge > 0 ? ` (${badge})` : ""}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          <div className="p-3">
-            {loading && displayRotations.length === 0 ? (
-              <p className="text-sm text-zinc-400">
-                Loading this week&apos;s bays…
-              </p>
-            ) : displayRotations.length === 0 ? (
+            {pendingVerifyCount > 0 ? (
               <div
-                className="rounded-2xl border border-dashed border-zinc-700 px-4 py-4 text-center"
-                data-testid="floor-empty-week"
+                className="flex items-center gap-2 rounded-xl border border-amber-500/35 bg-amber-950/30 px-3 py-2.5"
+                data-testid="floor-verification-strip"
               >
-                <p className="text-sm font-semibold text-zinc-200">
-                  {week
-                    ? `Staging week ${week} · 0 staged`
-                    : "0 bays staged"}
+                <div className="min-w-0 flex-1">
+                  <p className="font-mono text-[9px] font-bold uppercase tracking-wide text-amber-300/95">
+                    Needs attention
+                  </p>
+                  <p className="truncate text-xs font-semibold text-amber-50">
+                    {pendingVerifyCount} bay
+                    {pendingVerifyCount === 1 ? "" : "s"} awaiting verification
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setRollupOpen(true)}
+                  className="inline-flex min-h-10 shrink-0 items-center justify-center rounded-xl border border-amber-400/45 bg-amber-950/40 px-3 text-xs font-bold text-amber-50"
+                >
+                  Review
+                </button>
+              </div>
+            ) : null}
+
+            {ownershipPlan.needsOwnershipRecovery ? (
+              <div
+                className="rounded-xl border border-cyan-500/35 bg-cyan-950/25 px-3 py-2.5"
+                data-testid="floor-ownership-recovery"
+              >
+                <p className="text-xs font-semibold text-cyan-50">
+                  This week&apos;s ownership is incomplete
                 </p>
-                <p className="mt-1 font-mono text-[11px] leading-snug text-zinc-400">
-                  Target{" "}
-                  {resolveWeeklyBayTarget(activeDept?.weekly_bay_target)}
-                  /week
-                  {mappedLocations.length > 0
-                    ? ` · ${mappedLocations.length} mapped`
-                    : ""}
+                <p className="mt-0.5 text-[11px] leading-snug text-cyan-100/75">
+                  {ownershipPlan.unownedPhysicalBayCount} physical bay
+                  {ownershipPlan.unownedPhysicalBayCount === 1 ? "" : "s"} still
+                  need an owner.
                 </p>
-                <p className="mt-2 text-sm text-zinc-400">
-                  {simplified
-                    ? "No bays on your rotation yet — see your supervisor."
-                    : supervisor
-                      ? "Prepare this week's coverage to select the bays."
-                      : "Ask your supervisor to stage this week's bays."}
+                <button
+                  type="button"
+                  onClick={() => requestSundayAuditDrawer()}
+                  className="mt-2 inline-flex min-h-10 items-center gap-1.5 rounded-full border border-cyan-400/40 bg-cyan-950/40 px-3 text-xs font-semibold text-cyan-50"
+                >
+                  <Zap
+                    className="h-3.5 w-3.5"
+                    strokeWidth={ICON_STROKE}
+                    aria-hidden
+                  />
+                  Assign this week
+                </button>
+              </div>
+            ) : null}
+
+            {ownershipPlan.needsDispatchRecovery && !loading ? (
+              <div
+                className="rounded-xl border border-zinc-700/80 bg-zinc-950/50 px-3 py-2.5"
+                data-testid="floor-no-plan"
+              >
+                <p className="text-xs font-semibold text-zinc-100">
+                  No weekly rotation yet
                 </p>
-                {supervisor && !simplified ? (
+                <p className="mt-0.5 text-[11px] leading-snug text-zinc-400">
+                  {mappedPhysicalHint ||
+                    (master
+                      ? "Sunday automatic dispatch should create this week’s plan. Use recovery only if it missed."
+                      : "Ask your Master Admin if this week’s plan did not arrive.")}
+                </p>
+                {master ? (
                   <button
                     type="button"
                     onClick={() => requestSundayAuditDrawer()}
-                    className="mt-3 inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl border border-emerald-500/40 bg-emerald-950/30 px-4 text-sm font-bold text-emerald-100"
+                    className="mt-2 inline-flex min-h-10 items-center gap-1.5 rounded-full border border-zinc-600 px-3 text-xs font-semibold text-zinc-200"
                   >
                     <Zap
                       className="h-3.5 w-3.5"
                       strokeWidth={ICON_STROKE}
                       aria-hidden
                     />
-                    Stage this week
+                    Recovery tools
                   </button>
                 ) : null}
               </div>
-            ) : (
-              <ZebraChecklist
-                key={`${working}-${floorBayFilter}`}
-                specialist={specialist}
-                assignedWeek={week}
-                rotations={displayRotations}
-                onRefresh={silentRefresh}
-                assignmentDepartment={assignmentDept}
-                focusSpecialistId={effectiveFocus}
-                onDutyMembers={onDuty}
-                hideChrome
-                floorBayFilter={floorBayFilter}
-                simsScans={applianceScans}
-                simsCatalog={applianceCatalog}
-              />
-            )}
-          </div>
-        </section>
+            ) : null}
 
-        {/* D. Derived intelligence — after work; quiet AVAILABLE omitted */}
+            {ownershipPlan.barrierBayCount > 0 &&
+            pendingVerifyCount === 0 &&
+            !ownershipPlan.needsOwnershipRecovery ? (
+              <div
+                className="rounded-xl border border-rose-500/30 bg-rose-950/20 px-3 py-2"
+                data-testid="floor-barrier-attention"
+              >
+                <p className="text-xs font-semibold text-rose-100">
+                  {ownershipPlan.barrierBayCount} barrier
+                  {ownershipPlan.barrierBayCount === 1 ? "" : "s"} · coverage
+                  still owed
+                </p>
+              </div>
+            ) : null}
+          </section>
+        ) : null}
+
+        {/* Quiet week progress — not alarming */}
+        <div className="mb-2" data-testid="floor-week-state">
+          <p
+            className="text-xs text-zinc-400"
+            data-testid="floor-week-progress-line"
+          >
+            {loading && !ownershipPlan.hasPlan
+              ? "Loading this week…"
+              : weekProgressLine}
+          </p>
+        </div>
+
+        {/* Availability context — supporting, not allocation */}
+        <div className="mb-2 flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setRosterSheetOpen(true)}
+            className="inline-flex min-h-10 items-center gap-1.5 rounded-full border border-zinc-700/90 bg-zinc-900/60 px-3 text-xs font-semibold text-zinc-200"
+          >
+            <Users
+              className="h-3.5 w-3.5 text-zinc-400"
+              strokeWidth={ICON_STROKE}
+              aria-hidden
+            />
+            {onDutyLoading
+              ? "On now…"
+              : `On now · ${workload.groups.length}`}
+          </button>
+          {laterTodayCount > 0 ? (
+            <span className="font-mono text-[10px] font-semibold uppercase tracking-[0.12em] text-zinc-500">
+              {laterTodayCount} later today
+            </span>
+          ) : null}
+        </div>
+
+        {/* Primary: people → physical bays */}
+        {ownershipPlan.hasPlan ? (
+          <ThisWeekOwnershipBoard
+            plan={ownershipPlan}
+            specialist={specialist}
+            departmentId={deptId}
+            availabilityById={availabilityById}
+            onlySpecialistId={simplified ? String(specialist.id) : null}
+            allowExtraBay={!simplified && supervisor}
+            onRefresh={silentRefresh}
+          />
+        ) : null}
+
+        {/* Healthy week: no Stage/Assign chrome. Master may reach advanced recovery quietly. */}
+        {showMasterAdvancedRecovery ? (
+          <div className="mt-2" data-testid="floor-master-recovery-quiet">
+            <button
+              type="button"
+              onClick={() => requestSundayAuditDrawer()}
+              className="text-[11px] font-semibold text-zinc-500 underline-offset-2 hover:text-zinc-300 hover:underline"
+            >
+              Advanced recovery
+            </button>
+          </div>
+        ) : null}
+
         {showAttentionStrip ? (
           <div className="mt-2">
             <FloorAttentionSummary
@@ -875,7 +800,7 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
           </div>
         ) : null}
 
-        {/* F. Declared context — demoted below active work */}
+        {/* Seasonal context only — fiscal demoted */}
         <div className="mt-2">
           <FloorOperationalContextStrip
             specialist={specialist}
@@ -888,12 +813,13 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
                 : null)
             }
             refreshKey={healthKey}
+            omitFiscal
           />
         </div>
 
         <OnDutyAssociateStrip
           groups={workload.groups}
-          selectedId={focusAssociateId}
+          selectedId={pickedAssociateId}
           onSelect={setPickedAssociateId}
           loading={onDutyLoading}
           storewide={working === "all"}
@@ -911,84 +837,37 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
           />
         ) : null}
 
-        {/* Secondary tools / AI / analytics — collapsed by default.
-            UX-005C: shift actions first, reports second. Actions stay stacked
-            full-width so a phone never depends on a horizontal strip. */}
-        <div className="mt-3">
-          <ShiftAnalyticsDrawer>
+        {/* Secondary: Floor Pad (protected) + demoted showroom */}
+        {!simplified ? (
+          <section className="mt-3 space-y-2" data-testid="floor-secondary-tools">
             <div data-testid="floor-drawer-actions">
-              {/* 1 — Walk & Talk Floor Pad */}
-              {!simplified ? (
-                <TacticalVoiceFloorPad
-                  specialist={specialist}
-                  storeNumber={storeNumber}
-                  week={week}
-                  rotations={displayRotations}
-                  departmentId={deptId}
-                />
-              ) : null}
-              {/* 2 — Flag Downstock */}
-              {!simplified ? (
-                <button
-                  type="button"
-                  onClick={() => setDownstockOpen(true)}
-                  className="mb-3 flex min-h-12 w-full items-center justify-center rounded-xl border border-cyan-500/40 bg-cyan-950/30 px-3 text-sm font-semibold text-cyan-100"
-                >
-                  Flag Downstock
-                </button>
-              ) : null}
-              {!simplified ? (
-                <>
-                  {/* 3 — Showroom Quick Touch */}
-                  <ShowroomQuickTouchCard
-                    specialist={specialist}
-                    refreshKey={healthKey}
-                    onTouched={() => setHealthKey((k) => k + 1)}
-                  />
-                </>
-              ) : null}
-              {/* 4 — Weekly audit rollup */}
-              {supervisor && !simplified ? (
-                <button
-                  type="button"
-                  onClick={() => setRollupOpen(true)}
-                  className="mb-3 flex min-h-11 w-full items-center justify-center rounded-xl border border-emerald-500/40 bg-emerald-950/30 px-3 text-sm font-bold text-emerald-100"
-                >
-                  Weekly audit rollup
-                  {pendingVerifyCount > 0 ? ` (${pendingVerifyCount})` : ""}
-                </button>
-              ) : null}
-              {/*
-                SNAP-RETIRE-001 removed Snap Bay from Floor.
-                REDUCE-004 disconnected Predictive Copilot from everyday Floor.
-              */}
+              <TacticalVoiceFloorPad
+                specialist={specialist}
+                storeNumber={storeNumber}
+                week={week}
+                rotations={displayRotations}
+                departmentId={deptId}
+              />
             </div>
-            <ShiftAnalyticsReportsGroup>
-              {!simplified ? (
-                <>
-                  <StoreHealthChart
-                    specialist={specialist}
-                    refreshKey={healthKey}
-                  />
-                  {/* Exception Feed owns the visible barrier list in this drawer. */}
-                  <StoreHealthCard
-                    specialist={specialist}
-                    refreshKey={healthKey}
-                    showLoggedBarriers={false}
-                  />
-                </>
-              ) : null}
-              <ShiftBriefingCard
+            <button
+              type="button"
+              aria-expanded={secondaryOpen}
+              onClick={() => setSecondaryOpen((v) => !v)}
+              className="flex min-h-9 w-full items-center justify-between rounded-lg px-1 text-left text-[11px] font-semibold text-zinc-500"
+            >
+              <span>Showroom tools</span>
+              <span>{secondaryOpen ? "Hide" : "Show"}</span>
+            </button>
+            {secondaryOpen ? (
+              <ShowroomQuickTouchCard
                 specialist={specialist}
                 refreshKey={healthKey}
+                onTouched={() => setHealthKey((k) => k + 1)}
               />
-              {!simplified ? (
-                <ExceptionFeed specialist={specialist} refreshKey={healthKey} />
-              ) : null}
-            </ShiftAnalyticsReportsGroup>
-          </ShiftAnalyticsDrawer>
-        </div>
-        {/* After pad listeners so cold-mount effect order registers them first. */}
+            ) : null}
+          </section>
+        ) : null}
+
         <Suspense fallback={null}>
           <ExecutiveFloorPadIntentBridge />
         </Suspense>
@@ -1002,16 +881,6 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
         onClose={() => setRollupOpen(false)}
         onReviewed={silentRefresh}
       />
-      {downstockOpen ? (
-        <FlagDownstockSheet
-          specialist={specialist}
-          week={week}
-          department={assignmentDept}
-          rotations={displayRotations}
-          onClose={() => setDownstockOpen(false)}
-          onFlagged={silentRefresh}
-        />
-      ) : null}
     </>
   );
 }

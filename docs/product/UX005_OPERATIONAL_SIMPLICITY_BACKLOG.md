@@ -8,6 +8,12 @@
 
 Do not silently resolve, delete, or discard open questions during an early tranche unless that tranche explicitly owns them.
 
+### UX law (UX-REDUCE-002)
+
+> **Healthy state should be quieter than exceptional state.**
+
+Floor’s This Week ownership presentation applies this law. Map/Roster/More reduction tranches should preserve it.
+
 ---
 
 ## Program sequence
@@ -16,7 +22,7 @@ Do not silently resolve, delete, or discard open questions during an early tranc
 |---------|-------|--------|
 | **UX-005A** | Appliances operational home simplification | Implemented — real-hardware acceptance pending |
 | **UX-005B** | Specialty findability (Appliances-first Floor entry) | Implemented — Samsung acceptance pending |
-| **UX-005C** | Floor secondary drawer | Implemented — Samsung acceptance pending |
+| **UX-005C** | Floor secondary drawer | **Superseded presentation by UX-REDUCE-002** — analytics drawer removed from Floor; Floor Pad + demoted showroom remain. Samsung acceptance for old six/five-action drawer no longer applicable; accept UX-REDUCE-002 Floor instead |
 | **UX-005D** | Map operate vs investigate | Open — do not preempt |
 | **UX-005E** | Operational language | Open — do not preempt |
 | **UX-005F** | AI earn-your-place review | Open — do not preempt. **Repository-level evidence now supplied by GEMINI-001** (see below) |

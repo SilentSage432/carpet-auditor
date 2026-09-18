@@ -21,16 +21,12 @@ function readRepo(relativePath: string): string {
 }
 
 describe("UX-004C Floor bay filters", () => {
-  it("uses a mobile 2×2 grid without horizontal-scroll-only discovery", () => {
+  it("UX-REDUCE-002 replaces bay filter grid with people-first ownership", () => {
     const floor = readRepo("components/hub/tabs/FloorTab.tsx");
-    expect(floor).toContain('data-testid="floor-bay-filters"');
-    expect(floor).toContain("grid grid-cols-2");
-    expect(floor).not.toMatch(
-      /data-testid="floor-bay-filters"[\s\S]{0,200}overflow-x-auto/
-    );
-    for (const id of ["all", "mine", "attention", "completed"]) {
-      expect(floor).toContain(`id: "${id}"`);
-    }
+    // Prior UX-004C 2×2 filters retired with Zebra-primary Floor.
+    expect(floor).not.toContain('data-testid="floor-bay-filters"');
+    expect(floor).toContain("ThisWeekOwnershipBoard");
+    expect(floor).toContain("composeThisWeekOwnership");
   });
 });
 
