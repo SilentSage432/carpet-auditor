@@ -1,5 +1,13 @@
 # DeptSync Hub — Development Journal
 
+## 2026-09-18 — BULK-SETUP-001 Bulk Bay Generator archaeology
+
+**Read-only.** Baseline `main @ 78ec5a1`. No Bulk Generator / Location Type / AI Pre-Flight / Map / Floor / Gemini / schema / production mutation. UX-REDUCE-008 not opened. BULK-SETUP-002 not started.
+
+**Finding:** Bulk create still writes `store_locations` surface rows; reduced product already thinks in physical bays. Location Type BOTH is the justified normal write; Selling-only / Topstock-only are mounted legacy everyday radios. AI Pre-Flight is confirmation-gated Gemini parse of messy text — optional, not essential; unique consumer removable without Floor Pad. Preview/success copy still speaks location rows/tags.
+
+Canonical: [`docs/product/BULK_SETUP_001_BULK_BAY_GENERATOR_ARCHAEOLOGY.md`](docs/product/BULK_SETUP_001_BULK_BAY_GENERATOR_ARCHAEOLOGY.md).
+
 ## 2026-09-18 — UX-REDUCE-007 final legacy surface & residue retirement
 
 **Authorized bounded implementation.** Baseline `main @ c49709f`. Not a redesign. Handheld theme untouched.

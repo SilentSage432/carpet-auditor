@@ -175,6 +175,7 @@ lib/store-ops/audit-summary.ts → Supervisor weekly rollup composition (quota /
 components/store-ops/SupervisorAuditSummaryModal.tsx → Personal weekly stats + copy
 lib/admin-department-context.ts       → Working department pin (localStorage + event; Floor/Map/Roster subscribe)
 lib/store-ops/bay-pattern.ts          → Odd / even bay range expansion (Bulk Generator; default odd)
+lib/store-ops/ai-parse.ts             → Bulk Generator AI Pre-Flight: Gemini messy-text → structured aisle ranges (human Confirm → bulk upsert). Archaeology: docs/product/BULK_SETUP_001_BULK_BAY_GENERATOR_ARCHAEOLOGY.md
 lib/store-ops/manager-notes.ts        → Manager notes Supabase CRUD + realtime + archive (JWT-scoped)
 lib/store-ops/ai-bay-scan.ts          → Visual bay scan prompt / schema / normalize / local fallback
 lib/store-ops/ai-note-extract.ts      → Floor Pad Gemini Extract Tasks & Tag prompt / schema / fallback
