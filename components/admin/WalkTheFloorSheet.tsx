@@ -35,6 +35,11 @@ import {
   formatUnsectionedLabel,
   type BaySectionLookup,
 } from "@/lib/store-ops/operational-sections";
+import { fetchWalkthroughPlaceHistory } from "@/lib/store-ops/client";
+import {
+  observationTypeLabel,
+  type WalkthroughObservationView,
+} from "@/lib/store-ops/walkthroughs";
 import Link from "next/link";
 
 type BayPair = {
@@ -113,6 +118,40 @@ export function WalkTheFloorSheet({
   onChanged: () => void;
   onError: (msg: string | null) => void;
 }) {
+  const [walkHistory, setWalkHistory] = useState<
+    WalkthroughObservationView[] | null
+  >(null);
+  const [walkHistoryError, setWalkHistoryError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    setWalkHistory(null);
+    setWalkHistoryError(null);
+    void fetchWalkthroughPlaceHistory(specialist, {
+      departmentId: bay.departmentId,
+      aisle: bay.aisle,
+      bay: bay.pair.bay,
+    })
+      .then((res) => {
+        if (!cancelled) setWalkHistory(res.observations);
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        const msg =
+          err instanceof Error ? err.message : "Could not load walkthroughs";
+        // Missing migration is quiet — Map still works.
+        if (/not migrated|missing_relation|503/i.test(msg)) {
+          setWalkHistory([]);
+          return;
+        }
+        setWalkHistoryError(msg);
+        setWalkHistory([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [specialist, bay.departmentId, bay.aisle, bay.pair.bay]);
+
   const faces = useMemo(
     () =>
       [bay.pair.selling, bay.pair.topstock].filter(
@@ -395,6 +434,60 @@ export function WalkTheFloorSheet({
             )}
           </section>
         ) : null}
+
+        <section
+          className="mb-4 rounded-xl border border-zinc-700/50 bg-zinc-950/40 px-3 py-2.5"
+          data-testid="walk-sheet-walkthrough-history"
+          aria-label="Walkthrough history"
+        >
+          <p className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-zinc-500">
+            Walkthrough history
+          </p>
+          {walkHistory == null ? (
+            <p className="mt-1.5 text-xs text-zinc-500">Loading…</p>
+          ) : walkHistory.length === 0 ? (
+            <div className="mt-1.5 space-y-1">
+              <p className="text-sm text-zinc-400">No walkthrough notes on this bay.</p>
+              {walkHistoryError ? (
+                <p className="text-[11px] text-zinc-500">{walkHistoryError}</p>
+              ) : null}
+              <Link
+                href="/walkthroughs"
+                className="mt-1 inline-flex min-h-11 items-center text-sm font-semibold text-accent"
+                onClick={onClose}
+              >
+                Open Walkthroughs
+              </Link>
+            </div>
+          ) : (
+            <ul className="mt-1.5 space-y-2">
+              {walkHistory.slice(0, 5).map((obs) => (
+                <li key={obs.id} className="text-sm">
+                  <p className="font-semibold text-zinc-200">
+                    {observationTypeLabel(obs.observation_type)}
+                    <span className="ml-2 font-mono text-[10px] font-normal text-zinc-500">
+                      {new Date(obs.observed_at).toLocaleDateString(undefined, {
+                        month: "short",
+                        day: "numeric",
+                      })}
+                    </span>
+                  </p>
+                  <p className="text-xs leading-snug text-zinc-400">{obs.body}</p>
+                </li>
+              ))}
+              <li>
+                <Link
+                  href="/walkthroughs"
+                  className="inline-flex min-h-11 items-center text-sm font-semibold text-accent"
+                  onClick={onClose}
+                  data-testid="walk-sheet-walkthroughs-open"
+                >
+                  Open Walkthroughs
+                </Link>
+              </li>
+            </ul>
+          )}
+        </section>
 
         <section
           className="mb-4 rounded-xl border border-zinc-700/50 bg-zinc-950/40 px-3 py-2.5"

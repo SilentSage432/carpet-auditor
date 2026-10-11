@@ -1,5 +1,27 @@
 # DeptSync Hub — Development Journal
 
+## 2026-10-11 — DEPTSYNC-RD-5-RELEASE Walkthroughs production
+
+**Authorized release.** Project `fmeinlwhixngednabhgy`. Pre-migration `pg_dump` (581993 bytes) under `tmp/production-backups/`. Applied `20261012_walkthroughs.sql`; verified tables/RLS/FKs/indexes/SELECT-only jwt-scoped policies; empty row counts. App commit + Vercel Production for deptsync-hub includes RD-5 + RD-5-FIX. No Sunday/topology/capacity mutations; no sample walkthrough writes.
+
+Canonical: [`docs/product/DEPTSYNC_RD_5_RELEASE.md`](docs/product/DEPTSYNC_RD_5_RELEASE.md). STOP. Do not begin RD-6.
+
+## 2026-10-11 — DEPTSYNC-RD-5-FIX Walkthrough store relationship integrity
+
+**Scoped local correction.** No commit, push, deploy, or production migration.
+
+Closed RELEASE-READINESS blockers: validate companion/associate/responsible against `store_specialists.store_number`; validate section/focus via `loadOperationalSectionForStore`. Generic not_found errors. Behavioral authz + completion-independence tests. Schema unchanged. Typecheck pass; **1436** tests pass; build pass.
+
+Canonical: [`docs/product/DEPTSYNC_RD_5_WALKTHROUGHS.md`](docs/product/DEPTSYNC_RD_5_WALKTHROUGHS.md) §RD-5-FIX. STOP. Do not begin RD-6.
+
+## 2026-10-11 — DEPTSYNC-RD-5 Walkthroughs & follow-through
+
+**Scoped implementation.** No commit, push, deploy, or production migration.
+
+FLOORPAD-001 storage review: `manager_notes` / `shift_walk_tasks` unfit as walkthrough inbox substrate. Additive `walkthrough_sessions` / `observations` / `follow_ups` with store-scoped RLS; Supervisor/Master writes via service role. Walkthroughs tab: begin/capture/open/attention/completed; Overview open follow-ups; Map bay history. No scoring; rotation-independent. Floor Pad remains linked freeform capture. Typecheck pass; **1425** tests pass; build pass.
+
+Canonical: [`docs/product/DEPTSYNC_RD_5_WALKTHROUGHS.md`](docs/product/DEPTSYNC_RD_5_WALKTHROUGHS.md). STOP. Do not begin RD-6.
+
 ## 2026-10-11 — DEPTSYNC-RD-4 This Week command board
 
 **Scoped implementation.** No commit, push, deploy, production mutation, Sunday rewrite, or capacity change.

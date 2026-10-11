@@ -2009,3 +2009,119 @@ export async function removeOperationalSectionMembersClient(
   emitSectionsChanged();
   return result;
 }
+
+export const STORE_OPS_WALKTHROUGHS_CHANGED_EVENT =
+  "deptsync:store-ops-walkthroughs-changed";
+
+function emitWalkthroughsChanged() {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new Event(STORE_OPS_WALKTHROUGHS_CHANGED_EVENT));
+}
+
+/** RD-5 — Walkthroughs inbox. */
+export async function fetchWalkthroughInbox(
+  specialist: StoreSpecialist
+): Promise<{ inbox: import("./walkthroughs").WalkthroughInbox }> {
+  return storeOpsFetch<{ inbox: import("./walkthroughs").WalkthroughInbox }>(
+    "/api/walkthroughs",
+    specialist
+  );
+}
+
+export async function fetchWalkthroughPlaceHistory(
+  specialist: StoreSpecialist,
+  input: { departmentId: string; aisle: string; bay: number }
+): Promise<{
+  observations: import("./walkthroughs").WalkthroughObservationView[];
+}> {
+  const qs = new URLSearchParams({
+    department_id: input.departmentId,
+    aisle: input.aisle,
+    bay: String(input.bay),
+  });
+  return storeOpsFetch<{
+    observations: import("./walkthroughs").WalkthroughObservationView[];
+  }>(`/api/walkthroughs/observations?${qs}`, specialist);
+}
+
+export async function createWalkthroughObservationClient(
+  specialist: StoreSpecialist,
+  input: {
+    session_id?: string | null;
+    observation_type: import("./walkthroughs").WalkthroughObservationType;
+    body: string;
+    associate_specialist_id?: string | null;
+    section_id?: string | null;
+    department_id?: string | null;
+    aisle?: string | null;
+    bay?: number | null;
+    companion_specialist_id?: string | null;
+    focus_section_id?: string | null;
+    follow_up?: {
+      action_text?: string;
+      responsible_specialist_id?: string | null;
+      due_on?: string | null;
+    } | null;
+  }
+): Promise<{
+  ok: true;
+  observation: import("./walkthroughs").WalkthroughObservationRow;
+  session_id: string;
+  follow_up?: import("./walkthroughs").WalkthroughFollowUpRow | null;
+}> {
+  const result = await storeOpsFetch<{
+    ok: true;
+    observation: import("./walkthroughs").WalkthroughObservationRow;
+    session_id: string;
+    follow_up?: import("./walkthroughs").WalkthroughFollowUpRow | null;
+  }>("/api/walkthroughs/observations", specialist, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  emitWalkthroughsChanged();
+  return result;
+}
+
+export async function endWalkthroughSessionClient(
+  specialist: StoreSpecialist,
+  sessionId: string
+): Promise<{ ok: true; session: import("./walkthroughs").WalkthroughSessionRow }> {
+  const result = await storeOpsFetch<{
+    ok: true;
+    session: import("./walkthroughs").WalkthroughSessionRow;
+  }>(`/api/walkthroughs/sessions/${encodeURIComponent(sessionId)}`, specialist, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action: "end" }),
+  });
+  emitWalkthroughsChanged();
+  return result;
+}
+
+export async function completeWalkthroughFollowUpClient(
+  specialist: StoreSpecialist,
+  followUpId: string,
+  input: {
+    completion_evidence?: string | null;
+    resolution_notes?: string | null;
+  }
+): Promise<{
+  ok: true;
+  follow_up: import("./walkthroughs").WalkthroughFollowUpRow;
+}> {
+  const result = await storeOpsFetch<{
+    ok: true;
+    follow_up: import("./walkthroughs").WalkthroughFollowUpRow;
+  }>(
+    `/api/walkthroughs/follow-ups/${encodeURIComponent(followUpId)}`,
+    specialist,
+    {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "complete", ...input }),
+    }
+  );
+  emitWalkthroughsChanged();
+  return result;
+}

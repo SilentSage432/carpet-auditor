@@ -11,8 +11,10 @@ import type { WorkflowTabProps } from "@/components/hub/tabs/tab-props";
 import { HubIcon } from "@/components/hub/NavIcons";
 import {
   fetchThisWeekRotations,
+  fetchWalkthroughInbox,
   invalidateStoreOpsListCaches,
   STORE_OPS_LOCATIONS_CHANGED_EVENT,
+  STORE_OPS_WALKTHROUGHS_CHANGED_EVENT,
 } from "@/lib/store-ops/client";
 import {
   composeThisWeekOwnership,
@@ -26,6 +28,7 @@ import {
 import { isoWeekLabel } from "@/lib/store-ops/week";
 import { formatMapCalendarWeekChrome } from "@/lib/store-ops/week-copy";
 import type { WeeklyRotationWithLocation } from "@/lib/store-ops/types";
+import type { WalkthroughInbox } from "@/lib/store-ops/walkthroughs";
 
 type AttentionItem = {
   id: string;
@@ -77,6 +80,7 @@ export function OverviewTab({ specialist }: WorkflowTabProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [plan, setPlan] = useState<ThisWeekOwnershipPlan | null>(null);
+  const [walkInbox, setWalkInbox] = useState<WalkthroughInbox | null>(null);
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -93,6 +97,12 @@ export function OverviewTab({ specialist }: WorkflowTabProps) {
         assignments = {};
       }
       setPlan(composeThisWeekOwnership({ rotations, assignments }));
+      try {
+        const { inbox } = await fetchWalkthroughInbox(specialist);
+        setWalkInbox(inbox);
+      } catch {
+        setWalkInbox(null);
+      }
     } catch (err) {
       setPlan(null);
       setError(err instanceof Error ? err.message : "Could not load Overview");
@@ -111,12 +121,27 @@ export function OverviewTab({ specialist }: WorkflowTabProps) {
       void reload();
     }
     window.addEventListener(STORE_OPS_LOCATIONS_CHANGED_EVENT, onChanged);
+    window.addEventListener(STORE_OPS_WALKTHROUGHS_CHANGED_EVENT, onChanged);
     return () => {
       window.removeEventListener(STORE_OPS_LOCATIONS_CHANGED_EVENT, onChanged);
+      window.removeEventListener(STORE_OPS_WALKTHROUGHS_CHANGED_EVENT, onChanged);
     };
   }, [reload]);
 
-  const attention = plan ? attentionFromPlan(plan) : [];
+  const attention: AttentionItem[] = [
+    ...(plan ? attentionFromPlan(plan) : []),
+    ...(walkInbox && walkInbox.attention_count > 0
+      ? [
+          {
+            id: "walk-followups",
+            label: `${walkInbox.attention_count} walkthrough follow-up${
+              walkInbox.attention_count === 1 ? "" : "s"
+            } past target date`,
+            href: "/walkthroughs",
+          },
+        ]
+      : []),
+  ];
   const progress = plan ? composeThisWeekProgressLine(plan) : null;
 
   return (
@@ -251,18 +276,42 @@ export function OverviewTab({ specialist }: WorkflowTabProps) {
             <h3 className="text-xs font-bold uppercase tracking-wide text-zinc-500">
               Follow-ups
             </h3>
-            <div className="rounded-xl border border-dashed border-zinc-700/80 bg-zinc-950/40 px-3 py-3 text-sm text-zinc-400">
-              <p>
-                Walkthrough follow-ups are not stored yet. Capture stays in Floor
-                Pad until the walkthrough domain lands.
-              </p>
-              <Link
-                href="/walkthroughs"
-                className="mt-2 inline-flex min-h-11 items-center font-semibold text-accent"
-              >
-                Open Walkthroughs
-              </Link>
-            </div>
+            {walkInbox && walkInbox.open_count > 0 ? (
+              <div className="rounded-xl border border-zinc-800/80 bg-zinc-950/50 px-3 py-3 text-sm">
+                <p className="font-semibold text-zinc-100">
+                  {walkInbox.open_count} open
+                  {walkInbox.attention_count > 0
+                    ? ` · ${walkInbox.attention_count} need attention`
+                    : ""}
+                </p>
+                <ul className="mt-2 space-y-2">
+                  {walkInbox.open_follow_ups.slice(0, 3).map((fu) => (
+                    <li key={fu.id} className="text-xs text-zinc-400">
+                      <span className="font-medium text-zinc-200">
+                        {fu.action_text}
+                      </span>
+                      {fu.due_on ? ` · ${fu.due_on}` : ""}
+                    </li>
+                  ))}
+                </ul>
+                <Link
+                  href="/walkthroughs"
+                  className="mt-2 inline-flex min-h-11 items-center font-semibold text-accent"
+                >
+                  Open Walkthroughs
+                </Link>
+              </div>
+            ) : (
+              <div className="rounded-xl border border-dashed border-zinc-700/80 bg-zinc-950/40 px-3 py-3 text-sm text-zinc-400">
+                <p>No open walkthrough follow-ups.</p>
+                <Link
+                  href="/walkthroughs"
+                  className="mt-2 inline-flex min-h-11 items-center font-semibold text-accent"
+                >
+                  Start a walkthrough
+                </Link>
+              </div>
+            )}
           </section>
         </aside>
       </div>

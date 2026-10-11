@@ -20,8 +20,9 @@
 - [x] **RD-3-FIX-001** — Release blocker corrections — **COMPLETE** — [`DEPTSYNC_RD_3_FIX_001_OPERATIONAL_SECTIONS.md`](docs/product/DEPTSYNC_RD_3_FIX_001_OPERATIONAL_SECTIONS.md)
 - [x] **RD-3-DB-PREFLIGHT** — Production migration readiness — **COMPLETE** — [`DEPTSYNC_RD_3_DB_PREFLIGHT.md`](docs/product/DEPTSYNC_RD_3_DB_PREFLIGHT.md)
 - [x] **RD-3-RELEASE** — Production migrate + deploy — **COMPLETE** — [`DEPTSYNC_RD_3_RELEASE.md`](docs/product/DEPTSYNC_RD_3_RELEASE.md)
-- [x] **RD-4 This Week command board** — Weekly operational board (**COMPLETE** local; commit/deploy **not** authorized) — [`DEPTSYNC_RD_4_THIS_WEEK_COMMAND_BOARD.md`](docs/product/DEPTSYNC_RD_4_THIS_WEEK_COMMAND_BOARD.md)
-- [ ] **RD-5…RD-10** — Topology reconcile → walkthroughs → engine section preference → capacity → team consolidate → auth simplify → visual polish (**NOT STARTED** — see blueprint §L)
+- [x] **RD-4 This Week command board** — Weekly operational board (**PRODUCTION** via RD-4-RELEASE) — [`DEPTSYNC_RD_4_THIS_WEEK_COMMAND_BOARD.md`](docs/product/DEPTSYNC_RD_4_THIS_WEEK_COMMAND_BOARD.md)
+- [x] **RD-5 Walkthroughs** — Collaborative observations + follow-ups (**COMPLETE** local; commit/deploy/prod migrate **not** authorized) — [`DEPTSYNC_RD_5_WALKTHROUGHS.md`](docs/product/DEPTSYNC_RD_5_WALKTHROUGHS.md)
+- [ ] **RD-6…RD-10** — Topology reconcile → engine section preference → capacity → team consolidate → auth simplify → visual polish (**NOT STARTED** — see blueprint §L)
 
 ## Next (ALIGN — constitutional direction)
 - [x] **DEPTSYNC-ALIGN-001** — Constitutional alignment & redesign blueprint (**COMPLETE** — planning only; operator-approved)
@@ -35,7 +36,7 @@
 - [x] **DEPTSYNC-ALIGN-TOPO-001** — Two-department topology reconciliation (**COMPLETE** — discovery + design only; [`DEPTSYNC_ALIGN_TOPO_001_TWO_DEPARTMENT_TOPOLOGY_RECONCILIATION.md`](docs/product/DEPTSYNC_ALIGN_TOPO_001_TWO_DEPARTMENT_TOPOLOGY_RECONCILIATION.md); operator SQL `scripts/sql/align-topo001-topology-inventory-readonly.sql`; no app/schema/prod mutation)
 - [ ] **ALIGN-DEPT-001** — Flooring / Home Decor separation design lock / dry-run (**NOT STARTED** — fed by TOPO-001; blocked on operator aisle/bay mapping + §L decisions; migration still UNRESOLVED until approved)
 - [x] **SECTION-001 / RD-3** — Operational Section domain (**COMPLETE** engineering; prod migration **not** applied) — [`DEPTSYNC_RD_3_OPERATIONAL_SECTIONS.md`](docs/product/DEPTSYNC_RD_3_OPERATIONAL_SECTIONS.md)
-- [ ] **WALKTHROUGH-001** — Collaborative walkthrough domain (**NOT STARTED** — storage review of `manager_notes` / `shift_walk_tasks` first; FLOORPAD-001 related)
+- [x] **WALKTHROUGH-001 / RD-5** — Collaborative walkthrough domain (**COMPLETE** local; FLOORPAD-001 storage decision = dedicated tables; Floor Pad remains protected freeform) — [`DEPTSYNC_RD_5_WALKTHROUGHS.md`](docs/product/DEPTSYNC_RD_5_WALKTHROUGHS.md)
 
 ## Next (Product reduction — boundary locked; everyday surface reduced)
 - [x] **DEPTSYNC-REDUCE-001** — Product reduction safety archaeology (**COMPLETE**; evidence locked into REDUCE-002 docs)
