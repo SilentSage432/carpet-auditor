@@ -20,7 +20,8 @@
 - [x] **RD-3-FIX-001** — Release blocker corrections — **COMPLETE** — [`DEPTSYNC_RD_3_FIX_001_OPERATIONAL_SECTIONS.md`](docs/product/DEPTSYNC_RD_3_FIX_001_OPERATIONAL_SECTIONS.md)
 - [x] **RD-3-DB-PREFLIGHT** — Production migration readiness — **COMPLETE** — [`DEPTSYNC_RD_3_DB_PREFLIGHT.md`](docs/product/DEPTSYNC_RD_3_DB_PREFLIGHT.md)
 - [x] **RD-3-RELEASE** — Production migrate + deploy — **COMPLETE** — [`DEPTSYNC_RD_3_RELEASE.md`](docs/product/DEPTSYNC_RD_3_RELEASE.md)
-- [ ] **RD-4…RD-10** — Topology reconcile → walkthroughs → engine section preference → capacity → team consolidate → auth simplify → visual polish (**NOT STARTED** — see blueprint §L)
+- [x] **RD-4 This Week command board** — Weekly operational board (**COMPLETE** local; commit/deploy **not** authorized) — [`DEPTSYNC_RD_4_THIS_WEEK_COMMAND_BOARD.md`](docs/product/DEPTSYNC_RD_4_THIS_WEEK_COMMAND_BOARD.md)
+- [ ] **RD-5…RD-10** — Topology reconcile → walkthroughs → engine section preference → capacity → team consolidate → auth simplify → visual polish (**NOT STARTED** — see blueprint §L)
 
 ## Next (ALIGN — constitutional direction)
 - [x] **DEPTSYNC-ALIGN-001** — Constitutional alignment & redesign blueprint (**COMPLETE** — planning only; operator-approved)

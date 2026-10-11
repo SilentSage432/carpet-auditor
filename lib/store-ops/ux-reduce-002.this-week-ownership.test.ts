@@ -97,6 +97,7 @@ describe("composeThisWeekOwnership", () => {
       expect(owner.bays).toHaveLength(3);
       expect(owner.canAddAnotherBay).toBe(true);
     }
+    expect(composeThisWeekProgressLine(plan)).toContain("12 planned");
     expect(composeThisWeekProgressLine(plan)).toContain("12 assigned");
   });
 
@@ -198,7 +199,7 @@ describe("composeThisWeekOwnership", () => {
     expect(plan.hasPlan).toBe(false);
     expect(plan.needsDispatchRecovery).toBe(true);
     expect(plan.owners).toHaveLength(0);
-    expect(composeThisWeekProgressLine(plan)).toMatch(/No bays assigned/i);
+    expect(composeThisWeekProgressLine(plan)).toMatch(/No bays planned/i);
   });
 
   it("+1 eligibility requires complete base ownership and quota", () => {

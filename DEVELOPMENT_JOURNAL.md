@@ -1,5 +1,13 @@
 # DeptSync Hub — Development Journal
 
+## 2026-10-11 — DEPTSYNC-RD-4 This Week command board
+
+**Scoped implementation.** No commit, push, deploy, production mutation, Sunday rewrite, or capacity change.
+
+Redesigned This Week (`FloorTab`) as a mobile command board: evidence summary (planned / assigned / verified / remaining), people-first team board with roster placeholders, assignment cards separating ownership from completion evidence, Operational Section stewardship line, Map aisle/bay focus links. Engine remains `eligible × 3`; UI cites shared 4×3=12 without duplicating by department. Typecheck pass; 1407 tests pass; build pass.
+
+Canonical: [`docs/product/DEPTSYNC_RD_4_THIS_WEEK_COMMAND_BOARD.md`](docs/product/DEPTSYNC_RD_4_THIS_WEEK_COMMAND_BOARD.md). STOP for operator phone review.
+
 ## 2026-10-11 — DEPTSYNC-RD-3-RELEASE Operational Sections production
 
 **Authorized release.** Project `fmeinlwhixngednabhgy`. Pre-migration `pg_dump` (543509 bytes) under `tmp/production-backups/`. Applied `20261011_operational_sections.sql`; verified tables/RLS/trigger/expression unique index/SELECT-only jwt-scoped policies; empty row counts. App commit + Vercel Production for deptsync-hub. No topology/roster/Sunday/bootstrap mutations; no artificial sections.

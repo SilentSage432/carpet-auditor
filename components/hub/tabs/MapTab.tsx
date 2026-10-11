@@ -65,6 +65,7 @@ import {
   resolveMapAttentionInvestigationIntent,
   syncMapAttentionInvestigationClearUrl,
 } from "@/lib/store-ops/map-attention-investigation";
+import { resolveMapBayFocusIntent } from "@/lib/store-ops/map-bay-focus";
 
 const ICON_STROKE = 1.75;
 
@@ -119,6 +120,11 @@ export function MapTab({ specialist }: WorkflowTabProps) {
         allowedDepartmentScopes: accessibleDepartments(specialist),
       }),
     [searchParams, specialist]
+  );
+
+  const bayFocusIntent = useMemo(
+    () => resolveMapBayFocusIntent(searchParams),
+    [searchParams]
   );
 
   const investigationView = useMemo(
@@ -587,6 +593,9 @@ export function MapTab({ specialist }: WorkflowTabProps) {
               heatmap={heatmap}
               emphasizeAttentionMarkers={emphasizeAttentionMarkers}
               baySectionByKey={baySectionByKey}
+              focusAisle={bayFocusIntent?.aisle ?? null}
+              focusBay={bayFocusIntent?.bay ?? null}
+              focusDepartmentId={bayFocusIntent?.departmentId ?? null}
               onChanged={() => void reload(specialist)}
             />
           )}

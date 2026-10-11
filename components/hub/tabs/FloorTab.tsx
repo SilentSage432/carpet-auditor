@@ -16,6 +16,7 @@ import { TacticalVoiceFloorPad } from "@/components/dashboard/TacticalVoiceFloor
 import { FloorAttentionSummary } from "@/components/store-ops/FloorAttentionSummary";
 import { FloorOperationalContextStrip } from "@/components/store-ops/FloorOperationalContextStrip";
 import { OnDutyAssociateStrip } from "@/components/store-ops/OnDutyAssociateStrip";
+import { ThisWeekCommandSummaryCard } from "@/components/store-ops/ThisWeekCommandSummary";
 import { ThisWeekOwnershipBoard } from "@/components/store-ops/ThisWeekOwnershipBoard";
 import { ExecutiveFloorPadIntentBridge } from "@/components/hub/ExecutiveFloorPadIntentBridge";
 import { workingDepartmentId } from "@/lib/admin-department-context";
@@ -30,13 +31,19 @@ import {
   fetchDepartments,
   fetchExceptionSummary,
   fetchLocationAttention,
+  fetchOperationalSections,
   fetchStoreLocationsDetailed,
   fetchThisWeekRotations,
   peekCachedDepartments,
   peekCachedRotations,
   peekCachedStoreLocations,
   STORE_OPS_LOCATIONS_CHANGED_EVENT,
+  STORE_OPS_SECTIONS_CHANGED_EVENT,
 } from "@/lib/store-ops/client";
+import {
+  indexBaySectionLookups,
+  type BaySectionLookup,
+} from "@/lib/store-ops/operational-sections";
 import { fingerprintsEqual } from "@/lib/store-ops/cache";
 import { readableError } from "@/lib/store-ops/errors";
 import type { MapAttentionClientStatus } from "@/lib/store-ops/location-attention-presentation";
@@ -82,6 +89,7 @@ import { getStoreNumber } from "@/lib/store";
 import { shouldShowFloorAttentionSummary } from "@/lib/store-ops/floor-attention-visibility";
 import { buildMapCurrentAttentionHref } from "@/lib/store-ops/map-attention-investigation";
 import {
+  composeThisWeekCommandSummary,
   composeThisWeekOwnership,
   composeThisWeekProgressLine,
 } from "@/lib/store-ops/this-week-ownership";
@@ -142,6 +150,9 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
   const [rosterSheetOpen, setRosterSheetOpen] = useState(false);
   const [secondaryOpen, setSecondaryOpen] = useState(false);
   const [barrierRotationIds, setBarrierRotationIds] = useState<string[]>([]);
+  const [baySectionByKey, setBaySectionByKey] = useState<
+    Map<string, BaySectionLookup>
+  >(() => new Map());
 
   const [attentionStatus, setAttentionStatus] =
     useState<MapAttentionClientStatus>("IDLE");
@@ -336,6 +347,18 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
           .catch((err) => {
             console.error("[FloorTab] store locations failed (non-blocking)", err);
           });
+        // RD-3/4 section overlay — non-blocking; empty map if unavailable.
+        void fetchOperationalSections(member, {
+          includeMembers: true,
+          includeRetired: false,
+        })
+          .then((payload) => {
+            setBaySectionByKey(indexBaySectionLookups(payload.sections ?? []));
+          })
+          .catch((err) => {
+            console.error("[FloorTab] sections failed (non-blocking)", err);
+            setBaySectionByKey(new Map());
+          });
 
         // P0 ownership: await authoritative sunday_bay_assignments before unlock.
         if (nextWeek) {
@@ -519,11 +542,16 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
     }
     window.addEventListener(SUNDAY_AUDIT_EVENT, onFloorOpsReload);
     window.addEventListener(STORE_OPS_LOCATIONS_CHANGED_EVENT, onFloorOpsReload);
+    window.addEventListener(STORE_OPS_SECTIONS_CHANGED_EVENT, onFloorOpsReload);
     window.addEventListener(SHIFT_STATUS_EVENT, onFloorOpsReload);
     return () => {
       window.removeEventListener(SUNDAY_AUDIT_EVENT, onFloorOpsReload);
       window.removeEventListener(
         STORE_OPS_LOCATIONS_CHANGED_EVENT,
+        onFloorOpsReload
+      );
+      window.removeEventListener(
+        STORE_OPS_SECTIONS_CHANGED_EVENT,
         onFloorOpsReload
       );
       window.removeEventListener(SHIFT_STATUS_EVENT, onFloorOpsReload);
@@ -569,10 +597,24 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
         assignments,
         roster: shiftTeam,
         barrierRotationIds,
+        includeUnassignedRoster: !simplified && supervisor,
+        baySectionByKey,
       }),
-    [displayRotations, assignments, shiftTeam, barrierRotationIds]
+    [
+      displayRotations,
+      assignments,
+      shiftTeam,
+      barrierRotationIds,
+      simplified,
+      supervisor,
+      baySectionByKey,
+    ]
   );
 
+  const commandSummary = useMemo(
+    () => composeThisWeekCommandSummary(ownershipPlan, week || null),
+    [ownershipPlan, week]
+  );
   const weekProgressLine = composeThisWeekProgressLine(ownershipPlan);
   const pendingVerifyCount = ownershipPlan.pendingVerificationCount;
 
@@ -614,7 +656,7 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
 
   return (
     <>
-      <main className="hub-main">
+      <main className="hub-main hub-floor-command">
         <header className="mb-2" data-testid="floor-command-header">
           <h1 className="text-lg font-bold tracking-tight text-zinc-50">
             {weekTitle}
@@ -624,7 +666,18 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
               Week {week}
             </p>
           ) : null}
+          <p className="mt-1 text-[11px] leading-snug text-zinc-500">
+            Planned work, who owns it, what is evidenced complete, and what still
+            needs attention.
+          </p>
         </header>
+
+        <div className="mb-2">
+          <ThisWeekCommandSummaryCard
+            summary={commandSummary}
+            loading={loading}
+          />
+        </div>
 
         {/* Needs Attention — exceptional state only */}
         {needsAttention ? (
@@ -732,16 +785,9 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
           </section>
         ) : null}
 
-        {/* Quiet week progress — not alarming */}
-        <div className="mb-2" data-testid="floor-week-state">
-          <p
-            className="text-xs text-zinc-400"
-            data-testid="floor-week-progress-line"
-          >
-            {loading && !ownershipPlan.hasPlan
-              ? "Loading this week…"
-              : weekProgressLine}
-          </p>
+        {/* Quiet week progress line retained for contracts / assistive skim */}
+        <div className="mb-2 sr-only" data-testid="floor-week-state">
+          <p data-testid="floor-week-progress-line">{weekProgressLine}</p>
         </div>
 
         {/* Availability context — supporting, not allocation */}

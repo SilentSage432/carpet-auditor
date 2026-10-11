@@ -62,6 +62,7 @@ import {
   composeAisleManualPriority,
   composePhysicalBayManualPriority,
 } from "@/lib/store-ops/physical-bay-priority";
+import { normalizeAisle } from "@/lib/store-ops/aisle";
 import {
   composeMapAisleIndex,
   filterAisleIndexByQuery,
@@ -99,6 +100,10 @@ type Props = {
   emphasizeAttentionMarkers?: boolean;
   /** RD-3 — physicalBayKey → active section lookup (Map sheet only). */
   baySectionByKey?: Map<string, BaySectionLookup>;
+  /** RD-4 — open aisle (and optional bay) from This Week Map link. */
+  focusAisle?: string | null;
+  focusBay?: number | null;
+  focusDepartmentId?: string | null;
 };
 
 type BayPair = MapBayPair;
@@ -237,6 +242,9 @@ export function StoreLocationGrid({
   heatmap = false,
   emphasizeAttentionMarkers = false,
   baySectionByKey,
+  focusAisle = null,
+  focusBay = null,
+  focusDepartmentId = null,
 }: Props) {
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -244,6 +252,7 @@ export function StoreLocationGrid({
   const [showRetired, setShowRetired] = useState(false);
   const [aisleQuery, setAisleQuery] = useState("");
   const [walkBay, setWalkBay] = useState<SheetBay | null>(null);
+  const [appliedFocusKey, setAppliedFocusKey] = useState<string | null>(null);
   const [verifiedOverlay, setVerifiedOverlay] = useState<Set<string>>(
     () => new Set()
   );
@@ -339,6 +348,41 @@ export function StoreLocationGrid({
   useEffect(() => {
     setBayVisible(BAY_CHUNK);
   }, [selectedAisleKey]);
+
+  // RD-4 This Week → Map focus (apply once per intent key).
+  useEffect(() => {
+    const aisleNorm = String(focusAisle ?? "").trim();
+    if (!aisleNorm || aisleIndex.length === 0) return;
+    const focusKey = `${focusDepartmentId ?? ""}|${aisleNorm}|${focusBay ?? ""}`;
+    if (appliedFocusKey === focusKey) return;
+    const match = aisleIndex.find((entry) => {
+      if (normalizeAisle(entry.aisle) !== normalizeAisle(aisleNorm)) return false;
+      if (focusDepartmentId && entry.departmentId !== focusDepartmentId) {
+        return false;
+      }
+      return true;
+    });
+    if (!match) return;
+    setAppliedFocusKey(focusKey);
+    setSelectedAisleKey(match.key);
+    if (focusBay != null && Number.isFinite(focusBay)) {
+      const pair = match.bays.find((b) => b.bay === Number(focusBay));
+      if (pair) {
+        setWalkBay({
+          departmentId: match.departmentId,
+          departmentName: match.departmentName,
+          aisle: match.aisle,
+          pair,
+        });
+      }
+    }
+  }, [
+    aisleIndex,
+    focusAisle,
+    focusBay,
+    focusDepartmentId,
+    appliedFocusKey,
+  ]);
 
   const liveWalkBay = useMemo(() => {
     if (!walkBay) return null;

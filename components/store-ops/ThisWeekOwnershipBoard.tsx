@@ -7,7 +7,15 @@
  */
 
 import { useMemo, useState, startTransition } from "react";
-import { ChevronDown, ChevronUp, Hand, Flag, AlertTriangle } from "lucide-react";
+import Link from "next/link";
+import {
+  ChevronDown,
+  ChevronUp,
+  Hand,
+  Flag,
+  AlertTriangle,
+  MapPinned,
+} from "lucide-react";
 import { BarrierReasonChips } from "@/components/store-ops/BarrierReasonChips";
 import {
   completeRotation,
@@ -22,8 +30,11 @@ import { playErrorTone, playSuccessTone } from "@/lib/ui/feedback";
 import type { CurrentAvailability } from "@/lib/store-ops/current-availability";
 import { formatBayTag, type ExceptionReason } from "@/lib/store-ops/types";
 import type { StoreSpecialist } from "@/lib/types";
+import { buildMapBayFocusHref } from "@/lib/store-ops/map-bay-focus";
+import { formatUnsectionedLabel } from "@/lib/store-ops/operational-sections";
 import {
-  physicalBayLifecycleLabel,
+  assignmentResponsibilityLabel,
+  completionEvidenceLabel,
   type ThisWeekOwnedBay,
   type ThisWeekOwner,
   type ThisWeekOwnershipPlan,
@@ -69,16 +80,23 @@ export function ThisWeekOwnershipBoard({
       className="overflow-hidden rounded-2xl border border-zinc-800/90 bg-zinc-950/70"
       data-testid="floor-this-week-ownership"
     >
-      <header className="border-b border-zinc-800/80 px-3 py-2">
+      <header className="border-b border-zinc-800/80 px-3 py-2.5">
         <p className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-zinc-500">
-          This week
+          Team this week
         </p>
         <p className="text-sm font-semibold text-zinc-100">
-          {plan.ownedPhysicalBayCount} physical bay
-          {plan.ownedPhysicalBayCount === 1 ? "" : "s"} owned
+          {owners.length} teammate{owners.length === 1 ? "" : "s"}
+          {plan.ownedPhysicalBayCount > 0
+            ? ` · ${plan.ownedPhysicalBayCount} bay${
+                plan.ownedPhysicalBayCount === 1 ? "" : "s"
+              } assigned`
+            : ""}
           {plan.unownedPhysicalBayCount > 0
             ? ` · ${plan.unownedPhysicalBayCount} unowned`
             : ""}
+        </p>
+        <p className="mt-0.5 text-[11px] text-zinc-500">
+          Tap a person to inspect assignments. No rankings or scores.
         </p>
       </header>
 
@@ -93,7 +111,7 @@ export function ThisWeekOwnershipBoard({
           <ul className="mt-1 space-y-0.5 font-mono text-[11px] text-amber-100/80">
             {plan.unownedBays.map((bay) => (
               <li key={bay.physicalKey}>
-                {bay.label} · {physicalBayLifecycleLabel(bay.lifecycle)}
+                {bay.label} · {completionEvidenceLabel(bay.lifecycle)}
               </li>
             ))}
           </ul>
@@ -232,8 +250,15 @@ function ThisWeekOwnerRow({
             {owner.roleLabel ? <span>{owner.roleLabel}</span> : null}
             {availability ? <span>{availability.label}</span> : null}
             <span>
-              {owner.bays.length} bay{owner.bays.length === 1 ? "" : "s"}
+              {owner.bays.length === 0
+                ? "No bays assigned"
+                : `${owner.bays.length} bay${owner.bays.length === 1 ? "" : "s"}`}
             </span>
+            {owner.verifiedCount > 0 ? (
+              <span className="text-emerald-400/90">
+                {owner.verifiedCount} verified
+              </span>
+            ) : null}
           </span>
           {attentionParts.length > 0 ? (
             <span className="mt-1 block text-[11px] font-semibold text-amber-200">
@@ -258,16 +283,25 @@ function ThisWeekOwnerRow({
 
       {open ? (
         <div className="space-y-2 border-t border-zinc-800/80 bg-zinc-950/50 px-2 py-2">
-          <ul className="space-y-1.5">
-            {owner.bays.map((bay) => (
-              <ThisWeekBayDetail
-                key={bay.physicalKey}
-                bay={bay}
-                specialist={specialist}
-                onRefresh={onRefresh}
-              />
-            ))}
-          </ul>
+          {owner.bays.length === 0 ? (
+            <p
+              className="rounded-xl border border-zinc-800/80 px-3 py-2.5 text-xs text-zinc-400"
+              data-testid={`floor-owner-empty-${owner.specialistId}`}
+            >
+              No weekly assignments for this teammate yet.
+            </p>
+          ) : (
+            <ul className="space-y-1.5">
+              {owner.bays.map((bay) => (
+                <ThisWeekBayDetail
+                  key={bay.physicalKey}
+                  bay={bay}
+                  specialist={specialist}
+                  onRefresh={onRefresh}
+                />
+              ))}
+            </ul>
+          )}
 
           {allowExtraBay ? (
             <div
@@ -433,12 +467,19 @@ function ThisWeekBayDetail({
     }
   }
 
-  const lifecycleTone =
+  const evidenceTone =
     bay.lifecycle === "awaiting_verification" || bay.lifecycle === "barrier"
       ? "text-amber-200"
       : bay.lifecycle === "verified"
         ? "text-emerald-300"
         : "text-zinc-400";
+  const mapHref = buildMapBayFocusHref({
+    aisle: bay.aisle,
+    bay: bay.bay,
+    departmentId: bay.rotation.department_id,
+  });
+  const sectionName = bay.section?.section_name?.trim();
+  const sectionOwner = bay.section?.primary_owner_name?.trim();
 
   return (
     <li
@@ -450,20 +491,48 @@ function ThisWeekBayDetail({
           <p className="font-mono text-sm font-bold tabular-nums text-zinc-50">
             {bay.label}
           </p>
-          <p className={`mt-0.5 text-[11px] font-semibold ${lifecycleTone}`}>
-            {physicalBayLifecycleLabel(bay.lifecycle)}
+          <p className="mt-0.5 text-[11px] text-zinc-400">
+            {assignmentResponsibilityLabel(bay)}
+          </p>
+          <p className={`mt-0.5 text-[11px] font-semibold ${evidenceTone}`}>
+            {completionEvidenceLabel(bay.lifecycle)}
+          </p>
+          <p
+            className="mt-1 text-[11px] text-zinc-500"
+            data-testid={`floor-bay-section-${bay.physicalKey}`}
+          >
+            Section:{" "}
+            <span className="text-zinc-300">
+              {sectionName || formatUnsectionedLabel()}
+            </span>
+            {sectionOwner ? (
+              <span className="text-zinc-500">
+                {" "}
+                · steward {sectionOwner}
+              </span>
+            ) : null}
           </p>
         </div>
-        {!done ? (
-          <button
-            type="button"
-            aria-expanded={actionsOpen}
-            onClick={() => setActionsOpen((v) => !v)}
-            className="shrink-0 rounded-lg border border-zinc-700 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-zinc-300"
+        <div className="flex shrink-0 flex-col items-end gap-1.5">
+          <Link
+            href={mapHref}
+            className="inline-flex min-h-10 min-w-10 items-center justify-center gap-1 rounded-xl border border-zinc-700 px-2 text-[10px] font-semibold uppercase tracking-wide text-zinc-200"
+            data-testid={`floor-bay-map-${bay.physicalKey}`}
           >
-            Actions
-          </button>
-        ) : null}
+            <MapPinned className="h-3.5 w-3.5" strokeWidth={ICON_STROKE} aria-hidden />
+            Map
+          </Link>
+          {!done ? (
+            <button
+              type="button"
+              aria-expanded={actionsOpen}
+              onClick={() => setActionsOpen((v) => !v)}
+              className="min-h-10 rounded-xl border border-zinc-700 px-2.5 text-[10px] font-semibold uppercase tracking-wide text-zinc-300"
+            >
+              Actions
+            </button>
+          ) : null}
+        </div>
       </div>
 
       {actionsOpen && !done ? (

@@ -1,9 +1,12 @@
 /**
- * UX-REDUCE-002 — Floor "This Week" ownership composition.
+ * UX-REDUCE-002 + RD-4 — Floor "This Week" ownership / command composition.
  *
  * Pure presentation composer. Authoritative ownership remains
  * sunday_bay_assignments + weekly_rotations. Physical-bay identity is
  * BAY-UNIT-002. Does not persist, invent owners, or change engine semantics.
+ *
+ * RD-4: summary separates planned / assigned / completion evidence / verified.
+ * Assignment ≠ proof of work. Section stewardship ≠ weekly ownership.
  */
 
 import { normalizeAisle } from "./aisle";
@@ -17,12 +20,22 @@ import {
 import type { SundayAssignmentMap } from "./sunday-audit";
 import { formatBayTag, type WeeklyRotationWithLocation } from "./types";
 import { BASE_WEEKLY_BAY_QUOTA } from "./weekly-rotations";
+import type { BaySectionLookup } from "./operational-sections";
 import {
   rosterFloorBadgeLabel,
   type StoreSpecialist,
 } from "@/lib/types";
 
 export { BASE_WEEKLY_BAY_QUOTA };
+
+/**
+ * Blueprint shared team model: four people × three bays = 12.
+ * Engine stages `eligibleAssociateCount × BASE_WEEKLY_BAY_QUOTA` (not a hard
+ * constant). Presentation cites the shared model without rewriting dispatch.
+ */
+export const SHARED_TEAM_CAPACITY_SLOTS = 4;
+export const SHARED_TEAM_WEEKLY_CAPACITY =
+  SHARED_TEAM_CAPACITY_SLOTS * BASE_WEEKLY_BAY_QUOTA;
 
 export type PhysicalBayLifecycle =
   | "open"
@@ -39,6 +52,10 @@ export type ThisWeekOwnedBay = {
   rotation: WeeklyRotationWithLocation;
   lifecycle: PhysicalBayLifecycle;
   hasBarrier: boolean;
+  /** True when sunday_bay_assignments names an owner for this rotation. */
+  isAssigned: boolean;
+  /** RD-3 stewardship overlay — independent of weekly assignee. */
+  section?: BaySectionLookup | null;
 };
 
 export type ThisWeekOwner = {
@@ -50,8 +67,11 @@ export type ThisWeekOwner = {
   barrierCount: number;
   openCount: number;
   verifiedCount: number;
+  reportedCompleteCount: number;
   /** True when this owner already holds base quota and plan ownership is complete. */
   canAddAnotherBay: boolean;
+  /** Roster member present for coordination with zero assigned bays this week. */
+  isRosterPlaceholder?: boolean;
 };
 
 export type ThisWeekOwnershipPlan = {
@@ -81,6 +101,40 @@ export type ComposeThisWeekOwnershipInput = {
   roster?: StoreSpecialist[];
   /** Rotation ids with an open barrier/exception this week. */
   barrierRotationIds?: Iterable<string>;
+  /**
+   * When true (RD-4 default for supervisor board), include active associate
+   * roster rows even if they own zero bays — coordination, not scoring.
+   */
+  includeUnassignedRoster?: boolean;
+  /** RD-3 physicalBayKey → section lookup (optional). */
+  baySectionByKey?: Map<string, BaySectionLookup>;
+};
+
+/** Evidence-first weekly command board summary (RD-4). */
+export type ThisWeekCommandSummary = {
+  weekLabel: string | null;
+  /** Staged physical bays in the active plan (planned work). */
+  plannedBayCount: number;
+  /** Physical bays with a Sunday owner (assigned — not completion). */
+  assignedBayCount: number;
+  /** Staged but still lacking an owner. */
+  unassignedBayCount: number;
+  /** Associate-reported complete (includes awaiting verification). Not verified. */
+  reportedCompleteCount: number;
+  /** Operator-verified complete. */
+  verifiedCount: number;
+  /** Still open / barrier — work remaining. */
+  remainingBayCount: number;
+  awaitingVerificationCount: number;
+  barrierBayCount: number;
+  /** Blueprint shared pool citation (4×3). Engine may stage eligible×3. */
+  sharedCapacityBays: number;
+  sharedCapacitySlots: number;
+  baysPerPerson: number;
+  ownershipComplete: boolean;
+  hasPlan: boolean;
+  /** One-line evidence summary for chrome. */
+  headline: string;
 };
 
 function compareAisleBay(a: ThisWeekOwnedBay, b: ThisWeekOwnedBay): number {
@@ -155,6 +209,10 @@ export function composeThisWeekOwnership(
         : `rotation:${rotation.id}`;
 
     const hasBarrier = barrierSet.has(String(rotation.id));
+    const assigned = Boolean(
+      String(input.assignments[rotation.id]?.specialist_id ?? "").trim()
+    );
+    const section = input.baySectionByKey?.get(key) ?? null;
     const next: ThisWeekOwnedBay = {
       physicalKey: key,
       aisle,
@@ -163,6 +221,8 @@ export function composeThisWeekOwnership(
       rotation,
       lifecycle: lifecycleFor(rotation, hasBarrier),
       hasBarrier,
+      isAssigned: assigned,
+      section,
     };
 
     const existing = byPhysical.get(key);
@@ -220,11 +280,13 @@ export function composeThisWeekOwnership(
         barrierCount: 0,
         openCount: 0,
         verifiedCount: 0,
+        reportedCompleteCount: 0,
         canAddAnotherBay: false,
       };
       ownersById.set(specialistId, owner);
     }
     owner.bays.push(bay);
+    owner.isRosterPlaceholder = false;
     if (bay.lifecycle === "awaiting_verification") {
       owner.awaitingVerificationCount += 1;
     }
@@ -236,6 +298,36 @@ export function composeThisWeekOwnership(
     }
     if (bay.lifecycle === "verified") {
       owner.verifiedCount += 1;
+    }
+    if (
+      bay.lifecycle === "reported" ||
+      bay.lifecycle === "awaiting_verification"
+    ) {
+      owner.reportedCompleteCount += 1;
+    }
+  }
+
+  if (input.includeUnassignedRoster) {
+    for (const member of input.roster ?? []) {
+      if (!member.is_active) continue;
+      if (member.role === "MasterAdmin") continue;
+      // Coordination view: associates + specialists (and supervisors who own work).
+      const id = String(member.id ?? "").trim();
+      if (!id || ownersById.has(id)) continue;
+      if (member.role === "Supervisor") continue;
+      ownersById.set(id, {
+        specialistId: id,
+        specialistName: member.name?.trim() || "Team member",
+        roleLabel: roleLabelFor(id, rosterById),
+        bays: [],
+        awaitingVerificationCount: 0,
+        barrierCount: 0,
+        openCount: 0,
+        verifiedCount: 0,
+        reportedCompleteCount: 0,
+        canAddAnotherBay: false,
+        isRosterPlaceholder: true,
+      });
     }
   }
 
@@ -300,9 +392,10 @@ export function physicalBayLifecycleLabel(
 
 /** Compact week progress for Floor — no staging/target machinery language. */
 export function composeThisWeekProgressLine(plan: ThisWeekOwnershipPlan): string {
-  if (!plan.hasPlan) return "No bays assigned this week";
+  if (!plan.hasPlan) return "No bays planned this week";
   const parts = [
-    `${plan.physicalBayCount} assigned`,
+    `${plan.physicalBayCount} planned`,
+    `${plan.ownedPhysicalBayCount} assigned`,
     `${plan.verifiedCount} verified`,
   ];
   if (plan.pendingVerificationCount > 0) {
@@ -310,7 +403,61 @@ export function composeThisWeekProgressLine(plan: ThisWeekOwnershipPlan): string
       `${plan.pendingVerificationCount} awaiting verification`
     );
   } else if (plan.openCount > 0) {
-    parts.push(`${plan.openCount} open`);
+    parts.push(`${plan.openCount} remaining`);
   }
   return parts.join(" · ");
+}
+
+/**
+ * RD-4 command summary — answers planned / assigned / completed / remaining
+ * from existing ownership evidence. Does not invent capacity or completions.
+ */
+export function composeThisWeekCommandSummary(
+  plan: ThisWeekOwnershipPlan,
+  weekLabel: string | null = null
+): ThisWeekCommandSummary {
+  const plannedBayCount = plan.physicalBayCount;
+  const assignedBayCount = plan.ownedPhysicalBayCount;
+  const unassignedBayCount = plan.unownedPhysicalBayCount;
+  const remainingBayCount = plan.openCount;
+  const headline = composeThisWeekProgressLine(plan);
+
+  return {
+    weekLabel,
+    plannedBayCount,
+    assignedBayCount,
+    unassignedBayCount,
+    reportedCompleteCount: plan.reportedCompleteCount,
+    verifiedCount: plan.verifiedCount,
+    remainingBayCount,
+    awaitingVerificationCount: plan.pendingVerificationCount,
+    barrierBayCount: plan.barrierBayCount,
+    sharedCapacityBays: SHARED_TEAM_WEEKLY_CAPACITY,
+    sharedCapacitySlots: SHARED_TEAM_CAPACITY_SLOTS,
+    baysPerPerson: BASE_WEEKLY_BAY_QUOTA,
+    ownershipComplete: plan.ownershipComplete,
+    hasPlan: plan.hasPlan,
+    headline,
+  };
+}
+
+/** Assignment responsibility — never implies work occurred. */
+export function assignmentResponsibilityLabel(bay: ThisWeekOwnedBay): string {
+  return bay.isAssigned ? "Assigned this week" : "Planned — unowned";
+}
+
+/** Completion / verification evidence language (separate from assignment). */
+export function completionEvidenceLabel(lifecycle: PhysicalBayLifecycle): string {
+  switch (lifecycle) {
+    case "verified":
+      return "Verified complete";
+    case "awaiting_verification":
+      return "Reported — awaiting verification";
+    case "reported":
+      return "Reported complete";
+    case "barrier":
+      return "Barrier — coverage still owed";
+    default:
+      return "No completion evidence";
+  }
 }

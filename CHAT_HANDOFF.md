@@ -1,6 +1,8 @@
 # DeptSync Hub — Chat Handoff
 
 ## Latest (2026-10-11)
+- **DEPTSYNC-RD-4-RELEASE — THIS WEEK COMMAND BOARD PRODUCTION REVIEW.** Shipping local RD-4 to https://deptsync-hub.vercel.app for phone review. Canonical: [`docs/product/DEPTSYNC_RD_4_THIS_WEEK_COMMAND_BOARD.md`](docs/product/DEPTSYNC_RD_4_THIS_WEEK_COMMAND_BOARD.md). Do not begin RD-5.
+- **DEPTSYNC-RD-4 — THIS WEEK COMMAND BOARD — COMPLETE (local; no commit/push/deploy).** Floor This Week is a mobile command board: planned/assigned/verified/remaining summary; team board; assignment≠evidence; sections + Map focus. Engine/capacity untouched (`eligible×3`; UI cites shared 4×3=12). Tests 1407; typecheck/build pass. Canonical: [`docs/product/DEPTSYNC_RD_4_THIS_WEEK_COMMAND_BOARD.md`](docs/product/DEPTSYNC_RD_4_THIS_WEEK_COMMAND_BOARD.md). **STOP for phone review.** Do not begin RD-5.
 - **DEPTSYNC-RD-3-RELEASE — OPERATIONAL SECTIONS PRODUCTION — COMPLETE.** Migration applied on `fmeinlwhixngednabhgy` after fresh dump; RLS/trigger/unique index verified; app shipped to https://deptsync-hub.vercel.app. Canonical: [`docs/product/DEPTSYNC_RD_3_RELEASE.md`](docs/product/DEPTSYNC_RD_3_RELEASE.md). Do not begin RD-4 automatically.
 
 ## Latest (2026-10-10)
