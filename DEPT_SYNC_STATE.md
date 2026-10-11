@@ -6,11 +6,12 @@
 
 ---
 
-## REDESIGN / RD-1 — Floor Command shell (2026-10-10)
+## REDESIGN / RD-1 + RD-2 — Floor Command (2026-10-10)
 
 > Blueprint: [`docs/product/DEPTSYNC_REDESIGN_001_COMPLETE_PRODUCT_EXPERIENCE_BLUEPRINT.md`](docs/product/DEPTSYNC_REDESIGN_001_COMPLETE_PRODUCT_EXPERIENCE_BLUEPRINT.md).  
-> **RD-1 implemented locally:** primary chrome Overview · Map · This Week · Walkthroughs · More; landing `/overview`; Map without department-pin nav; Team under More → `/roster`; Walkthroughs placeholder. [`docs/product/DEPTSYNC_RD_1_FLOOR_COMMAND_APPLICATION_SHELL.md`](docs/product/DEPTSYNC_RD_1_FLOOR_COMMAND_APPLICATION_SHELL.md).  
-> **Not changed:** schema, auth model, rotation engine, topology rows, walkthrough storage, production. Deploy/commit not authorized.
+> **RD-1:** primary chrome Overview · Map · This Week · Walkthroughs · More; landing `/overview`; Team under More → `/roster`. [`docs/product/DEPTSYNC_RD_1_FLOOR_COMMAND_APPLICATION_SHELL.md`](docs/product/DEPTSYNC_RD_1_FLOOR_COMMAND_APPLICATION_SHELL.md).  
+> **RD-2 (local):** Map aisle index → bay list → bay detail; Show retired; Bulk Clean-Up soft-retire default. [`docs/product/DEPTSYNC_RD_2_FLOOR_COMMAND_MAP.md`](docs/product/DEPTSYNC_RD_2_FLOOR_COMMAND_MAP.md).  
+> **Not changed by RD-2:** schema, auth model, rotation engine, production topology rows, walkthrough storage. Deploy/commit for RD-2 not authorized.
 
 ## ALIGN-002 — Reality vs approved target (2026-10-10)
 

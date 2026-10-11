@@ -14,8 +14,9 @@
 
 ## Next (REDESIGN — complete product destination)
 - [x] **DEPTSYNC-REDESIGN-001** — Complete product & experience blueprint (**COMPLETE** — design only; [`DEPTSYNC_REDESIGN_001_COMPLETE_PRODUCT_EXPERIENCE_BLUEPRINT.md`](docs/product/DEPTSYNC_REDESIGN_001_COMPLETE_PRODUCT_EXPERIENCE_BLUEPRINT.md))
-- [x] **RD-1 IA Shell** — Floor Command application shell (**COMPLETE** engineering; deploy/commit **not** authorized) — [`DEPTSYNC_RD_1_FLOOR_COMMAND_APPLICATION_SHELL.md`](docs/product/DEPTSYNC_RD_1_FLOOR_COMMAND_APPLICATION_SHELL.md)
-- [ ] **RD-2…RD-10** — Map aisle-index polish → topology reconcile → sections → walkthroughs → engine preference → capacity → team consolidate → auth simplify → visual polish (**NOT STARTED** — see blueprint §L)
+- [x] **RD-1 IA Shell** — Floor Command application shell (**COMPLETE** — phone review / production release path used for RD-1) — [`DEPTSYNC_RD_1_FLOOR_COMMAND_APPLICATION_SHELL.md`](docs/product/DEPTSYNC_RD_1_FLOOR_COMMAND_APPLICATION_SHELL.md)
+- [x] **RD-2 Map** — Floor Command mobile Map (**COMPLETE** engineering; deploy/commit **not** authorized) — aisle → bay → detail; soft-retire Clean-Up default — [`DEPTSYNC_RD_2_FLOOR_COMMAND_MAP.md`](docs/product/DEPTSYNC_RD_2_FLOOR_COMMAND_MAP.md)
+- [ ] **RD-3…RD-10** — Topology reconcile → sections → walkthroughs → engine preference → capacity → team consolidate → auth simplify → visual polish (**NOT STARTED** — see blueprint §L)
 
 ## Next (ALIGN — constitutional direction)
 - [x] **DEPTSYNC-ALIGN-001** — Constitutional alignment & redesign blueprint (**COMPLETE** — planning only; operator-approved)

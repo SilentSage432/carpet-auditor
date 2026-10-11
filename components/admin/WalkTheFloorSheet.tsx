@@ -388,6 +388,20 @@ export function WalkTheFloorSheet({
           </section>
         ) : null}
 
+        <section
+          className="mb-4 rounded-xl border border-dashed border-zinc-700/60 bg-zinc-950/30 px-3 py-2.5"
+          data-testid="walk-sheet-section-slot"
+          aria-label="Operational section"
+        >
+          <p className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-zinc-500">
+            Operational section
+          </p>
+          <p className="mt-1 text-xs text-zinc-500">
+            Section ownership and walkthrough place links will appear here —
+            not stored in this release.
+          </p>
+        </section>
+
         {canMutateRotationPriority && faces.length > 0 ? (
           <section
             className="mb-4 rounded-xl border border-zinc-700/50 bg-zinc-950/40 px-3 py-2.5"

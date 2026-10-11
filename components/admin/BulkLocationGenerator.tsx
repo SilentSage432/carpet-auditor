@@ -29,10 +29,13 @@ import {
   bulkGenerateLocations,
   deleteStoreLocations,
   fetchStoreLocationsDetailed,
+  patchStoreLocation,
 } from "@/lib/store-ops/client";
 import type { StoreSpecialist } from "@/lib/types";
 
 type GeneratorTab = "manual" | "cleanup";
+/** RD-2: soft-retire is the default Clean-Up action; hard delete is advanced. */
+type CleanupAction = "retire" | "delete";
 
 type Props = {
   specialist: StoreSpecialist;
@@ -85,6 +88,7 @@ export function BulkLocationGenerator({
   const [mapLocations, setMapLocations] = useState<StoreLocation[]>([]);
   const [cleanupEntireAisle, setCleanupEntireAisle] = useState(false);
   const [cleanupConfirm, setCleanupConfirm] = useState(false);
+  const [cleanupAction, setCleanupAction] = useState<CleanupAction>("retire");
   const [csvText, setCsvText] = useState("");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -324,20 +328,42 @@ export function BulkLocationGenerator({
     setMessage(null);
     try {
       const physicalBefore = cleanupPhysicalBayCount;
-      const result = await deleteStoreLocations(specialist, cleanupIds);
-      setMessage(
-        `Deleted ${physicalBefore} physical bay${
-          physicalBefore === 1 ? "" : "s"
-        } (${result.deleted} surface row${
-          result.deleted === 1 ? "" : "s"
-        }). Weekly rotations for those bays were also removed.`
-      );
+      if (cleanupAction === "retire") {
+        let retired = 0;
+        for (const id of cleanupIds) {
+          await patchStoreLocation(specialist, id, { is_active: false });
+          retired += 1;
+        }
+        setMessage(
+          `Retired ${physicalBefore} physical bay${
+            physicalBefore === 1 ? "" : "s"
+          } (${retired} surface row${
+            retired === 1 ? "" : "s"
+          }). Rows stay in history — use Show retired on Map to review.`
+        );
+      } else {
+        const result = await deleteStoreLocations(specialist, cleanupIds);
+        setMessage(
+          `Permanently deleted ${physicalBefore} physical bay${
+            physicalBefore === 1 ? "" : "s"
+          } (${result.deleted} surface row${
+            result.deleted === 1 ? "" : "s"
+          }). Weekly rotations for those bays were also removed.`
+        );
+      }
       setCleanupConfirm(false);
       const refreshed = await fetchStoreLocationsDetailed(specialist);
       setMapLocations(refreshed.items);
       onGenerated({ source: "cleanup" });
     } catch (err) {
-      setError(bulkAuthFriendlyError(err, "Could not delete bays"));
+      setError(
+        bulkAuthFriendlyError(
+          err,
+          cleanupAction === "retire"
+            ? "Could not retire bays"
+            : "Could not delete bays"
+        )
+      );
     } finally {
       setBusy(false);
     }
@@ -566,9 +592,62 @@ export function BulkLocationGenerator({
       {tab === "cleanup" ? (
         <div className="mt-4 space-y-4">
           <p className="text-sm text-zinc-400">
-            Prune mapped physical bays by aisle or odd/even bay range. Deletion
-            is permanent and also removes weekly rotations for those bays.
+            Correct mapped physical bays by aisle or odd/even bay range.
+            Retire (pause) is the default — history and rotation identity stay
+            intact. Permanent delete remains available for true mistakes with
+            no history pressure.
           </p>
+
+          <fieldset data-testid="bulk-cleanup-action">
+            <legend className="mb-2 text-sm text-zinc-300">Clean-Up action</legend>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {(
+                [
+                  {
+                    value: "retire" as const,
+                    label: "Retire (pause)",
+                    hint: "Sets inactive — preferred",
+                  },
+                  {
+                    value: "delete" as const,
+                    label: "Permanently delete",
+                    hint: "Removes rows + week rotations",
+                  },
+                ] as const
+              ).map((option) => {
+                const selected = cleanupAction === option.value;
+                return (
+                  <label
+                    key={option.value}
+                    className={`flex min-h-14 cursor-pointer flex-col justify-center gap-0.5 rounded-xl border px-3 py-2 text-sm transition ${
+                      selected
+                        ? option.value === "delete"
+                          ? "border-rose-500/50 bg-rose-950/40 text-rose-100 ring-1 ring-rose-500/30"
+                          : "border-amber-500/45 bg-amber-950/30 text-amber-100 ring-1 ring-amber-500/25"
+                        : "border-zinc-800/80 bg-zinc-950/50 text-zinc-100"
+                    }`}
+                  >
+                    <span className="flex items-center gap-2 font-semibold">
+                      <input
+                        type="radio"
+                        name="bulk-cleanup-action"
+                        checked={selected}
+                        onChange={() => {
+                          setCleanupAction(option.value);
+                          setCleanupConfirm(false);
+                        }}
+                        className="h-5 w-5 accent-amber-500"
+                      />
+                      {option.label}
+                    </span>
+                    <span className="pl-7 font-mono text-[10px] text-zinc-500">
+                      {option.hint}
+                    </span>
+                  </label>
+                );
+              })}
+            </div>
+          </fieldset>
 
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="block text-sm">
@@ -709,21 +788,36 @@ export function BulkLocationGenerator({
             type="button"
             disabled={busy || cleanupIds.length === 0}
             onClick={() => void handleCleanup()}
+            data-testid="bulk-cleanup-submit"
             className={`flex min-h-14 w-full items-center justify-center rounded-xl border px-4 text-base font-bold disabled:opacity-50 ${
-              cleanupConfirm
-                ? "border-rose-400 bg-rose-600 text-white"
-                : "border-rose-500/45 bg-rose-950/40 text-rose-100"
+              cleanupAction === "delete"
+                ? cleanupConfirm
+                  ? "border-rose-400 bg-rose-600 text-white"
+                  : "border-rose-500/45 bg-rose-950/40 text-rose-100"
+                : cleanupConfirm
+                  ? "border-amber-400 bg-amber-600 text-white"
+                  : "border-amber-500/45 bg-amber-950/40 text-amber-100"
             }`}
           >
             {busy
-              ? "Deleting…"
+              ? cleanupAction === "retire"
+                ? "Retiring…"
+                : "Deleting…"
               : cleanupConfirm
-                ? `Confirm delete ${cleanupPhysicalBayCount} physical bay${
-                    cleanupPhysicalBayCount === 1 ? "" : "s"
-                  }`
-                : `Delete ${cleanupPhysicalBayCount} matching physical bay${
-                    cleanupPhysicalBayCount === 1 ? "" : "s"
-                  }`}
+                ? cleanupAction === "retire"
+                  ? `Confirm retire ${cleanupPhysicalBayCount} physical bay${
+                      cleanupPhysicalBayCount === 1 ? "" : "s"
+                    }`
+                  : `Confirm delete ${cleanupPhysicalBayCount} physical bay${
+                      cleanupPhysicalBayCount === 1 ? "" : "s"
+                    }`
+                : cleanupAction === "retire"
+                  ? `Retire ${cleanupPhysicalBayCount} matching physical bay${
+                      cleanupPhysicalBayCount === 1 ? "" : "s"
+                    }`
+                  : `Delete ${cleanupPhysicalBayCount} matching physical bay${
+                      cleanupPhysicalBayCount === 1 ? "" : "s"
+                    }`}
           </button>
           {cleanupConfirm ? (
             <button

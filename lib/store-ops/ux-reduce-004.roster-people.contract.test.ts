@@ -144,7 +144,9 @@ describe("UX-REDUCE-004 does not reopen Floor or Map", () => {
   it("Map remains physical-bay-first", () => {
     const map = readRepo("components/hub/tabs/MapTab.tsx");
     const grid = readRepo("components/admin/StoreLocationGrid.tsx");
-    expect(map).toMatch(/Department coverage/);
+    expect(map).toMatch(/Bay locator" : "Map"/);
+    expect(grid).toMatch(/Department coverage/);
+    expect(grid).toMatch(/map-aisle-navigator/);
     expect(grid).toMatch(/physicalBayCount/);
     expect(grid).not.toMatch(/tagCount/);
   });

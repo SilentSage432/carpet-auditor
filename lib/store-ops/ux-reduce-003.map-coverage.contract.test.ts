@@ -35,9 +35,9 @@ function loc(
 }
 
 describe("UX-REDUCE-003 Map department coverage contracts", () => {
-  it("MapTab is department coverage first; velocity is advanced disclosure", () => {
+  it("MapTab is coverage geography first; velocity is advanced disclosure", () => {
     const map = readSrc("components/hub/tabs/MapTab.tsx");
-    expect(map).toMatch(/Department coverage/);
+    expect(map).toMatch(/Bay locator" : "Map"/);
     expect(map).toMatch(/map-advanced-service-cadence/);
     expect(map).toMatch(/Service cadence/);
     expect(map).not.toMatch(/Velocity Heatmap/);
@@ -49,7 +49,8 @@ describe("UX-REDUCE-003 Map department coverage contracts", () => {
   it("StoreLocationGrid speaks physical bays, not tags", () => {
     const grid = readSrc("components/admin/StoreLocationGrid.tsx");
     expect(grid).toMatch(/physicalBayCount/);
-    expect(grid).toMatch(/formatPhysicalBayCount/);
+    expect(grid).toMatch(/formatMapCoverageSummaryLine/);
+    expect(grid).toMatch(/formatAisleBayCount/);
     expect(grid).toMatch(/Department coverage/);
     expect(grid).not.toMatch(/tagCount/);
     expect(grid).not.toMatch(/· \{dept\.tagCount\}/);

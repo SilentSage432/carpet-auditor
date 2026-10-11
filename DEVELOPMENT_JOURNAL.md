@@ -1,5 +1,13 @@
 # DeptSync Hub — Development Journal
 
+## 2026-10-10 — DEPTSYNC-RD-2 Floor Command Map
+
+**Scoped implementation.** No schema, auth change, production SQL, engine rewrite, sections storage, deploy, commit, or push.
+
+Map is aisle-first: index → aisle bay list → WalkTheFloorSheet. Active-only by default with Show retired. MapTab loads full location geography. Bulk Clean-Up defaults to soft-retire (`is_active=false`); hard delete remains advanced. Bay sheet reserves Operational Section slot without storage. Typecheck pass; 1374 tests pass; build pass.
+
+Canonical: [`docs/product/DEPTSYNC_RD_2_FLOOR_COMMAND_MAP.md`](docs/product/DEPTSYNC_RD_2_FLOOR_COMMAND_MAP.md). STOP for operator phone review before commit/deploy.
+
 ## 2026-10-10 — DEPTSYNC-RD-1 Floor Command application shell
 
 **Scoped implementation.** No schema, auth change, production SQL, engine rewrite, sections storage, walkthrough persistence, deploy, commit, or push.

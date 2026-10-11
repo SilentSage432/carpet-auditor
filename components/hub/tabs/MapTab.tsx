@@ -183,15 +183,17 @@ export function MapTab({ specialist }: WorkflowTabProps) {
           }
         );
 
-        const deptId = workingDepartmentId(member, depts.items);
-        const workingAll = !deptId;
+        // RD-2: Map geography loads all locations (aisle-first). Attention may
+        // still scope to the working department when one is pinned.
+        const attentionDeptId = workingDepartmentId(member, depts.items);
+        const workingAll = !attentionDeptId;
 
         attentionAbortRef.current?.abort();
         const abort = new AbortController();
         attentionAbortRef.current = abort;
         const token = nextAttentionRequestToken(
           attentionGenRef.current,
-          workingAll || !canReadAttention ? null : deptId
+          workingAll || !canReadAttention ? null : attentionDeptId
         );
         attentionGenRef.current = token.generation;
         clearAttentionPaint();
@@ -205,16 +207,18 @@ export function MapTab({ specialist }: WorkflowTabProps) {
         }
 
         const attentionPromise =
-          canReadAttention && deptId
-            ? fetchLocationAttention(member, deptId, { signal: abort.signal })
+          canReadAttention && attentionDeptId
+            ? fetchLocationAttention(member, attentionDeptId, {
+                signal: abort.signal,
+              })
                 .then((payload) => ({ ok: true as const, payload }))
                 .catch((err: unknown) => ({ ok: false as const, err }))
             : Promise.resolve(null);
 
         const [locs, weekData, exceptions, seasonalResult, attentionResult] =
           await Promise.all([
-            fetchStoreLocationsDetailed(member, deptId),
-            fetchThisWeekRotations(member, deptId),
+            fetchStoreLocationsDetailed(member),
+            fetchThisWeekRotations(member),
             fetchExceptionSummary(member),
             canReadSeasonal
               ? fetchOperationalContextLocationRelevanceResolve(member).catch(
@@ -272,7 +276,7 @@ export function MapTab({ specialist }: WorkflowTabProps) {
           isAttentionResponseCurrent(
             token,
             attentionGenRef.current,
-            workingAll || !canReadAttention ? null : deptId
+            workingAll || !canReadAttention ? null : attentionDeptId
           )
         ) {
           if (!canReadAttention) {
@@ -347,10 +351,9 @@ export function MapTab({ specialist }: WorkflowTabProps) {
         setDepartments((prev) =>
           fingerprintsEqual(prev, cachedDepts.items) ? prev : cachedDepts.items
         );
-        const deptId = workingDepartmentId(specialist, cachedDepts.items);
         const [cachedLocs, cachedWeek] = await Promise.all([
-          peekCachedStoreLocations(specialist, deptId),
-          peekCachedRotations(specialist, deptId),
+          peekCachedStoreLocations(specialist),
+          peekCachedRotations(specialist),
         ]);
         if (cancelled) return;
         if (cachedLocs?.items.length) {
@@ -399,17 +402,17 @@ export function MapTab({ specialist }: WorkflowTabProps) {
 
   return (
     <>
-      <main className="hub-main">
+      <main className="hub-main hub-floor-command">
         <header className="mb-3">
           <h1 className="text-base font-bold tracking-tight text-white">
-            {locatorOnly ? "Bay locator" : "Department coverage"}
+            {locatorOnly ? "Bay locator" : "Map"}
           </h1>
           <p className="mt-1 font-mono text-[11px] text-zinc-400">
             {locatorOnly
               ? formatMapCalendarWeekChrome(currentWeek, "locator")
               : master
                 ? formatMapCalendarWeekChrome(currentWeek, "master")
-                : `This week's coverage · ${currentWeek}`}
+                : `Aisle → bay · ${currentWeek}`}
           </p>
         </header>
 

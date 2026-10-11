@@ -65,6 +65,16 @@ describe("BULK-SETUP-002 normal Bulk UI", () => {
     expect(generator).toMatch(/Clean-Up/);
     expect(generator).toMatch(/type GeneratorTab = "manual" \| "cleanup"/);
   });
+
+  it("Clean-Up defaults to soft-retire before hard delete", () => {
+    expect(generator).toMatch(/type CleanupAction = "retire" \| "delete"/);
+    expect(generator).toMatch(/useState<CleanupAction>\("retire"\)/);
+    expect(generator).toMatch(/Retire \(pause\)/);
+    expect(generator).toMatch(/Permanently delete/);
+    expect(generator).toMatch(/patchStoreLocation/);
+    expect(generator).toMatch(/is_active: false/);
+    expect(generator).toMatch(/deleteStoreLocations/);
+  });
 });
 
 describe("BULK-SETUP-002 internal BOTH creation", () => {
