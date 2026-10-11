@@ -37,6 +37,14 @@ import {
   type ShiftRosterMember,
 } from "@/lib/store-ops/weekly-rotations";
 import type { Department } from "@/lib/store-ops/types";
+import {
+  filterPlanItemsToCapacity,
+  loadStoreWeekCapacity,
+  remainingCapMapForEligible,
+  resolveDepartmentStageDrawCount,
+  writeSundayAssignmentsWithCapacity,
+  type StoreWeekCapacitySnapshot,
+} from "@/lib/store-ops/shared-week-capacity";
 
 export { BASE_WEEKLY_BAY_QUOTA };
 
@@ -193,7 +201,20 @@ async function resolveProfileId(
   return data?.id ? String(data.id) : null;
 }
 
-/** Service-role writer — mirrors executeSundayAssignLive without browser client. */
+export type ApplySundayAssignmentAdminOptions = {
+  /** When omitted, capacity is loaded from store-week evidence. */
+  shared_target?: number;
+  quota_per_person?: number;
+  allow_over_base?: boolean;
+  allow_over_shared?: boolean;
+  /** Active / participating department codes for eligibility union. */
+  participating_department_codes?: readonly string[];
+};
+
+/**
+ * Service-role writer — CAPACITY-GUARD-002 atomic RPC boundary.
+ * Never falls back to unguarded upsert when the RPC is missing.
+ */
 export async function applySundayAssignmentPlanAdmin(
   supabase: SupabaseClient,
   week: string,
@@ -203,14 +224,14 @@ export async function applySundayAssignmentPlanAdmin(
     specialist_name: string;
   }>,
   storeNumber: string,
-  departmentCode: string
+  departmentCode: string,
+  options: ApplySundayAssignmentAdminOptions = {}
 ): Promise<number> {
   const store = String(storeNumber ?? "").trim();
   const department =
     String(departmentCode ?? "").trim().toLowerCase() || "flooring";
   if (!store || !week || items.length === 0) return 0;
 
-  const weekStarting = isoWeekToMondayDate(week);
   const uniqueIds = [...new Set(items.map((row) => row.specialist_id))];
   const profileByRoster = new Map<string, string | null>();
   await Promise.all(
@@ -219,41 +240,52 @@ export async function applySundayAssignmentPlanAdmin(
     })
   );
 
-  let written = 0;
-  for (const row of items) {
-    const bayId = String(row.rotationId ?? "").trim();
-    const specialistId = String(row.specialist_id ?? "").trim();
-    if (!bayId || !specialistId) continue;
-    const payload = {
+  let sharedTarget = options.shared_target;
+  if (sharedTarget == null) {
+    const codes =
+      options.participating_department_codes &&
+      options.participating_department_codes.length > 0
+        ? options.participating_department_codes
+        : [department];
+    const capacity = await loadStoreWeekCapacity(supabase, {
       store_number: store,
-      department,
-      week_starting: weekStarting,
-      bay_id: bayId,
-      assigned_specialist_id: profileByRoster.get(specialistId) ?? null,
-      roster_specialist_id: specialistId,
-      specialist_name: String(row.specialist_name ?? ""),
-      status: "assigned",
-      is_carried_over: false,
-      updated_at: new Date().toISOString(),
-    };
-    const { error } = await supabase.from("sunday_bay_assignments").upsert(
-      payload,
-      { onConflict: "store_number,department,week_starting,bay_id" }
-    );
-    if (error) {
-      const fallback = { ...payload };
-      delete (fallback as { is_carried_over?: boolean }).is_carried_over;
-      const retry = await supabase.from("sunday_bay_assignments").upsert(
-        fallback,
-        { onConflict: "store_number,department,week_starting,bay_id" }
-      );
-      if (retry.error) {
-        throw new Error(retry.error.message || "Could not save assignment");
-      }
-    }
-    written += 1;
+      week_label: week,
+      department_codes: codes,
+      quota_per_person: options.quota_per_person,
+    });
+    sharedTarget = capacity.shared_target;
   }
-  return written;
+
+  const writeItems = items
+    .map((row) => {
+      const bayId = String(row.rotationId ?? "").trim();
+      const specialistId = String(row.specialist_id ?? "").trim();
+      if (!bayId || !specialistId) return null;
+      return {
+        department,
+        bay_id: bayId,
+        roster_specialist_id: specialistId,
+        specialist_name: String(row.specialist_name ?? ""),
+        assigned_specialist_id: profileByRoster.get(specialistId) ?? null,
+        status: "assigned",
+        is_carried_over: false,
+      };
+    })
+    .filter((row): row is NonNullable<typeof row> => row != null);
+
+  const result = await writeSundayAssignmentsWithCapacity(supabase, {
+    store_number: store,
+    week_label: week,
+    shared_target: sharedTarget,
+    quota_per_person: options.quota_per_person ?? BASE_WEEKLY_BAY_QUOTA,
+    items: writeItems,
+    allow_over_base: options.allow_over_base === true,
+    allow_over_shared: options.allow_over_shared === true,
+  });
+  if (!result.ok) {
+    throw new Error(result.error || "Capacity-gated assignment write failed");
+  }
+  return result.written;
 }
 
 async function loadWorkforce(
@@ -432,6 +464,12 @@ export type DispatchWeeklyPlanOptions = {
   store_number: string;
   /** When true, Force Draw style restage — destructive; not used by cron. */
   forceOverwrite?: boolean;
+  /**
+   * CAPACITY-GUARD-002 — shared store-week capacity. When omitted, loaded from
+   * participating department codes (defaults to this department only).
+   */
+  storeWeekCapacity?: StoreWeekCapacitySnapshot;
+  participating_department_codes?: readonly string[];
 };
 
 /**
@@ -552,10 +590,27 @@ export async function dispatchWeeklyPlanForDepartment(
 
     const plannerMembers = weekLaborToPlannerMembers(labor.allocatable);
     const eligibleCount = plannerMembers.length;
-    const targetBays = resolveAutomaticWeeklyBayTarget(
-      eligibleCount,
-      BASE_WEEKLY_BAY_QUOTA
-    );
+
+    const participatingCodes =
+      options.participating_department_codes &&
+      options.participating_department_codes.length > 0
+        ? options.participating_department_codes
+        : [departmentCode];
+
+    let storeCapacity =
+      options.storeWeekCapacity ??
+      (await loadStoreWeekCapacity(supabase, {
+        store_number: storeNumber,
+        week_label: weekLabel,
+        department_codes: participatingCodes,
+      }));
+
+    // Department eligibility still drives who can own this dept's bays;
+    // shared remaining caps how many new bays this store-week may stage.
+    const targetBays = resolveDepartmentStageDrawCount({
+      departmentEligibleCount: eligibleCount,
+      capacity: storeCapacity,
+    });
 
     base.eligible_count = eligibleCount;
     base.target_bays = targetBays;
@@ -594,13 +649,19 @@ export async function dispatchWeeklyPlanForDepartment(
         departmentCode,
         weekLabel
       );
+      storeCapacity = await loadStoreWeekCapacity(supabase, {
+        store_number: storeNumber,
+        week_label: weekLabel,
+        department_codes: participatingCodes,
+      });
     };
 
     const earlyComplete = planIsComplete(
       rotations,
       assignments,
       eligibleCount,
-      targetBays
+      // Completeness vs the department's natural eligible×3 when shared pool allows it.
+      resolveAutomaticWeeklyBayTarget(eligibleCount, BASE_WEEKLY_BAY_QUOTA)
     );
     if (!options.forceOverwrite && earlyComplete.complete) {
       const loads = summarizeLoads(rotations, assignments, plannerMembers);
@@ -612,7 +673,7 @@ export async function dispatchWeeklyPlanForDepartment(
         ok: true,
         skipped: true,
         reason: earlyComplete.insufficient
-          ? `Already complete short plan for ${weekLabel}: ${rotations.length}/${targetBays} owed physical bays`
+          ? `Already complete short plan for ${weekLabel}: ${rotations.length}/${resolveAutomaticWeeklyBayTarget(eligibleCount, BASE_WEEKLY_BAY_QUOTA)} owed physical bays`
           : `Already complete weekly plan for ${weekLabel}`,
         staged_count: rotations.length,
         owned_count: rotations.length,
@@ -621,14 +682,46 @@ export async function dispatchWeeklyPlanForDepartment(
       };
     }
 
+    if (
+      !options.forceOverwrite &&
+      rotations.length === 0 &&
+      storeCapacity.remaining_shared <= 0
+    ) {
+      return {
+        ...base,
+        status: storeCapacity.over_capacity ? "PARTIAL" : "ALREADY_COMPLETE",
+        ok: !storeCapacity.over_capacity,
+        skipped: true,
+        reason: storeCapacity.over_capacity
+          ? `Store-week already over shared capacity (${storeCapacity.owned_total}/${storeCapacity.shared_target}) — refusing additive staging`
+          : `Shared store-week capacity already filled (${storeCapacity.owned_total}/${storeCapacity.shared_target})`,
+        staged_count: 0,
+        owned_count: storeCapacity.owned_total,
+        owners: Object.keys(storeCapacity.owned_by_specialist).length,
+      };
+    }
+
     let createdRotations = 0;
     let generated: GenerateRotationsResult | null = null;
 
     if (rotations.length === 0 || options.forceOverwrite) {
+      const drawCount = targetBays;
+      if (drawCount <= 0) {
+        return {
+          ...base,
+          status: "ALREADY_COMPLETE",
+          ok: true,
+          skipped: true,
+          reason: `No shared capacity remaining for ${weekLabel}`,
+          staged_count: rotations.length,
+          owned_count: storeCapacity.owned_total,
+          owners: Object.keys(storeCapacity.owned_by_specialist).length,
+        };
+      }
       generated = await generateWeeklyRotations(
         supabase,
         department.id,
-        targetBays,
+        drawCount,
         weekLabel,
         {
           skipIfExists: !options.forceOverwrite,
@@ -672,13 +765,18 @@ export async function dispatchWeeklyPlanForDepartment(
       }
     }
 
+    const naturalTarget = resolveAutomaticWeeklyBayTarget(
+      eligibleCount,
+      BASE_WEEKLY_BAY_QUOTA
+    );
+
     if (unowned.length === 0) {
       const loads = summarizeLoads(rotations, assignments, plannerMembers);
       const complete = planIsComplete(
         rotations,
         assignments,
         eligibleCount,
-        targetBays
+        naturalTarget
       );
       if (complete.complete) {
         return {
@@ -712,15 +810,21 @@ export async function dispatchWeeklyPlanForDepartment(
       };
     }
 
-    const remainingCap = new Map(
-      plannerMembers.map((m) => [
-        m.specialist_id,
-        Math.max(
-          0,
-          BASE_WEEKLY_BAY_QUOTA - (ownedCounts.get(m.specialist_id) ?? 0)
-        ),
-      ])
-    );
+    // Cross-department remaining caps (CAPACITY-GUARD-002).
+    const remainingCap = remainingCapMapForEligible(storeCapacity);
+    for (const member of plannerMembers) {
+      if (!remainingCap.has(member.specialist_id)) {
+        // Dept-eligible but not in shared eligible union — still cap at quota using store owned.
+        remainingCap.set(
+          member.specialist_id,
+          Math.max(
+            0,
+            BASE_WEEKLY_BAY_QUOTA -
+              (storeCapacity.owned_by_specialist[member.specialist_id] ?? 0)
+          )
+        );
+      }
+    }
     const membersForPlan = plannerMembers.filter(
       (m) => (remainingCap.get(m.specialist_id) ?? 0) > 0
     );
@@ -747,7 +851,8 @@ export async function dispatchWeeklyPlanForDepartment(
       { knownHoursOnly: true }
     );
 
-    const filteredItems = plan.items;
+    const filtered = filterPlanItemsToCapacity(plan.items, storeCapacity);
+    const filteredItems = filtered.accepted;
 
     let createdAssignments = 0;
     if (filteredItems.length > 0) {
@@ -756,7 +861,12 @@ export async function dispatchWeeklyPlanForDepartment(
         weekLabel,
         filteredItems,
         storeNumber,
-        departmentCode
+        departmentCode,
+        {
+          shared_target: storeCapacity.shared_target,
+          quota_per_person: BASE_WEEKLY_BAY_QUOTA,
+          participating_department_codes: participatingCodes,
+        }
       );
     }
 
@@ -785,6 +895,7 @@ export async function dispatchWeeklyPlanForDepartment(
       };
     }
 
+    // Completeness uses the shared-capped draw target for this department pass.
     const insufficient = rotations.length < targetBays;
     const atQuota = loads.filter(
       (l) => l.assigned === BASE_WEEKLY_BAY_QUOTA
@@ -799,7 +910,7 @@ export async function dispatchWeeklyPlanForDepartment(
         ...base,
         status: "INSUFFICIENT_BAYS",
         ok: true,
-        reason: `Only ${rotations.length} owed physical bays available for ${eligibleCount} eligible associates (target ${targetBays})`,
+        reason: `Only ${rotations.length} owed physical bays available for ${eligibleCount} eligible associates (target ${targetBays}; shared ${storeCapacity.shared_target})`,
         staged_count: rotations.length,
         owned_count: ownedCount,
         owners: distinctOwners,
@@ -812,6 +923,26 @@ export async function dispatchWeeklyPlanForDepartment(
     }
 
     if (!perfect) {
+      // Shared pool may intentionally leave this department below natural ×3.
+      if (
+        ownedCount === rotations.length &&
+        storeCapacity.owned_total >= storeCapacity.shared_target
+      ) {
+        return {
+          ...base,
+          status: "COMPLETE",
+          ok: true,
+          reason: `Shared store-week capacity filled (${storeCapacity.owned_total}/${storeCapacity.shared_target})`,
+          staged_count: rotations.length,
+          owned_count: ownedCount,
+          owners: distinctOwners,
+          created_rotations: createdRotations,
+          created_assignments: createdAssignments,
+          loads,
+          cycle_number: generated?.cycle_number,
+          cycle_reset: generated?.cycle_reset,
+        };
+      }
       return {
         ...base,
         status: "PARTIAL",
@@ -833,7 +964,7 @@ export async function dispatchWeeklyPlanForDepartment(
       ...base,
       status: "COMPLETE",
       ok: true,
-      reason: `Complete weekly plan: ${eligibleCount} × ${BASE_WEEKLY_BAY_QUOTA} physical bays`,
+      reason: `Complete weekly plan: ${eligibleCount} × ${BASE_WEEKLY_BAY_QUOTA} physical bays (shared target ${storeCapacity.shared_target})`,
       staged_count: rotations.length,
       owned_count: ownedCount,
       owners: distinctOwners,
@@ -899,16 +1030,40 @@ export async function runSundayDispatchForAllDepartments(
 
     if (error) throw new Error(error.message);
 
-    for (const dept of (departments ?? []) as Department[]) {
+    const activeDepartments = (departments ?? []) as Department[];
+    const participatingCodes = activeDepartments.map((d) =>
+      String(d.code ?? "")
+        .trim()
+        .toLowerCase()
+    );
+
+    // Shared capacity across all active departments for this store-week.
+    // Does not activate inactive departments — only those already is_active.
+    let storeWeekCapacity = await loadStoreWeekCapacity(supabase, {
+      store_number: store.store_number,
+      week_label: targetWeek,
+      department_codes: participatingCodes,
+    });
+
+    for (const dept of activeDepartments) {
       const result = await dispatchWeeklyPlanForDepartment(supabase, dept, {
         weekLabel: targetWeek,
         store_id: store.id,
         store_number: store.store_number,
+        storeWeekCapacity,
+        participating_department_codes: participatingCodes,
       });
       if (decision.reason && result.status === "COMPLETE") {
         result.reason = `${result.reason ?? "Complete"}; ${decision.reason}`;
       }
       results.push(result);
+
+      // Refresh shared remaining before the next department pass.
+      storeWeekCapacity = await loadStoreWeekCapacity(supabase, {
+        store_number: store.store_number,
+        week_label: targetWeek,
+        department_codes: participatingCodes,
+      });
     }
   }
 

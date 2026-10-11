@@ -23,8 +23,15 @@ import {
   type StoreSpecialist,
 } from "@/lib/types";
 import { workingDepartment } from "@/lib/admin-department-context";
-import type { ShiftRosterMember } from "@/lib/store-ops/weekly-rotations";
+import {
+  BASE_WEEKLY_BAY_QUOTA,
+  type ShiftRosterMember,
+} from "@/lib/store-ops/weekly-rotations";
 import { enqueueOrExecute } from "@/lib/sync-queue";
+import {
+  loadStoreWeekCapacity,
+  writeSundayAssignmentsWithCapacity,
+} from "@/lib/store-ops/shared-week-capacity";
 
 export const SUNDAY_AUDIT_EVENT = "deptsync:sunday-audit-assignments";
 export const SUNDAY_OPEN_EVENT = "deptsync:sunday-audit-open";
@@ -238,7 +245,10 @@ export async function setSundayBayAssignment(
   emitSundayEvent();
 }
 
-/** Live sunday_bay_assignments upsert — used by setSundayBayAssignment and queue replay. */
+/**
+ * Live sunday_bay_assignments write — CAPACITY-GUARD-002 atomic RPC.
+ * Used by setSundayBayAssignment and queue replay. Fail-closed if RPC missing.
+ */
 export async function executeSundayAssignLive(
   payload: Record<string, unknown>
 ): Promise<void> {
@@ -247,30 +257,40 @@ export async function executeSundayAssignLive(
   const week = String(payload.week ?? "").trim();
   const bayId = String(payload.bay_id ?? payload.assignment_id ?? "").trim();
   const department =
-    String(payload.department ?? SUNDAY_DEPARTMENT).trim() || SUNDAY_DEPARTMENT;
+    String(payload.department ?? SUNDAY_DEPARTMENT).trim().toLowerCase() ||
+    SUNDAY_DEPARTMENT;
   if (!store || !week || !bayId) return;
 
-  const weekStarting = isoWeekToMondayDate(week);
-  const status = String(payload.status ?? "assigned").trim() || "assigned";
+  const statusRaw = String(payload.status ?? "assigned").trim() || "assigned";
+  const status =
+    statusRaw.toUpperCase() === "CARRIED_OVER"
+      ? "assigned"
+      : statusRaw.toLowerCase();
   const specialistId = String(payload.specialist_id ?? "").trim();
+  // CAPACITY-GUARD-003: browser/queue payloads cannot elevate capacity.
+  // Overrides exist only on service-role paths (extra-bay API / admin).
 
   if (status === "cleared" || !specialistId) {
-    const { error } = await supabase.from("sunday_bay_assignments").upsert(
-      {
-        store_number: store,
-        department,
-        week_starting: weekStarting,
-        bay_id: bayId,
-        assigned_specialist_id: null,
-        roster_specialist_id: null,
-        specialist_name: "",
-        status: "cleared",
-        is_carried_over: false,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: "store_number,department,week_starting,bay_id" }
-    );
-    if (error) throw new Error(error.message || "Could not clear assignment");
+    const result = await writeSundayAssignmentsWithCapacity(supabase, {
+      store_number: store,
+      week_label: week,
+      shared_target: 0,
+      quota_per_person: BASE_WEEKLY_BAY_QUOTA,
+      items: [
+        {
+          department,
+          bay_id: bayId,
+          roster_specialist_id: "",
+          specialist_name: "",
+          assigned_specialist_id: null,
+          status: "cleared",
+          is_carried_over: false,
+        },
+      ],
+    });
+    if (!result.ok) {
+      throw new Error(result.error || "Could not clear assignment");
+    }
     emitSundayEvent();
     return;
   }
@@ -281,42 +301,41 @@ export async function executeSundayAssignLive(
       : "") || (await resolveProfileIdForRoster(specialistId));
 
   const isCarried =
-    payload.is_carried_over === true || status.toUpperCase() === "CARRIED_OVER";
+    payload.is_carried_over === true || statusRaw.toUpperCase() === "CARRIED_OVER";
 
-  const row: Record<string, unknown> = {
+  const participating =
+    Array.isArray(payload.participating_department_codes) &&
+    payload.participating_department_codes.length > 0
+      ? (payload.participating_department_codes as string[])
+      : [department];
+
+  const capacity = await loadStoreWeekCapacity(supabase, {
     store_number: store,
-    department,
-    week_starting: weekStarting,
-    bay_id: bayId,
-    assigned_specialist_id: profileId,
-    roster_specialist_id: specialistId,
-    specialist_name: String(payload.specialist_name ?? ""),
-    status,
-    is_carried_over: isCarried,
-    updated_at: new Date().toISOString(),
-  };
-
-  const { error } = await supabase.from("sunday_bay_assignments").upsert(row, {
-    onConflict: "store_number,department,week_starting,bay_id",
+    week_label: week,
+    department_codes: participating,
   });
 
-  if (error) {
-    const fallback = { ...row };
-    if (status === "CARRIED_OVER") fallback.status = "assigned";
-    const retryStatus = await supabase.from("sunday_bay_assignments").upsert(
-      fallback,
-      { onConflict: "store_number,department,week_starting,bay_id" }
-    );
-    if (retryStatus.error) {
-      delete fallback.is_carried_over;
-      const retryCols = await supabase.from("sunday_bay_assignments").upsert(
-        fallback,
-        { onConflict: "store_number,department,week_starting,bay_id" }
-      );
-      if (retryCols.error) {
-        throw new Error(retryCols.error.message || "Could not save assignment");
-      }
-    }
+  const result = await writeSundayAssignmentsWithCapacity(supabase, {
+    store_number: store,
+    week_label: week,
+    shared_target: capacity.shared_target,
+    quota_per_person: BASE_WEEKLY_BAY_QUOTA,
+    items: [
+      {
+        department,
+        bay_id: bayId,
+        roster_specialist_id: specialistId,
+        specialist_name: String(payload.specialist_name ?? ""),
+        assigned_specialist_id: profileId,
+        status: status === "completed" ? "completed" : "assigned",
+        is_carried_over: isCarried,
+      },
+    ],
+    allow_over_base: false,
+    allow_over_shared: false,
+  });
+  if (!result.ok) {
+    throw new Error(result.error || "Could not save assignment");
   }
   emitSundayEvent();
 }
@@ -390,7 +409,7 @@ export async function autoAssignSundayBaysToSpecialist(
   return bayIds.length;
 }
 
-/** Persist a balancer plan — assignment owner stays this module. */
+/** Persist a balancer plan — CAPACITY-GUARD-002 batch atomic write. */
 export async function applySundayAssignmentPlan(
   week: string,
   items: Array<{
@@ -402,7 +421,10 @@ export async function applySundayAssignmentPlan(
   storeNumber = getStoreNumber(),
   department = SUNDAY_DEPARTMENT
 ): Promise<number> {
-  const stamp = new Date().toISOString();
+  if (items.length === 0) return 0;
+  const supabase = requireClient();
+  const store = String(storeNumber ?? getStoreNumber()).trim();
+  const dept = String(department ?? SUNDAY_DEPARTMENT).trim().toLowerCase();
   const uniqueIds = [...new Set(items.map((row) => row.specialist_id))];
   const profileByRoster = new Map<string, string | null>();
   await Promise.all(
@@ -410,24 +432,33 @@ export async function applySundayAssignmentPlan(
       profileByRoster.set(id, await resolveProfileIdForRoster(id));
     })
   );
-  await Promise.all(
-    items.map((row) =>
-      setSundayBayAssignment(
-        week,
-        row.rotationId,
-        {
-          specialist_id: row.specialist_id,
-          specialist_name: row.specialist_name,
-          assigned_at: stamp,
-          assigned_specialist_id: profileByRoster.get(row.specialist_id) ?? null,
-          status: "assigned",
-        },
-        storeNumber,
-        department
-      )
-    )
-  );
-  return items.length;
+
+  const capacity = await loadStoreWeekCapacity(supabase, {
+    store_number: store,
+    week_label: week,
+    department_codes: [dept],
+  });
+
+  const result = await writeSundayAssignmentsWithCapacity(supabase, {
+    store_number: store,
+    week_label: week,
+    shared_target: capacity.shared_target,
+    quota_per_person: BASE_WEEKLY_BAY_QUOTA,
+    items: items.map((row) => ({
+      department: dept,
+      bay_id: String(row.rotationId),
+      roster_specialist_id: String(row.specialist_id),
+      specialist_name: String(row.specialist_name ?? ""),
+      assigned_specialist_id: profileByRoster.get(row.specialist_id) ?? null,
+      status: "assigned",
+      is_carried_over: false,
+    })),
+  });
+  if (!result.ok) {
+    throw new Error(result.error || "Could not save assignment plan");
+  }
+  emitSundayEvent();
+  return result.written;
 }
 
 export function subscribeSundayBayAssignments(

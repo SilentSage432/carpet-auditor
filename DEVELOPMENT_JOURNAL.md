@@ -1,5 +1,17 @@
 # DeptSync Hub — Development Journal
 
+## 2026-10-11 — DEPTSYNC-CAPACITY-GUARD-003 Shared capacity production release
+
+**Controlled DB + app release.** Hardened RPC auth (service_role overrides only; authenticated force `allow_over_*=false`; reject other roles). Revoked client INSERT/UPDATE/DELETE/TRUNCATE on `sunday_bay_assignments` (authenticated SELECT retained). Applied `20261014_capacity_guard_002_store_week_lock.sql` on `fmeinlwhixngednabhgy` after Management API password rotate; post-migrate dump 708141 bytes. Verified: service RPC ok; anon upsert/RPC denied; week assignments remain 6. Browser override payload removed. Typecheck/build PASS; **1576** tests. Canonical: [`docs/product/DEPTSYNC_CAPACITY_GUARD_003_RELEASE.md`](docs/product/DEPTSYNC_CAPACITY_GUARD_003_RELEASE.md). Dual-dept auto-stage **NO-GO**. **STOP.**
+
+## 2026-10-11 — DEPTSYNC-CAPACITY-GUARD-002 Shared store-week capacity enforcement
+
+**Controlled local implementation; no prod SQL/deploy/assignments/cron/roster/topology/dual-dept auto-stage.** Store-week capacity composer (`shared-week-capacity.ts`) + atomic RPC migration `20261014_capacity_guard_002_store_week_lock.sql` (`pg_advisory_xact_lock` + validate + upsert). Sunday dispatch caps draw by shared remaining; all additive writers fail-closed through RPC (no unguarded upsert). Completed assignments still consume; Master excluded; missing schedules do not archive. Typecheck/build PASS; **1575** tests. Canonical: [`docs/product/DEPTSYNC_CAPACITY_GUARD_002_IMPLEMENTATION.md`](docs/product/DEPTSYNC_CAPACITY_GUARD_002_IMPLEMENTATION.md). Local **GO**; prod release **CONDITIONAL GO** after migration apply. **STOP.**
+
+## 2026-10-11 — DEPTSYNC-CAPACITY-GUARD-001 Shared weekly capacity discovery
+
+**Read-only architectural investigation; no engine/cron/schema/roster/topology mutations, no dual-dept auto-stage, no commit/push/deploy.** Traced Sunday Stage+Assign: cron → `runSundayDispatchForAllDepartments` → per-dept `eligible × 3` (`resolveAutomaticWeeklyBayTarget`). Production store 2587: 5 active (4 operational + MasterAdmin), 2 schedule-eligible this week → 6 owned; single active `flooring` merge; cleanup retired foreign aisles / archived 30. UI cites shared 4×3; engine does not enforce. Design: store-week composer + cross-dept remaining caps + writer serialization; completed assignments still consume week capacity. Canonical: [`docs/product/DEPTSYNC_CAPACITY_GUARD_001_DISCOVERY.md`](docs/product/DEPTSYNC_CAPACITY_GUARD_001_DISCOVERY.md). Discovery **GO**; dual-dept auto-stage **NO-GO** until implementation. **STOP.**
+
 ## 2026-10-11 — DEPTSYNC-CLEANUP-003 Workspace cleanup release verification
 
 **Controlled release; no production cleanup mutations.** Verified CLEANUP-002 auth (MasterAdmin/store scope/fingerprint/confirm/no hard-delete), Map/eligibility soft-retire semantics, and mobile confirm gating. Added `workspace-cleanup.release.test.ts`. Typecheck/build PASS; **1552** tests. Pushed `11de884`; Production Ready `dpl_H7rBMbXm66ePdznJaheY8Bo2EH3H` aliased to https://deptsync-hub.vercel.app. Smoke: `/login` 200; cleanup API 401. Canonical: [`docs/product/DEPTSYNC_CLEANUP_003_RELEASE_VERIFICATION.md`](docs/product/DEPTSYNC_CLEANUP_003_RELEASE_VERIFICATION.md). **GO** capability; **NO-GO** agent-executed cleanup. **STOP.**

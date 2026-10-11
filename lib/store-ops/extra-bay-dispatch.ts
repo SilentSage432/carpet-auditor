@@ -617,7 +617,10 @@ export async function dispatchExtraPhysicalBay(
               },
             ],
             options.store_number,
-            options.department_code
+            options.department_code,
+            {
+              participating_department_codes: [options.department_code],
+            }
           );
         } catch (err) {
           return {
@@ -707,7 +710,13 @@ export async function dispatchExtraPhysicalBay(
             },
           ],
           options.store_number,
-          options.department_code
+          options.department_code,
+          {
+            // Explicit DS +1 — may exceed base 3 and shared target.
+            allow_over_base: true,
+            allow_over_shared: true,
+            participating_department_codes: [options.department_code],
+          }
         );
       } catch (err) {
         return {
@@ -776,7 +785,12 @@ export async function dispatchExtraPhysicalBay(
                 },
               ],
               options.store_number,
-              options.department_code
+              options.department_code,
+              {
+                allow_over_base: true,
+                allow_over_shared: true,
+                participating_department_codes: [options.department_code],
+              }
             );
           } catch (err) {
             return {
