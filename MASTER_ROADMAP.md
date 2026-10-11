@@ -28,8 +28,9 @@
 - [x] **DEPTSYNC-SEC-OPS-002B** — Repository alignment (migration + docs on `origin/main`; no prod re-apply / no app deploy)
 - [x] **DEPTSYNC-SEC-OPS-003** — PIN format discovery (read-only) — [`DEPTSYNC_SEC_OPS_003_PIN_AUTH_DISCOVERY.md`](docs/product/DEPTSYNC_SEC_OPS_003_PIN_AUTH_DISCOVERY.md)
 - [x] **DEPTSYNC-AUTH-HARDEN-001** — Privileged PIN scrypt + login upgrade + hub-bridge rate limit (**COMPLETE** local; prod migrate/deploy/commit **not** authorized) — [`DEPTSYNC_AUTH_HARDEN_001.md`](docs/product/DEPTSYNC_AUTH_HARDEN_001.md)
-- [x] **DEPTSYNC-AUTH-HARDEN-001A** — Fail-closed limiter + atomic admit + IP buckets (**COMPLETE** local; DB-before-app release gate) — same canonical doc
-- [ ] **Post-RD-6 trust / topology / auth pack** — AUTH-HARDEN release (§K, DB then app) → plaintext retirement → CI-001 → DOCS-TRUTH → AUTH inventory → ALIGN-DEPT + capacity guard
+- [x] **DEPTSYNC-AUTH-HARDEN-001A** — Fail-closed limiter + atomic admit + IP buckets (**COMPLETE**; released in 002)
+- [x] **DEPTSYNC-AUTH-HARDEN-002** — Controlled auth production release (**SHIPPED**; operator login upgrade pending manual verify) — [`DEPTSYNC_AUTH_HARDEN_002_PRODUCTION_RELEASE.md`](docs/product/DEPTSYNC_AUTH_HARDEN_002_PRODUCTION_RELEASE.md)
+- [ ] **Post-RD-6 trust / topology / auth pack** — operator login/scrypt confirm → plaintext retirement → CI-001 → DOCS-TRUTH → AUTH inventory → ALIGN-DEPT + capacity guard
 
 ## Next (ALIGN — constitutional direction)
 - [x] **DEPTSYNC-ALIGN-001** — Constitutional alignment & redesign blueprint (**COMPLETE** — planning only; operator-approved)

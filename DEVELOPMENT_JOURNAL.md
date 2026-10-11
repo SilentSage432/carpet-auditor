@@ -1,5 +1,9 @@
 # DeptSync Hub — Development Journal
 
+## 2026-10-11 — DEPTSYNC-AUTH-HARDEN-002 Controlled authentication production release
+
+**Authorized production release.** Project `fmeinlwhixngednabhgy`. Fresh `pg_dump` 587207 bytes (TOC 923). Applied rate-limit migration before app deploy; cleared 2 invited-associate unused plaintext PINs (Master untouched). Pushed `4fd914d` to `origin/main`; Vercel Production success (`5muXnbeQbWh4CsmCoXWejQfYGKc6`). Public auth + SEC-OPS-002 containment verified. Operator login / scrypt upgrade **awaiting manual verification**. Typecheck/build pass; **1465** tests. Canonical: [`docs/product/DEPTSYNC_AUTH_HARDEN_002_PRODUCTION_RELEASE.md`](docs/product/DEPTSYNC_AUTH_HARDEN_002_PRODUCTION_RELEASE.md).
+
 ## 2026-10-11 — DEPTSYNC-AUTH-HARDEN-001A Rate-limiter fail-closed release gate
 
 **Scoped local correction.** No production SQL, PIN changes, deploy, commit, or push.
