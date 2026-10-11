@@ -1,5 +1,9 @@
 # DeptSync Hub — Development Journal
 
+## 2026-10-11 — DEPTSYNC-SEC-OPS-006 Credential writer production release
+
+**Authorized production release.** Project `fmeinlwhixngednabhgy`. Fresh `pg_dump` 587293 bytes (TOC 938). No DB migration (app writers only). Pushed `e36bfb5` to `origin/main`; Vercel Production success (`CkWcALCvQTJYbaEw9Xm49Yas8E3B`). Public auth + SEC-OPS-002 containment + rate-limit RPC verified. MasterAdmin `f9e36630…` remains scrypt1; two obsolete digit mirrors unchanged. Live writer execution **NOT VERIFIED** (no PIN mutation). Typecheck/build pass; **1471** tests. Canonical: [`docs/product/DEPTSYNC_SEC_OPS_006_PRODUCTION_RELEASE.md`](docs/product/DEPTSYNC_SEC_OPS_006_PRODUCTION_RELEASE.md).
+
 ## 2026-10-11 — DEPTSYNC-SEC-OPS-005 Legacy credential write-path correction
 
 **Scoped local implementation.** No production SQL, credential cleanup, plaintext-fallback removal, commit, push, or deploy.
