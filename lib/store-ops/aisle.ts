@@ -6,7 +6,7 @@
 import type { BayNumberingPattern, StoreLocationType } from "./types";
 import { parseBayNumberingPattern } from "./bay-pattern";
 
-/** Persist / compare form: trim + uppercase (BW, RW, A1, 12). */
+/** Persist / compare form: trim + uppercase (BW, RW, A1, 12, SHOW-L). */
 export function normalizeAisle(raw: unknown): string {
   return String(raw ?? "")
     .trim()
@@ -24,6 +24,26 @@ export function formatAisleInput(raw: string): string {
 
 export function isValidAisle(raw: unknown): boolean {
   return normalizeAisle(raw).length > 0;
+}
+
+/** True when the aisle/zone code is digits-only (retail aisle number). */
+export function isNumericAisleCode(raw: unknown): boolean {
+  return /^\d+$/.test(normalizeAisle(raw));
+}
+
+/**
+ * Mobile-friendly label for numbered aisles vs named physical zones.
+ * Codes stay canonical; this is presentation only.
+ *
+ * - "41" → "Aisle 41"
+ * - "SHOW-L" / "CARPET-WALL" / "CLOTHING" → code as-is (no fake "Aisle" prefix)
+ * - empty → "Aisle"
+ */
+export function formatAisleDisplayLabel(raw: unknown): string {
+  const code = normalizeAisle(raw);
+  if (!code) return "Aisle";
+  if (isNumericAisleCode(code)) return `Aisle ${code}`;
+  return code;
 }
 
 /** Natural sort so "2" < "12" < "A1" < "BW". */

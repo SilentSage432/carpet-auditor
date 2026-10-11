@@ -1,5 +1,13 @@
 # DeptSync Hub — Development Journal
 
+## 2026-10-11 — DEPTSYNC-SECTION-UX-003 Controlled production release
+
+**Controlled app release of SECTION-UX-001 + SECTION-UX-002.** No schema migrations, no production topology/section/assignment mutations, no capacity/Sunday/Zebra changes. Section-aware auto-stage remains hard-off; Production preview flag not enabled. Pre-release: `tsc` PASS; **1626** tests; `next build` PASS. Canonical closeout: [`docs/product/DEPTSYNC_SECTION_UX_003_RELEASE.md`](docs/product/DEPTSYNC_SECTION_UX_003_RELEASE.md). Verdict recorded after deploy smoke. **STOP for phone acceptance.**
+
+## 2026-10-11 — DEPTSYNC-SECTION-UX-002 Named zone compatibility + release readiness
+
+**Controlled local implementation + verification; no prod deploy/SQL/data/schema.** Named physical zones reuse alphanumeric `store_locations.aisle` TEXT (no area table). Added `formatAisleDisplayLabel` / `isNumericAisleCode`; Map + Manage share labels; Bulk defaults empty aisle with zone copy; SECTION-UX-001 gains explicit discoverable-bay banner (`countDiscoverableBaysForSection`, never auto-add). Joint stewardship deferred (singular `primary_owner`). Capacity guard, Sunday dispatch, section-aware auto-stage (`false`), Zebra untouched. Typecheck/build PASS; **1626** tests. Canonical: [`docs/product/DEPTSYNC_SECTION_UX_002_RELEASE_READINESS.md`](docs/product/DEPTSYNC_SECTION_UX_002_RELEASE_READINESS.md). Combined UX-001+UX-002 app ship **CONDITIONAL GO** after phone review; prod topology/auto-stage **NO-GO**. **STOP.**
+
 ## 2026-10-11 — DEPTSYNC-CAPACITY-GUARD-003 Shared capacity production release
 
 **Controlled DB + app release.** Hardened RPC auth (service_role overrides only; authenticated force `allow_over_*=false`; reject other roles). Revoked client INSERT/UPDATE/DELETE/TRUNCATE on `sunday_bay_assignments` (authenticated SELECT retained). Applied `20261014_capacity_guard_002_store_week_lock.sql` on `fmeinlwhixngednabhgy` after Management API password rotate; post-migrate dump 708141 bytes. Verified: service RPC ok; anon upsert/RPC denied; week assignments remain 6. Browser override payload removed. Typecheck/build PASS; **1576** tests. Pushed `615929e`; Vercel Production `8Ha3ZLaLU8ZtTmAUe5SDZYr4dkKz` Ready @ https://deptsync-hub.vercel.app. Smoke: `/login` 200; anon upsert 42501. Canonical: [`docs/product/DEPTSYNC_CAPACITY_GUARD_003_RELEASE.md`](docs/product/DEPTSYNC_CAPACITY_GUARD_003_RELEASE.md). Dual-dept auto-stage **NO-GO**. **STOP.**

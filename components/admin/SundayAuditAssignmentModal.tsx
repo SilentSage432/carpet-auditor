@@ -9,10 +9,22 @@ import { useCallback, useEffect, useMemo, useId, useState } from "react";
 import {
   dispatchExtraBay,
   fetchDepartments,
+  fetchOperationalSections,
   fetchThisWeekRotations,
   generateRotations,
   suggestExtraBay,
 } from "@/lib/store-ops/client";
+import {
+  indexBaySectionLookups,
+  type BaySectionLookup,
+} from "@/lib/store-ops/operational-sections";
+import {
+  assertSectionAwarePreviewFresh,
+  buildPreviewCapacityCaps,
+  composeSectionAwareWeeklyPreview,
+  isSectionAwarePreviewEnabled,
+  type SectionAwareWeeklyPreview,
+} from "@/lib/store-ops/section-aware-rotation";
 import { readableError } from "@/lib/store-ops/errors";
 import { playErrorTone, playSuccessTone, playTapTone } from "@/lib/ui/feedback";
 import { diagnoseBayHealth, type BayHealthFinding } from "@/lib/store-ops/bay-health";
@@ -69,6 +81,7 @@ import { useFocusedWorkspace } from "@/lib/ui/focused-workspace";
 import { rosterJobTitleLabel, type StoreSpecialist } from "@/lib/types";
 
 const FLOORING_STAGING_DEPT = "flooring" as const;
+const EMPTY_BAY_SECTION_MAP: Map<string, BaySectionLookup> = new Map();
 
 function shiftDaysToLabRows(
   days: Record<string, { specialist_id: string; work_date: string; start_time: string | null; end_time: string | null; is_scheduled_today: boolean; is_call_out: boolean; status?: string | null }>
@@ -138,6 +151,11 @@ export function SundayAuditAssignmentModal({
     locationId: string;
     label: string;
   } | null>(null);
+  /** Opt-in SECTION-ROTATION-002 preview only (env flag; default off). */
+  const sectionAwarePreviewOn = isSectionAwarePreviewEnabled();
+  const [baySectionByKey, setBaySectionByKey] = useState<
+    Map<string, BaySectionLookup>
+  >(() => new Map());
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -230,6 +248,30 @@ export function SundayAuditAssignmentModal({
   }, [open, reload]);
 
   useEffect(() => {
+    if (!open || !sectionAwarePreviewOn) return;
+    let cancelled = false;
+    void fetchOperationalSections(specialist, { includeMembers: true })
+      .then((payload) => {
+        if (cancelled) return;
+        setBaySectionByKey(indexBaySectionLookups(payload.sections ?? []));
+      })
+      .catch((err) => {
+        console.error(
+          "[SundayAudit] section-aware preview sections failed (non-blocking)",
+          err
+        );
+        if (!cancelled) setBaySectionByKey(new Map());
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, sectionAwarePreviewOn, specialist]);
+
+  const activeBaySectionByKey = sectionAwarePreviewOn
+    ? baySectionByKey
+    : EMPTY_BAY_SECTION_MAP;
+
+  useEffect(() => {
     if (!open || !week) return;
     return subscribeSundayBayAssignments(getStoreNumber(), week, () => {
       void reload();
@@ -283,6 +325,55 @@ export function SundayAuditAssignmentModal({
     () => buildScheduleBalancePlan(bays, weekLabor, healthByRotation),
     [bays, weekLabor, healthByRotation]
   );
+
+  const sectionAwarePreview: SectionAwareWeeklyPreview | null = useMemo(() => {
+    if (!sectionAwarePreviewOn || !week || !weekLabor) return null;
+    if (weekLabor.processing_status === "UNAVAILABLE") return null;
+    const members = weekLaborToPlannerMembers(weekLabor.allocatable);
+    if (members.length === 0) return null;
+    const ownedBySpecialist: Record<string, number> = {};
+    let ownedTotal = 0;
+    const ownedRotationIds: string[] = [];
+    for (const row of bays) {
+      const owner = String(row.assignment?.specialist_id ?? "").trim();
+      if (!owner) continue;
+      ownedTotal += 1;
+      ownedBySpecialist[owner] = (ownedBySpecialist[owner] ?? 0) + 1;
+      ownedRotationIds.push(String(row.rotation.id));
+    }
+    const capacity = buildPreviewCapacityCaps({
+      eligibleSpecialistIds: members.map((m) => m.specialist_id),
+      ownedBySpecialist,
+      ownedTotal,
+    });
+    const bayRefs = bays.map((bay) => ({
+      rotationId: bay.rotation.id,
+      department_id: String(
+        bay.rotation.store_locations?.department_id ?? flooringDept?.id ?? ""
+      ).trim(),
+      aisle: bay.aisle,
+      bay: bay.bay,
+      riskScore: riskScoreFromFinding(healthByRotation.get(bay.rotation.id)),
+    }));
+    return composeSectionAwareWeeklyPreview({
+      store_number: getStoreNumber(),
+      week_label: week,
+      bays: bayRefs,
+      members,
+      baySectionByKey: activeBaySectionByKey,
+      ownedRotationIds,
+      capacity,
+      knownHoursOnly: true,
+    });
+  }, [
+    sectionAwarePreviewOn,
+    week,
+    weekLabor,
+    bays,
+    activeBaySectionByKey,
+    healthByRotation,
+    flooringDept?.id,
+  ]);
 
   const selectionSummary = useMemo(
     () =>
@@ -528,18 +619,71 @@ export function SundayAuditAssignmentModal({
         return;
       }
 
-      const plan = buildScheduleBalancePlan(bays, labor, healthByRotation);
-      if (plan.items.length === 0) {
-        setError(
-          "Could not authoritatively allocate staged bays from known schedule hours."
-        );
-        playErrorTone();
-        return;
-      }
+      // Default path: existing flat coverage assign (production-safe).
+      // Opt-in SECTION-ROTATION-002: recompute section-aware PROPOSED plan,
+      // reject stale fingerprints, then persist through the same capacity writer.
+      let planItems: Array<{
+        rotationId: string;
+        specialist_id: string;
+        specialist_name: string;
+        hours: number;
+      }> = [];
+      let loadCount = 0;
+      let totalHours = 0;
+      let usedSectionAware = false;
 
-      const n = await applySundayAssignmentPlan(
-        week,
-        plan.items.map((row) => ({
+      if (sectionAwarePreviewOn) {
+        const members = weekLaborToPlannerMembers(labor.allocatable);
+        const ownedBySpecialist: Record<string, number> = {};
+        let ownedTotal = 0;
+        const ownedRotationIds: string[] = [];
+        for (const row of bays) {
+          const owner = String(row.assignment?.specialist_id ?? "").trim();
+          if (!owner) continue;
+          ownedTotal += 1;
+          ownedBySpecialist[owner] = (ownedBySpecialist[owner] ?? 0) + 1;
+          ownedRotationIds.push(String(row.rotation.id));
+        }
+        const capacity = buildPreviewCapacityCaps({
+          eligibleSpecialistIds: members.map((m) => m.specialist_id),
+          ownedBySpecialist,
+          ownedTotal,
+        });
+        const bayRefs = bays.map((bayRow) => ({
+          rotationId: bayRow.rotation.id,
+          department_id: String(
+            bayRow.rotation.store_locations?.department_id ??
+              flooringDept?.id ??
+              ""
+          ).trim(),
+          aisle: bayRow.aisle,
+          bay: bayRow.bay,
+          riskScore: riskScoreFromFinding(
+            healthByRotation.get(bayRow.rotation.id)
+          ),
+        }));
+        const recomputed = composeSectionAwareWeeklyPreview({
+          store_number: getStoreNumber(),
+          week_label: week,
+          bays: bayRefs,
+          members,
+          baySectionByKey: activeBaySectionByKey,
+          ownedRotationIds,
+          capacity,
+          knownHoursOnly: true,
+        });
+        if (sectionAwarePreview) {
+          const freshness = assertSectionAwarePreviewFresh(
+            sectionAwarePreview.fingerprint,
+            recomputed
+          );
+          if (!freshness.ok) {
+            setError(freshness.message);
+            playErrorTone();
+            return;
+          }
+        }
+        planItems = recomputed.items.map((row) => ({
           rotationId: row.rotationId,
           specialist_id: row.specialist_id,
           specialist_name: formatSpecialistShiftLabel(
@@ -547,16 +691,45 @@ export function SundayAuditAssignmentModal({
             row.hours
           ),
           hours: row.hours,
-        }))
-      );
+        }));
+        loadCount = recomputed.loads.length;
+        totalHours = recomputed.total_hours;
+        usedSectionAware = true;
+      } else {
+        const plan = buildScheduleBalancePlan(bays, labor, healthByRotation);
+        planItems = plan.items.map((row) => ({
+          rotationId: row.rotationId,
+          specialist_id: row.specialist_id,
+          specialist_name: formatSpecialistShiftLabel(
+            row.specialist_name,
+            row.hours
+          ),
+          hours: row.hours,
+        }));
+        loadCount = plan.loads.length;
+        totalHours = plan.total_hours;
+      }
+
+      if (planItems.length === 0) {
+        setError(
+          "Could not authoritatively allocate staged bays from known schedule hours."
+        );
+        playErrorTone();
+        return;
+      }
+
+      const n = await applySundayAssignmentPlan(week, planItems);
       const partialNote =
         labor.processing_status === "PARTIAL"
           ? " Partial schedule evidence — only known hours were used."
           : "";
+      const sectionNote = usedSectionAware
+        ? " Section-aware preference applied (opt-in preview)."
+        : "";
       setStatus(
-        `Assigned ${n} physical bay${n === 1 ? "" : "s"} — base ${BASE_WEEKLY_BAY_QUOTA} each across ${plan.loads.length} eligible associate${
-          plan.loads.length === 1 ? "" : "s"
-        } from persisted week schedule (${plan.total_hours}h known).${partialNote}`
+        `Assigned ${n} physical bay${n === 1 ? "" : "s"} — base ${BASE_WEEKLY_BAY_QUOTA} each across ${loadCount} eligible associate${
+          loadCount === 1 ? "" : "s"
+        } from persisted week schedule (${totalHours}h known).${partialNote}${sectionNote}`
       );
       await reload();
       onChanged?.();
@@ -746,6 +919,49 @@ export function SundayAuditAssignmentModal({
                       </li>
                     ))}
                   </ul>
+                  {sectionAwarePreviewOn && sectionAwarePreview ? (
+                    <div
+                      data-testid="section-aware-assign-preview"
+                      className="mt-3 rounded-lg border border-violet-500/30 bg-violet-950/25 p-2.5"
+                    >
+                      <p className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-violet-300">
+                        PROPOSED · section-aware (opt-in)
+                      </p>
+                      <p className="mt-1 text-[11px] leading-snug text-violet-100/75">
+                        Not assigned until confirmed. Capacity{" "}
+                        {sectionAwarePreview.owned_total}/
+                        {sectionAwarePreview.shared_target} · remaining{" "}
+                        {sectionAwarePreview.remaining_shared}. Steward matches{" "}
+                        {sectionAwarePreview.steward_match_count} · coverage
+                        fallbacks {sectionAwarePreview.coverage_fallback_count}.
+                      </p>
+                      <p className="mt-1 text-[10px] leading-snug text-violet-200/60">
+                        {sectionAwarePreview.topology_note}
+                      </p>
+                      <ul
+                        data-testid="section-aware-assign-preview-items"
+                        className="mt-2 max-h-40 space-y-1 overflow-y-auto text-[12px] text-violet-50"
+                      >
+                        {sectionAwarePreview.items.map((item) => (
+                          <li key={item.rotationId}>
+                            <span className="font-mono text-[9px] uppercase text-violet-300/90">
+                              PROPOSED
+                            </span>{" "}
+                            {item.specialist_name} → Aisle {item.aisle} Bay{" "}
+                            {item.bay}
+                            {item.section_name
+                              ? ` · ${item.section_name}`
+                              : " · Unsectioned"}
+                            {item.preference === "steward_match"
+                              ? " · steward preference"
+                              : item.preference === "section_coverage"
+                                ? " · section coverage"
+                                : " · coverage fallback"}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  ) : null}
                   <button
                     type="button"
                     data-testid="week-assign-confirm"

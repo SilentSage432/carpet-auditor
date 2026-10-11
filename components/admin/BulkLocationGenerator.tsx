@@ -76,7 +76,7 @@ export function BulkLocationGenerator({
   const aisleInputRef = useRef<HTMLInputElement>(null);
   const [tab, setTab] = useState<GeneratorTab>("manual");
   const [departmentId, setDepartmentId] = useState(departments[0]?.id ?? "");
-  const [aisle, setAisle] = useState("1");
+  const [aisle, setAisle] = useState("");
   const [startBay, setStartBay] = useState("1");
   const [endBay, setEndBay] = useState("15");
   const [bayPattern, setBayPattern] =
@@ -374,9 +374,10 @@ export function BulkLocationGenerator({
       <h2 className="glass-subtitle text-emerald-400">Bulk Generator</h2>
       <p className="glass-muted mt-1 text-sm">
         Map a department aisle-by-aisle in one session. Select the department
-        once, then create each aisle range. Aisle accepts alphanumeric codes
-        (BW, RW, LW, GC, 12, A1). Each physical bay is created with selling and
-        topstock automatically. Re-running an existing bay updates it safely.
+        once, then create each aisle or named zone range. Codes may be numbered
+        aisles (5, 41) or named zones (SHOW-L, SHOW-R, CLOTHING, CARPET-WALL).
+        Each physical bay is created with selling and topstock automatically.
+        Re-running an existing bay updates it safely.
       </p>
 
       <div
@@ -442,7 +443,7 @@ export function BulkLocationGenerator({
                 inputMode="text"
                 autoCapitalize="characters"
                 spellCheck={false}
-                placeholder="Next aisle (e.g. 39, BW, A1)"
+                placeholder="Aisle or zone (e.g. 41, SHOW-L, CARPET-WALL)"
                 value={aisle}
                 onChange={(e) => setAisle(formatAisleInput(e.target.value))}
                 onBlur={() => setAisle(normalizeAisle(aisle))}

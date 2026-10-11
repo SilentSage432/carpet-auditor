@@ -1,8 +1,10 @@
 "use client";
 
 /**
- * RD-3 — Operational Sections management (More → Department Setup).
- * Aisle-first bay membership picker. Stewardship only — not weekly assignment.
+ * RD-3 + SECTION-UX-001 — Operational Sections management
+ * (More → Department Setup).
+ * Aisle-first multi-select expands to explicit active bay membership.
+ * Stewardship only — not weekly assignment.
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
@@ -19,10 +21,14 @@ import {
   STORE_OPS_SECTIONS_CHANGED_EVENT,
 } from "@/lib/store-ops/client";
 import {
-  composeMapAisleIndex,
-  formatMapAisleLabel,
-  type MapAisleEntry,
-} from "@/lib/store-ops/map-aisle-navigation";
+  assertSectionAislePreviewFresh,
+  composeDepartmentAisleIndexForSections,
+  composeSectionAisleMembershipPreview,
+  composeSectionAisleSelectionRows,
+  countDiscoverableBaysForSection,
+  indexClaimedBaysFromSections,
+  toggleAisleKeySelection,
+} from "@/lib/store-ops/section-aisle-membership";
 import {
   formatUnsectionedLabel,
   sectionBayKey,
@@ -41,7 +47,7 @@ type Props = {
   focusSectionId?: string | null;
 };
 
-type DraftMode = "list" | "create" | "detail" | "pick-bays";
+type DraftMode = "list" | "create" | "detail" | "pick-aisles";
 
 export function OperationalSectionsPanel({
   specialist,
@@ -72,7 +78,11 @@ export function OperationalSectionsPanel({
   const [pendingBays, setPendingBays] = useState<OperationalSectionBayRef[]>(
     []
   );
-  const [pickAisleKey, setPickAisleKey] = useState<string | null>(null);
+  /** SECTION-UX-001 — multi-aisle selection (keys from composeMapAisleIndex). */
+  const [selectedAisleKeys, setSelectedAisleKeys] = useState<string[]>([]);
+  const [aislePreviewFingerprint, setAislePreviewFingerprint] = useState<
+    string | null
+  >(null);
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -123,39 +133,99 @@ export function OperationalSectionsPanel({
 
   const aisleIndex = useMemo(
     () =>
-      composeMapAisleIndex({
-        locations: locations.filter(
-          (loc) => !departmentId || loc.department_id === departmentId
-        ),
+      composeDepartmentAisleIndexForSections({
+        locations,
         departments,
-        showRetired: false,
+        departmentId,
       }),
     [locations, departments, departmentId]
   );
 
-  const claimedKeys = useMemo(() => {
+  const claimedByKey = useMemo(
+    () =>
+      indexClaimedBaysFromSections({
+        sections,
+        excludeSectionId: selectedId,
+      }),
+    [sections, selectedId]
+  );
+
+  const existingMemberKeys = useMemo(() => {
     const set = new Set<string>();
-    for (const section of sections) {
-      if (!section.is_active) continue;
-      if (selectedId && section.id === selectedId) continue;
-      for (const member of section.members ?? []) {
-        set.add(sectionBayKey(member));
-      }
+    for (const member of selected?.members ?? []) {
+      set.add(sectionBayKey(member));
+    }
+    // Create flow: pending bays already chosen count as "existing" for preview.
+    if (!selectedId) {
+      for (const bay of pendingBays) set.add(sectionBayKey(bay));
     }
     return set;
-  }, [sections, selectedId]);
+  }, [selected?.members, selectedId, pendingBays]);
 
-  const selectedAisle: MapAisleEntry | null = useMemo(() => {
-    if (!pickAisleKey) return null;
-    return aisleIndex.find((a) => a.key === pickAisleKey) ?? null;
-  }, [aisleIndex, pickAisleKey]);
+  const aisleRows = useMemo(
+    () =>
+      composeSectionAisleSelectionRows({
+        aisleIndex,
+        selectedAisleKeys,
+        claimedByKey,
+        existingMemberKeys,
+      }),
+    [aisleIndex, selectedAisleKeys, claimedByKey, existingMemberKeys]
+  );
+
+  const aisleMembershipPreview = useMemo(
+    () =>
+      composeSectionAisleMembershipPreview({
+        aisleIndex,
+        selectedAisleKeys,
+        claimedByKey,
+        existingMemberKeys,
+      }),
+    [aisleIndex, selectedAisleKeys, claimedByKey, existingMemberKeys]
+  );
+
+  function handleToggleAisleKey(aisleKey: string) {
+    const next = toggleAisleKeySelection(selectedAisleKeys, aisleKey);
+    const preview = composeSectionAisleMembershipPreview({
+      aisleIndex,
+      selectedAisleKeys: next,
+      claimedByKey,
+      existingMemberKeys,
+    });
+    setSelectedAisleKeys(next);
+    setAislePreviewFingerprint(preview.fingerprint);
+  }
+
+  const discoverableBays = useMemo(() => {
+    if (!selected?.is_active) {
+      return { discoverable_count: 0, aisle_labels: [] as string[] };
+    }
+    return countDiscoverableBaysForSection({
+      aisleIndex,
+      sectionMembers: selected.members ?? [],
+      claimedByKey,
+    });
+  }, [selected, aisleIndex, claimedByKey]);
 
   function openCreate() {
     setName("");
     setDescription("");
     setOwnerId("");
     setPendingBays([]);
+    setSelectedAisleKeys([]);
+    setAislePreviewFingerprint(null);
     setMode("create");
+  }
+
+  function openAislePicker() {
+    setSelectedAisleKeys([]);
+    setAislePreviewFingerprint(null);
+    if (!selectedId) {
+      // Keep pendingBays from prior create picks; only clear aisle draft.
+    } else {
+      setPendingBays([]);
+    }
+    setMode("pick-aisles");
   }
 
   function openDetail(id: string) {
@@ -225,25 +295,71 @@ export function OperationalSectionsPanel({
     }
   }
 
-  async function handleApplyPendingMembers() {
-    if (!canManage || !selected || pendingBays.length === 0) return;
-    setBusy(true);
-    setError(null);
-    try {
-      await addOperationalSectionMembersClient(
-        specialist,
-        selected.id,
-        pendingBays
-      );
-      setPendingBays([]);
-      setMode("detail");
-      await reload();
-      onChanged?.();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Could not add bays");
-    } finally {
-      setBusy(false);
+  function recomputeAislePreviewFresh() {
+    return composeSectionAisleMembershipPreview({
+      aisleIndex,
+      selectedAisleKeys,
+      claimedByKey,
+      existingMemberKeys,
+    });
+  }
+
+  async function handleApplyAisleSelection() {
+    if (!canManage) return;
+    const recomputed = recomputeAislePreviewFresh();
+    const freshness = assertSectionAislePreviewFresh(
+      aislePreviewFingerprint ?? recomputed.fingerprint,
+      recomputed
+    );
+    if (!freshness.ok) {
+      setError(freshness.message);
+      return;
     }
+    if (recomputed.total_bays_to_add === 0) {
+      setError(
+        recomputed.conflicts.length > 0
+          ? "Selected aisles have no available bays — conflicted bays stay in their current section."
+          : "Selected aisles have no available active bays to add."
+      );
+      return;
+    }
+
+    if (selectedId && selected) {
+      setBusy(true);
+      setError(null);
+      try {
+        await addOperationalSectionMembersClient(
+          specialist,
+          selected.id,
+          recomputed.bays_to_add
+        );
+        setPendingBays([]);
+        setSelectedAisleKeys([]);
+        setMode("detail");
+        await reload();
+        onChanged?.();
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Could not add bays");
+      } finally {
+        setBusy(false);
+      }
+      return;
+    }
+
+    // Create flow: merge into pending, return to create form (no persistence yet).
+    setPendingBays((prev) => {
+      const seen = new Set(prev.map((b) => sectionBayKey(b)));
+      const next = [...prev];
+      for (const bay of recomputed.bays_to_add) {
+        const key = sectionBayKey(bay);
+        if (seen.has(key)) continue;
+        seen.add(key);
+        next.push(bay);
+      }
+      return next;
+    });
+    setSelectedAisleKeys([]);
+    setMode("create");
   }
 
   async function handleRemoveMember(ref: OperationalSectionBayRef) {
@@ -261,16 +377,6 @@ export function OperationalSectionsPanel({
     } finally {
       setBusy(false);
     }
-  }
-
-  function togglePendingBay(ref: OperationalSectionBayRef) {
-    const key = sectionBayKey(ref);
-    setPendingBays((prev) => {
-      if (prev.some((b) => sectionBayKey(b) === key)) {
-        return prev.filter((b) => sectionBayKey(b) !== key);
-      }
-      return [...prev, ref];
-    });
   }
 
   useEffect(() => {
@@ -293,7 +399,9 @@ export function OperationalSectionsPanel({
     <div className="space-y-3" data-testid="operational-sections-panel">
       <p className="text-[11px] leading-snug text-zinc-500">
         Persistent bay stewardship. Not weekly assignment and not proof of work.
-        A bay belongs to at most one active section.
+        A bay belongs to at most one active section. Numbered aisles and named
+        zones (e.g. SHOW-L, CARPET-WALL) appear together — select the whole
+        aisle/zone to include its currently documented active bays.
       </p>
 
       {error ? (
@@ -333,8 +441,8 @@ export function OperationalSectionsPanel({
               className="rounded-xl border border-dashed border-zinc-700 px-3 py-4 text-sm text-zinc-400"
               data-testid="sections-empty"
             >
-              No Operational Sections yet. Create one, then add bays from the
-              aisle map.
+              No Operational Sections yet. Create one, then add aisles (all
+              active bays in each aisle).
             </p>
           ) : (
             <ul className="space-y-2" data-testid="sections-list">
@@ -431,18 +539,15 @@ export function OperationalSectionsPanel({
           {mode === "create" ? (
             <>
               <p className="font-mono text-[10px] text-zinc-500">
-                Pending bays: {pendingBays.length}
+                Pending bays from aisles: {pendingBays.length}
               </p>
               <button
                 type="button"
-                onClick={() => {
-                  setPickAisleKey(null);
-                  setMode("pick-bays");
-                }}
+                onClick={openAislePicker}
                 className="flex min-h-12 w-full items-center justify-center rounded-xl border border-zinc-700 text-sm font-semibold text-zinc-100"
                 data-testid="sections-pick-bays"
               >
-                Add bays from Map
+                Select aisles
               </button>
               <button
                 type="button"
@@ -494,18 +599,33 @@ export function OperationalSectionsPanel({
                   {canManage && selected.is_active ? (
                     <button
                       type="button"
-                      onClick={() => {
-                        setPendingBays([]);
-                        setPickAisleKey(null);
-                        setMode("pick-bays");
-                      }}
+                      onClick={openAislePicker}
                       className="min-h-11 rounded-lg border border-zinc-700 px-2 text-xs font-semibold text-zinc-200"
                       data-testid="sections-add-bays"
                     >
-                      Add bays
+                      Add aisles
                     </button>
                   ) : null}
                 </div>
+                {canManage &&
+                selected.is_active &&
+                discoverableBays.discoverable_count > 0 ? (
+                  <div
+                    className="mb-2 rounded-xl border border-amber-500/30 bg-amber-950/20 px-3 py-2"
+                    data-testid="sections-discoverable-bays"
+                  >
+                    <p className="text-[12px] font-semibold text-amber-50">
+                      {discoverableBays.discoverable_count} newly mapped bay
+                      {discoverableBays.discoverable_count === 1 ? "" : "s"}{" "}
+                      available
+                    </p>
+                    <p className="mt-0.5 text-[11px] leading-snug text-amber-100/75">
+                      In {discoverableBays.aisle_labels.join(", ")}. Not added
+                      automatically — use Add aisles and re-select those
+                      aisles/zones to include them.
+                    </p>
+                  </div>
+                ) : null}
                 {(selected.members ?? []).length === 0 ? (
                   <p className="text-sm text-zinc-500">
                     No bays yet — unsectioned geography stays valid.
@@ -546,117 +666,164 @@ export function OperationalSectionsPanel({
         </div>
       ) : null}
 
-      {mode === "pick-bays" ? (
+      {mode === "pick-aisles" ? (
         <div
           className="space-y-3 rounded-2xl border border-zinc-800/80 bg-zinc-950/40 p-3"
           data-testid="sections-bay-picker"
         >
           <button
             type="button"
-            onClick={() =>
-              setMode(selectedId ? "detail" : "create")
-            }
+            onClick={() => {
+              setSelectedAisleKeys([]);
+              setMode(selectedId ? "detail" : "create");
+            }}
             className="min-h-11 text-sm font-semibold text-accent"
+            data-testid="sections-aisle-picker-back"
           >
             ← Back
           </button>
           <p className="text-sm text-zinc-300">
-            Pick bays by aisle. Claimed bays in other sections are disabled.
-          </p>
-          <p className="font-mono text-[10px] text-zinc-500">
-            Selected: {pendingBays.length}
+            Select aisles or named zones to include every currently documented
+            active bay. Future bays are never auto-included. Conflicted bays in
+            other sections are never moved silently. Joint stewardship (multiple
+            owners) is not available yet — one primary owner per section.
           </p>
 
-          {!selectedAisle ? (
-            <ul className="grid grid-cols-2 gap-2">
-              {aisleIndex.map((aisle) => (
-                <li key={aisle.key}>
-                  <button
-                    type="button"
-                    onClick={() => setPickAisleKey(aisle.key)}
-                    className="flex min-h-[4.5rem] w-full flex-col items-start justify-center rounded-xl border border-zinc-800 bg-zinc-950/60 px-3 text-left"
+          {aisleRows.length === 0 ? (
+            <p
+              className="rounded-xl border border-dashed border-zinc-700 px-3 py-4 text-sm text-zinc-400"
+              data-testid="sections-aisle-picker-empty"
+            >
+              No active aisles documented for this department yet. Map bays
+              first, then return here to include them.
+            </p>
+          ) : (
+            <ul
+              className="space-y-2"
+              data-testid="sections-aisle-multi-select"
+            >
+              {aisleRows.map((row) => (
+                <li key={row.aisle_key}>
+                  <label
+                    className={`flex min-h-14 w-full cursor-pointer items-center gap-3 rounded-xl border px-3 py-2 active:scale-[0.99] ${
+                      row.selected
+                        ? "border-accent/45 bg-accent/10"
+                        : "border-zinc-800 bg-zinc-950/60"
+                    } ${row.zero_active_bays ? "opacity-50" : ""}`}
+                    data-testid="sections-aisle-option"
                   >
-                    <span className="font-mono text-sm font-bold text-zinc-50">
-                      {formatMapAisleLabel(aisle)}
+                    <input
+                      type="checkbox"
+                      checked={row.selected}
+                      disabled={busy || row.zero_active_bays}
+                      onChange={() => handleToggleAisleKey(row.aisle_key)}
+                      className="h-5 w-5 shrink-0"
+                      data-testid="sections-aisle-checkbox"
+                    />
+                    <span className="min-w-0 flex-1 text-left">
+                      <span className="block font-mono text-sm font-bold text-zinc-50">
+                        {row.aisle_label}
+                      </span>
+                      <span className="mt-0.5 block font-mono text-[10px] text-zinc-500">
+                        {row.active_bay_count} active bay
+                        {row.active_bay_count === 1 ? "" : "s"}
+                        {row.available_bay_count < row.active_bay_count
+                          ? ` · ${row.available_bay_count} available`
+                          : ""}
+                        {row.conflict_bay_count > 0
+                          ? ` · ${row.conflict_bay_count} in other section`
+                          : ""}
+                        {row.already_member_count > 0
+                          ? ` · ${row.already_member_count} already included`
+                          : ""}
+                        {row.zero_active_bays ? " · no active bays" : ""}
+                      </span>
                     </span>
-                    <span className="font-mono text-[10px] text-zinc-500">
-                      {aisle.physicalBayCount} bays
-                    </span>
-                  </button>
+                  </label>
                 </li>
               ))}
             </ul>
-          ) : (
-            <>
-              <button
-                type="button"
-                onClick={() => setPickAisleKey(null)}
-                className="min-h-11 text-sm font-semibold text-zinc-300"
-              >
-                ← Aisles
-              </button>
-              <ul className="divide-y divide-zinc-800/80 overflow-hidden rounded-xl border border-zinc-800/80">
-                {selectedAisle.bays.map((pair) => {
-                  const ref: OperationalSectionBayRef = {
-                    department_id: selectedAisle.departmentId,
-                    aisle: selectedAisle.aisle,
-                    bay: pair.bay,
-                  };
-                  const key = sectionBayKey(ref);
-                  const claimed = claimedKeys.has(key);
-                  const alreadyInSelected = (selected?.members ?? []).some(
-                    (m) => sectionBayKey(m) === key
-                  );
-                  const checked = pendingBays.some(
-                    (b) => sectionBayKey(b) === key
-                  );
-                  const disabled = claimed || alreadyInSelected;
-                  return (
-                    <li key={key}>
-                      <label
-                        className={`flex min-h-12 items-center gap-3 px-3 ${
-                          disabled ? "opacity-40" : ""
-                        }`}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={checked || alreadyInSelected}
-                          disabled={disabled || busy}
-                          onChange={() => togglePendingBay(ref)}
-                          className="h-5 w-5"
-                        />
-                        <span className="font-mono text-sm text-zinc-100">
-                          {selectedAisle.aisle}-{pair.bay}
-                          {claimed ? " · other section" : ""}
-                          {alreadyInSelected ? " · already in section" : ""}
-                        </span>
-                      </label>
-                    </li>
-                  );
-                })}
-              </ul>
-            </>
           )}
 
-          {selectedId ? (
-            <button
-              type="button"
-              disabled={busy || pendingBays.length === 0}
-              onClick={() => void handleApplyPendingMembers()}
-              className="flex min-h-12 w-full items-center justify-center rounded-xl border border-accent/40 bg-accent/20 text-sm font-bold text-accent disabled:opacity-40"
+          {selectedAisleKeys.length > 0 ? (
+            <div
+              className="space-y-2 rounded-xl border border-cyan-500/30 bg-cyan-950/20 p-3"
+              data-testid="sections-aisle-preview"
             >
-              Add {pendingBays.length} bay
-              {pendingBays.length === 1 ? "" : "s"}
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={() => setMode("create")}
-              className="flex min-h-12 w-full items-center justify-center rounded-xl border border-zinc-700 text-sm font-semibold text-zinc-100"
-            >
-              Done selecting ({pendingBays.length})
-            </button>
-          )}
+              <p className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-cyan-300">
+                Preview before save
+              </p>
+              <ul className="space-y-1 text-[12px] text-cyan-50">
+                <li data-testid="sections-aisle-preview-aisles">
+                  Aisles:{" "}
+                  {aisleMembershipPreview.selected_aisle_labels.join(", ") ||
+                    "—"}
+                </li>
+                <li data-testid="sections-aisle-preview-total">
+                  Active bays to add: {aisleMembershipPreview.total_bays_to_add}
+                </li>
+                {aisleMembershipPreview.conflicts.length > 0 ? (
+                  <li
+                    className="text-amber-100"
+                    data-testid="sections-aisle-preview-conflicts"
+                  >
+                    Conflicts (kept in other section):{" "}
+                    {aisleMembershipPreview.conflicts.length}
+                    {" — "}
+                    {aisleMembershipPreview.conflicts
+                      .slice(0, 6)
+                      .map((c) => `${c.aisle_label} bay ${c.bay}`)
+                      .join(", ")}
+                    {aisleMembershipPreview.conflicts.length > 6
+                      ? "…"
+                      : ""}
+                  </li>
+                ) : (
+                  <li data-testid="sections-aisle-preview-conflicts">
+                    Conflicts: none
+                  </li>
+                )}
+                {aisleMembershipPreview.zero_active_aisles.length > 0 ? (
+                  <li
+                    className="text-amber-100/90"
+                    data-testid="sections-aisle-preview-zero"
+                  >
+                    Zero active bays:{" "}
+                    {aisleMembershipPreview.zero_active_aisles.join(", ")}
+                  </li>
+                ) : null}
+                {aisleMembershipPreview.partial_aisles.length > 0 ? (
+                  <li data-testid="sections-aisle-preview-partial">
+                    Partial aisles:{" "}
+                    {aisleMembershipPreview.partial_aisles.join(", ")}
+                  </li>
+                ) : null}
+              </ul>
+              <p className="text-[10px] leading-snug text-cyan-100/65">
+                {aisleMembershipPreview.note}
+              </p>
+            </div>
+          ) : null}
+
+          <button
+            type="button"
+            disabled={
+              busy ||
+              selectedAisleKeys.length === 0 ||
+              aisleMembershipPreview.total_bays_to_add === 0
+            }
+            onClick={() => void handleApplyAisleSelection()}
+            className="flex min-h-12 w-full items-center justify-center rounded-xl border border-accent/40 bg-accent/20 text-sm font-bold text-accent disabled:opacity-40"
+            data-testid="sections-aisle-confirm"
+          >
+            {selectedId
+              ? `Add ${aisleMembershipPreview.total_bays_to_add} bay${
+                  aisleMembershipPreview.total_bays_to_add === 1 ? "" : "s"
+                }`
+              : `Include ${aisleMembershipPreview.total_bays_to_add} bay${
+                  aisleMembershipPreview.total_bays_to_add === 1 ? "" : "s"
+                }`}
+          </button>
         </div>
       ) : null}
 

@@ -176,6 +176,73 @@ describe("map-aisle-navigation", () => {
     expect(formatMapAisleLabel(index[0]!)).toContain("·");
   });
 
+  it("labels numbered aisles and named zones distinctly", () => {
+    expect(
+      formatMapAisleLabel({
+        aisle: "41",
+        departmentName: "Flooring",
+        aisleCodeCollides: false,
+      })
+    ).toBe("Aisle 41");
+    expect(
+      formatMapAisleLabel({
+        aisle: "SHOW-L",
+        departmentName: "Flooring",
+        aisleCodeCollides: false,
+      })
+    ).toBe("SHOW-L");
+    expect(
+      formatMapAisleLabel({
+        aisle: "CARPET-WALL",
+        departmentName: "Flooring",
+        aisleCodeCollides: false,
+      })
+    ).toBe("CARPET-WALL");
+    expect(
+      formatMapAisleLabel({
+        aisle: "SHOW-R",
+        departmentName: "Flooring",
+        aisleCodeCollides: true,
+      })
+    ).toBe("SHOW-R · Flooring");
+  });
+
+  it("indexes named zone codes beside numbered aisles", () => {
+    const index = composeMapAisleIndex({
+      locations: [
+        loc({
+          id: "1",
+          department_id: "d1",
+          aisle: "41",
+          bay: 1,
+          type: "SELLING",
+        }),
+        loc({
+          id: "2",
+          department_id: "d1",
+          aisle: "SHOW-L",
+          bay: 1,
+          type: "SELLING",
+        }),
+        loc({
+          id: "3",
+          department_id: "d1",
+          aisle: "CARPET-WALL",
+          bay: 2,
+          type: "SELLING",
+        }),
+      ],
+      departments: depts,
+    });
+    expect(index.map((e) => e.aisle).sort()).toEqual([
+      "41",
+      "CARPET-WALL",
+      "SHOW-L",
+    ]);
+    expect(filterAisleIndexByQuery(index, "show")).toHaveLength(1);
+    expect(filterAisleIndexByQuery(index, "carpet")).toHaveLength(1);
+  });
+
   it("filters aisle index by query", () => {
     const index = composeMapAisleIndex({
       locations: [

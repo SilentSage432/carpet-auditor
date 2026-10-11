@@ -90,7 +90,9 @@ describe("RD-3 Operational Sections", () => {
     expect(settings).toMatch(/operational-sections/);
     const panel = readSrc("components/admin/OperationalSectionsPanel.tsx");
     expect(panel).toMatch(/sections-bay-picker/);
-    expect(panel).toMatch(/composeMapAisleIndex/);
+    expect(panel).toMatch(
+      /composeMapAisleIndex|composeDepartmentAisleIndexForSections|section-aisle-membership/
+    );
     expect(panel).toMatch(/canManageOperationalSections/);
     expect(panel).not.toMatch(/toggleDept/);
   });

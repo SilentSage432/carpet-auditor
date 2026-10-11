@@ -6,7 +6,7 @@ import { AddBaySheet } from "@/components/admin/AddBaySheet";
 import { EditBayDrawer } from "@/components/admin/EditBayDrawer";
 import { HubPortal } from "@/components/hub/HubPortal";
 import { ChevronDown, ChevronUp, Pencil, Plus, Sparkles, Trash2, X } from "lucide-react";
-import { compareAisles } from "@/lib/store-ops/aisle";
+import { compareAisles, formatAisleDisplayLabel } from "@/lib/store-ops/aisle";
 import { deleteStoreLocations } from "@/lib/store-ops/client";
 import {
   findDuplicateLegacyBays,
@@ -90,11 +90,9 @@ function cadenceLabel(tier: VelocityTier): string | null {
 }
 
 function aisleTitle(aisle: string): string {
-  const raw = String(aisle ?? "").trim();
-  if (!raw) return "Aisle";
-  if (/^(BW|BACK)/i.test(raw)) return "Back Wall";
-  if (/^(RW|RACK)/i.test(raw)) return `Aisle ${raw.toUpperCase()}`;
-  return `Aisle ${raw}`;
+  // SECTION-UX-002: numbered aisles + named zones (SHOW-L, CARPET-WALL, …).
+  // Do not invent display names that diverge from the canonical code.
+  return formatAisleDisplayLabel(aisle);
 }
 
 /**

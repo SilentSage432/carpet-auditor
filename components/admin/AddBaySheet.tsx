@@ -50,7 +50,7 @@ export function AddBaySheet({
       return;
     }
     if (!isValidAisle(aisleCode)) {
-      setError("Enter an aisle code (e.g. BW, RW, 12, A1)");
+      setError("Enter an aisle or zone code (e.g. 41, SHOW-L, CARPET-WALL)");
       return;
     }
     const bayNumber = Math.floor(Number(bayDraft));
@@ -73,7 +73,7 @@ export function AddBaySheet({
           ? "APPLIANCE_SIMS_AUDIT"
           : "STANDARD_MERCH",
       });
-      toastSuccess(`Added Aisle ${aisleCode} Bay ${bayNumber}`);
+      toastSuccess(`Added ${aisleCode} · Bay ${bayNumber}`);
       onChanged();
       onClose();
     } catch (err) {

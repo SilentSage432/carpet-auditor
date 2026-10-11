@@ -72,7 +72,7 @@ export function EditBayDrawer({
     if (ids.length === 0) return;
     const aisleCode = normalizeAisle(aisleDraft);
     if (!isValidAisle(aisleCode)) {
-      setError("Enter an aisle code (e.g. BW, RW, 12, A1)");
+      setError("Enter an aisle or zone code (e.g. 41, SHOW-L, CARPET-WALL)");
       return;
     }
     const bayNumber = Math.floor(Number(bayDraft));

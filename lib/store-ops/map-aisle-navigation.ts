@@ -5,7 +5,11 @@
  * Does not invent aisle adjacency, sections, or department geography.
  */
 
-import { compareAisles, normalizeAisle } from "./aisle";
+import {
+  compareAisles,
+  formatAisleDisplayLabel,
+  normalizeAisle,
+} from "./aisle";
 import type { Department, StoreLocation } from "./types";
 
 export type MapBayPair = {
@@ -133,10 +137,11 @@ export function formatMapAisleLabel(
     "aisle" | "departmentName" | "aisleCodeCollides"
   >
 ): string {
+  const base = formatAisleDisplayLabel(entry.aisle);
   if (entry.aisleCodeCollides) {
-    return `Aisle ${entry.aisle} · ${entry.departmentName}`;
+    return `${base} · ${entry.departmentName}`;
   }
-  return `Aisle ${entry.aisle}`;
+  return base;
 }
 
 export function filterAisleIndexByQuery(
