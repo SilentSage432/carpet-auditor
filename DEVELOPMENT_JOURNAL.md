@@ -1,5 +1,13 @@
 # DeptSync Hub — Development Journal
 
+## 2026-10-11 — DEPTSYNC-SEC-OPS-009 Credential writer closure
+
+**Authorized security release.** Closed remaining client plaintext writer: `updateSpecialistCredentials` now calls service-role `POST /api/auth/update-credentials` (`updateHubCredentials` → scrypt1). Browser payloads no longer write `pin_code`. AccessGate setup requires JWT. Pushed `dbf6847`; Vercel Production `As1U36FuRe89XwQrtkVDai9YgR6y`. Master scrypt1 preserved; inventory scrypt1=1 / digit=0 / unknown=0. Public auth + anon 42501 + rate-limit OK. **`DEPTSYNC_ALLOW_PLAINTEXT_PIN_VERIFY` not changed** — separate operator env disable is **GO**. Typecheck/build pass; **1523** tests. Canonical: [`docs/product/DEPTSYNC_SEC_OPS_009_WRITER_CLOSURE.md`](docs/product/DEPTSYNC_SEC_OPS_009_WRITER_CLOSURE.md).
+
+## 2026-10-11 — DEPTSYNC-SEC-OPS-008 Plaintext auth retirement audit
+
+**Read-only discovery.** No mutations/deploy. Verdict: **CONDITIONAL GO** for later fallback disable after writer closure. Canonical: [`docs/product/DEPTSYNC_SEC_OPS_008_AUTH_RETIREMENT_AUDIT.md`](docs/product/DEPTSYNC_SEC_OPS_008_AUTH_RETIREMENT_AUDIT.md).
+
 ## 2026-10-11 — DEPTSYNC-SEC-OPS-007G Authenticated bootstrap repair
 
 **Authorized hotfix.** Hub `/` awaits Supabase `getSession` before any `fetchSpecialists`; reuses `decideAccessGateBoot` via `decideHubPageBoot`; generation guard; fail-closed to unlock/login. SW cache `deptsync-shell-v7-auth-boot`. Pushed `54d2bc4`; Vercel Production `E84YJUL4vH3TFPPe31agW6kx5vmm`. Anon 42501 intact; `/login` 200. No anon grants / SQL / credential changes. Typecheck/build pass; **1507** tests. **OPERATOR LOGIN PENDING**. Canonical: [`docs/product/DEPTSYNC_SEC_OPS_007G_AUTH_BOOTSTRAP_REPAIR.md`](docs/product/DEPTSYNC_SEC_OPS_007G_AUTH_BOOTSTRAP_REPAIR.md).
