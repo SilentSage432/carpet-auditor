@@ -1,5 +1,21 @@
 # DeptSync Hub — Development Journal
 
+## 2026-10-11 — DEPTSYNC-SEC-OPS-007G Authenticated bootstrap repair
+
+**Authorized hotfix.** Hub `/` awaits Supabase `getSession` before any `fetchSpecialists`; reuses `decideAccessGateBoot` via `decideHubPageBoot`; generation guard; fail-closed to unlock/login. SW cache `deptsync-shell-v7-auth-boot`. No anon grants / SQL / credential changes. Typecheck/build pass; **1507** tests. **OPERATOR LOGIN PENDING**. Canonical: [`docs/product/DEPTSYNC_SEC_OPS_007G_AUTH_BOOTSTRAP_REPAIR.md`](docs/product/DEPTSYNC_SEC_OPS_007G_AUTH_BOOTSTRAP_REPAIR.md).
+
+## 2026-10-11 — DEPTSYNC-SEC-OPS-007F Production roster authorization investigation
+
+**Diagnostic only.** No production mutations, commit, push, or deploy.
+
+Operator DevTools: `GET /rest/v1/store_specialists` → HTTP 401 / `42501` permission denied for table — reproduced with production **anon** key (hint names `anon`). SEC-OPS-002 intentional revoke. `SPECIALIST_LIST_SELECT` has no secrets and fits authenticated column grants. App still bootstraps via browser `fetchSpecialists` without ensuring authenticated JWT (hub `loadStoreData`); uncaught rejection keeps splash. Repair = sequencing/error handling, **not** anon grants. Tests: `sec-ops-007f.roster-auth-diagnostic.test.ts`. Canonical: [`docs/product/DEPTSYNC_SEC_OPS_007F_ROSTER_AUTH_DIAGNOSTIC.md`](docs/product/DEPTSYNC_SEC_OPS_007F_ROSTER_AUTH_DIAGNOSTIC.md). STOP.
+
+## 2026-10-11 — DEPTSYNC-SEC-OPS-007E Device-evidence authentication investigation
+
+**Diagnostic only.** No production mutations, commit, push, or deploy.
+
+Operator phone still on “Loading DeptSync secure session…” after 007D with console 401 + `[fetchSpecialists]` + Uncaught Object. Production `/login` chunk `2yj418yf7-0ff.js` contains 007D catch/`roster_auth_rejected`. That uncaught triad cannot come from current AccessGate; stale pre-007D JS and/or hub `app/page.tsx` uncaught `loadStoreData` remain. SW `deptsync-shell-v6-stealth` cache-first for `/_next/static` can retain obsolete bundles after failed navigation. Diagnostic tests: `sec-ops-007e.device-auth-diagnostic.test.ts`. Canonical: [`docs/product/DEPTSYNC_SEC_OPS_007E_DEVICE_AUTH_DIAGNOSTIC.md`](docs/product/DEPTSYNC_SEC_OPS_007E_DEVICE_AUTH_DIAGNOSTIC.md). STOP.
+
 ## 2026-10-11 — DEPTSYNC-SEC-OPS-007D Secure session bootstrap repair
 
 **Authorized hotfix.** AccessGate fails closed out of `booting` on roster/JWT/network restore failures via `decideAccessGateBoot`; generation guard blocks stale enters. Pushed `75efe82`; Vercel Production `FqTvT3XYWuHTE55u8e7ZfRdoLAgj`. Clean `/login` PIN UI verified. **OPERATOR LOGIN PENDING**. Typecheck/build pass; **1487** tests. Canonical: [`docs/product/DEPTSYNC_SEC_OPS_007D_BOOTSTRAP_REPAIR.md`](docs/product/DEPTSYNC_SEC_OPS_007D_BOOTSTRAP_REPAIR.md).

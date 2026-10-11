@@ -1,6 +1,7 @@
 /**
- * AccessGate session bootstrap (SEC-OPS-007D).
- * Pure decision + async restore helpers — never grants access on failure.
+ * AccessGate / hub session bootstrap decisions (SEC-OPS-007D / 007G).
+ * Pure decision helpers — never grants access on failure.
+ * Hub page reuses via decideHubPageBoot (JWT-first roster; no anon SELECT).
  */
 
 import type { AuthSession } from "@/lib/auth-session";

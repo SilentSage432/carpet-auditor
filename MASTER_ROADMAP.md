@@ -38,7 +38,10 @@
 - [x] **DEPTSYNC-SEC-OPS-007B** — Emergency login hotfix (**SHIPPED** `ff2b30b` / `ED2oSLiAtovm3xWY944KCF74VDAB`) — [`DEPTSYNC_SEC_OPS_007B_LOGIN_HOTFIX.md`](docs/product/DEPTSYNC_SEC_OPS_007B_LOGIN_HOTFIX.md)
 - [x] **DEPTSYNC-SEC-OPS-007C** — Secure session bootstrap diagnostic — [`DEPTSYNC_SEC_OPS_007C_SESSION_BOOTSTRAP.md`](docs/product/DEPTSYNC_SEC_OPS_007C_SESSION_BOOTSTRAP.md)
 - [x] **DEPTSYNC-SEC-OPS-007D** — AccessGate bootstrap repair (**SHIPPED** `75efe82` / `FqTvT3XYWuHTE55u8e7ZfRdoLAgj`; operator login **PENDING**) — [`DEPTSYNC_SEC_OPS_007D_BOOTSTRAP_REPAIR.md`](docs/product/DEPTSYNC_SEC_OPS_007D_BOOTSTRAP_REPAIR.md)
-- [ ] **Post-RD-6 trust / topology / auth pack** — manual operator login confirm → plaintext fallback retirement → CI-001 → DOCS-TRUTH → AUTH inventory → ALIGN-DEPT + capacity guard
+- [x] **DEPTSYNC-SEC-OPS-007E** — Device-evidence auth diagnostic (**COMPLETE** docs/tests only; repair **NO-GO** here) — [`DEPTSYNC_SEC_OPS_007E_DEVICE_AUTH_DIAGNOSTIC.md`](docs/product/DEPTSYNC_SEC_OPS_007E_DEVICE_AUTH_DIAGNOSTIC.md)
+- [x] **DEPTSYNC-SEC-OPS-007F** — Roster authorization diagnostic (**COMPLETE**; anon 42501 = SEC-OPS-002; app sequencing repair **GO** when authorized) — [`DEPTSYNC_SEC_OPS_007F_ROSTER_AUTH_DIAGNOSTIC.md`](docs/product/DEPTSYNC_SEC_OPS_007F_ROSTER_AUTH_DIAGNOSTIC.md)
+- [x] **DEPTSYNC-SEC-OPS-007G** — Authenticated bootstrap repair (**SHIPPING**; operator login **PENDING**) — [`DEPTSYNC_SEC_OPS_007G_AUTH_BOOTSTRAP_REPAIR.md`](docs/product/DEPTSYNC_SEC_OPS_007G_AUTH_BOOTSTRAP_REPAIR.md)
+- [ ] **Post-RD-6 trust / topology / auth pack** — operator login confirm → plaintext fallback retirement → CI-001 → DOCS-TRUTH → AUTH inventory → ALIGN-DEPT + capacity guard
 
 ## Next (ALIGN — constitutional direction)
 - [x] **DEPTSYNC-ALIGN-001** — Constitutional alignment & redesign blueprint (**COMPLETE** — planning only; operator-approved)

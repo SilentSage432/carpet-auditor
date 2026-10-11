@@ -1,12 +1,21 @@
 "use client";
 
+/**
+ * Specialty hub `/` — SEC-OPS-007G: JWT-first roster bootstrap (never anon
+ * store_specialists). Fail-closed via decideHubPageBoot / AccessGate table.
+ */
+
 import dynamic from "next/dynamic";
-import { useCallback, useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { ChangePinModal } from "@/components/hub/ChangePinModal";
 import { AssociateSpecialtySwitcher } from "@/components/hub/HubChrome";
 import { SpecialtyToolsPanel } from "@/components/hub/SpecialtyToolsPanel";
 import { SpecialistModal } from "@/components/hub/SpecialistModal";
+import {
+  canFetchProtectedRoster,
+  decideHubPageBoot,
+} from "@/lib/auth/hub-page-bootstrap";
 import {
   clearAuthSession,
   isAuthSessionExpired,
@@ -154,6 +163,7 @@ export default function DeptSyncHubPage() {
   const [visitedSections, setVisitedSections] = useState<Set<HubSection>>(
     () => new Set()
   );
+  const bootGenRef = useRef(0);
   const { viewSpecialist } = useDevSandbox(specialist);
   const viewMember = viewSpecialist ?? specialist;
   const working = useWorkingDepartment(viewMember);
@@ -187,75 +197,39 @@ export default function DeptSyncHubPage() {
   const requireLogin = useCallback(() => {
     clearAuthSession();
     setSpecialist(null);
+    setSpecialists([]);
+    setRosterReady(true);
     setGate("login");
     window.location.replace("/login");
   }, []);
 
-  const resolveGateFromSession = useCallback(async (roster: StoreSpecialist[]) => {
-    const session = readAuthSession();
-    if (!session || isAuthSessionExpired(session)) {
-      clearAuthSession();
-      setSpecialist(null);
-      setGate("login");
-      return;
-    }
-
-    const matched =
-      syncActiveSpecialistFromRoster(roster) ?? session.specialist;
-    updateAuthSessionSpecialist(matched);
-    const refreshed = readAuthSession() ?? session;
-
-    if (needsCredentialSetup(matched) || matched.must_change_credentials) {
-      setSpecialist(matched);
-      setGate("setup");
-      return;
-    }
-
-    // Hub UI session alone is not enough for Store Ops — require a live
-    // Supabase Auth JWT (minted by Hub PIN bridge or phone recovery).
-    const supabase = getSupabase();
-    const { data: authData } = supabase
-      ? await supabase.auth.getSession()
-      : { data: { session: null } };
-    if (!authData.session?.access_token) {
-      setSpecialist(matched);
-      setGate("unlock");
-      return;
-    }
-
-    touchAuthSession();
-    markWorkspaceUnlocked(refreshed.sessionToken);
-    const adopted = adoptStoreNumberFromSpecialist(matched.store_number);
-    const withStore = adopted
-      ? { ...matched, store_number: adopted }
-      : matched;
-    setSpecialist(withStore);
-    if (adopted) setStoreNumberState(adopted);
-
-    const fromQuery =
-      typeof window !== "undefined"
-        ? parseHubSectionParam(
-            new URLSearchParams(window.location.search).get("section")
-          )
-        : null;
-    if (fromQuery === "remnants" || fromQuery === "settings") {
-      router.replace(fromQuery === "settings" ? "/settings" : "/dashboard");
-      return;
-    }
-    // REDUCE-004: specialty hub sections redirect to operator home.
-    if (fromQuery && shouldStayOnSpecialtyHub(fromQuery)) {
-      router.replace(homeHrefForSpecialist(withStore));
-      return;
-    }
-    router.replace(homeHrefForSpecialist(withStore));
-  }, [router]);
-
+  /** Authenticated roster refresh only — never PostgREST as anon. */
   const loadStoreData = useCallback(async () => {
-    const team = await fetchSpecialists();
-    const roster = dedupeRoster(team);
-    setSpecialists(roster);
-    setRosterReady(true);
-    return roster;
+    const supabase = getSupabase();
+    let hasJwt = false;
+    try {
+      const { data } = supabase
+        ? await supabase.auth.getSession()
+        : { data: { session: null } };
+      hasJwt = Boolean(data.session?.access_token);
+    } catch {
+      hasJwt = false;
+    }
+    if (!canFetchProtectedRoster(hasJwt)) {
+      setRosterReady(true);
+      return [] as StoreSpecialist[];
+    }
+    try {
+      const team = await fetchSpecialists();
+      const roster = dedupeRoster(team);
+      setSpecialists(roster);
+      setRosterReady(true);
+      return roster;
+    } catch (err) {
+      console.error("[loadStoreData] authorized roster fetch failed", err);
+      setRosterReady(true);
+      return [] as StoreSpecialist[];
+    }
   }, []);
 
   const loadInventoryForSection = useCallback(async (next: HubSection) => {
@@ -276,16 +250,148 @@ export default function DeptSyncHubPage() {
   }, []);
 
   useEffect(() => {
+    const bootGen = ++bootGenRef.current;
     let cancelled = false;
+    const stillActive = () => !cancelled && bootGenRef.current === bootGen;
+
     void (async () => {
-      const roster = await loadStoreData();
-      if (cancelled) return;
-      resolveGateFromSession(roster);
+      try {
+        const session = readAuthSession();
+        const expired = Boolean(session && isAuthSessionExpired(session));
+
+        if (!session || expired) {
+          const outcome = decideHubPageBoot({
+            session,
+            sessionExpired: expired,
+            hasJwt: false,
+            roster: null,
+            rosterError: null,
+            matched: null,
+            needsSetup: false,
+          });
+          if (!stillActive()) return;
+          if (outcome.clearHubSession) clearAuthSession();
+          setSpecialists([]);
+          setSpecialist(null);
+          setRosterReady(true);
+          setGate("login");
+          window.location.replace("/login");
+          return;
+        }
+
+        const supabase = getSupabase();
+        let hasJwt = false;
+        try {
+          const { data } = supabase
+            ? await supabase.auth.getSession()
+            : { data: { session: null } };
+          if (!stillActive()) return;
+          hasJwt = Boolean(data.session?.access_token);
+        } catch {
+          if (!stillActive()) return;
+          hasJwt = false;
+        }
+
+        let team: StoreSpecialist[] | null = null;
+        let rosterError: unknown | null = null;
+        if (canFetchProtectedRoster(hasJwt)) {
+          try {
+            team = dedupeRoster(await fetchSpecialists());
+          } catch (err) {
+            rosterError = err;
+            team = null;
+          }
+        } else {
+          team = [];
+        }
+        if (!stillActive()) return;
+
+        const matched =
+          (hasJwt && team
+            ? syncActiveSpecialistFromRoster(team)
+            : null) ?? session.specialist;
+
+        const outcome = decideHubPageBoot({
+          session,
+          sessionExpired: false,
+          hasJwt,
+          roster: team,
+          rosterError,
+          matched,
+          needsSetup:
+            needsCredentialSetup(matched) ||
+            Boolean(matched.must_change_credentials),
+        });
+
+        if (!stillActive()) return;
+
+        if (outcome.clearHubSession) clearAuthSession();
+        if (outcome.clearSupabaseLocal) {
+          const client = getSupabase();
+          if (client) {
+            void client.auth.signOut({ scope: "local" });
+          }
+        }
+
+        setSpecialists(outcome.roster);
+        setRosterReady(true);
+
+        if (outcome.member && outcome.mode !== "login") {
+          updateAuthSessionSpecialist(outcome.member);
+        }
+
+        if (outcome.mode === "enter" && outcome.member) {
+          const adopted = adoptStoreNumberFromSpecialist(
+            outcome.member.store_number
+          );
+          const withStore = adopted
+            ? { ...outcome.member, store_number: adopted }
+            : outcome.member;
+          if (adopted) setStoreNumberState(adopted);
+          setSpecialist(withStore);
+          touchAuthSession();
+          const refreshed = readAuthSession();
+          if (refreshed) markWorkspaceUnlocked(refreshed.sessionToken);
+          try {
+            unlockWorkspace(withStore);
+            if (!stillActive()) return;
+            // Redirect may not unmount immediately — never stay booting.
+            setGate((current) => (current === "booting" ? "unlock" : current));
+          } catch {
+            if (!stillActive()) return;
+            setGate("unlock");
+          }
+          return;
+        }
+
+        setSpecialist(outcome.member);
+        if (
+          outcome.mode === "login" ||
+          outcome.mode === "unlock" ||
+          outcome.mode === "setup"
+        ) {
+          setGate(outcome.mode);
+          if (outcome.mode === "login") {
+            window.location.replace("/login");
+          }
+          return;
+        }
+        setGate("unlock");
+      } catch {
+        if (!stillActive()) return;
+        setSpecialists([]);
+        setSpecialist(null);
+        setRosterReady(true);
+        setGate("login");
+        window.location.replace("/login");
+      }
     })();
+
     return () => {
       cancelled = true;
+      bootGenRef.current += 1;
     };
-  }, [loadStoreData, resolveGateFromSession]);
+  }, [unlockWorkspace]);
 
   useEffect(() => {
     function onStoreChanged(event: Event) {
