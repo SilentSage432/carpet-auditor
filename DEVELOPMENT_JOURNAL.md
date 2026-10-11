@@ -1,5 +1,31 @@
 # DeptSync Hub — Development Journal
 
+## 2026-10-11 — DEPTSYNC-SEC-OPS-002B Repository alignment
+
+**Controlled repository release.** No production database mutations; no app deploy. Recorded `20261013_sec_ops_002_rls_containment.sql` + SEC-OPS-001/002 reports + helper SQL in git; pushed `origin/main`. Live containment re-checked (policies/grants/anon 401). Project has no `supabase_migrations` tracking schema — repo migration files are the history record. Authenticated operator session smoke NOT VERIFIED. Typecheck pass; **1436** tests pass; build pass.
+
+## 2026-10-11 — DEPTSYNC-SEC-OPS-002 Production RLS exposure containment
+
+**Authorized scoped remediation.** Project `fmeinlwhixngednabhgy`. Pre-change `pg_dump` (581993 bytes, TOC 934). Dropped open `{public}` ALL policies on `bay_service_logs` and `rotation_exceptions`; revoked anon privileges; authenticated bay logs SELECT-only; secret columns removed from client SELECT via column grants on `store_specialists` / `profiles`. Anon PostgREST → 401 on contained tables. No PIN/auth/rotation/topology/data mutations. Migration `20261013_sec_ops_002_rls_containment.sql` recorded locally (commit/push/deploy not authorized). Typecheck pass; **1436** tests pass; build pass.
+
+Canonical: [`docs/product/DEPTSYNC_SEC_OPS_002_CONTAINMENT_REPORT.md`](docs/product/DEPTSYNC_SEC_OPS_002_CONTAINMENT_REPORT.md). STOP.
+
+## 2026-10-11 — DEPTSYNC-SEC-OPS-001 Production security truth
+
+**Read-only production verification.** No implementation, schema mutation, auth change, secret rotation, commit, push, or deploy.
+
+Confirmed canonical Supabase `fmeinlwhixngednabhgy` (ACTIVE_HEALTHY) matches `.env.local` host; app `https://deptsync-hub.vercel.app`. Live inventory: 36 public tables, RLS ON all, forced none. RD-3/RD-5 tables SELECT-only + `jwt_matches_store`. Edge/API unauthenticated → 401. **NO-GO for security certification:** residual open `{public}` ALL `USING (true)` on `bay_service_logs` and `rotation_exceptions`; anon PostgREST SELECT returned live `bay_service_logs` rows (P0). P1: `pin_code`/token column SELECT still granted to anon/authenticated; 3 non-bcrypt-shaped PINs; no public auth rate limits. Local: tsc pass; 59 focused security tests pass.
+
+Canonical: [`docs/product/DEPTSYNC_SEC_OPS_001_PRODUCTION_TRUST_REPORT.md`](docs/product/DEPTSYNC_SEC_OPS_001_PRODUCTION_TRUST_REPORT.md). Next tranche: **SEC-OPS-002**. STOP.
+
+## 2026-10-11 — DEPTSYNC-RD-6 Product completion discovery
+
+**Read-only audit.** No implementation, schema, production mutation, commit, push, or deploy.
+
+Inventory of Floor Command after RD-1…RD-5 Production: five primary surfaces COMPLETE and operator-validated. Remaining P0/P1: live RLS verify ops; shared dual-dept capacity + Home Decor cutover (operator-blocked); associate-auth vs ALIGN-002; specialty disposition; repo CI. Recommended next pack: SEC-OPS-001 + CI-001 + DOCS-TRUTH-001; do not auto-start engine section preference or visual polish.
+
+Canonical: [`docs/product/DEPTSYNC_RD_6_PRODUCT_COMPLETION_AUDIT.md`](docs/product/DEPTSYNC_RD_6_PRODUCT_COMPLETION_AUDIT.md). STOP.
+
 ## 2026-10-11 — DEPTSYNC-RD-5-RELEASE Walkthroughs production
 
 **Authorized release.** Project `fmeinlwhixngednabhgy`. Pre-migration `pg_dump` (581993 bytes) under `tmp/production-backups/`. Applied `20261012_walkthroughs.sql`; verified tables/RLS/FKs/indexes/SELECT-only jwt-scoped policies; empty row counts. App commit + Vercel Production for deptsync-hub includes RD-5 + RD-5-FIX. No Sunday/topology/capacity mutations; no sample walkthrough writes.

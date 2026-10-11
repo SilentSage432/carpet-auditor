@@ -21,8 +21,12 @@
 - [x] **RD-3-DB-PREFLIGHT** — Production migration readiness — **COMPLETE** — [`DEPTSYNC_RD_3_DB_PREFLIGHT.md`](docs/product/DEPTSYNC_RD_3_DB_PREFLIGHT.md)
 - [x] **RD-3-RELEASE** — Production migrate + deploy — **COMPLETE** — [`DEPTSYNC_RD_3_RELEASE.md`](docs/product/DEPTSYNC_RD_3_RELEASE.md)
 - [x] **RD-4 This Week command board** — Weekly operational board (**PRODUCTION** via RD-4-RELEASE) — [`DEPTSYNC_RD_4_THIS_WEEK_COMMAND_BOARD.md`](docs/product/DEPTSYNC_RD_4_THIS_WEEK_COMMAND_BOARD.md)
-- [x] **RD-5 Walkthroughs** — Collaborative observations + follow-ups (**COMPLETE** local; commit/deploy/prod migrate **not** authorized) — [`DEPTSYNC_RD_5_WALKTHROUGHS.md`](docs/product/DEPTSYNC_RD_5_WALKTHROUGHS.md)
-- [ ] **RD-6…RD-10** — Topology reconcile → engine section preference → capacity → team consolidate → auth simplify → visual polish (**NOT STARTED** — see blueprint §L)
+- [x] **RD-5 Walkthroughs** — Collaborative observations + follow-ups (**PRODUCTION** via RD-5-RELEASE + FIX) — [`DEPTSYNC_RD_5_WALKTHROUGHS.md`](docs/product/DEPTSYNC_RD_5_WALKTHROUGHS.md) · [`DEPTSYNC_RD_5_RELEASE.md`](docs/product/DEPTSYNC_RD_5_RELEASE.md)
+- [x] **RD-6 Product completion discovery** — Read-only audit of remaining Floor Command work (**COMPLETE** docs only) — [`DEPTSYNC_RD_6_PRODUCT_COMPLETION_AUDIT.md`](docs/product/DEPTSYNC_RD_6_PRODUCT_COMPLETION_AUDIT.md)
+- [x] **DEPTSYNC-SEC-OPS-001** — Production security truth (read-only) — P0 open RLS found — [`DEPTSYNC_SEC_OPS_001_PRODUCTION_TRUST_REPORT.md`](docs/product/DEPTSYNC_SEC_OPS_001_PRODUCTION_TRUST_REPORT.md)
+- [x] **DEPTSYNC-SEC-OPS-002** — Contain open RLS + secret-column SELECT (prod applied) — [`DEPTSYNC_SEC_OPS_002_CONTAINMENT_REPORT.md`](docs/product/DEPTSYNC_SEC_OPS_002_CONTAINMENT_REPORT.md)
+- [x] **DEPTSYNC-SEC-OPS-002B** — Repository alignment (migration + docs on `origin/main`; no prod re-apply / no app deploy)
+- [ ] **Post-RD-6 trust / topology / auth pack** — SEC-OPS-003 PIN hash rewrite → AUTH-RATE-001 → CI-001 → DOCS-TRUTH → AUTH inventory → ALIGN-DEPT + capacity guard
 
 ## Next (ALIGN — constitutional direction)
 - [x] **DEPTSYNC-ALIGN-001** — Constitutional alignment & redesign blueprint (**COMPLETE** — planning only; operator-approved)
