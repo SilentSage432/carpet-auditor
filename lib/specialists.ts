@@ -573,11 +573,12 @@ export function setActiveSpecialist(specialist: StoreSpecialist | null): void {
 }
 
 function specialistPayload(record: StoreSpecialist): Record<string, unknown> {
+  // SEC-OPS-009: client roster upserts never touch credential columns.
+  // PIN writes go through /api/auth/reset-pin or /api/auth/update-credentials.
   const payload: Record<string, unknown> = {
     store_number: record.store_number,
     name: record.name,
     role: record.role,
-    pin_code: record.pin_code,
     must_change_credentials: record.must_change_credentials,
     is_active: record.is_active !== false,
     created_at: record.created_at,
@@ -632,9 +633,7 @@ function buildSpecialistDbPatch(
   >
 ): Record<string, unknown> {
   const update: Record<string, unknown> = {};
-  if (patch.pin_code !== undefined) {
-    update.pin_code = patch.pin_code;
-  }
+  // SEC-OPS-009: ignore any pin_code on the patch — browser must not write it.
   if (
     patch.username !== undefined &&
     patch.username !== null &&
@@ -1057,10 +1056,19 @@ export async function adminResetSpecialistPin(
   }
 }
 
-/** First-login / supervisor credential customization (username + password + optional phone). */
+/**
+ * First-login / supervisor credential customization.
+ * SEC-OPS-009: persists via service-role /api/auth/update-credentials only.
+ * Browser never writes pin_code / pin_hash (including hashed values).
+ */
 export async function updateSpecialistCredentials(
   member: StoreSpecialist,
-  input: { username: string; password: string; phone?: string | null }
+  input: {
+    username: string;
+    password: string;
+    phone?: string | null;
+    current_password?: string | null;
+  }
 ): Promise<{ record: StoreSpecialist; offline: boolean }> {
   const username = input.username.trim();
   const password = input.password.trim();
@@ -1081,31 +1089,59 @@ export async function updateSpecialistCredentials(
     throw new Error("Choose a custom username and password (not the defaults)");
   }
 
-  const patch: Partial<
-    Pick<
-      StoreSpecialist,
-      | "username"
-      | "pin_code"
-      | "must_change_credentials"
-      | "must_change_pin"
-      | "phone_number"
-    >
-  > = {
-    username,
-    pin_code: password,
-    must_change_credentials: false,
-    must_change_pin: false,
-  };
-
+  let phone: string | null | undefined = undefined;
   if (input.phone !== undefined) {
-    const phone = normalizePhoneE164(input.phone);
-    if (String(input.phone ?? "").trim() && !phone) {
+    const normalized = normalizePhoneE164(input.phone);
+    if (String(input.phone ?? "").trim() && !normalized) {
       throw new Error("Enter a valid mobile phone number");
     }
-    patch.phone_number = phone;
+    phone = normalized;
   }
 
-  return persistSpecialistFields(member, patch);
+  if (shouldSaveOffline()) {
+    throw new Error(
+      "Credential changes require a live DeptSync connection. Reconnect and try again."
+    );
+  }
+
+  const { getSupabaseAccessToken } = await import("@/lib/supabase/client");
+  const token = await getSupabaseAccessToken();
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+  };
+  if (token) headers.Authorization = `Bearer ${token}`;
+
+  const res = await fetch("/api/auth/update-credentials", {
+    method: "POST",
+    headers,
+    body: JSON.stringify({
+      specialist_id: member.id,
+      username,
+      password,
+      phone,
+      current_password: input.current_password ?? undefined,
+    }),
+  });
+
+  const body = (await res.json().catch(() => ({}))) as {
+    error?: string;
+    specialist?: Record<string, unknown>;
+  };
+
+  if (!res.ok || !body.specialist) {
+    throw new Error(
+      body.error || `Could not update credentials (${res.status})`
+    );
+  }
+
+  const saved = mapRow({
+    ...body.specialist,
+    pin_code: null,
+    offline: false,
+  });
+  upsertLocal(saved);
+  setActiveSpecialist(saved);
+  return { record: saved, offline: false };
 }
 
 async function persistSpecialistFields(
@@ -1245,10 +1281,10 @@ async function persistSpecialistFields(
   }
 
   async function insertProfile(): Promise<StoreSpecialist> {
+    // SEC-OPS-009: never insert credential columns from the browser client.
     const insertRow: Record<string, unknown> = {
       name: displayName,
       role: member.role,
-      pin_code: nextLocal.pin_code,
       must_change_credentials: nextLocal.must_change_credentials,
       is_active: nextLocal.is_active !== false,
       store_number: store,
@@ -1466,19 +1502,15 @@ export function findSupervisor(
  * Reset to an explicit temporary PIN and force first-login credential change.
  * Prefer Super Admin invite (`/api/admin/invite-supervisor`) so the PIN is
  * cryptographically random and the invite/SMS preview owns delivery.
+ * SEC-OPS-009: client path removed — never persist plaintext pin_code here.
  */
 export async function resetSpecialistCredentials(
-  member: StoreSpecialist,
-  temporaryPassword: string
+  _member: StoreSpecialist,
+  _temporaryPassword: string
 ): Promise<{ record: StoreSpecialist; offline: boolean }> {
-  const pin = temporaryPassword.trim();
-  if (pin.length < 4) {
-    throw new Error("Temporary PIN must be at least 4 characters");
-  }
-  return persistSpecialistFields(member, {
-    pin_code: pin,
-    must_change_credentials: true,
-  });
+  throw new Error(
+    "Temporary credential resets must use Super Admin invite or /api/auth/reset-pin — client PIN writes are disabled"
+  );
 }
 
 /** Update role / department scope (Master Admin roster edit). */

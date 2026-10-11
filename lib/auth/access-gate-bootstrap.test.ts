@@ -119,7 +119,7 @@ describe("SEC-OPS-007D decideAccessGateBoot", () => {
     expect(out.clearSupabaseLocal).toBe(false);
   });
 
-  it("setup required → setup (not enter)", () => {
+  it("setup required with JWT → setup (not enter)", () => {
     const out = decideAccessGateBoot({
       session,
       sessionExpired: false,
@@ -130,6 +130,21 @@ describe("SEC-OPS-007D decideAccessGateBoot", () => {
       needsSetup: true,
     });
     expect(out.mode).toBe("setup");
+    expect(out.reason).toBe("setup_required");
+  });
+
+  it("setup required without JWT → unlock first (SEC-OPS-009)", () => {
+    const out = decideAccessGateBoot({
+      session,
+      sessionExpired: false,
+      hasJwt: false,
+      roster: [],
+      rosterError: null,
+      matched: { ...member, must_change_credentials: true },
+      needsSetup: true,
+    });
+    expect(out.mode).toBe("unlock");
+    expect(out.reason).toBe("setup_requires_unlock");
   });
 });
 

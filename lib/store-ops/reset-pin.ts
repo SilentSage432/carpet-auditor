@@ -9,7 +9,12 @@
 
 import "server-only";
 
-import { DEFAULT_SUPERVISOR_PIN, mapRow } from "@/lib/specialists";
+import {
+  DEFAULT_APPLIANCE_PASSWORD,
+  DEFAULT_APPLIANCE_USERNAME,
+  DEFAULT_SUPERVISOR_PIN,
+  mapRow,
+} from "@/lib/specialists";
 import { hashPin, isCanonicalPinHash, verifyStoredPin } from "@/lib/invite";
 import { normalizeStoreNumber } from "@/lib/store";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -379,5 +384,147 @@ export async function resetHubPin(input: {
     specialist: saved,
     created_specialist: createdSpecialist,
     upserted_store_profiles: upsertedProfiles,
+  };
+}
+
+export type UpdateCredentialsResult = {
+  specialist: StoreSpecialist;
+  upserted_store_profiles: boolean;
+};
+
+/**
+ * SEC-OPS-009 — first-login / credential customization.
+ * Service-role only. Never accepts a client-supplied hash.
+ * Callers must authorize via JWT actor ownership or verified current_password.
+ */
+export async function updateHubCredentials(input: {
+  specialist_id: string;
+  username: string;
+  password: string;
+  phone?: string | null;
+  /** When true, skip current-password check (authorized actor already proven). */
+  actor_authorized?: boolean;
+  current_password?: string | null;
+  /** Injected for tests — defaults to service-role admin client. */
+  admin?: ReturnType<typeof createAdminClient>;
+}): Promise<UpdateCredentialsResult> {
+  const specialistId = String(input.specialist_id ?? "").trim();
+  const username = String(input.username ?? "").trim();
+  const password = String(input.password ?? "").trim();
+  if (!specialistId) {
+    throw new Error("specialist_id is required");
+  }
+  if (username.length < 3) {
+    throw new Error("Username must be at least 3 characters");
+  }
+  if (password.length < 6) {
+    throw new Error("Password must be at least 6 characters");
+  }
+  if (
+    username.toLowerCase() === DEFAULT_APPLIANCE_USERNAME &&
+    password === DEFAULT_APPLIANCE_PASSWORD
+  ) {
+    throw new Error("Choose a custom username and password (not the defaults)");
+  }
+  if (
+    username.toLowerCase() === "master_admin" &&
+    password === DEFAULT_SUPERVISOR_PIN
+  ) {
+    throw new Error("Choose a custom username and password (not the defaults)");
+  }
+
+  const admin = input.admin ?? createAdminClient();
+
+  const { data: row, error: loadError } = await admin
+    .from("store_specialists")
+    .select("*")
+    .eq("id", specialistId)
+    .maybeSingle();
+  if (loadError) {
+    throw new Error(loadError.message || "Could not load specialist");
+  }
+  if (!row) {
+    throw new Error("Profile not found");
+  }
+  const specialist = mapRow(row as Record<string, unknown>);
+  if (specialist.is_active === false) {
+    throw new Error("Profile not found");
+  }
+
+  if (!input.actor_authorized) {
+    const current = String(input.current_password ?? "").trim();
+    const storedPin =
+      specialist.pin_hash?.trim() || specialist.pin_code?.trim() || "";
+    const pinOk = storedPin
+      ? verifyStoredPin(current, storedPin)
+      : current === DEFAULT_SUPERVISOR_PIN;
+    if (!current || !pinOk) {
+      throw new Error("Current PIN is incorrect");
+    }
+  }
+
+  const secure = rosterSecurePinFields(password);
+  const phone =
+    input.phone === undefined
+      ? undefined
+      : String(input.phone ?? "").trim() === ""
+        ? null
+        : String(input.phone).trim();
+
+  const patch: Record<string, unknown> = {
+    username,
+    pin_code: secure.pin_code,
+    pin_hash: secure.pin_hash,
+    pin_updated_at: secure.pin_updated_at,
+    must_change_credentials: false,
+    must_change_pin: false,
+    status: "active",
+    is_active: true,
+  };
+  if (phone !== undefined) {
+    patch.phone_number = phone;
+  }
+
+  const { data: updated, error: updateError } = await admin
+    .from("store_specialists")
+    .update(patch)
+    .eq("id", specialist.id)
+    .select("*")
+    .single();
+
+  if (updateError || !updated) {
+    throw new Error(updateError?.message || "Could not update credentials");
+  }
+
+  const saved = mapRow(updated as Record<string, unknown>);
+
+  // Mirror sync uses default admin — skip when tests inject a stub admin.
+  if (!input.admin) {
+    let upsertedProfiles = false;
+    try {
+      await upsertStoreProfiles(saved);
+      upsertedProfiles = true;
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      if (!/store_profiles/i.test(message)) {
+        throw err;
+      }
+    }
+
+    try {
+      await syncAuthProfilePin(saved, password);
+    } catch {
+      // Auth sync best-effort; roster credential is authoritative for hub-bridge.
+    }
+
+    return {
+      specialist: saved,
+      upserted_store_profiles: upsertedProfiles,
+    };
+  }
+
+  return {
+    specialist: saved,
+    upserted_store_profiles: false,
   };
 }

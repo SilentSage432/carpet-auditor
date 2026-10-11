@@ -23,6 +23,7 @@ export type AccessGateBootOutcome = {
     | "expired_session"
     | "no_jwt"
     | "setup_required"
+    | "setup_requires_unlock"
     | "enter"
     | "roster_auth_rejected"
     | "roster_network_error"
@@ -122,6 +123,19 @@ export function decideAccessGateBoot(input: {
   }
 
   const roster = input.roster ?? [];
+
+  // SEC-OPS-009: credential setup requires a live Hub Auth JWT so writes
+  // go through the authorized server boundary (never anon/client PIN columns).
+  if (input.needsSetup && !input.hasJwt) {
+    return {
+      mode: "unlock",
+      roster,
+      member,
+      clearHubSession: false,
+      clearSupabaseLocal: false,
+      reason: "setup_requires_unlock",
+    };
+  }
 
   if (input.needsSetup) {
     return {
