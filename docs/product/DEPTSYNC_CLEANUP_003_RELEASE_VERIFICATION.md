@@ -119,17 +119,22 @@ No production code defect fixes required beyond the release test pack.
 
 | Item | Value |
 |------|-------|
-| Commit SHA | _(filled after commit)_ |
-| Production deployment ID | _(filled after deploy)_ |
+| Commit SHA | `11de88436cd2ca858b49cf217c41bcb2656db83f` (`11de884`) |
+| Production deployment ID | `dpl_H7rBMbXm66ePdznJaheY8Bo2EH3H` |
+| Deployment URL | https://deptsync-406hp48aw-tyson-zauggs-projects.vercel.app |
 | Alias | https://deptsync-hub.vercel.app |
+| GitHub Production deployment | sha `11de884…` @ `2026-10-11T22:01:52Z` |
+| Status | Ready (aliased) |
 
 ### Production smoke (no cleanup mutations)
 
-| Check | Expected |
-|-------|----------|
-| App loads | `/` or `/login` HTTP 200 |
-| Cleanup API unauthenticated | 401 fail-closed |
-| Entry point present in bundle | `more-workspace-cleanup` / Workspace cleanup copy in Master Admin surface after Master login |
+| Check | Result |
+|-------|--------|
+| `/login` | HTTP **200** |
+| `/` | HTTP **307** → `/login` |
+| `GET /api/workspace-cleanup` (no auth) | HTTP **401** `{"error":"Unauthorized"}` |
+| Cleanup mutations | **Not executed** |
+| Entry point | Present in shipped commit (`data-testid="more-workspace-cleanup"` under Master Admin). Unauthenticated `/settings` is not an SSR More surface (404); operator verifies button after MasterAdmin login. |
 
 ---
 
@@ -169,4 +174,4 @@ Agent must not select or confirm production records.
 
 ---
 
-*Release evidence section completed immediately after commit/push/deploy in this tranche.*
+*End of DEPTSYNC-CLEANUP-003. Production cleanup not executed. STOP.*

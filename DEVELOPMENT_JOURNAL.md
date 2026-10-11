@@ -1,5 +1,9 @@
 # DeptSync Hub — Development Journal
 
+## 2026-10-11 — DEPTSYNC-CLEANUP-003 Workspace cleanup release verification
+
+**Controlled release; no production cleanup mutations.** Verified CLEANUP-002 auth (MasterAdmin/store scope/fingerprint/confirm/no hard-delete), Map/eligibility soft-retire semantics, and mobile confirm gating. Added `workspace-cleanup.release.test.ts`. Typecheck/build PASS; **1552** tests. Pushed `11de884`; Production Ready `dpl_H7rBMbXm66ePdznJaheY8Bo2EH3H` aliased to https://deptsync-hub.vercel.app. Smoke: `/login` 200; cleanup API 401. Canonical: [`docs/product/DEPTSYNC_CLEANUP_003_RELEASE_VERIFICATION.md`](docs/product/DEPTSYNC_CLEANUP_003_RELEASE_VERIFICATION.md). **GO** capability; **NO-GO** agent-executed cleanup. **STOP.**
+
 ## 2026-10-11 — DEPTSYNC-CLEANUP-002 Guided workspace cleanup
 
 **Controlled local implementation; no production cleanup, SQL, deploy, or commit.** MasterAdmin More wizard + `/api/workspace-cleanup` soft-retires aisles (`store_locations.is_active=false`) and soft-archives associates (`is_active=false`, `status=suspended`) with preview fingerprints, explicit confirm, store scope, and MasterAdmin archive rejection. Does not call `deleteSpecialist` (hard DELETE side effect). No schema migration. Typecheck/build pass; **1543** tests. Canonical: [`docs/product/DEPTSYNC_CLEANUP_002_GUIDED_WORKSPACE_CLEANUP.md`](docs/product/DEPTSYNC_CLEANUP_002_GUIDED_WORKSPACE_CLEANUP.md). **CONDITIONAL GO** deploy after review; **NO-GO** auto/prod cleanup. **STOP.**
