@@ -70,6 +70,10 @@ import {
   type MapAisleEntry,
   type MapBayPair,
 } from "@/lib/store-ops/map-aisle-navigation";
+import {
+  sectionBayKey,
+  type BaySectionLookup,
+} from "@/lib/store-ops/operational-sections";
 
 const BAY_CHUNK = 36;
 
@@ -93,6 +97,8 @@ type Props = {
   heatmap?: boolean;
   /** UX-004: emphasize existing MEDIUM/HIGH markers during Floor investigation. */
   emphasizeAttentionMarkers?: boolean;
+  /** RD-3 — physicalBayKey → active section lookup (Map sheet only). */
+  baySectionByKey?: Map<string, BaySectionLookup>;
 };
 
 type BayPair = MapBayPair;
@@ -230,6 +236,7 @@ export function StoreLocationGrid({
   attentionUnavailableEvidence = [],
   heatmap = false,
   emphasizeAttentionMarkers = false,
+  baySectionByKey,
 }: Props) {
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -848,6 +855,15 @@ export function StoreLocationGrid({
           attentionGeneratedAt={attentionGeneratedAt}
           attentionDegraded={attentionDegraded}
           attentionUnavailableEvidence={attentionUnavailableEvidence}
+          baySection={
+            baySectionByKey?.get(
+              sectionBayKey({
+                department_id: liveWalkBay.departmentId,
+                aisle: liveWalkBay.aisle,
+                bay: liveWalkBay.pair.bay,
+              })
+            ) ?? null
+          }
           onClose={() => setWalkBay(null)}
           onChanged={onChanged}
           onError={setError}

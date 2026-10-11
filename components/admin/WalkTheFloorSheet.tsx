@@ -31,6 +31,11 @@ import {
   type MapAttentionClientStatus,
 } from "@/lib/store-ops/location-attention-presentation";
 import { composePhysicalBayManualPriority } from "@/lib/store-ops/physical-bay-priority";
+import {
+  formatUnsectionedLabel,
+  type BaySectionLookup,
+} from "@/lib/store-ops/operational-sections";
+import Link from "next/link";
 
 type BayPair = {
   bay: number;
@@ -86,6 +91,7 @@ export function WalkTheFloorSheet({
   attentionGeneratedAt = null,
   attentionDegraded = false,
   attentionUnavailableEvidence = [],
+  baySection = null,
   onClose,
   onChanged,
   onError,
@@ -101,6 +107,8 @@ export function WalkTheFloorSheet({
   attentionGeneratedAt?: string | null;
   attentionDegraded?: boolean;
   attentionUnavailableEvidence?: AttentionEvidenceDimension[];
+  /** RD-3 — active section lookup for this physical bay (null = unsectioned). */
+  baySection?: BaySectionLookup | null;
   onClose: () => void;
   onChanged: () => void;
   onError: (msg: string | null) => void;
@@ -389,17 +397,62 @@ export function WalkTheFloorSheet({
         ) : null}
 
         <section
-          className="mb-4 rounded-xl border border-dashed border-zinc-700/60 bg-zinc-950/30 px-3 py-2.5"
+          className="mb-4 rounded-xl border border-zinc-700/50 bg-zinc-950/40 px-3 py-2.5"
           data-testid="walk-sheet-section-slot"
           aria-label="Operational section"
         >
           <p className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-zinc-500">
             Operational section
           </p>
-          <p className="mt-1 text-xs text-zinc-500">
-            Section ownership and walkthrough place links will appear here —
-            not stored in this release.
-          </p>
+          {baySection ? (
+            <div className="mt-1.5 space-y-1">
+              <p
+                className="text-sm font-semibold text-zinc-100"
+                data-testid="walk-sheet-section-name"
+              >
+                {baySection.section_name}
+              </p>
+              <p className="text-xs text-zinc-400">
+                Owner ·{" "}
+                {baySection.primary_owner_name
+                  ? baySection.primary_owner_name
+                  : "None assigned"}
+              </p>
+              <p className="text-[11px] text-zinc-500">
+                Stewardship only — not this week’s assignment.
+              </p>
+              <Link
+                href={`/settings?section=${encodeURIComponent(
+                  baySection.section_id
+                )}#operational-sections`}
+                className="mt-1 inline-flex min-h-11 items-center text-sm font-semibold text-accent"
+                data-testid="walk-sheet-section-open"
+                onClick={onClose}
+              >
+                Open section details
+              </Link>
+            </div>
+          ) : (
+            <div className="mt-1.5 space-y-1">
+              <p
+                className="text-sm text-zinc-400"
+                data-testid="walk-sheet-section-unsectioned"
+              >
+                {formatUnsectionedLabel()}
+              </p>
+              <p className="text-[11px] text-zinc-500">
+                Still eligible for coverage. Manage sections in More →
+                Department Setup.
+              </p>
+              <Link
+                href="/settings#operational-sections"
+                className="mt-1 inline-flex min-h-11 items-center text-sm font-semibold text-accent"
+                onClick={onClose}
+              >
+                Manage sections
+              </Link>
+            </div>
+          )}
         </section>
 
         {canMutateRotationPriority && faces.length > 0 ? (

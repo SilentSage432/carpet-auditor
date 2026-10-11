@@ -1,5 +1,35 @@
 # DeptSync Hub — Development Journal
 
+## 2026-10-11 — DEPTSYNC-RD-3-RELEASE Operational Sections production
+
+**Authorized release.** Project `fmeinlwhixngednabhgy`. Pre-migration `pg_dump` (543509 bytes) under `tmp/production-backups/`. Applied `20261011_operational_sections.sql`; verified tables/RLS/trigger/expression unique index/SELECT-only jwt-scoped policies; empty row counts. App commit + Vercel Production for deptsync-hub. No topology/roster/Sunday/bootstrap mutations; no artificial sections.
+
+Canonical: [`docs/product/DEPTSYNC_RD_3_RELEASE.md`](docs/product/DEPTSYNC_RD_3_RELEASE.md).
+
+## 2026-10-10 — DEPTSYNC-RD-3-DB-PREFLIGHT production migration readiness
+
+**Read-only inspection.** No migration execution, production row writes, commit, push, deploy, or RD-4.
+
+Confirmed production project `fmeinlwhixngednabhgy` via `.env.local`. Prerequisites (`stores`, `departments`, `store_specialists`, `jwt_matches_store(p_store_number text)`, pgcrypto) present. RD-3 tables/functions/indexes absent. RLS path will use store-scoped SELECT (not open fallback). Operator readonly SQL: `scripts/sql/rd3-operational-sections-preflight-readonly.sql`. Uniqueness proof on prod = catalog (trigger + expression index), not INSERT pairs.
+
+Canonical: [`docs/product/DEPTSYNC_RD_3_DB_PREFLIGHT.md`](docs/product/DEPTSYNC_RD_3_DB_PREFLIGHT.md). **CONDITIONAL GO** for operator-authorized apply; **NO-GO** to execute here.
+
+## 2026-10-10 — DEPTSYNC-RD-3-FIX-001 Operational Sections release blockers
+
+**Scoped implementation.** No commit, push, deploy, production SQL, or RD-4.
+
+Corrected RD-3 release blockers: store-scoped `loadOperationalSectionForStore` before every membership/lifecycle mutation; Supervisor/Master + department assert; client `store_id` ignored. Pending migration gains aisle normalize trigger + expression unique index matching `normalizeAisle`. Focused authz/conflict/Map regression tests; no local Postgres for live unique-index proof. Typecheck pass; 1397 tests pass; build pass.
+
+Canonical: [`docs/product/DEPTSYNC_RD_3_FIX_001_OPERATIONAL_SECTIONS.md`](docs/product/DEPTSYNC_RD_3_FIX_001_OPERATIONAL_SECTIONS.md). STOP after verification.
+
+## 2026-10-10 — DEPTSYNC-RD-3 Operational Sections
+
+**Scoped implementation.** No commit, push, deploy, or production migration execution.
+
+Additive schema `operational_sections` / members / events with store-scoped RLS and one-active-section-per-bay unique index. Supervisor/Master APIs; More aisle-first management panel; Map bay sheet shows section or Unsectioned. Owner is optional roster stewardship — not weekly assignment. Rotation engine/capacity untouched. Typecheck pass; 1385 tests pass; build pass (includes `/api/operational-sections*`).
+
+Canonical: [`docs/product/DEPTSYNC_RD_3_OPERATIONAL_SECTIONS.md`](docs/product/DEPTSYNC_RD_3_OPERATIONAL_SECTIONS.md). STOP for operator review before commit/deploy/migration.
+
 ## 2026-10-10 — DEPTSYNC-RD-2 Floor Command Map
 
 **Scoped implementation.** No schema, auth change, production SQL, engine rewrite, sections storage, deploy, commit, or push.

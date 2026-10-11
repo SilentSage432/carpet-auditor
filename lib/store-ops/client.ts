@@ -32,6 +32,10 @@ import type {
   WeeklyRotationWithLocation,
 } from "./types";
 import type { LocationAttentionResponse } from "./location-attention-contract";
+import type {
+  OperationalSectionBayRef,
+  OperationalSectionView,
+} from "./operational-sections";
 
 const STORE_OPS_LIST_TTL_MS = 45_000;
 
@@ -1896,4 +1900,112 @@ export async function setOperationalContextRelevance(
       }),
     }
   );
+}
+
+export const STORE_OPS_SECTIONS_CHANGED_EVENT =
+  "deptsync:store-ops-sections-changed";
+
+function emitSectionsChanged() {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new Event(STORE_OPS_SECTIONS_CHANGED_EVENT));
+}
+
+/** RD-3 — list Operational Sections for Map / More. */
+export async function fetchOperationalSections(
+  specialist: StoreSpecialist,
+  opts?: {
+    departmentId?: string;
+    includeRetired?: boolean;
+    includeMembers?: boolean;
+  }
+): Promise<{ sections: OperationalSectionView[] }> {
+  const qs = new URLSearchParams();
+  if (opts?.departmentId) qs.set("department_id", opts.departmentId);
+  if (opts?.includeRetired) qs.set("include_retired", "1");
+  if (opts?.includeMembers === false) qs.set("include_members", "0");
+  const suffix = qs.toString() ? `?${qs}` : "";
+  return storeOpsFetch<{ sections: OperationalSectionView[] }>(
+    `/api/operational-sections${suffix}`,
+    specialist
+  );
+}
+
+export async function createOperationalSectionClient(
+  specialist: StoreSpecialist,
+  input: {
+    department_id: string;
+    name: string;
+    description?: string | null;
+    primary_owner_specialist_id?: string | null;
+    members?: OperationalSectionBayRef[];
+  }
+): Promise<{ ok: true; section: OperationalSectionView }> {
+  const result = await storeOpsFetch<{
+    ok: true;
+    section: OperationalSectionView;
+  }>("/api/operational-sections", specialist, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  emitSectionsChanged();
+  return result;
+}
+
+export async function patchOperationalSectionClient(
+  specialist: StoreSpecialist,
+  id: string,
+  input: {
+    name?: string;
+    description?: string | null;
+    primary_owner_specialist_id?: string | null;
+    action?: "retire" | "reactivate";
+  }
+): Promise<{ ok: true; section: OperationalSectionView }> {
+  const result = await storeOpsFetch<{
+    ok: true;
+    section: OperationalSectionView;
+  }>(`/api/operational-sections/${encodeURIComponent(id)}`, specialist, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  emitSectionsChanged();
+  return result;
+}
+
+export async function addOperationalSectionMembersClient(
+  specialist: StoreSpecialist,
+  id: string,
+  members: OperationalSectionBayRef[]
+): Promise<{ ok: true; added: number }> {
+  const result = await storeOpsFetch<{ ok: true; added: number }>(
+    `/api/operational-sections/${encodeURIComponent(id)}/members`,
+    specialist,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ members }),
+    }
+  );
+  emitSectionsChanged();
+  return result;
+}
+
+export async function removeOperationalSectionMembersClient(
+  specialist: StoreSpecialist,
+  id: string,
+  members: OperationalSectionBayRef[]
+): Promise<{ ok: true; removed: number }> {
+  const result = await storeOpsFetch<{ ok: true; removed: number }>(
+    `/api/operational-sections/${encodeURIComponent(id)}/members`,
+    specialist,
+    {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ members }),
+    }
+  );
+  emitSectionsChanged();
+  return result;
 }

@@ -6,12 +6,13 @@
 
 ---
 
-## REDESIGN / RD-1 + RD-2 — Floor Command (2026-10-10)
+## REDESIGN / RD-1…RD-3 — Floor Command (2026-10-10)
 
 > Blueprint: [`docs/product/DEPTSYNC_REDESIGN_001_COMPLETE_PRODUCT_EXPERIENCE_BLUEPRINT.md`](docs/product/DEPTSYNC_REDESIGN_001_COMPLETE_PRODUCT_EXPERIENCE_BLUEPRINT.md).  
-> **RD-1:** primary chrome Overview · Map · This Week · Walkthroughs · More; landing `/overview`; Team under More → `/roster`. [`docs/product/DEPTSYNC_RD_1_FLOOR_COMMAND_APPLICATION_SHELL.md`](docs/product/DEPTSYNC_RD_1_FLOOR_COMMAND_APPLICATION_SHELL.md).  
-> **RD-2 (local):** Map aisle index → bay list → bay detail; Show retired; Bulk Clean-Up soft-retire default. [`docs/product/DEPTSYNC_RD_2_FLOOR_COMMAND_MAP.md`](docs/product/DEPTSYNC_RD_2_FLOOR_COMMAND_MAP.md).  
-> **Not changed by RD-2:** schema, auth model, rotation engine, production topology rows, walkthrough storage. Deploy/commit for RD-2 not authorized.
+> **RD-1:** Overview · Map · This Week · Walkthroughs · More. [`docs/product/DEPTSYNC_RD_1_FLOOR_COMMAND_APPLICATION_SHELL.md`](docs/product/DEPTSYNC_RD_1_FLOOR_COMMAND_APPLICATION_SHELL.md).  
+> **RD-2:** Map aisle → bay → detail; soft-retire Bulk Clean-Up. [`docs/product/DEPTSYNC_RD_2_FLOOR_COMMAND_MAP.md`](docs/product/DEPTSYNC_RD_2_FLOOR_COMMAND_MAP.md).  
+> **RD-3 (production):** Operational Sections overlay live on `fmeinlwhixngednabhgy` + deptsync-hub. Migration `20261011_operational_sections.sql` applied; More UI + Map sheet wired. [`docs/product/DEPTSYNC_RD_3_RELEASE.md`](docs/product/DEPTSYNC_RD_3_RELEASE.md).  
+> **Not changed by RD-3:** auth model, Sunday engine, weekly capacity, production topology/roster rows.
 
 ## ALIGN-002 — Reality vs approved target (2026-10-10)
 
@@ -20,7 +21,7 @@
 
 | Layer | Status |
 |-------|--------|
-| **A. Implemented reality** | Multi-role PWA (Floor · Map · Roster · More); Flooring/Home Decor **merged** as `departments.code = flooring`; associates may PIN/QR; deterministic rotation (physical bay, eligible×3, carry-over, Sunday stage, verification); no Operational Section entity; Floor Pad / Walk & Talk protected observational surfaces; specialty launchers dormant (REDUCE-004) |
+| **A. Implemented reality** | Multi-role PWA (Overview · Map · This Week · Walkthroughs · More); Flooring/Home Decor **merged** as `departments.code = flooring`; associates may PIN/QR; deterministic rotation (physical bay, eligible×3, carry-over, Sunday stage, verification); **Operational Sections** schema + API + More/Map surfaces (RD-3); Floor Pad / Walk & Talk protected observational surfaces; specialty launchers dormant (REDUCE-004) |
 | **B. Approved target architecture** | Sovereign personal operational intelligence for **one OPERATOR** over **Flooring** and **Home Decor** as separate first-class departments; team members are records not app users; Operational Sections (≤1 active section per physical bay); section-aware rotation; collaborative walkthroughs; chrome Overview · Map · This Week · Walkthroughs · More (Overview = landing); sovereign intelligence (no Orient/TeamLab/LLM dependency) |
 | **C. Unresolved migration decisions** | How to safely split merged Flooring/Home Decor topology — **design proposed in TOPO-001** (hybrid soft-retire + additive Home Decor + bulk rebuild); still **UNRESOLVED pending operator §L decisions** + production inventory; production DB not inspected in TOPO-001 — [`docs/product/DEPTSYNC_ALIGN_TOPO_001_TWO_DEPARTMENT_TOPOLOGY_RECONCILIATION.md`](docs/product/DEPTSYNC_ALIGN_TOPO_001_TWO_DEPARTMENT_TOPOLOGY_RECONCILIATION.md) |
 | **D. Deferred capabilities** | Section schema, engine section-awareness, walkthrough storage/UI, Overview IA, auth simplification, operator capacity config UI, interoperability stubs, security remediation implementation |

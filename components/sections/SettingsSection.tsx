@@ -86,6 +86,13 @@ const OperationalContextCard = dynamic(
     ),
   { ssr: false }
 );
+const OperationalSectionsPanel = dynamic(
+  () =>
+    import("@/components/admin/OperationalSectionsPanel").then(
+      (mod) => mod.OperationalSectionsPanel
+    ),
+  { ssr: false }
+);
 const ForceRotationModal = dynamic(
   () =>
     import("@/components/admin/ForceRotationModal").then(
@@ -106,6 +113,7 @@ type SettingsAccordion =
   | "device"
   | "store"
   | "bulk"
+  | "sections"
   | null;
 
 const ICON_STROKE = 1.75;
@@ -132,6 +140,7 @@ export function SettingsSection({
   const [locations, setLocations] = useState<StoreLocation[]>([]);
   const [forceOpen, setForceOpen] = useState(false);
   const [adminGraphLoaded, setAdminGraphLoaded] = useState(false);
+  const [focusSectionId, setFocusSectionId] = useState<string | null>(null);
 
   const configured = isSupabaseConfigured();
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
@@ -147,6 +156,7 @@ export function SettingsSection({
 
   const needTopologyGraph =
     openSection === "bulk" ||
+    openSection === "sections" ||
     forceOpen ||
     (masterOpen && masterSession);
 
@@ -210,6 +220,19 @@ export function SettingsSection({
         hash === "bay-setup"
       ) {
         setOpenSection("bulk");
+      } else if (
+        hash === "operational-sections" ||
+        hash === "sections"
+      ) {
+        setOpenSection("sections");
+        try {
+          const sid = new URLSearchParams(window.location.search).get(
+            "section"
+          );
+          setFocusSectionId(sid);
+        } catch {
+          setFocusSectionId(null);
+        }
       } else if (hash === "weekly-rotation") {
         setMasterOpen(true);
         setForceOpen(true);
@@ -413,6 +436,27 @@ export function SettingsSection({
             ) : (
               <p className="text-xs text-zinc-500">
                 Open to edit aisles and physical bays for this department.
+              </p>
+            )}
+          </Accordion>
+          <Accordion
+            id="operational-sections"
+            title="Operational Sections"
+            subtitle="Persistent bay stewardship · not weekly assignment"
+            open={openSection === "sections"}
+            onToggle={() => toggleSection("sections")}
+          >
+            {openSection === "sections" ? (
+              <OperationalSectionsPanel
+                specialist={activeSpecialist}
+                departments={departments}
+                locations={locations}
+                focusSectionId={focusSectionId}
+                onChanged={() => void reloadDepts()}
+              />
+            ) : (
+              <p className="text-xs text-zinc-500">
+                Open to create sections, assign owners, and pick member bays.
               </p>
             )}
           </Accordion>

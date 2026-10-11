@@ -41,11 +41,10 @@ describe("RD-2 Floor Command Map", () => {
     expect(grid).not.toMatch(/openDepts/);
   });
 
-  it("bay detail reserves Operational Section slot without storage", () => {
+  it("bay detail reserves Operational Section slot for RD-3 wiring", () => {
     const sheet = readSrc("components/admin/WalkTheFloorSheet.tsx");
     expect(sheet).toMatch(/walk-sheet-section-slot/);
     expect(sheet).toMatch(/Operational section/);
-    expect(sheet).toMatch(/not stored in this release/);
   });
 
   it("Bulk Clean-Up prefers retire over destructive delete", () => {

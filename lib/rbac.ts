@@ -136,6 +136,13 @@ export function canMutateRotationPriority(
   return isMasterAdmin(member) || isDepartmentSupervisor(member);
 }
 
+/** RD-3 — Master + DS configure Operational Sections (associates read-only via Map). */
+export function canManageOperationalSections(
+  member: StoreSpecialist | null | undefined
+): boolean {
+  return isMasterAdmin(member) || isDepartmentSupervisor(member);
+}
+
 /** Elevated roles that manage PINs / markdown / filters. */
 export function hasElevatedAccess(
   member: StoreSpecialist | null | undefined

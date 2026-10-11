@@ -18,12 +18,18 @@ import {
   fetchOperationalContextLocationRelevanceResolve,
   fetchStoreLocationsDetailed,
   fetchThisWeekRotations,
+  fetchOperationalSections,
   invalidateStoreOpsListCaches,
   peekCachedDepartments,
   peekCachedRotations,
   peekCachedStoreLocations,
   STORE_OPS_LOCATIONS_CHANGED_EVENT,
+  STORE_OPS_SECTIONS_CHANGED_EVENT,
 } from "@/lib/store-ops/client";
+import {
+  indexBaySectionLookups,
+  type BaySectionLookup,
+} from "@/lib/store-ops/operational-sections";
 import {
   indexMapLocationSeasonalViews,
   type MapLocationSeasonalView,
@@ -90,6 +96,9 @@ export function MapTab({ specialist }: WorkflowTabProps) {
   const [attentionUnavailable, setAttentionUnavailable] = useState<
     AttentionEvidenceDimension[]
   >([]);
+  const [baySectionByKey, setBaySectionByKey] = useState<
+    Map<string, BaySectionLookup>
+  >(() => new Map());
   const attentionGenRef = useRef(0);
   const attentionAbortRef = useRef<AbortController | null>(null);
   const currentWeek = isoWeekLabel();
@@ -215,7 +224,7 @@ export function MapTab({ specialist }: WorkflowTabProps) {
                 .catch((err: unknown) => ({ ok: false as const, err }))
             : Promise.resolve(null);
 
-        const [locs, weekData, exceptions, seasonalResult, attentionResult] =
+        const [locs, weekData, exceptions, seasonalResult, attentionResult, sectionsResult] =
           await Promise.all([
             fetchStoreLocationsDetailed(member),
             fetchThisWeekRotations(member),
@@ -232,6 +241,16 @@ export function MapTab({ specialist }: WorkflowTabProps) {
                 )
               : Promise.resolve(null),
             attentionPromise,
+            fetchOperationalSections(member, {
+              includeMembers: true,
+              includeRetired: false,
+            }).catch((err) => {
+              console.warn(
+                "[StoreMap] operational sections unavailable (non-blocking)",
+                err
+              );
+              return null;
+            }),
           ]);
 
         const nextWeek = (weekData.rotations ?? [])
@@ -264,6 +283,11 @@ export function MapTab({ specialist }: WorkflowTabProps) {
           );
         } else if (!canReadSeasonal || seasonalResult === null) {
           setSeasonalByLocationId(new Map());
+        }
+        if (sectionsResult?.sections) {
+          setBaySectionByKey(indexBaySectionLookups(sectionsResult.sections));
+        } else {
+          setBaySectionByKey(new Map());
         }
         if (depts.authRequired || locs.authRequired) {
           setAuthRequired(true);
@@ -393,8 +417,10 @@ export function MapTab({ specialist }: WorkflowTabProps) {
       void reload(specialist, true);
     }
     window.addEventListener(STORE_OPS_LOCATIONS_CHANGED_EVENT, onLocations);
+    window.addEventListener(STORE_OPS_SECTIONS_CHANGED_EVENT, onLocations);
     return () => {
       window.removeEventListener(STORE_OPS_LOCATIONS_CHANGED_EVENT, onLocations);
+      window.removeEventListener(STORE_OPS_SECTIONS_CHANGED_EVENT, onLocations);
     };
   }, [reload, specialist]);
 
@@ -560,6 +586,7 @@ export function MapTab({ specialist }: WorkflowTabProps) {
               attentionUnavailableEvidence={attentionUnavailable}
               heatmap={heatmap}
               emphasizeAttentionMarkers={emphasizeAttentionMarkers}
+              baySectionByKey={baySectionByKey}
               onChanged={() => void reload(specialist)}
             />
           )}

@@ -15,8 +15,12 @@
 ## Next (REDESIGN — complete product destination)
 - [x] **DEPTSYNC-REDESIGN-001** — Complete product & experience blueprint (**COMPLETE** — design only; [`DEPTSYNC_REDESIGN_001_COMPLETE_PRODUCT_EXPERIENCE_BLUEPRINT.md`](docs/product/DEPTSYNC_REDESIGN_001_COMPLETE_PRODUCT_EXPERIENCE_BLUEPRINT.md))
 - [x] **RD-1 IA Shell** — Floor Command application shell (**COMPLETE** — phone review / production release path used for RD-1) — [`DEPTSYNC_RD_1_FLOOR_COMMAND_APPLICATION_SHELL.md`](docs/product/DEPTSYNC_RD_1_FLOOR_COMMAND_APPLICATION_SHELL.md)
-- [x] **RD-2 Map** — Floor Command mobile Map (**COMPLETE** engineering; deploy/commit **not** authorized) — aisle → bay → detail; soft-retire Clean-Up default — [`DEPTSYNC_RD_2_FLOOR_COMMAND_MAP.md`](docs/product/DEPTSYNC_RD_2_FLOOR_COMMAND_MAP.md)
-- [ ] **RD-3…RD-10** — Topology reconcile → sections → walkthroughs → engine preference → capacity → team consolidate → auth simplify → visual polish (**NOT STARTED** — see blueprint §L)
+- [x] **RD-2 Map** — Floor Command mobile Map (**COMPLETE** — phone review / production release path used for RD-2) — [`DEPTSYNC_RD_2_FLOOR_COMMAND_MAP.md`](docs/product/DEPTSYNC_RD_2_FLOOR_COMMAND_MAP.md)
+- [x] **RD-3 Operational Sections** — Stewardship overlay (**PRODUCTION COMPLETE**) — [`DEPTSYNC_RD_3_OPERATIONAL_SECTIONS.md`](docs/product/DEPTSYNC_RD_3_OPERATIONAL_SECTIONS.md) · [`DEPTSYNC_RD_3_RELEASE.md`](docs/product/DEPTSYNC_RD_3_RELEASE.md)
+- [x] **RD-3-FIX-001** — Release blocker corrections — **COMPLETE** — [`DEPTSYNC_RD_3_FIX_001_OPERATIONAL_SECTIONS.md`](docs/product/DEPTSYNC_RD_3_FIX_001_OPERATIONAL_SECTIONS.md)
+- [x] **RD-3-DB-PREFLIGHT** — Production migration readiness — **COMPLETE** — [`DEPTSYNC_RD_3_DB_PREFLIGHT.md`](docs/product/DEPTSYNC_RD_3_DB_PREFLIGHT.md)
+- [x] **RD-3-RELEASE** — Production migrate + deploy — **COMPLETE** — [`DEPTSYNC_RD_3_RELEASE.md`](docs/product/DEPTSYNC_RD_3_RELEASE.md)
+- [ ] **RD-4…RD-10** — Topology reconcile → walkthroughs → engine section preference → capacity → team consolidate → auth simplify → visual polish (**NOT STARTED** — see blueprint §L)
 
 ## Next (ALIGN — constitutional direction)
 - [x] **DEPTSYNC-ALIGN-001** — Constitutional alignment & redesign blueprint (**COMPLETE** — planning only; operator-approved)
@@ -29,7 +33,7 @@
 - [x] **ALIGN-SEC-007** — Controlled Vercel security release (**LOCAL COMMIT** — push/deploy **not** authorized) — [`DEPTSYNC_ALIGN_SEC_007_CONTROLLED_VERCEL_SECURITY_RELEASE.md`](docs/product/DEPTSYNC_ALIGN_SEC_007_CONTROLLED_VERCEL_SECURITY_RELEASE.md)
 - [x] **DEPTSYNC-ALIGN-TOPO-001** — Two-department topology reconciliation (**COMPLETE** — discovery + design only; [`DEPTSYNC_ALIGN_TOPO_001_TWO_DEPARTMENT_TOPOLOGY_RECONCILIATION.md`](docs/product/DEPTSYNC_ALIGN_TOPO_001_TWO_DEPARTMENT_TOPOLOGY_RECONCILIATION.md); operator SQL `scripts/sql/align-topo001-topology-inventory-readonly.sql`; no app/schema/prod mutation)
 - [ ] **ALIGN-DEPT-001** — Flooring / Home Decor separation design lock / dry-run (**NOT STARTED** — fed by TOPO-001; blocked on operator aisle/bay mapping + §L decisions; migration still UNRESOLVED until approved)
-- [ ] **SECTION-001** — Operational Section domain (**NOT STARTED** — approved target; no schema yet)
+- [x] **SECTION-001 / RD-3** — Operational Section domain (**COMPLETE** engineering; prod migration **not** applied) — [`DEPTSYNC_RD_3_OPERATIONAL_SECTIONS.md`](docs/product/DEPTSYNC_RD_3_OPERATIONAL_SECTIONS.md)
 - [ ] **WALKTHROUGH-001** — Collaborative walkthrough domain (**NOT STARTED** — storage review of `manager_notes` / `shift_walk_tasks` first; FLOORPAD-001 related)
 
 ## Next (Product reduction — boundary locked; everyday surface reduced)
