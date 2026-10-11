@@ -32,8 +32,11 @@
 - [x] **DEPTSYNC-AUTH-HARDEN-002** — Controlled auth production release (**SHIPPED**; operator login upgrade pending manual verify) — [`DEPTSYNC_AUTH_HARDEN_002_PRODUCTION_RELEASE.md`](docs/product/DEPTSYNC_AUTH_HARDEN_002_PRODUCTION_RELEASE.md)
 - [x] **DEPTSYNC-SEC-OPS-004** — Legacy profile credential retirement discovery (read-only) — [`DEPTSYNC_SEC_OPS_004_LEGACY_CREDENTIAL_DISCOVERY.md`](docs/product/DEPTSYNC_SEC_OPS_004_LEGACY_CREDENTIAL_DISCOVERY.md); plaintext fallback removal **NO-GO**
 - [x] **DEPTSYNC-SEC-OPS-005** — Legacy credential write-path correction — [`DEPTSYNC_SEC_OPS_005_CREDENTIAL_WRITERS.md`](docs/product/DEPTSYNC_SEC_OPS_005_CREDENTIAL_WRITERS.md)
-- [x] **DEPTSYNC-SEC-OPS-006** — Credential writer production release (**SHIPPED** `e36bfb5` / `CkWcALCvQTJYbaEw9Xm49Yas8E3B`; cleanup **not** authorized) — [`DEPTSYNC_SEC_OPS_006_PRODUCTION_RELEASE.md`](docs/product/DEPTSYNC_SEC_OPS_006_PRODUCTION_RELEASE.md)
-- [ ] **Post-RD-6 trust / topology / auth pack** — re-inventory digits → clear SEC-OPS-004 obsolete mirrors → plaintext fallback retirement → CI-001 → DOCS-TRUTH → AUTH inventory → ALIGN-DEPT + capacity guard
+- [x] **DEPTSYNC-SEC-OPS-006** — Credential writer production release (**SHIPPED** `e36bfb5` / `CkWcALCvQTJYbaEw9Xm49Yas8E3B`) — [`DEPTSYNC_SEC_OPS_006_PRODUCTION_RELEASE.md`](docs/product/DEPTSYNC_SEC_OPS_006_PRODUCTION_RELEASE.md)
+- [x] **DEPTSYNC-SEC-OPS-007** — Legacy credential mirror cleanup (**COMPLETE**; digit inventory 0/0/0; plaintext fallback **still enabled**) — [`DEPTSYNC_SEC_OPS_007_LEGACY_CLEANUP.md`](docs/product/DEPTSYNC_SEC_OPS_007_LEGACY_CLEANUP.md)
+- [x] **DEPTSYNC-SEC-OPS-007A** — Post-cleanup auth regression diagnostic — [`DEPTSYNC_SEC_OPS_007A_AUTH_REGRESSION.md`](docs/product/DEPTSYNC_SEC_OPS_007A_AUTH_REGRESSION.md)
+- [x] **DEPTSYNC-SEC-OPS-007B** — Emergency login hotfix (**SHIPPED** `ff2b30b` / `ED2oSLiAtovm3xWY944KCF74VDAB`; operator login **PENDING**) — [`DEPTSYNC_SEC_OPS_007B_LOGIN_HOTFIX.md`](docs/product/DEPTSYNC_SEC_OPS_007B_LOGIN_HOTFIX.md)
+- [ ] **Post-RD-6 trust / topology / auth pack** — manual operator login confirm → plaintext fallback retirement → CI-001 → DOCS-TRUTH → AUTH inventory → ALIGN-DEPT + capacity guard
 
 ## Next (ALIGN — constitutional direction)
 - [x] **DEPTSYNC-ALIGN-001** — Constitutional alignment & redesign blueprint (**COMPLETE** — planning only; operator-approved)

@@ -1,5 +1,19 @@
 # DeptSync Hub — Development Journal
 
+## 2026-10-11 — DEPTSYNC-SEC-OPS-007B Emergency production login repair
+
+**Authorized hotfix.** Project `fmeinlwhixngednabhgy`. Writers clear NOT NULL `profiles.pin` / `store_profiles.pin` with `""` instead of null. Fresh `pg_dump` 587360 bytes (TOC 938). Pushed `ff2b30b`; Vercel Production `ED2oSLiAtovm3xWY944KCF74VDAB`. Master scrypt1 + digit inventory 0/0/0 preserved. Public auth/containment/rate-limit OK. **OPERATOR LOGIN PENDING** (manual). Typecheck/build pass; **1477** tests. Canonical: [`docs/product/DEPTSYNC_SEC_OPS_007B_LOGIN_HOTFIX.md`](docs/product/DEPTSYNC_SEC_OPS_007B_LOGIN_HOTFIX.md).
+
+## 2026-10-11 — DEPTSYNC-SEC-OPS-007A Post-cleanup auth regression diagnostic
+
+**Diagnostic only.** No production mutations, commit, push, or deploy.
+
+Root cause: SEC-OPS-005 `linkAuthUserToSpecialistProfile` (hub-bridge session mint) upserts `profiles.pin: null`, but live `profiles.pin` is NOT NULL. Same shape in `reset-pin` mirror sync. PIN verify against `store_specialists` scrypt is fine; failure is profile link after verify. Local 007A tests reproduce NOT NULL + document silent minimal fallback. Proposed fix: `pin: ""` (not applied). Canonical: [`docs/product/DEPTSYNC_SEC_OPS_007A_AUTH_REGRESSION.md`](docs/product/DEPTSYNC_SEC_OPS_007A_AUTH_REGRESSION.md). STOP.
+
+## 2026-10-11 — DEPTSYNC-SEC-OPS-007 Legacy credential mirror cleanup
+
+**Authorized production SQL remediation.** Project `fmeinlwhixngednabhgy`. Fresh `pg_dump` 587358 bytes (TOC 938). Cleared obsolete plaintext credential fields on exact rows `profiles` `0f3b20ce-85bf-4d1b-8103-4b81648d396d` and `store_profiles` `0b7d86d3-5f14-447d-b2f5-5ff8997947a7` (`pin=''` for NOT NULL columns; nullable `pin_code`/`pin_hash` null). MasterAdmin `f9e36630…` scrypt1 untouched. Post-inventory digit counts **0/0/0**. Rate-limit + SEC-OPS-002 containment OK. Operator login **manual verification required**. Plaintext fallback **not** disabled. No app deploy. Canonical: [`docs/product/DEPTSYNC_SEC_OPS_007_LEGACY_CLEANUP.md`](docs/product/DEPTSYNC_SEC_OPS_007_LEGACY_CLEANUP.md). STOP.
+
 ## 2026-10-11 — DEPTSYNC-SEC-OPS-006 Credential writer production release
 
 **Authorized production release.** Project `fmeinlwhixngednabhgy`. Fresh `pg_dump` 587293 bytes (TOC 938). No DB migration (app writers only). Pushed `e36bfb5` to `origin/main`; Vercel Production success (`CkWcALCvQTJYbaEw9Xm49Yas8E3B`). Public auth + SEC-OPS-002 containment + rate-limit RPC verified. MasterAdmin `f9e36630…` remains scrypt1; two obsolete digit mirrors unchanged. Live writer execution **NOT VERIFIED** (no PIN mutation). Typecheck/build pass; **1471** tests. Canonical: [`docs/product/DEPTSYNC_SEC_OPS_006_PRODUCTION_RELEASE.md`](docs/product/DEPTSYNC_SEC_OPS_006_PRODUCTION_RELEASE.md).
