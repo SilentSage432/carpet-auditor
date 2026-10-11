@@ -3,17 +3,25 @@ import type { NextRequest } from "next/server";
 import {
   HUB_GATE_COOKIE,
   HUB_GATE_HEADER,
+  edgeAllowsRequest,
   isAuthGatePublicPath,
   isAuthGateStaticPath,
+  isCronApiPath,
   safeInternalNext,
   verifyHubGateToken,
 } from "@/lib/auth-gate";
 
 /**
- * Next.js 16 Proxy — this is the auth middleware (middleware.ts is forbidden
- * in 16.2 when proxy.ts exists: https://nextjs.org/docs/messages/middleware-to-proxy).
- * Stealth + auth gate: unauthenticated HTML never reaches dashboard RSC.
- * Cron stays on CRON_SECRET. Hub JWT APIs may pass with Bearer.
+ * Next.js 16 Proxy — auth middleware (middleware.ts is forbidden when proxy.ts exists).
+ *
+ * ALIGN-SEC-001 edge classification:
+ * - Static / public HTML + `/api/auth/*` + `/api/invite/*` → allow
+ * - `/api/cron/*` → allow at edge; handler requires CRON_SECRET
+ * - All other HTML + `/api/*` → verified hub gate cookie only
+ *
+ * An arbitrary Authorization: Bearer header MUST NOT bypass the edge gate.
+ * Passing the proxy does NOT authorize service-role handlers — each route
+ * retains its own actor / JWT / secret checks.
  */
 
 function withStealthHeaders(response: NextResponse): NextResponse {
@@ -32,18 +40,15 @@ function loginRedirect(request: NextRequest): NextResponse {
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  if (isAuthGateStaticPath(pathname) || pathname.startsWith("/api/cron")) {
+  if (isAuthGateStaticPath(pathname) || isCronApiPath(pathname)) {
     return withStealthHeaders(NextResponse.next());
   }
 
-  const gate = await verifyHubGateToken(
-    request.cookies.get(HUB_GATE_COOKIE)?.value
-  );
-  const authed = Boolean(gate);
-  const bearer = request.headers.get("authorization")?.startsWith("Bearer ");
+  const gateCookie = request.cookies.get(HUB_GATE_COOKIE)?.value;
+  const allowed = await edgeAllowsRequest({ pathname, gateCookie });
 
   if (pathname.startsWith("/api/")) {
-    if (isAuthGatePublicPath(pathname) || authed || bearer) {
+    if (allowed) {
       return withStealthHeaders(NextResponse.next());
     }
     return withStealthHeaders(
@@ -55,7 +60,8 @@ export async function proxy(request: NextRequest) {
     return withStealthHeaders(NextResponse.next());
   }
 
-  if (!authed) {
+  const gate = await verifyHubGateToken(gateCookie);
+  if (!gate) {
     return loginRedirect(request);
   }
 

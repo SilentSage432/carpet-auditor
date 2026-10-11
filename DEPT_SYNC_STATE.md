@@ -4,9 +4,43 @@
 > Single source of truth for architecture, parity, routes, and operational status **beneath** `DEPTSYNC_CONSTITUTION.md` (governing laws).  
 > Ground-truth audit baseline: **2026-08-25**. Update this file whenever schema, sync behavior, or route structure changes.
 
+---
+
+## ALIGN-002 — Reality vs approved target (2026-10-10)
+
+> Governing ratification: [`docs/product/DEPTSYNC_ALIGN_002_CONSTITUTIONAL_RATIFICATION.md`](docs/product/DEPTSYNC_ALIGN_002_CONSTITUTIONAL_RATIFICATION.md).  
+> Constitution amended. **Application code, schema, auth, UI, and production were not changed.**
+
+| Layer | Status |
+|-------|--------|
+| **A. Implemented reality** | Multi-role PWA (Floor · Map · Roster · More); Flooring/Home Decor **merged** as `departments.code = flooring`; associates may PIN/QR; deterministic rotation (physical bay, eligible×3, carry-over, Sunday stage, verification); no Operational Section entity; Floor Pad / Walk & Talk protected observational surfaces; specialty launchers dormant (REDUCE-004) |
+| **B. Approved target architecture** | Sovereign personal operational intelligence for **one OPERATOR** over **Flooring** and **Home Decor** as separate first-class departments; team members are records not app users; Operational Sections (≤1 active section per physical bay); section-aware rotation; collaborative walkthroughs; chrome Overview · Map · This Week · Walkthroughs · More (Overview = landing); sovereign intelligence (no Orient/TeamLab/LLM dependency) |
+| **C. Unresolved migration decisions** | How to safely split merged Flooring/Home Decor topology — **UNRESOLVED**; requires operator aisle/bay mapping; production DB not inspected in ALIGN-002 |
+| **D. Deferred capabilities** | Section schema, engine section-awareness, walkthrough storage/UI, Overview IA, auth simplification, operator capacity config UI, interoperability stubs, security remediation implementation |
+
+### Security (ALIGN-SEC-001 — implemented locally; deploy not authorized)
+
+| Finding | Status after ALIGN-SEC-001 |
+|---------|----------------------------|
+| Hub gate secret fallback (cron → service role → anon → hardcoded) | **Remediated in code** — `HUB_GATE_SECRET` only, fail closed (`lib/auth-gate.ts`) |
+| Permissive `/api/*` Bearer edge pass | **Remediated in code** — gate cookie / public / cron only (`proxy.ts`) |
+| Bootstrap silent `CRON_SECRET` reuse | **Remediated in code** — `BOOTSTRAP_SECRET` only (`lib/store-ops/bootstrap-authorize.ts`) |
+| Schema seed supervisor PIN `1234` / demo PINs | **Remediated in seed path** — removed from `supabase/schema.sql` (does not rotate live rows) |
+| Production RLS apply state | **Unverified** — operator script: `scripts/sql/align-sec001-rls-verify-readonly.sql` |
+| Production env / deploy of new required secrets | **ALIGN-SEC-003: CONDITIONAL GO** — operator confirmed Production `HUB_GATE_SECRET` + `BOOTSTRAP_SECRET`; remaining env vars still require affirm; commit/deploy not authorized by audit — [`DEPTSYNC_ALIGN_SEC_003_FINAL_PRODUCTION_RELEASE_GATE.md`](docs/product/DEPTSYNC_ALIGN_SEC_003_FINAL_PRODUCTION_RELEASE_GATE.md) |
+| 64-hex Master recovery (`openssl rand -hex 32`) | **ALIGN-SEC-005: COMPATIBLE GO** — env/hub-bridge/bootstrap/AuthWall password path support full length; ordinary DB PIN unchanged — [`DEPTSYNC_ALIGN_SEC_005_MASTER_RECOVERY_CREDENTIAL_COMPATIBILITY.md`](docs/product/DEPTSYNC_ALIGN_SEC_005_MASTER_RECOVERY_CREDENTIAL_COMPATIBILITY.md) |
+| Master bootstrap plaintext / PIN echo | **ALIGN-SEC-006: remediated in code** — salted `hashPin` on roster; bootstrap HTTP/script omit raw PIN; no prod migration; deploy not authorized — [`DEPTSYNC_ALIGN_SEC_006_RECOVERY_CREDENTIAL_PROTECTION.md`](docs/product/DEPTSYNC_ALIGN_SEC_006_RECOVERY_CREDENTIAL_PROTECTION.md) |
+
+Canonical: [`docs/product/DEPTSYNC_ALIGN_SEC_001_SECURITY_STABILIZATION.md`](docs/product/DEPTSYNC_ALIGN_SEC_001_SECURITY_STABILIZATION.md).  
+One operator does **not** justify weaker security (Constitution Art. XVIII).
+
+---
+
 ## MANUAL EXPANSION LAW
 
 > The automatic weekly base quota remains three physical bays per eligible associate. Additional weekly coverage is explicitly dispatched by the DS and does not alter the base quota or redistribute existing ownership.
+
+> **ALIGN-002 note:** Three-bay weekly baseline remains the **initial default** under ratified law. Operator-configurable capacity and section-aware selection are **approved targets**, not current engine behavior. Do not automatically multiply rotational workload across departments.
 
 ---
 
@@ -18,10 +52,14 @@
 |-------|-------|
 | **Product name** | **DeptSync** (PWA `short_name`) |
 | **Repository** | `carpet-auditor` |
-| **Canonical product boundary (REDUCE-002 / 002A / 003A / 004 + LAB-WEEK-002 + STAGE-ASSIGN-CUE-001 + BAY-UNIT-002 + TIME-DUTY-002 + TIME-DUTY-003 + UX-REDUCE-002 + UX-REDUCE-003 + UX-REDUCE-004 + UX-REDUCE-005 + PRIORITY-UX-002 + UX-REDUCE-007 + BULK-SETUP-001 + BULK-SETUP-002)** | Intelligent continuous-coverage **rotation** system for merchandising aisle/bay work — not a broad store-ops platform. Spec: [`docs/product/DEPTSYNC_REDUCE_002_BOUNDARY_AND_DECOUPLING_SPEC.md`](docs/product/DEPTSYNC_REDUCE_002_BOUNDARY_AND_DECOUPLING_SPEC.md). Floor Pad / Walk & Talk: **PROTECTED — ROTATION OBSERVATIONAL CAPTURE EVALUATION PENDING** ([`DEPTSYNC_REDUCE_002A_FLOOR_PAD_PROTECTION.md`](docs/product/DEPTSYNC_REDUCE_002A_FLOOR_PAD_PROTECTION.md)). Seasonal Context: **PROTECTED — ROTATION CADENCE INPUT** ([`DEPTSYNC_REDUCE_003A_SEASONAL_CONTEXT_PROTECTION.md`](docs/product/DEPTSYNC_REDUCE_003A_SEASONAL_CONTEXT_PROTECTION.md)). **REDUCE-004:** everyday specialty launchers disconnected; specialty runtime dormant underneath. **LAB-WEEK-002:** automatic week allocation uses persisted whole-week `associate_shift_days` known hours (ISO Mon–Sun); `sunday_bay_assignments` remains weekly ownership; localStorage Sunday hours are not primary automatic labor truth. **STAGE-ASSIGN-CUE-001:** Stage remains selection-only; after staged/unowned bays, the Sunday drawer shows schedule-informed preview + visible **Assign this week** confirm (`handleBalanceAssign`); Auto-Assign All to Me is secondary. **BAY-UNIT-002:** one physical aisle/bay (`department_id + aisle + bay`) is one rotation/allocation/verification obligation; SELLING/TOPSTOCK remain topology surfaces; `weekly_bay_target` counts physical bays; DS verification fans out coverage memory to sibling surfaces. **TIME-DUTY-002:** Floor/Roster current expected availability is derived from persisted schedule rows + `stores.timezone` (On now / Later today / Off / Called out); normal shift start/end does not toggle the database or weekly bay ownership. **TIME-DUTY-003:** a call-out is availability-exception evidence for that date; weekly physical-bay ownership stays unless the DS explicitly chooses Reassign bays (pool / auto / carry). Next scheduled opportunity is derived, not persisted. **UX-REDUCE-002:** Floor is people→physical-bays This Week ownership; healthy state quieter than exceptional; recovery/Floor Pad/+1 preserved; no engine/schema change. **UX-REDUCE-003:** Map is department coverage geography (physical bays, not tags); Velocity/service cadence demoted to advanced disclosure; Sell/Top secondary; investigation + seasonal preserved; Map topology non-mutating; no engine/schema change. **UX-REDUCE-004:** Roster is People + schedule evidence; TIME-DUTY derived; call-out exception preserves ownership; access/device demoted; `accessible_departments` remains authority scope; no WORKFORCE-SCOPE-001 invention; no engine/schema change. **UX-REDUCE-005:** More is setup/administration (Floor Pad + Department Setup topology + Master Seasonal + collapsed Master Admin). **PRIORITY-UX-001/002:** durable High = `priority_override` as Model A selector pressure among owed/eligible physical bays (not a COMPLETED re-admission pin); Map owns Standard/High via `canMutateRotationPriority`; Hotspot/decay remain separate models — [`docs/product/PRIORITY_UX_002_MANUAL_COVERAGE_PRIORITY.md`](docs/product/PRIORITY_UX_002_MANUAL_COVERAGE_PRIORITY.md). **UX-REDUCE-007:** retired leftover mounted residue (Priority Lock, topology velocity radios, Bay Workflow UI, taxonomy/fiscal/weekly-target cards, specialty cache chrome); call-out no longer writes `priority_override`; schema and dormant specialty runtime retained. **BULK-SETUP-001/002:** Bulk Generator archaeology + physical-bay-first setup (internal BOTH; AI Pre-Flight consumer retired; no schema/RBAC) — [`docs/product/BULK_SETUP_002_PHYSICAL_BAY_FIRST_BULK_TOPOLOGY.md`](docs/product/BULK_SETUP_002_PHYSICAL_BAY_FIRST_BULK_TOPOLOGY.md). |
-| **Description (legacy marketing copy in manifest)** | Department & SIMS Inventory Audit Suite for Lowe's stores — floor bay rotations, specialty scans, roster auth, manager floor pad *(specialty surfaces subject to REDUCE retirement; Floor Pad protected)* |
-| **Default post-login land** | `/dashboard` (Floor This Week) |
+| **Governing identity (ALIGN-002)** | Sovereign personal operational intelligence for one Department Supervisor (Flooring + Home Decor). See `DEPTSYNC_CONSTITUTION.md` Art. I / II-A. |
+| **Implemented product boundary (REDUCE-002 era — still describes running surfaces)** | Intelligent continuous-coverage **rotation** system for merchandising aisle/bay work — not a broad store-ops platform. Spec: [`docs/product/DEPTSYNC_REDUCE_002_BOUNDARY_AND_DECOUPLING_SPEC.md`](docs/product/DEPTSYNC_REDUCE_002_BOUNDARY_AND_DECOUPLING_SPEC.md) (**historical boundary** under ALIGN-002 identity). Floor Pad / Walk & Talk: **PROTECTED — ROTATION OBSERVATIONAL CAPTURE EVALUATION PENDING** ([`DEPTSYNC_REDUCE_002A_FLOOR_PAD_PROTECTION.md`](docs/product/DEPTSYNC_REDUCE_002A_FLOOR_PAD_PROTECTION.md)). Seasonal Context: **PROTECTED — ROTATION CADENCE INPUT** ([`DEPTSYNC_REDUCE_003A_SEASONAL_CONTEXT_PROTECTION.md`](docs/product/DEPTSYNC_REDUCE_003A_SEASONAL_CONTEXT_PROTECTION.md)). **REDUCE-004:** everyday specialty launchers disconnected; specialty runtime dormant underneath. **LAB-WEEK-002:** automatic week allocation uses persisted whole-week `associate_shift_days` known hours (ISO Mon–Sun); `sunday_bay_assignments` remains weekly ownership; localStorage Sunday hours are not primary automatic labor truth. **STAGE-ASSIGN-CUE-001:** Stage remains selection-only; after staged/unowned bays, the Sunday drawer shows schedule-informed preview + visible **Assign this week** confirm (`handleBalanceAssign`); Auto-Assign All to Me is secondary. **BAY-UNIT-002:** one physical aisle/bay (`department_id + aisle + bay`) is one rotation/allocation/verification obligation; SELLING/TOPSTOCK remain topology surfaces; `weekly_bay_target` counts physical bays; DS verification fans out coverage memory to sibling surfaces. **TIME-DUTY-002:** Floor/Roster current expected availability is derived from persisted schedule rows + `stores.timezone` (On now / Later today / Off / Called out); normal shift start/end does not toggle the database or weekly bay ownership. **TIME-DUTY-003:** a call-out is availability-exception evidence for that date; weekly physical-bay ownership stays unless the DS explicitly chooses Reassign bays (pool / auto / carry). Next scheduled opportunity is derived, not persisted. **UX-REDUCE-002:** Floor is people→physical-bays This Week ownership; healthy state quieter than exceptional; recovery/Floor Pad/+1 preserved; no engine/schema change. **UX-REDUCE-003:** Map is department coverage geography (physical bays, not tags); Velocity/service cadence demoted to advanced disclosure; Sell/Top secondary; investigation + seasonal preserved; Map topology non-mutating; no engine/schema change. **UX-REDUCE-004:** Roster is People + schedule evidence; TIME-DUTY derived; call-out exception preserves ownership; access/device demoted; `accessible_departments` remains authority scope; no WORKFORCE-SCOPE-001 invention; no engine/schema change. **UX-REDUCE-005:** More is setup/administration (Floor Pad + Department Setup topology + Master Seasonal + collapsed Master Admin). **PRIORITY-UX-001/002:** durable High = `priority_override` as Model A selector pressure among owed/eligible physical bays (not a COMPLETED re-admission pin); Map owns Standard/High via `canMutateRotationPriority`; Hotspot/decay remain separate models — [`docs/product/PRIORITY_UX_002_MANUAL_COVERAGE_PRIORITY.md`](docs/product/PRIORITY_UX_002_MANUAL_COVERAGE_PRIORITY.md). **UX-REDUCE-007:** retired leftover mounted residue (Priority Lock, topology velocity radios, Bay Workflow UI, taxonomy/fiscal/weekly-target cards, specialty cache chrome); call-out no longer writes `priority_override`; schema and dormant specialty runtime retained. **BULK-SETUP-001/002:** Bulk Generator archaeology + physical-bay-first setup (internal BOTH; AI Pre-Flight consumer retired; no schema/RBAC) — [`docs/product/BULK_SETUP_002_PHYSICAL_BAY_FIRST_BULK_TOPOLOGY.md`](docs/product/BULK_SETUP_002_PHYSICAL_BAY_FIRST_BULK_TOPOLOGY.md). |
+| **Description (legacy marketing copy in manifest)** | Department & SIMS Inventory Audit Suite for Lowe's stores — floor bay rotations, specialty scans, roster auth, manager floor pad *(specialty surfaces subject to REDUCE retirement; Floor Pad protected; ALIGN-002 target identity supersedes this marketing copy for product law)* |
+| **Default post-login land (implemented)** | `/dashboard` (Floor This Week) |
+| **Intended landing (target, not implemented)** | Overview |
 | **Specialty scan hub** | Historical `/?section=*` paths redirect to `/dashboard` (REDUCE-004); appliance/cycle-audit runtime dormant |
+| **Flooring / Home Decor (implemented)** | Merged: `flooring` / “Flooring / Home Decor” — no separate Home Decor department row |
+| **Flooring / Home Decor (target)** | Separate first-class departments — migration **UNRESOLVED** |
 
 ### History integrity (completion attempts)
 
@@ -108,13 +146,13 @@
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Browser client |
 | `SUPABASE_SERVICE_ROLE_KEY` | API routes / admin writes |
 | `HUB_MASTER_PIN` | **Required** for Master PIN login / bootstrap — no default; unset = Master PIN unavailable |
-| `HUB_GATE_SECRET` | Recommended HMAC for hub gate + QR pair (else `CRON_SECRET` / service role chain) |
-| `BOOTSTRAP_SECRET` | Optional; `POST /api/auth/bootstrap-admin` (else `CRON_SECRET`) |
+| `HUB_GATE_SECRET` | **Required** (ALIGN-SEC-001) — sole HMAC for hub gate + QR pair + auth-verify cookies; fail closed; never cron/service/anon/hardcoded |
+| `BOOTSTRAP_SECRET` | **Required for HTTP** `POST /api/auth/bootstrap-admin` (ALIGN-SEC-001); no `CRON_SECRET` fallback; local script recovery does not need it |
 | `HUB_BOOTSTRAP_STORE_NUMBER` | Optional store for Master Admin bootstrap |
 | `GEMINI_API_KEY` / `GEMINI_MODEL` | The five live consumers — Pre-Flight parse, Floor-Walk Copilot, Executive Floor Pad, Flooring Insights, Visual Bay Scan (all optional) |
 | VAPID keys | Web Push (`lib/push/*`) |
 | Twilio env / `SMS_INVITE_WEBHOOK_URL` | Roster invite SMS |
-| `CRON_SECRET` | Weekly rotation cron auth (+ signing/bootstrap fallback) |
+| `CRON_SECRET` | Weekly rotation cron auth only — not a gate/bootstrap substitute |
 | `APPLIANCE_SCAN_HMAC_SECRET` | APP-UPC-001A server-only HMAC for opaque appliance scan fingerprints (fail closed; never NEXT_PUBLIC / never reuse gate/cron/auth) |
 | Hub gate HMAC | `lib/auth-gate.ts` — `deptsync_hub_gate` cookie |
 
@@ -132,11 +170,12 @@ Canonical env comments live in `.env.example`. Placeholder detection: `lib/supab
 
 | File | Role |
 |------|------|
-| `DEPTSYNC_CONSTITUTION.md` | **Governing laws** — purpose, authority, anti-drift (outranks this file on principle) |
-| `ARCHITECTURE.md` | Module ownership index |
+| `DEPTSYNC_CONSTITUTION.md` | **Governing laws** — purpose, authority, anti-drift (outranks this file on principle); ALIGN-002 ratified |
+| `docs/product/DEPTSYNC_ALIGN_002_CONSTITUTIONAL_RATIFICATION.md` | ALIGN-002 ratification record + Flooring/Home Decor topology investigation |
+| `ARCHITECTURE.md` | Module ownership index (implemented codebase) |
 | `APP_LAYOUT_MAP.md` | UI layout & z-index |
-| `MASTER_ROADMAP.md` | Historical completion checklist |
-| `DEPT_SYNC_STATE.md` | **This file — canonical implementation state** |
+| `MASTER_ROADMAP.md` | Historical completion checklist + ALIGN next items |
+| `DEPT_SYNC_STATE.md` | **This file — canonical implementation state** (+ labeled target intent) |
 | `AGENTS.md` | Next.js 16 agent rules |
 
 ---
@@ -552,8 +591,9 @@ Operational configuration only — do **not** hardcode store numbers, PINs, or t
 
 - [ ] `NEXT_PUBLIC_SUPABASE_URL` + `NEXT_PUBLIC_SUPABASE_ANON_KEY` + `SUPABASE_SERVICE_ROLE_KEY`
 - [ ] Unique `HUB_MASTER_PIN` (required; no default)
-- [ ] `HUB_GATE_SECRET` (recommended) and `CRON_SECRET`
-- [ ] Master recovery: `node --env-file=.env.local scripts/bootstrap-admin.mjs` or `POST /api/auth/bootstrap-admin` with Bearer `BOOTSTRAP_SECRET` / `CRON_SECRET`
+- [ ] `HUB_GATE_SECRET` (**required** ALIGN-SEC-001) and `CRON_SECRET` (cron only)
+- [ ] `BOOTSTRAP_SECRET` (**required** for HTTP bootstrap; do not reuse `CRON_SECRET`)
+- [ ] Master recovery: `node --env-file=.env.local scripts/bootstrap-admin.mjs` or `POST /api/auth/bootstrap-admin` with Bearer `BOOTSTRAP_SECRET`
 - [ ] Optional `HUB_BOOTSTRAP_STORE_NUMBER` for bootstrap store
 - [ ] HTTPS host for PWA install on personal phones (or trusted local tunnel for dry-run)
 

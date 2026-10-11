@@ -5,6 +5,8 @@
 **Amends:** [DEPTSYNC_REDUCE_002_BOUNDARY_AND_DECOUPLING_SPEC.md](./DEPTSYNC_REDUCE_002_BOUNDARY_AND_DECOUPLING_SPEC.md)  
 **Runtime:** unchanged · **APP-UPC-001A:** undisturbed by this amendment · **Companion:** [REDUCE-003A Seasonal Context](./DEPTSYNC_REDUCE_003A_SEASONAL_CONTEXT_PROTECTION.md) · **Commit:** captured via REDUCE-003A repository reconciliation
 
+> **ALIGN-002 (2026-10-10):** Constitution Art. V-B ratifies **collaborative walkthroughs** as leadership conversations (not inspections/scoring). Target: dedicated walkthrough domain where necessary; reuse Floor Pad where practical. **No new storage** until `manager_notes` / `shift_walk_tasks` dependency review. FLOORPAD-001 remains required before Floor Pad retirement or redesign. This protection disposition is **not withdrawn** by ALIGN-002.
+
 ---
 
 ## 1. Purpose

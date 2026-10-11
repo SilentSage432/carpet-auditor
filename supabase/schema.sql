@@ -99,12 +99,9 @@ where lower(role) in ('specialist', 'associate');
 delete from public.store_specialists
 where lower(name) in ('alex', 'dave', 'sales specialist 1', 'sales specialist 2');
 
--- Seed a single Flooring Supervisor (default PIN 1234) if none exists
-insert into public.store_specialists (name, role, pin_code)
-select 'Flooring Supervisor', 'Supervisor', '1234'
-where not exists (
-  select 1 from public.store_specialists where role = 'Supervisor'
-);
+-- ALIGN-SEC-001: do NOT seed known default PINs (e.g. 1234).
+-- Operator provisioning: POST /api/auth/bootstrap-admin (BOOTSTRAP_SECRET)
+-- or `node --env-file=.env.local scripts/bootstrap-admin.mjs` (HUB_MASTER_PIN).
 
 -- Deduplicate generic Department Supervisor rows only (keep newest).
 -- Do NOT collapse all Supervisor roles — department supervisors coexist.
@@ -245,47 +242,9 @@ set
 where role = 'Supervisor'
   and lower(name) in ('department supervisor', 'dept supervisor', 'flooring supervisor');
 
--- Seed Flooring Supervisor for default store if missing
-insert into public.store_specialists (
-  name, role, pin_code, store_number, assigned_department, must_change_credentials
-)
-select 'Flooring Supervisor', 'Supervisor', '1234', '1234', 'flooring', false
-where not exists (
-  select 1 from public.store_specialists
-  where role = 'Supervisor' and store_number = '1234'
-    and coalesce(assigned_department, 'flooring') = 'flooring'
-);
-
--- Seed Master Admin
-insert into public.store_specialists (
-  name, role, pin_code, store_number, username, assigned_department, must_change_credentials
-)
-select 'Master Admin', 'MasterAdmin', '1234', '1234', 'master_admin', 'all', false
-where not exists (
-  select 1 from public.store_specialists
-  where role = 'MasterAdmin' and store_number = '1234'
-);
-
--- Seed Amber (Appliances Supervisor) with first-login credential force
-insert into public.store_specialists (
-  name, role, pin_code, store_number, username, assigned_department, must_change_credentials
-)
-select
-  'Amber',
-  'Supervisor',
-  'ChangeMe123',
-  '1234',
-  'amber_appliance',
-  'appliances',
-  true
-where not exists (
-  select 1 from public.store_specialists
-  where store_number = '1234'
-    and (
-      lower(username) = 'amber_appliance'
-      or (role = 'Supervisor' and coalesce(assigned_department, '') = 'appliances')
-    )
-);
+-- ALIGN-SEC-001: demo roster PIN seeds removed (Flooring Supervisor 1234,
+-- Master Admin 1234, Amber ChangeMe123). Do not reintroduce known defaults.
+-- Fresh environments: use Master Admin bootstrap with HUB_MASTER_PIN.
 
 create index if not exists store_specialists_username_idx
   on public.store_specialists (store_number, username);

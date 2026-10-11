@@ -1,5 +1,51 @@
 # DeptSync Hub — Development Journal
 
+## 2026-10-10 — DEPTSYNC-ALIGN-SEC-007 controlled Vercel security release
+
+**Local commit preparation only.** No push, deploy, Production SQL, or bootstrap execution.
+
+Scoped release: ALIGN-002 docs + SEC-001…006 security code/tests/docs/RLS script. `tmp/` excluded. Operator confirmed Production secrets present (values never read). Canonical: [`docs/product/DEPTSYNC_ALIGN_SEC_007_CONTROLLED_VERCEL_SECURITY_RELEASE.md`](docs/product/DEPTSYNC_ALIGN_SEC_007_CONTROLLED_VERCEL_SECURITY_RELEASE.md).
+
+## 2026-10-10 — DEPTSYNC-ALIGN-SEC-006 recovery credential protection
+
+**Scoped security implementation.** No deploy, prod mutation, commit, or push.
+
+Bootstrap Master credential now persisted as existing salted `hashPin` (`pin_code` + `pin_hash`); HTTP bootstrap responses and local script stdout no longer echo `HUB_MASTER_PIN`. Auth.users password still set from env (provider hashes). Legacy plaintext verify preserved. Synthetic tests; suite 1351; typecheck/build pass. Canonical: [`docs/product/DEPTSYNC_ALIGN_SEC_006_RECOVERY_CREDENTIAL_PROTECTION.md`](docs/product/DEPTSYNC_ALIGN_SEC_006_RECOVERY_CREDENTIAL_PROTECTION.md). STOP for operator review.
+
+## 2026-10-10 — DEPTSYNC-ALIGN-SEC-005 master recovery credential compatibility
+
+**Read-only investigation + local synthetic tests.** No deploy, prod mutation, commit, or push. Production `HUB_MASTER_PIN` never read.
+
+Verified `openssl rand -hex 32` (64 hex) is compatible with `getHubMasterPin` / `isHubMasterPin` / hub-bridge Master fallback / bootstrap `pin_code` write / AuthWall password fields. No truncation or 4-digit-only server gate on Master path. Ordinary DB PIN login unchanged. Residual (optional): plaintext bootstrap storage + PIN echo in bootstrap HTTP. Tests: 16 SEC-005 + full suite 1341; typecheck/build pass. **COMPATIBLE GO.** Canonical: [`docs/product/DEPTSYNC_ALIGN_SEC_005_MASTER_RECOVERY_CREDENTIAL_COMPATIBILITY.md`](docs/product/DEPTSYNC_ALIGN_SEC_005_MASTER_RECOVERY_CREDENTIAL_COMPATIBILITY.md). STOP for operator review.
+
+## 2026-10-10 — DEPTSYNC-ALIGN-SEC-003 final production release gate
+
+**Read-only.** Operator confirmed Production `HUB_GATE_SECRET` + `BOOTSTRAP_SECRET` (values never accessed). Auth `/api/auth/*` matrix completed; no new privilege-without-auth gaps from SEC-001. Residual: no rate limits on public login/reset (pre-existing). Existing five Production env vars still **OPERATOR CONFIRMATION REQUIRED**. Tests 1325 pass; build pass. **CONDITIONAL GO.** Canonical: [`docs/product/DEPTSYNC_ALIGN_SEC_003_FINAL_PRODUCTION_RELEASE_GATE.md`](docs/product/DEPTSYNC_ALIGN_SEC_003_FINAL_PRODUCTION_RELEASE_GATE.md). Deploy/commit not authorized by this tranche.
+
+## 2026-10-10 — DEPTSYNC-ALIGN-SEC-002 Vercel production security readiness
+
+**Read-only audit + local verification.** No deploy, prod mutation, commit, push, Vercel env changes, or production SQL.
+
+Verified locally: gate fail-closed, secret rotation cookie rejection, TTL lockstep, bootstrap without gate cookie, cron edge continuity, RLS script SELECT-only. Vercel Production env presence **UNKNOWN** (CLI unavailable). Local `.env.local` missing `HUB_GATE_SECRET` / `BOOTSTRAP_SECRET` / `HUB_MASTER_PIN`. **NO-GO** until operator confirms Production secrets. Canonical: [`docs/product/DEPTSYNC_ALIGN_SEC_002_VERCEL_PRODUCTION_READINESS.md`](docs/product/DEPTSYNC_ALIGN_SEC_002_VERCEL_PRODUCTION_READINESS.md).
+
+## 2026-10-10 — DEPTSYNC-ALIGN-SEC-001 single-operator security stabilization
+
+**Authorized security implementation (no deploy / prod mutation / commit / push).**
+
+Fail-closed `HUB_GATE_SECRET` (removed cron/service/anon/hardcoded fallbacks) in `lib/auth-gate.ts` + pairing/auth-verify HMAC. `proxy.ts` no longer treats arbitrary Bearer as edge auth. Bootstrap HTTP requires dedicated `BOOTSTRAP_SECRET`. Schema seed demo PINs removed. Read-only RLS verify SQL for operator. Tests: gate/edge/bootstrap/seed/cron contracts. Local recovery via `scripts/bootstrap-admin.mjs` preserved.
+
+Canonical: [`docs/product/DEPTSYNC_ALIGN_SEC_001_SECURITY_STABILIZATION.md`](docs/product/DEPTSYNC_ALIGN_SEC_001_SECURITY_STABILIZATION.md). Do not start SECTION-001 / dept split / walkthroughs / associate auth retirement.
+
+## 2026-10-10 — DEPTSYNC-ALIGN-002 constitutional ratification (docs only)
+
+**Authorized documentation tranche.** No application code, schema, auth, UI, production, commit, or push.
+
+Ratified ALIGN-001 direction into `DEPTSYNC_CONSTITUTION.md`: single-operator identity; Flooring + Home Decor active scope (separate first-class = target; merge remains implemented); Operational Sections; Cross Ownership & Respect; walkthrough principles; target chrome Overview · Map · This Week · Walkthroughs · More; Art. XXV sovereign intelligence; security debt recorded (A-7).
+
+Read-only topology investigation: merged `flooring` / “Flooring / Home Decor”; no schema distinction of Home Decor; split requires operator mapping — migration **UNRESOLVED**.
+
+Canonical: [`docs/product/DEPTSYNC_ALIGN_002_CONSTITUTIONAL_RATIFICATION.md`](docs/product/DEPTSYNC_ALIGN_002_CONSTITUTIONAL_RATIFICATION.md). State/README/ARCHITECTURE/REDUCE-002 banner/roadmap/handoff updated. Do not start ALIGN-SEC-001 / SECTION-001 / walkthrough storage without separate authorization.
+
 ## 2026-09-18 — BULK-SETUP-002 physical-bay-first Bulk topology
 
 **Authorized implementation.** Baseline `main @ 93b88b0`. Evidence: BULK-SETUP-001.

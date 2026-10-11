@@ -4,30 +4,28 @@ import {
   getHubMasterPin,
   HUB_MASTER_USERNAME,
 } from "@/lib/store-ops/bootstrap-admin";
+import { authorizeBootstrapRequest } from "@/lib/store-ops/bootstrap-authorize";
 import { readableError } from "@/lib/store-ops/errors";
 import { describeSupabaseEnv } from "@/lib/supabase/env";
 import { normalizeStoreNumber } from "@/lib/store";
 
 export const dynamic = "force-dynamic";
 
-function authorizeBootstrap(request: Request): boolean {
-  const secret =
-    process.env.BOOTSTRAP_SECRET?.trim() || process.env.CRON_SECRET?.trim();
-  if (!secret) return false;
-  const auth = request.headers.get("authorization");
-  return auth === `Bearer ${secret}`;
-}
-
 /**
  * POST /api/auth/bootstrap-admin
  * One-time / recovery seed for Master Admin (service role).
- * Auth: Bearer CRON_SECRET or BOOTSTRAP_SECRET.
+ * Auth: Bearer BOOTSTRAP_SECRET only (ALIGN-SEC-001 — no CRON_SECRET fallback).
+ *
+ * Local recovery without HTTP: `node --env-file=.env.local scripts/bootstrap-admin.mjs`
+ * (uses service role + HUB_MASTER_PIN; does not require BOOTSTRAP_SECRET).
  *
  * Body (optional): { store_number?: string, mint_session?: boolean }
+ *
+ * ALIGN-SEC-006: never return HUB_MASTER_PIN in the response body.
  */
 export async function POST(request: Request) {
   try {
-    if (!authorizeBootstrap(request)) {
+    if (!authorizeBootstrapRequest(request)) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -60,8 +58,8 @@ export async function POST(request: Request) {
     return NextResponse.json({
       ok: true,
       username: HUB_MASTER_USERNAME,
-      // Intentionally return the master PIN so local recovery can sign in.
-      pin: getHubMasterPin(),
+      pin_configured: Boolean(getHubMasterPin()),
+      pin_storage: "hashed",
       specialist_id: result.specialist.id,
       store_number: result.store_number,
       auth_user_id: result.authUserId,
@@ -69,7 +67,7 @@ export async function POST(request: Request) {
       created_specialist: result.created_specialist,
       created_auth_user: result.created_auth_user,
       session: result.session ?? null,
-      hint: `Sign in with username "${HUB_MASTER_USERNAME}" and the returned pin (Hub PIN bridge will mint Auth).`,
+      hint: `Sign in with username "${HUB_MASTER_USERNAME}" and your configured HUB_MASTER_PIN (Hub PIN bridge will mint Auth).`,
     });
   } catch (err) {
     return NextResponse.json(
@@ -79,10 +77,10 @@ export async function POST(request: Request) {
   }
 }
 
-/** GET — status check (same Bearer). Does not reset PIN unless ?force=1. */
+/** GET — status check (same Bearer BOOTSTRAP_SECRET). Does not reset PIN unless ?force=1. */
 export async function GET(request: Request) {
   try {
-    if (!authorizeBootstrap(request)) {
+    if (!authorizeBootstrapRequest(request)) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -98,7 +96,8 @@ export async function GET(request: Request) {
         ok: true,
         forced: true,
         username: HUB_MASTER_USERNAME,
-        pin: getHubMasterPin(),
+        pin_configured: Boolean(getHubMasterPin()),
+        pin_storage: "hashed",
         specialist_id: result.specialist.id,
         store_number: result.store_number,
       });
@@ -108,7 +107,7 @@ export async function GET(request: Request) {
       ok: true,
       username: HUB_MASTER_USERNAME,
       pin_configured: Boolean(getHubMasterPin()),
-      hint: "POST with Bearer CRON_SECRET to seed/reset Master Admin.",
+      hint: "POST with Bearer BOOTSTRAP_SECRET to seed/reset Master Admin.",
     });
   } catch (err) {
     return NextResponse.json(

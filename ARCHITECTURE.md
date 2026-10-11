@@ -1,5 +1,10 @@
 # DeptSync Hub — Architecture
 
+> **ALIGN-002 (2026-10-10):** Product law is the single-operator Flooring + Home Decor identity in `DEPTSYNC_CONSTITUTION.md`.  
+> This file remains a **module ownership map of the implemented codebase**. It does **not** claim Overview / Walkthroughs / Operational Sections routes exist.  
+> Target IA: Overview · Map · This Week · Walkthroughs · More — see Constitution Arts. XV–XVI and [`docs/product/DEPTSYNC_ALIGN_002_CONSTITUTIONAL_RATIFICATION.md`](docs/product/DEPTSYNC_ALIGN_002_CONSTITUTIONAL_RATIFICATION.md).  
+> Implemented chrome today: Floor · Map · Roster · More (`/dashboard`, `/admin/store-map`, `/roster`, `/settings`).
+
 ```
 app/page.tsx                      → Authenticated specialty scan hub (`?section=`); unauthenticated `/` redirects to /login
 app/login/page.tsx                → Public AccessGate + AuthWall (no dashboard chrome)

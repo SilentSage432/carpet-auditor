@@ -148,13 +148,13 @@ export function isInviteHarnessMode(testFlag?: boolean | string | null): boolean
   return testFlag === true || testFlag === "1" || testFlag === "true";
 }
 
-function verifyCookieSecret(): string {
-  return (
-    process.env.HUB_GATE_SECRET?.trim() ||
-    process.env.CRON_SECRET?.trim() ||
-    process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() ||
-    "deptsync-auth-verify-v1"
-  );
+/**
+ * ALIGN-SEC-001: verify-cookie HMAC uses HUB_GATE_SECRET only (fail closed).
+ * Never fall back to CRON_SECRET, service role, or hardcoded strings.
+ */
+function verifyCookieSecret(): string | null {
+  const secret = process.env.HUB_GATE_SECRET?.trim();
+  return secret ? secret : null;
 }
 
 export type AuthVerifyPayload = {
@@ -185,14 +185,13 @@ export function mintAuthVerifyCookie(
   purpose: AuthTokenPurpose
 ): string | null {
   const sid = String(specialistId ?? "").trim();
-  if (!sid) return null;
+  const secret = verifyCookieSecret();
+  if (!sid || !secret) return null;
   const exp = Date.now() + VERIFY_SESSION_TTL_MS;
   const body = Buffer.from(
     JSON.stringify({ v: 1, sid, purpose, exp } satisfies AuthVerifyPayload)
   ).toString("base64url");
-  const sig = createHmac("sha256", verifyCookieSecret())
-    .update(body)
-    .digest("base64url");
+  const sig = createHmac("sha256", secret).update(body).digest("base64url");
   return `${body}.${sig}`;
 }
 
@@ -200,12 +199,13 @@ export function verifyAuthVerifyCookie(
   token: string | null | undefined
 ): AuthVerifyPayload | null {
   const raw = String(token ?? "").trim();
-  if (!raw) return null;
+  const secret = verifyCookieSecret();
+  if (!raw || !secret) return null;
   const dot = raw.lastIndexOf(".");
   if (dot <= 0) return null;
   const body = raw.slice(0, dot);
   const sig = raw.slice(dot + 1);
-  const expected = createHmac("sha256", verifyCookieSecret())
+  const expected = createHmac("sha256", secret)
     .update(body)
     .digest("base64url");
   if (expected.length !== sig.length) return null;

@@ -7,6 +7,7 @@ import "server-only";
 
 import { randomBytes } from "crypto";
 import { createClient } from "@supabase/supabase-js";
+import { hashPin, verifyStoredPin } from "@/lib/auth-token";
 import { mapRow } from "@/lib/specialists";
 import { normalizeStoreNumber } from "@/lib/store";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -25,6 +26,19 @@ export const HUB_MASTER_NAME = "Master Admin";
 export const HUB_MASTER_AUTH_EMAIL = "hub.master-admin@deptsync.hub";
 
 export { getHubMasterPin, isHubMasterPin, requireHubMasterPin };
+
+/**
+ * Roster fields for Master bootstrap — one-way salted hash only (ALIGN-SEC-006).
+ * Matches reset-pin storage: both pin_code and pin_hash hold salt.digest.
+ * Auth.users password is set separately from env (provider hashes it).
+ */
+export function masterBootstrapPinFields(pin: string): {
+  pin_code: string;
+  pin_hash: string;
+} {
+  const pinHash = hashPin(pin);
+  return { pin_code: pinHash, pin_hash: pinHash };
+}
 
 function hubBridgeEmail(specialistId: string): string {
   const safe = String(specialistId)
@@ -263,13 +277,14 @@ export async function ensureMasterAdminBootstrap(input?: {
 
   let createdSpecialist = false;
   let specialist = await findExistingMasterSpecialist();
+  const pinFields = masterBootstrapPinFields(pin);
 
   const patch = {
     name: HUB_MASTER_NAME,
     username: HUB_MASTER_USERNAME,
     role: "MasterAdmin",
     assigned_department: "all",
-    pin_code: pin,
+    ...pinFields,
     store_number: storeNumber,
     is_active: true,
     must_change_credentials: false,
@@ -300,10 +315,9 @@ export async function ensureMasterAdminBootstrap(input?: {
     specialist = mapRow(data as Record<string, unknown>);
     createdSpecialist = true;
   } else {
-    const pinMismatch =
-      !specialist.pin_code ||
-      specialist.pin_code.trim() === "" ||
-      specialist.pin_code.trim() !== pin;
+    const stored =
+      specialist.pin_hash?.trim() || specialist.pin_code?.trim() || "";
+    const pinMismatch = !stored || !verifyStoredPin(pin, stored);
     const { data, error } = await admin
       .from("store_specialists")
       .update(patch)

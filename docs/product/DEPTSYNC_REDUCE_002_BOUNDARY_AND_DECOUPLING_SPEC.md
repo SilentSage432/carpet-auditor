@@ -5,15 +5,23 @@
 **Git baseline at archaeology:** `05b0dc4`  
 **Authority:** Beneath `DEPTSYNC_CONSTITUTION.md`. Implementation not authorized by this document alone.
 
+> **ALIGN-002 (2026-10-10) — HISTORICAL PRODUCT BOUNDARY**  
+> Constitution Art. I / II-A now define DeptSync as a **sovereign personal operational intelligence system** for one operator over Flooring and Home Decor.  
+> This REDUCE-002 document remains the canonical lock of the **rotation reduction / specialty decoupling** program and still accurately describes much of the **implemented** rotation surface.  
+> Where REDUCE-002 identity language conflicts with ALIGN-002, **the Constitution (ALIGN-002) governs**.  
+> Ratification record: [`DEPTSYNC_ALIGN_002_CONSTITUTIONAL_RATIFICATION.md`](./DEPTSYNC_ALIGN_002_CONSTITUTIONAL_RATIFICATION.md).
+
 This file is the repository-canonical lock of the REDUCE-002 design tranche (originally delivered in session) **as amended by REDUCE-002A (Floor Pad) and REDUCE-003A (Seasonal Context)**.
 
 ---
 
 ## 1. Canonical product definition
 
-> **DeptSync is an intelligent continuous-coverage rotation system that helps a Department Supervisor select, distribute, verify, and remember recurring aisle/bay coverage across a merchandising workforce — without replacing Lowe’s task workflow.**
+> **Historical REDUCE-002 definition (implemented rotation thesis):** DeptSync is an intelligent continuous-coverage rotation system that helps a Department Supervisor select, distribute, verify, and remember recurring aisle/bay coverage across a merchandising workforce — without replacing Lowe’s task workflow.
 
-Product character: a quiet, stubborn coverage instrument for physical merchandising environments. Not a broad store-operations platform. Not required for every department.
+> **Governing ALIGN-002 identity:** see `DEPTSYNC_CONSTITUTION.md` Article I — sovereign personal operational intelligence for one operator (Flooring + Home Decor).
+
+Product character under REDUCE: a quiet, stubborn coverage instrument for physical merchandising environments. Not a broad store-operations platform. Not required for every department.
 
 Canonical Lowe’s boundary (Art. II):
 

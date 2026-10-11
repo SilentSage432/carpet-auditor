@@ -2,6 +2,9 @@
  * Edge-safe hub gate — HTTP-only session cookie + public-path allowlist.
  * Owns crawl/auth boundary tokens only. Does not own AuthWall, roster, or JWTs.
  * TTL matches `AUTH_SESSION_TIMEOUT_MS` in lib/auth-session.ts (8h inactivity).
+ *
+ * ALIGN-SEC-001: signing secret is HUB_GATE_SECRET only — fail closed when unset.
+ * Never fall back to CRON_SECRET, service role, anon key, or hardcoded strings.
  */
 
 export const HUB_GATE_COOKIE = "deptsync_hub_gate";
@@ -11,14 +14,13 @@ export const HUB_GATE_TTL_MS = 8 * 60 * 60 * 1000;
 
 const encoder = new TextEncoder();
 
-function gateSecret(): string {
-  return (
-    process.env.HUB_GATE_SECRET?.trim() ||
-    process.env.CRON_SECRET?.trim() ||
-    process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() ||
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY?.trim() ||
-    "deptsync-hub-gate-v1"
-  );
+/**
+ * Dedicated hub-gate HMAC secret.
+ * Returns null when unset — callers MUST fail closed (no mint / no verify success).
+ */
+export function resolveHubGateSecret(): string | null {
+  const secret = process.env.HUB_GATE_SECRET?.trim();
+  return secret ? secret : null;
 }
 
 function bytesToB64url(bytes: Uint8Array): string {
@@ -83,7 +85,7 @@ export function hubGateCookieOptions(): {
 }
 
 export async function mintHubGateToken(specialistId: string): Promise<string | null> {
-  const secret = gateSecret();
+  const secret = resolveHubGateSecret();
   const sid = String(specialistId ?? "").trim();
   if (!secret || !sid) return null;
   const exp = Date.now() + HUB_GATE_TTL_MS;
@@ -98,7 +100,7 @@ export async function verifyHubGateToken(
   token: string | null | undefined
 ): Promise<HubGatePayload | null> {
   const raw = String(token ?? "").trim();
-  const secret = gateSecret();
+  const secret = resolveHubGateSecret();
   if (!raw || !secret) return null;
   const dot = raw.lastIndexOf(".");
   if (dot <= 0) return null;
@@ -123,6 +125,17 @@ export async function verifyHubGateToken(
   }
 }
 
+/**
+ * Edge route classes (ALIGN-SEC-001):
+ * - Public: login/pair/invite HTML + `/api/auth/*` + `/api/invite/*` + static
+ * - Cron: `/api/cron/*` — edge pass-through; handler requires CRON_SECRET
+ * - Operator-authenticated: all other HTML + `/api/*` — require verified hub gate cookie
+ * - Bootstrap: `/api/auth/bootstrap-admin` is under public auth prefix at the edge;
+ *   the route handler requires dedicated BOOTSTRAP_SECRET (not CRON_SECRET)
+ *
+ * An Authorization Bearer header alone MUST NOT authorize edge access.
+ * Handlers still perform their own actor/JWT/service-role authorization.
+ */
 export function isAuthGatePublicPath(pathname: string): boolean {
   if (pathname === "/login" || pathname === "/access-gate" || pathname === "/pair") {
     return true;
@@ -132,7 +145,6 @@ export function isAuthGatePublicPath(pathname: string): boolean {
   }
   if (pathname === "/invite" || pathname.startsWith("/invite/")) return true;
   if (pathname.startsWith("/api/auth")) return true;
-  if (pathname.startsWith("/api/cron")) return true;
   if (pathname.startsWith("/api/invite")) return true;
   if (pathname === "/robots.txt" || pathname === "/sw.js") return true;
   if (pathname === "/favicon.ico") return true;
@@ -155,6 +167,29 @@ export function isAuthGateStaticPath(pathname: string): boolean {
     pathname === "/sw.js" ||
     /\.(?:svg|png|jpg|jpeg|gif|webp|ico|woff2)$/i.test(pathname)
   );
+}
+
+export function isCronApiPath(pathname: string): boolean {
+  return pathname.startsWith("/api/cron");
+}
+
+/**
+ * Pure edge-access decision for tests and proxy.ts.
+ * Does not validate Bearer tokens — cookie or classified public/cron only.
+ */
+export async function edgeAllowsRequest(input: {
+  pathname: string;
+  gateCookie?: string | null;
+}): Promise<boolean> {
+  const pathname = String(input.pathname ?? "");
+  if (isAuthGateStaticPath(pathname) || isCronApiPath(pathname)) {
+    return true;
+  }
+  if (isAuthGatePublicPath(pathname)) {
+    return true;
+  }
+  const gate = await verifyHubGateToken(input.gateCookie);
+  return Boolean(gate);
 }
 
 /** Internal relative path only — never protocol-relative or off-site. */

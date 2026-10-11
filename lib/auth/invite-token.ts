@@ -18,13 +18,13 @@ export type PairingPayload = {
   exp: number;
 };
 
-function pairingSecret(): string {
-  return (
-    process.env.HUB_GATE_SECRET?.trim() ||
-    process.env.CRON_SECRET?.trim() ||
-    process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() ||
-    "deptsync-qr-pair-v1"
-  );
+/**
+ * ALIGN-SEC-001: pairing HMAC uses HUB_GATE_SECRET only (fail closed).
+ * Never fall back to CRON_SECRET, service role, or hardcoded strings.
+ */
+function pairingSecret(): string | null {
+  const secret = process.env.HUB_GATE_SECRET?.trim();
+  return secret ? secret : null;
 }
 
 export function hashPairingNonce(nonce: string): string {
@@ -49,6 +49,12 @@ export function mintPairingToken(input: {
   if (!specialist_id || !store_number) {
     throw new Error("specialist_id and store_number are required");
   }
+  const secret = pairingSecret();
+  if (!secret) {
+    throw new Error(
+      "HUB_GATE_SECRET is not configured — set it before issuing pairing tokens"
+    );
+  }
   const nonce = randomBytes(24).toString("base64url");
   const expiresAt = pairingExpiresAt();
   const payload: PairingPayload = {
@@ -58,9 +64,7 @@ export function mintPairingToken(input: {
     exp: expiresAt.getTime(),
   };
   const body = Buffer.from(JSON.stringify(payload)).toString("base64url");
-  const sig = createHmac("sha256", pairingSecret())
-    .update(body)
-    .digest("base64url");
+  const sig = createHmac("sha256", secret).update(body).digest("base64url");
   return {
     token: `${body}.${sig}`,
     nonce,
@@ -73,12 +77,13 @@ export function verifyPairingToken(
   token: string | null | undefined
 ): PairingPayload | null {
   const raw = String(token ?? "").trim();
-  if (!raw) return null;
+  const secret = pairingSecret();
+  if (!raw || !secret) return null;
   const dot = raw.lastIndexOf(".");
   if (dot <= 0) return null;
   const body = raw.slice(0, dot);
   const sig = raw.slice(dot + 1);
-  const expected = createHmac("sha256", pairingSecret())
+  const expected = createHmac("sha256", secret)
     .update(body)
     .digest("base64url");
   if (expected.length !== sig.length) return null;

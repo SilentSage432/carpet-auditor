@@ -5,11 +5,17 @@
 **Baseline:** `main` @ `d6d580617a0b8f78abe48c888613a6d8b6b527e8`  
 **Scope:** Product purpose, authority boundaries, and architectural invariants for DeptSync (`carpet-auditor`)
 
+**Amendment:** **ALIGN-002 — Constitutional Ratification** (2026-10-10).  
+Ratifies the product identity and architectural direction approved from DEPTSYNC-ALIGN-001.  
+Does **not** authorize application code, schema, UI, auth, or production changes.
+
 This document is not a README, roadmap, feature inventory, changelog, or subsystem manual.  
 It answers: *Does this proposed change belong in DeptSync, and does it preserve the system’s architectural laws?*
 
 When lower-level documentation conflicts with this Constitution, flag the conflict.  
 When implementation conflicts with this Constitution, record **constitutional debt** — do not silently weaken the law to match imperfect code.
+
+> **Historical note (superseded identity):** Prior to ALIGN-002, Article I described DeptSync as broader store-operations / multi-role floor technology. That language remains historical context in journals and pre-ALIGN product docs. Current law is this file as amended.
 
 ---
 
@@ -26,33 +32,44 @@ When implementation conflicts with this Constitution, record **constitutional de
 
 ## Article I — Preamble (Why DeptSync Exists)
 
-DeptSync began as practical department inventory tooling and evolved into a **Department Supervisor operational system**.
+DeptSync is a **sovereign personal operational intelligence system** for one Department Supervisor responsible for **Flooring** and **Home Decor**.
+
+It exists to reduce operational and administrative friction while supporting departmental awareness, continuous maintenance, collaborative leadership, and historical continuity.
 
 **Operating doctrine:** Small, bounded, recurring work can create continuous department readiness without turning ordinary maintenance into an overwhelming project.
 
-DeptSync exists to convert management intent into sustainable, trackable, verifiable operational coverage — supporting year-round readiness rather than frantic pre-inventory cleanup.
+DeptSync converts management intent into sustainable, trackable, verifiable operational coverage — supporting year-round readiness rather than frantic pre-inventory cleanup.
 
-DeptSync is floor technology for store operations. It is not a general-purpose enterprise platform, surveillance product, or chatbot product.
+**Canonical character:**
+
+- ONE authenticated application **operator**
+- Associates and specialists are **operational team members**, not application users
+- Deterministic domain intelligence remains independently functional
+- Not a SaaS product, multi-supervisor platform, employee-facing application, employee performance scoring system, enterprise-system replacement, or AI-dependent operational engine
 
 ---
 
 ## Article II — Canonical Operating Boundary
 
-> **DeptSync manages the rotation; Lowe’s manages the task; the DS validates the work.**
+> **DeptSync manages the rotation; Lowe’s manages the task; the operator validates the work.**
 
 ### II.1 What DeptSync MAY do
 
 DeptSync MAY:
 
 - select and stage operational coverage (weekly rotations, Sunday assignment planning)
-- assist a Department Supervisor in assigning coverage to workforce context
-- maintain workforce planning context (roster, schedules, on-duty, call-out redistribution)
+- assist the operator in assigning coverage to workforce context
+- maintain workforce planning context (roster, schedules, availability, call-out redistribution)
 - track coverage debt, carry-over, and cycle history
 - record barriers and exceptions
 - preserve operational history
-- support physical verification by authorized supervisors
+- support physical verification by the authenticated operator
 - calculate operational health and other **derived** measures from recorded state
-- provide specialty department tools that extend the shared operational model
+- define and maintain Operational Sections over physical topology
+- record permanent section ownership distinct from weekly rotational assignment
+- support collaborative walkthrough records (observations, priorities, follow-ups)
+- expose a future bounded interoperability surface without relocating domain authority
+- provide department-specific tools only when they serve the active Flooring / Home Decor operating scope (specialty expansion is not a standing mandate)
 
 ### II.2 What DeptSync need not own
 
@@ -62,8 +79,28 @@ DeptSync MUST NOT treat the following as core product responsibilities merely fo
 - replacing Lowe’s task dashboard
 - becoming an associate surveillance system
 - becoming the system of record for every action performed inside Lowe’s
+- becoming a multi-tenant SaaS or multi-supervisor platform
 
-**No-Zebra integration** is currently intentional (pilot and product boundary). Future authorized integration MAY be considered if it serves the operating doctrine — that is a product decision, not an eternal prohibition. The **boundary of responsibility** above remains constitutional regardless of integration choices.
+**No-Zebra integration** is currently intentional (product boundary). Future authorized integration MAY be considered if it serves the operating doctrine — that is a product decision, not an eternal prohibition. The **boundary of responsibility** above remains constitutional regardless of integration choices.
+
+---
+
+## Article II-A — Active Department Scope
+
+The product’s **active** operating departments are:
+
+1. **Flooring**
+2. **Home Decor**
+
+They MUST eventually exist as separate first-class operational departments.
+
+The internal department abstraction MUST remain for topology and the rotational engine. Domain logic MUST NOT hardcode department display names as the sole identity mechanism.
+
+Other department rows, codes, and historical data MAY remain in storage. They SHOULD be excluded from active application workflows.
+
+Historical data MUST NOT be deleted without an explicit, separately reviewed migration plan.
+
+> **Implemented reality (ALIGN-002):** Flooring and Home Decor are currently represented as one merged department (`code = flooring`, display “Flooring / Home Decor”). Separation is **approved target architecture**. Migration strategy is **UNRESOLVED** and MUST NOT be assumed without topology analysis and operator-provided mapping evidence. See `DEPT_SYNC_STATE.md` and `docs/product/DEPTSYNC_ALIGN_002_CONSTITUTIONAL_RATIFICATION.md`.
 
 ---
 
@@ -73,41 +110,61 @@ DeptSync MUST NOT treat the following as core product responsibilities merely fo
 
 | Conceptual role | Intent |
 |-----------------|--------|
-| **MASTER_ADMIN** | Store-wide operational and administrative authority |
-| **DEPARTMENT_SUPERVISOR** | Authorized department-scope operation and validation |
-| **WORKFORCE_MEMBER** | Operational workforce representation; may receive work through Lowe’s normal systems |
+| **OPERATOR** | Sole authenticated application user; Department Supervisor for Flooring and Home Decor; full operational and administrative authority within the product |
+| **TEAM_MEMBER** | Operational workforce representation (e.g. Flooring Specialist, CSA); may receive section ownership and weekly rotational assignment; MUST NOT require application access |
 
-### III.2 Mapping to current implementation (descriptive, not redesign)
+**Approved operational team (target staffing model):**
 
-| Conceptual | Current hub / Store Ops labels (illustrative) |
-|------------|-----------------------------------------------|
-| MASTER_ADMIN | Hub `MasterAdmin` / Store Ops `super_admin` / view role `MASTER_ADMIN` |
-| DEPARTMENT_SUPERVISOR | Hub `Supervisor` / Store Ops `department_supervisor` / view role `DEPARTMENT_SUPERVISOR` |
-| WORKFORCE_MEMBER | Roster rows (including roster-only); floor titles such as Specialist / CSA; app-paired associates may use simplified associate chrome |
+| Department | Members |
+|------------|---------|
+| Flooring | Two Flooring Specialists |
+| Home Decor | Department Supervisor (operator) + one CSA |
 
-Implementation storage and role enums MAY evolve. Conceptual authority MUST remain clear.
+### III.2 Transitional implementation (descriptive debt)
+
+Current hub labels (MasterAdmin, Supervisor, Associate chrome, PIN/QR pair, invite SMS) MAY persist until a separately authorized auth-simplification tranche removes dependencies safely. They MUST NOT be treated as product requirements of the single-operator identity.
 
 ### III.3 Authority rules
 
-1. **MASTER_ADMIN** MAY enter and operate authorized or all departments, and MAY administer the system. Master MUST NOT be required as the runtime bottleneck for normal department operation.
-2. **DEPARTMENT_SUPERVISOR** operates authorized department scope(s): stages/plans work, manages workforce context within scope, validates physical completion, and uses specialty tools appropriate to that department.
-3. **WORKFORCE_MEMBER** MAY exist solely as an operational workforce record.
+1. The **OPERATOR** is the sole application authority. Authentication MUST remain fail-closed (Article XVIII).
+2. **TEAM_MEMBER** records preserve stable identifiers and operational history.
+3. Workforce representation does not imply application access.
+4. Temporary coverage or assistance MUST NOT silently alter permanent section ownership (Article III-A).
+5. Expanding additional application users requires constitutional amendment and Article XXI evidence — not convenience.
 
 > **Workforce representation does not imply application access.**
 
 > **Application authority and workforce participation are distinct concepts even where current storage models share records.**
 
-Associates are not required to install DeptSync for the rotation model to function. Expanding mandatory app access requires evidence (Article XXIV), not fashion.
+---
+
+## Article III-A — Cross Ownership and Respect
+
+Permanent section ownership assigns **stewardship**, not exclusive labor.
+
+Everyone on the operational team shares responsibility for maintaining departmental standards.
+
+DeptSync MUST distinguish:
+
+- permanent section ownership
+- weekly rotational assignment
+- temporary coverage
+- actual work performed
+
+These MUST NOT be collapsed into a single relationship.
+
+Temporary assistance MUST NOT silently transfer permanent ownership.  
+Meaningful operational changes MAY be recorded without requiring trivial activity logging.
+
+DeptSync MUST NOT become an employee scoring, leaderboard, or automatic performance-judgment system (see also Article XIX).
 
 ---
 
 ## Article IV — Absence Resilience
 
-> **The system SHOULD preserve operating intent without making a specific human its runtime dependency.**
+> **The system SHOULD preserve operating intent as institutional memory the operator can resume.**
 
-Normal department operation MUST NOT require the creator, Master Admin, or a particular supervisor to manually reconstruct the weekly process from scratch when that person is absent.
-
-Configured targets, topology, staged rotations, assignment history, barriers, and verification state SHOULD persist as institutional operating memory.
+For the single-operator product, absence resilience means: configured topology, sections, staged rotations, assignment history, barriers, verification state, and walkthrough continuity persist so the OPERATOR can resume without reconstructing institutional memory — not that multiple supervisors are a product requirement.
 
 This is **not** autonomous management. Human judgment and physical verification remain required (Articles VIII–IX).
 
@@ -124,7 +181,7 @@ This is **not** autonomous management. Human judgment and physical verification 
 5. **Broad coverage matters** over repeatedly servicing only convenient locations.
 6. **Cycle history MUST preserve** what has and has not been touched.
 7. **Barriers MUST NOT silently disappear** from operational truth.
-8. **Workload SHOULD remain sustainable** relative to available capacity.
+8. **Workload SHOULD remain sustainable** relative to available capacity and compatible with Flooring Specialists’ sales responsibilities.
 
 ### V.2 Capacity
 
@@ -132,7 +189,55 @@ This is **not** autonomous management. Human judgment and physical verification 
 
 > **The rotation SHOULD seek sustainable coverage without hiding uncompleted work.**
 
-Department weekly targets, hours-based proportional assignment, and similar controls are **configuration / operating** decisions. They MUST NOT be constitutionalized as fixed universal quotas (e.g. “3 bays per associate per week” is a useful historical baseline hypothesis, not law).
+The historical **three-bay weekly baseline** remains the **initial default**. Weekly capacity MUST eventually be configurable by the OPERATOR.
+
+Department weekly targets, hours-based proportional assignment, and similar controls are **configuration / operating** decisions. They MUST NOT be constitutionalized as fixed universal quotas.
+
+DeptSync MUST NOT automatically multiply rotational workload across departments solely from headcount (e.g. four people × three bays is not a constitutional departmental volume).
+
+### V.3 Section-focused rotation (approved target behavior)
+
+The deterministic rotation engine MUST remain independently functional.
+
+Preserve: physical bay identity, priority selection, coverage history, carry-over, Sunday staging, completion attempts, verification evidence, and operational exceptions.
+
+Weekly selection SHOULD prefer focused rotational work within assigned Operational Sections when sections exist, without discarding the preserved engine properties above.
+
+**No engine changes are authorized by ALIGN-002 documentation alone.**
+
+---
+
+## Article V-A — Operational Section Law
+
+An **Operational Section** is a named collection of existing physical locations within **one** department.
+
+A section MAY contain complete aisles, partial aisles, bay ranges, or non-contiguous locations when necessary.
+
+The physical topology (`store_locations` / physical bay identity) remains authoritative. Sections **overlay** topology; they MUST NOT duplicate or replace it.
+
+A physical bay MAY belong to **no more than one** active operational section at a time.
+
+Bays not assigned to any section MUST remain visible and eligible for explicit operational attention.
+
+Each section has a continuously assigned responsible owner (TEAM_MEMBER or OPERATOR). Ownership is independent of weekly rotational assignments.
+
+The OPERATOR MUST eventually be able to create, name, bound, assign, reassign, inspect coverage of, and historically preserve section ownership — and to edit team membership and operational configuration.
+
+Historical ownership changes SHOULD be preservable as evidence.
+
+---
+
+## Article V-B — Collaborative Walkthrough Law
+
+DeptSync MUST support recurring collaborative walkthroughs as **leadership conversations**, not inspections or employee evaluations.
+
+A walkthrough record SHOULD preserve: date, department, section (when known), participants, positive observations, improvement opportunities, agreed priorities, follow-up actions, and historical continuity.
+
+The experience MUST remain lightweight. DeptSync MUST NOT require excessive documentation or introduce employee scoring, rankings, or surveillance through walkthroughs.
+
+**Target architecture:** use a dedicated walkthrough domain model where necessary; reuse existing Floor Pad capabilities where practical.
+
+**Storage gate:** new walkthrough storage MUST NOT be introduced until existing `manager_notes` and `shift_walk_tasks` dependencies have been reviewed (Article XX). FLOORPAD-001 remains the gate before Floor Pad retirement or redesign.
 
 ---
 
@@ -144,7 +249,7 @@ Department weekly targets, hours-based proportional assignment, and similar cont
 |-------|---------|
 | **ASSIGNED / staged** | Planned coverage for a period (intent). |
 | **COMPLETED / reported complete** | Work reported done (`is_completed` / associate or actor submit). |
-| **VERIFIED** | Authorized supervisor closed review (`VERIFIED_COMPLETE` or equivalent). |
+| **VERIFIED** | Authorized operator closed review (`VERIFIED_COMPLETE` or equivalent). |
 | **BLOCKED / BARRIER** | Explicit exception preventing or documenting inability to complete. |
 
 Current week-item review terms include: `PENDING` → `PENDING_VERIFICATION` → `VERIFIED_COMPLETE` on `weekly_rotations`, with location `COMPLETED` reserved for verified closure when the two-stage path is active.
@@ -159,7 +264,7 @@ Current week-item review terms include: `PENDING` → `PENDING_VERIFICATION` →
 
 > **Unverified work MUST NOT silently advance authoritative readiness as though it were verified.**
 
-DS/Master actors who themselves complete a bay MAY be treated as verifying in the same act (human verifier present). Automated or predicted “verification” MUST NOT substitute for that authority (Articles XII–XIII).
+The OPERATOR who personally completes a bay MAY be treated as verifying in the same act (human verifier present). Automated or predicted “verification” MUST NOT substitute for that authority (Articles XII–XIII).
 
 **Constitutional debt** related to derived completion metrics treating reported-complete as verified is recorded in Appendix A — do not “fix” wording here to pretend metrics already distinguish perfectly.
 
@@ -172,12 +277,14 @@ DS/Master actors who themselves complete a bay MAY be treated as verifying in th
 Facts recorded about the store world and intentional operations. Examples:
 
 - stores, departments, locations (topology)
+- operational sections and section ownership (when implemented)
 - assignments and weekly rotations
 - completion and verification records
 - barriers / exceptions
 - workforce / roster records
+- collaborative walkthrough records (when implemented)
 - configured targets and schedules
-- specialty audit records (flooring audits, appliance scans, remnants, etc.)
+- specialty audit records retained as historical / dormant evidence
 
 Authoritative state MUST be written through authorized actors and defined persistence paths.
 
@@ -247,6 +354,8 @@ UI EXPRESSION
 
 Lower layers MUST NOT be overridden by higher layers. Explanation and UI MUST NOT create Layer 0 facts.
 
+The deterministic engine and Layer 0–4 intelligence MUST remain independently functional without any specific AI model (Article XXV).
+
 ---
 
 ## Article X — Generative AI Law
@@ -283,30 +392,30 @@ Existing Gemini (or successor) call sites that narrate compact packets, parse st
 
 DeptSync MUST NOT create a separate “AI tab” merely because intelligence exists.
 
-Examples of correct placement:
+Examples of correct placement (target surfaces):
 
 | Signal | Surface |
 |--------|---------|
-| Coverage / verification lag | Floor |
-| Priority aisle / bay context | Map |
-| Workload / capacity risk | Roster / Sunday planning |
-| Appliance anomaly | Appliances specialty |
-| Inventory variance | Relevant specialty tool |
-| Store-wide risk | Future Master health surface (when justified) |
+| Department condition / outstanding issues | Overview |
+| Section boundaries / ownership / priority aisle·bay | Map |
+| Focused rotational work / verification lag | This Week |
+| Collaborative observations / follow-ups | Walkthroughs |
+| Workload / capacity risk | This Week / More (team) |
+| Configuration / security | More |
 
-Intelligence SHOULD augment Articles XVI–XVIII rather than invent an unrelated experience.
+Intelligence SHOULD augment Articles XV–XVII rather than invent an unrelated experience.
 
 ---
 
 ## Article XII — Specialty Module Law
 
-DeptSync supports shared operational foundations plus department-specific specialty tools.
+DeptSync supports shared operational foundations plus department-specific tools **within the active Flooring / Home Decor scope**.
 
 > **A department-specific workflow SHOULD extend the shared operational model rather than force every department into an identical interaction.**
 
 > **Specialty modules MAY differ in workflow while preserving common authority, provenance, verification, and store/department boundaries.**
 
-Today’s specialty list (flooring cycle / remnants, appliances continuous scan, generic department audit, etc.) is **illustrative**, not constitutional inventory.
+Historical specialty surfaces (appliances continuous scan, generic multi-department audit, etc.) are **illustrative legacy**, not a mandate to restore multi-department SaaS scope. REDUCE-era dormancy remains compatible with this Article when it serves Article II-A.
 
 ---
 
@@ -316,11 +425,11 @@ Today’s specialty list (flooring cycle / remnants, appliances continuous scan,
 
 Store and department scope for mutations and privileged reads MUST be actor-bound (authenticated identity / profiles / JWT claims and server resolution). Client headers, local pins, or UI filters MUST NOT expand authority.
 
-- **MASTER_ADMIN** MAY legitimately operate across broader store scope.
-- **DEPARTMENT_SUPERVISOR** authority remains constrained to authorized department scope(s), including explicitly granted accessible departments.
+- The **OPERATOR** holds application authority for the product’s active departments.
 - Working-department pins and chrome filters are **views**, not grants of new authority.
+- Transitional multi-role labels (Master / Supervisor / Associate) MUST NOT expand authority beyond authenticated actor resolution.
 
-This Article does not redesign RBAC; it constrains how scope may be trusted.
+This Article does not redesign RBAC in ALIGN-002; it constrains how scope may be trusted.
 
 ---
 
@@ -359,16 +468,30 @@ Operational surfaces SHOULD answer, in order:
 | Level | Role |
 |-------|------|
 | **Level 1** | Operational headline (readiness, week status, attention) |
-| **Level 2** | Work objects (bays, assignments, map cells, roster rows) |
+| **Level 2** | Work objects (bays, assignments, map cells, team rows, walkthroughs) |
 | **Level 3** | Utilities / configuration / diagnostics |
 
 Configuration MUST NOT visually compete with daily execution on primary operate surfaces. Intelligence SHOULD augment these levels (Article XI).
+
+### Target operator experience (ALIGN-002)
+
+Conceptual primary areas (not mandatory route names):
+
+| Area | Job |
+|------|-----|
+| **Overview** | Department conditions, priorities, outstanding issues — **intended landing experience** |
+| **Map** | Physical topology, bulk aisle/bay creation, section configuration, ownership visibility |
+| **This Week** | Rotational work, completion, carry-over, availability |
+| **Walkthroughs** | Collaborative observations, follow-up continuity |
+| **More** | Team roster, configuration, security, advanced tools |
+
+**ALIGN-002 does not authorize new routes or UI components.** Historical Floor · Map · Roster · More remains valid transitional chrome until an authorized IA tranche lands.
 
 ### Map coverage geography law (UX-REDUCE-003)
 
 > **Map represents coverage geography, not topology implementation.**
 
-The DS thinks in department / aisle / physical bay — not raw `store_locations` rows, SELLING/TOPSTOCK record counts, or topology tags. Sibling SELLING and TOPSTOCK surfaces MAY appear as secondary detail under one physical bay; they MUST NOT present as two independent coverage obligations on everyday Map.
+The operator thinks in department / aisle / physical bay — not raw `store_locations` rows, SELLING/TOPSTOCK record counts, or topology tags. Sibling SELLING and TOPSTOCK surfaces MAY appear as secondary detail under one physical bay; they MUST NOT present as two independent coverage obligations on everyday Map.
 
 Everyday Map identity is department coverage geography. Service/velocity evidence MAY remain as secondary advanced disclosure; it MUST NOT compete as an equal peer Map identity. Ordinary owed / remaining coverage is normal continuous-coverage state, not failure. Exceptional attention (barrier / truthful investigation) SHOULD be louder than healthy remaining.
 
@@ -376,15 +499,15 @@ Manual coverage priority (PRIORITY-UX-002) MAY appear on Map as a narrow operati
 
 Call-out and absence evidence MUST NOT write `priority_override`. Existing High remains High; Standard remains Standard. Unresolved coverage remains owed through weekly ownership and carryover — not by manufacturing manual High.
 
-Floor answers who has what this week. Map answers where coverage stands across the department.
+This Week answers who has what this week. Map answers where coverage stands across the department — and, when implemented, where sections and ownership sit.
 
-### Roster participation law (UX-REDUCE-004)
+### Team participation law (evolved from UX-REDUCE-004)
 
-> **Roster represents rotation participation and schedule evidence, not employment administration.**
+> **Team roster represents operational participation and schedule evidence, not employment administration or application-user management.**
 
 Capability is not availability. Schedule says when someone is expected; current time determines whether now falls inside the schedule interval; call-out/absence evidence overrides expected availability. DeptSync MUST NOT pretend it has Lowe’s actual punch data.
 
-`accessible_departments` is DeptSync app authority scope — not proof of secondary workforce capability or labor allocation (WORKFORCE-SCOPE-001 remains unresolved; do not invent policy in presentation).
+Transitional `accessible_departments` app-authority chips are implementation debt under single-operator identity — not proof of secondary workforce capability (do not invent WORKFORCE-SCOPE-001 policy in presentation).
 
 ---
 
@@ -404,7 +527,8 @@ persistent bottom navigation
 
 Exact CSS is implementation. Reachability, one-handed usability, and appropriate density are constitutional concerns. The work surface MUST be the scroll owner for primary operational content; fixed chrome MUST clear touch targets.
 
-Primary elevated chrome (conceptual): **Floor · Map · Roster · More** (route implementation MAY use `/settings` while labeling **More**). Associates MAY see a reduced operate set (e.g. My Shift + Map).
+Primary elevated chrome (conceptual target): **Overview · Map · This Week · Walkthroughs · More**.  
+Transitional chrome (**Floor · Map · Roster · More**) MAY persist until an authorized IA tranche. Route implementation MAY differ from labels.
 
 ### Handheld personalization law (HANDHELD-UX-002)
 
@@ -413,7 +537,6 @@ Primary elevated chrome (conceptual): **Floor · Map · Roster · More** (route 
 > **Theme changes personality. Semantic state preserves meaning.**
 
 Appearance, density, contrast, sound, and haptics MAY change device-local feel. They MUST NOT change operational meaning. Theme accent MAY own navigation, selection, primary actions, decorative glow, and focus personality. Theme accent MUST NOT own Covered, This week, Needs attention, Remaining, High priority, Seasonal, Called out, On now, destructive, success, warning, failure, or offline/sync state. Visual personalization MUST NOT regress operational P0 render.
-
 
 ---
 
@@ -425,7 +548,7 @@ Illustrative (not eternal route law):
 
 | Operate | Configure / administer / diagnose |
 |---------|-----------------------------------|
-| Floor / Map / Roster | More / management surfaces |
+| Overview / Map / This Week / Walkthroughs | More / management surfaces |
 
 Tools may move between surfaces when hierarchy improves; the principle remains.
 
@@ -442,6 +565,10 @@ Principles (not an implementation guide):
 5. Privileged service-role database access MUST NOT bypass actor authorization for user-driven mutations.
 6. Public internet reachability requires production-safe credentials and configuration.
 
+> **One operator does not justify weaker security.**
+
+ALIGN-001 security findings (gate-secret fallbacks, permissive API Bearer edge pass, seed credentials, unverified production RLS state) are **priority implementation debt**. Remediation requires a separately authorized security tranche. ALIGN-002 MUST NOT modify authentication infrastructure, access production secrets, or change production configuration.
+
 ---
 
 ## Article XIX — Observability Without Surveillance
@@ -450,7 +577,7 @@ DeptSync needs accountability and historical operational evidence.
 
 > **Measure work outcomes and operational state, not unnecessary human activity.**
 
-Appropriate evidence includes: assignment, completion, verification, barrier, coverage cadence, workload/capacity.
+Appropriate evidence includes: assignment, completion, verification, barrier, coverage cadence, workload/capacity, section ownership history, walkthrough follow-ups.
 
 DeptSync MUST NOT become minute-by-minute worker surveillance. Telemetry MUST earn its place through operational need (Article XX).
 
@@ -464,7 +591,7 @@ DeptSync MUST NOT become minute-by-minute worker surveillance. Telemetry MUST ea
 
 > **Existing simple architecture SHOULD NOT be replaced without evidence that it blocks a constitutional requirement.**
 
-Examples of unjustified complexity: orchestrators without need; custom LLMs without need; device-identity systems without a real requirement; splitting workforce/auth schemas solely for conceptual purity during pilot; enterprise observability stacks without an operational need.
+Examples of unjustified complexity: orchestrators without need; custom LLMs without need; device-identity systems without a real requirement; splitting workforce/auth schemas solely for conceptual purity during pilot; enterprise observability stacks without an operational need; parallel note systems before reviewing Floor Pad / walk-task storage.
 
 ---
 
@@ -492,10 +619,12 @@ Failure to answer these is grounds to defer the change.
 | Button labels, copy polish | Allowing AI to mutate completion/verification state |
 | Weekly target default values | Removing physical verification as authority |
 | Moving a tool within More | Making associates mandatory app users |
-| Scoring coefficients / forecast tuning | Replacing DS judgment with autonomous assignment |
+| Scoring coefficients / forecast tuning | Replacing operator judgment with autonomous assignment |
 | Internal library replacements | Changing store/department authority boundaries |
 | | Treating predicted state as observed state |
 | | Making Lowe’s task workflow a core DeptSync responsibility |
+| | Collapsing permanent ownership into weekly assignment |
+| | Weakening authentication because there is one operator |
 
 ---
 
@@ -521,7 +650,7 @@ Document authority order:
 ```text
 DEPTSYNC_CONSTITUTION.md          ← governing laws (this file)
         ↓
-DEPT_SYNC_STATE.md                ← current implementation truth
+DEPT_SYNC_STATE.md                ← current implementation truth (+ target intent blocks)
         ↓
 ARCHITECTURE.md / APP_LAYOUT_MAP.md / subsystem docs
         ↓
@@ -533,12 +662,31 @@ DEVELOPMENT_JOURNAL.md / CHAT_HANDOFF.md  ← historical / session memory
 | Document | Owns |
 |----------|------|
 | Constitution | Laws, authority, anti-drift tests |
-| DEPT_SYNC_STATE | What is true in the running system now |
+| DEPT_SYNC_STATE | What is true in the running system now; clearly labeled target intent |
 | Architecture / layout docs | Module ownership and UI mechanics |
 | Roadmap | Planned work |
 | Journal / handoff | History and session continuity |
+| `docs/product/DEPTSYNC_ALIGN_002_*` | ALIGN-002 ratification record and topology investigation |
 
 Lower docs MUST NOT silently override this Constitution. Implementation gaps → Appendix A.
+
+---
+
+## Article XXV — Sovereign Intelligence and Interoperability
+
+DeptSync owns its operational truth.
+
+Domain intelligence MUST remain independently functional without:
+
+- Orient
+- TeamLab Studio
+- a personal assistant
+- any specific LLM
+- external orchestration
+
+Future systems MAY access **authorized** capabilities. They MUST NOT duplicate or override DeptSync’s domain authority.
+
+A future path MAY include capability discovery, authenticated access, provenance, and bounded actions. **No integrations are authorized by ALIGN-002.**
 
 ---
 
@@ -552,7 +700,7 @@ Known gaps where current reality only partially fulfills a law. **Do not “fix�
 |-------|--------|
 | **LAW** | Art. VI — Unverified work MUST NOT silently advance authoritative readiness as though verified. |
 | **CURRENT REALITY** | Associate completion sets `is_completed` + `PENDING_VERIFICATION` without closing location to `COMPLETED`. Store health and Floor “complete” counts largely key off `is_completed`, so reported-complete advances completion % / week-complete headlines before `VERIFIED_COMPLETE`. |
-| **RISK** | Operators may read pace/readiness as physically closed when DS review is still open. |
+| **RISK** | Operators may read pace/readiness as physically closed when review is still open. |
 | **STATUS** | Open — presentation/derivation debt; two-stage review path exists. |
 
 ### A-2 — Offline authority is partial
@@ -564,14 +712,50 @@ Known gaps where current reality only partially fulfills a law. **Do not “fix�
 | **RISK** | Uneven floor resilience; operators may assume full offline parity. |
 | **STATUS** | Open — intentional phased matrix; document in state, do not over-promise. |
 
-### A-3 — Dual roster / auth storage
+### A-3 — Dual roster / auth storage vs single-operator identity
 
 | Field | Value |
 |-------|--------|
-| **LAW** | Art. III — Application authority and workforce participation are distinct. |
-| **CURRENT REALITY** | Distinct *conceptually* (roster-only rows, QR pair for app access) but often shared `store_specialists` (and linked `profiles`) storage. |
-| **RISK** | Future contributors may conflate roster presence with app entitlement or over-split schemas for purity. |
-| **STATUS** | Accepted pilot compromise — not a mandate to redesign schema. |
+| **LAW** | Art. III — OPERATOR is sole app user; TEAM_MEMBER does not require app access. |
+| **CURRENT REALITY** | Multi-role hub (Master/Supervisor/Associate), PIN/QR pair, invite paths, shared `store_specialists` / `profiles` storage. |
+| **RISK** | Contributors may treat associate app access as required product law. |
+| **STATUS** | Open ALIGN debt — do not delete auth infrastructure until dependency inventory + security tranche. |
+
+### A-4 — Merged Flooring / Home Decor vs two active departments
+
+| Field | Value |
+|-------|--------|
+| **LAW** | Art. II-A — Flooring and Home Decor are separate first-class active departments. |
+| **CURRENT REALITY** | Single `departments.code = flooring` named “Flooring / Home Decor”; no Home Decor code; topology does not distinguish the two. |
+| **RISK** | Silent reassignment or assumed aisle split would corrupt history. |
+| **STATUS** | Approved target; **migration UNRESOLVED** — see ALIGN-002 topology investigation. |
+
+### A-5 — Missing Operational Section overlay
+
+| Field | Value |
+|-------|--------|
+| **LAW** | Art. V-A — Sections overlay topology with exclusive active membership and permanent ownership. |
+| **CURRENT REALITY** | No section entity; weekly ownership via `sunday_bay_assignments` + physical bay. |
+| **RISK** | Conflating weekly assignment with permanent stewardship. |
+| **STATUS** | Approved target; not implemented. |
+
+### A-6 — Walkthrough product job unresolved vs Floor Pad / Walk & Talk
+
+| Field | Value |
+|-------|--------|
+| **LAW** | Art. V-B — Collaborative walkthroughs; storage reuse review before new tables. |
+| **CURRENT REALITY** | `manager_notes` (Floor Pad) and `shift_walk_tasks` (Walk & Talk) exist; FLOORPAD-001 deferred. |
+| **RISK** | Parallel note systems or premature Floor Pad deletion. |
+| **STATUS** | Approved target; storage review deferred. |
+
+### A-7 — Auth gate secret fallback + permissive API Bearer edge pass
+
+| Field | Value |
+|-------|--------|
+| **LAW** | Art. XVIII — fail closed; no unsafe production defaults; one operator ≠ weaker security. |
+| **CURRENT REALITY** | **ALIGN-SEC-001 remediated in repository code:** `HUB_GATE_SECRET` only; proxy no longer accepts arbitrary Bearer; bootstrap requires `BOOTSTRAP_SECRET`; schema seed demo PINs removed. Production env deployment and live RLS verification remain operator actions (not authorized in ALIGN-SEC-001). |
+| **RISK** | Deploy without configuring new required secrets would lock out gate minting; historical demo PINs may remain in live DBs until rotated. |
+| **STATUS** | Code remediated — production config + RLS evidence still open. |
 
 ---
 
@@ -579,14 +763,17 @@ Known gaps where current reality only partially fulfills a law. **Do not “fix�
 
 | ID | Proposal | Constitutional guidance |
 |----|----------|-------------------------|
-| A | Chatbot for “how is the department doing?” | MAY explain Layer 1–4 outputs; MUST NOT become intelligence authority (Arts. IX–X). |
+| A | Chatbot for “how is the department doing?” | MAY explain Layer 1–4 outputs; MUST NOT become intelligence authority (Arts. IX–X, XXV). |
 | B | Auto-verify bays above 95% confidence | MUST NOT — predicted verification is not physical verification (Arts. VI, VII.3, X). |
-| C | Every associate must install DeptSync | Requires evidence under Art. XXI; Art. III does not require app access for workforce representation. |
+| C | Every associate must install DeptSync | MUST NOT as product law (Art. III); requires amendment + Art. XXI evidence. |
 | D | LLM chooses next week’s bays | MAY advise (Layer 4); MUST NOT silently write authoritative rotation state without human staging rules (Arts. V, VII.3, X). |
 | E | Microservices “because we may scale” | Blocked without demonstrated need (Art. XX). |
 | F | Default weekly workload 3 → 4 | Implementation / configuration (Arts. V.2, XXII) — not an amendment. |
-| G | Garden seasonal specialty workflow | Permitted specialty extension (Art. XII). |
+| G | Restore multi-department SaaS scope | Conflicts with Arts. I / II-A unless amended. |
 | H | Forecast “inventory readiness 92%” | MUST distinguish forecast from observed readiness and retain provenance (Arts. VII–VIII, IX Layer 3). |
+| I | Temporary help auto-changes section owner | MUST NOT (Art. III-A). |
+| J | Orient/TeamLab reimplements rotation selection | MUST NOT override domain authority (Art. XXV). |
+| K | Weaken auth because N=1 | MUST NOT (Art. XVIII). |
 
 ---
 

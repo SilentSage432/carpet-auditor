@@ -4,7 +4,7 @@
  */
 
 import { createClient } from "@supabase/supabase-js";
-import { randomBytes } from "crypto";
+import { createHash, randomBytes } from "crypto";
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
 const service = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
@@ -23,6 +23,13 @@ if (!masterPin) {
     "HUB_MASTER_PIN is required — set a unique Master PIN in .env.local (no default)"
   );
   process.exit(1);
+}
+
+/** Must match lib/auth-token.ts hashPin (ALIGN-SEC-006). */
+function hashPin(pin, salt) {
+  const s = salt && salt.length > 0 ? salt : randomBytes(16).toString("hex");
+  const digest = createHash("sha256").update(`${s}:${pin}`).digest("hex");
+  return `${s}.${digest}`;
 }
 
 const admin = createClient(url, service, {
@@ -117,12 +124,14 @@ async function main() {
   const storeNumber = await resolveStoreNumber();
   await ensureStore(storeNumber);
 
+  const pinHash = hashPin(masterPin);
   const patch = {
     name,
     username,
     role: "MasterAdmin",
     assigned_department: "all",
-    pin_code: masterPin,
+    pin_code: pinHash,
+    pin_hash: pinHash,
     store_number: storeNumber,
     is_active: true,
     must_change_credentials: false,
@@ -232,8 +241,8 @@ async function main() {
       full_name: name,
       is_active: true,
       must_change_credentials: false,
-      pin_code: masterPin,
-      pin: masterPin,
+      pin_code: pinHash,
+      pin: pinHash,
       assigned_department: null,
     },
     { onConflict: "id" }
@@ -247,7 +256,7 @@ async function main() {
         specialist_id: String(specialist.id),
         username,
         full_name: name,
-        pin_code: masterPin,
+        pin_code: pinHash,
       },
       { onConflict: "id" }
     );
@@ -284,12 +293,14 @@ async function main() {
     email_confirm: true,
   });
 
+  // ALIGN-SEC-006: never print HUB_MASTER_PIN — operator already has it in env.
   console.log(
     JSON.stringify(
       {
         ok: true,
         username,
-        pin: masterPin,
+        pin_configured: true,
+        pin_storage: "hashed",
         specialist_id: specialist.id,
         store_number: storeNumber,
         auth_user_id: authUserId,
@@ -297,6 +308,7 @@ async function main() {
         created_specialist: createdSpecialist,
         created_auth_user: createdAuth,
         auth_smoke_test: "passed",
+        hint: `Sign in with username "${username}" and your configured HUB_MASTER_PIN.`,
       },
       null,
       2
