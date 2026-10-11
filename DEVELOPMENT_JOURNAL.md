@@ -2,7 +2,7 @@
 
 ## 2026-10-11 — DEPTSYNC-SECTION-UX-003 Controlled production release
 
-**Controlled app release of SECTION-UX-001 + SECTION-UX-002.** No schema migrations, no production topology/section/assignment mutations, no capacity/Sunday/Zebra changes. Section-aware auto-stage remains hard-off; Production preview flag not enabled. Pre-release: `tsc` PASS; **1626** tests; `next build` PASS. Canonical closeout: [`docs/product/DEPTSYNC_SECTION_UX_003_RELEASE.md`](docs/product/DEPTSYNC_SECTION_UX_003_RELEASE.md). Verdict recorded after deploy smoke. **STOP for phone acceptance.**
+**Controlled app release of SECTION-UX-001 + SECTION-UX-002.** Commit `33a088b`; Vercel Production Ready `F2e8nkg74JkKg1viL1zVQVhjgkDN` (`deptsync-60jrduc81`) @ https://deptsync-hub.vercel.app. No schema migrations, no production topology/section/assignment mutations, no capacity/Sunday/Zebra changes. Section-aware auto-stage hard-off; Production preview flag not enabled. Pre-release: `tsc` PASS; **1626** tests; `next build` PASS. Smoke: `/login` 200. Canonical: [`docs/product/DEPTSYNC_SECTION_UX_003_RELEASE.md`](docs/product/DEPTSYNC_SECTION_UX_003_RELEASE.md). **RELEASED — AWAITING PHONE ACCEPTANCE.** **STOP.**
 
 ## 2026-10-11 — DEPTSYNC-SECTION-UX-002 Named zone compatibility + release readiness
 
