@@ -602,6 +602,15 @@ body {
   overscroll-behavior: none;
 }
 
+/* RD-1 Floor Command — calm command-center surface on existing tokens */
+.hub-floor-command {
+  --floor-command-rail: color-mix(in srgb, var(--accent, #7dd3fc) 18%, transparent);
+}
+
+.hub-app-shell.hub-floor-command .hub-bottom-pill {
+  border-color: color-mix(in srgb, var(--accent, #7dd3fc) 22%, rgb(39 39 42 / 0.7));
+}
+
 [data-density="compact"] .hub-main {
   padding-top: 0.25rem;
   padding-left: 0.625rem;

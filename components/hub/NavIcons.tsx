@@ -79,7 +79,8 @@ export type NavIconId =
   | "home"
   | "barrier"
   | "grid"
-  | "stock";
+  | "stock"
+  | "calendar";
 
 export type HubIconId =
   | NavIconId

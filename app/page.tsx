@@ -20,6 +20,7 @@ import { blurActiveInput } from "@/lib/focus-input";
 import { fetchApplianceCatalog } from "@/lib/appliance-catalog";
 import { fetchCatalog } from "@/lib/catalog";
 import { fetchRemnants } from "@/lib/remnants";
+import { homeHrefForSpecialist } from "@/lib/nav-hub";
 import {
   canAccessSection,
   effectiveDepartment,
@@ -177,10 +178,10 @@ export default function DeptSyncHubPage() {
     }
     // REDUCE-004: specialty hub sections no longer stay as an everyday product.
     if (fromQuery && shouldStayOnSpecialtyHub(fromQuery)) {
-      router.replace("/dashboard");
+      router.replace(homeHrefForSpecialist(member));
       return;
     }
-    router.replace("/dashboard");
+    router.replace(homeHrefForSpecialist(member));
   }, [router]);
 
   const requireLogin = useCallback(() => {
@@ -241,12 +242,12 @@ export default function DeptSyncHubPage() {
       router.replace(fromQuery === "settings" ? "/settings" : "/dashboard");
       return;
     }
-    // REDUCE-004: specialty hub sections redirect to Floor.
+    // REDUCE-004: specialty hub sections redirect to operator home.
     if (fromQuery && shouldStayOnSpecialtyHub(fromQuery)) {
-      router.replace("/dashboard");
+      router.replace(homeHrefForSpecialist(withStore));
       return;
     }
-    router.replace("/dashboard");
+    router.replace(homeHrefForSpecialist(withStore));
   }, [router]);
 
   const loadStoreData = useCallback(async () => {

@@ -6,6 +6,12 @@
 
 ---
 
+## REDESIGN / RD-1 — Floor Command shell (2026-10-10)
+
+> Blueprint: [`docs/product/DEPTSYNC_REDESIGN_001_COMPLETE_PRODUCT_EXPERIENCE_BLUEPRINT.md`](docs/product/DEPTSYNC_REDESIGN_001_COMPLETE_PRODUCT_EXPERIENCE_BLUEPRINT.md).  
+> **RD-1 implemented locally:** primary chrome Overview · Map · This Week · Walkthroughs · More; landing `/overview`; Map without department-pin nav; Team under More → `/roster`; Walkthroughs placeholder. [`docs/product/DEPTSYNC_RD_1_FLOOR_COMMAND_APPLICATION_SHELL.md`](docs/product/DEPTSYNC_RD_1_FLOOR_COMMAND_APPLICATION_SHELL.md).  
+> **Not changed:** schema, auth model, rotation engine, topology rows, walkthrough storage, production. Deploy/commit not authorized.
+
 ## ALIGN-002 — Reality vs approved target (2026-10-10)
 
 > Governing ratification: [`docs/product/DEPTSYNC_ALIGN_002_CONSTITUTIONAL_RATIFICATION.md`](docs/product/DEPTSYNC_ALIGN_002_CONSTITUTIONAL_RATIFICATION.md).  
@@ -15,7 +21,7 @@
 |-------|--------|
 | **A. Implemented reality** | Multi-role PWA (Floor · Map · Roster · More); Flooring/Home Decor **merged** as `departments.code = flooring`; associates may PIN/QR; deterministic rotation (physical bay, eligible×3, carry-over, Sunday stage, verification); no Operational Section entity; Floor Pad / Walk & Talk protected observational surfaces; specialty launchers dormant (REDUCE-004) |
 | **B. Approved target architecture** | Sovereign personal operational intelligence for **one OPERATOR** over **Flooring** and **Home Decor** as separate first-class departments; team members are records not app users; Operational Sections (≤1 active section per physical bay); section-aware rotation; collaborative walkthroughs; chrome Overview · Map · This Week · Walkthroughs · More (Overview = landing); sovereign intelligence (no Orient/TeamLab/LLM dependency) |
-| **C. Unresolved migration decisions** | How to safely split merged Flooring/Home Decor topology — **UNRESOLVED**; requires operator aisle/bay mapping; production DB not inspected in ALIGN-002 |
+| **C. Unresolved migration decisions** | How to safely split merged Flooring/Home Decor topology — **design proposed in TOPO-001** (hybrid soft-retire + additive Home Decor + bulk rebuild); still **UNRESOLVED pending operator §L decisions** + production inventory; production DB not inspected in TOPO-001 — [`docs/product/DEPTSYNC_ALIGN_TOPO_001_TWO_DEPARTMENT_TOPOLOGY_RECONCILIATION.md`](docs/product/DEPTSYNC_ALIGN_TOPO_001_TWO_DEPARTMENT_TOPOLOGY_RECONCILIATION.md) |
 | **D. Deferred capabilities** | Section schema, engine section-awareness, walkthrough storage/UI, Overview IA, auth simplification, operator capacity config UI, interoperability stubs, security remediation implementation |
 
 ### Security (ALIGN-SEC-001 — implemented locally; deploy not authorized)

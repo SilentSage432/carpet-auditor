@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Primary workflow bottom tabs — Floor · Map · Roster · More.
+ * Primary workflow bottom tabs — Overview · Map · This Week · Walkthroughs · More.
  * Floating pill chrome with hardware-accelerated sliding active indicator.
  * Route ownership: lib/nav-hub.ts.
  */
@@ -31,7 +31,9 @@ export function BottomNav({
       ? "grid-cols-2"
       : count === 3
         ? "grid-cols-3"
-        : "grid-cols-4";
+        : count === 4
+          ? "grid-cols-4"
+          : "grid-cols-5";
 
   const activeIndex = Math.max(
     0,
@@ -67,14 +69,18 @@ export function BottomNav({
               onFocus={() => prefetchWorkflowTab(link.href)}
               aria-current={active ? "page" : undefined}
               aria-label={link.label}
-              className={`relative z-10 flex min-h-12 min-w-12 flex-col items-center justify-center gap-0.5 rounded-full px-2 transition-colors duration-200 ease-out active:scale-[0.96] ${
+              className={`relative z-10 flex min-h-12 min-w-0 flex-col items-center justify-center gap-0.5 rounded-full px-1 transition-colors duration-200 ease-out active:scale-[0.96] sm:px-2 ${
                 active
                   ? "theme-nav-active"
                   : "text-muted active:text-foreground"
               }`}
             >
-              <NavIcon id={link.icon} className="h-5 w-5" />
-              <span className="max-w-full truncate text-center text-[9px] font-bold uppercase tracking-wide">
+              <NavIcon id={link.icon} className="h-5 w-5 shrink-0" />
+              <span
+                className={`max-w-full truncate text-center font-bold uppercase tracking-wide ${
+                  count >= 5 ? "text-[8px]" : "text-[9px]"
+                }`}
+              >
                 {link.shortLabel}
               </span>
             </Link>

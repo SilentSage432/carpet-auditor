@@ -39,7 +39,7 @@ describe("UX-REDUCE-005 More setup & administration", () => {
   const matrix = readRepo("components/admin/DepartmentTargetsMatrix.tsx");
 
   it("frames More as setup and administration", () => {
-    expect(settings).toMatch(/Setup and administration for DeptSync/);
+    expect(settings).toMatch(/Team, setup, and administration/);
     expect(settings).toMatch(/UX-REDUCE-005/);
     expect(settings).toContain('title="Floor Pad"');
     expect(settings).toContain('title="Department Setup"');

@@ -1,5 +1,29 @@
 # DeptSync Hub — Development Journal
 
+## 2026-10-10 — DEPTSYNC-RD-1 Floor Command application shell
+
+**Scoped implementation.** No schema, auth change, production SQL, engine rewrite, sections storage, walkthrough persistence, deploy, commit, or push.
+
+Primary chrome is Overview · Map · This Week · Walkthroughs · More. Operator lands on `/overview` (evidence-only week/attention/people). Map shows full aisle geography without department-pin navigation. Team lives under More → `/roster`. Walkthroughs is an intentional empty state. This Week preserves FloorTab. Typecheck pass; 1362 tests pass; build pass (`/overview`, `/walkthroughs` routes).
+
+Canonical: [`docs/product/DEPTSYNC_RD_1_FLOOR_COMMAND_APPLICATION_SHELL.md`](docs/product/DEPTSYNC_RD_1_FLOOR_COMMAND_APPLICATION_SHELL.md). STOP for operator review before deploy.
+
+## 2026-10-10 — DEPTSYNC-REDESIGN-001 complete product & experience blueprint
+
+**Product design + architectural discovery only.** No application code, schema, production SQL, auth change, deploy, commit, or push.
+
+Defines the finished single-operator Flooring + Home Decor command center: Overview · Map · This Week · Walkthroughs · More; Operational Sections; four-person × three-bay shared capacity; walkthroughs without scoring; Floor Command visual direction; legacy keep/refine/replace/retire/defer; security-preserving auth simplification path; RD-0…RD-10 implementation roadmap. Distinguishes IMPLEMENTED / APPROVED TARGET / PROPOSED / DEFERRED / UNRESOLVED.
+
+Canonical: [`docs/product/DEPTSYNC_REDESIGN_001_COMPLETE_PRODUCT_EXPERIENCE_BLUEPRINT.md`](docs/product/DEPTSYNC_REDESIGN_001_COMPLETE_PRODUCT_EXPERIENCE_BLUEPRINT.md). STOP for operator review (RD-0 GO).
+
+## 2026-10-10 — DEPTSYNC-ALIGN-TOPO-001 two-department topology reconciliation
+
+**Discovery + implementation design only.** No application code, schema, location mutation, production SQL execution, deploy, commit, or push.
+
+Traced physical location model, merge assumptions (`flooring` / Flooring / Home Decor), FK/cascade matrix (including completion-attempt `ON DELETE RESTRICT`), Bulk Generator capabilities, and rotation capacity risk (two active depts must not silently run eligible×3 twice). Recommended smallest safe path: hybrid soft-retire (`is_active`) + additive Home Decor department + bulk rebuild; reject full reset and blind reassignment. Operator read-only inventory SQL: `scripts/sql/align-topo001-topology-inventory-readonly.sql`.
+
+Canonical: [`docs/product/DEPTSYNC_ALIGN_TOPO_001_TWO_DEPARTMENT_TOPOLOGY_RECONCILIATION.md`](docs/product/DEPTSYNC_ALIGN_TOPO_001_TWO_DEPARTMENT_TOPOLOGY_RECONCILIATION.md). STOP for operator review (mapping, codes, cutover, capacity rule).
+
 ## 2026-10-10 — DEPTSYNC-ALIGN-SEC-007 controlled Vercel security release
 
 **Local commit preparation only.** No push, deploy, Production SQL, or bootstrap execution.

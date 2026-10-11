@@ -12,7 +12,7 @@ import {
 } from "./roster-people-presentation";
 import { composeCurrentAvailability } from "./current-availability";
 import { isSimplifiedAssociateView } from "@/lib/rbac";
-import { navRoleLinks } from "@/lib/nav-hub";
+import { canAccessWorkflowTab, navRoleLinks } from "@/lib/nav-hub";
 import type { StoreSpecialist } from "@/lib/types";
 
 const root = path.resolve(__dirname, "../..");
@@ -47,8 +47,10 @@ describe("UX-REDUCE-004 Roster People contracts", () => {
     expect(roster).toMatch(/\bPeople\b/);
     expect(roster).toMatch(/formatPeopleCount/);
     expect(roster).not.toMatch(/Team roster/);
-    expect(nav).toMatch(/label: \"People\"/);
-    expect(nav).toMatch(/return \"People\"/);
+    // RD-1: Team is More → secondary /roster (title "Team"), not a primary tab.
+    expect(nav).toMatch(/return \"Team\"/);
+    expect(nav).toContain('"/roster"');
+    expect(nav).toMatch(/SecondaryWorkflowHref = \"\/roster\"/);
   });
 
   it("keeps schedule before member settings and device access", () => {
@@ -90,22 +92,26 @@ describe("UX-REDUCE-004 Roster People contracts", () => {
     expect(roster).toMatch(/rotation workforce/);
   });
 
-  it("associates remain excluded from Roster nav", () => {
+  it("associates remain excluded from Roster / Team access", () => {
     const associate = member({ id: "a1", role: "Associate" });
     expect(isSimplifiedAssociateView(associate)).toBe(true);
     const links = navRoleLinks(associate);
     expect(links.some((l) => l.href === "/roster")).toBe(false);
+    expect(canAccessWorkflowTab(associate, "/roster")).toBe(false);
     expect(links.map((l) => l.href)).toEqual([
-      "/dashboard",
       "/admin/store-map",
+      "/dashboard",
     ]);
   });
 
-  it("Master and DS still see Roster", () => {
+  it("Master and DS reach Team via More (secondary /roster)", () => {
     const master = member({ id: "m1", role: "MasterAdmin" });
     const ds = member({ id: "d1", role: "Supervisor" });
-    expect(navRoleLinks(master).some((l) => l.href === "/roster")).toBe(true);
-    expect(navRoleLinks(ds).some((l) => l.href === "/roster")).toBe(true);
+    expect(navRoleLinks(master).some((l) => l.href === "/roster")).toBe(false);
+    expect(navRoleLinks(ds).some((l) => l.href === "/roster")).toBe(false);
+    expect(canAccessWorkflowTab(master, "/roster")).toBe(true);
+    expect(canAccessWorkflowTab(ds, "/roster")).toBe(true);
+    expect(navRoleLinks(ds).some((l) => l.href === "/settings")).toBe(true);
   });
 
   it("schedule-unknown presentation helpers stay pure", () => {

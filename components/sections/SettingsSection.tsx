@@ -3,8 +3,8 @@
 /**
  * UX-REDUCE-005 — More = setup & administration, not everyday operations.
  *
- * Primary hierarchy: Floor Pad → Department Setup → Rotation Setup →
- * Device & Account → Master Admin (collapsed).
+ * Primary hierarchy (RD-1): Team → Floor Pad → Department Setup →
+ * Rotation Setup → Device & Account → Master Admin (collapsed).
  * PERF-LOAD-002: this tab mounts only on first visit; keep-alive after.
  * Defer Master/topology admin graphs until their sections open.
  */
@@ -22,6 +22,7 @@ import {
   Snowflake,
   Target,
   UserCheck,
+  Users,
   type LucideIcon,
 } from "lucide-react";
 import { PushNotificationsCard } from "@/components/hub/PushNotificationsCard";
@@ -323,9 +324,37 @@ export function SettingsSection({
       <header className="px-0.5">
         <h1 className="text-lg font-bold tracking-tight text-zinc-50">More</h1>
         <p className="mt-0.5 text-sm text-zinc-500">
-          Setup and administration for DeptSync
+          Team, setup, and administration
         </p>
       </header>
+
+      {supervisorSession || masterSession ? (
+        <SettingsCard
+          id="team"
+          title="Team"
+          subtitle="People, schedules, and availability"
+          icons={[Users]}
+          data-testid="more-team"
+        >
+          <button
+            type="button"
+            data-testid="more-open-team"
+            onClick={() => router.push("/roster")}
+            className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-zinc-600/50 bg-zinc-900/70 px-3 text-sm font-semibold text-zinc-100"
+          >
+            <Users
+              className="h-4 w-4"
+              strokeWidth={ICON_STROKE}
+              aria-hidden
+            />
+            Open Team
+          </button>
+          <p className="text-[11px] leading-snug text-zinc-500">
+            Roster remains available here while Overview and This Week absorb
+            everyday people views.
+          </p>
+        </SettingsCard>
+      ) : null}
 
       {showFloorPad ? (
         <SettingsCard

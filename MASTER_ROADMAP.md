@@ -12,6 +12,11 @@
 
 > **UX-005 Operational Simplicity (active program):** [`docs/product/UX005_OPERATIONAL_SIMPLICITY_BACKLOG.md`](docs/product/UX005_OPERATIONAL_SIMPLICITY_BACKLOG.md) — UX-005A is first tranche only; B–F and open Question Its Place items remain constraints.
 
+## Next (REDESIGN — complete product destination)
+- [x] **DEPTSYNC-REDESIGN-001** — Complete product & experience blueprint (**COMPLETE** — design only; [`DEPTSYNC_REDESIGN_001_COMPLETE_PRODUCT_EXPERIENCE_BLUEPRINT.md`](docs/product/DEPTSYNC_REDESIGN_001_COMPLETE_PRODUCT_EXPERIENCE_BLUEPRINT.md))
+- [x] **RD-1 IA Shell** — Floor Command application shell (**COMPLETE** engineering; deploy/commit **not** authorized) — [`DEPTSYNC_RD_1_FLOOR_COMMAND_APPLICATION_SHELL.md`](docs/product/DEPTSYNC_RD_1_FLOOR_COMMAND_APPLICATION_SHELL.md)
+- [ ] **RD-2…RD-10** — Map aisle-index polish → topology reconcile → sections → walkthroughs → engine preference → capacity → team consolidate → auth simplify → visual polish (**NOT STARTED** — see blueprint §L)
+
 ## Next (ALIGN — constitutional direction)
 - [x] **DEPTSYNC-ALIGN-001** — Constitutional alignment & redesign blueprint (**COMPLETE** — planning only; operator-approved)
 - [x] **DEPTSYNC-ALIGN-002** — Constitutional ratification & implementation readiness (**COMPLETE** — docs only; [`DEPTSYNC_ALIGN_002_CONSTITUTIONAL_RATIFICATION.md`](docs/product/DEPTSYNC_ALIGN_002_CONSTITUTIONAL_RATIFICATION.md))
@@ -21,7 +26,8 @@
 - [x] **ALIGN-SEC-005** — Master recovery credential compatibility (**COMPLETE** read-only + local tests; **COMPATIBLE GO** for 64-hex `HUB_MASTER_PIN`) — [`DEPTSYNC_ALIGN_SEC_005_MASTER_RECOVERY_CREDENTIAL_COMPATIBILITY.md`](docs/product/DEPTSYNC_ALIGN_SEC_005_MASTER_RECOVERY_CREDENTIAL_COMPATIBILITY.md)
 - [x] **ALIGN-SEC-006** — Recovery credential protection (**COMPLETE** engineering; deploy/prod/commit **not** authorized) — hashed bootstrap storage; no PIN in bootstrap HTTP/script output — [`DEPTSYNC_ALIGN_SEC_006_RECOVERY_CREDENTIAL_PROTECTION.md`](docs/product/DEPTSYNC_ALIGN_SEC_006_RECOVERY_CREDENTIAL_PROTECTION.md)
 - [x] **ALIGN-SEC-007** — Controlled Vercel security release (**LOCAL COMMIT** — push/deploy **not** authorized) — [`DEPTSYNC_ALIGN_SEC_007_CONTROLLED_VERCEL_SECURITY_RELEASE.md`](docs/product/DEPTSYNC_ALIGN_SEC_007_CONTROLLED_VERCEL_SECURITY_RELEASE.md)
-- [ ] **ALIGN-DEPT-001** — Flooring / Home Decor separation design (**NOT STARTED** — blocked on operator aisle/bay mapping; migration UNRESOLVED)
+- [x] **DEPTSYNC-ALIGN-TOPO-001** — Two-department topology reconciliation (**COMPLETE** — discovery + design only; [`DEPTSYNC_ALIGN_TOPO_001_TWO_DEPARTMENT_TOPOLOGY_RECONCILIATION.md`](docs/product/DEPTSYNC_ALIGN_TOPO_001_TWO_DEPARTMENT_TOPOLOGY_RECONCILIATION.md); operator SQL `scripts/sql/align-topo001-topology-inventory-readonly.sql`; no app/schema/prod mutation)
+- [ ] **ALIGN-DEPT-001** — Flooring / Home Decor separation design lock / dry-run (**NOT STARTED** — fed by TOPO-001; blocked on operator aisle/bay mapping + §L decisions; migration still UNRESOLVED until approved)
 - [ ] **SECTION-001** — Operational Section domain (**NOT STARTED** — approved target; no schema yet)
 - [ ] **WALKTHROUGH-001** — Collaborative walkthrough domain (**NOT STARTED** — storage review of `manager_notes` / `shift_walk_tasks` first; FLOORPAD-001 related)
 

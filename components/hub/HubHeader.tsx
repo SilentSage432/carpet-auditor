@@ -28,6 +28,8 @@ type HubHeaderProps = {
   onToggleUser: () => void;
   userMenu: ReactNode;
   onLogoTripleTap?: () => void;
+  /** RD-1: Map / Overview / Walkthroughs are aisle-first — no dept pin. */
+  showDepartmentSwitcher?: boolean;
 };
 
 export function HubHeader({
@@ -42,6 +44,7 @@ export function HubHeader({
   onToggleUser,
   userMenu,
   onLogoTripleTap,
+  showDepartmentSwitcher = true,
 }: HubHeaderProps) {
   const tapTimes = useRef<number[]>([]);
 
@@ -86,10 +89,9 @@ export function HubHeader({
           ) : null}
         </div>
 
-        <AdminDepartmentSwitcher
-          specialist={specialist}
-          compact
-        />
+        {showDepartmentSwitcher ? (
+          <AdminDepartmentSwitcher specialist={specialist} compact />
+        ) : null}
 
         <SyncStatusPill storeNumber={storeNumber} />
 

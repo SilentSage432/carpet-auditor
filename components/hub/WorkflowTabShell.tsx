@@ -1,9 +1,9 @@
 "use client";
 
 /**
- * Keep-alive shell for Floor / Map / Roster / More.
+ * Keep-alive shell for Overview · Map · This Week · Walkthroughs · More.
  * PERF-LOAD-002: visit-on-demand first mount, then keep-alive after visit.
- * Unvisited tabs do not mount or fetch. URL still updates via BottomNav Links.
+ * Team (/roster) remains a secondary More route during RD-1.
  */
 
 import { usePathname, useRouter } from "next/navigation";
@@ -13,12 +13,15 @@ import { NavigationHub } from "@/components/hub/NavigationHub";
 import { SpecialtyToolsHost } from "@/components/hub/SpecialtyToolsHost";
 import { FloorTab } from "@/components/hub/tabs/FloorTab";
 import { MapTab } from "@/components/hub/tabs/MapTab";
+import { OverviewTab } from "@/components/hub/tabs/OverviewTab";
 import { RosterTab } from "@/components/hub/tabs/RosterTab";
 import { SettingsTab } from "@/components/hub/tabs/SettingsTab";
+import { WalkthroughsTab } from "@/components/hub/tabs/WalkthroughsTab";
 import type { WorkflowTabProps } from "@/components/hub/tabs/tab-props";
 import { updateAuthSessionSpecialist } from "@/lib/auth-session";
 import {
   canAccessWorkflowTab,
+  homeHrefForSpecialist,
   PRIMARY_WORKFLOW_TAB_HREFS,
   workflowTabFromPathname,
   workflowTabTitle,
@@ -67,14 +70,26 @@ function KeepAlivePanel({
   );
 }
 
+function primaryVisitKey(
+  active: NonNullable<ReturnType<typeof workflowTabFromPathname>>
+): WorkflowTabHref {
+  if (active === "/roster") return "/settings";
+  return active;
+}
+
 export function WorkflowTabShell(props: WorkflowTabProps) {
-  const pathname = usePathname() || "/dashboard";
+  const pathname = usePathname() || "/overview";
   const router = useRouter();
-  const active = workflowTabFromPathname(pathname) ?? "/dashboard";
+  const { viewSpecialist } = useDevSandbox(props.specialist);
+  const viewPreview = viewSpecialist ?? props.specialist;
+  const resolved =
+    workflowTabFromPathname(pathname) ?? homeHrefForSpecialist(viewPreview);
+  const active = resolved;
+  const visitKey = primaryVisitKey(active);
   const [storeNumber, setStore] = useState(props.storeNumber);
   const [member, setMember] = useState<StoreSpecialist>(props.specialist);
   const [changePinOpen, setChangePinOpen] = useState(false);
-  const { viewSpecialist } = useDevSandbox(member);
+  const [rosterVisited, setRosterVisited] = useState(active === "/roster");
   const view = viewSpecialist ?? member;
   const working = useWorkingDepartment(view);
   const allowedTabs = useMemo(
@@ -85,21 +100,25 @@ export function WorkflowTabShell(props: WorkflowTabProps) {
     [view]
   );
   const [visited, setVisited] = useState<Set<WorkflowTabHref>>(() =>
-    seedVisitedTabs(active, allowedTabs)
+    seedVisitedTabs(visitKey, allowedTabs)
   );
 
   useEffect(() => {
     if (!canAccessWorkflowTab(view, active)) {
-      router.replace("/dashboard");
+      router.replace(homeHrefForSpecialist(view));
     }
   }, [active, router, view]);
 
   useEffect(() => {
+    if (active === "/roster") setRosterVisited(true);
+  }, [active]);
+
+  useEffect(() => {
     setVisited((prev) => {
-      const next = reconcileVisitedTabs(prev, active, allowedTabs);
+      const next = reconcileVisitedTabs(prev, visitKey, allowedTabs);
       return visitedSetsEqual(prev, next) ? prev : next;
     });
-  }, [active, allowedTabs]);
+  }, [visitKey, allowedTabs]);
 
   useEffect(() => {
     setStore(props.storeNumber);
@@ -142,7 +161,7 @@ export function WorkflowTabShell(props: WorkflowTabProps) {
   }
 
   return (
-    <div className="hub-app-shell flex h-dvh max-h-dvh flex-col overflow-hidden">
+    <div className="hub-app-shell hub-floor-command flex h-dvh max-h-dvh flex-col overflow-hidden">
       <div className="hub-app-header shrink-0">
         <NavigationHub
           title={workflowTabTitle(active, view, working)}
@@ -163,9 +182,9 @@ export function WorkflowTabShell(props: WorkflowTabProps) {
       {/* Outside keep-alive `inert` panels so More utilities can open tools. */}
       <SpecialtyToolsHost specialist={view} storeNumber={storeNumber} />
       <div className="hub-app-workspace relative min-h-0 flex-1">
-        {visited.has("/dashboard") ? (
-          <KeepAlivePanel active={active === "/dashboard"}>
-            <FloorTab {...tabProps} />
+        {visited.has("/overview") && canAccessWorkflowTab(view, "/overview") ? (
+          <KeepAlivePanel active={active === "/overview"}>
+            <OverviewTab {...tabProps} />
           </KeepAlivePanel>
         ) : null}
         {visited.has("/admin/store-map") ? (
@@ -175,7 +194,18 @@ export function WorkflowTabShell(props: WorkflowTabProps) {
             </Suspense>
           </KeepAlivePanel>
         ) : null}
-        {visited.has("/roster") && canAccessWorkflowTab(view, "/roster") ? (
+        {visited.has("/dashboard") ? (
+          <KeepAlivePanel active={active === "/dashboard"}>
+            <FloorTab {...tabProps} />
+          </KeepAlivePanel>
+        ) : null}
+        {visited.has("/walkthroughs") &&
+        canAccessWorkflowTab(view, "/walkthroughs") ? (
+          <KeepAlivePanel active={active === "/walkthroughs"}>
+            <WalkthroughsTab {...tabProps} />
+          </KeepAlivePanel>
+        ) : null}
+        {rosterVisited && canAccessWorkflowTab(view, "/roster") ? (
           <KeepAlivePanel active={active === "/roster"}>
             <RosterTab {...tabProps} />
           </KeepAlivePanel>

@@ -1,7 +1,9 @@
 /**
- * Navigation Hub — owns the Floor / Map / Roster / Settings workflow.
- * Inventory section tabs stay in lib/rbac.ts; this module owns Store Ops routes.
- * Authenticated home is /dashboard. Hub `/` with ?section= is specialty scan only.
+ * Navigation Hub — Floor Command primary workflow.
+ * RD-1 chrome: Overview · Map · This Week · Walkthroughs · More.
+ * Inventory specialty tabs stay in lib/rbac.ts; this module owns Store Ops routes.
+ * Authenticated operator home is /overview. Associates land on /dashboard (This Week).
+ * Hub `/` with ?section= is specialty scan only (dormant REDUCE-004).
  */
 
 import { workingDepartment } from "@/lib/admin-department-context";
@@ -24,8 +26,10 @@ export type SpecialtyHubHref =
   | "/?section=department";
 
 export type NavHubHref =
+  | "/overview"
   | "/admin/store-map"
   | "/dashboard"
+  | "/walkthroughs"
   | "/roster"
   | "/settings"
   | "/"
@@ -65,7 +69,7 @@ export function specialtyHubHref(
 
 /**
  * True when `/` should keep the specialty scan pane instead of replacing
- * to /dashboard. Remnants/settings query params still redirect to their routes.
+ * to the operator home. Remnants/settings query params still redirect to their routes.
  */
 export function shouldStayOnSpecialtyHub(
   section: HubSection | string | null | undefined
@@ -73,10 +77,12 @@ export function shouldStayOnSpecialtyHub(
   return isSpecialtyHubSection(section);
 }
 
+/** Primary keep-alive tabs (Roster remains a secondary More → Team route). */
 export const PRIMARY_WORKFLOW_TAB_HREFS = [
-  "/dashboard",
+  "/overview",
   "/admin/store-map",
-  "/roster",
+  "/dashboard",
+  "/walkthroughs",
   "/settings",
 ] as const;
 
@@ -84,9 +90,26 @@ export const WORKFLOW_TAB_HREFS = PRIMARY_WORKFLOW_TAB_HREFS;
 
 export type WorkflowTabHref = (typeof WORKFLOW_TAB_HREFS)[number];
 
+/** Secondary workflow routes that still mount inside the shell. */
+export type SecondaryWorkflowHref = "/roster";
+
+export type ShellWorkflowHref = WorkflowTabHref | SecondaryWorkflowHref;
+
+/** Post-login / unauthorized-tab recovery home. */
+export function homeHrefForSpecialist(
+  member: StoreSpecialist | null | undefined
+): WorkflowTabHref {
+  if (!member) return "/overview";
+  if (isSimplifiedAssociateView(member)) return "/dashboard";
+  return "/overview";
+}
+
 export function workflowTabFromPathname(
   pathname: string
-): WorkflowTabHref | null {
+): ShellWorkflowHref | null {
+  if (pathname === "/overview" || pathname.startsWith("/overview/")) {
+    return "/overview";
+  }
   if (pathname === "/dashboard" || pathname.startsWith("/dashboard/")) {
     return "/dashboard";
   }
@@ -95,6 +118,12 @@ export function workflowTabFromPathname(
     pathname.startsWith("/admin/store-map/")
   ) {
     return "/admin/store-map";
+  }
+  if (
+    pathname === "/walkthroughs" ||
+    pathname.startsWith("/walkthroughs/")
+  ) {
+    return "/walkthroughs";
   }
   if (pathname === "/roster" || pathname.startsWith("/roster/")) {
     return "/roster";
@@ -106,10 +135,14 @@ export function workflowTabFromPathname(
 }
 
 export function prefetchWorkflowTab(href: string): void {
-  if (href === "/dashboard") {
+  if (href === "/overview") {
+    void import("@/components/hub/tabs/OverviewTab");
+  } else if (href === "/dashboard") {
     void import("@/components/hub/tabs/FloorTab");
   } else if (href === "/admin/store-map") {
     void import("@/components/hub/tabs/MapTab");
+  } else if (href === "/walkthroughs") {
+    void import("@/components/hub/tabs/WalkthroughsTab");
   } else if (href === "/roster") {
     void import("@/components/hub/tabs/RosterTab");
   } else if (href === "/settings") {
@@ -118,17 +151,25 @@ export function prefetchWorkflowTab(href: string): void {
 }
 
 export function workflowTabTitle(
-  href: WorkflowTabHref,
+  href: ShellWorkflowHref,
   specialist?: StoreSpecialist | null,
   working?: ReturnType<typeof workingDepartment>
 ): string {
-  if (href === "/admin/store-map") return "Store Map";
-  if (href === "/roster") return "People";
+  if (href === "/overview") return "Overview";
+  if (href === "/admin/store-map") return "Map";
+  if (href === "/walkthroughs") return "Walkthroughs";
+  if (href === "/roster") return "Team";
   if (href === "/settings") return "More";
+  if (href === "/dashboard") {
+    if (specialist && isSimplifiedAssociateView(specialist)) {
+      return "My Shift";
+    }
+    return "This Week";
+  }
   const scope =
     working ?? (specialist ? workingDepartment(specialist) : "all");
-  if (scope === "all") return "Floor Rotation";
-  return `${departmentMeta(scope).shortLabel} Rotation`;
+  if (scope === "all") return "This Week";
+  return `${departmentMeta(scope).shortLabel} · This Week`;
 }
 
 export type NavHubLink = {
@@ -157,36 +198,43 @@ export function navLoginIdentity(
 
 const PRIMARY_LINKS: NavHubLink[] = [
   {
-    href: "/dashboard",
-    label: "Floor",
-    shortLabel: "Floor",
-    icon: "zebra",
-    description: "This week's bay checklist",
+    href: "/overview",
+    label: "Overview",
+    shortLabel: "Overview",
+    icon: "home",
+    description: "Week status and what needs attention",
   },
   {
     href: "/admin/store-map",
-    label: "Store Map",
+    label: "Map",
     shortLabel: "Map",
     icon: "map",
-    description: "Visual heatmap and bay layout",
+    description: "Aisles and physical bays",
   },
   {
-    href: "/roster",
-    label: "People",
-    shortLabel: "Roster",
-    icon: "users",
-    description: "People, schedules, and availability",
+    href: "/dashboard",
+    label: "This Week",
+    shortLabel: "Week",
+    icon: "calendar",
+    description: "Weekly plan, ownership, and verification",
+  },
+  {
+    href: "/walkthroughs",
+    label: "Walkthroughs",
+    shortLabel: "Walk",
+    icon: "notes",
+    description: "Collaborative floor conversations and follow-ups",
   },
   {
     href: "/settings",
     label: "More",
     shortLabel: "More",
     icon: "more",
-    description: "Floor utilities, store admin, and device diagnostics",
+    description: "Team, topology, configuration, and device",
   },
 ];
 
-/** Primary bottom-bar links — Floor · Map · Roster · More, filtered by role. */
+/** Primary bottom-bar links — Overview · Map · This Week · Walkthroughs · More. */
 export function navRoleLinks(
   member: StoreSpecialist | null | undefined
 ): NavHubLink[] {
@@ -212,11 +260,29 @@ export function canAccessWorkflowTab(
   member: StoreSpecialist | null | undefined,
   href: string
 ): boolean {
+  if (href === "/roster") {
+    if (!member) return false;
+    return !isSimplifiedAssociateView(member);
+  }
   return navRoleLinks(member).some((link) => link.href === href);
 }
 
 export function navPrimaryLinks(links: NavHubLink[]): NavHubLink[] {
   return links;
+}
+
+/** Hide working-department pin on geography / shell surfaces that are aisle-first. */
+export function showHeaderDepartmentSwitcher(pathname: string): boolean {
+  if (pathname === "/admin/store-map" || pathname.startsWith("/admin/store-map/")) {
+    return false;
+  }
+  if (pathname === "/overview" || pathname.startsWith("/overview/")) {
+    return false;
+  }
+  if (pathname === "/walkthroughs" || pathname.startsWith("/walkthroughs/")) {
+    return false;
+  }
+  return true;
 }
 
 function hubSectionParam(search: string | null | undefined): string | null {
@@ -239,8 +305,18 @@ export function isNavHubPathActive(
     : null;
   const path = hrefPath || "/";
 
+  if (path === "/overview") {
+    return pathname === "/overview" || pathname.startsWith("/overview/");
+  }
+
   if (path === "/dashboard") {
     return pathname === "/dashboard" || pathname.startsWith("/dashboard/");
+  }
+
+  if (path === "/walkthroughs") {
+    return (
+      pathname === "/walkthroughs" || pathname.startsWith("/walkthroughs/")
+    );
   }
 
   if (href === "/roster") {
@@ -249,6 +325,10 @@ export function isNavHubPathActive(
 
   if (href === "/settings") {
     if (pathname === "/settings" || pathname.startsWith("/settings/")) {
+      return true;
+    }
+    // Team lives under More during RD-1 transition.
+    if (pathname === "/roster" || pathname.startsWith("/roster/")) {
       return true;
     }
     if ((pathname === "/" || pathname === "") && section === "settings") {
@@ -283,6 +363,7 @@ export const SETTINGS_TOOL_HASHES = [
   "taxonomies",
   "remnants",
   "remnants-calculator",
+  "team",
 ] as const;
 
 export function isSettingsToolHash(hash: string): boolean {

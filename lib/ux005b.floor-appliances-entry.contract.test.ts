@@ -71,13 +71,14 @@ describe("UX-005B Floor Appliances entry — REDUCE-004 disconnected", () => {
     expect(settings).toContain('data-testid="more-executive-floor-pad"');
   });
 
-  it("BottomNav IA remains Floor · Map · Roster · More", () => {
+  it("BottomNav IA is Overview · Map · This Week · Walkthroughs · More (RD-1)", () => {
     const shell = readRepo("components/hub/WorkflowTabShell.tsx");
     expect(shell).not.toContain("floor-appliances-entry");
     const nav = readRepo("lib/nav-hub.ts");
-    expect(nav).toContain("Floor");
+    expect(nav).toContain("Overview");
     expect(nav).toContain("Map");
-    expect(nav).toContain("Roster");
+    expect(nav).toContain("This Week");
+    expect(nav).toContain("Walkthroughs");
     expect(nav).toContain("More");
   });
 });

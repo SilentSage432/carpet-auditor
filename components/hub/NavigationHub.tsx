@@ -1,7 +1,8 @@
 "use client";
 
 /**
- * Navigation Hub chrome — title, department pill, account/PIN, Floor/Map/Roster/More bar.
+ * Navigation Hub chrome — title, optional department pill, account/PIN,
+ * Overview · Map · This Week · Walkthroughs · More bar.
  */
 
 import { useEffect, useId, useRef, useState } from "react";
@@ -17,6 +18,7 @@ import {
   navPrimaryLinks,
   navRoleBadge,
   navRoleLinks,
+  showHeaderDepartmentSwitcher,
 } from "@/lib/nav-hub";
 import { requestSundayAuditDrawer } from "@/lib/store-ops/sunday-audit";
 import { useFocusedWorkspaceActive } from "@/lib/ui/focused-workspace";
@@ -116,6 +118,7 @@ export function NavigationHub({
         userOpen={userOpen}
         userMenuId={userMenuId}
         userRef={userRef}
+        showDepartmentSwitcher={showHeaderDepartmentSwitcher(pathname)}
         onToggleUser={() => setUserOpen((o) => !o)}
         onLogoTripleTap={
           canOpen

@@ -487,11 +487,12 @@ describe("UX-005G preserves prior mobile work", () => {
     expect(portal).toContain("document.body");
   });
 
-  it("BottomNav IA is unchanged — Floor / Map / Roster / More", () => {
+  it("BottomNav IA is Overview · Map · Week · Walk · More (RD-1)", () => {
     const nav = readRepo("lib/nav-hub.ts");
-    expect(nav).toContain('shortLabel: "Floor"');
+    expect(nav).toContain('shortLabel: "Overview"');
     expect(nav).toContain('shortLabel: "Map"');
-    expect(nav).toContain('shortLabel: "Roster"');
+    expect(nav).toContain('shortLabel: "Week"');
+    expect(nav).toContain('shortLabel: "Walk"');
     expect(nav).toContain('shortLabel: "More"');
   });
 

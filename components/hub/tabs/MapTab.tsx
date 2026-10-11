@@ -99,16 +99,9 @@ export function MapTab({ specialist }: WorkflowTabProps) {
   const canReadAttention = isSupervisor(specialist);
   const heatmap = mapMode === "heatmap";
   const working = useWorkingDepartment(specialist);
-  const activeDepartmentId = workingDepartmentId(specialist, departments);
-  const visibleDepartments = useMemo(() => {
-    if (working === "all" || !activeDepartmentId) return departments;
-    return departments.filter((dept) => dept.id === activeDepartmentId);
-  }, [departments, working, activeDepartmentId]);
-  const visibleLocations = useMemo(() => {
-    if (working === "all" || !activeDepartmentId) return locations;
-    const ids = new Set(visibleDepartments.map((dept) => dept.id));
-    return locations.filter((loc) => ids.has(loc.department_id));
-  }, [locations, working, activeDepartmentId, visibleDepartments]);
+  // RD-1 Floor Command: Map is aisle → bay geography — not department-pin navigation.
+  const visibleDepartments = departments;
+  const visibleLocations = locations;
 
   const investigationIntent = useMemo(
     () =>
