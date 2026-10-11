@@ -26,7 +26,10 @@
 - [x] **DEPTSYNC-SEC-OPS-001** — Production security truth (read-only) — P0 open RLS found — [`DEPTSYNC_SEC_OPS_001_PRODUCTION_TRUST_REPORT.md`](docs/product/DEPTSYNC_SEC_OPS_001_PRODUCTION_TRUST_REPORT.md)
 - [x] **DEPTSYNC-SEC-OPS-002** — Contain open RLS + secret-column SELECT (prod applied) — [`DEPTSYNC_SEC_OPS_002_CONTAINMENT_REPORT.md`](docs/product/DEPTSYNC_SEC_OPS_002_CONTAINMENT_REPORT.md)
 - [x] **DEPTSYNC-SEC-OPS-002B** — Repository alignment (migration + docs on `origin/main`; no prod re-apply / no app deploy)
-- [ ] **Post-RD-6 trust / topology / auth pack** — SEC-OPS-003 PIN hash rewrite → AUTH-RATE-001 → CI-001 → DOCS-TRUTH → AUTH inventory → ALIGN-DEPT + capacity guard
+- [x] **DEPTSYNC-SEC-OPS-003** — PIN format discovery (read-only) — [`DEPTSYNC_SEC_OPS_003_PIN_AUTH_DISCOVERY.md`](docs/product/DEPTSYNC_SEC_OPS_003_PIN_AUTH_DISCOVERY.md)
+- [x] **DEPTSYNC-AUTH-HARDEN-001** — Privileged PIN scrypt + login upgrade + hub-bridge rate limit (**COMPLETE** local; prod migrate/deploy/commit **not** authorized) — [`DEPTSYNC_AUTH_HARDEN_001.md`](docs/product/DEPTSYNC_AUTH_HARDEN_001.md)
+- [x] **DEPTSYNC-AUTH-HARDEN-001A** — Fail-closed limiter + atomic admit + IP buckets (**COMPLETE** local; DB-before-app release gate) — same canonical doc
+- [ ] **Post-RD-6 trust / topology / auth pack** — AUTH-HARDEN release (§K, DB then app) → plaintext retirement → CI-001 → DOCS-TRUTH → AUTH inventory → ALIGN-DEPT + capacity guard
 
 ## Next (ALIGN — constitutional direction)
 - [x] **DEPTSYNC-ALIGN-001** — Constitutional alignment & redesign blueprint (**COMPLETE** — planning only; operator-approved)

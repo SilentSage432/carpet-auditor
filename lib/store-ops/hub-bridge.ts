@@ -9,7 +9,7 @@ import "server-only";
 import { createClient } from "@supabase/supabase-js";
 import { randomBytes } from "crypto";
 import { mapRow } from "@/lib/specialists";
-import { verifyStoredPin } from "@/lib/invite";
+import { needsPinCredentialUpgrade, verifyStoredPin } from "@/lib/invite";
 import { normalizeStoreNumber } from "@/lib/store";
 import { getSupabaseAnonKey, getSupabaseUrl } from "@/lib/supabase/env";
 import { createAdminClient } from "@/lib/supabase/admin";
@@ -19,6 +19,7 @@ import {
   isHubMasterPin,
 } from "./bootstrap-admin";
 import { linkAuthUserToSpecialistProfile } from "./link-auth-profile";
+import { persistPinCredentialUpgrade } from "./pin-credential-upgrade";
 import type { StoreSpecialist } from "@/lib/types";
 
 export type HubBridgeSession = {
@@ -326,6 +327,11 @@ export async function mintHubBridgeSession(input: {
     specialist.is_active !== false &&
     pinMatches
   ) {
+    await maybeUpgradePinCredential({
+      specialist,
+      pin,
+      previousStored: storedPin,
+    });
     return mintSessionForSpecialist(specialist);
   }
 
@@ -346,4 +352,46 @@ async function mintExistingMasterWithHubPin(): Promise<HubBridgeResult> {
     throw new Error("Invalid username or PIN");
   }
   return mintSessionForSpecialist(master);
+}
+
+/**
+ * AUTH-HARDEN-001 — after verified legacy auth, persist scrypt atomically.
+ * Login proceeds unless a concurrent credential change invalidates the PIN.
+ * Upgrade persistence failures are logged; they are never reported as success.
+ */
+async function maybeUpgradePinCredential(input: {
+  specialist: StoreSpecialist;
+  pin: string;
+  previousStored: string;
+}): Promise<void> {
+  if (!needsPinCredentialUpgrade(input.previousStored)) return;
+
+  const result = await persistPinCredentialUpgrade({
+    specialistId: String(input.specialist.id),
+    pin: input.pin,
+    previousStored: input.previousStored,
+  });
+
+  if (result.status === "upgraded" || result.status === "skipped") {
+    return;
+  }
+
+  if (result.status === "conflict") {
+    const fresh = await loadSpecialistById(String(input.specialist.id));
+    const nextStored =
+      fresh?.pin_hash?.trim() || fresh?.pin_code?.trim() || "";
+    if (!nextStored || !verifyStoredPin(input.pin, nextStored)) {
+      throw new Error("Invalid username or PIN");
+    }
+    console.warn("[auth-harden] pin upgrade conflict — re-verified before mint", {
+      specialist_id: String(input.specialist.id),
+    });
+    return;
+  }
+
+  // Persistence error: do not claim upgrade; allow login so operator is not locked out.
+  console.warn("[auth-harden] pin upgrade not persisted — login continues on legacy", {
+    specialist_id: String(input.specialist.id),
+    reason: result.reason,
+  });
 }

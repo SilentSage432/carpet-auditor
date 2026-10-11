@@ -5,7 +5,8 @@
 import { afterEach, describe, expect, it } from "vitest";
 import {
   hashPin,
-  isSaltedPinHash,
+  hashPinSha256Legacy,
+  isCanonicalPinHash,
   isValidPermanentPin,
   verifyStoredPin,
 } from "@/lib/auth-token";
@@ -23,10 +24,10 @@ const SYNTHETIC_64_HEX =
 const ORDINARY_DB_PIN = "4821";
 
 describe("ALIGN-SEC-006 masterBootstrapPinFields (hashed storage)", () => {
-  it("stores salted hash in both pin_code and pin_hash — never plaintext", () => {
+  it("stores canonical scrypt hash in both pin_code and pin_hash — never plaintext", () => {
     const fields = masterBootstrapPinFields(SYNTHETIC_64_HEX);
     expect(fields.pin_code).toBe(fields.pin_hash);
-    expect(isSaltedPinHash(fields.pin_hash)).toBe(true);
+    expect(isCanonicalPinHash(fields.pin_hash)).toBe(true);
     expect(fields.pin_code).not.toBe(SYNTHETIC_64_HEX);
     expect(fields.pin_code.includes(SYNTHETIC_64_HEX)).toBe(false);
   });
@@ -44,10 +45,20 @@ describe("ALIGN-SEC-006 masterBootstrapPinFields (hashed storage)", () => {
   });
 
   it("ordinary DB-backed 4-digit PIN hashing remains functional", () => {
-    const stored = hashPin(ORDINARY_DB_PIN, "00112233445566778899aabbccddeeff");
+    const stored = hashPin(ORDINARY_DB_PIN);
+    expect(isCanonicalPinHash(stored)).toBe(true);
     expect(verifyStoredPin(ORDINARY_DB_PIN, stored)).toBe(true);
     expect(isValidPermanentPin(ORDINARY_DB_PIN)).toBe(true);
     expect(verifyStoredPin(SYNTHETIC_64_HEX, stored)).toBe(false);
+  });
+
+  it("legacy salted SHA-256 fixtures still verify", () => {
+    const legacy = hashPinSha256Legacy(
+      ORDINARY_DB_PIN,
+      "00112233445566778899aabbccddeeff"
+    );
+    expect(verifyStoredPin(ORDINARY_DB_PIN, legacy)).toBe(true);
+    expect(verifyStoredPin("0000", legacy)).toBe(false);
   });
 });
 

@@ -28,8 +28,8 @@ export const HUB_MASTER_AUTH_EMAIL = "hub.master-admin@deptsync.hub";
 export { getHubMasterPin, isHubMasterPin, requireHubMasterPin };
 
 /**
- * Roster fields for Master bootstrap — one-way salted hash only (ALIGN-SEC-006).
- * Matches reset-pin storage: both pin_code and pin_hash hold salt.digest.
+ * Roster fields for Master bootstrap — scrypt hash only (AUTH-HARDEN-001).
+ * Matches reset-pin storage: both pin_code and pin_hash hold the canonical hash.
  * Auth.users password is set separately from env (provider hashes it).
  */
 export function masterBootstrapPinFields(pin: string): {

@@ -4,7 +4,7 @@
  */
 
 import { createClient } from "@supabase/supabase-js";
-import { createHash, randomBytes } from "crypto";
+import { randomBytes, scryptSync } from "crypto";
 
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL?.trim();
 const service = process.env.SUPABASE_SERVICE_ROLE_KEY?.trim();
@@ -25,11 +25,17 @@ if (!masterPin) {
   process.exit(1);
 }
 
-/** Must match lib/auth-token.ts hashPin (ALIGN-SEC-006). */
-function hashPin(pin, salt) {
-  const s = salt && salt.length > 0 ? salt : randomBytes(16).toString("hex");
-  const digest = createHash("sha256").update(`${s}:${pin}`).digest("hex");
-  return `${s}.${digest}`;
+/** Must match lib/auth-token.ts hashPinScrypt (AUTH-HARDEN-001). */
+function hashPin(pin) {
+  const salt = randomBytes(16);
+  const derived = scryptSync(pin, salt, 32, { N: 16384, r: 8, p: 1 });
+  const b64url = (buf) =>
+    buf
+      .toString("base64")
+      .replace(/\+/g, "-")
+      .replace(/\//g, "_")
+      .replace(/=+$/g, "");
+  return ["scrypt1", "16384", "8", "1", b64url(salt), b64url(derived)].join("$");
 }
 
 const admin = createClient(url, service, {

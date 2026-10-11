@@ -1,5 +1,23 @@
 # DeptSync Hub — Development Journal
 
+## 2026-10-11 — DEPTSYNC-AUTH-HARDEN-001A Rate-limiter fail-closed release gate
+
+**Scoped local correction.** No production SQL, PIN changes, deploy, commit, or push.
+
+Hub-bridge rate limiting now **fail-closed** (503) when RPC/table unavailable or errors. Atomic `attempt` admit before PIN verify closes peek races. Buckets are IP-only (no client `store_number` rotation). Success clears only the caller bucket; verified login still issues session if clear fails. Protected recovery remains `BOOTSTRAP_SECRET` bootstrap / local script — not a public bypass. DB-before-app release ordering is mandatory. Typecheck pass; **1465** tests; build pass. Canonical: [`docs/product/DEPTSYNC_AUTH_HARDEN_001.md`](docs/product/DEPTSYNC_AUTH_HARDEN_001.md). STOP.
+
+## 2026-10-11 — DEPTSYNC-AUTH-HARDEN-001 Privileged PIN + hub-bridge rate limit
+
+**Scoped local implementation.** No production SQL, credential resets, deploy, commit, or push.
+
+Canonical PIN storage is now Node `scrypt` (`scrypt1$…`) via `hashPin`. Legacy salted SHA-256 and gated plaintext verify remain for migration. Successful hub-bridge login atomically upgrades legacy credentials; concurrent updates conflict safely; persist failure does not claim success and does not lock out the operator. Shared rate limiting via `auth_rate_limits` + `touch_auth_rate_limit` (fail-open if missing — **superseded by 001A fail-closed**). Invited-associate PIN clear SQL prepared with `ROLLBACK` only. Typecheck pass; **1459** tests pass; build pass. Canonical: [`docs/product/DEPTSYNC_AUTH_HARDEN_001.md`](docs/product/DEPTSYNC_AUTH_HARDEN_001.md). STOP.
+
+## 2026-10-11 — DEPTSYNC-SEC-OPS-003 PIN auth format discovery
+
+**Read-only discovery.** No PIN changes, rehashes, auth code changes, commits, pushes, or production mutations.
+
+Traced hub-bridge / bootstrap / reset / invite / phone-reset paths. Canonical storage is salted SHA-256 (`hashPin`), not bcrypt; `verifyStoredPin` still accepts plaintext equality. Live metadata: 3 digit-shaped `pin_code` rows (0 salted) — 1 active MasterAdmin, 2 invited Associates (unused by hub-bridge). Recommended future impl: login-time upgrade + clear invited digits; do not remove plaintext fallback yet. Canonical: [`docs/product/DEPTSYNC_SEC_OPS_003_PIN_AUTH_DISCOVERY.md`](docs/product/DEPTSYNC_SEC_OPS_003_PIN_AUTH_DISCOVERY.md). STOP.
+
 ## 2026-10-11 — DEPTSYNC-SEC-OPS-002B Repository alignment
 
 **Controlled repository release.** No production database mutations; no app deploy. Recorded `20261013_sec_ops_002_rls_containment.sql` + SEC-OPS-001/002 reports + helper SQL in git; pushed `origin/main`. Live containment re-checked (policies/grants/anon 401). Project has no `supabase_migrations` tracking schema — repo migration files are the history record. Authenticated operator session smoke NOT VERIFIED. Typecheck pass; **1436** tests pass; build pass.

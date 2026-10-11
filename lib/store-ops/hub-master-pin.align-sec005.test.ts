@@ -78,8 +78,8 @@ describe("ALIGN-SEC-005 synthetic 64-hex HUB_MASTER_PIN", () => {
   });
 
   it("hashPin / verifyStoredPin round-trip a 64-hex secret (no length reject)", () => {
-    const stored = hashPin(SYNTHETIC_64_HEX, "aabbccddeeff00112233445566778899");
-    expect(stored).toMatch(/^[0-9a-f]+\.[0-9a-f]{64}$/i);
+    const stored = hashPin(SYNTHETIC_64_HEX);
+    expect(stored.startsWith("scrypt1$")).toBe(true);
     expect(verifyStoredPin(SYNTHETIC_64_HEX, stored)).toBe(true);
     expect(verifyStoredPin(SYNTHETIC_64_HEX.slice(0, 8), stored)).toBe(false);
   });
