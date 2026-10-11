@@ -3,7 +3,8 @@
  *
  * Canonical credential owner: store_specialists (scrypt via hashPin).
  * profiles / store_profiles are identity mirrors only — PIN columns are cleared
- * on sync, never written with plaintext (SEC-OPS-005).
+ * on sync, never written with plaintext (SEC-OPS-005 / 007B).
+ * NOT NULL legacy `pin` columns clear as "" (never null).
  */
 
 import "server-only";
@@ -120,6 +121,7 @@ async function upsertStoreProfiles(specialist: StoreSpecialist): Promise<void> {
     (specialist.role === "MasterAdmin" ? "master_admin" : null);
 
   // Identity mirror only — never persist PIN material (plaintext or hash).
+  // store_profiles.pin is NOT NULL — clear with "" (SEC-OPS-007B).
   const profilePayload: Record<string, unknown> = {
     username,
     full_name: specialist.name,
@@ -130,7 +132,7 @@ async function upsertStoreProfiles(specialist: StoreSpecialist): Promise<void> {
         : specialist.role === "Supervisor"
           ? "Supervisor"
           : "Associate",
-    pin: null,
+    pin: "",
     pin_code: null,
     store_number: store,
     is_active: specialist.is_active !== false,
@@ -234,10 +236,11 @@ async function syncAuthProfilePin(
   if (!linked?.id) return;
 
   // Clear mirror credential columns; Auth.users password is provider-hashed separately.
+  // profiles.pin is NOT NULL — clear with "" (SEC-OPS-007B).
   await admin
     .from("profiles")
     .update({
-      pin: null,
+      pin: "",
       pin_code: null,
       pin_hash: null,
       must_change_credentials: false,

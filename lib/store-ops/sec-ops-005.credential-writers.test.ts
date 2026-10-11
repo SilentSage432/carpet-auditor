@@ -102,7 +102,8 @@ describe("SEC-OPS-005 linkAuthUserToSpecialistProfile", () => {
     expect(upserts.length).toBeGreaterThan(0);
     const payload = upserts[0]!;
     expect(payload.pin_code).toBeNull();
-    expect(payload.pin).toBeNull();
+    // SEC-OPS-007B: NOT NULL profiles.pin clears as "" (never null / never plaintext).
+    expect(payload.pin).toBe("");
     expect(payload.pin_hash).toBeNull();
     expect(payload.specialist_id).toBe("spec-secops005-1");
     expect(payload.store_number).toBe("2587");
@@ -121,8 +122,9 @@ describe("SEC-OPS-005 source contracts — no plaintext writers", () => {
       "utf8"
     );
     expect(source).toMatch(/rosterSecurePinFields/);
-    expect(source).toMatch(/pin:\s*null/);
+    expect(source).toMatch(/pin:\s*""/);
     expect(source).toMatch(/pin_code:\s*null/);
+    expect(source).not.toMatch(/pin:\s*null/);
     expect(source).not.toMatch(/pin_code:\s*newPin\b/);
     expect(source).not.toMatch(/pin_code:\s*pin\b/);
     expect(source).toMatch(/\.eq\("store_number", store\)/);
@@ -161,6 +163,7 @@ describe("SEC-OPS-005 source contracts — no plaintext writers", () => {
     );
     expect(source).not.toMatch(/pin_code:\s*input\.specialist\.pin_code/);
     expect(source).toMatch(/pin_code:\s*null/);
-    expect(source).toMatch(/pin:\s*null/);
+    expect(source).toMatch(/pin:\s*""/);
+    expect(source).not.toMatch(/pin:\s*null/);
   });
 });

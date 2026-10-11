@@ -3,8 +3,9 @@
  * Called after Hub PIN bridge / phone OTP verify / credential reset so Store
  * Ops APIs can resolve the actor.
  *
- * SEC-OPS-005: profiles is identity/JWT linkage only — never copy roster PIN
- * material into profiles.pin / pin_code (hub-bridge authenticates store_specialists).
+ * SEC-OPS-005 / 007B: profiles is identity/JWT linkage only — never copy roster
+ * PIN material into profiles.pin / pin_code (hub-bridge authenticates
+ * store_specialists). profiles.pin is NOT NULL → clear with "" not null.
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -84,8 +85,9 @@ export async function linkAuthUserToSpecialistProfile(
     is_active: input.specialist.is_active !== false,
     must_change_credentials: Boolean(input.specialist.must_change_credentials),
     // Clear legacy mirror credential columns; do not copy roster PIN material.
+    // pin is NOT NULL in production — use empty string, never null (SEC-OPS-007B).
     pin_code: null,
-    pin: null,
+    pin: "",
     pin_hash: null,
     assigned_department:
       input.specialist.assigned_department &&
