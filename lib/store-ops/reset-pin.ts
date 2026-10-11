@@ -1,17 +1,35 @@
 /**
  * Hub PIN reset / upsert (service role).
- * Writes pin_code to store_specialists (login source of truth) and upserts
- * store_profiles when present so Master Admin Change PIN never fails on a
- * missing profile row.
+ *
+ * Canonical credential owner: store_specialists (scrypt via hashPin).
+ * profiles / store_profiles are identity mirrors only — PIN columns are cleared
+ * on sync, never written with plaintext (SEC-OPS-005).
  */
 
 import "server-only";
 
 import { DEFAULT_SUPERVISOR_PIN, mapRow } from "@/lib/specialists";
-import { hashPin, verifyStoredPin } from "@/lib/invite";
+import { hashPin, isCanonicalPinHash, verifyStoredPin } from "@/lib/invite";
 import { normalizeStoreNumber } from "@/lib/store";
 import { createAdminClient } from "@/lib/supabase/admin";
 import type { StoreSpecialist } from "@/lib/types";
+
+/** Roster fields for a successful PIN write — never plaintext. */
+export function rosterSecurePinFields(pin: string): {
+  pin_code: string;
+  pin_hash: string;
+  pin_updated_at: string;
+} {
+  const pinHash = hashPin(pin);
+  if (!isCanonicalPinHash(pinHash) || pinHash === pin) {
+    throw new Error("Secure PIN hash generation failed");
+  }
+  return {
+    pin_code: pinHash,
+    pin_hash: pinHash,
+    pin_updated_at: new Date().toISOString(),
+  };
+}
 
 const MASTER_NAMES = new Set(["master admin", "master_admin", "super admin"]);
 
@@ -84,10 +102,7 @@ async function loadSpecialistRow(input: {
   return null;
 }
 
-async function upsertStoreProfiles(
-  specialist: StoreSpecialist,
-  pin: string
-): Promise<void> {
+async function upsertStoreProfiles(specialist: StoreSpecialist): Promise<void> {
   const admin = createAdminClient();
   const probe = await admin.from("store_profiles").select("id").limit(1);
   if (
@@ -104,6 +119,7 @@ async function upsertStoreProfiles(
     specialist.username?.trim() ||
     (specialist.role === "MasterAdmin" ? "master_admin" : null);
 
+  // Identity mirror only — never persist PIN material (plaintext or hash).
   const profilePayload: Record<string, unknown> = {
     username,
     full_name: specialist.name,
@@ -114,10 +130,9 @@ async function upsertStoreProfiles(
         : specialist.role === "Supervisor"
           ? "Supervisor"
           : "Associate",
-    pin,
-    pin_code: pin,
+    pin: null,
+    pin_code: null,
     store_number: store,
-    specialist_id: String(specialist.id),
     is_active: specialist.is_active !== false,
     must_change_credentials: false,
     assigned_department:
@@ -126,32 +141,20 @@ async function upsertStoreProfiles(
         : null,
   };
 
-  const { data: bySpecialist } = await admin
-    .from("store_profiles")
-    .select("id")
-    .eq("specialist_id", String(specialist.id))
-    .maybeSingle();
-
-  if (bySpecialist?.id) {
-    const { error } = await admin
-      .from("store_profiles")
-      .update(profilePayload)
-      .eq("id", bySpecialist.id);
-    if (error) throw new Error(error.message || "Could not update store_profiles");
-    return;
-  }
-
+  // Prefer username + store match — never rewrite another store's mirror.
   if (username) {
     const { data: byUser } = await admin
       .from("store_profiles")
       .select("id")
       .eq("username", username)
+      .eq("store_number", store)
       .maybeSingle();
     if (byUser?.id) {
       const { error } = await admin
         .from("store_profiles")
         .update(profilePayload)
-        .eq("id", byUser.id);
+        .eq("id", byUser.id)
+        .eq("store_number", store);
       if (error) {
         throw new Error(error.message || "Could not update store_profiles");
       }
@@ -160,9 +163,11 @@ async function upsertStoreProfiles(
   }
 
   if (specialist.role === "MasterAdmin") {
+    // Bound to the specialist's store — never rewrite another store's mirror.
     const { data: roleRows } = await admin
       .from("store_profiles")
-      .select("id, role, full_name, name")
+      .select("id, role, full_name, name, store_number")
+      .eq("store_number", store)
       .limit(50);
     const masterRow = (roleRows ?? []).find((row) => {
       const roleOk = isMasterRole(row.role);
@@ -172,7 +177,6 @@ async function upsertStoreProfiles(
       return roleOk || MASTER_NAMES.has(name);
     });
     if (masterRow?.id) {
-      // Prefer super_admin label when that column style is used on profiles.
       const payload = {
         ...profilePayload,
         role: isMasterRole(masterRow.role) ? masterRow.role : "MasterAdmin",
@@ -180,7 +184,8 @@ async function upsertStoreProfiles(
       const { error } = await admin
         .from("store_profiles")
         .update(payload)
-        .eq("id", masterRow.id);
+        .eq("id", masterRow.id)
+        .eq("store_number", store);
       if (error) {
         throw new Error(error.message || "Could not update store_profiles");
       }
@@ -228,11 +233,13 @@ async function syncAuthProfilePin(
     .maybeSingle();
   if (!linked?.id) return;
 
+  // Clear mirror credential columns; Auth.users password is provider-hashed separately.
   await admin
     .from("profiles")
     .update({
-      pin,
-      pin_code: pin,
+      pin: null,
+      pin_code: null,
+      pin_hash: null,
       must_change_credentials: false,
       username: specialist.username,
       full_name: specialist.name,
@@ -240,7 +247,6 @@ async function syncAuthProfilePin(
     })
     .eq("id", linked.id);
 
-  // Keep Auth password aligned for optional direct recovery (hub-bridge rotates too).
   await admin.auth.admin.updateUserById(String(linked.id), {
     password: pin,
     email_confirm: true,
@@ -283,6 +289,7 @@ export async function resetHubPin(input: {
   });
 
   if (!specialist && input.ensure_master) {
+    const secure = rosterSecurePinFields(newPin);
     const { data, error } = await admin
       .from("store_specialists")
       .insert({
@@ -290,7 +297,9 @@ export async function resetHubPin(input: {
         username: "master_admin",
         role: "MasterAdmin",
         assigned_department: "all",
-        pin_code: newPin,
+        pin_code: secure.pin_code,
+        pin_hash: secure.pin_hash,
+        pin_updated_at: secure.pin_updated_at,
         store_number: store || "0001",
         is_active: true,
         must_change_credentials: false,
@@ -321,13 +330,13 @@ export async function resetHubPin(input: {
     }
   }
 
-  const pinHash = hashPin(newPin);
+  const secure = rosterSecurePinFields(newPin);
   const { data: updated, error: updateError } = await admin
     .from("store_specialists")
     .update({
-      pin_code: pinHash,
-      pin_hash: pinHash,
-      pin_updated_at: new Date().toISOString(),
+      pin_code: secure.pin_code,
+      pin_hash: secure.pin_hash,
+      pin_updated_at: secure.pin_updated_at,
       must_change_credentials: false,
       must_change_pin: false,
       status: "active",
@@ -346,7 +355,7 @@ export async function resetHubPin(input: {
 
   let upsertedProfiles = false;
   try {
-    await upsertStoreProfiles(saved, newPin);
+    await upsertStoreProfiles(saved);
     upsertedProfiles = true;
   } catch (err) {
     // Master Admin must not fail solely because store_profiles is missing —

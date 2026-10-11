@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { normalizePhoneE164, phonesMatch } from "@/lib/phone";
 import { mapRow } from "@/lib/specialists";
 import { linkAuthUserToSpecialistProfile } from "@/lib/store-ops/link-auth-profile";
+import { rosterSecurePinFields } from "@/lib/store-ops/reset-pin";
 import { requireSupabaseAdmin } from "@/lib/supabase/admin-response";
 import type { StoreSpecialist } from "@/lib/types";
 
@@ -14,8 +15,9 @@ type Body = {
 /**
  * POST /api/auth/phone-reset/confirm
  * Requires Bearer access token from supabase.auth.verifyOtp (SMS).
- * Resets store_specialists pin/username for the phone-matched active profile
- * and links auth.users.id → public.profiles (+ JWT app_metadata claims).
+ * Resets store_specialists credentials (scrypt) for the phone-matched active
+ * profile and links auth.users.id → public.profiles identity (no PIN mirror).
+ * SEC-OPS-005: never persist plaintext PIN on the roster.
  */
 export async function POST(request: Request) {
   try {
@@ -90,8 +92,11 @@ export async function POST(request: Request) {
       );
     }
 
+    const secure = rosterSecurePinFields(newPassword);
     const patch: Record<string, unknown> = {
-      pin_code: newPassword,
+      pin_code: secure.pin_code,
+      pin_hash: secure.pin_hash,
+      pin_updated_at: secure.pin_updated_at,
       must_change_credentials: false,
       must_change_pin: false,
       is_active: true,

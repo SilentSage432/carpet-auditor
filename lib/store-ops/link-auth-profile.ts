@@ -2,6 +2,9 @@
  * Link auth.users → public.profiles (id = auth uid) and inject JWT app_metadata.
  * Called after Hub PIN bridge / phone OTP verify / credential reset so Store
  * Ops APIs can resolve the actor.
+ *
+ * SEC-OPS-005: profiles is identity/JWT linkage only — never copy roster PIN
+ * material into profiles.pin / pin_code (hub-bridge authenticates store_specialists).
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -80,8 +83,10 @@ export async function linkAuthUserToSpecialistProfile(
     full_name: input.specialist.name ?? null,
     is_active: input.specialist.is_active !== false,
     must_change_credentials: Boolean(input.specialist.must_change_credentials),
-    pin_code: input.specialist.pin_code ?? null,
-    pin: input.specialist.pin_code ?? null,
+    // Clear legacy mirror credential columns; do not copy roster PIN material.
+    pin_code: null,
+    pin: null,
+    pin_hash: null,
     assigned_department:
       input.specialist.assigned_department &&
       input.specialist.assigned_department !== "all"

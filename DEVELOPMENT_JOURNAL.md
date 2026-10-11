@@ -1,5 +1,17 @@
 # DeptSync Hub — Development Journal
 
+## 2026-10-11 — DEPTSYNC-SEC-OPS-005 Legacy credential write-path correction
+
+**Scoped local implementation.** No production SQL, credential cleanup, plaintext-fallback removal, commit, push, or deploy.
+
+Stopped plaintext PIN persistence on Change PIN (`resetHubPin`), phone-reset confirm, and hub-bridge profile link. Canonical auth remains `store_specialists` via hub-bridge `verifyStoredPin`; mirrors (`profiles` / `store_profiles`) no longer receive PIN values on write (columns retained). `rosterSecurePinFields` centralizes scrypt `pin_code`+`pin_hash` for roster writes. Typecheck pass; **1471** tests; build pass. Canonical: [`docs/product/DEPTSYNC_SEC_OPS_005_CREDENTIAL_WRITERS.md`](docs/product/DEPTSYNC_SEC_OPS_005_CREDENTIAL_WRITERS.md). STOP.
+
+## 2026-10-11 — DEPTSYNC-SEC-OPS-004 Legacy profile credential retirement discovery
+
+**Read-only discovery.** No mutations, credential changes, commits, pushes, or deploys.
+
+Hub roster digit PINs = 0 (Master scrypt). Remaining digits: `profiles` (1) linked to Master `f9e36630…` as superseded mirror; `store_profiles` (1) orphan `master_admin` on store **1852** (not 2587). Neither table is read for PIN verify. Write paths (`reset-pin`, `phone-reset`, profile link) can still reintroduce plaintext. Plaintext fallback removal **NO-GO** until writers fixed + inventory clear. Canonical: [`docs/product/DEPTSYNC_SEC_OPS_004_LEGACY_CREDENTIAL_DISCOVERY.md`](docs/product/DEPTSYNC_SEC_OPS_004_LEGACY_CREDENTIAL_DISCOVERY.md). STOP.
+
 ## 2026-10-11 — DEPTSYNC-AUTH-HARDEN-002 Controlled authentication production release
 
 **Authorized production release.** Project `fmeinlwhixngednabhgy`. Fresh `pg_dump` 587207 bytes (TOC 923). Applied rate-limit migration before app deploy; cleared 2 invited-associate unused plaintext PINs (Master untouched). Pushed `4fd914d` to `origin/main`; Vercel Production success (`5muXnbeQbWh4CsmCoXWejQfYGKc6`). Public auth + SEC-OPS-002 containment verified. Operator login / scrypt upgrade **awaiting manual verification**. Typecheck/build pass; **1465** tests. Canonical: [`docs/product/DEPTSYNC_AUTH_HARDEN_002_PRODUCTION_RELEASE.md`](docs/product/DEPTSYNC_AUTH_HARDEN_002_PRODUCTION_RELEASE.md).
