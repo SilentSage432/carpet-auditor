@@ -1,5 +1,15 @@
 # DeptSync Hub — Development Journal
 
+## 2026-10-11 — DEPTSYNC-SEC-OPS-007D Secure session bootstrap repair
+
+**Authorized hotfix.** AccessGate fails closed out of `booting` on roster/JWT/network restore failures via `decideAccessGateBoot`; generation guard blocks stale enters. Pushed `75efe82`; Vercel Production `FqTvT3XYWuHTE55u8e7ZfRdoLAgj`. Clean `/login` PIN UI verified. **OPERATOR LOGIN PENDING**. Typecheck/build pass; **1487** tests. Canonical: [`docs/product/DEPTSYNC_SEC_OPS_007D_BOOTSTRAP_REPAIR.md`](docs/product/DEPTSYNC_SEC_OPS_007D_BOOTSTRAP_REPAIR.md).
+
+## 2026-10-11 — DEPTSYNC-SEC-OPS-007C Secure session bootstrap diagnostic
+
+**Diagnostic only.** No production mutations, commit, push, or deploy.
+
+Operator stuck on “Loading DeptSync secure session…”. Clean production `/login` renders PIN UI. Reproduced permanent splash by injecting local `deptsync_auth_session` + invalid Supabase JWT: AccessGate awaits `fetchSpecialists()` with no try/catch, so roster rejection leaves `mode === "booting"`. SEC-OPS-007B not the defect. Workaround: clear site storage. Recommended repair: fail closed to login/unlock. Canonical: [`docs/product/DEPTSYNC_SEC_OPS_007C_SESSION_BOOTSTRAP.md`](docs/product/DEPTSYNC_SEC_OPS_007C_SESSION_BOOTSTRAP.md). STOP.
+
 ## 2026-10-11 — DEPTSYNC-SEC-OPS-007B Emergency production login repair
 
 **Authorized hotfix.** Project `fmeinlwhixngednabhgy`. Writers clear NOT NULL `profiles.pin` / `store_profiles.pin` with `""` instead of null. Fresh `pg_dump` 587360 bytes (TOC 938). Pushed `ff2b30b`; Vercel Production `ED2oSLiAtovm3xWY944KCF74VDAB`. Master scrypt1 + digit inventory 0/0/0 preserved. Public auth/containment/rate-limit OK. **OPERATOR LOGIN PENDING** (manual). Typecheck/build pass; **1477** tests. Canonical: [`docs/product/DEPTSYNC_SEC_OPS_007B_LOGIN_HOTFIX.md`](docs/product/DEPTSYNC_SEC_OPS_007B_LOGIN_HOTFIX.md).

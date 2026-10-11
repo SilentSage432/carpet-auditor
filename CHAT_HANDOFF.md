@@ -1,7 +1,9 @@
 # DeptSync Hub — Chat Handoff
 
 ## Latest (2026-10-11)
-- **DEPTSYNC-SEC-OPS-007B — EMERGENCY LOGIN HOTFIX — SHIPPED.** Commit `ff2b30b`; Vercel `ED2oSLiAtovm3xWY944KCF74VDAB`. Writers use `pin: ""` for NOT NULL mirrors. Master scrypt1 + digit 0/0/0 OK. **OPERATOR LOGIN PENDING.** Canonical: [`docs/product/DEPTSYNC_SEC_OPS_007B_LOGIN_HOTFIX.md`](docs/product/DEPTSYNC_SEC_OPS_007B_LOGIN_HOTFIX.md). **STOP** for operator login confirm.
+- **DEPTSYNC-SEC-OPS-007D — SECURE SESSION BOOTSTRAP REPAIR — SHIPPED.** Commit `75efe82`; Vercel `FqTvT3XYWuHTE55u8e7ZfRdoLAgj`. AccessGate recovers to login/unlock on restore failures; never grants access on error. Clean `/login` OK. **OPERATOR LOGIN PENDING.** Canonical: [`docs/product/DEPTSYNC_SEC_OPS_007D_BOOTSTRAP_REPAIR.md`](docs/product/DEPTSYNC_SEC_OPS_007D_BOOTSTRAP_REPAIR.md). **STOP.**
+- **DEPTSYNC-SEC-OPS-007C — SECURE SESSION BOOTSTRAP — DIAGNOSTIC COMPLETE (repaired via 007D).** Canonical: [`docs/product/DEPTSYNC_SEC_OPS_007C_SESSION_BOOTSTRAP.md`](docs/product/DEPTSYNC_SEC_OPS_007C_SESSION_BOOTSTRAP.md).
+- **DEPTSYNC-SEC-OPS-007B — EMERGENCY LOGIN HOTFIX — SHIPPED.** Commit `ff2b30b`; Vercel `ED2oSLiAtovm3xWY944KCF74VDAB`. Canonical: [`docs/product/DEPTSYNC_SEC_OPS_007B_LOGIN_HOTFIX.md`](docs/product/DEPTSYNC_SEC_OPS_007B_LOGIN_HOTFIX.md).
 - **DEPTSYNC-SEC-OPS-007A — POST-CLEANUP AUTH REGRESSION — DIAGNOSTIC COMPLETE (repaired via 007B).** Canonical: [`docs/product/DEPTSYNC_SEC_OPS_007A_AUTH_REGRESSION.md`](docs/product/DEPTSYNC_SEC_OPS_007A_AUTH_REGRESSION.md).
 - **DEPTSYNC-SEC-OPS-007 — LEGACY CREDENTIAL MIRROR CLEANUP — COMPLETE.** Digit inventory **0/0/0**; Master scrypt1 preserved. Canonical: [`docs/product/DEPTSYNC_SEC_OPS_007_LEGACY_CLEANUP.md`](docs/product/DEPTSYNC_SEC_OPS_007_LEGACY_CLEANUP.md).
 - **DEPTSYNC-SEC-OPS-006 — CREDENTIAL WRITER PRODUCTION RELEASE — SHIPPED.** Commit `e36bfb5`; Vercel `CkWcALCvQTJYbaEw9Xm49Yas8E3B`. Canonical: [`docs/product/DEPTSYNC_SEC_OPS_006_PRODUCTION_RELEASE.md`](docs/product/DEPTSYNC_SEC_OPS_006_PRODUCTION_RELEASE.md).

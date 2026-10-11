@@ -35,7 +35,9 @@
 - [x] **DEPTSYNC-SEC-OPS-006** — Credential writer production release (**SHIPPED** `e36bfb5` / `CkWcALCvQTJYbaEw9Xm49Yas8E3B`) — [`DEPTSYNC_SEC_OPS_006_PRODUCTION_RELEASE.md`](docs/product/DEPTSYNC_SEC_OPS_006_PRODUCTION_RELEASE.md)
 - [x] **DEPTSYNC-SEC-OPS-007** — Legacy credential mirror cleanup (**COMPLETE**; digit inventory 0/0/0; plaintext fallback **still enabled**) — [`DEPTSYNC_SEC_OPS_007_LEGACY_CLEANUP.md`](docs/product/DEPTSYNC_SEC_OPS_007_LEGACY_CLEANUP.md)
 - [x] **DEPTSYNC-SEC-OPS-007A** — Post-cleanup auth regression diagnostic — [`DEPTSYNC_SEC_OPS_007A_AUTH_REGRESSION.md`](docs/product/DEPTSYNC_SEC_OPS_007A_AUTH_REGRESSION.md)
-- [x] **DEPTSYNC-SEC-OPS-007B** — Emergency login hotfix (**SHIPPED** `ff2b30b` / `ED2oSLiAtovm3xWY944KCF74VDAB`; operator login **PENDING**) — [`DEPTSYNC_SEC_OPS_007B_LOGIN_HOTFIX.md`](docs/product/DEPTSYNC_SEC_OPS_007B_LOGIN_HOTFIX.md)
+- [x] **DEPTSYNC-SEC-OPS-007B** — Emergency login hotfix (**SHIPPED** `ff2b30b` / `ED2oSLiAtovm3xWY944KCF74VDAB`) — [`DEPTSYNC_SEC_OPS_007B_LOGIN_HOTFIX.md`](docs/product/DEPTSYNC_SEC_OPS_007B_LOGIN_HOTFIX.md)
+- [x] **DEPTSYNC-SEC-OPS-007C** — Secure session bootstrap diagnostic — [`DEPTSYNC_SEC_OPS_007C_SESSION_BOOTSTRAP.md`](docs/product/DEPTSYNC_SEC_OPS_007C_SESSION_BOOTSTRAP.md)
+- [x] **DEPTSYNC-SEC-OPS-007D** — AccessGate bootstrap repair (**SHIPPED** `75efe82` / `FqTvT3XYWuHTE55u8e7ZfRdoLAgj`; operator login **PENDING**) — [`DEPTSYNC_SEC_OPS_007D_BOOTSTRAP_REPAIR.md`](docs/product/DEPTSYNC_SEC_OPS_007D_BOOTSTRAP_REPAIR.md)
 - [ ] **Post-RD-6 trust / topology / auth pack** — manual operator login confirm → plaintext fallback retirement → CI-001 → DOCS-TRUTH → AUTH inventory → ALIGN-DEPT + capacity guard
 
 ## Next (ALIGN — constitutional direction)
