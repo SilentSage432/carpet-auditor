@@ -2,7 +2,7 @@
 
 ## 2026-10-11 — DEPTSYNC-CAPACITY-GUARD-003 Shared capacity production release
 
-**Controlled DB + app release.** Hardened RPC auth (service_role overrides only; authenticated force `allow_over_*=false`; reject other roles). Revoked client INSERT/UPDATE/DELETE/TRUNCATE on `sunday_bay_assignments` (authenticated SELECT retained). Applied `20261014_capacity_guard_002_store_week_lock.sql` on `fmeinlwhixngednabhgy` after Management API password rotate; post-migrate dump 708141 bytes. Verified: service RPC ok; anon upsert/RPC denied; week assignments remain 6. Browser override payload removed. Typecheck/build PASS; **1576** tests. Canonical: [`docs/product/DEPTSYNC_CAPACITY_GUARD_003_RELEASE.md`](docs/product/DEPTSYNC_CAPACITY_GUARD_003_RELEASE.md). Dual-dept auto-stage **NO-GO**. **STOP.**
+**Controlled DB + app release.** Hardened RPC auth (service_role overrides only; authenticated force `allow_over_*=false`; reject other roles). Revoked client INSERT/UPDATE/DELETE/TRUNCATE on `sunday_bay_assignments` (authenticated SELECT retained). Applied `20261014_capacity_guard_002_store_week_lock.sql` on `fmeinlwhixngednabhgy` after Management API password rotate; post-migrate dump 708141 bytes. Verified: service RPC ok; anon upsert/RPC denied; week assignments remain 6. Browser override payload removed. Typecheck/build PASS; **1576** tests. Pushed `615929e`; Vercel Production `8Ha3ZLaLU8ZtTmAUe5SDZYr4dkKz` Ready @ https://deptsync-hub.vercel.app. Smoke: `/login` 200; anon upsert 42501. Canonical: [`docs/product/DEPTSYNC_CAPACITY_GUARD_003_RELEASE.md`](docs/product/DEPTSYNC_CAPACITY_GUARD_003_RELEASE.md). Dual-dept auto-stage **NO-GO**. **STOP.**
 
 ## 2026-10-11 — DEPTSYNC-CAPACITY-GUARD-002 Shared store-week capacity enforcement
 

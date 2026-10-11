@@ -1,11 +1,13 @@
 # DEPTSYNC-CAPACITY-GUARD-003 — Shared Capacity Production Release
 
-**Status:** COMPLETE (migration applied + app release pending commit/deploy verification below)  
+**Status:** COMPLETE (migration applied + app shipped)  
 **Date:** 2026-10-11  
 **Mode:** Controlled database + application release  
 **Application:** https://deptsync-hub.vercel.app  
 **Supabase:** `fmeinlwhixngednabhgy`  
-**Store:** `2587`
+**Store:** `2587`  
+**Commit:** `615929e`  
+**Vercel Production:** `8Ha3ZLaLU8ZtTmAUe5SDZYr4dkKz` (`deptsync-c62a285yr`, Ready)
 
 **References:**  
 [`DEPTSYNC_CAPACITY_GUARD_001_DISCOVERY.md`](DEPTSYNC_CAPACITY_GUARD_001_DISCOVERY.md) ·  
@@ -147,25 +149,27 @@ No production assignments created for testing.
 
 ## 8. App commit / deployment
 
-Filled after git push + Vercel Ready:
-
 | Item | Value |
 |------|-------|
-| Commit | _(pending push)_ |
-| Deployment ID | _(pending)_ |
+| Commit | `615929e9a5aff6e23942d636c0636f6063d1500d` |
+| Message | `feat(capacity): enforce shared store-week assignment capacity` |
+| Deployment ID | `8Ha3ZLaLU8ZtTmAUe5SDZYr4dkKz` |
+| Deployment URL | https://deptsync-c62a285yr-tyson-zauggs-projects.vercel.app |
 | Production alias | https://deptsync-hub.vercel.app |
+| GitHub Vercel status | success — Deployment has completed |
 
 ---
 
 ## 9. Post-deploy smoke checklist
 
-- [ ] `/login` loads  
-- [ ] Auth path intact  
-- [ ] This Week loads  
-- [ ] Existing 6 assignments intact  
-- [ ] Anon roster / assignment upsert denied  
-- [ ] No unexpected auto-staging  
-- [ ] Cron schedule unchanged (`0 11 * * 0`)
+- [x] `/login` loads (HTTP 200)  
+- [x] Root responds (HTTP 307 → auth/hub)  
+- [x] Existing 6 assignments intact  
+- [x] Anon assignment upsert denied (`42501`)  
+- [x] Capacity RPC healthy (`caller_role=service_role`)  
+- [x] No unauthorized assignments created  
+- [x] Cron schedule unchanged in repo (`0 11 * * 0`)  
+- [ ] Operator manual: This Week UI + authenticated login on device
 
 ---
 
@@ -184,10 +188,10 @@ Filled after git push + Vercel Ready:
 | Question | Verdict |
 |----------|---------|
 | DB capacity guard live? | **GO** |
-| App release after smoke? | **GO** (proceed to commit/deploy) |
+| App release after smoke? | **GO** |
 | Second-department auto-stage? | **NO-GO** |
 | Create real assignments without operator? | **NO-GO** |
 
 ---
 
-**STOP AFTER REPORTING** (after deploy smoke section completed in same release pass).
+**STOP AFTER REPORTING.**
