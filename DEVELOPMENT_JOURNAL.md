@@ -2,7 +2,7 @@
 
 ## 2026-10-11 — DEPTSYNC-SEC-OPS-007G Authenticated bootstrap repair
 
-**Authorized hotfix.** Hub `/` awaits Supabase `getSession` before any `fetchSpecialists`; reuses `decideAccessGateBoot` via `decideHubPageBoot`; generation guard; fail-closed to unlock/login. SW cache `deptsync-shell-v7-auth-boot`. No anon grants / SQL / credential changes. Typecheck/build pass; **1507** tests. **OPERATOR LOGIN PENDING**. Canonical: [`docs/product/DEPTSYNC_SEC_OPS_007G_AUTH_BOOTSTRAP_REPAIR.md`](docs/product/DEPTSYNC_SEC_OPS_007G_AUTH_BOOTSTRAP_REPAIR.md).
+**Authorized hotfix.** Hub `/` awaits Supabase `getSession` before any `fetchSpecialists`; reuses `decideAccessGateBoot` via `decideHubPageBoot`; generation guard; fail-closed to unlock/login. SW cache `deptsync-shell-v7-auth-boot`. Pushed `54d2bc4`; Vercel Production `E84YJUL4vH3TFPPe31agW6kx5vmm`. Anon 42501 intact; `/login` 200. No anon grants / SQL / credential changes. Typecheck/build pass; **1507** tests. **OPERATOR LOGIN PENDING**. Canonical: [`docs/product/DEPTSYNC_SEC_OPS_007G_AUTH_BOOTSTRAP_REPAIR.md`](docs/product/DEPTSYNC_SEC_OPS_007G_AUTH_BOOTSTRAP_REPAIR.md).
 
 ## 2026-10-11 — DEPTSYNC-SEC-OPS-007F Production roster authorization investigation
 

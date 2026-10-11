@@ -81,13 +81,20 @@ Never grants workspace entry on failed restore. No infinite retry loop.
 
 ## Commit SHA
 
-_(filled after commit)_
+`54d2bc42176eaf33c5f4434424a914f52465f347`  
+Message: `fix(auth): JWT-first hub bootstrap; never roster-fetch as anon`  
+Push: `55d2a35..54d2bc4` → `origin/main`
 
 ---
 
 ## Vercel deployment ID
 
-_(filled after deploy)_
+| Field | Value |
+|-------|--------|
+| SHA | `54d2bc42176eaf33c5f4434424a914f52465f347` |
+| Vercel status | **success** |
+| Vercel URL | https://vercel.com/tyson-zauggs-projects/deptsync-hub/E84YJUL4vH3TFPPe31agW6kx5vmm |
+| Deployment id | `E84YJUL4vH3TFPPe31agW6kx5vmm` |
 
 ---
 
@@ -107,7 +114,15 @@ Post-deploy: operator should hard-reload `/login` (new SW cache name helps drop 
 
 ## Production verification
 
-_(filled after deploy)_
+| Check | Result |
+|-------|--------|
+| `/login` | **200** — secure-session splash / AccessGate shell present |
+| `/` unauth | **307** → `/login?next=%2F` |
+| `/sw.js` | **200** — `deptsync-shell-v7-auth-boot` |
+| Anon `store_specialists` SELECT | **401** `42501` (containment intact) |
+| `POST /api/auth/hub-bridge` empty | **400** |
+| Login chunk retains 007D markers | `1dz52dic4zfl1.js` includes `roster_auth_rejected` |
+| Rate-limit / RLS / Master scrypt1 | Not mutated this tranche; anon containment re-verified |
 
 ---
 
