@@ -43,7 +43,7 @@
 - [x] **DEPTSYNC-SEC-OPS-007G** — Authenticated bootstrap repair (**SHIPPED** `54d2bc4` / `E84YJUL4vH3TFPPe31agW6kx5vmm`; operator login confirmed) — [`DEPTSYNC_SEC_OPS_007G_AUTH_BOOTSTRAP_REPAIR.md`](docs/product/DEPTSYNC_SEC_OPS_007G_AUTH_BOOTSTRAP_REPAIR.md)
 - [x] **DEPTSYNC-SEC-OPS-008** — Plaintext auth retirement audit (read-only) — [`DEPTSYNC_SEC_OPS_008_AUTH_RETIREMENT_AUDIT.md`](docs/product/DEPTSYNC_SEC_OPS_008_AUTH_RETIREMENT_AUDIT.md)
 - [x] **DEPTSYNC-SEC-OPS-009** — Credential writer closure (**SHIPPED** `dbf6847` / `As1U36FuRe89XwQrtkVDai9YgR6y`; plaintext env still enabled) — [`DEPTSYNC_SEC_OPS_009_WRITER_CLOSURE.md`](docs/product/DEPTSYNC_SEC_OPS_009_WRITER_CLOSURE.md)
-- [ ] **Plaintext fallback disable** — operator-authorized `DEPTSYNC_ALLOW_PLAINTEXT_PIN_VERIFY=0` (code removal later); then CI-001 → DOCS-TRUTH → AUTH inventory → ALIGN-DEPT + capacity guard
+- [ ] **DEPTSYNC-SEC-OPS-010** — Plaintext fallback disable (`DEPTSYNC_ALLOW_PLAINTEXT_PIN_VERIFY=0`) — **STOPPED** pending valid Vercel auth; prechange PASS — [`DEPTSYNC_SEC_OPS_010_FALLBACK_RETIREMENT.md`](docs/product/DEPTSYNC_SEC_OPS_010_FALLBACK_RETIREMENT.md); then CI-001 → DOCS-TRUTH → AUTH inventory → ALIGN-DEPT + capacity guard
 
 ## Next (ALIGN — constitutional direction)
 - [x] **DEPTSYNC-ALIGN-001** — Constitutional alignment & redesign blueprint (**COMPLETE** — planning only; operator-approved)

@@ -1,5 +1,9 @@
 # DeptSync Hub — Development Journal
 
+## 2026-10-11 — DEPTSYNC-SEC-OPS-010 Plaintext fallback retirement (STOPPED)
+
+**Controlled config release — incomplete.** Prechange PASS: `dbf6847`/`As1U36Fu…` app identity; Master scrypt1; digit/unknown 0; update-credentials 401 without auth / wrong current_password; anon 42501; SEC-OPS-009 tests PASS. **Did not set** `DEPTSYNC_ALLOW_PLAINTEXT_PIN_VERIFY=0` — local Vercel CLI/API token `invalidToken`. No redeploy. No PIN/SQL/RLS changes. **OPERATOR LOGIN PENDING** (N/A until flag applied). Closeout **NO-GO**. Canonical: [`docs/product/DEPTSYNC_SEC_OPS_010_FALLBACK_RETIREMENT.md`](docs/product/DEPTSYNC_SEC_OPS_010_FALLBACK_RETIREMENT.md). STOP — operator `vercel login` then resume config-only.
+
 ## 2026-10-11 — DEPTSYNC-SEC-OPS-009 Credential writer closure
 
 **Authorized security release.** Closed remaining client plaintext writer: `updateSpecialistCredentials` now calls service-role `POST /api/auth/update-credentials` (`updateHubCredentials` → scrypt1). Browser payloads no longer write `pin_code`. AccessGate setup requires JWT. Pushed `dbf6847`; Vercel Production `As1U36FuRe89XwQrtkVDai9YgR6y`. Master scrypt1 preserved; inventory scrypt1=1 / digit=0 / unknown=0. Public auth + anon 42501 + rate-limit OK. **`DEPTSYNC_ALLOW_PLAINTEXT_PIN_VERIFY` not changed** — separate operator env disable is **GO**. Typecheck/build pass; **1523** tests. Canonical: [`docs/product/DEPTSYNC_SEC_OPS_009_WRITER_CLOSURE.md`](docs/product/DEPTSYNC_SEC_OPS_009_WRITER_CLOSURE.md).
