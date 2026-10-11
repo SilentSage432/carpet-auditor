@@ -21,6 +21,7 @@ import {
   Sliders,
   Snowflake,
   Target,
+  Trash2,
   UserCheck,
   Users,
   type LucideIcon,
@@ -100,6 +101,13 @@ const ForceRotationModal = dynamic(
     ),
   { ssr: false }
 );
+const WorkspaceCleanupWizard = dynamic(
+  () =>
+    import("@/components/admin/WorkspaceCleanupWizard").then(
+      (mod) => mod.WorkspaceCleanupWizard
+    ),
+  { ssr: false }
+);
 
 type Props = {
   activeSpecialist: StoreSpecialist | null;
@@ -139,6 +147,7 @@ export function SettingsSection({
   const [departments, setDepartments] = useState<Department[]>([]);
   const [locations, setLocations] = useState<StoreLocation[]>([]);
   const [forceOpen, setForceOpen] = useState(false);
+  const [cleanupOpen, setCleanupOpen] = useState(false);
   const [adminGraphLoaded, setAdminGraphLoaded] = useState(false);
   const [focusSectionId, setFocusSectionId] = useState<string | null>(null);
 
@@ -682,6 +691,23 @@ export function SettingsSection({
               />
               Advanced recovery · Generate this week
             </button>
+            <button
+              type="button"
+              data-testid="more-workspace-cleanup"
+              onClick={() => setCleanupOpen(true)}
+              className="flex min-h-12 w-full items-center justify-center rounded-xl border border-amber-500/40 bg-amber-950/20 text-sm font-semibold text-amber-100"
+            >
+              <Trash2
+                className="mr-2 h-4 w-4"
+                strokeWidth={ICON_STROKE}
+                aria-hidden
+              />
+              Workspace cleanup
+            </button>
+            <p className="text-[11px] leading-snug text-zinc-500">
+              Guided soft-retire for aisles and soft-archive for associates.
+              Historical records stay intact. No automatic cleanup.
+            </p>
           </div>
 
           <Accordion
@@ -710,6 +736,17 @@ export function SettingsSection({
           }
           onForced={() => {
             setForceOpen(false);
+            void reloadDepts();
+          }}
+        />
+      ) : null}
+
+      {cleanupOpen && activeSpecialist ? (
+        <WorkspaceCleanupWizard
+          open={cleanupOpen}
+          onClose={() => setCleanupOpen(false)}
+          specialist={activeSpecialist}
+          onCompleted={() => {
             void reloadDepts();
           }}
         />

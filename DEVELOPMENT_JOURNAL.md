@@ -1,5 +1,21 @@
 # DeptSync Hub — Development Journal
 
+## 2026-10-11 — DEPTSYNC-CLEANUP-002 Guided workspace cleanup
+
+**Controlled local implementation; no production cleanup, SQL, deploy, or commit.** MasterAdmin More wizard + `/api/workspace-cleanup` soft-retires aisles (`store_locations.is_active=false`) and soft-archives associates (`is_active=false`, `status=suspended`) with preview fingerprints, explicit confirm, store scope, and MasterAdmin archive rejection. Does not call `deleteSpecialist` (hard DELETE side effect). No schema migration. Typecheck/build pass; **1543** tests. Canonical: [`docs/product/DEPTSYNC_CLEANUP_002_GUIDED_WORKSPACE_CLEANUP.md`](docs/product/DEPTSYNC_CLEANUP_002_GUIDED_WORKSPACE_CLEANUP.md). **CONDITIONAL GO** deploy after review; **NO-GO** auto/prod cleanup. **STOP.**
+
+## 2026-10-11 — DEPTSYNC-CLEANUP-001 Department workspace discovery
+
+**Read-only discovery; no code/SQL/mutation/commit/push/deploy.** Prepared Flooring + Home Decor workspace cleanup design: soft-retire locations (`is_active`) and soft-archive associates preserve UUIDs/history; hard-delete rejected as primary path. Bulk Clean-Up retires one department+aisle at a time; roster Remove is per-member; MasterAdmin protected. Proposed mobile guided multi-select + preview + confirm wizard (CLEANUP-002). Map attention conflation documented for later milestone. Rotation: cleanup feeds but does not replace CAPACITY-GUARD-001 before dual-dept auto-stage. Canonical: [`docs/product/DEPTSYNC_CLEANUP_001_WORKSPACE_DISCOVERY.md`](docs/product/DEPTSYNC_CLEANUP_001_WORKSPACE_DISCOVERY.md). **STOP.**
+
+## 2026-10-11 — DEPTSYNC-SEC-OPS-010B Production authentication closeout
+
+**Config verification + controlled redeploy; no app code.** Independently confirmed Production env key `DEPTSYNC_ALLOW_PLAINTEXT_PIN_VERIFY` (target Production, type `sensitive`, created `19:33:56Z`). Literal value `=0` **not readable** via API/CLI (sensitive). Redeployed post-change tip → Production `dpl_BNbrf7CAFvU7HVzrzMEfujDFYdag` @ `9e34146` (docs-only atop `dbf6847`; alias `deptsync-hub.vercel.app`). Auth/health PASS: `/login` 200; hub-bridge empty/missing 400, bad/unknown 401; update-credentials unauthorized/wrong PIN 401; anon roster 42501; inventory scrypt1=1 / digit=0; unit 43/43. **OPERATOR LOGIN PENDING.** Closeout **CONDITIONAL GO**. Canonical: [`docs/product/DEPTSYNC_SEC_OPS_010_FALLBACK_RETIREMENT.md`](docs/product/DEPTSYNC_SEC_OPS_010_FALLBACK_RETIREMENT.md). STOP.
+
+## 2026-10-11 — DEPTSYNC-SEC-OPS-010A Vercel authentication recovery
+
+**Environment recovery only.** Root cause of SEC-OPS-010 `403 invalidToken`: local Vercel CLI access token expired (`expiresAt` overdue; refresh not possible without CLI OAuth client). No `VERCEL_*` env override. `.vercel/project.json` still linked to existing project/team. Production deploys continue via `vercel[bot]` on git push. Initiated `vercel login --github --oob`; browser at GitHub OAuth for Vercel. **Awaiting operator approval + verification code.** No production env/app changes. Canonical: [`docs/product/DEPTSYNC_SEC_OPS_010A_VERCEL_AUTH_RECOVERY.md`](docs/product/DEPTSYNC_SEC_OPS_010A_VERCEL_AUTH_RECOVERY.md). STOP.
+
 ## 2026-10-11 — DEPTSYNC-SEC-OPS-010 Plaintext fallback retirement (STOPPED)
 
 **Controlled config release — incomplete.** Prechange PASS: `dbf6847`/`As1U36Fu…` app identity; Master scrypt1; digit/unknown 0; update-credentials 401 without auth / wrong current_password; anon 42501; SEC-OPS-009 tests PASS. **Did not set** `DEPTSYNC_ALLOW_PLAINTEXT_PIN_VERIFY=0` — local Vercel CLI/API token `invalidToken`. No redeploy. No PIN/SQL/RLS changes. **OPERATOR LOGIN PENDING** (N/A until flag applied). Closeout **NO-GO**. Canonical: [`docs/product/DEPTSYNC_SEC_OPS_010_FALLBACK_RETIREMENT.md`](docs/product/DEPTSYNC_SEC_OPS_010_FALLBACK_RETIREMENT.md). STOP — operator `vercel login` then resume config-only.

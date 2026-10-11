@@ -2125,3 +2125,125 @@ export async function completeWalkthroughFollowUpClient(
   emitWalkthroughsChanged();
   return result;
 }
+
+/** CLEANUP-002 — MasterAdmin guided workspace cleanup inventory. */
+export async function fetchWorkspaceCleanupInventory(
+  specialist: StoreSpecialist
+): Promise<{
+  store_number: string;
+  store_id: string;
+  aisles: import("./workspace-cleanup").CleanupAisleInventoryRow[];
+  associates: import("./workspace-cleanup").CleanupAssociateInventoryRow[];
+}> {
+  return storeOpsFetch("/api/workspace-cleanup", specialist);
+}
+
+export async function previewWorkspaceCleanupAisles(
+  specialist: StoreSpecialist,
+  aisleKeys: Array<{ department_id: string; aisle: string }>
+): Promise<{
+  action: string;
+  preview: import("./workspace-cleanup").CleanupAislePreview;
+}> {
+  return storeOpsFetch("/api/workspace-cleanup", specialist, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      action: "preview_aisles",
+      aisle_keys: aisleKeys,
+    }),
+  });
+}
+
+export async function retireWorkspaceCleanupAisles(
+  specialist: StoreSpecialist,
+  input: {
+    aisle_keys: Array<{ department_id: string; aisle: string }>;
+    fingerprint: string;
+  }
+): Promise<{
+  action: string;
+  ok: boolean;
+  partial: boolean;
+  complete_success: boolean;
+  results: import("./workspace-cleanup").CleanupRecordResult[];
+  succeeded: number;
+  failed: number;
+  review: number;
+}> {
+  const result = await storeOpsFetch<{
+    action: string;
+    ok: boolean;
+    partial: boolean;
+    complete_success: boolean;
+    results: import("./workspace-cleanup").CleanupRecordResult[];
+    succeeded: number;
+    failed: number;
+    review: number;
+  }>("/api/workspace-cleanup", specialist, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      action: "retire_aisles",
+      aisle_keys: input.aisle_keys,
+      fingerprint: input.fingerprint,
+      confirm: true,
+    }),
+  });
+  await invalidateStoreOpsListCaches();
+  return result;
+}
+
+export async function previewWorkspaceCleanupAssociates(
+  specialist: StoreSpecialist,
+  specialistIds: string[]
+): Promise<{
+  action: string;
+  preview: import("./workspace-cleanup").CleanupAssociatePreview;
+}> {
+  return storeOpsFetch("/api/workspace-cleanup", specialist, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      action: "preview_associates",
+      specialist_ids: specialistIds,
+    }),
+  });
+}
+
+export async function archiveWorkspaceCleanupAssociates(
+  specialist: StoreSpecialist,
+  input: { specialist_ids: string[]; fingerprint: string }
+): Promise<{
+  action: string;
+  ok: boolean;
+  partial: boolean;
+  complete_success: boolean;
+  results: import("./workspace-cleanup").CleanupRecordResult[];
+  succeeded: number;
+  failed: number;
+  review: number;
+}> {
+  const result = await storeOpsFetch<{
+    action: string;
+    ok: boolean;
+    partial: boolean;
+    complete_success: boolean;
+    results: import("./workspace-cleanup").CleanupRecordResult[];
+    succeeded: number;
+    failed: number;
+    review: number;
+  }>("/api/workspace-cleanup", specialist, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      action: "archive_associates",
+      specialist_ids: input.specialist_ids,
+      fingerprint: input.fingerprint,
+      confirm: true,
+    }),
+  });
+  const { invalidateRosterCache } = await import("@/lib/specialists");
+  invalidateRosterCache();
+  return result;
+}
