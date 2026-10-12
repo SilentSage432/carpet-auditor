@@ -1,6 +1,6 @@
 # DEPTSYNC-OPERATIONAL-011 — Strict Section Ownership Enforcement
 
-**Status:** COMPLETE (local implementation; **no deploy / no production migrations / no data mutations**)  
+**Status:** COMPLETE — **released via OPERATIONAL-012** (`26d48ba`; migration applied on production)  
 **Date:** 2026-10-12  
 **Mode:** Focused implementation  
 **Store (acceptance fixture):** 2587  
@@ -123,7 +123,7 @@ No silent unrestricted fallback when ownership evidence is missing.
 | Item | Status |
 |------|--------|
 | `20261018_operational_011_section_ownership.sql` | Written locally |
-| Apply to production | **NOT DONE** (explicit stop) |
+| Apply to production | **DONE** via OPERATIONAL-012 |
 | Section / membership data rebuild | **Not required** |
 | W41 / historical assignment rewrite | **Not required / forbidden** |
 
@@ -136,8 +136,8 @@ Release sequence later: app deploy may ship first only if RPC already enforces; 
 | Gate | Status |
 |------|--------|
 | Local implementation | **GO** |
-| Production migration applied | **NO-GO** (not authorized this tranche) |
-| Deploy | **NO-GO** (stop after implementation) |
+| Production migration applied | **DONE** (OPERATIONAL-012) |
+| Deploy | **DONE** (OPERATIONAL-012 `26d48ba`) |
 | Phone acceptance | Pending after controlled release |
 | Sunday auto-stage | Must stay **OFF** |
 | Data preservation (4 sections / 160 members / schedules / approvals / history / Zebra) | **Preserved** (untouched) |
@@ -148,8 +148,6 @@ Release sequence later: app deploy may ship first only if RPC already enforces; 
 
 ## 9. Remaining blockers
 
-1. Production migration not applied — DB does not yet reject cross-section writes live.  
-2. Deploy not performed.  
-3. Call-out redistribute to peers outside a bay’s section will fail closed at RPC after migration (carry path remains).  
-4. Operator must still approve weekly capacity before Assign (intentional).  
-5. Phone acceptance of ownership proposal UX after release.
+1. Phone acceptance of ownership proposal UX (see OPERATIONAL-012).  
+2. Call-out redistribute to peers outside a bay’s section fails closed at RPC (carry path remains).  
+3. Operator must still approve weekly capacity before Assign (intentional).
