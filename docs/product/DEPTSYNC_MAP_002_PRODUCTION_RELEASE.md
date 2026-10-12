@@ -37,6 +37,7 @@
 | gitSource | `github` · `main` · sha `b9ae9611becef59e64911b4836333e0616e8b65e` |
 | CLI recovery | **Not used** |
 | Schema changes | **None** |
+| Docs follow-up | `8cd492c` — release report; Production `dpl_GogVDhZwX34gHK3xDVKf297auMJx` READY (alias moved here; app code unchanged from `b9ae961`) |
 
 ---
 
