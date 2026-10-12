@@ -16,11 +16,13 @@ import { assertActorCanAccessDepartmentId } from "@/lib/store-ops/department-sco
 import {
   createWalkthroughFollowUp,
   createWalkthroughObservation,
+  ensureActiveWalkthroughSession,
   listWalkthroughPlaceHistory,
-  startWalkthroughSession,
+  resolveWalkthroughPlaceOwnership,
   type WalkthroughObservationType,
 } from "@/lib/store-ops/walkthroughs";
 import { readableError } from "@/lib/store-ops/errors";
+import { normalizeAisle } from "@/lib/store-ops/aisle";
 
 export async function GET(request: Request) {
   try {
@@ -49,12 +51,20 @@ export async function GET(request: Request) {
       departmentId
     );
 
-    const result = await listWalkthroughPlaceHistory(supabase, {
-      store_id: store.id,
-      department_id: departmentId,
-      aisle,
-      bay,
-    });
+    const [result, ownership] = await Promise.all([
+      listWalkthroughPlaceHistory(supabase, {
+        store_id: store.id,
+        department_id: departmentId,
+        aisle,
+        bay,
+      }),
+      resolveWalkthroughPlaceOwnership(supabase, {
+        store_id: store.id,
+        department_id: departmentId,
+        aisle: normalizeAisle(aisle),
+        bay,
+      }),
+    ]);
 
     if (!result.ok) {
       const status =
@@ -69,7 +79,11 @@ export async function GET(request: Request) {
       );
     }
 
-    return NextResponse.json({ observations: result.value, store_id: store.id });
+    return NextResponse.json({
+      observations: result.value,
+      place_ownership: ownership.ok ? ownership.value : null,
+      store_id: store.id,
+    });
   } catch (err) {
     if (err instanceof StoreOpsAuthError) {
       return NextResponse.json({ error: err.message }, { status: err.status });
@@ -122,7 +136,8 @@ export async function POST(request: Request) {
 
     let sessionId = String(body.session_id ?? "").trim();
     if (!sessionId) {
-      const started = await startWalkthroughSession(supabase, {
+      // Reuse active store session when present — Map + tab share one walk.
+      const ensured = await ensureActiveWalkthroughSession(supabase, {
         store_id: store.id,
         store_number: store.store_number,
         department_id: departmentId,
@@ -133,21 +148,21 @@ export async function POST(request: Request) {
           null,
         created_by_specialist_id: actor.specialistId,
       });
-      if (!started.ok) {
+      if (!ensured.ok) {
         const status =
-          started.code === "missing_relation"
+          ensured.code === "missing_relation"
             ? 503
-            : started.code === "not_found"
+            : ensured.code === "not_found"
               ? 404
-              : started.code === "create_failed"
+              : ensured.code === "create_failed"
                 ? 500
                 : 400;
         return NextResponse.json(
-          { error: started.message, code: started.code },
+          { error: ensured.message, code: ensured.code },
           { status }
         );
       }
-      sessionId = started.value.id;
+      sessionId = ensured.value.id;
     }
 
     const result = await createWalkthroughObservation(supabase, {

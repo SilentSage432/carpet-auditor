@@ -1,5 +1,13 @@
 # DeptSync Hub — Development Journal
 
+## 2026-10-12 — DEPTSYNC-WALK-002-003 place-bound mobile walkthrough capture
+
+**Focused local implementation; no deploy / no schema migrate / no prod mutations.** Map bay sheet **Record Observation** opens RD-5 capture with locked department/aisle/bay; section owner from persisted memberships (display + trusted server bind); `ensureActiveWalkthroughSession` reuses active session (no silent duplicates); fast mobile form (type + short note; More options). No auto follow-up / rotation / Zebra. Focused **39 PASS**; `tsc` PASS; lint clean; `next build` PASS. Canonical: [`docs/product/DEPTSYNC_WALK_002_003_IMPLEMENTATION.md`](docs/product/DEPTSYNC_WALK_002_003_IMPLEMENTATION.md). Release **CONDITIONAL GO** after phone review. **STOP.**
+
+## 2026-10-12 — DEPTSYNC-WALKTHROUGHS-001 supervisory walkthroughs discovery
+
+**Read-only discovery; no impl / migrate / deploy / mutations.** RD-5 domain is real and production-migrated (`20261012_walkthroughs.sql`) with sessions/observations/follow-ups APIs, Walkthroughs tab, Overview inbox, Map bay history, RD-5-FIX store-ref asserts. Production store 2587: **0/0/0** walkthrough rows; Operational Sections stewardship intact (Tyson 5·6 / Nate 7·39·40 / Nick 43·44 / Tracy 41·42). Gaps for a practical 15–20 min walk: place-first Map capture unused, no aisle/bay→section owner compose, capture form heavy, follow-up-later API disconnected from UI, no photos/offline. Rotation/Zebra independence confirmed. Focused tests **29 PASS**. Canonical: [`docs/product/DEPTSYNC_WALKTHROUGHS_001_DISCOVERY.md`](docs/product/DEPTSYNC_WALKTHROUGHS_001_DISCOVERY.md). Verdict **CONDITIONAL GO** for WALK-002/003/004 polish on existing domain; **NO-GO** rebuild/task platform/rotation coupling. **STOP.**
+
 ## 2026-10-12 — DEPTSYNC-OPERATIONAL-012 strict section ownership production release
 
 **Authorized controlled release.** Project `fmeinlwhixngednabhgy`. Pre-migrate `pg_dump` **757562** bytes (TOC **1237**). Applied `20261018_operational_011_section_ownership.sql` **COMMIT** before app deploy (no bypass window). Transactional RPC verify: `SECTION_OWNERSHIP_MISMATCH` + `MISSING` PASS; AMBIGUOUS code present; SBA count unchanged **30**. Pushed `26d48ba`; GitHub Production deploy **`7015902704`** success → https://deptsync-ai74crrfg-tyson-zauggs-projects.vercel.app; alias https://deptsync-hub.vercel.app. Data preserved: sections **4/160**; caps **4/sum 11**; W41=6; W42=0; zebra unset. Auto-stage OFF. Canonical: [`docs/product/DEPTSYNC_OPERATIONAL_012_PRODUCTION_RELEASE.md`](docs/product/DEPTSYNC_OPERATIONAL_012_PRODUCTION_RELEASE.md). **RELEASED — AWAITING PHONE ACCEPTANCE.** **STOP.**

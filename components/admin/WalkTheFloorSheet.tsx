@@ -35,11 +35,19 @@ import {
   formatUnsectionedLabel,
   type BaySectionLookup,
 } from "@/lib/store-ops/operational-sections";
-import { fetchWalkthroughPlaceHistory } from "@/lib/store-ops/client";
+import {
+  fetchOperationalSections,
+  fetchWalkthroughPlaceHistory,
+  STORE_OPS_WALKTHROUGHS_CHANGED_EVENT,
+} from "@/lib/store-ops/client";
 import {
   observationTypeLabel,
   type WalkthroughObservationView,
+  type WalkthroughPlaceOwnership,
 } from "@/lib/store-ops/walkthroughs";
+import { WalkthroughCaptureSheet } from "@/components/walkthroughs/WalkthroughCaptureSheet";
+import type { OperationalSectionView } from "@/lib/store-ops/operational-sections";
+import { dedupeRoster, fetchSpecialists, isSupervisor } from "@/lib/specialists";
 import Link from "next/link";
 
 type BayPair = {
@@ -122,18 +130,29 @@ export function WalkTheFloorSheet({
     WalkthroughObservationView[] | null
   >(null);
   const [walkHistoryError, setWalkHistoryError] = useState<string | null>(null);
+  const [placeOwnership, setPlaceOwnership] =
+    useState<WalkthroughPlaceOwnership | null>(null);
+  const [captureOpen, setCaptureOpen] = useState(false);
+  const [captureTeam, setCaptureTeam] = useState<StoreSpecialist[]>([]);
+  const [captureSections, setCaptureSections] = useState<
+    OperationalSectionView[]
+  >([]);
+  const canRecordObservation = isSupervisor(specialist);
 
   useEffect(() => {
     let cancelled = false;
     setWalkHistory(null);
     setWalkHistoryError(null);
+    setPlaceOwnership(null);
     void fetchWalkthroughPlaceHistory(specialist, {
       departmentId: bay.departmentId,
       aisle: bay.aisle,
       bay: bay.pair.bay,
     })
       .then((res) => {
-        if (!cancelled) setWalkHistory(res.observations);
+        if (cancelled) return;
+        setWalkHistory(res.observations);
+        setPlaceOwnership(res.place_ownership ?? null);
       })
       .catch((err) => {
         if (cancelled) return;
@@ -151,6 +170,41 @@ export function WalkTheFloorSheet({
       cancelled = true;
     };
   }, [specialist, bay.departmentId, bay.aisle, bay.pair.bay]);
+
+  async function openCapture() {
+    setCaptureOpen(true);
+    try {
+      const [roster, sectionPayload] = await Promise.all([
+        fetchSpecialists().then(dedupeRoster).catch(() => [] as StoreSpecialist[]),
+        fetchOperationalSections(specialist, { includeMembers: false }).catch(
+          () => ({ sections: [] as OperationalSectionView[] })
+        ),
+      ]);
+      setCaptureTeam(roster);
+      setCaptureSections(sectionPayload.sections.filter((s) => s.is_active));
+    } catch {
+      setCaptureTeam([]);
+      setCaptureSections([]);
+    }
+  }
+
+  function onObservationSaved() {
+    window.dispatchEvent(new Event(STORE_OPS_WALKTHROUGHS_CHANGED_EVENT));
+    setWalkHistory(null);
+    void fetchWalkthroughPlaceHistory(specialist, {
+      departmentId: bay.departmentId,
+      aisle: bay.aisle,
+      bay: bay.pair.bay,
+    })
+      .then((res) => {
+        setWalkHistory(res.observations);
+        setPlaceOwnership(res.place_ownership ?? null);
+      })
+      .catch(() => {
+        setWalkHistory([]);
+      });
+    onChanged();
+  }
 
   const faces = useMemo(
     () =>
@@ -441,12 +495,41 @@ export function WalkTheFloorSheet({
           aria-label="Walkthrough history"
         >
           <p className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-zinc-500">
-            Walkthrough history
+            Walkthrough
           </p>
+          {placeOwnership ? (
+            <p
+              className="mt-1.5 text-sm font-medium text-zinc-200"
+              data-testid="walk-sheet-section-owner"
+            >
+              {placeOwnership.label}
+            </p>
+          ) : baySection ? (
+            <p className="mt-1.5 text-sm font-medium text-zinc-200">
+              Section owner:{" "}
+              {baySection.primary_owner_name || "none assigned"}
+            </p>
+          ) : (
+            <p className="mt-1.5 text-sm text-zinc-400">
+              Unsectioned — no section owner
+            </p>
+          )}
+
+          {canRecordObservation ? (
+            <button
+              type="button"
+              onClick={() => void openCapture()}
+              className="mt-3 flex min-h-14 w-full items-center justify-center rounded-xl bg-accent px-4 text-sm font-bold text-zinc-950"
+              data-testid="walk-sheet-record-observation"
+            >
+              Record Observation
+            </button>
+          ) : null}
+
           {walkHistory == null ? (
-            <p className="mt-1.5 text-xs text-zinc-500">Loading…</p>
+            <p className="mt-2 text-xs text-zinc-500">Loading history…</p>
           ) : walkHistory.length === 0 ? (
-            <div className="mt-1.5 space-y-1">
+            <div className="mt-2 space-y-1">
               <p className="text-sm text-zinc-400">No walkthrough notes on this bay.</p>
               {walkHistoryError ? (
                 <p className="text-[11px] text-zinc-500">{walkHistoryError}</p>
@@ -460,7 +543,7 @@ export function WalkTheFloorSheet({
               </Link>
             </div>
           ) : (
-            <ul className="mt-1.5 space-y-2">
+            <ul className="mt-2 space-y-2">
               {walkHistory.slice(0, 5).map((obs) => (
                 <li key={obs.id} className="text-sm">
                   <p className="font-semibold text-zinc-200">
@@ -644,6 +727,50 @@ export function WalkTheFloorSheet({
         ) : null}
       </div>
     </div>
+
+    {captureOpen ? (
+      <WalkthroughCaptureSheet
+        specialist={specialist}
+        team={captureTeam}
+        sections={captureSections}
+        activeSessionId={null}
+        initialDepartmentId={bay.departmentId}
+        initialDepartmentName={deptName}
+        initialAisle={bay.aisle}
+        initialBay={bay.pair.bay}
+        initialSectionId={
+          placeOwnership?.section_id || baySection?.section_id || null
+        }
+        placeOwnership={
+          placeOwnership ??
+          (baySection
+            ? {
+                status: baySection.primary_owner_specialist_id
+                  ? "owned"
+                  : "owner_missing",
+                section_id: baySection.section_id,
+                section_name: baySection.section_name,
+                primary_owner_specialist_id:
+                  baySection.primary_owner_specialist_id,
+                primary_owner_name: baySection.primary_owner_name,
+                label: baySection.primary_owner_name
+                  ? `Section owner: ${baySection.primary_owner_name}`
+                  : "Section owner: none assigned",
+              }
+            : {
+                status: "unsectioned",
+                section_id: null,
+                section_name: null,
+                primary_owner_specialist_id: null,
+                primary_owner_name: null,
+                label: "Unsectioned — no section owner",
+              })
+        }
+        placeLocked
+        onClose={() => setCaptureOpen(false)}
+        onSaved={onObservationSaved}
+      />
+    ) : null}
     </HubPortal>
   );
 }

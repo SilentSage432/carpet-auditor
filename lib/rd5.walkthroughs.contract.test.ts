@@ -73,6 +73,31 @@ describe("RD-5 Walkthroughs contracts", () => {
     expect(map).not.toMatch(/fetchWalkthroughPlaceHistory/);
   });
 
+  it("WALK-002 Map bay sheet records place-bound observations", () => {
+    const sheet = readSrc("components/admin/WalkTheFloorSheet.tsx");
+    expect(sheet).toMatch(/walk-sheet-record-observation/);
+    expect(sheet).toMatch(/Record Observation/);
+    expect(sheet).toMatch(/WalkthroughCaptureSheet/);
+    expect(sheet).toMatch(/placeLocked/);
+    expect(sheet).toMatch(/initialAisle=\{bay\.aisle\}/);
+    expect(sheet).toMatch(/initialBay=\{bay\.pair\.bay\}/);
+    expect(sheet).toMatch(/initialDepartmentId=\{bay\.departmentId\}/);
+    const capture = readSrc(
+      "components/walkthroughs/WalkthroughCaptureSheet.tsx"
+    );
+    expect(capture).toMatch(/walkthrough-capture-section-owner/);
+    expect(capture).toMatch(/More options/);
+    expect(capture).toMatch(/placeLocked/);
+    const observations = readSrc("app/api/walkthroughs/observations/route.ts");
+    expect(observations).toMatch(/ensureActiveWalkthroughSession/);
+    expect(observations).toMatch(/resolveWalkthroughPlaceOwnership/);
+    const domain = readSrc("lib/store-ops/walkthroughs.ts");
+    expect(domain).toMatch(/composeWalkthroughPlaceOwnership/);
+    expect(domain).toMatch(/assertCanonicalWalkthroughPlace/);
+    expect(domain).toMatch(/ensureActiveWalkthroughSession/);
+    expect(domain).not.toMatch(/sunday_bay_assignments/);
+  });
+
   it("domain stays independent of rotation mutation", () => {
     const domain = readSrc("lib/store-ops/walkthroughs.ts");
     expect(domain).not.toMatch(/sunday_bay_assignments/);

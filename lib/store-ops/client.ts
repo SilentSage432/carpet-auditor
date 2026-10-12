@@ -2145,6 +2145,7 @@ export async function fetchWalkthroughPlaceHistory(
   input: { departmentId: string; aisle: string; bay: number }
 ): Promise<{
   observations: import("./walkthroughs").WalkthroughObservationView[];
+  place_ownership: import("./walkthroughs").WalkthroughPlaceOwnership | null;
 }> {
   const qs = new URLSearchParams({
     department_id: input.departmentId,
@@ -2153,6 +2154,7 @@ export async function fetchWalkthroughPlaceHistory(
   });
   return storeOpsFetch<{
     observations: import("./walkthroughs").WalkthroughObservationView[];
+    place_ownership: import("./walkthroughs").WalkthroughPlaceOwnership | null;
   }>(`/api/walkthroughs/observations?${qs}`, specialist);
 }
 

@@ -22,6 +22,8 @@
 - [x] **RD-3-RELEASE** — Production migrate + deploy — **COMPLETE** — [`DEPTSYNC_RD_3_RELEASE.md`](docs/product/DEPTSYNC_RD_3_RELEASE.md)
 - [x] **RD-4 This Week command board** — Weekly operational board (**PRODUCTION** via RD-4-RELEASE) — [`DEPTSYNC_RD_4_THIS_WEEK_COMMAND_BOARD.md`](docs/product/DEPTSYNC_RD_4_THIS_WEEK_COMMAND_BOARD.md)
 - [x] **RD-5 Walkthroughs** — Collaborative observations + follow-ups (**PRODUCTION** via RD-5-RELEASE + FIX) — [`DEPTSYNC_RD_5_WALKTHROUGHS.md`](docs/product/DEPTSYNC_RD_5_WALKTHROUGHS.md) · [`DEPTSYNC_RD_5_RELEASE.md`](docs/product/DEPTSYNC_RD_5_RELEASE.md)
+- [x] **DEPTSYNC-WALKTHROUGHS-001** — Supervisory walkthroughs discovery (read-only; **CONDITIONAL GO** for place-first polish on existing domain) — [`DEPTSYNC_WALKTHROUGHS_001_DISCOVERY.md`](docs/product/DEPTSYNC_WALKTHROUGHS_001_DISCOVERY.md)
+- [x] **DEPTSYNC-WALK-002-003** — Place-bound Map capture + fast mobile form (**COMPLETE** local; deploy pending) — [`DEPTSYNC_WALK_002_003_IMPLEMENTATION.md`](docs/product/DEPTSYNC_WALK_002_003_IMPLEMENTATION.md)
 - [x] **RD-6 Product completion discovery** — Read-only audit of remaining Floor Command work (**COMPLETE** docs only) — [`DEPTSYNC_RD_6_PRODUCT_COMPLETION_AUDIT.md`](docs/product/DEPTSYNC_RD_6_PRODUCT_COMPLETION_AUDIT.md)
 - [x] **DEPTSYNC-SEC-OPS-001** — Production security truth (read-only) — P0 open RLS found — [`DEPTSYNC_SEC_OPS_001_PRODUCTION_TRUST_REPORT.md`](docs/product/DEPTSYNC_SEC_OPS_001_PRODUCTION_TRUST_REPORT.md)
 - [x] **DEPTSYNC-SEC-OPS-002** — Contain open RLS + secret-column SELECT (prod applied) — [`DEPTSYNC_SEC_OPS_002_CONTAINMENT_REPORT.md`](docs/product/DEPTSYNC_SEC_OPS_002_CONTAINMENT_REPORT.md)

@@ -94,6 +94,23 @@ export type WalkthroughInbox = {
   attention_count: number;
 };
 
+/** Trusted place → Operational Section ownership (context only; not assignment). */
+export type WalkthroughPlaceOwnershipStatus =
+  | "owned"
+  | "unsectioned"
+  | "ambiguous"
+  | "owner_missing";
+
+export type WalkthroughPlaceOwnership = {
+  status: WalkthroughPlaceOwnershipStatus;
+  section_id: string | null;
+  section_name: string | null;
+  primary_owner_specialist_id: string | null;
+  primary_owner_name: string | null;
+  /** Operator-facing line, e.g. "Section owner: Nate". */
+  label: string;
+};
+
 export type WalkthroughMutationResult<T> =
   | { ok: true; value: T }
   | { ok: false; code: string; message: string; details?: unknown };
@@ -140,6 +157,76 @@ export function formatWalkthroughPlaceLabel(input: {
     return `Aisle ${aisle}`;
   }
   return `Aisle ${aisle} · Bay ${Number(bay)}`;
+}
+
+/**
+ * Pure: compose honest ownership context from active section membership matches.
+ * Does not transfer ownership or invent a steward.
+ */
+export function composeWalkthroughPlaceOwnership(
+  matches: ReadonlyArray<{
+    section_id: string;
+    section_name: string;
+    primary_owner_specialist_id: string | null;
+    primary_owner_name: string | null;
+  }>
+): WalkthroughPlaceOwnership {
+  const uniqueSections = new Map<string, (typeof matches)[number]>();
+  for (const row of matches) {
+    const id = String(row.section_id ?? "").trim();
+    if (!id) continue;
+    if (!uniqueSections.has(id)) uniqueSections.set(id, row);
+  }
+
+  if (uniqueSections.size === 0) {
+    return {
+      status: "unsectioned",
+      section_id: null,
+      section_name: null,
+      primary_owner_specialist_id: null,
+      primary_owner_name: null,
+      label: "Unsectioned — no section owner",
+    };
+  }
+
+  if (uniqueSections.size > 1) {
+    return {
+      status: "ambiguous",
+      section_id: null,
+      section_name: null,
+      primary_owner_specialist_id: null,
+      primary_owner_name: null,
+      label: "Ownership ambiguous",
+    };
+  }
+
+  const only = [...uniqueSections.values()][0];
+  const ownerId = only.primary_owner_specialist_id
+    ? String(only.primary_owner_specialist_id).trim() || null
+    : null;
+  const ownerName = only.primary_owner_name
+    ? String(only.primary_owner_name).trim() || null
+    : null;
+
+  if (!ownerId) {
+    return {
+      status: "owner_missing",
+      section_id: only.section_id,
+      section_name: only.section_name,
+      primary_owner_specialist_id: null,
+      primary_owner_name: null,
+      label: "Section owner: none assigned",
+    };
+  }
+
+  return {
+    status: "owned",
+    section_id: only.section_id,
+    section_name: only.section_name,
+    primary_owner_specialist_id: ownerId,
+    primary_owner_name: ownerName,
+    label: `Section owner: ${ownerName || "Assigned"}`,
+  };
 }
 
 /** Pure: overdue open follow-up needs attention — not a performance grade. */
@@ -376,6 +463,226 @@ export async function assertOperationalSectionForStore(
   return { ok: true, value: true };
 }
 
+/**
+ * WALK-002 — resolve place ownership from persisted Operational Section memberships.
+ * Store-scoped. Never trusts client-provided owner fields.
+ */
+export async function resolveWalkthroughPlaceOwnership(
+  supabase: SupabaseClient,
+  input: {
+    store_id: string;
+    department_id: string;
+    aisle: string;
+    bay: number;
+  }
+): Promise<WalkthroughMutationResult<WalkthroughPlaceOwnership>> {
+  const storeId = String(input.store_id ?? "").trim();
+  const departmentId = String(input.department_id ?? "").trim();
+  const aisle = normalizeAisle(input.aisle);
+  const bay = Number(input.bay);
+  if (!storeId || !departmentId || !aisle || !Number.isFinite(bay) || bay < 0) {
+    return { ok: false, code: "invalid", message: "Place is required" };
+  }
+
+  const { data: members, error: memberErr } = await supabase
+    .from("operational_section_members")
+    .select("section_id, department_id, aisle, bay")
+    .eq("department_id", departmentId)
+    .eq("aisle", aisle)
+    .eq("bay", bay);
+
+  if (memberErr) {
+    if (isMissingRelation(memberErr)) {
+      return {
+        ok: false,
+        code: "missing_relation",
+        message:
+          "Operational sections tables are not migrated yet on this database.",
+        details: memberErr,
+      };
+    }
+    return {
+      ok: false,
+      code: "list_failed",
+      message: memberErr.message,
+      details: memberErr,
+    };
+  }
+
+  const sectionIds = [
+    ...new Set(
+      (members ?? [])
+        .map((row) => String((row as { section_id: string }).section_id ?? ""))
+        .filter(Boolean)
+    ),
+  ];
+
+  if (sectionIds.length === 0) {
+    return { ok: true, value: composeWalkthroughPlaceOwnership([]) };
+  }
+
+  const { data: sections, error: sectionErr } = await supabase
+    .from("operational_sections")
+    .select("id, name, primary_owner_specialist_id, is_active, store_id")
+    .eq("store_id", storeId)
+    .eq("is_active", true)
+    .in("id", sectionIds);
+
+  if (sectionErr) {
+    return {
+      ok: false,
+      code: "list_failed",
+      message: sectionErr.message,
+      details: sectionErr,
+    };
+  }
+
+  const activeSections = (sections ?? []) as Array<{
+    id: string;
+    name: string;
+    primary_owner_specialist_id: string | null;
+  }>;
+  const ownerIds = [
+    ...new Set(
+      activeSections
+        .map((s) => s.primary_owner_specialist_id)
+        .filter((id): id is string => Boolean(id))
+    ),
+  ];
+  const names = await loadSpecialistNames(supabase, ownerIds);
+
+  return {
+    ok: true,
+    value: composeWalkthroughPlaceOwnership(
+      activeSections.map((s) => ({
+        section_id: s.id,
+        section_name: s.name,
+        primary_owner_specialist_id: s.primary_owner_specialist_id,
+        primary_owner_name: s.primary_owner_specialist_id
+          ? names.get(s.primary_owner_specialist_id) ?? null
+          : null,
+      }))
+    ),
+  };
+}
+
+/**
+ * When department + aisle + bay are all present, require a real store_locations row.
+ * Prevents inventing places that the Map does not know.
+ */
+export async function assertCanonicalWalkthroughPlace(
+  supabase: SupabaseClient,
+  input: {
+    department_id: string;
+    aisle: string;
+    bay: number;
+  }
+): Promise<WalkthroughMutationResult<true>> {
+  const departmentId = String(input.department_id ?? "").trim();
+  const aisle = normalizeAisle(input.aisle);
+  const bay = Number(input.bay);
+  if (!departmentId || !aisle || !Number.isFinite(bay) || bay < 0) {
+    return { ok: false, code: "invalid", message: "Place is required" };
+  }
+
+  const { data, error } = await supabase
+    .from("store_locations")
+    .select("id")
+    .eq("department_id", departmentId)
+    .eq("aisle", aisle)
+    .eq("bay", bay)
+    .limit(1)
+    .maybeSingle();
+
+  if (error) {
+    return {
+      ok: false,
+      code: "list_failed",
+      message: error.message,
+      details: error,
+    };
+  }
+  if (!data) {
+    return {
+      ok: false,
+      code: "not_found",
+      message: "Location not found on the store map",
+    };
+  }
+  return { ok: true, value: true };
+}
+
+export async function findActiveWalkthroughSessionForStore(
+  supabase: SupabaseClient,
+  input: { store_id: string }
+): Promise<WalkthroughMutationResult<WalkthroughSessionRow | null>> {
+  const storeId = String(input.store_id ?? "").trim();
+  if (!storeId) {
+    return { ok: false, code: "invalid", message: "store_id is required" };
+  }
+  const { data, error } = await supabase
+    .from("walkthrough_sessions")
+    .select("*")
+    .eq("store_id", storeId)
+    .eq("status", "active")
+    .order("started_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) {
+    if (isMissingRelation(error)) {
+      return {
+        ok: false,
+        code: "missing_relation",
+        message:
+          "Walkthrough tables are not migrated yet on this database.",
+        details: error,
+      };
+    }
+    return {
+      ok: false,
+      code: "list_failed",
+      message: error.message,
+      details: error,
+    };
+  }
+  return {
+    ok: true,
+    value: data ? (data as WalkthroughSessionRow) : null,
+  };
+}
+
+/**
+ * Reuse the newest active session for the store, or start one.
+ * Prevents silent duplicate actives from Map / tab capture races.
+ */
+export async function ensureActiveWalkthroughSession(
+  supabase: SupabaseClient,
+  input: {
+    store_id: string;
+    store_number: string;
+    department_id?: string | null;
+    companion_specialist_id?: string | null;
+    focus_section_id?: string | null;
+    notes?: string | null;
+    created_by_specialist_id?: string | null;
+  }
+): Promise<
+  WalkthroughMutationResult<WalkthroughSessionRow> & {
+    created?: boolean;
+  }
+> {
+  const existing = await findActiveWalkthroughSessionForStore(supabase, {
+    store_id: input.store_id,
+  });
+  if (!existing.ok) return existing;
+  if (existing.value) {
+    return { ok: true, value: existing.value, created: false };
+  }
+  const started = await startWalkthroughSession(supabase, input);
+  if (!started.ok) return started;
+  return { ok: true, value: started.value, created: true };
+}
+
 export async function loadWalkthroughSessionForStore(
   supabase: SupabaseClient,
   input: { session_id: string; store_id: string }
@@ -579,17 +886,60 @@ export async function createWalkthroughObservation(
   });
   if (!associateOk.ok) return associateOk;
 
-  const sectionOk = await assertOperationalSectionForStore(supabase, {
-    section_id: input.section_id,
-    store_id: input.store_id,
-  });
-  if (!sectionOk.ok) return sectionOk;
-
   const aisle = input.aisle ? normalizeAisle(input.aisle) || null : null;
   const bay =
     input.bay == null || String(input.bay) === ""
       ? null
       : Number(input.bay);
+  const departmentId = String(input.department_id ?? "").trim() || null;
+
+  /**
+   * Full place → trusted section bind from memberships.
+   * Client section_id is not authoritative when place is complete.
+   * Never auto-sets associate / follow-up from ownership.
+   */
+  let sectionId = String(input.section_id ?? "").trim() || null;
+  if (departmentId && aisle && bay != null && Number.isFinite(bay)) {
+    const placeOk = await assertCanonicalWalkthroughPlace(supabase, {
+      department_id: departmentId,
+      aisle,
+      bay,
+    });
+    if (!placeOk.ok) return placeOk;
+
+    const ownership = await resolveWalkthroughPlaceOwnership(supabase, {
+      store_id: input.store_id,
+      department_id: departmentId,
+      aisle,
+      bay,
+    });
+    if (!ownership.ok) return ownership;
+
+    if (
+      ownership.value.status === "owned" ||
+      ownership.value.status === "owner_missing"
+    ) {
+      sectionId = ownership.value.section_id;
+    } else {
+      // unsectioned / ambiguous — do not guess a section
+      sectionId = null;
+    }
+  } else {
+    const sectionOk = await assertOperationalSectionForStore(supabase, {
+      section_id: sectionId,
+      store_id: input.store_id,
+    });
+    if (!sectionOk.ok) return sectionOk;
+  }
+
+  if (sectionId) {
+    const sectionOk = await assertOperationalSectionForStore(supabase, {
+      section_id: sectionId,
+      store_id: input.store_id,
+    });
+    if (!sectionOk.ok) return sectionOk;
+  }
+
   const now = new Date().toISOString();
   const { data, error } = await supabase
     .from("walkthrough_observations")
@@ -600,8 +950,8 @@ export async function createWalkthroughObservation(
       body: normalizeObservationBody(input.body),
       associate_specialist_id:
         String(input.associate_specialist_id ?? "").trim() || null,
-      section_id: String(input.section_id ?? "").trim() || null,
-      department_id: input.department_id ?? null,
+      section_id: sectionId,
+      department_id: departmentId,
       aisle,
       bay,
       observed_at: input.observed_at?.trim() || now,

@@ -5,6 +5,7 @@
 import { describe, expect, it } from "vitest";
 import {
   composeWalkthroughInbox,
+  composeWalkthroughPlaceOwnership,
   formatWalkthroughPlaceLabel,
   isFollowUpNeedingAttention,
   observationTypeLabel,
@@ -237,6 +238,67 @@ describe("walkthrough inbox composition", () => {
       "Aisle 7 · Bay 2"
     );
     expect(formatWalkthroughPlaceLabel({ aisle: "", bay: 2 })).toBeNull();
+  });
+
+  it("composes honest section ownership without inventing stewards", () => {
+    expect(composeWalkthroughPlaceOwnership([])).toMatchObject({
+      status: "unsectioned",
+      label: "Unsectioned — no section owner",
+      section_id: null,
+    });
+
+    expect(
+      composeWalkthroughPlaceOwnership([
+        {
+          section_id: "sec-1",
+          section_name: "Myself",
+          primary_owner_specialist_id: "tyson",
+          primary_owner_name: "Tyson",
+        },
+      ])
+    ).toMatchObject({
+      status: "owned",
+      label: "Section owner: Tyson",
+      section_id: "sec-1",
+      primary_owner_specialist_id: "tyson",
+    });
+
+    expect(
+      composeWalkthroughPlaceOwnership([
+        {
+          section_id: "sec-1",
+          section_name: "Myself",
+          primary_owner_specialist_id: null,
+          primary_owner_name: null,
+        },
+      ])
+    ).toMatchObject({
+      status: "owner_missing",
+      label: "Section owner: none assigned",
+      section_id: "sec-1",
+    });
+
+    expect(
+      composeWalkthroughPlaceOwnership([
+        {
+          section_id: "sec-1",
+          section_name: "A",
+          primary_owner_specialist_id: "a",
+          primary_owner_name: "A",
+        },
+        {
+          section_id: "sec-2",
+          section_name: "B",
+          primary_owner_specialist_id: "b",
+          primary_owner_name: "B",
+        },
+      ])
+    ).toMatchObject({
+      status: "ambiguous",
+      label: "Ownership ambiguous",
+      section_id: null,
+      primary_owner_specialist_id: null,
+    });
   });
 });
 

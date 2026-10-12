@@ -12,7 +12,7 @@ import {
 import { requireSupabaseAdmin } from "@/lib/supabase/admin-response";
 import { resolveStoreByNumber } from "@/lib/store-ops/stores";
 import { assertActorCanAccessDepartmentId } from "@/lib/store-ops/department-scope";
-import { startWalkthroughSession } from "@/lib/store-ops/walkthroughs";
+import { ensureActiveWalkthroughSession } from "@/lib/store-ops/walkthroughs";
 import { readableError } from "@/lib/store-ops/errors";
 
 type Body = {
@@ -42,7 +42,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const result = await startWalkthroughSession(supabase, {
+    const result = await ensureActiveWalkthroughSession(supabase, {
       store_id: store.id,
       store_number: store.store_number,
       department_id: departmentId,
@@ -68,7 +68,11 @@ export async function POST(request: Request) {
       );
     }
 
-    return NextResponse.json({ ok: true, session: result.value });
+    return NextResponse.json({
+      ok: true,
+      session: result.value,
+      created: Boolean(result.created),
+    });
   } catch (err) {
     if (err instanceof StoreOpsAuthError) {
       return NextResponse.json({ error: err.message }, { status: err.status });
