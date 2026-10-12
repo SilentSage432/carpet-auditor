@@ -378,8 +378,8 @@ describe("SECTION-ROTATION-006 capacity + distribution", () => {
     ).toBe(true);
   });
 
-  it("12. outside-section selection remains possible", () => {
-    // Only Nate has capacity, but only Tyson section bays exist → coverage.
+  it("12. outside-section selection is refused (OPERATIONAL-011)", () => {
+    // Only Nate has capacity, but only Tyson section bays exist → unfilled.
     const sections = buildSections();
     const tysonOnly = allAgingCandidates()
       .filter((c) => ["5", "6"].includes(String(c.aisle)))
@@ -403,15 +403,15 @@ describe("SECTION-ROTATION-006 capacity + distribution", () => {
       baySectionByKey: sections,
       capacity,
     });
-    expect(proposal.items.length).toBeGreaterThan(0);
+    expect(proposal.items).toHaveLength(0);
     expect(
-      proposal.items.every((i) => i.preference !== "steward_match")
+      proposal.unfilled_capacity.some((u) => u.specialist_id === "nate")
     ).toBe(true);
   });
 
-  it("13–14. unavailable associate keeps section; no auto redistrib invent", () => {
+  it("13–14. unavailable associate keeps section; no cross-section fill", () => {
     // Nick has 0 capacity — his section remains in map; others do not absorb
-    // a forced fill of Nick's entire stewardship.
+    // Nick's bays to fill unused capacity.
     const sections = buildSections();
     const capacity = buildPreviewCapacityCaps({
       eligibleSpecialistIds: ["tyson", "tracy", "nate"],
@@ -434,6 +434,9 @@ describe("SECTION-ROTATION-006 capacity + distribution", () => {
       capacity,
     });
     expect(proposal.items.some((i) => i.specialist_id === "nick")).toBe(false);
+    expect(
+      proposal.items.every((i) => String(i.aisle) !== "43" && String(i.aisle) !== "44")
+    ).toBe(true);
     expect(sections.size).toBeGreaterThan(0);
     expect(proposal.items).toHaveLength(8);
   });
@@ -490,7 +493,7 @@ describe("SECTION-ROTATION-006 capacity + distribution", () => {
     expect(dispatch).not.toMatch(/STEWARDSHIP_WEEK_DISTRIBUTION_AUTO_STAGE\s*=\s*true/);
   });
 
-  it("20. empty sections degrade safely (coverage-first within tier)", () => {
+  it("20. empty sections fail closed (no unrestricted assignment)", () => {
     const empty = new Map<string, BaySectionLookup>();
     const candidates = [
       { department_id: DEPT, aisle: "5", bay: 1, rotationId: "r1" },
@@ -502,7 +505,7 @@ describe("SECTION-ROTATION-006 capacity + distribution", () => {
       empty,
       { tyson: 2 }
     );
-    expect(selected).toHaveLength(2);
+    expect(selected).toHaveLength(0);
   });
 
   it("explanations are deterministic evidence strings (no LLM)", () => {

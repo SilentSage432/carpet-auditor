@@ -1,5 +1,9 @@
 # DeptSync Hub — Development Journal
 
+## 2026-10-12 — DEPTSYNC-OPERATIONAL-011 strict section ownership enforcement
+
+**Focused local implementation; no deploy / no production migration applied / no data mutations.** Root cause: weekly distributor treated Operational Sections as soft preference (Phase B + soft assign could cross sections). Fix: associate-first hard ownership from persisted memberships; unused capacity never filled from another section; fingerprint includes ownership digest; Sunday proposal shows associate/section/capacity/unfilled reasons. Migration `20261018_operational_011_section_ownership.sql` extends capacity RPC with `SECTION_OWNERSHIP_*` fail-closed (local only). Auto-stage OFF. Focused **92** PASS; `tsc` PASS; `next build` PASS. Canonical: [`docs/product/DEPTSYNC_OPERATIONAL_011_IMPLEMENTATION.md`](docs/product/DEPTSYNC_OPERATIONAL_011_IMPLEMENTATION.md). Release **CONDITIONAL GO** after migration+deploy authorization. **STOP.**
+
 ## 2026-10-12 — DEPTSYNC-OPERATIONAL-010 production release
 
 **Authorized app-only release.** Commit `43505f5` pushed `cd3c5fe..43505f5`. GitHub Production deployment `7014663741` **success** → https://deptsync-e7cfso5ez-tyson-zauggs-projects.vercel.app; alias https://deptsync-hub.vercel.app (`/login` 200; unauth week-capacity + operational-sections **401**). No migration. Data preserved: sections **4 active / 160 members**; stewardship map intact; SBA **30** (W41=6 / W42=0); capacity approvals **4** (W42 sum 11); zebra columns present all null. Assign path stewardship+approvals only; auto-stage OFF. Canonical: [`docs/product/DEPTSYNC_OPERATIONAL_010_PRODUCTION_RELEASE.md`](docs/product/DEPTSYNC_OPERATIONAL_010_PRODUCTION_RELEASE.md). **RELEASED — AWAITING PHONE ACCEPTANCE.** **STOP.**

@@ -17,8 +17,6 @@ import {
   selectBaysWithSectionPreference,
   type SectionAwareBayRef,
 } from "./section-aware-rotation";
-import { planFlatBayAssignmentsWithCaps } from "./weekly-rotations";
-
 const root = path.resolve(__dirname, "../..");
 
 function readRepo(relativePath: string): string {
@@ -237,18 +235,30 @@ describe("SECTION-ROTATION-002 multi-associate distribution", () => {
 
   it("one associate receives up to remaining capacity only", () => {
     const bays = [1, 2, 3, 4].map((n) => bay(`r${n}`, dept, "5", n));
+    const map = new Map(
+      bays.map((b) => [
+        `${dept}|5|${b.bay}`,
+        section({
+          section_id: "s-tyson",
+          section_name: "Tyson",
+          department_id: dept,
+          primary_owner_specialist_id: "tyson",
+          primary_owner_name: "Tyson",
+        }),
+      ])
+    );
     const plan = planSectionAwareFlatAssignments(
       bays,
       [member("tyson", "Tyson")],
       new Map([["tyson", 3]]),
-      new Map(),
+      map,
       { knownHoursOnly: true }
     );
     expect(plan.items).toHaveLength(3);
     expect(plan.items.every((i) => i.specialist_id === "tyson")).toBe(true);
   });
 
-  it("two associates share without one consuming every desirable bay", () => {
+  it("two associates share only owned section bays", () => {
     const map = new Map<string, BaySectionLookup>([
       [
         `${dept}|41|1`,
@@ -306,19 +316,38 @@ describe("SECTION-ROTATION-002 multi-associate distribution", () => {
       map,
       { knownHoursOnly: true }
     );
-    expect(plan.items).toHaveLength(6);
+    // Unsectioned aisle 5 bays are never assigned under hard ownership.
+    expect(plan.items).toHaveLength(4);
     const nick = plan.items.filter((i) => i.specialist_id === "nick");
     const tracy = plan.items.filter((i) => i.specialist_id === "tracy");
-    expect(nick).toHaveLength(3);
-    expect(tracy).toHaveLength(3);
+    expect(nick).toHaveLength(2);
+    expect(tracy).toHaveLength(2);
     expect(plan.preference_by_rotation.n1).toBe("steward_match");
     expect(plan.preference_by_rotation.t1).toBe("steward_match");
   });
 
-  it("four eligible associates respect per-person cap of 3", () => {
-    const bays = Array.from({ length: 12 }, (_, i) =>
-      bay(`r${i}`, dept, "5", i + 1)
-    );
+  it("four eligible associates respect per-person cap of 3 inside owned sections", () => {
+    const owners = ["tyson", "nate", "nick", "tracy"] as const;
+    const aisles = ["5", "39", "43", "41"] as const;
+    const bays: SectionAwareBayRef[] = [];
+    const map = new Map<string, BaySectionLookup>();
+    owners.forEach((owner, oi) => {
+      const aisle = aisles[oi]!;
+      for (let n = 1; n <= 3; n += 1) {
+        const rotationId = `r-${owner}-${n}`;
+        bays.push(bay(rotationId, dept, aisle, n));
+        map.set(
+          `${dept}|${aisle}|${n}`,
+          section({
+            section_id: `s-${owner}`,
+            section_name: owner,
+            department_id: dept,
+            primary_owner_specialist_id: owner,
+            primary_owner_name: owner,
+          })
+        );
+      }
+    });
     const plan = planSectionAwareFlatAssignments(
       bays,
       [
@@ -328,16 +357,16 @@ describe("SECTION-ROTATION-002 multi-associate distribution", () => {
         member("tracy", "Tracy"),
       ],
       caps("tyson", "nate", "nick", "tracy"),
-      new Map(),
+      map,
       { knownHoursOnly: true }
     );
     expect(plan.items).toHaveLength(12);
-    for (const id of ["tyson", "nate", "nick", "tracy"]) {
+    for (const id of owners) {
       expect(plan.items.filter((i) => i.specialist_id === id)).toHaveLength(3);
     }
   });
 
-  it("cross-section fallback when steward at capacity", () => {
+  it("cross-section fill refused when steward at capacity (OPERATIONAL-011)", () => {
     const map = new Map<string, BaySectionLookup>([
       [
         `${dept}|41|1`,
@@ -389,14 +418,10 @@ describe("SECTION-ROTATION-002 multi-associate distribution", () => {
     );
     expect(plan.items.filter((i) => i.specialist_id === "nick")).toHaveLength(3);
     const tracyItems = plan.items.filter((i) => i.specialist_id === "tracy");
-    expect(tracyItems).toHaveLength(1);
-    // Tracy receives a Nick-stewarded bay after Nick is at capacity — not exclusive ownership.
-    expect(plan.preference_by_rotation[tracyItems[0]!.rotationId]).toBe(
-      "section_coverage"
-    );
+    expect(tracyItems).toHaveLength(0);
   });
 
-  it("no section memberships matches coverage-first flat assign assignees set sizes", () => {
+  it("no section memberships fails closed (no unrestricted assign)", () => {
     const bays = [1, 2, 3, 4, 5, 6].map((n) => bay(`r${n}`, dept, "5", n));
     const members = [member("a", "A"), member("b", "B")];
     const rem = caps("a", "b");
@@ -407,21 +432,27 @@ describe("SECTION-ROTATION-002 multi-associate distribution", () => {
       new Map(),
       { knownHoursOnly: true }
     );
-    const flat = planFlatBayAssignmentsWithCaps(bays, members, rem, {
-      knownHoursOnly: true,
-    });
-    expect(sectionPlan.items).toHaveLength(flat.items.length);
-    expect(
-      sectionPlan.items.filter((i) => i.specialist_id === "a")
-    ).toHaveLength(flat.items.filter((i) => i.specialist_id === "a").length);
+    expect(sectionPlan.items).toHaveLength(0);
   });
 
   it("excludes associates with missing schedules (0 hours)", () => {
+    const map = new Map<string, BaySectionLookup>([
+      [
+        `${dept}|5|1`,
+        section({
+          section_id: "s-tyson",
+          section_name: "Tyson",
+          department_id: dept,
+          primary_owner_specialist_id: "tyson",
+          primary_owner_name: "Tyson",
+        }),
+      ],
+    ]);
     const plan = planSectionAwareFlatAssignments(
       [bay("r1", dept, "5", 1)],
       [member("nate", "Nate", 0), member("tyson", "Tyson", 20)],
       caps("nate", "tyson"),
-      new Map(),
+      map,
       { knownHoursOnly: true }
     );
     expect(plan.items).toHaveLength(1);
@@ -429,11 +460,24 @@ describe("SECTION-ROTATION-002 multi-associate distribution", () => {
   });
 
   it("respects already-consumed capacity", () => {
+    const bays = [1, 2, 3].map((n) => bay(`r${n}`, dept, "5", n));
+    const map = new Map(
+      bays.map((b) => [
+        `${dept}|5|${b.bay}`,
+        section({
+          section_id: "s-tyson",
+          section_name: "Tyson",
+          department_id: dept,
+          primary_owner_specialist_id: "tyson",
+          primary_owner_name: "Tyson",
+        }),
+      ])
+    );
     const plan = planSectionAwareFlatAssignments(
-      [1, 2, 3].map((n) => bay(`r${n}`, dept, "5", n)),
+      bays,
       [member("tyson", "Tyson")],
       new Map([["tyson", 1]]),
-      new Map(),
+      map,
       { knownHoursOnly: true }
     );
     expect(plan.items).toHaveLength(1);
@@ -444,6 +488,28 @@ describe("SECTION-ROTATION-002 preview without persistence", () => {
   const dept = "dept-flooring";
 
   it("marks all rows PROPOSED and skips owned rotations", () => {
+    const map = new Map<string, BaySectionLookup>([
+      [
+        `${dept}|5|1`,
+        section({
+          section_id: "s-tracy",
+          section_name: "Tracy",
+          department_id: dept,
+          primary_owner_specialist_id: "tracy",
+          primary_owner_name: "Tracy",
+        }),
+      ],
+      [
+        `${dept}|5|2`,
+        section({
+          section_id: "s-tracy",
+          section_name: "Tracy",
+          department_id: dept,
+          primary_owner_specialist_id: "tracy",
+          primary_owner_name: "Tracy",
+        }),
+      ],
+    ]);
     const preview = composeSectionAwareWeeklyPreview({
       store_number: "2587",
       week_label: "2026-W41",
@@ -452,7 +518,7 @@ describe("SECTION-ROTATION-002 preview without persistence", () => {
         bay("open", dept, "5", 2),
       ],
       members: [member("tracy", "Tracy")],
-      baySectionByKey: new Map(),
+      baySectionByKey: map,
       ownedRotationIds: ["owned"],
       capacity: {
         shared_target: 3,
@@ -470,12 +536,24 @@ describe("SECTION-ROTATION-002 preview without persistence", () => {
   });
 
   it("rejects stale fingerprints", () => {
+    const map = new Map<string, BaySectionLookup>([
+      [
+        `${dept}|5|1`,
+        section({
+          section_id: "s-tracy",
+          section_name: "Tracy",
+          department_id: dept,
+          primary_owner_specialist_id: "tracy",
+          primary_owner_name: "Tracy",
+        }),
+      ],
+    ]);
     const preview = composeSectionAwareWeeklyPreview({
       store_number: "2587",
       week_label: "2026-W41",
       bays: [bay("r1", dept, "5", 1)],
       members: [member("tracy", "Tracy")],
-      baySectionByKey: new Map(),
+      baySectionByKey: map,
       capacity: {
         shared_target: 3,
         owned_total: 0,

@@ -258,10 +258,14 @@ function clusterSectionAwareBays(bays: SectionAwareBayRef[]): SectionAwareBayRef
 }
 
 /**
- * Flat capacity-aware assignment with steward soft preference.
- * Preserves multi-associate fairness: iterates coverage-ordered bays and
- * picks among associates with remaining capacity — steward match is a
- * tie-break boost, not exclusive ownership and not first-come all bays.
+ * Flat capacity-aware assignment with OPERATIONAL-011 hard section ownership.
+ *
+ * A bay with Operational Section evidence may only be assigned to its primary
+ * owner. Unsectioned / ownerless bays are skipped (fail closed). Unused
+ * capacity is never filled from another associate's section.
+ *
+ * When the membership map is empty, no automatic ownership is invented —
+ * returns zero items (legacy soft cross-section fill removed).
  */
 export function planSectionAwareFlatAssignments(
   bays: SectionAwareBayRef[],
@@ -292,6 +296,7 @@ export function planSectionAwareFlatAssignments(
     preference_by_rotation: {} as Record<string, SectionAwarePreferenceKind>,
   };
   if (bays.length === 0 || active.length === 0) return empty;
+  if (!baySectionByKey || baySectionByKey.size === 0) return empty;
 
   const hours = active.map((m) => resolvePlannerHours(m.hours));
   const totalHours = hours.reduce((sum, h) => sum + h, 0);
@@ -299,7 +304,7 @@ export function planSectionAwareFlatAssignments(
     Math.max(0, Math.floor(remainingCaps.get(m.specialist_id) ?? 0))
   );
   const quotas = [...remaining];
-  const lastAisle = active.map(() => "");
+  const indexById = new Map(active.map((m, i) => [m.specialist_id, i]));
   const items: BayAssignmentPlanItem[] = [];
   const preference_by_rotation: Record<string, SectionAwarePreferenceKind> = {};
   const queue = clusterSectionAwareBays(bays);
@@ -307,30 +312,11 @@ export function planSectionAwareFlatAssignments(
   for (const bay of queue) {
     const section = lookupBaySection(bay, baySectionByKey);
     const stewardId = String(section?.primary_owner_specialist_id ?? "").trim();
-    let pick = -1;
-    let best = -1;
-    for (let i = 0; i < active.length; i += 1) {
-      if ((remaining[i] ?? 0) <= 0) continue;
-      const member = active[i]!;
-      const sameAisle = lastAisle[i] === normalizeAisle(bay.aisle) ? 2 : 0;
-      const stewardMatch =
-        stewardId && stewardId === member.specialist_id ? 1 : 0;
-      // Steward boost cannot invent capacity; only ranks among remaining caps.
-      // Same-aisle remains meaningful; specialist_id order breaks ties.
-      const score =
-        stewardMatch * 10_000 +
-        sameAisle * 1_000 +
-        (remaining[i] ?? 0) * 10 +
-        (active.length - i);
-      if (score > best) {
-        best = score;
-        pick = i;
-      }
-    }
-    if (pick < 0) break;
+    if (!section || !stewardId) continue;
+    const pick = indexById.get(stewardId);
+    if (pick == null || (remaining[pick] ?? 0) <= 0) continue;
     const member = active[pick]!;
     remaining[pick] = (remaining[pick] ?? 0) - 1;
-    lastAisle[pick] = normalizeAisle(bay.aisle);
     const memberHours = resolvePlannerHours(member.hours);
     items.push({
       rotationId: bay.rotationId,
@@ -378,6 +364,8 @@ export function buildSectionAwarePreviewFingerprint(input: {
   owned_total: number;
   remaining_shared: number;
   eligible_ids: readonly string[];
+  /** OPERATIONAL-011: key→section:owner digest so ownership changes stale plans. */
+  ownership_digest?: string;
 }): string {
   const parts = [
     String(input.store_number ?? "").trim(),
@@ -388,6 +376,7 @@ export function buildSectionAwarePreviewFingerprint(input: {
     String(input.owned_total),
     String(input.remaining_shared),
     [...input.eligible_ids].map(String).sort().join(","),
+    String(input.ownership_digest ?? ""),
   ];
   return parts.join("::");
 }
@@ -557,6 +546,14 @@ export function composeSectionAwareWeeklyPreview(input: {
     };
   });
 
+  const ownershipDigest = [...input.baySectionByKey.entries()]
+    .map(([key, section]) => {
+      const owner = String(section.primary_owner_specialist_id ?? "").trim();
+      return `${key}->${section.section_id}:${owner || "NONE"}`;
+    })
+    .sort()
+    .join("|");
+
   const fingerprint = buildSectionAwarePreviewFingerprint({
     store_number: input.store_number,
     week_label: input.week_label,
@@ -566,6 +563,7 @@ export function composeSectionAwareWeeklyPreview(input: {
     owned_total: input.capacity.owned_total,
     remaining_shared: input.capacity.remaining_shared,
     eligible_ids: input.capacity.eligible_specialist_ids,
+    ownership_digest: ownershipDigest,
   });
 
   return {
@@ -581,7 +579,7 @@ export function composeSectionAwareWeeklyPreview(input: {
     remaining_shared: input.capacity.remaining_shared,
     remaining_by_specialist: { ...input.capacity.remaining_by_specialist },
     topology_note:
-      "PROPOSED only among known staged/candidate bays. Undocumented topology is not invented. Incomplete section membership degrades to coverage-first.",
+      "PROPOSED only among known staged/candidate bays inside owned Operational Sections. Undocumented topology is not invented. Missing ownership fails closed.",
     section_membership_count: sectionKeys.length,
     steward_match_count: items.filter((i) => i.preference === "steward_match")
       .length,

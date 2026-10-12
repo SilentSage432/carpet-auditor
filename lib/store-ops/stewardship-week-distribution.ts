@@ -1,8 +1,12 @@
 /**
- * DEPTSYNC-SECTION-ROTATION-006 — stewardship-aware weekly bay distribution.
+ * DEPTSYNC-OPERATIONAL-011 — strict section-owned weekly bay distribution.
  *
- * Pure planner: priority tiers → within-tier steward capacity fill →
- * aisle-diverse coverage fill → soft-preference assign with explanations.
+ * Pure planner: priority tiers → per-associate selection inside owned
+ * Operational Sections → aisle diversity within section → explanations.
+ *
+ * Operational Sections are authoritative ownership boundaries.
+ * Rotation assignments never create, transfer, or limit section ownership,
+ * and never auto-assign a bay outside the associate's section.
  *
  * Does not persist, invent topology, activate Sunday auto-stage, or invent
  * capacity approvals. Consumes ROTATION-005 remaining capacity contract.
@@ -17,7 +21,6 @@ import {
   SECTION_AWARE_TIER_ORDER,
   buildSectionAwarePreviewFingerprint,
   lookupBaySection,
-  planSectionAwareFlatAssignments,
   sectionAwarePhysicalKey,
   type SectionAwareBayCandidate,
   type SectionAwareBayRef,
@@ -26,6 +29,16 @@ import {
   type SectionAwarePreviewItem,
   type SectionAwareWeeklyPreview,
 } from "./section-aware-rotation";
+import {
+  STRICT_SECTION_OWNERSHIP_AUTO_STAGE,
+  buildSectionOwnershipDigest,
+  explainUnfilledCapacity,
+  indexOwnedBaysBySpecialist,
+  inspectSectionOwnershipEvidence,
+  planStrictSectionOwnershipAssignments,
+  selectBaysWithStrictSectionOwnership,
+  type UnfilledCapacityReason,
+} from "./section-ownership-enforcement";
 import type { BaySectionLookup } from "./operational-sections";
 import type { StoreWeekCapacitySnapshot } from "./shared-week-capacity";
 import {
@@ -34,18 +47,19 @@ import {
 } from "./weekly-rotations";
 
 export { SECTION_AWARE_ROTATION_AUTO_STAGE, BASE_WEEKLY_BAY_QUOTA };
+export { STRICT_SECTION_OWNERSHIP_AUTO_STAGE };
 
-/** ROTATION-006 activation: proposal composer only — auto-stage stays hard off. */
+/** Proposal composer only — auto-stage stays hard off. */
 export const STEWARDSHIP_WEEK_DISTRIBUTION_AUTO_STAGE = false as const;
 
 export type SelectionExplanationCode =
   | "priority_tier"
   | "steward_section_fill"
   | "aisle_diversity"
-  | "section_coverage"
-  | "coverage_fallback"
+  | "section_ownership"
   | "capacity_remaining"
-  | "existing_assignment_skip";
+  | "existing_assignment_skip"
+  | "unfilled_capacity";
 
 export type SelectionExplanation = {
   codes: SelectionExplanationCode[];
@@ -61,6 +75,18 @@ export type StewardshipProposalItem = SectionAwarePreviewItem & {
   explanation: SelectionExplanation;
 };
 
+export type StewardshipAssociateSummary = {
+  specialist_id: string;
+  specialist_name: string;
+  section_id: string | null;
+  section_name: string | null;
+  approved_capacity: number;
+  proposed_count: number;
+  aisles: string[];
+  unfilled: number;
+  unfilled_reason: string | null;
+};
+
 export type StewardshipWeeklyProposal = Omit<
   SectionAwareWeeklyPreview,
   "items"
@@ -70,51 +96,15 @@ export type StewardshipWeeklyProposal = Omit<
   items: StewardshipProposalItem[];
   aisle_counts: Record<string, number>;
   distribution_note: string;
+  ownership_digest: string;
+  associate_summaries: StewardshipAssociateSummary[];
+  unfilled_capacity: UnfilledCapacityReason[];
 };
 
-function aisleSortKey(aisle: string): string {
-  const a = normalizeAisle(aisle);
-  if (/^\d+$/.test(a)) {
-    return `0:${a.padStart(6, "0")}`;
-  }
-  return `1:${a}`;
-}
-
-function compareCandidates(
-  a: SectionAwareBayCandidate,
-  b: SectionAwareBayCandidate
-): number {
-  const aisleCmp = aisleSortKey(String(a.aisle)).localeCompare(
-    aisleSortKey(String(b.aisle))
-  );
-  if (aisleCmp !== 0) return aisleCmp;
-  const bayCmp = Number(a.bay) - Number(b.bay);
-  if (bayCmp !== 0) return bayCmp;
-  return sectionAwarePhysicalKey(a).localeCompare(sectionAwarePhysicalKey(b));
-}
-
-function countSelectedByAisle(
-  selected: readonly SectionAwareBayCandidate[]
-): Map<string, number> {
-  const map = new Map<string, number>();
-  for (const bay of selected) {
-    const aisle = normalizeAisle(bay.aisle);
-    map.set(aisle, (map.get(aisle) ?? 0) + 1);
-  }
-  return map;
-}
-
 /**
- * Within-tier, capacity-aware candidate draw that avoids single-aisle collapse.
- *
- * Root cause addressed: prior rankBaysWithinPriorityTier + take-first-N used
- * lexicographic physical keys, so one aisle absorbed the entire shared draw
- * before assign-time steward preference could act.
- *
- * Phase A: round-robin stewards with remaining capacity, picking their
- * stewarded bays (stable aisle/bay order).
- * Phase B: aisle-diverse coverage among remaining equivalent-tier candidates.
- * Never leapfrogs priority tiers.
+ * Within-tier strict ownership draw.
+ * Prefer selectBaysWithStrictSectionOwnership for associate-first capacity.
+ * Kept as a thin wrapper for existing call sites / tests.
  */
 export function selectBaysWithStewardshipDistribution(
   tiers: ReadonlyArray<{
@@ -125,88 +115,17 @@ export function selectBaysWithStewardshipDistribution(
   baySectionByKey: ReadonlyMap<string, BaySectionLookup>,
   remainingCaps: ReadonlyMap<string, number> | Record<string, number>
 ): SectionAwareBayCandidate[] {
+  const evidence = inspectSectionOwnershipEvidence(baySectionByKey, {
+    requireMembershipEvidence: true,
+  });
+  if (!evidence.ok) return [];
+
+  const { selected } = selectBaysWithStrictSectionOwnership(
+    tiers,
+    remainingCaps,
+    baySectionByKey
+  );
   const need = Math.max(0, Math.floor(drawCount));
-  if (need === 0) return [];
-
-  const slots = new Map<string, number>();
-  const entries =
-    remainingCaps instanceof Map
-      ? remainingCaps.entries()
-      : Object.entries(remainingCaps);
-  for (const [id, n] of entries) {
-    const sid = String(id).trim();
-    const cap = Math.max(0, Math.floor(Number(n) || 0));
-    if (sid && cap > 0) slots.set(sid, cap);
-  }
-
-  const selected: SectionAwareBayCandidate[] = [];
-  const seen = new Set<string>();
-
-  const take = (bay: SectionAwareBayCandidate): boolean => {
-    const key = sectionAwarePhysicalKey(bay);
-    if (seen.has(key)) return false;
-    seen.add(key);
-    selected.push(bay);
-    return true;
-  };
-
-  for (const tierName of SECTION_AWARE_TIER_ORDER) {
-    if (selected.length >= need) break;
-    const bucket = tiers.find((t) => t.tier === tierName);
-    if (!bucket || bucket.candidates.length === 0) continue;
-
-    const pool = [...bucket.candidates]
-      .filter((b) => !seen.has(sectionAwarePhysicalKey(b)))
-      .sort(compareCandidates);
-
-    // Phase A — steward capacity fill (round-robin by specialist id).
-    let stewardProgress = true;
-    while (selected.length < need && stewardProgress) {
-      stewardProgress = false;
-      const stewards = [...slots.keys()].sort((a, b) => a.localeCompare(b));
-      for (const sid of stewards) {
-        if (selected.length >= need) break;
-        if ((slots.get(sid) ?? 0) <= 0) continue;
-        const idx = pool.findIndex((bay) => {
-          const key = sectionAwarePhysicalKey(bay);
-          if (seen.has(key)) return false;
-          const section = lookupBaySection(bay, baySectionByKey);
-          return (
-            String(section?.primary_owner_specialist_id ?? "").trim() === sid
-          );
-        });
-        if (idx < 0) continue;
-        const bay = pool[idx]!;
-        if (take(bay)) {
-          slots.set(sid, (slots.get(sid) ?? 0) - 1);
-          stewardProgress = true;
-        }
-      }
-    }
-
-    // Phase B — aisle-diverse coverage among remaining tier candidates.
-    while (selected.length < need) {
-      const aisleCounts = countSelectedByAisle(selected);
-      let best: SectionAwareBayCandidate | null = null;
-      let bestScore = "";
-      for (const bay of pool) {
-        const key = sectionAwarePhysicalKey(bay);
-        if (seen.has(key)) continue;
-        const aisle = normalizeAisle(bay.aisle);
-        const count = aisleCounts.get(aisle) ?? 0;
-        const score = `${String(count).padStart(4, "0")}|${aisleSortKey(
-          aisle
-        )}|${String(bay.bay).padStart(6, "0")}|${key}`;
-        if (!best || score.localeCompare(bestScore) < 0) {
-          best = bay;
-          bestScore = score;
-        }
-      }
-      if (!best) break;
-      take(best);
-    }
-  }
-
   return selected.slice(0, need);
 }
 
@@ -216,30 +135,24 @@ function buildExplanation(input: {
   aisle: string;
   remainingAfter: number;
   aisleAlreadyAssigned: number;
-  usedDiversityPass: boolean;
+  sectionName: string | null;
 }): SelectionExplanation {
   const codes: SelectionExplanationCode[] = [];
   if (input.tier) codes.push("priority_tier");
+  codes.push("section_ownership");
   if (input.preference === "steward_match") codes.push("steward_section_fill");
-  else if (input.preference === "section_coverage") codes.push("section_coverage");
-  else codes.push("coverage_fallback");
-  if (input.usedDiversityPass || input.aisleAlreadyAssigned > 0) {
-    codes.push("aisle_diversity");
-  }
+  if (input.aisleAlreadyAssigned > 0) codes.push("aisle_diversity");
   codes.push("capacity_remaining");
 
   const tierLabel = input.tier ?? "unspecified";
-  const prefLabel =
-    input.preference === "steward_match"
-      ? "steward section match"
-      : input.preference === "section_coverage"
-        ? "section coverage (soft)"
-        : "coverage fallback";
+  const sectionLabel = input.sectionName
+    ? `owned section ${input.sectionName}`
+    : "owned Operational Section";
   const diversity =
-    input.usedDiversityPass || input.aisleAlreadyAssigned > 0
-      ? ` Aisle ${normalizeAisle(input.aisle)} chosen with distribution among equal-priority candidates.`
+    input.aisleAlreadyAssigned > 0
+      ? ` Aisle ${normalizeAisle(input.aisle)} chosen with within-section distribution.`
       : "";
-  const summary = `${tierLabel} priority · ${prefLabel}.${diversity} Remaining capacity after this pick: ${input.remainingAfter}.`;
+  const summary = `${tierLabel} priority · ${sectionLabel}.${diversity} Remaining capacity after this pick: ${input.remainingAfter}.`;
 
   return {
     codes,
@@ -252,7 +165,7 @@ function buildExplanation(input: {
 }
 
 /**
- * Compose an actionable stewardship weekly proposal from known candidates.
+ * Compose an actionable strict-ownership weekly proposal from known candidates.
  * Requires approvals_complete on the capacity snapshot.
  */
 export function composeStewardshipWeeklyProposal(input: {
@@ -267,6 +180,8 @@ export function composeStewardshipWeeklyProposal(input: {
   bays: SectionAwareBayRef[];
   members: ShiftRosterMember[];
   baySectionByKey: ReadonlyMap<string, BaySectionLookup>;
+  /** Physical keys with multi-section claims (fail closed). */
+  conflictPhysicalKeys?: readonly string[];
   ownedRotationIds?: ReadonlySet<string> | readonly string[];
   capacity: Pick<
     StoreWeekCapacitySnapshot,
@@ -280,6 +195,11 @@ export function composeStewardshipWeeklyProposal(input: {
   >;
   knownHoursOnly?: boolean;
 }): StewardshipWeeklyProposal {
+  const ownershipDigest = buildSectionOwnershipDigest(input.baySectionByKey);
+  const ownershipBySpecialist = indexOwnedBaysBySpecialist(
+    input.baySectionByKey
+  );
+
   const approvalGate = assertApprovalsReadyForAssignment({
     approvals_complete: input.capacity.approvals_complete,
     approved_by_specialist: input.capacity.approved_by_specialist,
@@ -303,86 +223,75 @@ export function composeStewardshipWeeklyProposal(input: {
     if (!remainingCaps.has(id)) remainingCaps.set(id, 0);
   }
 
-  const drawCount = Math.min(
-    input.capacity.remaining_shared,
-    [...remainingCaps.values()].reduce((a, b) => a + b, 0),
-    input.bays.filter((b) => !owned.has(String(b.rotationId))).length ||
-      input.tiers.reduce((n, t) => n + t.candidates.length, 0)
-  );
-
   if (!approvalGate.ok) {
-    return emptyBlockedProposal(input, approvalGate.error, remainingCaps);
+    return emptyBlockedProposal(
+      input,
+      approvalGate.error,
+      remainingCaps,
+      ownershipDigest,
+      ownershipBySpecialist
+    );
   }
 
-  const distributed = selectBaysWithStewardshipDistribution(
-    input.tiers,
-    drawCount,
-    input.baySectionByKey,
-    remainingCaps
-  );
+  const evidence = inspectSectionOwnershipEvidence(input.baySectionByKey, {
+    requireMembershipEvidence: true,
+    eligibleSpecialistIds: input.capacity.eligible_specialist_ids,
+    conflictPhysicalKeys: input.conflictPhysicalKeys,
+  });
+  if (!evidence.ok) {
+    return emptyBlockedProposal(
+      input,
+      evidence.issue.message,
+      remainingCaps,
+      ownershipDigest,
+      ownershipBySpecialist
+    );
+  }
 
-  // Map distributed physical keys back to staged bay refs when available.
   const unownedRefs = input.bays.filter((b) => !owned.has(String(b.rotationId)));
   const refByKey = new Map(
     unownedRefs.map((b) => [sectionAwarePhysicalKey(b), b] as const)
   );
-  const assignBays: SectionAwareBayRef[] = [];
-  for (const cand of distributed) {
+
+  // Prefer staged refs as the candidate pool; fall back to tier candidates.
+  const tierSource =
+    unownedRefs.length > 0
+      ? classifyBayPriorityTier(unownedRefs)
+      : input.tiers.map((bucket) => ({
+          tier: bucket.tier,
+          candidates: bucket.candidates.filter(
+            (c) => !owned.has(String(c.rotationId ?? ""))
+          ),
+        }));
+
+  const { selected } = selectBaysWithStrictSectionOwnership(
+    tierSource,
+    remainingCaps,
+    input.baySectionByKey
+  );
+
+  const planBays: SectionAwareBayRef[] = [];
+  for (const cand of selected) {
     const key = sectionAwarePhysicalKey(cand);
     const ref = refByKey.get(key);
     if (ref) {
-      assignBays.push({
+      planBays.push({
         ...ref,
-        priority_tier: candTier(input.tiers, cand),
+        priority_tier: candTier(tierSource, cand),
       });
     } else if (cand.rotationId) {
-      assignBays.push({
+      planBays.push({
         rotationId: cand.rotationId,
         department_id: cand.department_id,
         aisle: String(cand.aisle),
         bay: Number(cand.bay),
         riskScore: cand.riskScore ?? 0,
-        priority_tier: candTier(input.tiers, cand),
+        priority_tier: candTier(tierSource, cand),
       });
     }
   }
 
-  // If staged refs exist but distribution used topology-only keys, fall back to
-  // distributing among unowned staged refs with synthetic single aging tier.
-  const planBays =
-    assignBays.length > 0
-      ? assignBays
-      : selectBaysWithStewardshipDistribution(
-          [
-            {
-              tier: "aging",
-              candidates: unownedRefs.map((b) => ({
-                department_id: b.department_id,
-                aisle: String(b.aisle),
-                bay: Number(b.bay),
-                rotationId: b.rotationId,
-                riskScore: b.riskScore,
-              })),
-            },
-          ],
-          drawCount,
-          input.baySectionByKey,
-          remainingCaps
-        ).map((cand) => {
-          const ref = refByKey.get(sectionAwarePhysicalKey(cand));
-          return (
-            ref ?? {
-              rotationId: String(cand.rotationId ?? sectionAwarePhysicalKey(cand)),
-              department_id: cand.department_id,
-              aisle: String(cand.aisle),
-              bay: Number(cand.bay),
-              riskScore: cand.riskScore ?? 0,
-              priority_tier: "aging" as const,
-            }
-          );
-        });
-
-  const plan = planSectionAwareFlatAssignments(
+  const plan = planStrictSectionOwnershipAssignments(
     planBays,
     input.members,
     remainingCaps,
@@ -393,6 +302,7 @@ export function composeStewardshipWeeklyProposal(input: {
   const aisleAssignCounts = new Map<string, number>();
   const remainingAfter = new Map(remainingCaps);
   const sectionKeys = [...input.baySectionByKey.keys()].sort();
+  const proposedBySpecialist: Record<string, number> = {};
 
   const items: StewardshipProposalItem[] = plan.items.map((row) => {
     const bay = planBays.find((b) => b.rotationId === row.rotationId);
@@ -400,8 +310,7 @@ export function composeStewardshipWeeklyProposal(input: {
     const section = bay
       ? lookupBaySection(bay, input.baySectionByKey)
       : null;
-    const preference =
-      plan.preference_by_rotation[row.rotationId] ?? "coverage_fallback";
+    const preference: SectionAwarePreferenceKind = "steward_match";
     const aisle = normalizeAisle(row.aisle);
     const priorAisle = aisleAssignCounts.get(aisle) ?? 0;
     aisleAssignCounts.set(aisle, priorAisle + 1);
@@ -410,6 +319,8 @@ export function composeStewardshipWeeklyProposal(input: {
       (remainingAfter.get(row.specialist_id) ?? 0) - 1
     );
     remainingAfter.set(row.specialist_id, left);
+    proposedBySpecialist[row.specialist_id] =
+      (proposedBySpecialist[row.specialist_id] ?? 0) + 1;
     const tier = bay?.priority_tier ?? null;
     const explanation = buildExplanation({
       tier,
@@ -417,7 +328,7 @@ export function composeStewardshipWeeklyProposal(input: {
       aisle,
       remainingAfter: left,
       aisleAlreadyAssigned: priorAisle,
-      usedDiversityPass: preference !== "steward_match",
+      sectionName: section?.section_name ?? null,
     });
 
     return {
@@ -446,10 +357,28 @@ export function composeStewardshipWeeklyProposal(input: {
     owned_total: input.capacity.owned_total,
     remaining_shared: input.capacity.remaining_shared,
     eligible_ids: input.capacity.eligible_specialist_ids,
+    ownership_digest: ownershipDigest,
   });
 
   const aisle_counts: Record<string, number> = {};
   for (const [aisle, n] of aisleAssignCounts) aisle_counts[aisle] = n;
+
+  const unfilled_capacity = explainUnfilledCapacity({
+    members: input.members.filter((m) => m.active),
+    remainingBefore: remainingCaps,
+    proposedBySpecialist,
+    approvedBySpecialist: input.capacity.approved_by_specialist,
+    ownershipBySpecialist,
+  });
+
+  const associate_summaries = buildAssociateSummaries({
+    members: input.members,
+    items,
+    remainingCaps,
+    approvedBySpecialist: input.capacity.approved_by_specialist,
+    ownershipBySpecialist,
+    unfilled_capacity,
+  });
 
   return {
     state: "PROPOSED",
@@ -469,17 +398,65 @@ export function composeStewardshipWeeklyProposal(input: {
     ),
     remaining_by_specialist: Object.fromEntries(remainingAfter),
     topology_note:
-      "PROPOSED only among known staged/candidate bays. Zero-bay named locations are not invented.",
+      "PROPOSED only among known staged/candidate bays inside each associate's Operational Section. Zero-bay named locations are not invented.",
     section_membership_count: sectionKeys.length,
-    steward_match_count: items.filter((i) => i.preference === "steward_match")
-      .length,
-    coverage_fallback_count: items.filter(
-      (i) => i.preference === "coverage_fallback"
-    ).length,
+    steward_match_count: items.length,
+    coverage_fallback_count: 0,
     aisle_counts,
     distribution_note:
-      "Within each priority tier, stewarded bays are filled round-robin by approved remaining capacity, then equal-priority coverage diversifies across aisles.",
+      "Each associate receives only bays inside their owned Operational Section, up to approved remaining capacity, with priority tiers and within-section aisle diversity. Unused capacity is never filled from another associate's section.",
+    ownership_digest: ownershipDigest,
+    associate_summaries,
+    unfilled_capacity,
   };
+}
+
+function buildAssociateSummaries(input: {
+  members: ShiftRosterMember[];
+  items: StewardshipProposalItem[];
+  remainingCaps: Map<string, number>;
+  approvedBySpecialist?: Readonly<Record<string, number>>;
+  ownershipBySpecialist: ReturnType<typeof indexOwnedBaysBySpecialist>;
+  unfilled_capacity: UnfilledCapacityReason[];
+}): StewardshipAssociateSummary[] {
+  const unfilledById = new Map(
+    input.unfilled_capacity.map((row) => [row.specialist_id, row] as const)
+  );
+  return input.members
+    .filter((m) => m.active)
+    .slice()
+    .sort((a, b) => a.specialist_id.localeCompare(b.specialist_id))
+    .map((member) => {
+      const mine = input.items.filter(
+        (i) => i.specialist_id === member.specialist_id
+      );
+      const owned = input.ownershipBySpecialist.get(member.specialist_id);
+      const remaining = Math.max(
+        0,
+        Math.floor(input.remainingCaps.get(member.specialist_id) ?? 0)
+      );
+      const approved = Math.max(
+        0,
+        Math.floor(
+          input.approvedBySpecialist?.[member.specialist_id] ?? remaining
+        )
+      );
+      const unfilled = unfilledById.get(member.specialist_id);
+      const aisles = [
+        ...new Set(mine.map((i) => normalizeAisle(i.aisle)).filter(Boolean)),
+      ].sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+      return {
+        specialist_id: member.specialist_id,
+        specialist_name: member.specialist_name,
+        section_id: owned?.section_ids[0] ?? null,
+        section_name: owned?.section_names[0] ?? null,
+        approved_capacity: approved,
+        proposed_count: mine.length,
+        aisles,
+        unfilled: unfilled?.unfilled ?? Math.max(0, remaining - mine.length),
+        unfilled_reason: unfilled?.reason ?? null,
+      };
+    });
 }
 
 function candTier(
@@ -504,6 +481,7 @@ function emptyBlockedProposal(
   input: {
     store_number: string;
     week_label: string;
+    members?: ShiftRosterMember[];
     capacity: Pick<
       StoreWeekCapacitySnapshot,
       | "shared_target"
@@ -511,13 +489,25 @@ function emptyBlockedProposal(
       | "remaining_shared"
       | "remaining_by_specialist"
       | "eligible_specialist_ids"
+      | "approved_by_specialist"
     >;
     baySectionByKey: ReadonlyMap<string, BaySectionLookup>;
   },
   reason: string,
-  remainingCaps: Map<string, number>
+  remainingCaps: Map<string, number>,
+  ownershipDigest: string,
+  ownershipBySpecialist: ReturnType<typeof indexOwnedBaysBySpecialist>
 ): StewardshipWeeklyProposal {
   const sectionKeys = [...input.baySectionByKey.keys()].sort();
+  const members = (input.members ?? []).filter((m) => m.active);
+  const unfilled_capacity = explainUnfilledCapacity({
+    members,
+    remainingBefore: remainingCaps,
+    proposedBySpecialist: {},
+    approvedBySpecialist: input.capacity.approved_by_specialist,
+    ownershipBySpecialist,
+    blocked: true,
+  });
   return {
     state: "PROPOSED",
     week_label: input.week_label,
@@ -531,6 +521,7 @@ function emptyBlockedProposal(
       owned_total: input.capacity.owned_total,
       remaining_shared: input.capacity.remaining_shared,
       eligible_ids: input.capacity.eligible_specialist_ids,
+      ownership_digest: ownershipDigest,
     }),
     actionable: false,
     block_reason: reason,
@@ -541,12 +532,22 @@ function emptyBlockedProposal(
     owned_total: input.capacity.owned_total,
     remaining_shared: input.capacity.remaining_shared,
     remaining_by_specialist: Object.fromEntries(remainingCaps),
-    topology_note: "No actionable proposal until weekly capacity is approved.",
+    topology_note: "No actionable proposal until ownership and capacity are valid.",
     section_membership_count: sectionKeys.length,
     steward_match_count: 0,
     coverage_fallback_count: 0,
     aisle_counts: {},
     distribution_note: reason,
+    ownership_digest: ownershipDigest,
+    associate_summaries: buildAssociateSummaries({
+      members,
+      items: [],
+      remainingCaps,
+      approvedBySpecialist: input.capacity.approved_by_specialist,
+      ownershipBySpecialist,
+      unfilled_capacity,
+    }),
+    unfilled_capacity,
   };
 }
 
@@ -565,7 +566,7 @@ export function assertStewardshipProposalFresh(
     ok: false,
     code: "STALE_PREVIEW",
     message:
-      "Stewardship proposal is outdated (capacity, assignments, sections, or candidates changed). Refresh before confirming.",
+      "Section ownership proposal is outdated (capacity, assignments, sections, or ownership changed). Regenerate before confirming.",
   };
 }
 

@@ -18,6 +18,7 @@ import {
 } from "@/lib/store-ops/client";
 import type { WeekCapacityReviewBoard } from "@/lib/store-ops/approved-week-capacity";
 import {
+  findActiveBayMembershipConflicts,
   indexBaySectionLookups,
   type BaySectionLookup,
 } from "@/lib/store-ops/operational-sections";
@@ -163,6 +164,7 @@ export function SundayAuditAssignmentModal({
   const [baySectionByKey, setBaySectionByKey] = useState<
     Map<string, BaySectionLookup>
   >(() => new Map());
+  const [sectionConflictKeys, setSectionConflictKeys] = useState<string[]>([]);
   /** SECTION-ROTATION-005 — operator-approved weekly capacity review. */
   const [capacityBoard, setCapacityBoard] =
     useState<WeekCapacityReviewBoard | null>(null);
@@ -298,14 +300,28 @@ export function SundayAuditAssignmentModal({
     void fetchOperationalSections(specialist, { includeMembers: true })
       .then((payload) => {
         if (cancelled) return;
-        setBaySectionByKey(indexBaySectionLookups(payload.sections ?? []));
+        const sections = payload.sections ?? [];
+        const membershipRows = sections.flatMap((section) =>
+          (section.members ?? []).map((member) => ({
+            section_id: section.id,
+            section_is_active: section.is_active,
+            department_id: member.department_id,
+            aisle: member.aisle,
+            bay: member.bay,
+          }))
+        );
+        setSectionConflictKeys(findActiveBayMembershipConflicts(membershipRows));
+        setBaySectionByKey(indexBaySectionLookups(sections));
       })
       .catch((err) => {
         console.error(
           "[SundayAudit] operational sections failed (non-blocking)",
           err
         );
-        if (!cancelled) setBaySectionByKey(new Map());
+        if (!cancelled) {
+          setBaySectionByKey(new Map());
+          setSectionConflictKeys([]);
+        }
       });
     return () => {
       cancelled = true;
@@ -490,6 +506,7 @@ export function SundayAuditAssignmentModal({
       bays: bayRefs,
       members,
       baySectionByKey: baySectionByKey,
+      conflictPhysicalKeys: sectionConflictKeys,
       ownedRotationIds,
       capacity,
       knownHoursOnly: true,
@@ -500,6 +517,7 @@ export function SundayAuditAssignmentModal({
     capacityBoard,
     bays,
     baySectionByKey,
+    sectionConflictKeys,
     healthByRotation,
     flooringDept?.id,
   ]);
@@ -861,6 +879,7 @@ export function SundayAuditAssignmentModal({
         bays: bayRefs,
         members,
         baySectionByKey,
+        conflictPhysicalKeys: sectionConflictKeys,
         ownedRotationIds,
         capacity,
         knownHoursOnly: true,
@@ -899,7 +918,7 @@ export function SundayAuditAssignmentModal({
         const achievable = recomputed.shared_target;
         setError(
           recomputed.block_reason ||
-            `Stewardship distributor could not allocate owners (achievable ${recomputed.owned_total}/${achievable} against approved capacity). Check schedules, sections, and remaining capacity.`
+            `Section ownership distributor could not allocate owners (achievable ${recomputed.owned_total}/${achievable} against approved capacity). Check schedules, owned sections, and remaining capacity.`
         );
         playErrorTone();
         return;
@@ -1218,11 +1237,12 @@ export function SundayAuditAssignmentModal({
                 <>
                   <p className="mt-1 text-[11px] text-cyan-100/70">
                     Floor Command prepares full ownership from approved capacity
-                    + Operational Section stewardship
+                    inside each associate&apos;s Operational Section
                     {` across ${bays.length} staged bay${
                       bays.length === 1 ? "" : "s"
                     }`}
-                    . Confirm once to persist — no manual owner picking.
+                    . Confirm once to persist — no manual owner picking or
+                    cross-section balancing.
                   </p>
                   {stewardshipProposal ? (
                     <div
@@ -1231,19 +1251,54 @@ export function SundayAuditAssignmentModal({
                     >
                       <p className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-teal-300">
                         {stewardshipProposal.actionable
-                          ? "PROPOSED · stewardship distribution"
-                          : "BLOCKED · capacity not actionable"}
+                          ? "PROPOSED · section ownership"
+                          : "BLOCKED · ownership / capacity"}
                       </p>
                       <p className="mt-1 text-[11px] leading-snug text-teal-100/75">
                         Week {stewardshipProposal.week_label}. Not assigned until
                         confirmed. Capacity {stewardshipProposal.owned_total}/
                         {stewardshipProposal.shared_target} · remaining{" "}
-                        {stewardshipProposal.remaining_shared}. Steward matches{" "}
-                        {stewardshipProposal.steward_match_count}.
+                        {stewardshipProposal.remaining_shared}. Owned-section
+                        picks {stewardshipProposal.steward_match_count}.
                       </p>
                       <p className="mt-1 text-[10px] leading-snug text-teal-200/60">
                         {stewardshipProposal.distribution_note}
                       </p>
+                      {stewardshipProposal.associate_summaries.length > 0 ? (
+                        <ul
+                          data-testid="section-ownership-associate-summary"
+                          className="mt-2 space-y-1.5 text-[12px] text-teal-50"
+                        >
+                          {stewardshipProposal.associate_summaries.map((row) => (
+                            <li
+                              key={row.specialist_id}
+                              className="rounded-md border border-teal-500/15 bg-zinc-950/30 px-2 py-1.5"
+                            >
+                              <div>
+                                {row.specialist_name}
+                                {row.section_name
+                                  ? ` · ${row.section_name}`
+                                  : " · no owned section"}
+                              </div>
+                              <p className="mt-0.5 font-mono text-[10px] text-teal-200/75">
+                                Approved {row.approved_capacity} · proposed{" "}
+                                {row.proposed_count}
+                                {row.aisles.length > 0
+                                  ? ` · aisles ${row.aisles.join(", ")}`
+                                  : ""}
+                                {row.unfilled > 0
+                                  ? ` · unfilled ${row.unfilled}`
+                                  : ""}
+                              </p>
+                              {row.unfilled_reason ? (
+                                <p className="mt-0.5 text-[10px] leading-snug text-amber-200/85">
+                                  {row.unfilled_reason}
+                                </p>
+                              ) : null}
+                            </li>
+                          ))}
+                        </ul>
+                      ) : null}
                       {stewardshipProposal.actionable &&
                       stewardshipProposal.items.length < pending ? (
                         <p
@@ -1255,7 +1310,8 @@ export function SundayAuditAssignmentModal({
                           {stewardshipProposal.items.length} of {pending}{" "}
                           unowned staged (approved shared target{" "}
                           {stewardshipProposal.shared_target}). Excess staged
-                          bays beyond capacity stay unassigned.
+                          bays beyond capacity or outside owned sections stay
+                          unassigned.
                         </p>
                       ) : null}
                       {stewardshipProposal.block_reason ? (
@@ -1285,7 +1341,7 @@ export function SundayAuditAssignmentModal({
                                 {item.bay}
                                 {item.section_name
                                   ? ` · ${item.section_name}`
-                                  : " · Unsectioned"}
+                                  : ""}
                               </div>
                               <p className="mt-0.5 text-[10px] leading-snug text-teal-100/65">
                                 {item.explanation.summary}
@@ -1293,24 +1349,6 @@ export function SundayAuditAssignmentModal({
                             </li>
                           ))}
                         </ul>
-                      ) : null}
-                      {Object.keys(stewardshipProposal.remaining_by_specialist)
-                        .length > 0 ? (
-                        <p className="mt-2 font-mono text-[10px] text-teal-200/70">
-                          Remaining after proposal:{" "}
-                          {Object.entries(
-                            stewardshipProposal.remaining_by_specialist
-                          )
-                            .sort(([a], [b]) => a.localeCompare(b))
-                            .map(([id, n]) => {
-                              const name =
-                                capacityBoard?.associates.find(
-                                  (r) => r.specialist_id === id
-                                )?.specialist_name ?? id;
-                              return `${name}:${n}`;
-                            })
-                            .join(" · ")}
-                        </p>
                       ) : null}
                     </div>
                   ) : capacityBoard.approvals_complete ? (

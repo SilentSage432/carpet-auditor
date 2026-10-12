@@ -375,12 +375,18 @@ export type CapacityWriteResult = {
     | "CAPACITY_APPROVAL_MISSING"
     | "CAPACITY_APPROVAL_STALE"
     | "CAPACITY_APPROVAL_ZERO"
-    | "CAPACITY_APPROVAL_SCHEMA_MISSING";
+    | "CAPACITY_APPROVAL_SCHEMA_MISSING"
+    | "SECTION_OWNERSHIP_MISSING"
+    | "SECTION_OWNERSHIP_MISMATCH"
+    | "SECTION_OWNERSHIP_AMBIGUOUS";
   raw?: unknown;
 };
 
 function classifyCapacityError(message: string): CapacityWriteResult["code"] {
   const m = String(message ?? "");
+  if (/SECTION_OWNERSHIP_AMBIGUOUS/i.test(m)) return "SECTION_OWNERSHIP_AMBIGUOUS";
+  if (/SECTION_OWNERSHIP_MISMATCH/i.test(m)) return "SECTION_OWNERSHIP_MISMATCH";
+  if (/SECTION_OWNERSHIP_MISSING/i.test(m)) return "SECTION_OWNERSHIP_MISSING";
   if (/CAPACITY_PERSON_EXCEEDED/i.test(m)) return "CAPACITY_PERSON_EXCEEDED";
   if (/CAPACITY_SHARED_EXCEEDED/i.test(m)) return "CAPACITY_SHARED_EXCEEDED";
   if (/CAPACITY_STORE_FORBIDDEN/i.test(m)) return "CAPACITY_STORE_FORBIDDEN";
