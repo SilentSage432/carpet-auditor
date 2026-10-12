@@ -1,8 +1,11 @@
 /**
- * DEPTSYNC-CAPACITY-GUARD-002 — store-week shared capacity authority.
+ * DEPTSYNC-CAPACITY-GUARD-002 + SECTION-ROTATION-005 — store-week capacity.
  *
- * Owns: shared eligibility union, shared target (eligible × quota),
- * remaining per-person / shared slots, and the atomic DB writer boundary.
+ * Owns: shared eligibility union, remaining per-person / shared slots,
+ * and the atomic DB writer boundary.
+ *
+ * ROTATION-005: when approvals exist, shared target = sum(approved caps)
+ * and per-person ceilings come from operator-approved weekly capacities.
  *
  * Does not: invent eligibility, archive associates, change section semantics,
  * or activate second-department auto-stage.
@@ -55,7 +58,11 @@ export type StoreWeekCapacitySnapshot = {
   /** Distinct roster ids with schedule-backed eligibility in any participating dept. */
   eligible_specialist_ids: string[];
   eligible_count: number;
-  /** eligible_count × quota — never a hard-coded 12. */
+  /**
+   * Shared weekly target.
+   * Legacy: eligible_count × quota.
+   * ROTATION-005: sum of operator-approved per-person capacities when present.
+   */
   shared_target: number;
   /** Non-cleared owned assignments across all departments for the store-week. */
   owned_total: number;
@@ -65,6 +72,10 @@ export type StoreWeekCapacitySnapshot = {
   remaining_by_specialist: Record<string, number>;
   /** True when owned_total already exceeds shared_target (historic over-capacity). */
   over_capacity: boolean;
+  /** ROTATION-005: specialist → approved 0–3 when using approved capacity model. */
+  approved_by_specialist?: Record<string, number>;
+  /** ROTATION-005: every eligible associate has a non-stale approval. */
+  approvals_complete?: boolean;
 };
 
 export type ComposeStoreWeekCapacityInput = {
@@ -90,6 +101,11 @@ export type ComposeStoreWeekCapacityInput = {
    */
   profile_to_roster?: ReadonlyMap<string, string> | Record<string, string>;
   quota_per_person?: number;
+  /**
+   * ROTATION-005: when provided, shared_target = sum(approved) and per-person
+   * remaining uses approved caps (missing id → 0 remaining / fail-closed).
+   */
+  approved_by_specialist?: Readonly<Record<string, number>>;
   as_of?: string;
 };
 
@@ -174,7 +190,6 @@ export function composeStoreWeekCapacity(
     a.localeCompare(b)
   );
   const eligible_count = eligible_specialist_ids.length;
-  const shared_target = resolveAutomaticWeeklyBayTarget(eligible_count, quota);
 
   const owned_by_specialist: Record<string, number> = {};
   let owned_total = 0;
@@ -195,11 +210,45 @@ export function composeStoreWeekCapacity(
     owned_by_specialist[owner] = (owned_by_specialist[owner] ?? 0) + 1;
   }
 
+  const approvedInput = input.approved_by_specialist;
+  const usingApprovals = approvedInput != null;
+  const approved_by_specialist: Record<string, number> | undefined = usingApprovals
+    ? {}
+    : undefined;
+  let shared_target: number;
+  let approvals_complete: boolean | undefined;
+
+  if (usingApprovals && approved_by_specialist) {
+    shared_target = 0;
+    approvals_complete = eligible_count > 0;
+    for (const id of eligible_specialist_ids) {
+      const raw = Number(approvedInput[id]);
+      const cap =
+        Number.isInteger(raw) && raw >= 0 && raw <= quota ? raw : null;
+      if (cap == null) {
+        approvals_complete = false;
+        approved_by_specialist[id] = 0;
+        continue;
+      }
+      approved_by_specialist[id] = cap;
+      shared_target += cap;
+    }
+    if (eligible_count === 0) {
+      approvals_complete = false;
+      shared_target = 0;
+    }
+  } else {
+    shared_target = resolveAutomaticWeeklyBayTarget(eligible_count, quota);
+  }
+
   const remaining_by_specialist: Record<string, number> = {};
   for (const id of eligible_specialist_ids) {
+    const personQuota = usingApprovals
+      ? (approved_by_specialist?.[id] ?? 0)
+      : quota;
     remaining_by_specialist[id] = Math.max(
       0,
-      quota - (owned_by_specialist[id] ?? 0)
+      personQuota - (owned_by_specialist[id] ?? 0)
     );
   }
 
@@ -218,6 +267,9 @@ export function composeStoreWeekCapacity(
     remaining_shared,
     remaining_by_specialist,
     over_capacity: owned_total > shared_target,
+    ...(usingApprovals
+      ? { approved_by_specialist, approvals_complete }
+      : {}),
   };
 }
 
@@ -282,7 +334,12 @@ export function filterPlanItemsToCapacity<
       continue;
     }
     const personOwned = personCounts[sid] ?? 0;
-    if (!allowOverBase && personOwned >= capacity.quota_per_person) {
+    const personQuota =
+      capacity.approved_by_specialist &&
+      Object.prototype.hasOwnProperty.call(capacity.approved_by_specialist, sid)
+        ? Math.max(0, Math.floor(capacity.approved_by_specialist[sid] ?? 0))
+        : capacity.quota_per_person;
+    if (!allowOverBase && personOwned >= personQuota) {
       rejected.push(item);
       continue;
     }
@@ -314,7 +371,11 @@ export type CapacityWriteResult = {
     | "CAPACITY_RPC_MISSING"
     | "CAPACITY_STORE_FORBIDDEN"
     | "CAPACITY_INPUT"
-    | "CAPACITY_WRITE_FAILED";
+    | "CAPACITY_WRITE_FAILED"
+    | "CAPACITY_APPROVAL_MISSING"
+    | "CAPACITY_APPROVAL_STALE"
+    | "CAPACITY_APPROVAL_ZERO"
+    | "CAPACITY_APPROVAL_SCHEMA_MISSING";
   raw?: unknown;
 };
 
@@ -323,6 +384,11 @@ function classifyCapacityError(message: string): CapacityWriteResult["code"] {
   if (/CAPACITY_PERSON_EXCEEDED/i.test(m)) return "CAPACITY_PERSON_EXCEEDED";
   if (/CAPACITY_SHARED_EXCEEDED/i.test(m)) return "CAPACITY_SHARED_EXCEEDED";
   if (/CAPACITY_STORE_FORBIDDEN/i.test(m)) return "CAPACITY_STORE_FORBIDDEN";
+  if (/CAPACITY_APPROVAL_MISSING/i.test(m)) return "CAPACITY_APPROVAL_MISSING";
+  if (/CAPACITY_APPROVAL_STALE/i.test(m)) return "CAPACITY_APPROVAL_STALE";
+  if (/CAPACITY_APPROVAL_ZERO/i.test(m)) return "CAPACITY_APPROVAL_ZERO";
+  if (/CAPACITY_APPROVAL_SCHEMA_MISSING|store_week_capacity_approvals/i.test(m))
+    return "CAPACITY_APPROVAL_SCHEMA_MISSING";
   if (/CAPACITY_INPUT/i.test(m)) return "CAPACITY_INPUT";
   if (
     /could not find the function|PGRST202|404|does not exist|upsert_sunday_bay_assignments_with_capacity/i.test(
@@ -509,8 +575,49 @@ async function loadWeekShiftDays(
 /**
  * Load evidence + compose authoritative store-week capacity.
  * `department_codes` should be the Sunday-participating / active department codes.
+ *
+ * ROTATION-005: loads operator approvals when the schema is present and applies
+ * approved per-person caps. Missing schema fails closed (migration required
+ * before writers that depend on approved capacity).
  */
 export async function loadStoreWeekCapacity(
+  supabase: SupabaseClient,
+  input: {
+    store_number: string;
+    week_label: string;
+    department_codes: readonly string[];
+    quota_per_person?: number;
+  }
+): Promise<StoreWeekCapacitySnapshot> {
+  const store = String(input.store_number ?? "").trim();
+  const week = String(input.week_label ?? "").trim();
+
+  try {
+    const { loadApprovedStoreWeekCapacity } = await import(
+      "@/lib/store-ops/approved-week-capacity"
+    );
+    return await loadApprovedStoreWeekCapacity(supabase, {
+      store_number: store,
+      week_label: week,
+      department_codes: input.department_codes,
+    });
+  } catch (err) {
+    const code = String((err as { code?: string })?.code ?? "");
+    const message = err instanceof Error ? err.message : String(err);
+    // Schema not migrated yet → legacy eligible×3 (pre-ROTATION-005 release).
+    // Once migrated, approvals are required (fail closed via RPC + approvals_complete).
+    if (
+      code === "CAPACITY_APPROVAL_SCHEMA_MISSING" ||
+      /store_week_capacity_approvals|not migrated/i.test(message)
+    ) {
+      return loadLegacyStoreWeekCapacity(supabase, input);
+    }
+    throw err;
+  }
+}
+
+/** Pre-approval uniform eligible×3 composer (compat until migration applied). */
+async function loadLegacyStoreWeekCapacity(
   supabase: SupabaseClient,
   input: {
     store_number: string;

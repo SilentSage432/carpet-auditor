@@ -7,13 +7,16 @@
 
 import { useCallback, useEffect, useMemo, useId, useState } from "react";
 import {
+  approveWeekCapacity,
   dispatchExtraBay,
   fetchDepartments,
   fetchOperationalSections,
   fetchThisWeekRotations,
+  fetchWeekCapacityBoard,
   generateRotations,
   suggestExtraBay,
 } from "@/lib/store-ops/client";
+import type { WeekCapacityReviewBoard } from "@/lib/store-ops/approved-week-capacity";
 import {
   indexBaySectionLookups,
   type BaySectionLookup,
@@ -156,6 +159,14 @@ export function SundayAuditAssignmentModal({
   const [baySectionByKey, setBaySectionByKey] = useState<
     Map<string, BaySectionLookup>
   >(() => new Map());
+  /** SECTION-ROTATION-005 — operator-approved weekly capacity review. */
+  const [capacityBoard, setCapacityBoard] =
+    useState<WeekCapacityReviewBoard | null>(null);
+  const [capacityDraft, setCapacityDraft] = useState<Record<string, number>>(
+    {}
+  );
+  const [capacityBusy, setCapacityBusy] = useState(false);
+  const [capacityError, setCapacityError] = useState<string | null>(null);
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -231,12 +242,41 @@ export function SundayAuditAssignmentModal({
         });
       }
       setWeekLabor(labor);
+
+      // Capacity review board (ROTATION-005). Schema-missing → non-blocking null.
+      try {
+        const board = await fetchWeekCapacityBoard(
+          specialist,
+          rotData.assigned_week
+        );
+        setCapacityBoard(board);
+        const draft: Record<string, number> = {};
+        for (const row of board.associates) {
+          draft[row.specialist_id] =
+            row.approval_status === "approved" && row.approved_capacity != null
+              ? row.approved_capacity
+              : row.suggested_capacity;
+        }
+        setCapacityDraft(draft);
+        setCapacityError(null);
+      } catch (capErr) {
+        console.error("[SundayAudit] week capacity board unavailable", capErr);
+        setCapacityBoard(null);
+        setCapacityDraft({});
+        setCapacityError(
+          readableError(
+            capErr,
+            "Weekly capacity approval is unavailable until the schema is migrated"
+          )
+        );
+      }
     } catch (err) {
       setError(
         readableError(err, "Could not load Sunday Flooring cycle audits")
       );
       setBays([]);
       setWeekLabor(null);
+      setCapacityBoard(null);
     } finally {
       setLoading(false);
     }
@@ -579,8 +619,61 @@ export function SundayAuditAssignmentModal({
     }
   }
 
+  async function handleApproveWeekCapacity() {
+    if (!week || !capacityBoard) return;
+    if (!isMasterAdmin(specialist)) {
+      setCapacityError("Only Master Admin can approve weekly bay capacity.");
+      playErrorTone();
+      return;
+    }
+    setCapacityBusy(true);
+    setCapacityError(null);
+    try {
+      const items = capacityBoard.associates
+        .filter((row) => row.eligible)
+        .map((row) => ({
+          specialist_id: row.specialist_id,
+          approved_capacity: Math.max(
+            0,
+            Math.min(
+              3,
+              Math.floor(capacityDraft[row.specialist_id] ?? row.suggested_capacity)
+            )
+          ),
+        }));
+      const board = await approveWeekCapacity(specialist, { week, items });
+      setCapacityBoard(board);
+      const draft: Record<string, number> = {};
+      for (const row of board.associates) {
+        draft[row.specialist_id] =
+          row.approved_capacity ?? row.suggested_capacity;
+      }
+      setCapacityDraft(draft);
+      setStatus(
+        `Approved weekly capacity · shared target ${board.shared_target_approved} bay${
+          board.shared_target_approved === 1 ? "" : "s"
+        }.`
+      );
+      playSuccessTone();
+    } catch (err) {
+      setCapacityError(
+        readableError(err, "Could not approve weekly capacity")
+      );
+      playErrorTone();
+    } finally {
+      setCapacityBusy(false);
+    }
+  }
+
   async function handleBalanceAssign() {
     if (!week || bays.length === 0) return;
+    if (capacityBoard && !capacityBoard.approvals_complete) {
+      setError(
+        "Approve weekly bay capacity for every eligible associate before assigning."
+      );
+      playErrorTone();
+      return;
+    }
     setBusy(true);
     setError(null);
     setStatus(null);
@@ -886,6 +979,114 @@ export function SundayAuditAssignmentModal({
             </button>
           ) : null}
 
+          {week && capacityBoard ? (
+            <section
+              data-testid="week-capacity-review"
+              className="rounded-xl border border-amber-500/30 bg-amber-950/20 p-3"
+            >
+              <p className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-amber-300">
+                Weekly bay capacity · {capacityBoard.week_label}
+              </p>
+              <p className="mt-1 text-[11px] leading-snug text-amber-100/75">
+                Department schedule evidence only. Suggested {BASE_WEEKLY_BAY_QUOTA}{" "}
+                is not an approval — confirm each eligible associate (0–3).
+                Shared target{" "}
+                {capacityBoard.approvals_complete
+                  ? capacityBoard.shared_target_approved
+                  : capacityBoard.shared_target_proposed}{" "}
+                ·{" "}
+                {capacityBoard.approvals_complete
+                  ? "approved"
+                  : "not approved yet"}
+              </p>
+              {capacityError ? (
+                <p
+                  role="alert"
+                  className="mt-2 text-[12px] leading-snug text-rose-200"
+                >
+                  {capacityError}
+                </p>
+              ) : null}
+              <ul className="mt-2 space-y-2">
+                {capacityBoard.associates.map((row) => (
+                  <li
+                    key={row.specialist_id}
+                    data-testid={`week-capacity-row-${row.specialist_id}`}
+                    className="rounded-lg border border-amber-500/20 bg-zinc-950/40 px-2.5 py-2"
+                  >
+                    <div className="flex flex-wrap items-baseline justify-between gap-2">
+                      <span className="text-sm font-semibold text-white">
+                        {row.specialist_name}
+                      </span>
+                      <span className="font-mono text-[10px] uppercase text-amber-200/80">
+                        {row.approval_status}
+                        {row.approved_capacity != null
+                          ? ` · ${row.approved_capacity}`
+                          : ""}
+                      </span>
+                    </div>
+                    <p className="mt-0.5 text-[11px] text-amber-100/65">
+                      {row.scheduled_department_days} dept day
+                      {row.scheduled_department_days === 1 ? "" : "s"} ·{" "}
+                      {row.known_available_hours}h
+                      {row.owned_count > 0
+                        ? ` · ${row.owned_count} already assigned`
+                        : ""}
+                      {!row.eligible ? " · not eligible" : ""}
+                    </p>
+                    {row.eligible ? (
+                      <label className="mt-1.5 flex items-center gap-2 text-[12px] text-amber-50">
+                        <span className="shrink-0">Capacity</span>
+                        <select
+                          data-testid={`week-capacity-select-${row.specialist_id}`}
+                          className="min-h-[40px] flex-1 rounded-lg border border-amber-400/30 bg-zinc-950 px-2 text-sm text-white"
+                          value={
+                            capacityDraft[row.specialist_id] ??
+                            row.suggested_capacity
+                          }
+                          disabled={capacityBusy || !isMasterAdmin(specialist)}
+                          onChange={(e) => {
+                            const n = Number(e.target.value);
+                            setCapacityDraft((prev) => ({
+                              ...prev,
+                              [row.specialist_id]: n,
+                            }));
+                          }}
+                        >
+                          {[0, 1, 2, 3].map((n) => (
+                            <option key={n} value={n}>
+                              {n}
+                              {n === row.suggested_capacity ? " (suggested)" : ""}
+                              {row.owned_count > n ? " — below owned" : ""}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    ) : null}
+                  </li>
+                ))}
+              </ul>
+              <button
+                type="button"
+                data-testid="week-capacity-approve"
+                disabled={
+                  capacityBusy ||
+                  busy ||
+                  !isMasterAdmin(specialist) ||
+                  capacityBoard.associates.every((r) => !r.eligible)
+                }
+                onClick={() => void handleApproveWeekCapacity()}
+                className="mt-3 flex min-h-[44px] w-full items-center justify-center rounded-xl border border-amber-400/50 bg-amber-950/50 px-3 text-sm font-bold text-amber-50 disabled:opacity-40"
+              >
+                {capacityBusy
+                  ? "Approving…"
+                  : capacityBoard.approvals_complete
+                    ? "Re-approve weekly capacity"
+                    : "Approve weekly capacity"}
+              </button>
+            </section>
+          ) : null}
+
           {bays.length > 0 && pending > 0 ? (
             <section
               data-testid="week-assign-cue"
@@ -897,13 +1098,12 @@ export function SundayAuditAssignmentModal({
               {balancerPlan.loads.length > 0 ? (
                 <>
                   <p className="mt-1 text-[11px] text-cyan-100/70">
-                    Base quota {BASE_WEEKLY_BAY_QUOTA} physical bays each from
-                    this week&apos;s known schedules
+                    Assign from approved weekly capacity (max{" "}
+                    {BASE_WEEKLY_BAY_QUOTA} each; shared = sum of approvals)
                     {` across ${bays.length} staged bay${
                       bays.length === 1 ? "" : "s"
                     }`}
-                    {" "}
-                    (not proportional hours).
+                    . Hours do not auto-scale quota.
                   </p>
                   <ul
                     data-testid="week-assign-preview"
@@ -965,11 +1165,18 @@ export function SundayAuditAssignmentModal({
                   <button
                     type="button"
                     data-testid="week-assign-confirm"
-                    disabled={busy}
-                    onClick={() => void handleBalanceAssign()}
                     className="btn-primary-glow mt-3 flex min-h-[44px] w-full items-center justify-center rounded-xl px-3 text-sm disabled:opacity-40"
+                    disabled={
+                      busy ||
+                      Boolean(capacityBoard && !capacityBoard.approvals_complete)
+                    }
+                    onClick={() => void handleBalanceAssign()}
                   >
-                    {busy ? "Assigning…" : "Assign this week"}
+                    {busy
+                      ? "Assigning…"
+                      : capacityBoard && !capacityBoard.approvals_complete
+                        ? "Assign this week (approve capacity first)"
+                        : "Assign this week"}
                   </button>
                 </>
               ) : (

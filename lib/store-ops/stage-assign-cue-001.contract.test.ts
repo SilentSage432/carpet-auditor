@@ -60,7 +60,8 @@ describe("STAGE-ASSIGN-CUE-001 user-journey contracts", () => {
 
   it("Assign this week still routes through handleBalanceAssign and LAB-WEEK-002 writer", () => {
     const confirmIdx = modal.indexOf('data-testid="week-assign-confirm"');
-    const nearby = modal.slice(confirmIdx, confirmIdx + 420);
+    // Slice covers disabled/capacity gate props plus label (ROTATION-005).
+    const nearby = modal.slice(confirmIdx, confirmIdx + 720);
     expect(nearby).toMatch(/handleBalanceAssign/);
     expect(nearby).toMatch(/Assign this week/);
     const balance = functionBody(modal, "handleBalanceAssign");

@@ -424,6 +424,8 @@ export function buildPreviewCapacityCaps(input: {
   ownedBySpecialist: Readonly<Record<string, number>>;
   ownedTotal: number;
   quotaPerPerson?: number;
+  /** ROTATION-005: when set, shared = sum(approved) and per-person remaining uses caps. */
+  approvedBySpecialist?: Readonly<Record<string, number>>;
 }): Pick<
   StoreWeekCapacitySnapshot,
   | "shared_target"
@@ -431,6 +433,8 @@ export function buildPreviewCapacityCaps(input: {
   | "remaining_shared"
   | "remaining_by_specialist"
   | "eligible_specialist_ids"
+  | "approved_by_specialist"
+  | "approvals_complete"
 > {
   const quota = Math.max(
     0,
@@ -441,19 +445,49 @@ export function buildPreviewCapacityCaps(input: {
       input.eligibleSpecialistIds.map((id) => String(id).trim()).filter(Boolean)
     ),
   ].sort((a, b) => a.localeCompare(b));
-  const shared_target = eligible_specialist_ids.length * quota;
   const owned_total = Math.max(0, Math.floor(input.ownedTotal));
+  const usingApprovals = input.approvedBySpecialist != null;
+  const approved_by_specialist: Record<string, number> = {};
+  let shared_target = 0;
+  let approvals_complete = usingApprovals && eligible_specialist_ids.length > 0;
   const remaining_by_specialist: Record<string, number> = {};
+
   for (const id of eligible_specialist_ids) {
     const owned = Math.max(0, Math.floor(input.ownedBySpecialist[id] ?? 0));
-    remaining_by_specialist[id] = Math.max(0, quota - owned);
+    if (usingApprovals) {
+      const raw = Number(input.approvedBySpecialist?.[id]);
+      const cap =
+        Number.isInteger(raw) && raw >= 0 && raw <= quota ? raw : null;
+      if (cap == null) {
+        approvals_complete = false;
+        approved_by_specialist[id] = 0;
+        remaining_by_specialist[id] = 0;
+        continue;
+      }
+      approved_by_specialist[id] = cap;
+      shared_target += cap;
+      remaining_by_specialist[id] = Math.max(0, cap - owned);
+    } else {
+      shared_target = eligible_specialist_ids.length * quota;
+      remaining_by_specialist[id] = Math.max(0, quota - owned);
+    }
   }
+  if (!usingApprovals) {
+    shared_target = eligible_specialist_ids.length * quota;
+  } else if (eligible_specialist_ids.length === 0) {
+    approvals_complete = false;
+    shared_target = 0;
+  }
+
   return {
     eligible_specialist_ids,
     shared_target,
     owned_total,
     remaining_shared: Math.max(0, shared_target - owned_total),
     remaining_by_specialist,
+    ...(usingApprovals
+      ? { approved_by_specialist, approvals_complete }
+      : {}),
   };
 }
 

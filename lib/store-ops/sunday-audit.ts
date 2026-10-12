@@ -28,6 +28,7 @@ import {
   type ShiftRosterMember,
 } from "@/lib/store-ops/weekly-rotations";
 import { enqueueOrExecute } from "@/lib/sync-queue";
+import { assertApprovedCapacityReady } from "@/lib/store-ops/approved-week-capacity";
 import {
   loadStoreWeekCapacity,
   writeSundayAssignmentsWithCapacity,
@@ -314,6 +315,7 @@ export async function executeSundayAssignLive(
     week_label: week,
     department_codes: participating,
   });
+  assertApprovedCapacityReady(capacity);
 
   const result = await writeSundayAssignmentsWithCapacity(supabase, {
     store_number: store,
@@ -438,6 +440,7 @@ export async function applySundayAssignmentPlan(
     week_label: week,
     department_codes: [dept],
   });
+  assertApprovedCapacityReady(capacity);
 
   const result = await writeSundayAssignmentsWithCapacity(supabase, {
     store_number: store,

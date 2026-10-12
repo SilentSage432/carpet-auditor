@@ -2318,3 +2318,37 @@ export async function archiveWorkspaceCleanupAssociates(
   invalidateRosterCache();
   return result;
 }
+
+/** SECTION-ROTATION-005 — load weekly capacity review board. */
+export async function fetchWeekCapacityBoard(
+  specialist: StoreSpecialist,
+  weekLabel: string
+): Promise<import("./approved-week-capacity").WeekCapacityReviewBoard> {
+  const week = encodeURIComponent(String(weekLabel ?? "").trim());
+  const result = await storeOpsFetch<{
+    board: import("./approved-week-capacity").WeekCapacityReviewBoard;
+  }>(`/api/week-capacity?week=${week}`, specialist, { method: "GET" });
+  return result.board;
+}
+
+/** SECTION-ROTATION-005 — MasterAdmin explicit capacity approval. */
+export async function approveWeekCapacity(
+  specialist: StoreSpecialist,
+  input: {
+    week: string;
+    items: Array<{ specialist_id: string; approved_capacity: number }>;
+  }
+): Promise<import("./approved-week-capacity").WeekCapacityReviewBoard> {
+  const result = await storeOpsFetch<{
+    ok: boolean;
+    board: import("./approved-week-capacity").WeekCapacityReviewBoard;
+  }>("/api/week-capacity", specialist, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      week: input.week,
+      items: input.items,
+    }),
+  });
+  return result.board;
+}

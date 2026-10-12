@@ -37,6 +37,7 @@ import {
   type ShiftRosterMember,
 } from "@/lib/store-ops/weekly-rotations";
 import type { Department } from "@/lib/store-ops/types";
+import { assertApprovedCapacityReady } from "@/lib/store-ops/approved-week-capacity";
 import {
   filterPlanItemsToCapacity,
   loadStoreWeekCapacity,
@@ -240,21 +241,22 @@ export async function applySundayAssignmentPlanAdmin(
     })
   );
 
-  let sharedTarget = options.shared_target;
-  if (sharedTarget == null) {
-    const codes =
-      options.participating_department_codes &&
-      options.participating_department_codes.length > 0
-        ? options.participating_department_codes
-        : [department];
-    const capacity = await loadStoreWeekCapacity(supabase, {
-      store_number: store,
-      week_label: week,
-      department_codes: codes,
-      quota_per_person: options.quota_per_person,
-    });
-    sharedTarget = capacity.shared_target;
-  }
+  const codes =
+    options.participating_department_codes &&
+    options.participating_department_codes.length > 0
+      ? options.participating_department_codes
+      : [department];
+  const capacity = await loadStoreWeekCapacity(supabase, {
+    store_number: store,
+    week_label: week,
+    department_codes: codes,
+    quota_per_person: options.quota_per_person,
+  });
+  assertApprovedCapacityReady(capacity);
+  const sharedTarget =
+    options.shared_target != null
+      ? Math.min(options.shared_target, capacity.shared_target)
+      : capacity.shared_target;
 
   const writeItems = items
     .map((row) => {
