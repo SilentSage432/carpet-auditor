@@ -68,9 +68,11 @@ describe("RD-5 Walkthroughs contracts", () => {
   it("Map bay sheet exposes walkthrough history without aisle-index clutter", () => {
     const sheet = readSrc("components/admin/WalkTheFloorSheet.tsx");
     expect(sheet).toMatch(/walk-sheet-walkthrough-history/);
-    expect(sheet).toMatch(/fetchWalkthroughPlaceHistory/);
+    // MAP-002: place context API supersedes direct place-history fetch on the sheet.
+    expect(sheet).toMatch(/fetchMapBayContext/);
     const map = readSrc("components/hub/tabs/MapTab.tsx");
     expect(map).not.toMatch(/fetchWalkthroughPlaceHistory/);
+    expect(map).not.toMatch(/fetchMapBayContext/);
   });
 
   it("WALK-002 Map bay sheet records place-bound observations", () => {

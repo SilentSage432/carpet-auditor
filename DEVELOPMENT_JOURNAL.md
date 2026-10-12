@@ -1,5 +1,13 @@
 # DeptSync Hub — Development Journal
 
+## 2026-10-12 — DEPTSYNC-MAP-002 bay context and attention
+
+**Focused local implementation; no deploy / no schema migrate / no prod mutations.** Map bay sheet loads store-scoped `GET /api/store-locations/bay-context`: this-week assignment status + assignee, place-local open/overdue follow-ups + opportunity decision cues, progressive rotation/observation/completed-follow-up history. Record Observation + section slot preserved. No ownership/Zebra writes. Focused **43 PASS**; `tsc` PASS; lint clean; `next build` PASS (`/api/store-locations/bay-context`). Canonical: [`docs/product/DEPTSYNC_MAP_002_IMPLEMENTATION.md`](docs/product/DEPTSYNC_MAP_002_IMPLEMENTATION.md). Release **CONDITIONAL GO** after phone review. **STOP.**
+
+## 2026-10-12 — DEPTSYNC-MAP-001 Map vision and roadmap reconciliation
+
+**Read-only discovery; no impl / migrate / deploy / mutations.** Reconciled Redesign-001 §D.2 Map vision against RD-2…WALK-006 production Map: aisle→bay navigator, week readiness, section bay-sheet, walkthrough history + Record Observation are **COMPLETE**; full place history, open-follow-up Map cues, Pin-to-week (gated `canMutate=false`), named-zone geography incomplete. Broader Floor Command gaps recorded (ALIGN-DEPT, SEC-OPS-010, auth simplify, specialty, CI, phone acceptances). Auto-stage remains OFF. Verdict **CONDITIONAL GO** for focused MAP-002 bay-sheet affordances; **NO-GO** Map rewrite / floorplan / workflow merge. Canonical: [`docs/product/DEPTSYNC_MAP_001_ROADMAP_RECONCILIATION.md`](docs/product/DEPTSYNC_MAP_001_ROADMAP_RECONCILIATION.md). **STOP.**
+
 ## 2026-10-12 — DEPTSYNC-WALK-006 walkthrough follow-up production release
 
 **Authorized controlled release.** Commit `cbaac90` pushed `808ea48..cbaac90`. Vercel Production `dpl_BvF6rSuu7Lbw5KAh1ouSF3z6qwvh` READY; alias https://deptsync-hub.vercel.app → that deployment. No schema migrate; no CLI recovery. WALK-004 failure diagnosed as Vercel `git_info_fail` (not app build). Smoke: `/login` 200; walkthroughs/overview/map **307**→login; walkthrough APIs + follow-ups POST **401**; zebra-entry **401**. Data preserved: walkthroughs **0/0/0**; sections **4/160**. Auto-stage OFF. Canonical: [`docs/product/DEPTSYNC_WALK_006_PRODUCTION_RELEASE.md`](docs/product/DEPTSYNC_WALK_006_PRODUCTION_RELEASE.md). **RELEASED — AWAITING PHONE ACCEPTANCE.** **STOP.**

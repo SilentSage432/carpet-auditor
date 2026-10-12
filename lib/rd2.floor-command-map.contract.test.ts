@@ -63,4 +63,24 @@ describe("RD-2 Floor Command Map", () => {
     const nav = readSrc("lib/nav-hub.ts");
     expect(nav).toMatch(/\/admin\/store-map/);
   });
+
+  it("MAP-002 bay sheet loads place context without Map rewrite", () => {
+    const sheet = readSrc("components/admin/WalkTheFloorSheet.tsx");
+    expect(sheet).toMatch(/fetchMapBayContext/);
+    expect(sheet).toMatch(/walk-sheet-this-week/);
+    expect(sheet).toMatch(/walk-sheet-follow-up-attention/);
+    expect(sheet).toMatch(/walk-sheet-history-toggle/);
+    expect(sheet).toMatch(/walk-sheet-record-observation/);
+    expect(sheet).toMatch(/walk-sheet-section-slot/);
+    expect(sheet).toMatch(/Open This Week/);
+    expect(sheet).not.toMatch(/from\("sunday_bay_assignments"\)\.insert/);
+    expect(sheet).not.toMatch(/zebra-entry/);
+    const api = readSrc("app/api/store-locations/bay-context/route.ts");
+    expect(api).toMatch(/requireStoreOpsActor/);
+    expect(api).toMatch(/listMapBayContext/);
+    expect(api).toMatch(/assertActorCanAccessDepartmentId/);
+    const domain = readSrc("lib/store-ops/map-bay-context.ts");
+    expect(domain).toMatch(/Does not mutate ownership/);
+    expect(domain).toMatch(/composeMapBayFollowUpAttention/);
+  });
 });

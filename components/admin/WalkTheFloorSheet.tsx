@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { X } from "lucide-react";
 import { HubPortal } from "@/components/hub/HubPortal";
 import { assignLocationsToWeek, logBayService, setPhysicalBayRotationPriority } from "@/lib/store-ops/client";
@@ -36,19 +36,21 @@ import {
   type BaySectionLookup,
 } from "@/lib/store-ops/operational-sections";
 import {
+  fetchMapBayContext,
   fetchOperationalSections,
-  fetchWalkthroughPlaceHistory,
   STORE_OPS_WALKTHROUGHS_CHANGED_EVENT,
 } from "@/lib/store-ops/client";
 import {
   observationTypeLabel,
-  type WalkthroughObservationView,
   type WalkthroughPlaceOwnership,
 } from "@/lib/store-ops/walkthroughs";
+import type { MapBayContext } from "@/lib/store-ops/map-bay-context";
 import { WalkthroughCaptureSheet } from "@/components/walkthroughs/WalkthroughCaptureSheet";
 import type { OperationalSectionView } from "@/lib/store-ops/operational-sections";
 import { dedupeRoster, fetchSpecialists, isSupervisor } from "@/lib/specialists";
+import { isoWeekLabel } from "@/lib/store-ops/week";
 import Link from "next/link";
+import { ChevronDown, ChevronUp } from "lucide-react";
 
 type BayPair = {
   bay: number;
@@ -126,50 +128,48 @@ export function WalkTheFloorSheet({
   onChanged: () => void;
   onError: (msg: string | null) => void;
 }) {
-  const [walkHistory, setWalkHistory] = useState<
-    WalkthroughObservationView[] | null
-  >(null);
-  const [walkHistoryError, setWalkHistoryError] = useState<string | null>(null);
-  const [placeOwnership, setPlaceOwnership] =
-    useState<WalkthroughPlaceOwnership | null>(null);
+  const [bayContext, setBayContext] = useState<MapBayContext | null>(null);
+  const [contextError, setContextError] = useState<string | null>(null);
+  const [contextLoading, setContextLoading] = useState(true);
+  const [showHistory, setShowHistory] = useState(false);
   const [captureOpen, setCaptureOpen] = useState(false);
   const [captureTeam, setCaptureTeam] = useState<StoreSpecialist[]>([]);
   const [captureSections, setCaptureSections] = useState<
     OperationalSectionView[]
   >([]);
   const canRecordObservation = isSupervisor(specialist);
+  const placeOwnership: WalkthroughPlaceOwnership | null =
+    bayContext?.place_ownership ?? null;
+
+  const reloadBayContext = useCallback(async () => {
+    setContextLoading(true);
+    setContextError(null);
+    try {
+      const { context } = await fetchMapBayContext(specialist, {
+        departmentId: bay.departmentId,
+        aisle: bay.aisle,
+        bay: bay.pair.bay,
+        week: isoWeekLabel(),
+      });
+      setBayContext(context);
+    } catch (err) {
+      const msg =
+        err instanceof Error ? err.message : "Could not load bay context";
+      if (/not migrated|missing_relation|503/i.test(msg)) {
+        setBayContext(null);
+        setContextError(null);
+      } else {
+        setContextError(msg);
+        setBayContext(null);
+      }
+    } finally {
+      setContextLoading(false);
+    }
+  }, [specialist, bay.departmentId, bay.aisle, bay.pair.bay]);
 
   useEffect(() => {
-    let cancelled = false;
-    setWalkHistory(null);
-    setWalkHistoryError(null);
-    setPlaceOwnership(null);
-    void fetchWalkthroughPlaceHistory(specialist, {
-      departmentId: bay.departmentId,
-      aisle: bay.aisle,
-      bay: bay.pair.bay,
-    })
-      .then((res) => {
-        if (cancelled) return;
-        setWalkHistory(res.observations);
-        setPlaceOwnership(res.place_ownership ?? null);
-      })
-      .catch((err) => {
-        if (cancelled) return;
-        const msg =
-          err instanceof Error ? err.message : "Could not load walkthroughs";
-        // Missing migration is quiet — Map still works.
-        if (/not migrated|missing_relation|503/i.test(msg)) {
-          setWalkHistory([]);
-          return;
-        }
-        setWalkHistoryError(msg);
-        setWalkHistory([]);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [specialist, bay.departmentId, bay.aisle, bay.pair.bay]);
+    void reloadBayContext();
+  }, [reloadBayContext]);
 
   async function openCapture() {
     setCaptureOpen(true);
@@ -190,19 +190,7 @@ export function WalkTheFloorSheet({
 
   function onObservationSaved() {
     window.dispatchEvent(new Event(STORE_OPS_WALKTHROUGHS_CHANGED_EVENT));
-    setWalkHistory(null);
-    void fetchWalkthroughPlaceHistory(specialist, {
-      departmentId: bay.departmentId,
-      aisle: bay.aisle,
-      bay: bay.pair.bay,
-    })
-      .then((res) => {
-        setWalkHistory(res.observations);
-        setPlaceOwnership(res.place_ownership ?? null);
-      })
-      .catch(() => {
-        setWalkHistory([]);
-      });
+    void reloadBayContext();
     onChanged();
   }
 
@@ -489,10 +477,115 @@ export function WalkTheFloorSheet({
           </section>
         ) : null}
 
+        {/* MAP-002 — follow-up attention first (place-local; not Overview inbox) */}
+        {bayContext &&
+        (bayContext.attention_follow_ups.length > 0 ||
+          bayContext.open_follow_ups.length > 0 ||
+          bayContext.review_observations.length > 0) ? (
+          <section
+            className="mb-4 rounded-xl border border-amber-700/40 bg-amber-950/20 px-3 py-2.5"
+            data-testid="walk-sheet-follow-up-attention"
+            aria-label="Follow-up attention"
+          >
+            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-amber-200/90">
+              Follow-up attention
+            </p>
+            <ul className="mt-2 space-y-2">
+              {bayContext.attention_follow_ups.map((fu) => (
+                <li key={fu.id} className="text-sm">
+                  <p className="font-semibold text-amber-50">{fu.action_text}</p>
+                  <p className="text-[11px] text-amber-100/70">
+                    Overdue
+                    {fu.due_on ? ` · target ${fu.due_on}` : ""}
+                  </p>
+                </li>
+              ))}
+              {bayContext.open_follow_ups
+                .filter((f) => !f.needs_attention)
+                .map((fu) => (
+                  <li key={fu.id} className="text-sm">
+                    <p className="font-semibold text-zinc-100">{fu.action_text}</p>
+                    <p className="text-[11px] text-zinc-500">
+                      Open follow-up
+                      {fu.due_on ? ` · target ${fu.due_on}` : ""}
+                    </p>
+                  </li>
+                ))}
+              {bayContext.review_observations.map((obs) => (
+                <li key={obs.id} className="text-sm">
+                  <p className="font-semibold text-zinc-100">
+                    {observationTypeLabel(obs.observation_type)}
+                  </p>
+                  <p className="text-xs text-zinc-400 line-clamp-2">{obs.body}</p>
+                  <p className="text-[11px] text-zinc-500">
+                    Needs follow-up decision — not open work yet
+                  </p>
+                </li>
+              ))}
+            </ul>
+            <Link
+              href="/walkthroughs"
+              className="mt-2 inline-flex min-h-12 w-full items-center justify-center rounded-xl border border-amber-700/40 bg-amber-950/30 text-sm font-semibold text-amber-50"
+              onClick={onClose}
+              data-testid="walk-sheet-open-follow-ups"
+            >
+              Open Walkthroughs
+            </Link>
+          </section>
+        ) : null}
+
+        <section
+          className="mb-4 rounded-xl border border-zinc-700/50 bg-zinc-950/40 px-3 py-2.5"
+          data-testid="walk-sheet-this-week"
+          aria-label="This week assignment"
+        >
+          <p className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-zinc-500">
+            This week
+          </p>
+          {contextLoading && !bayContext ? (
+            <p className="mt-1.5 text-xs text-zinc-500">Loading week status…</p>
+          ) : bayContext ? (
+            <div className="mt-1.5 space-y-1">
+              <p
+                className="text-sm font-semibold text-zinc-100"
+                data-testid="walk-sheet-week-status"
+              >
+                {bayContext.week.status_label}
+              </p>
+              {bayContext.week.assignee_name ? (
+                <p className="text-xs text-zinc-400">
+                  Assignee · {bayContext.week.assignee_name}
+                </p>
+              ) : null}
+              {bayContext.week.assigned_week ? (
+                <p className="font-mono text-[10px] text-zinc-600">
+                  {bayContext.week.assigned_week}
+                </p>
+              ) : null}
+              <p className="text-[11px] text-zinc-500">
+                Weekly assignment — not section ownership.
+              </p>
+              <Link
+                href={bayContext.week.this_week_href}
+                className="mt-1 inline-flex min-h-12 w-full items-center justify-center rounded-xl border border-zinc-700 bg-zinc-900/80 text-sm font-semibold text-zinc-100"
+                onClick={onClose}
+                data-testid="walk-sheet-open-this-week"
+              >
+                Open This Week
+              </Link>
+            </div>
+          ) : (
+            <p className="mt-1.5 text-xs text-zinc-400">
+              Week status unavailable
+              {contextError ? ` · ${contextError}` : ""}
+            </p>
+          )}
+        </section>
+
         <section
           className="mb-4 rounded-xl border border-zinc-700/50 bg-zinc-950/40 px-3 py-2.5"
           data-testid="walk-sheet-walkthrough-history"
-          aria-label="Walkthrough history"
+          aria-label="Walkthrough capture"
         >
           <p className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-zinc-500">
             Walkthrough
@@ -526,50 +619,139 @@ export function WalkTheFloorSheet({
             </button>
           ) : null}
 
-          {walkHistory == null ? (
-            <p className="mt-2 text-xs text-zinc-500">Loading history…</p>
-          ) : walkHistory.length === 0 ? (
-            <div className="mt-2 space-y-1">
-              <p className="text-sm text-zinc-400">No walkthrough notes on this bay.</p>
-              {walkHistoryError ? (
-                <p className="text-[11px] text-zinc-500">{walkHistoryError}</p>
+          <Link
+            href="/walkthroughs"
+            className="mt-2 inline-flex min-h-11 items-center text-sm font-semibold text-accent"
+            onClick={onClose}
+            data-testid="walk-sheet-walkthroughs-open"
+          >
+            Open Walkthroughs
+          </Link>
+        </section>
+
+        <section
+          className="mb-4 rounded-xl border border-zinc-700/50 bg-zinc-950/40 px-3 py-2.5"
+          data-testid="walk-sheet-history"
+          aria-label="Bay history"
+        >
+          <button
+            type="button"
+            onClick={() => setShowHistory((v) => !v)}
+            className="flex min-h-12 w-full items-center justify-between gap-2 text-left"
+            data-testid="walk-sheet-history-toggle"
+            aria-expanded={showHistory}
+          >
+            <span className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-zinc-500">
+              History
+              {bayContext
+                ? ` · ${(bayContext.rotation_history.length || 0) + (bayContext.observations.length || 0)}`
+                : ""}
+            </span>
+            {showHistory ? (
+              <ChevronUp className="h-4 w-4 text-zinc-400" aria-hidden />
+            ) : (
+              <ChevronDown className="h-4 w-4 text-zinc-400" aria-hidden />
+            )}
+          </button>
+
+          {showHistory ? (
+            <div className="mt-2 space-y-3 border-t border-zinc-800 pt-3">
+              {contextLoading && !bayContext ? (
+                <p className="text-xs text-zinc-500">Loading history…</p>
               ) : null}
-              <Link
-                href="/walkthroughs"
-                className="mt-1 inline-flex min-h-11 items-center text-sm font-semibold text-accent"
-                onClick={onClose}
-              >
-                Open Walkthroughs
-              </Link>
-            </div>
-          ) : (
-            <ul className="mt-2 space-y-2">
-              {walkHistory.slice(0, 5).map((obs) => (
-                <li key={obs.id} className="text-sm">
-                  <p className="font-semibold text-zinc-200">
-                    {observationTypeLabel(obs.observation_type)}
-                    <span className="ml-2 font-mono text-[10px] font-normal text-zinc-500">
-                      {new Date(obs.observed_at).toLocaleDateString(undefined, {
-                        month: "short",
-                        day: "numeric",
-                      })}
-                    </span>
+
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500">
+                  Weekly rotations
+                </p>
+                {bayContext && bayContext.rotation_history.length > 0 ? (
+                  <ul className="mt-1.5 space-y-1.5">
+                    {bayContext.rotation_history.map((row) => (
+                      <li
+                        key={row.id}
+                        className="flex flex-wrap items-baseline justify-between gap-2 text-xs"
+                      >
+                        <span className="font-mono text-zinc-300">
+                          {row.assigned_week}
+                          {row.surface !== "UNKNOWN"
+                            ? ` · ${row.surface === "SELLING" ? "Sell" : "Top"}`
+                            : ""}
+                        </span>
+                        <span className="text-zinc-400">{row.status_label}</span>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="mt-1.5 text-xs text-zinc-500">
+                    No rotation history for this bay.
                   </p>
-                  <p className="text-xs leading-snug text-zinc-400">{obs.body}</p>
-                </li>
-              ))}
-              <li>
-                <Link
-                  href="/walkthroughs"
-                  className="inline-flex min-h-11 items-center text-sm font-semibold text-accent"
-                  onClick={onClose}
-                  data-testid="walk-sheet-walkthroughs-open"
-                >
-                  Open Walkthroughs
-                </Link>
-              </li>
-            </ul>
-          )}
+                )}
+              </div>
+
+              <div>
+                <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500">
+                  Observations
+                </p>
+                {bayContext && bayContext.observations.length > 0 ? (
+                  <ul className="mt-1.5 space-y-2">
+                    {bayContext.observations.slice(0, 5).map((obs) => (
+                      <li key={obs.id} className="text-sm">
+                        <p className="font-semibold text-zinc-200">
+                          {observationTypeLabel(obs.observation_type)}
+                          <span className="ml-2 font-mono text-[10px] font-normal text-zinc-500">
+                            {new Date(obs.observed_at).toLocaleDateString(
+                              undefined,
+                              { month: "short", day: "numeric" }
+                            )}
+                          </span>
+                          {obs.has_open_follow_up ? (
+                            <span className="ml-2 text-[10px] font-bold uppercase text-amber-200/80">
+                              Follow-up open
+                            </span>
+                          ) : (obs.done_follow_up_count ?? 0) > 0 ? (
+                            <span className="ml-2 text-[10px] font-bold uppercase text-emerald-200/70">
+                              Follow-up done
+                            </span>
+                          ) : obs.awaiting_follow_up_decision ? (
+                            <span className="ml-2 text-[10px] font-bold uppercase text-zinc-500">
+                              Needs decision
+                            </span>
+                          ) : null}
+                        </p>
+                        <p className="text-xs leading-snug text-zinc-400">
+                          {obs.body}
+                        </p>
+                      </li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="mt-1.5 text-xs text-zinc-500">
+                    No walkthrough notes on this bay.
+                  </p>
+                )}
+              </div>
+
+              {bayContext && bayContext.completed_follow_ups.length > 0 ? (
+                <div>
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-zinc-500">
+                    Completed follow-ups
+                  </p>
+                  <ul className="mt-1.5 space-y-1.5">
+                    {bayContext.completed_follow_ups.map((fu) => (
+                      <li key={fu.id} className="text-xs text-zinc-400">
+                        <span className="font-medium text-zinc-300">
+                          {fu.action_text}
+                        </span>
+                        {fu.completion_evidence
+                          ? ` · ${fu.completion_evidence}`
+                          : ""}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
         </section>
 
         <section

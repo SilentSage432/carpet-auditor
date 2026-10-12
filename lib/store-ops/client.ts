@@ -2158,6 +2158,28 @@ export async function fetchWalkthroughPlaceHistory(
   }>(`/api/walkthroughs/observations?${qs}`, specialist);
 }
 
+/** MAP-002 — read-only bay operational context for Map sheet. */
+export async function fetchMapBayContext(
+  specialist: StoreSpecialist,
+  input: {
+    departmentId: string;
+    aisle: string;
+    bay: number;
+    week?: string | null;
+  }
+): Promise<{ context: import("./map-bay-context").MapBayContext }> {
+  const qs = new URLSearchParams({
+    department_id: input.departmentId,
+    aisle: input.aisle,
+    bay: String(input.bay),
+  });
+  if (input.week) qs.set("week", input.week);
+  return storeOpsFetch<{ context: import("./map-bay-context").MapBayContext }>(
+    `/api/store-locations/bay-context?${qs}`,
+    specialist
+  );
+}
+
 export async function createWalkthroughObservationClient(
   specialist: StoreSpecialist,
   input: {
