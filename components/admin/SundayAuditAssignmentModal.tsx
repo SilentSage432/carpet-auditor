@@ -28,6 +28,12 @@ import {
   isSectionAwarePreviewEnabled,
   type SectionAwareWeeklyPreview,
 } from "@/lib/store-ops/section-aware-rotation";
+import {
+  assertStewardshipProposalFresh,
+  classifyBayPriorityTier,
+  composeStewardshipWeeklyProposal,
+  type StewardshipWeeklyProposal,
+} from "@/lib/store-ops/stewardship-week-distribution";
 import { readableError } from "@/lib/store-ops/errors";
 import { playErrorTone, playSuccessTone, playTapTone } from "@/lib/ui/feedback";
 import { diagnoseBayHealth, type BayHealthFinding } from "@/lib/store-ops/bay-health";
@@ -288,7 +294,8 @@ export function SundayAuditAssignmentModal({
   }, [open, reload]);
 
   useEffect(() => {
-    if (!open || !sectionAwarePreviewOn) return;
+    // Sections feed stewardship distribution (ROTATION-006) and opt-in preview.
+    if (!open) return;
     let cancelled = false;
     void fetchOperationalSections(specialist, { includeMembers: true })
       .then((payload) => {
@@ -297,7 +304,7 @@ export function SundayAuditAssignmentModal({
       })
       .catch((err) => {
         console.error(
-          "[SundayAudit] section-aware preview sections failed (non-blocking)",
+          "[SundayAudit] operational sections failed (non-blocking)",
           err
         );
         if (!cancelled) setBaySectionByKey(new Map());
@@ -305,11 +312,12 @@ export function SundayAuditAssignmentModal({
     return () => {
       cancelled = true;
     };
-  }, [open, sectionAwarePreviewOn, specialist]);
+  }, [open, specialist]);
 
-  const activeBaySectionByKey = sectionAwarePreviewOn
-    ? baySectionByKey
-    : EMPTY_BAY_SECTION_MAP;
+  const activeBaySectionByKey =
+    sectionAwarePreviewOn || Boolean(capacityBoard?.approvals_complete)
+      ? baySectionByKey
+      : EMPTY_BAY_SECTION_MAP;
 
   useEffect(() => {
     if (!open || !week) return;
@@ -381,10 +389,25 @@ export function SundayAuditAssignmentModal({
       ownedBySpecialist[owner] = (ownedBySpecialist[owner] ?? 0) + 1;
       ownedRotationIds.push(String(row.rotation.id));
     }
+    const approvedBySpecialist: Record<string, number> = {};
+    if (capacityBoard?.approvals_complete) {
+      for (const row of capacityBoard.associates) {
+        if (
+          row.eligible &&
+          row.approval_status === "approved" &&
+          row.approved_capacity != null
+        ) {
+          approvedBySpecialist[row.specialist_id] = row.approved_capacity;
+        }
+      }
+    }
     const capacity = buildPreviewCapacityCaps({
       eligibleSpecialistIds: members.map((m) => m.specialist_id),
       ownedBySpecialist,
       ownedTotal,
+      ...(Object.keys(approvedBySpecialist).length > 0
+        ? { approvedBySpecialist }
+        : {}),
     });
     const bayRefs = bays.map((bay) => ({
       rotationId: bay.rotation.id,
@@ -411,6 +434,73 @@ export function SundayAuditAssignmentModal({
     weekLabor,
     bays,
     activeBaySectionByKey,
+    healthByRotation,
+    flooringDept?.id,
+    capacityBoard,
+  ]);
+
+  /** ROTATION-006 — explainable stewardship proposal when capacity is approved. */
+  const stewardshipProposal: StewardshipWeeklyProposal | null = useMemo(() => {
+    if (!week || !weekLabor || !capacityBoard) return null;
+    if (weekLabor.processing_status === "UNAVAILABLE") return null;
+    const members = weekLaborToPlannerMembers(weekLabor.allocatable);
+    if (members.length === 0) return null;
+    const ownedBySpecialist: Record<string, number> = {};
+    let ownedTotal = 0;
+    const ownedRotationIds: string[] = [];
+    for (const row of bays) {
+      const owner = String(row.assignment?.specialist_id ?? "").trim();
+      if (!owner) continue;
+      ownedTotal += 1;
+      ownedBySpecialist[owner] = (ownedBySpecialist[owner] ?? 0) + 1;
+      ownedRotationIds.push(String(row.rotation.id));
+    }
+    const approvedBySpecialist: Record<string, number> = {};
+    for (const row of capacityBoard.associates) {
+      if (
+        row.eligible &&
+        row.approval_status === "approved" &&
+        row.approved_capacity != null
+      ) {
+        approvedBySpecialist[row.specialist_id] = row.approved_capacity;
+      }
+    }
+    const capacity = buildPreviewCapacityCaps({
+      eligibleSpecialistIds: members.map((m) => m.specialist_id),
+      ownedBySpecialist,
+      ownedTotal,
+      approvedBySpecialist,
+    });
+    const bayRefs = bays.map((bay) => ({
+      rotationId: bay.rotation.id,
+      department_id: String(
+        bay.rotation.store_locations?.department_id ?? flooringDept?.id ?? ""
+      ).trim(),
+      aisle: bay.aisle,
+      bay: bay.bay,
+      riskScore: riskScoreFromFinding(healthByRotation.get(bay.rotation.id)),
+      priority_tier: undefined,
+      carried_over: Boolean(
+        (bay.rotation as { carried_over?: boolean }).carried_over
+      ),
+    }));
+    return composeStewardshipWeeklyProposal({
+      store_number: getStoreNumber(),
+      week_label: week,
+      tiers: classifyBayPriorityTier(bayRefs),
+      bays: bayRefs,
+      members,
+      baySectionByKey: baySectionByKey,
+      ownedRotationIds,
+      capacity,
+      knownHoursOnly: true,
+    });
+  }, [
+    week,
+    weekLabor,
+    capacityBoard,
+    bays,
+    baySectionByKey,
     healthByRotation,
     flooringDept?.id,
   ]);
@@ -713,8 +803,9 @@ export function SundayAuditAssignmentModal({
       }
 
       // Default path: existing flat coverage assign (production-safe).
-      // Opt-in SECTION-ROTATION-002: recompute section-aware PROPOSED plan,
-      // reject stale fingerprints, then persist through the same capacity writer.
+      // ROTATION-006: when capacity is approved, use stewardship distribution.
+      // Opt-in SECTION-ROTATION-002: section-aware PROPOSED plan when preview flag on.
+      // All paths persist through the same capacity writer (revalidates approvals).
       let planItems: Array<{
         rotationId: string;
         specialist_id: string;
@@ -724,19 +815,98 @@ export function SundayAuditAssignmentModal({
       let loadCount = 0;
       let totalHours = 0;
       let usedSectionAware = false;
+      let usedStewardship = false;
 
-      if (sectionAwarePreviewOn) {
-        const members = weekLaborToPlannerMembers(labor.allocatable);
-        const ownedBySpecialist: Record<string, number> = {};
-        let ownedTotal = 0;
-        const ownedRotationIds: string[] = [];
-        for (const row of bays) {
-          const owner = String(row.assignment?.specialist_id ?? "").trim();
-          if (!owner) continue;
-          ownedTotal += 1;
-          ownedBySpecialist[owner] = (ownedBySpecialist[owner] ?? 0) + 1;
-          ownedRotationIds.push(String(row.rotation.id));
+      const members = weekLaborToPlannerMembers(labor.allocatable);
+      const ownedBySpecialist: Record<string, number> = {};
+      let ownedTotal = 0;
+      const ownedRotationIds: string[] = [];
+      for (const row of bays) {
+        const owner = String(row.assignment?.specialist_id ?? "").trim();
+        if (!owner) continue;
+        ownedTotal += 1;
+        ownedBySpecialist[owner] = (ownedBySpecialist[owner] ?? 0) + 1;
+        ownedRotationIds.push(String(row.rotation.id));
+      }
+      const approvedBySpecialist: Record<string, number> = {};
+      if (capacityBoard?.approvals_complete) {
+        for (const row of capacityBoard.associates) {
+          if (
+            row.eligible &&
+            row.approval_status === "approved" &&
+            row.approved_capacity != null
+          ) {
+            approvedBySpecialist[row.specialist_id] = row.approved_capacity;
+          }
         }
+      }
+
+      if (capacityBoard?.approvals_complete) {
+        const capacity = buildPreviewCapacityCaps({
+          eligibleSpecialistIds: members.map((m) => m.specialist_id),
+          ownedBySpecialist,
+          ownedTotal,
+          approvedBySpecialist,
+        });
+        const bayRefs = bays.map((bayRow) => ({
+          rotationId: bayRow.rotation.id,
+          department_id: String(
+            bayRow.rotation.store_locations?.department_id ??
+              flooringDept?.id ??
+              ""
+          ).trim(),
+          aisle: bayRow.aisle,
+          bay: bayRow.bay,
+          riskScore: riskScoreFromFinding(
+            healthByRotation.get(bayRow.rotation.id)
+          ),
+          carried_over: Boolean(
+            (bayRow.rotation as { carried_over?: boolean }).carried_over
+          ),
+        }));
+        const recomputed = composeStewardshipWeeklyProposal({
+          store_number: getStoreNumber(),
+          week_label: week,
+          tiers: classifyBayPriorityTier(bayRefs),
+          bays: bayRefs,
+          members,
+          baySectionByKey,
+          ownedRotationIds,
+          capacity,
+          knownHoursOnly: true,
+        });
+        if (!recomputed.actionable) {
+          setError(
+            recomputed.block_reason ||
+              "Weekly capacity approvals are incomplete — cannot assign."
+          );
+          playErrorTone();
+          return;
+        }
+        if (stewardshipProposal) {
+          const freshness = assertStewardshipProposalFresh(
+            stewardshipProposal.fingerprint,
+            recomputed
+          );
+          if (!freshness.ok) {
+            setError(freshness.message);
+            playErrorTone();
+            return;
+          }
+        }
+        planItems = recomputed.items.map((row) => ({
+          rotationId: row.rotationId,
+          specialist_id: row.specialist_id,
+          specialist_name: formatSpecialistShiftLabel(
+            row.specialist_name,
+            row.hours
+          ),
+          hours: row.hours,
+        }));
+        loadCount = recomputed.loads.length;
+        totalHours = recomputed.total_hours;
+        usedStewardship = true;
+      } else if (sectionAwarePreviewOn) {
         const capacity = buildPreviewCapacityCaps({
           eligibleSpecialistIds: members.map((m) => m.specialist_id),
           ownedBySpecialist,
@@ -816,9 +986,11 @@ export function SundayAuditAssignmentModal({
         labor.processing_status === "PARTIAL"
           ? " Partial schedule evidence — only known hours were used."
           : "";
-      const sectionNote = usedSectionAware
-        ? " Section-aware preference applied (opt-in preview)."
-        : "";
+      const sectionNote = usedStewardship
+        ? " Stewardship-aware distribution applied (capacity-approved)."
+        : usedSectionAware
+          ? " Section-aware preference applied (opt-in preview)."
+          : "";
       setStatus(
         `Assigned ${n} physical bay${n === 1 ? "" : "s"} — base ${BASE_WEEKLY_BAY_QUOTA} each across ${loadCount} eligible associate${
           loadCount === 1 ? "" : "s"
@@ -1119,6 +1291,82 @@ export function SundayAuditAssignmentModal({
                       </li>
                     ))}
                   </ul>
+                  {stewardshipProposal ? (
+                    <div
+                      data-testid="stewardship-week-proposal"
+                      className="mt-3 rounded-lg border border-teal-500/30 bg-teal-950/25 p-2.5"
+                    >
+                      <p className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-teal-300">
+                        {stewardshipProposal.actionable
+                          ? "PROPOSED · stewardship distribution"
+                          : "BLOCKED · capacity not actionable"}
+                      </p>
+                      <p className="mt-1 text-[11px] leading-snug text-teal-100/75">
+                        Week {stewardshipProposal.week_label}. Not assigned until
+                        confirmed. Capacity {stewardshipProposal.owned_total}/
+                        {stewardshipProposal.shared_target} · remaining{" "}
+                        {stewardshipProposal.remaining_shared}. Steward matches{" "}
+                        {stewardshipProposal.steward_match_count}.
+                      </p>
+                      <p className="mt-1 text-[10px] leading-snug text-teal-200/60">
+                        {stewardshipProposal.distribution_note}
+                      </p>
+                      {stewardshipProposal.block_reason ? (
+                        <p
+                          role="status"
+                          className="mt-1 text-[11px] leading-snug text-amber-200"
+                        >
+                          {stewardshipProposal.block_reason}
+                        </p>
+                      ) : null}
+                      {stewardshipProposal.actionable &&
+                      stewardshipProposal.items.length > 0 ? (
+                        <ul
+                          data-testid="stewardship-week-proposal-items"
+                          className="mt-2 max-h-48 space-y-1.5 overflow-y-auto text-[12px] text-teal-50"
+                        >
+                          {stewardshipProposal.items.map((item) => (
+                            <li
+                              key={item.rotationId}
+                              className="rounded-md border border-teal-500/15 bg-zinc-950/30 px-2 py-1.5"
+                            >
+                              <div>
+                                <span className="font-mono text-[9px] uppercase text-teal-300/90">
+                                  PROPOSED
+                                </span>{" "}
+                                {item.specialist_name} → Aisle {item.aisle} Bay{" "}
+                                {item.bay}
+                                {item.section_name
+                                  ? ` · ${item.section_name}`
+                                  : " · Unsectioned"}
+                              </div>
+                              <p className="mt-0.5 text-[10px] leading-snug text-teal-100/65">
+                                {item.explanation.summary}
+                              </p>
+                            </li>
+                          ))}
+                        </ul>
+                      ) : null}
+                      {Object.keys(stewardshipProposal.remaining_by_specialist)
+                        .length > 0 ? (
+                        <p className="mt-2 font-mono text-[10px] text-teal-200/70">
+                          Remaining after proposal:{" "}
+                          {Object.entries(
+                            stewardshipProposal.remaining_by_specialist
+                          )
+                            .sort(([a], [b]) => a.localeCompare(b))
+                            .map(([id, n]) => {
+                              const name =
+                                capacityBoard?.associates.find(
+                                  (r) => r.specialist_id === id
+                                )?.specialist_name ?? id;
+                              return `${name}:${n}`;
+                            })
+                            .join(" · ")}
+                        </p>
+                      ) : null}
+                    </div>
+                  ) : null}
                   {sectionAwarePreviewOn && sectionAwarePreview ? (
                     <div
                       data-testid="section-aware-assign-preview"
