@@ -1,5 +1,9 @@
 # DeptSync Hub — Development Journal
 
+## 2026-10-12 — DEPTSYNC-WALK-004 map-bound walkthrough production release
+
+**Authorized controlled release.** Commit `d810605` pushed `fb25563..d810605`. GitHub Production git deploy `7017291733` failed (`dpl_ExXCdtqVspe4W5V4iXGom6jyoV5B`); recovered via CLI prod deploy `dpl_2BMYcwgu5f9AJzEZFSZGdCqPFoU2` → https://deptsync-a4d47bthl-tyson-zauggs-projects.vercel.app; alias https://deptsync-hub.vercel.app Ready. No schema migrate. Smoke: `/login` 200; walkthrough APIs **401**; zebra-entry **401**. Data preserved: walkthroughs **0/0/0**; sections **4/160** stewardship intact. Auto-stage OFF. Canonical: [`docs/product/DEPTSYNC_WALK_004_PRODUCTION_RELEASE.md`](docs/product/DEPTSYNC_WALK_004_PRODUCTION_RELEASE.md). **RELEASED — AWAITING PHONE ACCEPTANCE.** **STOP.**
+
 ## 2026-10-12 — DEPTSYNC-WALK-002-003 place-bound mobile walkthrough capture
 
 **Focused local implementation; no deploy / no schema migrate / no prod mutations.** Map bay sheet **Record Observation** opens RD-5 capture with locked department/aisle/bay; section owner from persisted memberships (display + trusted server bind); `ensureActiveWalkthroughSession` reuses active session (no silent duplicates); fast mobile form (type + short note; More options). No auto follow-up / rotation / Zebra. Focused **39 PASS**; `tsc` PASS; lint clean; `next build` PASS. Canonical: [`docs/product/DEPTSYNC_WALK_002_003_IMPLEMENTATION.md`](docs/product/DEPTSYNC_WALK_002_003_IMPLEMENTATION.md). Release **CONDITIONAL GO** after phone review. **STOP.**
