@@ -3,15 +3,18 @@
 import { useMemo, useState } from "react";
 import dynamic from "next/dynamic";
 import { AddBaySheet } from "@/components/admin/AddBaySheet";
+import { CreateLocationSheet } from "@/components/admin/CreateLocationSheet";
 import { EditBayDrawer } from "@/components/admin/EditBayDrawer";
 import { HubPortal } from "@/components/hub/HubPortal";
-import { ChevronDown, ChevronUp, Pencil, Plus, Sparkles, Trash2, X } from "lucide-react";
+import { ChevronDown, ChevronUp, MapPin, Pencil, Plus, Sparkles, Trash2, X } from "lucide-react";
 import { compareAisles, formatAisleDisplayLabel } from "@/lib/store-ops/aisle";
 import { deleteStoreLocations } from "@/lib/store-ops/client";
 import {
   findDuplicateLegacyBays,
+  locationDedupeAisleKey,
   pruneIdsFromDuplicateGroups,
 } from "@/lib/store-ops/locations";
+import type { StoreAisle } from "@/lib/store-ops/store-aisles";
 import {
   formatBayTag,
   isPendingDrawLocation,
@@ -22,6 +25,7 @@ import {
 import { parseVelocityTier } from "@/lib/store-ops/velocity";
 import { toastError, toastSuccess } from "@/lib/toast";
 import type { StoreSpecialist } from "@/lib/types";
+import { isMasterAdmin } from "@/lib/rbac";
 import { shouldCloseBulkGeneratorAfterGenerated } from "@/lib/store-ops/bulk-mapping-session";
 
 const BulkLocationGenerator = dynamic(
@@ -40,14 +44,18 @@ type BayPair = {
 
 type AisleGroup = {
   aisle: string;
+  departmentId: string;
   bays: BayPair[];
   tagCount: number;
+  registryOnly: boolean;
+  displayName: string | null;
 };
 
 type Props = {
   specialist: StoreSpecialist;
   departments: Department[];
   locations: StoreLocation[];
+  registryAisles?: StoreAisle[];
   canMutate: boolean;
   contextLabel: string;
   onChanged: () => void;
@@ -89,9 +97,9 @@ function cadenceLabel(tier: VelocityTier): string | null {
   return null;
 }
 
-function aisleTitle(aisle: string): string {
-  // SECTION-UX-002: numbered aisles + named zones (SHOW-L, CARPET-WALL, …).
-  // Do not invent display names that diverge from the canonical code.
+function aisleTitle(aisle: string, displayName?: string | null): string {
+  const named = displayName?.trim();
+  if (named) return named;
   return formatAisleDisplayLabel(aisle);
 }
 
@@ -103,6 +111,7 @@ export function AisleBayManager({
   specialist,
   departments,
   locations,
+  registryAisles = [],
   canMutate,
   contextLabel,
   onChanged,
@@ -119,26 +128,55 @@ export function AisleBayManager({
     departmentId: string;
     aisle: string;
   } | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
   const [bulkOpen, setBulkOpen] = useState(false);
   const [editFaces, setEditFaces] = useState<StoreLocation[] | null>(null);
   const [deleteFaces, setDeleteFaces] = useState<StoreLocation[] | null>(null);
+  const canCreateLocation = canMutate && isMasterAdmin(specialist);
 
   const groups = useMemo((): AisleGroup[] => {
-    const byAisle = new Map<string, StoreLocation[]>();
+    const byKey = new Map<string, StoreLocation[]>();
     for (const loc of locations) {
-      const key = String(loc.aisle);
-      const list = byAisle.get(key) ?? [];
+      const aisle = locationDedupeAisleKey(loc.aisle);
+      if (!aisle) continue;
+      const key = `${loc.department_id}:${aisle}`;
+      const list = byKey.get(key) ?? [];
       list.push(loc);
-      byAisle.set(key, list);
+      byKey.set(key, list);
     }
-    return [...byAisle.entries()]
-      .sort((a, b) => compareAisles(a[0], b[0]))
-      .map(([aisle, locs]) => ({
-        aisle,
-        bays: buildPairs(locs),
-        tagCount: locs.length,
-      }));
-  }, [locations]);
+    const displayByKey = new Map<string, string | null>();
+    for (const row of registryAisles) {
+      if (row.is_active === false) continue;
+      const aisle = locationDedupeAisleKey(row.aisle);
+      if (!aisle) continue;
+      displayByKey.set(
+        `${row.department_id}:${aisle}`,
+        row.display_name?.trim() || null
+      );
+      if (!byKey.has(`${row.department_id}:${aisle}`)) {
+        byKey.set(`${row.department_id}:${aisle}`, []);
+      }
+    }
+    return [...byKey.entries()]
+      .map(([key, locs]) => {
+        const colon = key.indexOf(":");
+        const departmentId = key.slice(0, colon);
+        const aisle = key.slice(colon + 1);
+        return {
+          aisle,
+          departmentId,
+          bays: buildPairs(locs),
+          tagCount: locs.length,
+          registryOnly: locs.length === 0,
+          displayName: displayByKey.get(key) ?? null,
+        };
+      })
+      .sort((a, b) => {
+        const aisleCmp = compareAisles(a.aisle, b.aisle);
+        if (aisleCmp !== 0) return aisleCmp;
+        return a.departmentId.localeCompare(b.departmentId);
+      });
+  }, [locations, registryAisles]);
 
   const mappedBayCount = useMemo(
     () => groups.reduce((sum, g) => sum + g.bays.length, 0),
@@ -157,8 +195,12 @@ export function AisleBayManager({
   const defaultDeptId =
     locations[0]?.department_id || departments[0]?.id || "";
 
-  function toggleAisle(aisle: string) {
-    setOpenAisles((prev) => ({ ...prev, [aisle]: !prev[aisle] }));
+  function groupKey(group: AisleGroup): string {
+    return `${group.departmentId}:${group.aisle}`;
+  }
+
+  function toggleAisle(key: string) {
+    setOpenAisles((prev) => ({ ...prev, [key]: !prev[key] }));
   }
 
   function togglePair(pair: BayPair) {
@@ -256,30 +298,43 @@ export function AisleBayManager({
       </div>
 
       {canMutate ? (
-        <div className="grid grid-cols-2 gap-2">
-          <button
-            type="button"
-            onClick={() => {
-              setAddPrefill(
-                defaultDeptId
-                  ? { departmentId: defaultDeptId, aisle: "" }
-                  : null
-              );
-              setAddOpen(true);
-            }}
-            className="btn-primary-glow flex min-h-11 items-center justify-center rounded-xl px-3 text-sm font-bold"
-          >
-            <Plus className="h-4 w-4 mr-1.5" strokeWidth={1.75} aria-hidden />
-            Add Single Bay
-          </button>
-          <button
-            type="button"
-            onClick={() => setBulkOpen(true)}
-            className="flex min-h-11 items-center justify-center gap-1.5 rounded-xl border border-amber-500/40 bg-amber-950/30 px-3 text-sm font-bold text-amber-100"
-          >
-            <Sparkles className="h-4 w-4" strokeWidth={1.75} aria-hidden />
-            Bulk Generator
-          </button>
+        <div className="space-y-2">
+          {canCreateLocation ? (
+            <button
+              type="button"
+              onClick={() => setCreateOpen(true)}
+              className="btn-primary-glow flex min-h-12 w-full items-center justify-center rounded-xl px-3 text-sm font-bold"
+              data-testid="create-location-open"
+            >
+              <MapPin className="mr-1.5 h-4 w-4" strokeWidth={1.75} aria-hidden />
+              Create Location
+            </button>
+          ) : null}
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setAddPrefill(
+                  defaultDeptId
+                    ? { departmentId: defaultDeptId, aisle: "" }
+                    : null
+                );
+                setAddOpen(true);
+              }}
+              className="flex min-h-11 items-center justify-center rounded-xl border border-zinc-600 bg-zinc-900/80 px-3 text-sm font-bold text-zinc-100"
+            >
+              <Plus className="h-4 w-4 mr-1.5" strokeWidth={1.75} aria-hidden />
+              Add Single Bay
+            </button>
+            <button
+              type="button"
+              onClick={() => setBulkOpen(true)}
+              className="flex min-h-11 items-center justify-center gap-1.5 rounded-xl border border-amber-500/40 bg-amber-950/30 px-3 text-sm font-bold text-amber-100"
+            >
+              <Sparkles className="h-4 w-4" strokeWidth={1.75} aria-hidden />
+              Bulk Generator
+            </button>
+          </div>
         </div>
       ) : null}
 
@@ -335,36 +390,44 @@ export function AisleBayManager({
         </div>
       ) : null}
 
-      {locations.length === 0 ? (
+      {groups.length === 0 ? (
         <p className="glass-card border-dashed px-4 py-8 text-center text-sm text-zinc-400">
-          No aisles mapped for {contextLabel} yet.
+          No locations for {contextLabel} yet.
+          {canCreateLocation
+            ? " Create a location without bays, or add physical bays."
+            : ""}
         </p>
       ) : (
         <>
         <ul className="space-y-2">
           {groups.slice(0, aisleVisible).map((group) => {
-            const open = Boolean(openAisles[group.aisle]);
-            const bayLimit = bayVisible[group.aisle] ?? 24;
+            const key = groupKey(group);
+            const open = Boolean(openAisles[key]);
+            const bayLimit = bayVisible[key] ?? 24;
             const visibleBays = open ? group.bays.slice(0, bayLimit) : [];
             return (
               <li
-                key={group.aisle}
+                key={key}
                 className="glass-card overflow-hidden !rounded-xl !p-0"
               >
                 <button
                   type="button"
                   aria-expanded={open}
-                  onClick={() => toggleAisle(group.aisle)}
+                  onClick={() => toggleAisle(key)}
                   className="flex min-h-12 w-full items-center justify-between gap-3 px-3 py-2 text-left"
                 >
                   <span>
                     <span className="block text-sm font-bold text-white">
-                      {aisleTitle(group.aisle)}
+                      {aisleTitle(group.aisle, group.displayName)}
                     </span>
                     <span className="font-mono text-[11px] tracking-tight text-zinc-500">
-                      {group.bays.length} bay
-                      {group.bays.length === 1 ? "" : "s"} · {group.tagCount}{" "}
-                      tag{group.tagCount === 1 ? "" : "s"}
+                      {group.bays.length === 0
+                        ? "0 documented bays"
+                        : `${group.bays.length} bay${
+                            group.bays.length === 1 ? "" : "s"
+                          } · ${group.tagCount} tag${
+                            group.tagCount === 1 ? "" : "s"
+                          }`}
                     </span>
                   </span>
                   {open ? (
@@ -375,6 +438,28 @@ export function AisleBayManager({
                 </button>
                 {open ? (
                   <ul className="space-y-1.5 border-t border-zinc-800/80 px-2 py-2">
+                    {group.registryOnly || group.bays.length === 0 ? (
+                      <li className="rounded-xl border border-dashed border-zinc-700/80 px-3 py-3 text-center">
+                        <p className="text-sm text-zinc-400">
+                          0 documented bays — add physical bays when ready.
+                        </p>
+                        {canMutate ? (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setAddPrefill({
+                                departmentId: group.departmentId,
+                                aisle: group.aisle,
+                              });
+                              setAddOpen(true);
+                            }}
+                            className="btn-primary-glow mt-2 inline-flex min-h-11 items-center justify-center rounded-xl px-3 text-sm font-bold"
+                          >
+                            Add Bays
+                          </button>
+                        ) : null}
+                      </li>
+                    ) : null}
                     {visibleBays.map((pair) => {
                       const faces = [pair.selling, pair.topstock].filter(
                         (loc): loc is StoreLocation => Boolean(loc)
@@ -386,7 +471,7 @@ export function AisleBayManager({
                       const tier = worstTier(pair);
                       return (
                         <li
-                          key={`${group.aisle}-${pair.bay}`}
+                          key={`${key}-${pair.bay}`}
                           className="rounded-xl border border-zinc-800 bg-zinc-950/50 px-2 py-2"
                         >
                           <div className="flex items-start gap-2">
@@ -468,7 +553,7 @@ export function AisleBayManager({
                           onClick={() =>
                             setBayVisible((prev) => ({
                               ...prev,
-                              [group.aisle]: bayLimit + 24,
+                              [key]: bayLimit + 24,
                             }))
                           }
                           className="flex min-h-10 w-full items-center justify-center font-mono text-[11px] font-bold text-accent"
@@ -494,6 +579,17 @@ export function AisleBayManager({
         ) : null}
         </>
       )}
+
+      {createOpen ? (
+        <CreateLocationSheet
+          open={createOpen}
+          specialist={specialist}
+          departments={departments}
+          defaultDepartmentId={defaultDeptId}
+          onClose={() => setCreateOpen(false)}
+          onCreated={onChanged}
+        />
+      ) : null}
 
       {addOpen ? (
         <AddBaySheet

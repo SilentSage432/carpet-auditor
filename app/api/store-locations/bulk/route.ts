@@ -12,6 +12,7 @@ import {
 } from "@/lib/store-ops/auth-soft";
 import { readableError } from "@/lib/store-ops/errors";
 import { bulkInsertLocations } from "@/lib/store-ops/locations";
+import { ensureStoreAisleForBayWrite } from "@/lib/store-ops/store-aisles";
 import { getSupabaseAdmin } from "@/lib/store-ops/supabase-admin";
 import { resolveStoreByNumber } from "@/lib/store-ops/stores";
 import type { StoreLocationType } from "@/lib/store-ops/types";
@@ -85,16 +86,24 @@ export async function POST(request: Request) {
       );
     }
 
+    const aisle = normalizeAisle(body.aisle);
     const locations = await bulkInsertLocations(supabase, {
       store_id: dept.store_id as string,
       department_id: departmentId,
-      aisle: normalizeAisle(body.aisle),
+      aisle,
       start_bay: Number(body.start_bay),
       end_bay: Number(body.end_bay),
       types: Array.isArray(body.types) ? body.types : [],
       bay_pattern: parseBayNumberingPattern(body.bay_pattern),
       velocity_seed: parseVelocitySeedPreset(body.velocity_seed),
       workflow_type: parseLocationWorkflowType(body.workflow_type),
+    });
+
+    // REGISTRY-003 — heal/ensure aisle shell after bay documentation (never invents bays).
+    await ensureStoreAisleForBayWrite(supabase, {
+      store_id: dept.store_id as string,
+      department_id: departmentId,
+      aisle,
     });
 
     return NextResponse.json({

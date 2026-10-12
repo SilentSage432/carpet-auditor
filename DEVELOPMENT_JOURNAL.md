@@ -1,5 +1,25 @@
 # DeptSync Hub — Development Journal
 
+## 2026-10-11 — DEPTSYNC-TOPOLOGY-REGISTRY-003 Create Location + empty Map
+
+**Controlled local impl; no prod deploy/data mutations; no new migrations.** MasterAdmin Create Location → `POST /api/store-aisles` (service-role after auth/store/dept checks; RLS writes still denied). Map/sections merge registry ∪ bay aisles; empty shells show **0 documented bays** + Add Bays; bulk ensure heals registry. Capacity/Sunday/Zebra/section-aware-off untouched. `tsc` PASS; **1658** tests; `next build` PASS. Canonical: [`docs/product/DEPTSYNC_TOPOLOGY_REGISTRY_003_IMPLEMENTATION.md`](docs/product/DEPTSYNC_TOPOLOGY_REGISTRY_003_IMPLEMENTATION.md). App ship **CONDITIONAL GO** after phone review. **STOP.**
+
+## 2026-10-11 — DEPTSYNC-TOPOLOGY-REGISTRY-002B production store_aisles apply
+
+**Authorized production SQL only; no app deploy; no invented topology rows.** Canonical `fmeinlwhixngednabhgy` verified ACTIVE_HEALTHY. Preflight PASS (712 bays; 21 expected registry rows; 0 norm collisions; `jwt_matches_store` present; `store_aisles` absent). Applied unmodified `20261015_store_aisles_registry.sql` via Management API ephemeral password + psql 17; `INSERT 0 21` committed. Post: registry 9 active / 12 retired matching bay activity; loc/asg fingerprints unchanged; RLS SELECT-only fail-closed; authenticated INSERT denied; app `/login` 200. Canonical: [`docs/product/DEPTSYNC_TOPOLOGY_REGISTRY_002B_PRODUCTION_APPLY.md`](docs/product/DEPTSYNC_TOPOLOGY_REGISTRY_002B_PRODUCTION_APPLY.md). Verdict **APPLIED — VERIFIED**. Next **REGISTRY-003**. **STOP.**
+
+## 2026-10-11 — DEPTSYNC-TOPOLOGY-REGISTRY-002 store_aisles database foundation
+
+**Controlled local migration; production DB read-only; no UI/deploy/prod SQL.** Added `20261015_store_aisles_registry.sql`: `store_aisles` + `normalize_store_aisle` + soft-retire + store/dept triggers + idempotent bay backfill + fail-closed store-scoped RLS (no authenticated writes). Soft-join only; `store_locations.bay NOT NULL` untouched. Isolated Homebrew PG validation **PASS**; production **not** applied. App contracts **7 PASS**; full suite **1643**; `tsc`/build PASS. Canonical: [`docs/product/DEPTSYNC_TOPOLOGY_REGISTRY_002_IMPLEMENTATION.md`](docs/product/DEPTSYNC_TOPOLOGY_REGISTRY_002_IMPLEMENTATION.md). Prod apply **CONDITIONAL GO** after preflight; UI = REGISTRY-003. **STOP.**
+
+## 2026-10-11 — DEPTSYNC-TOPOLOGY-REGISTRY-001 Independent physical location registry design
+
+**Read-only architecture + migration design; no impl/schema/prod/deploy.** Recommends additive `store_aisles` registry (store + department + normalized aisle code + soft-retire + optional display_name), soft-joined to `store_locations` bay rows; keep bay NOT NULL. Idempotent backfill from distinct aisles; RD-3-style SELECT RLS + service-role writes after Master bulk auth; Map merge registry ∪ bay-derived so aisles never disappear; empty shells non-eligible for rotation/section membership. Canonical: [`docs/product/DEPTSYNC_TOPOLOGY_REGISTRY_001_DESIGN.md`](docs/product/DEPTSYNC_TOPOLOGY_REGISTRY_001_DESIGN.md). Design **GO**; implement/migrate **CONDITIONAL GO** when authorized (REGISTRY-002+). **STOP.**
+
+## 2026-10-11 — DEPTSYNC-TOPOLOGY-UX-004 Independent location creation (BLOCKED)
+
+**Controlled investigation; no feature impl, no schema, no deploy, no prod data.** Phone acceptance failed: creating `CARPET-WALL` requires bay numbers. Root cause **VERIFIED**: `store_locations.bay integer not null` + unique `(department_id, aisle, bay, type)`; no aisle-registry table; Bulk/Add Bay only upsert bay rows; Map omits zero-bay aisles. Stopped per mission (no fake bays; no new area table without authorization). Blocker tests **9 PASS**; full suite **1636**; `tsc`/build PASS. Canonical: [`docs/product/DEPTSYNC_TOPOLOGY_UX_004_IMPLEMENTATION.md`](docs/product/DEPTSYNC_TOPOLOGY_UX_004_IMPLEMENTATION.md). Next: operator-authorized aisle/zone registry tranche. **STOP.**
+
 ## 2026-10-11 — DEPTSYNC-SECTION-UX-003 Controlled production release
 
 **Controlled app release of SECTION-UX-001 + SECTION-UX-002.** Commit `33a088b`; Vercel Production Ready `F2e8nkg74JkKg1viL1zVQVhjgkDN` (`deptsync-60jrduc81`) @ https://deptsync-hub.vercel.app. No schema migrations, no production topology/section/assignment mutations, no capacity/Sunday/Zebra changes. Section-aware auto-stage hard-off; Production preview flag not enabled. Pre-release: `tsc` PASS; **1626** tests; `next build` PASS. Smoke: `/login` 200. Canonical: [`docs/product/DEPTSYNC_SECTION_UX_003_RELEASE.md`](docs/product/DEPTSYNC_SECTION_UX_003_RELEASE.md). **RELEASED — AWAITING PHONE ACCEPTANCE.** **STOP.**

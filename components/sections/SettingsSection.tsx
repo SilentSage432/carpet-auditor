@@ -47,9 +47,11 @@ import {
 } from "@/lib/store";
 import {
   fetchDepartmentsDetailed,
+  fetchStoreAisles,
   fetchStoreLocationsDetailed,
   STORE_OPS_LOCATIONS_CHANGED_EVENT,
 } from "@/lib/store-ops/client";
+import type { StoreAisle } from "@/lib/store-ops/store-aisles";
 import { findFlooringDepartment } from "@/lib/store-ops/sunday-audit";
 import {
   ADMIN_DEPT_CONTEXT_EVENT,
@@ -146,6 +148,7 @@ export function SettingsSection({
   const [cacheMsg, setCacheMsg] = useState<string | null>(null);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [locations, setLocations] = useState<StoreLocation[]>([]);
+  const [registryAisles, setRegistryAisles] = useState<StoreAisle[]>([]);
   const [forceOpen, setForceOpen] = useState(false);
   const [cleanupOpen, setCleanupOpen] = useState(false);
   const [adminGraphLoaded, setAdminGraphLoaded] = useState(false);
@@ -177,6 +180,7 @@ export function SettingsSection({
     if (!store) {
       setDepartments([]);
       setLocations([]);
+      setRegistryAisles([]);
       return;
     }
     try {
@@ -184,19 +188,25 @@ export function SettingsSection({
       setDepartments(result.items);
       if (mapConsole) {
         const deptId = workingDepartmentId(activeSpecialist, result.items);
-        const locs = await fetchStoreLocationsDetailed(
-          activeSpecialist,
-          deptId
-        );
+        const [locs, aisles] = await Promise.all([
+          fetchStoreLocationsDetailed(activeSpecialist, deptId),
+          fetchStoreAisles(activeSpecialist, {
+            departmentId: deptId || undefined,
+            includeRetired: true,
+          }).catch(() => ({ items: [] as StoreAisle[] })),
+        ]);
         setLocations(locs.items);
+        setRegistryAisles(aisles.items);
       } else {
         setLocations([]);
+        setRegistryAisles([]);
       }
       setAdminGraphLoaded(true);
     } catch (err) {
       console.error("[Settings] live departments failed", err);
       setDepartments([]);
       setLocations([]);
+      setRegistryAisles([]);
     }
   }, [activeSpecialist, masterSession, mapConsole, storeNumber]);
 
@@ -434,6 +444,7 @@ export function SettingsSection({
                 specialist={activeSpecialist}
                 departments={departments}
                 locations={locations}
+                registryAisles={registryAisles}
                 canMutate
                 contextLabel={
                   working === "all"
@@ -460,6 +471,7 @@ export function SettingsSection({
                 specialist={activeSpecialist}
                 departments={departments}
                 locations={locations}
+                registryAisles={registryAisles}
                 focusSectionId={focusSectionId}
                 onChanged={() => void reloadDepts()}
               />

@@ -109,6 +109,24 @@ describe("map-aisle-navigation", () => {
     expect(index.every((e) => e.key.includes(":"))).toBe(true);
   });
 
+  it("cannot surface a named zone with zero documented bay rows", () => {
+    const index = composeMapAisleIndex({
+      locations: [
+        loc({
+          id: "1",
+          department_id: "d1",
+          aisle: "41",
+          bay: 1,
+          type: "SELLING",
+        }),
+      ],
+      departments: depts,
+    });
+    expect(index.map((e) => e.aisle)).toEqual(["41"]);
+    expect(index.some((e) => e.aisle === "CARPET-WALL")).toBe(false);
+    expect(index.some((e) => e.physicalBayCount === 0)).toBe(false);
+  });
+
   it("hides inactive bays unless showRetired", () => {
     const locations = [
       loc({

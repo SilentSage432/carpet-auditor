@@ -22,6 +22,7 @@ import type { StoreSpecialist } from "@/lib/types";
 import { patchStoreLocation, setAislePriority } from "@/lib/store-ops/client";
 import { toastError, toastSuccess } from "@/lib/toast";
 import { canManageMapConsole, canMutateRotationPriority } from "@/lib/rbac";
+import { AddBaySheet } from "@/components/admin/AddBaySheet";
 import { WalkTheFloorSheet } from "@/components/admin/WalkTheFloorSheet";
 import {
   BAY_READINESS_EVENT,
@@ -82,6 +83,8 @@ type Props = {
   specialist: StoreSpecialist;
   departments: Department[];
   locations: StoreLocation[];
+  /** REGISTRY-003 — store_aisles shells merged into Map index. */
+  registryAisles?: import("@/lib/store-ops/store-aisles").StoreAisle[];
   onChanged: () => void;
   assignedWeek?: string;
   weekRotationLocations?: Array<{ locationId: string; completed: boolean }>;
@@ -229,6 +232,7 @@ export function StoreLocationGrid({
   specialist,
   departments,
   locations,
+  registryAisles = [],
   onChanged,
   assignedWeek,
   weekRotationLocations = [],
@@ -265,7 +269,12 @@ export function StoreLocationGrid({
   const [aislePriorityBusy, setAislePriorityBusy] = useState<string | null>(
     null
   );
+  const [addBayPrefill, setAddBayPrefill] = useState<{
+    departmentId: string;
+    aisle: string;
+  } | null>(null);
   const allowRotationPriority = canMutateRotationPriority(specialist);
+  const canSetupTopology = canManageMapConsole(specialist);
 
   const weekByLocation = useMemo(() => {
     const map = new Map<string, { assigned: boolean; completed: boolean }>();
@@ -325,8 +334,9 @@ export function StoreLocationGrid({
         departments,
         showRetired,
         activeOverlay,
+        registryAisles,
       }),
-    [locations, departments, showRetired, activeOverlay]
+    [locations, departments, showRetired, activeOverlay, registryAisles]
   );
 
   const filteredAisles = useMemo(
@@ -479,24 +489,23 @@ export function StoreLocationGrid({
     }
   }
 
-  if (locations.length === 0) {
-    const canSetup = canManageMapConsole(specialist);
+  if (aisleIndex.length === 0) {
     return (
       <section
         className="rounded-2xl border border-dashed border-zinc-700/80 bg-zinc-950/40 p-6 text-center"
         data-testid="map-empty-state"
       >
         <p className="text-sm text-zinc-400">
-          {canSetup
-            ? "No aisles mapped yet. Add bays from Settings → Store Topology & Bay Setup."
-            : "No aisles mapped yet. Ask your supervisor to set up the store map."}
+          {canSetupTopology
+            ? "No locations yet. Create a location or add bays from Manage → Aisles & bays."
+            : "No locations mapped yet. Ask your supervisor to set up the store map."}
         </p>
-        {canSetup ? (
+        {canSetupTopology ? (
           <Link
             href="/settings#bulk-generate"
             className="btn-primary-glow mt-3 inline-flex min-h-12 items-center justify-center rounded-xl px-4 text-sm font-bold"
           >
-            Open bay setup
+            Open Manage
           </Link>
         ) : null}
       </section>
@@ -700,7 +709,7 @@ export function StoreLocationGrid({
                         </span>
                         <span className="mt-0.5 block font-mono text-[10px] text-zinc-500">
                           {formatAisleBayCount(entry.physicalBayCount)}
-                          {!heatmap
+                          {!heatmap && entry.physicalBayCount > 0
                             ? ` · ${formatAisleCoverageProgress(progress)}`
                             : ""}
                           {entry.inactiveBayCount > 0 && showRetired
@@ -752,7 +761,7 @@ export function StoreLocationGrid({
                 </p>
               </div>
             </div>
-            {allowRotationPriority ? (
+            {allowRotationPriority && selectedAisle.physicalBayCount > 0 ? (
               <div
                 className="flex flex-wrap gap-1.5"
                 data-testid="map-aisle-priority"
@@ -791,83 +800,130 @@ export function StoreLocationGrid({
             ) : null}
           </div>
 
-          <ul
-            className="mt-2 divide-y divide-zinc-800/80 overflow-hidden rounded-2xl border border-zinc-800/80 bg-zinc-950/50"
-            data-testid="map-bay-list"
-          >
-            {visibleBays.map((pair) => {
-              const active = isMapBayPairActive(pair, activeOverlay);
-              return (
-                <BayRow
-                  key={`${selectedAisle.key}-bay-${pair.bay}`}
-                  aisle={selectedAisle.aisle}
-                  pair={pair}
-                  heatmap={heatmap}
-                  cadence={cadenceById}
-                  pendingId={pendingId}
-                  canMutate={false}
-                  retired={!active}
-                  sellingActive={
-                    pair.selling
-                      ? (activeOverlay[pair.selling.id] ??
-                        pair.selling.is_active)
-                      : false
-                  }
-                  topstockActive={
-                    pair.topstock
-                      ? (activeOverlay[pair.topstock.id] ??
-                        pair.topstock.is_active)
-                      : false
-                  }
-                  seasonalBadge={composeBayPairSeasonalBadge([
-                    pair.selling
-                      ? seasonalByLocationId?.get(pair.selling.id)
-                      : undefined,
-                    pair.topstock
-                      ? seasonalByLocationId?.get(pair.topstock.id)
-                      : undefined,
-                  ])}
-                  attentionMarker={
-                    attentionStatus === "AVAILABLE" ||
-                    attentionStatus === "DEGRADED"
-                      ? attentionCellMarkerForPair([
-                          pair.selling
-                            ? attentionByLocationId?.get(pair.selling.id)
-                            : undefined,
-                          pair.topstock
-                            ? attentionByLocationId?.get(pair.topstock.id)
-                            : undefined,
-                        ])
-                      : null
-                  }
-                  emphasizeAttention={emphasizeAttentionMarkers}
-                  highPriority={
-                    composePhysicalBayManualPriority(
-                      [pair.selling, pair.topstock].filter(
-                        (loc): loc is StoreLocation => Boolean(loc)
-                      )
-                    ) === "high"
-                  }
-                  departmentId={selectedAisle.departmentId}
-                  departmentName={selectedAisle.departmentName}
-                  onOpenWalk={openWalkSheet}
-                  onToggle={toggleActive}
-                />
-              );
-            })}
-          </ul>
-
-          {selectedAisle.bays.length > bayVisible ? (
-            <button
-              type="button"
-              onClick={() => setBayVisible((n) => n + BAY_CHUNK)}
-              className="mt-2 flex min-h-12 w-full items-center justify-center rounded-xl border border-zinc-800/80 font-mono text-[11px] font-bold text-accent"
+          {selectedAisle.physicalBayCount === 0 ? (
+            <div
+              className="mt-2 rounded-2xl border border-dashed border-zinc-700/80 bg-zinc-950/40 px-4 py-6 text-center"
+              data-testid="map-empty-location"
             >
-              Show more bays ({selectedAisle.bays.length - bayVisible})
-            </button>
+              <p className="text-sm font-semibold text-zinc-100">
+                {formatMapAisleLabel(selectedAisle)}
+              </p>
+              <p className="mt-1 font-mono text-[11px] text-zinc-500">
+                {formatAisleBayCount(0)}
+              </p>
+              <p className="mt-2 text-sm text-zinc-400">
+                No physical bays documented yet. Coverage and weekly assignment
+                start when you add bays.
+              </p>
+              {canSetupTopology ? (
+                <button
+                  type="button"
+                  onClick={() =>
+                    setAddBayPrefill({
+                      departmentId: selectedAisle.departmentId,
+                      aisle: selectedAisle.aisle,
+                    })
+                  }
+                  className="btn-primary-glow mt-4 inline-flex min-h-12 items-center justify-center rounded-xl px-4 text-sm font-bold"
+                  data-testid="map-empty-add-bays"
+                >
+                  Add Bays
+                </button>
+              ) : null}
+            </div>
+          ) : null}
+
+          {selectedAisle.physicalBayCount > 0 ? (
+            <>
+              <ul
+                className="mt-2 divide-y divide-zinc-800/80 overflow-hidden rounded-2xl border border-zinc-800/80 bg-zinc-950/50"
+                data-testid="map-bay-list"
+              >
+                {visibleBays.map((pair) => {
+                  const active = isMapBayPairActive(pair, activeOverlay);
+                  return (
+                    <BayRow
+                      key={`${selectedAisle.key}-bay-${pair.bay}`}
+                      aisle={selectedAisle.aisle}
+                      pair={pair}
+                      heatmap={heatmap}
+                      cadence={cadenceById}
+                      pendingId={pendingId}
+                      canMutate={false}
+                      retired={!active}
+                      sellingActive={
+                        pair.selling
+                          ? (activeOverlay[pair.selling.id] ??
+                            pair.selling.is_active)
+                          : false
+                      }
+                      topstockActive={
+                        pair.topstock
+                          ? (activeOverlay[pair.topstock.id] ??
+                            pair.topstock.is_active)
+                          : false
+                      }
+                      seasonalBadge={composeBayPairSeasonalBadge([
+                        pair.selling
+                          ? seasonalByLocationId?.get(pair.selling.id)
+                          : undefined,
+                        pair.topstock
+                          ? seasonalByLocationId?.get(pair.topstock.id)
+                          : undefined,
+                      ])}
+                      attentionMarker={
+                        attentionStatus === "AVAILABLE" ||
+                        attentionStatus === "DEGRADED"
+                          ? attentionCellMarkerForPair([
+                              pair.selling
+                                ? attentionByLocationId?.get(pair.selling.id)
+                                : undefined,
+                              pair.topstock
+                                ? attentionByLocationId?.get(pair.topstock.id)
+                                : undefined,
+                            ])
+                          : null
+                      }
+                      emphasizeAttention={emphasizeAttentionMarkers}
+                      highPriority={
+                        composePhysicalBayManualPriority(
+                          [pair.selling, pair.topstock].filter(
+                            (loc): loc is StoreLocation => Boolean(loc)
+                          )
+                        ) === "high"
+                      }
+                      departmentId={selectedAisle.departmentId}
+                      departmentName={selectedAisle.departmentName}
+                      onOpenWalk={openWalkSheet}
+                      onToggle={toggleActive}
+                    />
+                  );
+                })}
+              </ul>
+
+              {selectedAisle.bays.length > bayVisible ? (
+                <button
+                  type="button"
+                  onClick={() => setBayVisible((n) => n + BAY_CHUNK)}
+                  className="mt-2 flex min-h-12 w-full items-center justify-center rounded-xl border border-zinc-800/80 font-mono text-[11px] font-bold text-accent"
+                >
+                  Show more bays ({selectedAisle.bays.length - bayVisible})
+                </button>
+              ) : null}
+            </>
           ) : null}
         </div>
       )}
+
+      {addBayPrefill ? (
+        <AddBaySheet
+          specialist={specialist}
+          departments={departments}
+          prefill={addBayPrefill}
+          onClose={() => setAddBayPrefill(null)}
+          onChanged={onChanged}
+        />
+      ) : null}
 
       {heatmap ? (
         <div

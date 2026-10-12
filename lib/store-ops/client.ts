@@ -21,6 +21,7 @@ import {
 import { createTtlCache } from "./ttl-cache";
 import { buildLocalShiftBriefing } from "./shift-briefing";
 import type { WalkParseResult } from "./ai-walk-parse";
+import type { StoreAisle } from "./store-aisles";
 import type {
   BayServiceIntensity,
   BayServiceLog,
@@ -47,6 +48,9 @@ const rotationsCache = createTtlCache<{
   rotations: WeeklyRotationWithLocation[];
 }>(STORE_OPS_LIST_TTL_MS);
 const locationsCache = createTtlCache<StoreOpsListResult<StoreLocation>>(
+  STORE_OPS_LIST_TTL_MS
+);
+const storeAislesCache = createTtlCache<StoreOpsListResult<StoreAisle>>(
   STORE_OPS_LIST_TTL_MS
 );
 const healthCache = createTtlCache<StoreHealthSnapshotClient>(
@@ -102,6 +106,7 @@ export async function invalidateStoreOpsListCaches(): Promise<void> {
   departmentsCache.invalidate();
   rotationsCache.invalidate();
   locationsCache.invalidate();
+  storeAislesCache.invalidate();
   healthCache.invalidate();
   await clearDurable();
 }
@@ -347,6 +352,72 @@ export async function bulkGenerateLocations(
   await invalidateStoreOpsListCaches();
   notifyStoreLocationsChanged();
   return data;
+}
+
+/** REGISTRY-003 — list store_aisles (registry ∪ soft-retire flags). */
+export async function fetchStoreAisles(
+  specialist: StoreSpecialist,
+  options?: { departmentId?: string; includeRetired?: boolean }
+): Promise<StoreOpsListResult<StoreAisle>> {
+  const params = new URLSearchParams();
+  if (options?.departmentId) {
+    params.set("department_id", options.departmentId);
+  }
+  if (options?.includeRetired) {
+    params.set("include_retired", "1");
+  }
+  const qs = params.toString() ? `?${params.toString()}` : "";
+  return storeAislesCache.getSWR(
+    storeOpsListCacheKey(specialist, `store-aisles:${qs}`),
+    async () => {
+      try {
+        const data = await storeOpsFetch<{
+          aisles: StoreAisle[];
+          auth_required?: boolean;
+          hint?: string;
+        }>(`/api/store-aisles${qs}`, specialist);
+        return {
+          items: data.aisles ?? [],
+          authRequired: Boolean(data.auth_required),
+          hint: data.hint,
+        };
+      } catch (err) {
+        const message = String(
+          (err as { message?: string } | null)?.message ?? ""
+        );
+        if (isStoreOpsAuthFailureMessage(message)) {
+          return {
+            items: [],
+            authRequired: true,
+            hint: STORE_OPS_AUTH_HINT,
+          };
+        }
+        throw err;
+      }
+    }
+  );
+}
+
+/** REGISTRY-003 — MasterAdmin create empty aisle/zone (no bay numbers). */
+export async function createStoreAisle(
+  specialist: StoreSpecialist,
+  input: {
+    department_id: string;
+    aisle: string;
+    display_name?: string | null;
+  }
+): Promise<StoreAisle> {
+  const data = await storeOpsFetch<{ aisle: StoreAisle }>(
+    "/api/store-aisles",
+    specialist,
+    {
+      method: "POST",
+      body: JSON.stringify(input),
+    }
+  );
+  await invalidateStoreOpsListCaches();
+  notifyStoreLocationsChanged();
+  return data.aisle;
 }
 
 /** Supervisor / Super Admin — Gemini floor-walk transcript → structured tasks. */

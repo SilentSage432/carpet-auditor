@@ -269,6 +269,13 @@ export function composeDepartmentAisleIndexForSections(input: {
   locations: StoreLocation[];
   departments: Department[];
   departmentId: string;
+  /** REGISTRY-003 — include empty registered locations (zero membership). */
+  registryAisles?: readonly {
+    department_id: string;
+    aisle: string;
+    display_name?: string | null;
+    is_active?: boolean;
+  }[];
 }): MapAisleEntry[] {
   const departmentId = String(input.departmentId ?? "").trim();
   return composeMapAisleIndex({
@@ -277,6 +284,9 @@ export function composeDepartmentAisleIndexForSections(input: {
     ),
     departments: input.departments,
     showRetired: false,
+    registryAisles: (input.registryAisles ?? []).filter(
+      (row) => !departmentId || row.department_id === departmentId
+    ),
   });
 }
 

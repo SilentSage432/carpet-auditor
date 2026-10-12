@@ -10,6 +10,10 @@ import {
   formatAisleDisplayLabel,
   normalizeAisle,
 } from "./aisle";
+import {
+  normalizeStoreAisleCode,
+  type StoreAisleRegistryInput,
+} from "./store-aisles";
 import type { Department, StoreLocation } from "./types";
 
 export type MapBayPair = {
@@ -24,8 +28,12 @@ export type MapAisleEntry = {
   aisle: string;
   departmentId: string;
   departmentName: string;
+  /** Optional registry display_name (Carpet Wall); null → formatAisleDisplayLabel. */
+  displayName: string | null;
   /** True when the same aisle code appears under more than one department. */
   aisleCodeCollides: boolean;
+  /** True when this entry exists only in store_aisles (no bay rows). */
+  registryOnly: boolean;
   bays: MapBayPair[];
   physicalBayCount: number;
   activeBayCount: number;
@@ -59,21 +67,24 @@ export function isMapBayPairActive(
 }
 
 /**
- * Compose aisle-first index from location rows.
- * Groups by (department_id, aisle) — never invents cross-aisle structure.
+ * Compose aisle-first index from bay rows ∪ store_aisles registry.
+ * Soft-join key: department_id + normalizeStoreAisleCode(aisle).
+ * Never invents bay rows or cross-aisle structure.
  */
 export function composeMapAisleIndex(input: {
   locations: StoreLocation[];
   departments: Department[];
   showRetired?: boolean;
   activeOverlay?: Record<string, boolean>;
+  /** REGISTRY-003 — active (or retired when showRetired) aisle/zone shells. */
+  registryAisles?: readonly StoreAisleRegistryInput[];
 }): MapAisleEntry[] {
   const showRetired = Boolean(input.showRetired);
   const nameById = new Map(input.departments.map((d) => [d.id, d.name]));
 
   const byKey = new Map<string, StoreLocation[]>();
   for (const loc of input.locations) {
-    const aisle = normalizeAisle(loc.aisle);
+    const aisle = normalizeStoreAisleCode(loc.aisle);
     if (!aisle) continue;
     const key = `${loc.department_id}:${aisle}`;
     const list = byKey.get(key) ?? [];
@@ -81,20 +92,39 @@ export function composeMapAisleIndex(input: {
     byKey.set(key, list);
   }
 
+  const registryByKey = new Map<string, StoreAisleRegistryInput>();
+  for (const row of input.registryAisles ?? []) {
+    const aisle = normalizeStoreAisleCode(row.aisle);
+    const departmentId = String(row.department_id ?? "").trim();
+    if (!aisle || !departmentId) continue;
+    const active = row.is_active !== false;
+    if (!showRetired && !active) continue;
+    registryByKey.set(`${departmentId}:${aisle}`, row);
+  }
+
   const deptsByAisleCode = new Map<string, Set<string>>();
-  for (const [key] of byKey) {
-    const aisle = key.slice(key.indexOf(":") + 1);
-    const departmentId = key.slice(0, key.indexOf(":"));
+  const touchCollision = (aisle: string, departmentId: string) => {
     const set = deptsByAisleCode.get(aisle) ?? new Set<string>();
     set.add(departmentId);
     deptsByAisleCode.set(aisle, set);
+  };
+  for (const [key] of byKey) {
+    const colon = key.indexOf(":");
+    touchCollision(key.slice(colon + 1), key.slice(0, colon));
+  }
+  for (const [key] of registryByKey) {
+    const colon = key.indexOf(":");
+    touchCollision(key.slice(colon + 1), key.slice(0, colon));
   }
 
   const entries: MapAisleEntry[] = [];
+  const seen = new Set<string>();
+
   for (const [key, locs] of byKey) {
     const sample = locs[0];
     if (!sample) continue;
-    const aisle = normalizeAisle(sample.aisle);
+    const aisle = normalizeStoreAisleCode(sample.aisle);
+    const registry = registryByKey.get(key);
     const allBays = buildMapBayPairs(locs);
     let activeBayCount = 0;
     let inactiveBayCount = 0;
@@ -102,7 +132,9 @@ export function composeMapAisleIndex(input: {
       if (isMapBayPairActive(pair, input.activeOverlay)) activeBayCount += 1;
       else inactiveBayCount += 1;
     }
-    if (!showRetired && activeBayCount === 0) continue;
+    const registryActive = registry ? registry.is_active !== false : false;
+    // Active view: keep aisles with active bays OR an active registry shell.
+    if (!showRetired && activeBayCount === 0 && !registryActive) continue;
 
     const displayBays = showRetired
       ? allBays
@@ -111,16 +143,49 @@ export function composeMapAisleIndex(input: {
         );
 
     const deptSet = deptsByAisleCode.get(aisle);
+    const displayName =
+      registry?.display_name == null ||
+      String(registry.display_name).trim() === ""
+        ? null
+        : String(registry.display_name).trim();
     entries.push({
       key,
       aisle,
       departmentId: sample.department_id,
       departmentName: nameById.get(sample.department_id) ?? "Unknown",
+      displayName,
       aisleCodeCollides: Boolean(deptSet && deptSet.size > 1),
+      registryOnly: false,
       bays: displayBays,
       physicalBayCount: displayBays.length,
       activeBayCount,
       inactiveBayCount,
+    });
+    seen.add(key);
+  }
+
+  for (const [key, registry] of registryByKey) {
+    if (seen.has(key)) continue;
+    const aisle = normalizeStoreAisleCode(registry.aisle);
+    const departmentId = String(registry.department_id).trim();
+    const deptSet = deptsByAisleCode.get(aisle);
+    const displayName =
+      registry.display_name == null ||
+      String(registry.display_name).trim() === ""
+        ? null
+        : String(registry.display_name).trim();
+    entries.push({
+      key,
+      aisle,
+      departmentId,
+      departmentName: nameById.get(departmentId) ?? "Unknown",
+      displayName,
+      aisleCodeCollides: Boolean(deptSet && deptSet.size > 1),
+      registryOnly: true,
+      bays: [],
+      physicalBayCount: 0,
+      activeBayCount: 0,
+      inactiveBayCount: 0,
     });
   }
 
@@ -132,12 +197,12 @@ export function composeMapAisleIndex(input: {
 }
 
 export function formatMapAisleLabel(
-  entry: Pick<
-    MapAisleEntry,
-    "aisle" | "departmentName" | "aisleCodeCollides"
-  >
+  entry: Pick<MapAisleEntry, "aisle" | "departmentName" | "aisleCodeCollides"> & {
+    displayName?: string | null;
+  }
 ): string {
-  const base = formatAisleDisplayLabel(entry.aisle);
+  const named = entry.displayName?.trim();
+  const base = named || formatAisleDisplayLabel(entry.aisle);
   if (entry.aisleCodeCollides) {
     return `${base} · ${entry.departmentName}`;
   }

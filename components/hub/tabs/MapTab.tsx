@@ -16,6 +16,7 @@ import {
   fetchExceptionSummary,
   fetchLocationAttention,
   fetchOperationalContextLocationRelevanceResolve,
+  fetchStoreAisles,
   fetchStoreLocationsDetailed,
   fetchThisWeekRotations,
   fetchOperationalSections,
@@ -26,6 +27,7 @@ import {
   STORE_OPS_LOCATIONS_CHANGED_EVENT,
   STORE_OPS_SECTIONS_CHANGED_EVENT,
 } from "@/lib/store-ops/client";
+import type { StoreAisle } from "@/lib/store-ops/store-aisles";
 import {
   indexBaySectionLookups,
   type BaySectionLookup,
@@ -74,6 +76,7 @@ export function MapTab({ specialist }: WorkflowTabProps) {
   const searchParams = useSearchParams();
   const [departments, setDepartments] = useState<Department[]>([]);
   const [locations, setLocations] = useState<StoreLocation[]>([]);
+  const [registryAisles, setRegistryAisles] = useState<StoreAisle[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [authRequired, setAuthRequired] = useState(false);
@@ -230,9 +233,16 @@ export function MapTab({ specialist }: WorkflowTabProps) {
                 .catch((err: unknown) => ({ ok: false as const, err }))
             : Promise.resolve(null);
 
-        const [locs, weekData, exceptions, seasonalResult, attentionResult, sectionsResult] =
+        const [locs, aislesResult, weekData, exceptions, seasonalResult, attentionResult, sectionsResult] =
           await Promise.all([
             fetchStoreLocationsDetailed(member),
+            fetchStoreAisles(member, { includeRetired: true }).catch((err) => {
+              console.warn(
+                "[StoreMap] store_aisles unavailable (non-blocking)",
+                err
+              );
+              return { items: [] as StoreAisle[], authRequired: false };
+            }),
             fetchThisWeekRotations(member),
             fetchExceptionSummary(member),
             canReadSeasonal
@@ -276,6 +286,11 @@ export function MapTab({ specialist }: WorkflowTabProps) {
         );
         setLocations((prev) =>
           fingerprintsEqual(prev, locs.items) ? prev : locs.items
+        );
+        setRegistryAisles((prev) =>
+          fingerprintsEqual(prev, aislesResult.items)
+            ? prev
+            : aislesResult.items
         );
         setWeekRotationLocations((prev) =>
           fingerprintsEqual(prev, nextWeek) ? prev : nextWeek
@@ -360,6 +375,7 @@ export function MapTab({ specialist }: WorkflowTabProps) {
           setAuthRequired(true);
           setDepartments([]);
           setLocations([]);
+          setRegistryAisles([]);
           setAttentionStatus("IDLE");
           clearAttentionPaint();
         } else {
@@ -581,6 +597,7 @@ export function MapTab({ specialist }: WorkflowTabProps) {
               specialist={specialist}
               departments={visibleDepartments}
               locations={visibleLocations}
+              registryAisles={registryAisles}
               assignedWeek={currentWeek}
               weekRotationLocations={weekRotationLocations}
               barrierLocationIds={barrierLocationIds}

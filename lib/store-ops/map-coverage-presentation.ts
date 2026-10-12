@@ -109,6 +109,7 @@ export function formatPhysicalBayCount(n: number): string {
 }
 
 export function formatAisleBayCount(n: number): string {
+  if (n === 0) return "0 documented bays";
   return `${n} bay${n === 1 ? "" : "s"}`;
 }
 

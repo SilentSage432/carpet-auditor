@@ -9,6 +9,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { StoreSpecialist } from "@/lib/types";
+import type { StoreAisle } from "@/lib/store-ops/store-aisles";
 import type { Department, StoreLocation } from "@/lib/store-ops/types";
 import { canManageOperationalSections } from "@/lib/rbac";
 import { fetchSpecialists } from "@/lib/specialists";
@@ -42,6 +43,7 @@ type Props = {
   specialist: StoreSpecialist;
   departments: Department[];
   locations: StoreLocation[];
+  registryAisles?: StoreAisle[];
   onChanged?: () => void;
   /** Deep-link focus from Map bay sheet */
   focusSectionId?: string | null;
@@ -53,6 +55,7 @@ export function OperationalSectionsPanel({
   specialist,
   departments,
   locations,
+  registryAisles = [],
   onChanged,
   focusSectionId = null,
 }: Props) {
@@ -137,8 +140,9 @@ export function OperationalSectionsPanel({
         locations,
         departments,
         departmentId,
+        registryAisles,
       }),
-    [locations, departments, departmentId]
+    [locations, departments, departmentId, registryAisles]
   );
 
   const claimedByKey = useMemo(
