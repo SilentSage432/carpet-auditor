@@ -1,5 +1,9 @@
 # DeptSync Hub — Development Journal
 
+## 2026-10-12 — DEPTSYNC-WALK-006 walkthrough follow-up production release
+
+**Authorized controlled release.** Commit `cbaac90` pushed `808ea48..cbaac90`. Vercel Production `dpl_BvF6rSuu7Lbw5KAh1ouSF3z6qwvh` READY; alias https://deptsync-hub.vercel.app → that deployment. No schema migrate; no CLI recovery. WALK-004 failure diagnosed as Vercel `git_info_fail` (not app build). Smoke: `/login` 200; walkthroughs/overview/map **307**→login; walkthrough APIs + follow-ups POST **401**; zebra-entry **401**. Data preserved: walkthroughs **0/0/0**; sections **4/160**. Auto-stage OFF. Canonical: [`docs/product/DEPTSYNC_WALK_006_PRODUCTION_RELEASE.md`](docs/product/DEPTSYNC_WALK_006_PRODUCTION_RELEASE.md). **RELEASED — AWAITING PHONE ACCEPTANCE.** **STOP.**
+
 ## 2026-10-12 — DEPTSYNC-WALK-005 walkthrough follow-up lifecycle
 
 **Focused local implementation; no deploy / no schema migrate / no prod mutations.** Wired existing `POST /api/walkthroughs/follow-ups` into Walkthroughs UI via `ObservationDetailSheet` + `createWalkthroughFollowUpClient`. Opportunities without follow-up rows surface as **Needs follow-up decision** (not open work); positives never auto-outstanding; Overview attention remains overdue follow-ups only (review hint separate). Close-with-evidence reuses `FollowUpCloseSheet`. Map capture untouched. Focused **42 PASS**; `tsc` PASS; lint clean; `next build` PASS. Canonical: [`docs/product/DEPTSYNC_WALK_005_IMPLEMENTATION.md`](docs/product/DEPTSYNC_WALK_005_IMPLEMENTATION.md). Release **CONDITIONAL GO** after phone review. **STOP.**
