@@ -34,6 +34,7 @@ import {
   fetchOperationalSections,
   fetchStoreLocationsDetailed,
   fetchThisWeekRotations,
+  fetchWeekCapacityBoard,
   peekCachedDepartments,
   peekCachedRotations,
   peekCachedStoreLocations,
@@ -153,6 +154,10 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
   const [baySectionByKey, setBaySectionByKey] = useState<
     Map<string, BaySectionLookup>
   >(() => new Map());
+  /** OPERATIONAL-009 — approved shared target for ownership recovery goal. */
+  const [approvedSharedTarget, setApprovedSharedTarget] = useState<
+    number | null
+  >(null);
 
   const [attentionStatus, setAttentionStatus] =
     useState<MapAttentionClientStatus>("IDLE");
@@ -581,6 +586,25 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
     };
   }, [supervisor, simplified, specialist, week, healthKey]);
 
+  useEffect(() => {
+    if (!supervisor || simplified || !week) return;
+    let cancelled = false;
+    void fetchWeekCapacityBoard(specialist, week)
+      .then((board) => {
+        if (cancelled) return;
+        setApprovedSharedTarget(
+          board.approvals_complete ? board.shared_target_approved : null
+        );
+      })
+      .catch((err) => {
+        console.error("[FloorTab] week capacity failed (non-blocking)", err);
+        if (!cancelled) setApprovedSharedTarget(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [supervisor, simplified, specialist, week]);
+
   const displayRotations = useMemo(() => {
     const scoped =
       working !== "all" && deptId
@@ -599,6 +623,8 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
         barrierRotationIds,
         includeUnassignedRoster: !simplified && supervisor,
         baySectionByKey,
+        approvedSharedTarget:
+          supervisor && !simplified && week ? approvedSharedTarget : null,
       }),
     [
       displayRotations,
@@ -608,6 +634,8 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
       simplified,
       supervisor,
       baySectionByKey,
+      approvedSharedTarget,
+      week,
     ]
   );
 
@@ -720,7 +748,8 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
                 <p className="mt-0.5 text-[11px] leading-snug text-cyan-100/75">
                   {ownershipPlan.unownedPhysicalBayCount} physical bay
                   {ownershipPlan.unownedPhysicalBayCount === 1 ? "" : "s"} still
-                  need an owner.
+                  need an owner. Open Assign this week to review the prepared
+                  stewardship proposal and confirm once.
                 </p>
                 <button
                   type="button"

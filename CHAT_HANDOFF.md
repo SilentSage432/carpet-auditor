@@ -1,6 +1,9 @@
 # DeptSync Hub — Chat Handoff
 
 ## Latest (2026-10-12)
+- **DEPTSYNC-OPERATIONAL-009 — SECTIONS UI REPAIR + ROTATION ASSIGNMENT COMPLETION — COMPLETE (local; deploy NO-GO).** Pin `all` store-wide list (no `departments[0]`); race guard; honest empty states. Assign persist = stewardship + approved capacity only; stage draw = approved shared target; Floor recovery goal respects capacity; legacy balancer not used to persist. Auto-stage OFF. Focused **82** PASS; tsc/build PASS. Canonical: [`docs/product/DEPTSYNC_OPERATIONAL_009_IMPLEMENTATION.md`](docs/product/DEPTSYNC_OPERATIONAL_009_IMPLEMENTATION.md). **STOP — await authorize for app release.**
+- **DEPTSYNC-OPERATIONAL-SECTIONS-008 — PRODUCTION REGRESSION INVESTIGATION — COMPLETE.** Canonical: [`docs/product/DEPTSYNC_OPERATIONAL_SECTIONS_008_REGRESSION.md`](docs/product/DEPTSYNC_OPERATIONAL_SECTIONS_008_REGRESSION.md).
+
 - **DEPTSYNC-ZEBRA-HANDOFF-004 — PRODUCTION RELEASE — RELEASED; AWAITING PHONE ACCEPTANCE.** Commit `ef593f0`; migrate `20261017_…` COMMIT; Vercel Production `7014109854` / `Ch9t3SZ8xkrHQxSJuLeSxzNcjmVV` @ https://deptsync-hub.vercel.app. Data preserved (SBA 30; W41=6; W42=0). No Zebra API; auto-stage OFF. Canonical: [`docs/product/DEPTSYNC_ZEBRA_HANDOFF_004_PRODUCTION_RELEASE.md`](docs/product/DEPTSYNC_ZEBRA_HANDOFF_004_PRODUCTION_RELEASE.md). **STOP for phone acceptance.**
 - **DEPTSYNC-ZEBRA-HANDOFF-003 — PRODUCTION RELEASE READINESS — PREFLIGHT COMPLETE / CONDITIONAL GO.** Canonical: [`docs/product/DEPTSYNC_ZEBRA_HANDOFF_003_RELEASE_READINESS.md`](docs/product/DEPTSYNC_ZEBRA_HANDOFF_003_RELEASE_READINESS.md).
 - **DEPTSYNC-ZEBRA-HANDOFF-002 — PER-BAY MANUAL ZEBRA HANDOFF — COMPLETE (released via 004).** Canonical: [`docs/product/DEPTSYNC_ZEBRA_HANDOFF_002_IMPLEMENTATION.md`](docs/product/DEPTSYNC_ZEBRA_HANDOFF_002_IMPLEMENTATION.md).

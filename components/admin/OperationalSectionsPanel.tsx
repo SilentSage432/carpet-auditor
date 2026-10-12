@@ -7,7 +7,7 @@
  * Stewardship only — not weekly assignment.
  */
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { StoreSpecialist } from "@/lib/types";
 import type { StoreAisle } from "@/lib/store-ops/store-aisles";
 import type { Department, StoreLocation } from "@/lib/store-ops/types";
@@ -38,6 +38,11 @@ import {
 } from "@/lib/store-ops/operational-sections";
 import { workingDepartmentId } from "@/lib/admin-department-context";
 import { useWorkingDepartment } from "@/lib/use-working-department";
+import {
+  classifySectionsEmptyState,
+  resolveOperationalSectionsListFilter,
+  shouldApplySectionsFetchResult,
+} from "@/lib/store-ops/operational-sections-department-filter";
 
 type Props = {
   specialist: StoreSpecialist;
@@ -61,10 +66,18 @@ export function OperationalSectionsPanel({
 }: Props) {
   const canManage = canManageOperationalSections(specialist);
   const working = useWorkingDepartment(specialist);
-  const departmentId =
-    workingDepartmentId(specialist, departments) ??
-    departments[0]?.id ??
-    "";
+  const pinnedDepartmentId = workingDepartmentId(specialist, departments);
+  const listFilter = useMemo(
+    () =>
+      resolveOperationalSectionsListFilter({
+        pinnedDepartmentId,
+        workingScopeIsAll: working === "all",
+        departmentsLoaded: departments.length > 0 || working === "all",
+      }),
+    [pinnedDepartmentId, working, departments.length]
+  );
+  /** Explicit pin for create/edit; never departments[0] fallback. */
+  const departmentId = listFilter.departmentId ?? "";
 
   const [sections, setSections] = useState<OperationalSectionView[]>([]);
   const [roster, setRoster] = useState<StoreSpecialist[]>([]);
@@ -74,6 +87,7 @@ export function OperationalSectionsPanel({
   const [mode, setMode] = useState<DraftMode>("list");
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const fetchGenRef = useRef(0);
 
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
@@ -88,27 +102,41 @@ export function OperationalSectionsPanel({
   >(null);
 
   const reload = useCallback(async () => {
+    if (listFilter.awaitingResolution) {
+      setLoading(true);
+      return;
+    }
+    const requestId = ++fetchGenRef.current;
     setLoading(true);
     setError(null);
     try {
       const [sec, people] = await Promise.all([
         fetchOperationalSections(specialist, {
-          departmentId: departmentId || undefined,
+          departmentId: listFilter.departmentId,
           includeRetired: showRetired,
           includeMembers: true,
         }),
         fetchSpecialists().catch(() => [] as StoreSpecialist[]),
       ]);
+      if (!shouldApplySectionsFetchResult(requestId, fetchGenRef.current)) {
+        return;
+      }
       setSections(sec.sections ?? []);
       setRoster(people.filter((p) => p.is_active !== false));
     } catch (err) {
+      if (!shouldApplySectionsFetchResult(requestId, fetchGenRef.current)) {
+        return;
+      }
+      // Keep prior sections — do not treat load failure as an empty list.
       setError(
         err instanceof Error ? err.message : "Could not load Operational Sections"
       );
     } finally {
-      setLoading(false);
+      if (shouldApplySectionsFetchResult(requestId, fetchGenRef.current)) {
+        setLoading(false);
+      }
     }
-  }, [specialist, departmentId, showRetired]);
+  }, [specialist, listFilter, showRetired]);
 
   useEffect(() => {
     void reload();
@@ -391,10 +419,20 @@ export function OperationalSectionsPanel({
     }
   }, [mode, selected]);
 
-  if (!departmentId) {
+  const emptyKind = classifySectionsEmptyState({
+    loading,
+    error,
+    sectionCount: sections.length,
+    filter: listFilter,
+  });
+
+  if (listFilter.awaitingResolution) {
     return (
-      <p className="text-sm text-zinc-400" data-testid="sections-need-department">
-        Select a working department to manage Operational Sections.
+      <p
+        className="text-sm text-zinc-400"
+        data-testid="sections-awaiting-department"
+      >
+        Loading department context…
       </p>
     );
   }
@@ -406,6 +444,9 @@ export function OperationalSectionsPanel({
         A bay belongs to at most one active section. Numbered aisles and named
         zones (e.g. SHOW-L, CARPET-WALL) appear together — select the whole
         aisle/zone to include its currently documented active bays.
+        {listFilter.storeWide
+          ? " Full Store pin lists every department’s sections."
+          : null}
       </p>
 
       {error ? (
@@ -417,7 +458,7 @@ export function OperationalSectionsPanel({
       {mode === "list" ? (
         <>
           <div className="flex flex-wrap items-center gap-2">
-            {canManage ? (
+            {canManage && listFilter.canManageInDepartment ? (
               <button
                 type="button"
                 onClick={openCreate}
@@ -426,6 +467,15 @@ export function OperationalSectionsPanel({
               >
                 New section
               </button>
+            ) : null}
+            {canManage && listFilter.storeWide ? (
+              <p
+                className="w-full text-[11px] leading-snug text-zinc-500"
+                data-testid="sections-need-department"
+              >
+                Pin a working department to create or edit sections. Viewing all
+                store sections below.
+              </p>
             ) : null}
             <label className="inline-flex min-h-12 items-center gap-2 rounded-xl border border-zinc-800 px-3 text-xs text-zinc-400">
               <input
@@ -438,9 +488,17 @@ export function OperationalSectionsPanel({
             </label>
           </div>
 
-          {loading ? (
+          {emptyKind === "loading" ? (
             <p className="text-sm text-zinc-500">Loading sections…</p>
-          ) : sections.length === 0 ? (
+          ) : emptyKind === "none_in_department" ? (
+            <p
+              className="rounded-xl border border-dashed border-zinc-700 px-3 py-4 text-sm text-zinc-400"
+              data-testid="sections-empty-filtered"
+            >
+              No Operational Sections in this department. Pin Full Store to see
+              every department, or create a section here.
+            </p>
+          ) : emptyKind === "none_configured" ? (
             <p
               className="rounded-xl border border-dashed border-zinc-700 px-3 py-4 text-sm text-zinc-400"
               data-testid="sections-empty"
@@ -448,7 +506,15 @@ export function OperationalSectionsPanel({
               No Operational Sections yet. Create one, then add aisles (all
               active bays in each aisle).
             </p>
-          ) : (
+          ) : emptyKind === "error" && sections.length === 0 ? (
+            <p
+              className="rounded-xl border border-dashed border-rose-700/50 px-3 py-4 text-sm text-rose-200/80"
+              data-testid="sections-load-failed"
+            >
+              Sections could not be loaded. Previous data was not cleared — try
+              again.
+            </p>
+          ) : sections.length === 0 ? null : (
             <ul className="space-y-2" data-testid="sections-list">
               {sections.map((section) => (
                 <li key={section.id}>

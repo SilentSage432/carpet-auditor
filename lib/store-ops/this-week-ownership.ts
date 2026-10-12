@@ -21,6 +21,7 @@ import type { SundayAssignmentMap } from "./sunday-audit";
 import { formatBayTag, type WeeklyRotationWithLocation } from "./types";
 import { BASE_WEEKLY_BAY_QUOTA } from "./weekly-rotations";
 import type { BaySectionLookup } from "./operational-sections";
+import { resolveOwnershipRecoveryGoal } from "./weekly-stage-draw";
 import {
   rosterFloorBadgeLabel,
   type StoreSpecialist,
@@ -119,6 +120,12 @@ export type ComposeThisWeekOwnershipInput = {
   includeUnassignedRoster?: boolean;
   /** RD-3 physicalBayKey → section lookup (optional). */
   baySectionByKey?: Map<string, BaySectionLookup>;
+  /**
+   * OPERATIONAL-009 — when capacity approvals set a shared target, ownership
+   * recovery is complete once owned >= min(staged, approvedSharedTarget).
+   * Excess staged rows beyond approved capacity do not force recovery chrome.
+   */
+  approvedSharedTarget?: number | null;
 };
 
 /** Evidence-first weekly command board summary (RD-4). */
@@ -379,8 +386,13 @@ export function composeThisWeekOwnership(
   const hasPlan = physicalBays.length > 0;
   const unownedPhysicalBayCount = unownedBays.length;
   const ownedPhysicalBayCount = physicalBays.length - unownedPhysicalBayCount;
-  const ownershipComplete = hasPlan && unownedPhysicalBayCount === 0;
-  const needsOwnershipRecovery = hasPlan && !ownershipComplete;
+  const ownershipGoal = resolveOwnershipRecoveryGoal({
+    stagedPhysicalBayCount: physicalBays.length,
+    approvedSharedTarget: input.approvedSharedTarget,
+  });
+  const ownershipComplete =
+    hasPlan && ownedPhysicalBayCount >= ownershipGoal && ownershipGoal > 0;
+  const needsOwnershipRecovery = hasPlan && ownedPhysicalBayCount < ownershipGoal;
   const needsDispatchRecovery = !hasPlan;
   const isHealthyOwnedPlan = ownershipComplete;
 

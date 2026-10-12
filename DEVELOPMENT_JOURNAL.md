@@ -1,5 +1,13 @@
 # DeptSync Hub — Development Journal
 
+## 2026-10-12 — DEPTSYNC-OPERATIONAL-009 sections UI repair + assignment completion
+
+**Focused local implementation; no deploy / no prod mutations / no section rebuild.** UI: pin `all` no longer uses `departments[0]`; store-wide list omit filter; fetch generation guard; empty vs filtered vs error states. Assign: `handleBalanceAssign` stewardship-only + capacity board required; stage draw uses approved shared target; Floor ownership recovery respects approved target; legacy balancer removed from persist. Auto-stage OFF. `tsc` PASS; focused **82** PASS; `next build` PASS. Canonical: [`docs/product/DEPTSYNC_OPERATIONAL_009_IMPLEMENTATION.md`](docs/product/DEPTSYNC_OPERATIONAL_009_IMPLEMENTATION.md). Release **CONDITIONAL GO** after operator review. **STOP.**
+
+## 2026-10-12 — DEPTSYNC-OPERATIONAL-SECTIONS-008 production regression investigation
+
+**Read-only diagnosis; no impl/migrate/deploy/mutations.** Store 2587 on `fmeinlwhixngednabhgy`: **4 active sections + 160 memberships preserved**; stewardship aisles match Tyson 5·6 / Nate 7·39·40 / Nick 43·44 / Tracy 41·42. UI flash→empty: `OperationalSectionsPanel` pin `all` falls back to `departments[0]` (name-ordered non-flooring) after an unfiltered first fetch; successful empty list overwrites valid rows; empty copy implies “none configured.” W41 aisles not steward-aligned = legacy assign path; W42 assignments **0**. Zebra handoff **not causal**. Existing suites **36 PASS**. Canonical: [`docs/product/DEPTSYNC_OPERATIONAL_SECTIONS_008_REGRESSION.md`](docs/product/DEPTSYNC_OPERATIONAL_SECTIONS_008_REGRESSION.md). Verdict **CONDITIONAL GO** for focused UI filter/empty-state/race fix only; **NO-GO** data rebuild. **STOP.**
+
 ## 2026-10-12 — DEPTSYNC-ZEBRA-HANDOFF-004 production release
 
 **Authorized release executed.** Commit `ef593f0` pushed `cfd1ca4..ef593f0`. Backup `tmp/production-backups/deptsync-fmeinlwhixngednabhgy-2026-10-12T12-29-09Z.dump` (639670 B / TOC 970). Migration `20261017_…` **COMMIT** on `fmeinlwhixngednabhgy` (columns+trigger; SBA 30/W41=6/W42=0/attempts 25/caps 4 preserved; all zebra null). Vercel Production success deploy `7014109854` / `Ch9t3SZ8xkrHQxSJuLeSxzNcjmVV` @ https://deptsync-hub.vercel.app (`/login` 200; unauth zebra-entry 401). No Zebra API; auto-stage OFF; no assignment mutations in verify. Canonical: [`docs/product/DEPTSYNC_ZEBRA_HANDOFF_004_PRODUCTION_RELEASE.md`](docs/product/DEPTSYNC_ZEBRA_HANDOFF_004_PRODUCTION_RELEASE.md). **RELEASED — AWAITING PHONE ACCEPTANCE.** **STOP.**

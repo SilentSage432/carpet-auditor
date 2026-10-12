@@ -68,7 +68,10 @@ describe("STAGE-ASSIGN-CUE-001 user-journey contracts", () => {
     expect(balance).toMatch(/fetchShiftDaysRange/);
     expect(balance).toMatch(/composeWeekLaborAvailability/);
     expect(balance).toMatch(/applySundayAssignmentPlan/);
-    expect(balance).toMatch(/knownHoursOnly:\s*true|buildScheduleBalancePlan/);
+    expect(balance).toMatch(/knownHoursOnly:\s*true/);
+    // OPERATIONAL-009 — persist path is stewardship + approved capacity only.
+    expect(balance).toMatch(/composeStewardshipWeeklyProposal/);
+    expect(balance).not.toMatch(/buildScheduleBalancePlan/);
   });
 
   it("Auto-Assign All to Me remains secondary, not the primary week action", () => {
