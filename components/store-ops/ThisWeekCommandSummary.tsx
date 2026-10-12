@@ -105,6 +105,18 @@ export function ThisWeekCommandSummaryCard({
           emphasize={summary.unassignedBayCount > 0 ? "amber" : "zinc"}
         />
         <Stat
+          label="In Zebra"
+          value={summary.zebraEnteredCount}
+          hint={
+            summary.zebraPendingCount > 0
+              ? `${summary.zebraPendingCount} not entered yet`
+              : summary.assignedBayCount > 0
+                ? "Operator-recorded"
+                : "No assignments"
+          }
+          emphasize={summary.zebraPendingCount > 0 ? "amber" : "emerald"}
+        />
+        <Stat
           label="Verified"
           value={summary.verifiedCount}
           hint={
@@ -114,26 +126,16 @@ export function ThisWeekCommandSummaryCard({
           }
           emphasize="emerald"
         />
-        <Stat
-          label="Remaining"
-          value={summary.remainingBayCount}
-          hint={
-            summary.awaitingVerificationCount > 0
-              ? `${summary.awaitingVerificationCount} awaiting verify`
-              : summary.barrierBayCount > 0
-                ? `${summary.barrierBayCount} barrier`
-                : "Still open"
-          }
-          emphasize={summary.remainingBayCount > 0 ? "amber" : "emerald"}
-        />
       </div>
 
       <p
         className="border-t border-zinc-800/80 px-3 py-2 text-[10px] leading-snug text-zinc-500"
         data-testid="week-summary-evidence-note"
       >
-        Assignment names responsibility. Reported and verified counts are
-        completion evidence — a scheduled bay is not proof that work occurred.
+        Assignment names responsibility. In Zebra is an operator-recorded
+        handoff only — not proof Lowe&apos;s accepted the task. Reported and
+        verified counts are completion evidence — a scheduled bay is not proof
+        that work occurred.
       </p>
     </section>
   );

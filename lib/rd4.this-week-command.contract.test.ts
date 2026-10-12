@@ -39,16 +39,20 @@ describe("RD-4 This Week command board", () => {
     expect(summary).toMatch(/this-week-command-summary/);
     expect(summary).toMatch(/week-summary-evidence-note/);
     expect(summary).toMatch(/scheduled bay is not proof/);
+    expect(summary).toMatch(/In Zebra/);
+    expect(summary).toMatch(/operator-recorded/);
     expect(summary).toMatch(/eligible ×/);
     expect(summary).toMatch(/not a fixed/);
 
     const board = readSrc("components/store-ops/ThisWeekOwnershipBoard.tsx");
     expect(board).toMatch(/assignmentResponsibilityLabel/);
     expect(board).toMatch(/completionEvidenceLabel/);
+    expect(board).toMatch(/zebraHandoffEvidenceLabel/);
     expect(board).toMatch(/buildMapBayFocusHref/);
     expect(board).toMatch(/formatUnsectionedLabel/);
     expect(board).toMatch(/completeRotation/);
     expect(board).toMatch(/reportRotationBarriers/);
+    expect(board).toMatch(/confirmZebraBayEntry/);
   });
 
   it("Map accepts This Week bay focus without rewriting geography", () => {

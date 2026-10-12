@@ -19,6 +19,7 @@ import {
 import { BarrierReasonChips } from "@/components/store-ops/BarrierReasonChips";
 import {
   completeRotation,
+  confirmZebraBayEntry,
   dispatchExtraBay,
   reportRotationBarriers,
   suggestExtraBay,
@@ -35,10 +36,15 @@ import { formatUnsectionedLabel } from "@/lib/store-ops/operational-sections";
 import {
   assignmentResponsibilityLabel,
   completionEvidenceLabel,
+  zebraHandoffEvidenceLabel,
   type ThisWeekOwnedBay,
   type ThisWeekOwner,
   type ThisWeekOwnershipPlan,
 } from "@/lib/store-ops/this-week-ownership";
+import {
+  buildZebraTaskTypingAid,
+  formatZebraEnteredAt,
+} from "@/lib/store-ops/zebra-handoff";
 
 const ICON_STROKE = 1.75;
 
@@ -52,6 +58,8 @@ type Props = {
   /** Associate simplified: only show the signed-in member's ownership. */
   onlySpecialistId?: string | null;
   allowExtraBay?: boolean;
+  /** Supervisor/Master — per-bay Zebra handoff confirm (ZEBRA-HANDOFF-002). */
+  allowZebraHandoff?: boolean;
   onRefresh: () => void;
 };
 
@@ -62,6 +70,7 @@ export function ThisWeekOwnershipBoard({
   availabilityById = {},
   onlySpecialistId = null,
   allowExtraBay = false,
+  allowZebraHandoff = false,
   onRefresh,
 }: Props) {
   const owners = useMemo(() => {
@@ -127,6 +136,7 @@ export function ThisWeekOwnershipBoard({
             departmentId={departmentId}
             availability={availabilityById[owner.specialistId]}
             allowExtraBay={allowExtraBay && owner.canAddAnotherBay}
+            allowZebraHandoff={allowZebraHandoff}
             onRefresh={onRefresh}
           />
         ))}
@@ -141,6 +151,7 @@ function ThisWeekOwnerRow({
   departmentId,
   availability,
   allowExtraBay,
+  allowZebraHandoff,
   onRefresh,
 }: {
   owner: ThisWeekOwner;
@@ -148,6 +159,7 @@ function ThisWeekOwnerRow({
   departmentId: string | null;
   availability?: CurrentAvailability;
   allowExtraBay: boolean;
+  allowZebraHandoff: boolean;
   onRefresh: () => void;
 }) {
   const [open, setOpen] = useState(false);
@@ -167,6 +179,11 @@ function ThisWeekOwnerRow({
   if (owner.barrierCount > 0) {
     attentionParts.push(
       `${owner.barrierCount} barrier${owner.barrierCount === 1 ? "" : "s"}`
+    );
+  }
+  if (owner.zebraPendingCount > 0) {
+    attentionParts.push(
+      `${owner.zebraPendingCount} not in Zebra`
     );
   }
 
@@ -296,7 +313,9 @@ function ThisWeekOwnerRow({
                 <ThisWeekBayDetail
                   key={bay.physicalKey}
                   bay={bay}
+                  associateName={owner.specialistName}
                   specialist={specialist}
+                  allowZebraHandoff={allowZebraHandoff}
                   onRefresh={onRefresh}
                 />
               ))}
@@ -365,19 +384,70 @@ function ThisWeekOwnerRow({
 
 function ThisWeekBayDetail({
   bay,
+  associateName,
   specialist,
+  allowZebraHandoff,
   onRefresh,
 }: {
   bay: ThisWeekOwnedBay;
+  associateName: string;
   specialist: StoreSpecialist;
+  allowZebraHandoff: boolean;
   onRefresh: () => void;
 }) {
   const [actionsOpen, setActionsOpen] = useState(false);
   const [barrierOpen, setBarrierOpen] = useState(false);
+  const [aidOpen, setAidOpen] = useState(false);
+  const [copied, setCopied] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [zebraBusy, setZebraBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const done =
     bay.lifecycle === "verified" || bay.lifecycle === "reported";
+  const zebraEntered = Boolean(bay.zebraEnteredAt);
+  const typingAid = buildZebraTaskTypingAid({
+    aisle: bay.aisle,
+    bay: bay.bay,
+    associateName,
+    bayLabel: bay.label,
+  });
+
+  async function handleConfirmZebra() {
+    if (!allowZebraHandoff || !bay.isAssigned || zebraEntered) return;
+    setZebraBusy(true);
+    setError(null);
+    try {
+      await confirmZebraBayEntry(specialist, {
+        bayId: bay.rotation.id,
+        assignedWeek: bay.rotation.assigned_week,
+        departmentId: bay.rotation.department_id,
+      });
+      hapticPulse("success");
+      playSuccessTone();
+      onRefresh();
+    } catch (err) {
+      setError(
+        err instanceof Error ? err.message : "Could not confirm Zebra entry"
+      );
+      playErrorTone();
+    } finally {
+      setZebraBusy(false);
+    }
+  }
+
+  async function handleCopyAid() {
+    try {
+      if (!navigator.clipboard?.writeText) {
+        setError("Clipboard unavailable on this device");
+        return;
+      }
+      await navigator.clipboard.writeText(typingAid);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1600);
+    } catch {
+      setError("Could not copy task text");
+    }
+  }
 
   async function handleComplete() {
     setBusy(true);
@@ -498,6 +568,17 @@ function ThisWeekBayDetail({
             {completionEvidenceLabel(bay.lifecycle)}
           </p>
           <p
+            className={`mt-0.5 text-[11px] font-semibold ${
+              zebraEntered ? "text-sky-300" : "text-amber-200"
+            }`}
+            data-testid={`floor-bay-zebra-${bay.physicalKey}`}
+          >
+            {zebraHandoffEvidenceLabel(bay)}
+            {zebraEntered && bay.zebraEnteredAt
+              ? ` · ${formatZebraEnteredAt(bay.zebraEnteredAt)}`
+              : ""}
+          </p>
+          <p
             className="mt-1 text-[11px] text-zinc-500"
             data-testid={`floor-bay-section-${bay.physicalKey}`}
           >
@@ -522,58 +603,119 @@ function ThisWeekBayDetail({
             <MapPinned className="h-3.5 w-3.5" strokeWidth={ICON_STROKE} aria-hidden />
             Map
           </Link>
-          {!done ? (
-            <button
-              type="button"
-              aria-expanded={actionsOpen}
-              onClick={() => setActionsOpen((v) => !v)}
-              className="min-h-10 rounded-xl border border-zinc-700 px-2.5 text-[10px] font-semibold uppercase tracking-wide text-zinc-300"
-            >
-              Actions
-            </button>
-          ) : null}
+          <button
+            type="button"
+            aria-expanded={actionsOpen}
+            onClick={() => setActionsOpen((v) => !v)}
+            className="min-h-10 rounded-xl border border-zinc-700 px-2.5 text-[10px] font-semibold uppercase tracking-wide text-zinc-300"
+          >
+            Actions
+          </button>
         </div>
       </div>
 
-      {actionsOpen && !done ? (
+      {actionsOpen ? (
         <div className="mt-2 space-y-2 border-t border-zinc-800/80 pt-2">
-          <div className="flex flex-wrap gap-1.5">
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => startTransition(() => void handleComplete())}
-              className="btn-quick-touch border-cyan-500/35 bg-cyan-950/25 text-cyan-100"
-              aria-label={`Mark facing complete: ${bay.label}`}
+          {bay.isAssigned ? (
+            <div
+              className="rounded-xl border border-sky-500/25 bg-sky-950/20 p-2.5"
+              data-testid={`floor-bay-zebra-panel-${bay.physicalKey}`}
             >
-              <Hand className="h-4 w-4" strokeWidth={ICON_STROKE} aria-hidden />
-              <span>Facing check</span>
-            </button>
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => setBarrierOpen((v) => !v)}
-              className="btn-quick-touch border-rose-500/40 bg-rose-950/30 text-rose-100"
-              aria-label={`Log barrier: ${bay.label}`}
-            >
-              <AlertTriangle
-                className="h-4 w-4"
-                strokeWidth={ICON_STROKE}
-                aria-hidden
-              />
-              <span>Barrier</span>
-            </button>
-            <button
-              type="button"
-              disabled={busy}
-              onClick={() => void handleDownstock()}
-              className="btn-quick-touch border-zinc-600 bg-zinc-950/60 text-zinc-200"
-              aria-label={`Flag downstock: ${bay.label}`}
-            >
-              <Flag className="h-4 w-4" strokeWidth={ICON_STROKE} aria-hidden />
-              <span>Downstock</span>
-            </button>
-          </div>
-          {barrierOpen ? (
+              <p className="text-[11px] font-semibold text-sky-100">
+                Zebra Dashboard entry
+              </p>
+              <p className="mt-0.5 text-[10px] leading-snug text-sky-100/70">
+                One bay = one Zebra task. Operator-recorded only — DeptSync does
+                not talk to Zebra.
+              </p>
+              <button
+                type="button"
+                onClick={() => setAidOpen((v) => !v)}
+                className="mt-2 text-[11px] font-semibold text-sky-200 underline-offset-2 hover:underline"
+                data-testid={`floor-bay-zebra-aid-toggle-${bay.physicalKey}`}
+              >
+                {aidOpen ? "Hide typing aid" : "Show typing aid"}
+              </button>
+              {aidOpen ? (
+                <div className="mt-2 space-y-2">
+                  <pre className="max-h-40 overflow-auto whitespace-pre-wrap rounded-lg border border-sky-500/20 bg-zinc-950/70 px-2.5 py-2 font-sans text-[11px] leading-snug text-zinc-200">
+                    {typingAid}
+                  </pre>
+                  <button
+                    type="button"
+                    onClick={() => void handleCopyAid()}
+                    className="inline-flex min-h-10 items-center justify-center rounded-xl border border-sky-400/40 bg-sky-950/40 px-3 text-xs font-semibold text-sky-50"
+                    data-testid={`floor-bay-zebra-copy-${bay.physicalKey}`}
+                  >
+                    {copied ? "Copied" : "Copy for Zebra"}
+                  </button>
+                </div>
+              ) : null}
+              {allowZebraHandoff && !zebraEntered ? (
+                <button
+                  type="button"
+                  disabled={zebraBusy}
+                  onClick={() => void handleConfirmZebra()}
+                  className="mt-2 inline-flex min-h-11 w-full items-center justify-center rounded-xl border border-sky-400/50 bg-sky-900/50 px-3 text-xs font-bold text-sky-50 disabled:opacity-40"
+                  data-testid={`floor-bay-zebra-confirm-${bay.physicalKey}`}
+                  aria-label={`Mark entered in Zebra: ${bay.label}`}
+                >
+                  {zebraBusy ? "Saving…" : "Mark Entered in Zebra"}
+                </button>
+              ) : null}
+              {zebraEntered ? (
+                <p
+                  className="mt-2 text-[11px] font-semibold text-sky-200"
+                  data-testid={`floor-bay-zebra-confirmed-${bay.physicalKey}`}
+                >
+                  Entered in Zebra
+                  {bay.zebraEnteredAt
+                    ? ` · ${formatZebraEnteredAt(bay.zebraEnteredAt)}`
+                    : ""}
+                </p>
+              ) : null}
+            </div>
+          ) : null}
+
+          {!done ? (
+            <div className="flex flex-wrap gap-1.5">
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => startTransition(() => void handleComplete())}
+                className="btn-quick-touch border-cyan-500/35 bg-cyan-950/25 text-cyan-100"
+                aria-label={`Mark facing complete: ${bay.label}`}
+              >
+                <Hand className="h-4 w-4" strokeWidth={ICON_STROKE} aria-hidden />
+                <span>Facing check</span>
+              </button>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => setBarrierOpen((v) => !v)}
+                className="btn-quick-touch border-rose-500/40 bg-rose-950/30 text-rose-100"
+                aria-label={`Log barrier: ${bay.label}`}
+              >
+                <AlertTriangle
+                  className="h-4 w-4"
+                  strokeWidth={ICON_STROKE}
+                  aria-hidden
+                />
+                <span>Barrier</span>
+              </button>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => void handleDownstock()}
+                className="btn-quick-touch border-zinc-600 bg-zinc-950/60 text-zinc-200"
+                aria-label={`Flag downstock: ${bay.label}`}
+              >
+                <Flag className="h-4 w-4" strokeWidth={ICON_STROKE} aria-hidden />
+                <span>Downstock</span>
+              </button>
+            </div>
+          ) : null}
+          {barrierOpen && !done ? (
             <BarrierReasonChips
               disabled={busy}
               onSelect={(reason) => void handleBarrier(reason)}

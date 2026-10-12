@@ -1166,6 +1166,47 @@ export async function verifyPendingBay(
   notifyStoreLocationsChanged();
 }
 
+/**
+ * ZEBRA-HANDOFF-002 — operator confirms one bay was typed into Lowe's Zebra.
+ * Does not complete/verify the rotation or call Zebra.
+ */
+export async function confirmZebraBayEntry(
+  specialist: StoreSpecialist,
+  input: {
+    bayId: string;
+    assignedWeek: string;
+    departmentId?: string | null;
+    departmentCode?: string | null;
+  }
+): Promise<{
+  zebra_entered_at: string;
+  zebra_entered_by: string;
+  already_confirmed: boolean;
+}> {
+  const { invalidateSundayAssignmentsCache } = await import("./sunday-audit");
+  const result = await storeOpsFetch<{
+    zebra_entered_at?: string;
+    zebra_entered_by?: string;
+    already_confirmed?: boolean;
+  }>("/api/rotations/zebra-entry", specialist, {
+    method: "POST",
+    body: JSON.stringify({
+      bay_id: input.bayId,
+      assigned_week: input.assignedWeek,
+      ...(input.departmentCode
+        ? { department_code: input.departmentCode }
+        : {}),
+      ...(input.departmentId ? { department_id: input.departmentId } : {}),
+    }),
+  });
+  invalidateSundayAssignmentsCache();
+  return {
+    zebra_entered_at: String(result.zebra_entered_at ?? ""),
+    zebra_entered_by: String(result.zebra_entered_by ?? ""),
+    already_confirmed: result.already_confirmed === true,
+  };
+}
+
 export async function sendBackPendingBay(
   specialist: StoreSpecialist,
   rotationId: string,

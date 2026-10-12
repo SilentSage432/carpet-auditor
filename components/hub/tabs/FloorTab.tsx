@@ -822,6 +822,7 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
             availabilityById={availabilityById}
             onlySpecialistId={simplified ? String(specialist.id) : null}
             allowExtraBay={!simplified && supervisor}
+            allowZebraHandoff={!simplified && supervisor}
             onRefresh={silentRefresh}
           />
         ) : null}

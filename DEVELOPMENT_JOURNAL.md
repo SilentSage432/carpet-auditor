@@ -1,5 +1,17 @@
 # DeptSync Hub — Development Journal
 
+## 2026-10-11 — DEPTSYNC-ZEBRA-HANDOFF-003 production release readiness
+
+**Preflight only; no commit/push/migrate/deploy.** Local tranche present; `tsc` PASS; focused **86** PASS; build PASS (`/api/rotations/zebra-entry`). Prod `fmeinlwhixngednabhgy`: zebra columns **absent**; SBA 30 preserved (W41=6, W42=0); attempts 25; capacity approvals 4 (W42 sum 11); sections 5. Migration additive/nullable. Order: isolated commit → backup → migrate → deploy. Exclude SEC-OPS-010/RD_6/tmp dirt. Section-aware auto-stage OFF. Canonical: [`docs/product/DEPTSYNC_ZEBRA_HANDOFF_003_RELEASE_READINESS.md`](docs/product/DEPTSYNC_ZEBRA_HANDOFF_003_RELEASE_READINESS.md). **CONDITIONAL GO.** **STOP.**
+
+## 2026-10-11 — DEPTSYNC-ZEBRA-HANDOFF-002 per-bay manual Zebra handoff
+
+**Controlled local implementation; no prod migrate/deploy/data mutation.** Orthogonal `zebra_entered_at` / `zebra_entered_by` on `sunday_bay_assignments` + owner-change clear trigger (`20261017_zebra_handoff_002_sunday_bay_entry.sql`). Domain + `POST /api/rotations/zebra-entry` (`requireSupervisorOrAdmin`); idempotent confirm; no Zebra API. This Week: per-bay status, typing aid + copy, **Mark Entered in Zebra** (one bay only). Completion/verification/capacity/auto-stage untouched. `tsc` PASS; focused **86** PASS; `next build` PASS (`/api/rotations/zebra-entry`). Canonical: [`docs/product/DEPTSYNC_ZEBRA_HANDOFF_002_IMPLEMENTATION.md`](docs/product/DEPTSYNC_ZEBRA_HANDOFF_002_IMPLEMENTATION.md). Prod release **CONDITIONAL GO** after operator authorize. **STOP.**
+
+## 2026-10-11 — DEPTSYNC-ZEBRA-HANDOFF-001 assignment handoff discovery
+
+**Read-only discovery; no impl.** Lifecycle split ownership vs complete/verify; no durable Zebra entry evidence; This Week board is the surface. Prod 2587: 30 assigned rows; no zebra columns. Canonical: [`docs/product/DEPTSYNC_ZEBRA_HANDOFF_001_DISCOVERY.md`](docs/product/DEPTSYNC_ZEBRA_HANDOFF_001_DISCOVERY.md). **STOP.**
+
 ## 2026-10-11 — DEPTSYNC-SECTION-ROTATION-007 production release
 
 **Authorized execution complete; phone acceptance pending.** Pushed `d17813b..c3b2317`. Production Ready `dpl_C87tZtp1VnfLnfT2rBD89Zoj4Zww` @ https://deptsync-hub.vercel.app (`/login` 200; `/api/week-capacity` 401). Backup `tmp/production-backups/deptsync-fmeinlwhixngednabhgy-2026-10-12T03-04-04Z.dump` (756974 B / TOC 1240). Applied `20261016_section_rotation_005_approved_capacity.sql` → **COMMIT**; data preserved W41=6 / W42=0 / sections 160 / shifts 27; approval rows **0**. Enforcement: empty RPC `approved_capacity_enforced`; non-empty → `CAPACITY_APPROVAL_MISSING`; anon denied. Auto-stage OFF. Operator must approve W42 3/3/3/2 on phone. Canonical: [`docs/product/DEPTSYNC_SECTION_ROTATION_007_PRODUCTION_RELEASE.md`](docs/product/DEPTSYNC_SECTION_ROTATION_007_PRODUCTION_RELEASE.md). **RELEASED — AWAITING PHONE ACCEPTANCE.**

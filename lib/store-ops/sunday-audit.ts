@@ -74,6 +74,9 @@ export type SundayBayAssignment = {
   assigned_specialist_id?: string | null;
   status?: string;
   is_carried_over?: boolean;
+  /** Operator-recorded Zebra handoff (ZEBRA-HANDOFF-002). Independent of complete/verify. */
+  zebra_entered_at?: string | null;
+  zebra_entered_by?: string | null;
 };
 
 export type SundayAssignmentMap = Record<string, SundayBayAssignment>;
@@ -99,6 +102,8 @@ type SundayBayAssignmentRow = {
   is_carried_over?: boolean | null;
   created_at: string;
   updated_at?: string | null;
+  zebra_entered_at?: string | null;
+  zebra_entered_by?: string | null;
 };
 
 function requireClient() {
@@ -113,6 +118,11 @@ function emitSundayEvent() {
   sundayAssignmentsCache.invalidate();
   if (typeof window === "undefined") return;
   window.dispatchEvent(new CustomEvent(SUNDAY_AUDIT_EVENT));
+}
+
+/** Drop cached Sunday ownership (e.g. after Zebra handoff confirm). */
+export function invalidateSundayAssignmentsCache() {
+  emitSundayEvent();
 }
 
 function mapRow(row: SundayBayAssignmentRow): SundayBayAssignment | null {
@@ -131,6 +141,12 @@ function mapRow(row: SundayBayAssignmentRow): SundayBayAssignment | null {
     is_carried_over:
       row.is_carried_over === true ||
       String(row.status ?? "").toUpperCase() === "CARRIED_OVER",
+    zebra_entered_at: row.zebra_entered_at
+      ? String(row.zebra_entered_at)
+      : null,
+    zebra_entered_by: row.zebra_entered_by
+      ? String(row.zebra_entered_by)
+      : null,
   };
 }
 

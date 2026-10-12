@@ -56,6 +56,9 @@ export type ThisWeekOwnedBay = {
   isAssigned: boolean;
   /** RD-3 stewardship overlay — independent of weekly assignee. */
   section?: BaySectionLookup | null;
+  /** ZEBRA-HANDOFF-002 — operator-recorded Zebra entry (not completion). */
+  zebraEnteredAt: string | null;
+  zebraEnteredBy: string | null;
 };
 
 export type ThisWeekOwner = {
@@ -68,6 +71,10 @@ export type ThisWeekOwner = {
   openCount: number;
   verifiedCount: number;
   reportedCompleteCount: number;
+  /** Assigned bays not yet confirmed entered in Zebra. */
+  zebraPendingCount: number;
+  /** Assigned bays with operator Zebra confirmation. */
+  zebraEnteredCount: number;
   /** True when this owner already holds base quota and plan ownership is complete. */
   canAddAnotherBay: boolean;
   /** Roster member present for coordination with zero assigned bays this week. */
@@ -87,6 +94,10 @@ export type ThisWeekOwnershipPlan = {
   verifiedCount: number;
   reportedCompleteCount: number;
   openCount: number;
+  /** Assigned physical bays lacking operator Zebra confirmation. */
+  zebraPendingCount: number;
+  /** Assigned physical bays with operator Zebra confirmation. */
+  zebraEnteredCount: number;
   /** Staged rotations exist but at least one physical bay lacks an owner. */
   needsOwnershipRecovery: boolean;
   /** No active weekly rotations in scope. */
@@ -127,6 +138,8 @@ export type ThisWeekCommandSummary = {
   remainingBayCount: number;
   awaitingVerificationCount: number;
   barrierBayCount: number;
+  zebraPendingCount: number;
+  zebraEnteredCount: number;
   /** Blueprint shared pool citation (4×3). Engine may stage eligible×3. */
   sharedCapacityBays: number;
   sharedCapacitySlots: number;
@@ -209,8 +222,9 @@ export function composeThisWeekOwnership(
         : `rotation:${rotation.id}`;
 
     const hasBarrier = barrierSet.has(String(rotation.id));
+    const assignmentRow = input.assignments[rotation.id];
     const assigned = Boolean(
-      String(input.assignments[rotation.id]?.specialist_id ?? "").trim()
+      String(assignmentRow?.specialist_id ?? "").trim()
     );
     const section = input.baySectionByKey?.get(key) ?? null;
     const next: ThisWeekOwnedBay = {
@@ -223,6 +237,16 @@ export function composeThisWeekOwnership(
       hasBarrier,
       isAssigned: assigned,
       section,
+      zebraEnteredAt: assigned
+        ? assignmentRow?.zebra_entered_at
+          ? String(assignmentRow.zebra_entered_at)
+          : null
+        : null,
+      zebraEnteredBy: assigned
+        ? assignmentRow?.zebra_entered_by
+          ? String(assignmentRow.zebra_entered_by)
+          : null
+        : null,
     };
 
     const existing = byPhysical.get(key);
@@ -252,6 +276,8 @@ export function composeThisWeekOwnership(
   let verifiedCount = 0;
   let reportedCompleteCount = 0;
   let openCount = 0;
+  let zebraPendingCount = 0;
+  let zebraEnteredCount = 0;
 
   for (const bay of physicalBays) {
     if (bay.lifecycle === "awaiting_verification") pendingVerificationCount += 1;
@@ -269,6 +295,9 @@ export function composeThisWeekOwnership(
       continue;
     }
 
+    if (bay.zebraEnteredAt) zebraEnteredCount += 1;
+    else zebraPendingCount += 1;
+
     let owner = ownersById.get(specialistId);
     if (!owner) {
       owner = {
@@ -281,12 +310,16 @@ export function composeThisWeekOwnership(
         openCount: 0,
         verifiedCount: 0,
         reportedCompleteCount: 0,
+        zebraPendingCount: 0,
+        zebraEnteredCount: 0,
         canAddAnotherBay: false,
       };
       ownersById.set(specialistId, owner);
     }
     owner.bays.push(bay);
     owner.isRosterPlaceholder = false;
+    if (bay.zebraEnteredAt) owner.zebraEnteredCount += 1;
+    else owner.zebraPendingCount += 1;
     if (bay.lifecycle === "awaiting_verification") {
       owner.awaitingVerificationCount += 1;
     }
@@ -325,6 +358,8 @@ export function composeThisWeekOwnership(
         openCount: 0,
         verifiedCount: 0,
         reportedCompleteCount: 0,
+        zebraPendingCount: 0,
+        zebraEnteredCount: 0,
         canAddAnotherBay: false,
         isRosterPlaceholder: true,
       });
@@ -367,6 +402,8 @@ export function composeThisWeekOwnership(
     verifiedCount,
     reportedCompleteCount,
     openCount,
+    zebraPendingCount,
+    zebraEnteredCount,
     needsOwnershipRecovery,
     needsDispatchRecovery,
     isHealthyOwnedPlan,
@@ -398,6 +435,9 @@ export function composeThisWeekProgressLine(plan: ThisWeekOwnershipPlan): string
     `${plan.ownedPhysicalBayCount} assigned`,
     `${plan.verifiedCount} verified`,
   ];
+  if (plan.zebraPendingCount > 0) {
+    parts.push(`${plan.zebraPendingCount} not in Zebra`);
+  }
   if (plan.pendingVerificationCount > 0) {
     parts.push(
       `${plan.pendingVerificationCount} awaiting verification`
@@ -432,6 +472,8 @@ export function composeThisWeekCommandSummary(
     remainingBayCount,
     awaitingVerificationCount: plan.pendingVerificationCount,
     barrierBayCount: plan.barrierBayCount,
+    zebraPendingCount: plan.zebraPendingCount,
+    zebraEnteredCount: plan.zebraEnteredCount,
     sharedCapacityBays: SHARED_TEAM_WEEKLY_CAPACITY,
     sharedCapacitySlots: SHARED_TEAM_CAPACITY_SLOTS,
     baysPerPerson: BASE_WEEKLY_BAY_QUOTA,
@@ -460,4 +502,11 @@ export function completionEvidenceLabel(lifecycle: PhysicalBayLifecycle): string
     default:
       return "No completion evidence";
   }
+}
+
+/** Zebra handoff label — operator-recorded only; never implies Zebra acceptance. */
+export function zebraHandoffEvidenceLabel(bay: ThisWeekOwnedBay): string {
+  if (!bay.isAssigned) return "Zebra entry — needs owner first";
+  if (bay.zebraEnteredAt) return "Entered in Zebra";
+  return "Not entered in Zebra";
 }
