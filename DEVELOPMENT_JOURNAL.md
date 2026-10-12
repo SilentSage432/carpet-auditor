@@ -1,5 +1,9 @@
 # DeptSync Hub — Development Journal
 
+## 2026-10-12 — DEPTSYNC-ZEBRA-HANDOFF-004 production release
+
+**Authorized release executed.** Commit `ef593f0` pushed `cfd1ca4..ef593f0`. Backup `tmp/production-backups/deptsync-fmeinlwhixngednabhgy-2026-10-12T12-29-09Z.dump` (639670 B / TOC 970). Migration `20261017_…` **COMMIT** on `fmeinlwhixngednabhgy` (columns+trigger; SBA 30/W41=6/W42=0/attempts 25/caps 4 preserved; all zebra null). Vercel Production success deploy `7014109854` / `Ch9t3SZ8xkrHQxSJuLeSxzNcjmVV` @ https://deptsync-hub.vercel.app (`/login` 200; unauth zebra-entry 401). No Zebra API; auto-stage OFF; no assignment mutations in verify. Canonical: [`docs/product/DEPTSYNC_ZEBRA_HANDOFF_004_PRODUCTION_RELEASE.md`](docs/product/DEPTSYNC_ZEBRA_HANDOFF_004_PRODUCTION_RELEASE.md). **RELEASED — AWAITING PHONE ACCEPTANCE.** **STOP.**
+
 ## 2026-10-11 — DEPTSYNC-ZEBRA-HANDOFF-003 production release readiness
 
 **Preflight only; no commit/push/migrate/deploy.** Local tranche present; `tsc` PASS; focused **86** PASS; build PASS (`/api/rotations/zebra-entry`). Prod `fmeinlwhixngednabhgy`: zebra columns **absent**; SBA 30 preserved (W41=6, W42=0); attempts 25; capacity approvals 4 (W42 sum 11); sections 5. Migration additive/nullable. Order: isolated commit → backup → migrate → deploy. Exclude SEC-OPS-010/RD_6/tmp dirt. Section-aware auto-stage OFF. Canonical: [`docs/product/DEPTSYNC_ZEBRA_HANDOFF_003_RELEASE_READINESS.md`](docs/product/DEPTSYNC_ZEBRA_HANDOFF_003_RELEASE_READINESS.md). **CONDITIONAL GO.** **STOP.**
