@@ -4,10 +4,12 @@
 
 import { describe, expect, it } from "vitest";
 import {
+  annotateObservationFollowUpState,
   composeWalkthroughInbox,
   composeWalkthroughPlaceOwnership,
   formatWalkthroughPlaceLabel,
   isFollowUpNeedingAttention,
+  isObservationAwaitingFollowUpDecision,
   observationTypeLabel,
   validateFollowUpCompleteInput,
   validateFollowUpCreateInput,
@@ -171,8 +173,10 @@ describe("walkthrough inbox composition", () => {
     });
     expect(inbox.active_session).toBeNull();
     expect(inbox.recent_observations).toEqual([]);
+    expect(inbox.review_observations).toEqual([]);
     expect(inbox.open_count).toBe(0);
     expect(inbox.attention_count).toBe(0);
+    expect(inbox.review_count).toBe(0);
     expect(inbox.completed_follow_ups).toEqual([]);
   });
 
@@ -228,7 +232,107 @@ describe("walkthrough inbox composition", () => {
     expect(inbox.open_follow_ups[0]?.id).toBe("f0");
     expect(inbox.recent_observations[0]?.type_label).toBe("Positive");
     expect(inbox.recent_observations[0]?.place_label).toBe("Aisle 12 · Bay 4");
+    expect(inbox.recent_observations[0]?.has_open_follow_up).toBe(false);
+    expect(inbox.review_count).toBe(0);
     expect(inbox.completed_follow_ups).toHaveLength(1);
+  });
+
+  it("surfaces opportunities without follow-ups for decision, not positives", () => {
+    const inbox = composeWalkthroughInbox({
+      sessions: [],
+      observations: [
+        observation({
+          id: "opp-1",
+          body: "Packdown needed",
+          observation_type: "opportunity",
+          observed_at: "2026-10-11T15:00:00.000Z",
+        }),
+        observation({
+          id: "pos-1",
+          body: "Great face",
+          observation_type: "positive",
+          observed_at: "2026-10-11T14:00:00.000Z",
+        }),
+        observation({
+          id: "gen-1",
+          body: "Note only",
+          observation_type: "general",
+          observed_at: "2026-10-11T13:00:00.000Z",
+        }),
+        observation({
+          id: "opp-done",
+          body: "Already tracked",
+          observation_type: "opportunity",
+          observed_at: "2026-10-11T12:00:00.000Z",
+        }),
+      ],
+      followUps: [
+        followUp({
+          id: "f-open",
+          observation_id: "opp-done",
+          status: "open",
+          action_text: "Track it",
+        }),
+      ],
+      todayIsoDate: "2026-10-11",
+    });
+
+    expect(inbox.review_count).toBe(1);
+    expect(inbox.review_observations.map((o) => o.id)).toEqual(["opp-1"]);
+    expect(inbox.review_observations[0]?.awaiting_follow_up_decision).toBe(
+      true
+    );
+    expect(
+      inbox.recent_observations.find((o) => o.id === "pos-1")
+        ?.awaiting_follow_up_decision
+    ).toBe(false);
+    expect(
+      inbox.recent_observations.find((o) => o.id === "gen-1")
+        ?.awaiting_follow_up_decision
+    ).toBe(false);
+    expect(
+      inbox.recent_observations.find((o) => o.id === "opp-done")
+        ?.has_open_follow_up
+    ).toBe(true);
+    expect(inbox.open_count).toBe(1);
+    expect(inbox.attention_count).toBe(0);
+  });
+
+  it("annotates follow-up counts without inventing observation resolution", () => {
+    const annotated = annotateObservationFollowUpState(
+      observation({
+        id: "obs-1",
+        observation_type: "opportunity",
+        body: "Needs packdown",
+      }),
+      [
+        { observation_id: "obs-1", status: "done" },
+        { observation_id: "obs-1", status: "open" },
+        { observation_id: "other", status: "open" },
+      ]
+    );
+    expect(annotated.open_follow_up_count).toBe(1);
+    expect(annotated.done_follow_up_count).toBe(1);
+    expect(annotated.has_open_follow_up).toBe(true);
+    expect(annotated.awaiting_follow_up_decision).toBe(false);
+
+    const closedOnly = annotateObservationFollowUpState(
+      observation({
+        id: "obs-2",
+        observation_type: "opportunity",
+        body: "Already closed once",
+      }),
+      [{ observation_id: "obs-2", status: "done" }]
+    );
+    expect(closedOnly.awaiting_follow_up_decision).toBe(false);
+
+    expect(
+      isObservationAwaitingFollowUpDecision({
+        observation_type: "positive",
+        open_follow_up_count: 0,
+        done_follow_up_count: 0,
+      })
+    ).toBe(false);
   });
 
   it("labels place and observation types for UI", () => {

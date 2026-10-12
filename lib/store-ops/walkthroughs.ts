@@ -73,6 +73,18 @@ export type WalkthroughObservationView = WalkthroughObservationRow & {
   section_name?: string | null;
   place_label?: string | null;
   type_label?: string;
+  /**
+   * Derived from linked follow-up rows. Observations themselves have no
+   * open/resolved lifecycle — only follow-ups do.
+   */
+  open_follow_up_count?: number;
+  done_follow_up_count?: number;
+  has_open_follow_up?: boolean;
+  /**
+   * Opportunity with no follow-up rows yet — discoverable for a supervisor
+   * decision, not fabricated "unresolved work".
+   */
+  awaiting_follow_up_decision?: boolean;
 };
 
 export type WalkthroughFollowUpView = WalkthroughFollowUpRow & {
@@ -87,11 +99,17 @@ export type WalkthroughFollowUpView = WalkthroughFollowUpRow & {
 export type WalkthroughInbox = {
   active_session: WalkthroughSessionRow | null;
   recent_observations: WalkthroughObservationView[];
+  /**
+   * Opportunities without an open follow-up. Review/decide surface only —
+   * not counted as open follow-up work and never includes positives.
+   */
+  review_observations: WalkthroughObservationView[];
   open_follow_ups: WalkthroughFollowUpView[];
   attention_follow_ups: WalkthroughFollowUpView[];
   completed_follow_ups: WalkthroughFollowUpView[];
   open_count: number;
   attention_count: number;
+  review_count: number;
 };
 
 /** Trusted place → Operational Section ownership (context only; not assignment). */
@@ -240,6 +258,61 @@ export function isFollowUpNeedingAttention(
   return due < todayIsoDate;
 }
 
+/**
+ * Pure: annotate an observation with linked follow-up counts.
+ * Does not invent observation resolution — only summarizes follow-ups.
+ */
+export function annotateObservationFollowUpState(
+  observation: WalkthroughObservationView,
+  followUps: ReadonlyArray<{ observation_id: string; status: string }>
+): WalkthroughObservationView {
+  let openCount = 0;
+  let doneCount = 0;
+  for (const fu of followUps) {
+    if (fu.observation_id !== observation.id) continue;
+    if (fu.status === "open") openCount += 1;
+    else if (fu.status === "done") doneCount += 1;
+  }
+  const annotated: WalkthroughObservationView = {
+    ...observation,
+    type_label:
+      observation.type_label ??
+      observationTypeLabel(observation.observation_type),
+    place_label:
+      observation.place_label ??
+      formatWalkthroughPlaceLabel({
+        aisle: observation.aisle,
+        bay: observation.bay,
+      }),
+    open_follow_up_count: openCount,
+    done_follow_up_count: doneCount,
+    has_open_follow_up: openCount > 0,
+  };
+  annotated.awaiting_follow_up_decision =
+    isObservationAwaitingFollowUpDecision(annotated);
+  return annotated;
+}
+
+/**
+ * Pure: opportunities with no follow-up rows stay discoverable for a
+ * supervisor decision. Positives and generals are never auto-outstanding.
+ * Once any follow-up exists (open or done), this leaves the review queue —
+ * open work lives on the follow-up inbox; completed work is not reopened.
+ * Observations are not tasks — this is not an open/resolved state.
+ */
+export function isObservationAwaitingFollowUpDecision(observation: {
+  observation_type: string;
+  has_open_follow_up?: boolean;
+  open_follow_up_count?: number;
+  done_follow_up_count?: number;
+}): boolean {
+  if (observation.observation_type !== "opportunity") return false;
+  if (observation.has_open_follow_up) return false;
+  if ((observation.open_follow_up_count ?? 0) > 0) return false;
+  if ((observation.done_follow_up_count ?? 0) > 0) return false;
+  return true;
+}
+
 export function composeWalkthroughInbox(input: {
   sessions: WalkthroughSessionRow[];
   observations: WalkthroughObservationView[];
@@ -247,9 +320,11 @@ export function composeWalkthroughInbox(input: {
   todayIsoDate: string;
   recentLimit?: number;
   completedLimit?: number;
+  reviewLimit?: number;
 }): WalkthroughInbox {
   const recentLimit = input.recentLimit ?? 12;
   const completedLimit = input.completedLimit ?? 8;
+  const reviewLimit = input.reviewLimit ?? 12;
   const active =
     input.sessions.find((s) => s.status === "active") ?? null;
   const open = input.followUps
@@ -275,25 +350,27 @@ export function composeWalkthroughInbox(input: {
       )
     )
     .slice(0, completedLimit);
-  const recent = [...input.observations]
+  const annotated = input.observations.map((o) =>
+    annotateObservationFollowUpState(o, input.followUps)
+  );
+  const recent = [...annotated]
     .sort((a, b) => b.observed_at.localeCompare(a.observed_at))
-    .slice(0, recentLimit)
-    .map((o) => ({
-      ...o,
-      type_label: observationTypeLabel(o.observation_type),
-      place_label:
-        o.place_label ??
-        formatWalkthroughPlaceLabel({ aisle: o.aisle, bay: o.bay }),
-    }));
+    .slice(0, recentLimit);
+  const review = annotated
+    .filter((o) => o.awaiting_follow_up_decision)
+    .sort((a, b) => b.observed_at.localeCompare(a.observed_at))
+    .slice(0, reviewLimit);
 
   return {
     active_session: active,
     recent_observations: recent,
+    review_observations: review,
     open_follow_ups: open,
     attention_follow_ups: attention,
     completed_follow_ups: completed,
     open_count: open.length,
     attention_count: attention.length,
+    review_count: review.length,
   };
 }
 

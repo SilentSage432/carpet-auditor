@@ -1,16 +1,17 @@
 "use client";
 
 /**
- * RD-5 Walkthroughs — collaborative leadership follow-through.
+ * RD-5 / WALK-005 Walkthroughs — collaborative leadership follow-through.
  * Real persisted observations / follow-ups only. No scoring. No fabricated history.
  */
 
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { HubIcon } from "@/components/hub/NavIcons";
 import type { WorkflowTabProps } from "@/components/hub/tabs/tab-props";
 import { WalkthroughCaptureSheet } from "@/components/walkthroughs/WalkthroughCaptureSheet";
 import { FollowUpCloseSheet } from "@/components/walkthroughs/FollowUpCloseSheet";
+import { ObservationDetailSheet } from "@/components/walkthroughs/ObservationDetailSheet";
 import {
   endWalkthroughSessionClient,
   fetchOperationalSections,
@@ -24,7 +25,6 @@ import {
   type WalkthroughInbox,
   type WalkthroughObservationView,
 } from "@/lib/store-ops/walkthroughs";
-import { buildMapBayFocusHref } from "@/lib/store-ops/map-bay-focus";
 import { buildExecutiveFloorPadHref } from "@/lib/specialty-tools";
 import { dedupeRoster, fetchSpecialists, isSupervisor } from "@/lib/specialists";
 import type { StoreSpecialist } from "@/lib/types";
@@ -36,48 +36,82 @@ function typeTone(type: string): string {
   return "text-zinc-200 border-zinc-700/60 bg-zinc-900/50";
 }
 
-function ObservationCard({ item }: { item: WalkthroughObservationView }) {
-  const mapHref =
-    item.aisle && item.bay != null && item.department_id
-      ? buildMapBayFocusHref({
-          aisle: item.aisle,
-          bay: item.bay,
-          departmentId: item.department_id,
-        })
-      : null;
+function followUpStatusChip(item: WalkthroughObservationView): {
+  label: string;
+  className: string;
+} | null {
+  if (item.has_open_follow_up) {
+    return {
+      label: "Follow-up open",
+      className:
+        "border-amber-700/50 bg-amber-950/40 text-amber-100",
+    };
+  }
+  if ((item.done_follow_up_count ?? 0) > 0) {
+    return {
+      label: "Follow-up done",
+      className:
+        "border-emerald-700/40 bg-emerald-950/30 text-emerald-100",
+    };
+  }
+  if (item.awaiting_follow_up_decision) {
+    return {
+      label: "Needs decision",
+      className: "border-zinc-600 bg-zinc-900 text-zinc-300",
+    };
+  }
+  return null;
+}
+
+function ObservationCard({
+  item,
+  onOpen,
+}: {
+  item: WalkthroughObservationView;
+  onOpen: (item: WalkthroughObservationView) => void;
+}) {
+  const status = followUpStatusChip(item);
   return (
-    <li className="rounded-xl border border-zinc-800/80 bg-zinc-950/50 px-3 py-3">
-      <div className="flex items-start justify-between gap-2">
-        <span
-          className={`inline-flex rounded-lg border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${typeTone(
-            item.observation_type
-          )}`}
-        >
-          {item.type_label ?? observationTypeLabel(item.observation_type)}
-        </span>
-        <time className="shrink-0 font-mono text-[10px] text-zinc-500">
-          {new Date(item.observed_at).toLocaleString(undefined, {
-            month: "short",
-            day: "numeric",
-            hour: "numeric",
-            minute: "2-digit",
-          })}
-        </time>
-      </div>
-      <p className="mt-2 text-sm leading-snug text-zinc-100">{item.body}</p>
-      <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-zinc-500">
-        {item.associate_name ? <span>With {item.associate_name}</span> : null}
-        {item.section_name ? <span>{item.section_name}</span> : null}
-        {item.place_label ? (
-          mapHref ? (
-            <Link href={mapHref} className="font-semibold text-accent">
-              {item.place_label}
-            </Link>
-          ) : (
-            <span>{item.place_label}</span>
-          )
-        ) : null}
-      </div>
+    <li>
+      <button
+        type="button"
+        onClick={() => onOpen(item)}
+        className="w-full rounded-xl border border-zinc-800/80 bg-zinc-950/50 px-3 py-3 text-left transition active:bg-zinc-900/80"
+        data-testid="walkthrough-observation-card"
+      >
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex flex-wrap items-center gap-1.5">
+            <span
+              className={`inline-flex rounded-lg border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${typeTone(
+                item.observation_type
+              )}`}
+            >
+              {item.type_label ?? observationTypeLabel(item.observation_type)}
+            </span>
+            {status ? (
+              <span
+                className={`inline-flex rounded-lg border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${status.className}`}
+              >
+                {status.label}
+              </span>
+            ) : null}
+          </div>
+          <time className="shrink-0 font-mono text-[10px] text-zinc-500">
+            {new Date(item.observed_at).toLocaleString(undefined, {
+              month: "short",
+              day: "numeric",
+              hour: "numeric",
+              minute: "2-digit",
+            })}
+          </time>
+        </div>
+        <p className="mt-2 text-sm leading-snug text-zinc-100">{item.body}</p>
+        <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-zinc-500">
+          {item.associate_name ? <span>With {item.associate_name}</span> : null}
+          {item.section_name ? <span>Section: {item.section_name}</span> : null}
+          {item.place_label ? <span>{item.place_label}</span> : null}
+        </div>
+      </button>
     </li>
   );
 }
@@ -86,10 +120,12 @@ function FollowUpCard({
   item,
   canMutate,
   onClose,
+  onOpenObservation,
 }: {
   item: WalkthroughFollowUpView;
   canMutate: boolean;
   onClose: (item: WalkthroughFollowUpView) => void;
+  onOpenObservation?: (observationId: string) => void;
 }) {
   return (
     <li className="rounded-xl border border-zinc-800/80 bg-zinc-950/50 px-3 py-3">
@@ -110,10 +146,21 @@ function FollowUpCard({
         )}
       </div>
       {item.observation_body ? (
-        <p className="mt-1 text-xs text-zinc-500">From: {item.observation_body}</p>
+        onOpenObservation ? (
+          <button
+            type="button"
+            onClick={() => onOpenObservation(item.observation_id)}
+            className="mt-1 block text-left text-xs text-zinc-500 underline-offset-2 hover:underline"
+          >
+            From: {item.observation_body}
+          </button>
+        ) : (
+          <p className="mt-1 text-xs text-zinc-500">From: {item.observation_body}</p>
+        )
       ) : null}
       <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-zinc-500">
         {item.responsible_name ? <span>{item.responsible_name}</span> : null}
+        {item.section_name ? <span>Section: {item.section_name}</span> : null}
         {item.due_on ? <span>Target {item.due_on}</span> : null}
         {item.place_label ? <span>{item.place_label}</span> : null}
       </div>
@@ -126,7 +173,7 @@ function FollowUpCard({
         <button
           type="button"
           onClick={() => onClose(item)}
-          className="mt-3 flex min-h-11 w-full items-center justify-center rounded-xl border border-zinc-700 bg-zinc-900/80 text-sm font-semibold text-zinc-100"
+          className="mt-3 flex min-h-12 w-full items-center justify-center rounded-xl border border-zinc-700 bg-zinc-900/80 text-sm font-semibold text-zinc-100"
         >
           Close with evidence
         </button>
@@ -148,7 +195,35 @@ export function WalkthroughsTab({ specialist }: WorkflowTabProps) {
   const [sections, setSections] = useState<OperationalSectionView[]>([]);
   const [captureOpen, setCaptureOpen] = useState(false);
   const [closing, setClosing] = useState<WalkthroughFollowUpView | null>(null);
+  const [viewing, setViewing] = useState<WalkthroughObservationView | null>(
+    null
+  );
   const [ending, setEnding] = useState(false);
+
+  const allFollowUps = useMemo(() => {
+    if (!inbox) return [] as WalkthroughFollowUpView[];
+    const byId = new Map<string, WalkthroughFollowUpView>();
+    for (const fu of [
+      ...inbox.open_follow_ups,
+      ...inbox.completed_follow_ups,
+      ...inbox.attention_follow_ups,
+    ]) {
+      byId.set(fu.id, fu);
+    }
+    return [...byId.values()];
+  }, [inbox]);
+
+  const observationsById = useMemo(() => {
+    const map = new Map<string, WalkthroughObservationView>();
+    if (!inbox) return map;
+    for (const o of [
+      ...inbox.recent_observations,
+      ...inbox.review_observations,
+    ]) {
+      map.set(o.id, o);
+    }
+    return map;
+  }, [inbox]);
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -164,6 +239,14 @@ export function WalkthroughsTab({ specialist }: WorkflowTabProps) {
       setInbox(next);
       setTeam(roster);
       setSections(sectionPayload.sections.filter((s) => s.is_active));
+      setViewing((prev) => {
+        if (!prev) return null;
+        const refreshed =
+          next.recent_observations.find((o) => o.id === prev.id) ??
+          next.review_observations.find((o) => o.id === prev.id) ??
+          null;
+        return refreshed;
+      });
     } catch (err) {
       setInbox(null);
       const message =
@@ -201,12 +284,51 @@ export function WalkthroughsTab({ specialist }: WorkflowTabProps) {
     }
   }
 
+  function openObservationById(observationId: string) {
+    const found = observationsById.get(observationId);
+    if (found) {
+      setViewing(found);
+      return;
+    }
+    // Observation may be outside recent window — synthesize minimal view from follow-up.
+    const fu = allFollowUps.find((f) => f.observation_id === observationId);
+    if (!fu) return;
+    setViewing({
+      id: observationId,
+      store_id: fu.store_id,
+      session_id: fu.session_id,
+      observation_type: fu.observation_type ?? "general",
+      body: fu.observation_body ?? "Observation",
+      associate_specialist_id: null,
+      section_id: null,
+      department_id: null,
+      aisle: null,
+      bay: null,
+      observed_at: fu.created_at,
+      created_by_specialist_id: fu.created_by_specialist_id,
+      created_at: fu.created_at,
+      updated_at: fu.updated_at,
+      place_label: fu.place_label ?? null,
+      section_name: fu.section_name ?? null,
+      type_label: fu.observation_type
+        ? observationTypeLabel(fu.observation_type)
+        : undefined,
+      has_open_follow_up: fu.status === "open",
+      open_follow_up_count: fu.status === "open" ? 1 : 0,
+      done_follow_up_count: fu.status === "done" ? 1 : 0,
+    });
+  }
+
   const empty =
     !loading &&
     inbox &&
     inbox.recent_observations.length === 0 &&
     inbox.open_follow_ups.length === 0 &&
-    inbox.completed_follow_ups.length === 0;
+    inbox.completed_follow_ups.length === 0 &&
+    inbox.review_observations.length === 0;
+
+  const openNonAttention =
+    inbox?.open_follow_ups.filter((f) => !f.needs_attention) ?? [];
 
   return (
     <main className="hub-main hub-floor-command">
@@ -294,28 +416,53 @@ export function WalkthroughsTab({ specialist }: WorkflowTabProps) {
                   item={item}
                   canMutate={canMutate}
                   onClose={setClosing}
+                  onOpenObservation={openObservationById}
                 />
               ))}
             </ul>
           </section>
         ) : null}
 
-        {inbox && inbox.open_follow_ups.length > 0 ? (
+        {openNonAttention.length > 0 ? (
           <section aria-label="Open follow-ups" className="space-y-2">
             <h3 className="text-xs font-bold uppercase tracking-wide text-zinc-500">
-              Open follow-ups · {inbox.open_count}
+              Open follow-ups · {inbox?.open_count ?? 0}
             </h3>
             <ul className="space-y-2">
-              {inbox.open_follow_ups
-                .filter((f) => !f.needs_attention)
-                .map((item) => (
-                  <FollowUpCard
-                    key={item.id}
-                    item={item}
-                    canMutate={canMutate}
-                    onClose={setClosing}
-                  />
-                ))}
+              {openNonAttention.map((item) => (
+                <FollowUpCard
+                  key={item.id}
+                  item={item}
+                  canMutate={canMutate}
+                  onClose={setClosing}
+                  onOpenObservation={openObservationById}
+                />
+              ))}
+            </ul>
+          </section>
+        ) : null}
+
+        {inbox && inbox.review_count > 0 ? (
+          <section
+            aria-label="Opportunities needing a follow-up decision"
+            className="space-y-2"
+            data-testid="walkthrough-review-observations"
+          >
+            <h3 className="text-xs font-bold uppercase tracking-wide text-zinc-500">
+              Needs follow-up decision · {inbox.review_count}
+            </h3>
+            <p className="text-[11px] leading-relaxed text-zinc-600">
+              Opportunities without an open follow-up. Not open work until you
+              add one — positives never appear here.
+            </p>
+            <ul className="space-y-2">
+              {inbox.review_observations.map((item) => (
+                <ObservationCard
+                  key={item.id}
+                  item={item}
+                  onOpen={setViewing}
+                />
+              ))}
             </ul>
           </section>
         ) : null}
@@ -327,7 +474,11 @@ export function WalkthroughsTab({ specialist }: WorkflowTabProps) {
             </h3>
             <ul className="space-y-2">
               {inbox.recent_observations.map((item) => (
-                <ObservationCard key={item.id} item={item} />
+                <ObservationCard
+                  key={item.id}
+                  item={item}
+                  onOpen={setViewing}
+                />
               ))}
             </ul>
           </section>
@@ -345,6 +496,7 @@ export function WalkthroughsTab({ specialist }: WorkflowTabProps) {
                   item={item}
                   canMutate={false}
                   onClose={setClosing}
+                  onOpenObservation={openObservationById}
                 />
               ))}
             </ul>
@@ -378,6 +530,21 @@ export function WalkthroughsTab({ specialist }: WorkflowTabProps) {
           activeSessionId={inbox?.active_session?.id ?? null}
           onClose={() => setCaptureOpen(false)}
           onSaved={() => void reload()}
+        />
+      ) : null}
+
+      {viewing ? (
+        <ObservationDetailSheet
+          specialist={specialist}
+          observation={viewing}
+          followUps={allFollowUps}
+          team={team}
+          canMutate={canMutate}
+          onClose={() => setViewing(null)}
+          onSaved={() => void reload()}
+          onCloseFollowUp={(fu) => {
+            setClosing(fu);
+          }}
         />
       ) : null}
 

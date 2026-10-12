@@ -135,4 +135,28 @@ describe("RD-5 Walkthroughs contracts", () => {
       repoExists("docs/product/DEPTSYNC_RD_5_WALKTHROUGHS.md")
     ).toBe(true);
   });
+
+  it("WALK-005 wires follow-up-later UI onto existing API", () => {
+    const client = readSrc("lib/store-ops/client.ts");
+    expect(client).toMatch(/createWalkthroughFollowUpClient/);
+    expect(client).toMatch(/\/api\/walkthroughs\/follow-ups/);
+    expect(repoExists("components/walkthroughs/ObservationDetailSheet.tsx")).toBe(
+      true
+    );
+    const detail = readSrc("components/walkthroughs/ObservationDetailSheet.tsx");
+    expect(detail).toMatch(/createWalkthroughFollowUpClient/);
+    expect(detail).toMatch(/observation-add-follow-up/);
+    expect(detail).toMatch(/Close with evidence/);
+    const tab = readSrc("components/hub/tabs/WalkthroughsTab.tsx");
+    expect(tab).toMatch(/ObservationDetailSheet/);
+    expect(tab).toMatch(/walkthrough-review-observations/);
+    expect(tab).toMatch(/Needs follow-up decision/);
+    const domain = readSrc("lib/store-ops/walkthroughs.ts");
+    expect(domain).toMatch(/isObservationAwaitingFollowUpDecision/);
+    expect(domain).toMatch(/review_observations/);
+    expect(domain).toMatch(/awaiting_follow_up_decision/);
+    const overview = readSrc("components/hub/tabs/OverviewTab.tsx");
+    expect(overview).toMatch(/overview-walkthrough-review-hint/);
+    expect(overview).not.toMatch(/review_count.*attention/);
+  });
 });

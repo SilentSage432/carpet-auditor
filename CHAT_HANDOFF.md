@@ -1,6 +1,7 @@
 # DeptSync Hub — Chat Handoff
 
 ## Latest (2026-10-12)
+- **DEPTSYNC-WALK-005 — WALKTHROUGH FOLLOW-UP LIFECYCLE — COMPLETE (local; no deploy).** Follow-up-later UI on existing POST API; observation detail sheet; opportunity review queue (not open work); Overview hint separate from attention. Canonical: [`docs/product/DEPTSYNC_WALK_005_IMPLEMENTATION.md`](docs/product/DEPTSYNC_WALK_005_IMPLEMENTATION.md). **STOP. Do not deploy.**
 - **DEPTSYNC-WALK-004 — MAP-BOUND WALKTHROUGH PRODUCTION RELEASE — RELEASED; AWAITING PHONE ACCEPTANCE.** Commit `d810605`; CLI prod deploy `dpl_2BMYcwgu5f9AJzEZFSZGdCqPFoU2` aliased @ https://deptsync-hub.vercel.app (GitHub git deploy failed once; recovered). No migrate. Data preserved (walkthroughs 0/0/0; sections 4×160). Canonical: [`docs/product/DEPTSYNC_WALK_004_PRODUCTION_RELEASE.md`](docs/product/DEPTSYNC_WALK_004_PRODUCTION_RELEASE.md). **STOP for phone acceptance.**
 - **DEPTSYNC-WALK-002-003 — PLACE-BOUND MOBILE WALKTHROUGH CAPTURE — COMPLETE (released via 004).** Canonical: [`docs/product/DEPTSYNC_WALK_002_003_IMPLEMENTATION.md`](docs/product/DEPTSYNC_WALK_002_003_IMPLEMENTATION.md).
 - **DEPTSYNC-WALKTHROUGHS-001 — SUPERVISORY WALKTHROUGHS DISCOVERY — COMPLETE (read-only).** Canonical: [`docs/product/DEPTSYNC_WALKTHROUGHS_001_DISCOVERY.md`](docs/product/DEPTSYNC_WALKTHROUGHS_001_DISCOVERY.md).

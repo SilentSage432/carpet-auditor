@@ -312,6 +312,16 @@ export function OverviewTab({ specialist }: WorkflowTabProps) {
                 </Link>
               </div>
             )}
+            {walkInbox && walkInbox.review_count > 0 ? (
+              <p
+                className="rounded-xl border border-zinc-800/60 bg-zinc-950/40 px-3 py-2.5 text-xs text-zinc-400"
+                data-testid="overview-walkthrough-review-hint"
+              >
+                {walkInbox.review_count} opportunit
+                {walkInbox.review_count === 1 ? "y" : "ies"} without a
+                follow-up — decide on Walkthroughs (not counted as open work).
+              </p>
+            ) : null}
           </section>
         </aside>
       </div>

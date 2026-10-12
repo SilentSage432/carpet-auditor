@@ -2213,6 +2213,31 @@ export async function endWalkthroughSessionClient(
   return result;
 }
 
+/** WALK-005 — create follow-up on an existing observation (later path). */
+export async function createWalkthroughFollowUpClient(
+  specialist: StoreSpecialist,
+  input: {
+    observation_id: string;
+    action_text: string;
+    responsible_specialist_id?: string | null;
+    due_on?: string | null;
+  }
+): Promise<{
+  ok: true;
+  follow_up: import("./walkthroughs").WalkthroughFollowUpRow;
+}> {
+  const result = await storeOpsFetch<{
+    ok: true;
+    follow_up: import("./walkthroughs").WalkthroughFollowUpRow;
+  }>("/api/walkthroughs/follow-ups", specialist, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  emitWalkthroughsChanged();
+  return result;
+}
+
 export async function completeWalkthroughFollowUpClient(
   specialist: StoreSpecialist,
   followUpId: string,

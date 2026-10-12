@@ -1,5 +1,9 @@
 # DeptSync Hub — Development Journal
 
+## 2026-10-12 — DEPTSYNC-WALK-005 walkthrough follow-up lifecycle
+
+**Focused local implementation; no deploy / no schema migrate / no prod mutations.** Wired existing `POST /api/walkthroughs/follow-ups` into Walkthroughs UI via `ObservationDetailSheet` + `createWalkthroughFollowUpClient`. Opportunities without follow-up rows surface as **Needs follow-up decision** (not open work); positives never auto-outstanding; Overview attention remains overdue follow-ups only (review hint separate). Close-with-evidence reuses `FollowUpCloseSheet`. Map capture untouched. Focused **42 PASS**; `tsc` PASS; lint clean; `next build` PASS. Canonical: [`docs/product/DEPTSYNC_WALK_005_IMPLEMENTATION.md`](docs/product/DEPTSYNC_WALK_005_IMPLEMENTATION.md). Release **CONDITIONAL GO** after phone review. **STOP.**
+
 ## 2026-10-12 — DEPTSYNC-WALK-004 map-bound walkthrough production release
 
 **Authorized controlled release.** Commit `d810605` pushed `fb25563..d810605`. GitHub Production git deploy `7017291733` failed (`dpl_ExXCdtqVspe4W5V4iXGom6jyoV5B`); recovered via CLI prod deploy `dpl_2BMYcwgu5f9AJzEZFSZGdCqPFoU2` → https://deptsync-a4d47bthl-tyson-zauggs-projects.vercel.app; alias https://deptsync-hub.vercel.app Ready. No schema migrate. Smoke: `/login` 200; walkthrough APIs **401**; zebra-entry **401**. Data preserved: walkthroughs **0/0/0**; sections **4/160** stewardship intact. Auto-stage OFF. Canonical: [`docs/product/DEPTSYNC_WALK_004_PRODUCTION_RELEASE.md`](docs/product/DEPTSYNC_WALK_004_PRODUCTION_RELEASE.md). **RELEASED — AWAITING PHONE ACCEPTANCE.** **STOP.**
