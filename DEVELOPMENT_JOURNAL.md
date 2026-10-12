@@ -1,8 +1,12 @@
 # DeptSync Hub — Development Journal
 
+## 2026-10-12 — DEPTSYNC-MAP-002 bay context production release
+
+**Authorized controlled release.** Commit `b9ae961` pushed `3165187..b9ae961`. Vercel Production `dpl_EE2iSwmSoY3JxCNk6sYnPksLszAJ` READY; alias https://deptsync-hub.vercel.app → that deployment (`gitSource.sha` `b9ae961…`). No schema migrate; no CLI recovery. Focused **43 PASS**; `tsc` + `next build` PASS. Smoke: `/login` 200; overview/walkthroughs/map/dashboard **307**→login; `GET/POST /api/store-locations/bay-context` **401**; zebra-entry **401**. Data preserved: sections **4/160**; rotations **179**; SBA **38**; capacity approvals **4**; walkthroughs **1/1/0** (pre-existing operator rows; none created by release). Auto-stage OFF. Canonical: [`docs/product/DEPTSYNC_MAP_002_PRODUCTION_RELEASE.md`](docs/product/DEPTSYNC_MAP_002_PRODUCTION_RELEASE.md). **RELEASED — AWAITING PHONE ACCEPTANCE.** **STOP. Do not begin MAP-003/004.**
+
 ## 2026-10-12 — DEPTSYNC-MAP-002 bay context and attention
 
-**Focused local implementation; no deploy / no schema migrate / no prod mutations.** Map bay sheet loads store-scoped `GET /api/store-locations/bay-context`: this-week assignment status + assignee, place-local open/overdue follow-ups + opportunity decision cues, progressive rotation/observation/completed-follow-up history. Record Observation + section slot preserved. No ownership/Zebra writes. Focused **43 PASS**; `tsc` PASS; lint clean; `next build` PASS (`/api/store-locations/bay-context`). Canonical: [`docs/product/DEPTSYNC_MAP_002_IMPLEMENTATION.md`](docs/product/DEPTSYNC_MAP_002_IMPLEMENTATION.md). Release **CONDITIONAL GO** after phone review. **STOP.**
+**Focused local implementation; released via MAP-002 production release.** Map bay sheet loads store-scoped `GET /api/store-locations/bay-context`: this-week assignment status + assignee, place-local open/overdue follow-ups + opportunity decision cues, progressive rotation/observation/completed-follow-up history. Record Observation + section slot preserved. No ownership/Zebra writes. Focused **43 PASS**; `tsc` PASS; lint clean; `next build` PASS (`/api/store-locations/bay-context`). Canonical: [`docs/product/DEPTSYNC_MAP_002_IMPLEMENTATION.md`](docs/product/DEPTSYNC_MAP_002_IMPLEMENTATION.md).
 
 ## 2026-10-12 — DEPTSYNC-MAP-001 Map vision and roadmap reconciliation
 

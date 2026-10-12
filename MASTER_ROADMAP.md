@@ -28,7 +28,7 @@
 - [x] **DEPTSYNC-WALK-005** — Walkthrough follow-up lifecycle (**COMPLETE**; released via WALK-006) — [`DEPTSYNC_WALK_005_IMPLEMENTATION.md`](docs/product/DEPTSYNC_WALK_005_IMPLEMENTATION.md)
 - [x] **DEPTSYNC-WALK-006** — Walkthrough follow-up production release (**RELEASED**; phone acceptance pending) — [`DEPTSYNC_WALK_006_PRODUCTION_RELEASE.md`](docs/product/DEPTSYNC_WALK_006_PRODUCTION_RELEASE.md)
 - [x] **DEPTSYNC-MAP-001** — Map vision + Floor Command roadmap reconciliation (**COMPLETE** read-only; **CONDITIONAL GO** MAP-002 affordances; **NO-GO** rewrite) — [`DEPTSYNC_MAP_001_ROADMAP_RECONCILIATION.md`](docs/product/DEPTSYNC_MAP_001_ROADMAP_RECONCILIATION.md)
-- [x] **DEPTSYNC-MAP-002** — Bay context and attention (**COMPLETE** local; no deploy) — [`DEPTSYNC_MAP_002_IMPLEMENTATION.md`](docs/product/DEPTSYNC_MAP_002_IMPLEMENTATION.md)
+- [x] **DEPTSYNC-MAP-002** — Bay context and attention (**RELEASED**; phone acceptance pending) — [`DEPTSYNC_MAP_002_IMPLEMENTATION.md`](docs/product/DEPTSYNC_MAP_002_IMPLEMENTATION.md) · [`DEPTSYNC_MAP_002_PRODUCTION_RELEASE.md`](docs/product/DEPTSYNC_MAP_002_PRODUCTION_RELEASE.md)
 - [ ] **DEPTSYNC-MAP-003** — Walking cues on aisle/bay tiles (**NOT STARTED** — after MAP-002 phone review)
 - [ ] **DEPTSYNC-MAP-004** — Named zone geography documentation (**NOT STARTED** — operator-driven)
 - [x] **RD-6 Product completion discovery** — Read-only audit of remaining Floor Command work (**COMPLETE** docs only) — [`DEPTSYNC_RD_6_PRODUCT_COMPLETION_AUDIT.md`](docs/product/DEPTSYNC_RD_6_PRODUCT_COMPLETION_AUDIT.md)

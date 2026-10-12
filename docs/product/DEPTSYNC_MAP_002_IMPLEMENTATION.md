@@ -1,9 +1,10 @@
 # DEPTSYNC-MAP-002 — Bay Context and Attention
 
-**Status:** COMPLETE (local implementation)  
+**Status:** COMPLETE — released via [`DEPTSYNC_MAP_002_PRODUCTION_RELEASE.md`](./DEPTSYNC_MAP_002_PRODUCTION_RELEASE.md)  
 **Date:** 2026-10-12  
 **Authority:** [`DEPTSYNC_MAP_001_ROADMAP_RECONCILIATION.md`](./DEPTSYNC_MAP_001_ROADMAP_RECONCILIATION.md) · Redesign-001 §D.2 · RD-5 / WALK-005 follow-up contracts · RD-3 sections  
-**Not authorized:** production deploy, schema redesign, commit/push, MAP-003/004
+**Production:** commit `b9ae961` · `dpl_EE2iSwmSoY3JxCNk6sYnPksLszAJ` · https://deptsync-hub.vercel.app  
+**Not authorized next:** MAP-003/004 until phone acceptance
 
 Improves the existing Map bay detail sheet. Does not rebuild Map. Does not mutate ownership, rotation, or Zebra.
 
