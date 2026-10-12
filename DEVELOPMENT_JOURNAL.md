@@ -1,5 +1,9 @@
 # DeptSync Hub — Development Journal
 
+## 2026-10-12 — DEPTSYNC-OPERATIONAL-010 production release
+
+**Authorized app-only release.** Commit `43505f5` pushed `cd3c5fe..43505f5`. GitHub Production deployment `7014663741` **success** → https://deptsync-e7cfso5ez-tyson-zauggs-projects.vercel.app; alias https://deptsync-hub.vercel.app (`/login` 200; unauth week-capacity + operational-sections **401**). No migration. Data preserved: sections **4 active / 160 members**; stewardship map intact; SBA **30** (W41=6 / W42=0); capacity approvals **4** (W42 sum 11); zebra columns present all null. Assign path stewardship+approvals only; auto-stage OFF. Canonical: [`docs/product/DEPTSYNC_OPERATIONAL_010_PRODUCTION_RELEASE.md`](docs/product/DEPTSYNC_OPERATIONAL_010_PRODUCTION_RELEASE.md). **RELEASED — AWAITING PHONE ACCEPTANCE.** **STOP.**
+
 ## 2026-10-12 — DEPTSYNC-OPERATIONAL-009 sections UI repair + assignment completion
 
 **Focused local implementation; no deploy / no prod mutations / no section rebuild.** UI: pin `all` no longer uses `departments[0]`; store-wide list omit filter; fetch generation guard; empty vs filtered vs error states. Assign: `handleBalanceAssign` stewardship-only + capacity board required; stage draw uses approved shared target; Floor ownership recovery respects approved target; legacy balancer removed from persist. Auto-stage OFF. `tsc` PASS; focused **82** PASS; `next build` PASS. Canonical: [`docs/product/DEPTSYNC_OPERATIONAL_009_IMPLEMENTATION.md`](docs/product/DEPTSYNC_OPERATIONAL_009_IMPLEMENTATION.md). Release **CONDITIONAL GO** after operator review. **STOP.**
