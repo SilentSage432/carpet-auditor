@@ -1,5 +1,9 @@
 # DeptSync Hub — Development Journal
 
+## 2026-10-11 — DEPTSYNC-TOPOLOGY-REGISTRY-004 controlled production release
+
+**Authorized app-only release.** Commit `b702b94`; Vercel Production Ready `AYeicq8TT2WHTNmJd5JhhxDSJu41` (`deptsync-6q2i25pls`) @ https://deptsync-hub.vercel.app. No SQL; no prod topology mutations; registry already on `fmeinlwhixngednabhgy` (002B). Pre-release: `tsc` PASS; **1658** tests; `next build` PASS. Smoke: `/login` 200; unauth `/api/store-aisles` GET/POST 401. Canonical: [`docs/product/DEPTSYNC_TOPOLOGY_REGISTRY_004_RELEASE.md`](docs/product/DEPTSYNC_TOPOLOGY_REGISTRY_004_RELEASE.md). **RELEASED — AWAITING PHONE ACCEPTANCE.** **STOP.**
+
 ## 2026-10-11 — DEPTSYNC-TOPOLOGY-REGISTRY-003 Create Location + empty Map
 
 **Controlled local impl; no prod deploy/data mutations; no new migrations.** MasterAdmin Create Location → `POST /api/store-aisles` (service-role after auth/store/dept checks; RLS writes still denied). Map/sections merge registry ∪ bay aisles; empty shells show **0 documented bays** + Add Bays; bulk ensure heals registry. Capacity/Sunday/Zebra/section-aware-off untouched. `tsc` PASS; **1658** tests; `next build` PASS. Canonical: [`docs/product/DEPTSYNC_TOPOLOGY_REGISTRY_003_IMPLEMENTATION.md`](docs/product/DEPTSYNC_TOPOLOGY_REGISTRY_003_IMPLEMENTATION.md). App ship **CONDITIONAL GO** after phone review. **STOP.**
