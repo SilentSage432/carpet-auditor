@@ -2,7 +2,7 @@
 
 ## 2026-10-13 — DEPTSYNC-AUTH-002-RELEASE production release
 
-**Security-gated production release.** Preflight: PIN-before-mint; server-only `generateLink`; session/userId binding; rate-limit; no credential reset; no migrations. Focused auth/security tests **146 PASS**; typecheck/build PASS. Shipping AUTH-002 reliability (bounded login, slim mint, single gate sync, honest biometric resume). Canonical: [`docs/product/DEPTSYNC_AUTH_002_PRODUCTION_RELEASE.md`](docs/product/DEPTSYNC_AUTH_002_PRODUCTION_RELEASE.md). **AUTH-003 / MAP-004 not started.** Operator phone acceptance pending.
+**Security-gated production release — SHIPPED.** Preflight: PIN-before-mint; server-only `generateLink`; session/userId binding; rate-limit; no credential reset; no migrations. Focused auth/security tests **146 PASS**; typecheck/build PASS. Commit `483abae`; GitHub Production `7049245786`; Vercel `7m7be8SYj9wMEKvNYowSH7BNKFF5` READY. Smoke: `/login` 200; hub-bridge 400/401; gate 401; SW `deptsync-shell-v8-auth-002`. Canonical: [`docs/product/DEPTSYNC_AUTH_002_PRODUCTION_RELEASE.md`](docs/product/DEPTSYNC_AUTH_002_PRODUCTION_RELEASE.md). **AUTH-003 / MAP-004 not started.** Operator phone acceptance pending.
 
 ## 2026-10-13 — DEPTSYNC-AUTH-002 authentication reliability (local)
 

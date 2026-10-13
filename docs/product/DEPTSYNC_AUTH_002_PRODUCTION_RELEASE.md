@@ -46,7 +46,8 @@
 
 | Field | Value |
 |-------|-------|
-| Commit | *(filled after push)* |
+| Commit | `483abae323aba690988fdc8406bbbffe81db5e79` |
+| Short | `483abae` |
 | Message | `fix(auth): AUTH-002 reliability — bounded login and slim session mint` |
 | Parent | `7161796` (`docs(map): record MAP-003 production release`) |
 
@@ -56,9 +57,12 @@
 
 | Field | Value |
 |-------|-------|
-| Vercel deployment | *(filled after deploy)* |
+| GitHub Production deployment id | `7049245786` |
+| Vercel deployment | `7m7be8SYj9wMEKvNYowSH7BNKFF5` |
+| Vercel URL | https://vercel.com/tyson-zauggs-projects/deptsync-hub/7m7be8SYj9wMEKvNYowSH7BNKFF5 |
 | Environment | Production |
-| Creator | *(GitHub → Vercel bot expected)* |
+| Commit status | **success** — “Deployment has completed” |
+| Creator | `vercel[bot]` (GitHub → Vercel) |
 
 ---
 
@@ -67,7 +71,7 @@
 | Check | Result |
 |-------|--------|
 | Alias | https://deptsync-hub.vercel.app |
-| Serves AUTH-002 | *(filled after deploy — SW cache / login 200)* |
+| Serves AUTH-002 | **Yes** — `/sw.js` serves `deptsync-shell-v8-auth-002`; login **200** with `x-robots-tag: noindex, nofollow, noarchive` |
 
 ---
 
@@ -132,19 +136,21 @@ Interactive MasterAdmin PIN login: **operator phone acceptance** (this report §
 
 ## 9. Production verification
 
-*(Filled after deploy — unauthenticated probes only.)*
+Unauthenticated probes only (2026-10-13 post-deploy). No operator PIN submitted. One invalid-PIN probe for reject-path latency.
 
 | Probe | Expected | Result |
 |-------|----------|--------|
-| `GET /login` | 200 | pending |
-| `GET /` | 307 → `/login` | pending |
-| `GET /dashboard` | 307 → `/login` | pending |
-| `POST /api/auth/hub-bridge` `{}` | 400 | pending |
-| `POST /api/auth/hub-bridge` invalid PIN | 401 | pending |
-| `POST /api/auth/gate` unauth | 401 | pending |
-| `GET /sw.js` | contains `deptsync-shell-v8-auth-002` | pending |
+| `GET /login` | 200 | **200** (~0.79s) |
+| `GET /` | 307 → `/login` | **307** → `/login?next=%2F` (~0.21s) |
+| `GET /dashboard` | 307 → `/login` | **307** → `/login?next=%2Fdashboard` (~0.21s) |
+| `POST /api/auth/hub-bridge` `{}` | 400 | **400** — validation error (~0.44s) |
+| `POST /api/auth/hub-bridge` invalid PIN | 401 | **401** `"Invalid username or PIN"` (~1.39s) — no session minted |
+| `POST /api/auth/gate` unauth | 401 | **401** — sign-in required (~0.50s) |
+| `GET /sw.js` | `deptsync-shell-v8-auth-002` | **Confirmed** |
 
-No repeated credentialed login attempts. No secrets logged.
+Operational data: no migrations; no credential or identity mutations in this release.
+
+No secrets logged.
 
 ---
 
@@ -188,10 +194,10 @@ Independent biometric login that **mints** a server session still requires:
 | Tests / typecheck / build | **GO** |
 | Scope (AUTH-002 only; no unrelated SEC-OPS-010 / tmp) | **GO** |
 | Migrations / credential resets | **None** |
-| Deploy | *(pending push)* |
+| Deploy | **GO — SHIPPED** (`483abae` / Vercel `7m7be8SYj9wMEKvNYowSH7BNKFF5`) |
 | Operator acceptance | **PENDING** |
 
-**Overall: GO TO DEPLOY** — operator phone acceptance remains the final product confirmation.
+**Overall: GO — SHIPPED.** Operator phone acceptance (§10) remains the final product confirmation.
 
 ---
 
