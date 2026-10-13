@@ -1,5 +1,5 @@
 /* DeptSync Hub — offline shell cache */
-const CACHE_VERSION = "deptsync-shell-v7-auth-boot";
+const CACHE_VERSION = "deptsync-shell-v8-auth-002";
 const SHELL_ASSETS = [
   "/login",
   "/manifest.json",

@@ -16,6 +16,8 @@ import {
   canFetchProtectedRoster,
   decideHubPageBoot,
 } from "@/lib/auth/hub-page-bootstrap";
+import { resolveLiveSupabaseSession } from "@/lib/auth/live-session";
+import { syncHubGateCookie } from "@/lib/auth-gate-client";
 import {
   clearAuthSession,
   isAuthSessionExpired,
@@ -160,6 +162,7 @@ export default function DeptSyncHubPage() {
   );
   const [gate, setGate] = useState<Gate>("booting");
   const [rosterReady, setRosterReady] = useState(false);
+  const [authError, setAuthError] = useState<string | null>(null);
   const [visitedSections, setVisitedSections] = useState<Set<HubSection>>(
     () => new Set()
   );
@@ -205,16 +208,8 @@ export default function DeptSyncHubPage() {
 
   /** Authenticated roster refresh only — never PostgREST as anon. */
   const loadStoreData = useCallback(async () => {
-    const supabase = getSupabase();
-    let hasJwt = false;
-    try {
-      const { data } = supabase
-        ? await supabase.auth.getSession()
-        : { data: { session: null } };
-      hasJwt = Boolean(data.session?.access_token);
-    } catch {
-      hasJwt = false;
-    }
+    const live = await resolveLiveSupabaseSession();
+    const hasJwt = live.hasAccessToken;
     if (!canFetchProtectedRoster(hasJwt)) {
       setRosterReady(true);
       return [] as StoreSpecialist[];
@@ -279,18 +274,9 @@ export default function DeptSyncHubPage() {
           return;
         }
 
-        const supabase = getSupabase();
-        let hasJwt = false;
-        try {
-          const { data } = supabase
-            ? await supabase.auth.getSession()
-            : { data: { session: null } };
-          if (!stillActive()) return;
-          hasJwt = Boolean(data.session?.access_token);
-        } catch {
-          if (!stillActive()) return;
-          hasJwt = false;
-        }
+        const live = await resolveLiveSupabaseSession();
+        if (!stillActive()) return;
+        const hasJwt = live.hasAccessToken;
 
         let team: StoreSpecialist[] | null = null;
         let rosterError: unknown | null = null;
@@ -473,8 +459,20 @@ export default function DeptSyncHubPage() {
       setStoreNumberState(active);
     }
     upsertSpecialist(nextMember);
-    startAuthSession(nextMember);
-    unlockWorkspace(nextMember);
+    setAuthError(null);
+    // AUTH-002: wall session then single awaited hub-gate mint before navigate.
+    void (async () => {
+      startAuthSession(nextMember);
+      const gated = await syncHubGateCookie();
+      if (!gated) {
+        setAuthError(
+          "Could not open a secure hub session. Check your connection and try again."
+        );
+        setGate("unlock");
+        return;
+      }
+      unlockWorkspace(nextMember);
+    })();
   }
 
   function handleSelectSpecialist(member: StoreSpecialist) {
@@ -596,19 +594,29 @@ export default function DeptSyncHubPage() {
 
   if (gate === "login" || gate === "setup" || gate === "unlock") {
     return (
-      <AuthWall
-        mode={gate}
-        roster={specialists}
-        member={specialist}
-        onAuthenticated={handleAuthenticated}
-        onRequestFullLogin={
-          gate === "unlock"
-            ? () => {
-                requireLogin();
-              }
-            : undefined
-        }
-      />
+      <>
+        {authError ? (
+          <p
+            role="alert"
+            className="fixed inset-x-0 top-3 z-[95] mx-auto w-[min(92vw,28rem)] rounded-xl border border-rose-500/40 bg-rose-950/95 px-3 py-2 text-center text-sm font-semibold text-rose-100"
+          >
+            {authError}
+          </p>
+        ) : null}
+        <AuthWall
+          mode={gate}
+          roster={specialists}
+          member={specialist}
+          onAuthenticated={handleAuthenticated}
+          onRequestFullLogin={
+            gate === "unlock"
+              ? () => {
+                  requireLogin();
+                }
+              : undefined
+          }
+        />
+      </>
     );
   }
 

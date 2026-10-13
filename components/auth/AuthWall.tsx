@@ -1,8 +1,12 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { DeptSyncBadge } from "@/components/hub/DeptSyncBadge";
 import { TextField } from "@/components/ui/NumberField";
+import {
+  hasStoredSupabaseAuthHint,
+  resolveLiveSupabaseSession,
+} from "@/lib/auth/live-session";
 import {
   authenticateWithBiometric,
   clearStoredBiometricCredential,
@@ -25,7 +29,6 @@ import {
   verifyPin,
 } from "@/lib/specialists";
 import { tryEstablishHubBridgeSession, establishHubBridgeSession } from "@/lib/store-ops/hub-bridge-client";
-import { getSupabase } from "@/lib/supabase";
 import type { StoreSpecialist } from "@/lib/types";
 
 export type AuthWallMode = "login" | "setup" | "unlock";
@@ -100,6 +103,7 @@ export function AuthWall({
         ) : null}
         {mode === "unlock" && member ? (
           <UnlockForm
+            key={member.id}
             member={member}
             roster={roster}
             onAuthenticated={onAuthenticated}
@@ -124,9 +128,11 @@ function LoginForm({
   const [busy, setBusy] = useState(false);
   const [biometricReady, setBiometricReady] = useState(false);
   const [hasPasskey, setHasPasskey] = useState(false);
+  const [sessionResumePossible, setSessionResumePossible] = useState(false);
   const [enrollMember, setEnrollMember] = useState<StoreSpecialist | null>(null);
   const [enrollBusy, setEnrollBusy] = useState(false);
   const [phoneResetOpen, setPhoneResetOpen] = useState(false);
+  const submittingRef = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -136,6 +142,8 @@ function LoginForm({
       if (cancelled) return;
       setBiometricReady(available);
       setHasPasskey(Boolean(stored));
+      // AUTH-002: fingerprint only when a refreshable Auth session may exist.
+      setSessionResumePossible(hasStoredSupabaseAuthHint());
     })();
     return () => {
       cancelled = true;
@@ -160,6 +168,8 @@ function LoginForm({
   }
 
   async function handleLogin() {
+    if (submittingRef.current) return;
+    submittingRef.current = true;
     setBusy(true);
     setError(null);
     try {
@@ -184,18 +194,21 @@ function LoginForm({
           return;
         }
         setError(
-          "Master Admin Auth minted — reload the page, then unlock with PIN 1234 (or your HUB_MASTER_PIN)."
+          "Sign-in succeeded but your roster profile was not returned. Reload and sign in again with your PIN."
         );
         return;
       }
 
       setError(bridge.error || "Invalid username or password");
     } finally {
+      submittingRef.current = false;
       setBusy(false);
     }
   }
 
   async function handleBiometricLogin() {
+    if (submittingRef.current) return;
+    submittingRef.current = true;
     setBusy(true);
     setError(null);
     try {
@@ -211,29 +224,29 @@ function LoginForm({
       if (!match || match.is_active === false) {
         clearStoredBiometricCredential();
         setHasPasskey(false);
-        setError("Saved fingerprint login is no longer valid. Sign in with password.");
+        setError("Saved fingerprint is no longer valid. Sign in with your PIN.");
         return;
       }
-      const supabase = getSupabase();
-      const { data } = supabase
-        ? await supabase.auth.getSession()
-        : { data: { session: null } };
-      if (!data.session?.access_token) {
+      // AUTH-002: try refresh — biometric alone does not mint a server session.
+      const live = await resolveLiveSupabaseSession();
+      if (!live.hasAccessToken) {
+        setSessionResumePossible(false);
         setError(
-          "Fingerprint unlocked the Hub — enter your PIN/password once to unlock Store Ops."
+          "Saved session expired. Enter your PIN to unlock Store Ops, then fingerprint can resume again."
         );
         return;
       }
       onAuthenticated(match);
     } catch (err) {
       if (err instanceof DOMException && err.name === "NotAllowedError") {
-        setError("Fingerprint login cancelled");
+        setError("Fingerprint cancelled");
       } else {
         setError(
-          err instanceof Error ? err.message : "Fingerprint login failed"
+          err instanceof Error ? err.message : "Fingerprint resume failed"
         );
       }
     } finally {
+      submittingRef.current = false;
       setBusy(false);
     }
   }
@@ -299,17 +312,6 @@ function LoginForm({
         void handleLogin();
       }}
     >
-      {hasPasskey && biometricReady ? (
-        <button
-          type="button"
-          disabled={busy}
-          onClick={() => void handleBiometricLogin()}
-          className="flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl border border-emerald-500/40 bg-emerald-950/50 text-sm font-bold text-emerald-200 shadow-[0_0_20px_-8px_rgba(16,185,129,0.55)] active:scale-[0.98] disabled:opacity-40"
-        >
-          👆 Login with Fingerprint / Touch ID
-        </button>
-      ) : null}
-
       <TextField
         id="deptsync-username"
         name="username"
@@ -340,6 +342,16 @@ function LoginForm({
       >
         {busy ? "Signing in…" : "Log In"}
       </button>
+      {hasPasskey && biometricReady && sessionResumePossible ? (
+        <button
+          type="button"
+          disabled={busy}
+          onClick={() => void handleBiometricLogin()}
+          className="flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl border border-emerald-500/40 bg-emerald-950/50 text-sm font-bold text-emerald-200 active:scale-[0.98] disabled:opacity-40"
+        >
+          {busy ? "Resuming…" : "Resume with fingerprint"}
+        </button>
+      ) : null}
       <button
         type="button"
         disabled={busy}
@@ -351,9 +363,10 @@ function LoginForm({
       >
         Forgot Access Code? Reset via Phone
       </button>
-      <p className="text-center text-[11px] text-zinc-400">
-        Access is locked until you authenticate. Session stays signed in on this
-        browser until logout or 8h idle.
+      <p className="text-center text-[11px] leading-relaxed text-zinc-400">
+        PIN unlocks Store Ops. Idle lock is 8 hours. Fingerprint resumes a saved
+        session on this device when it is still valid — it is not a separate
+        password.
       </p>
     </form>
   );
@@ -451,11 +464,11 @@ function BiometricEnrollBanner({
   return (
     <div className="mt-5 space-y-3 rounded-2xl border border-emerald-500/30 bg-emerald-950/30 p-4">
       <p className="text-sm font-semibold leading-relaxed text-emerald-100">
-        ⚡ Enable Fingerprint / Touch ID Login for faster access on this phone?
+        Enable fingerprint to resume your saved session faster on this phone?
       </p>
       <p className="text-xs text-zinc-400">
-        Signed in as {memberName}. Your device will prompt for Face ID,
-        Touch ID, or fingerprint to register.
+        Signed in as {memberName}. Fingerprint resumes a valid saved session —
+        your PIN is still required after logout or when the session expires.
       </p>
       {error ? (
         <p className="text-center text-sm font-semibold text-rose-400" role="alert">
@@ -468,7 +481,7 @@ function BiometricEnrollBanner({
         onClick={onEnable}
         className="btn-primary-glow flex min-h-[44px] w-full items-center justify-center rounded-xl text-sm disabled:opacity-40"
       >
-        {busy ? "Waiting for sensor…" : "Enable Fingerprint Access"}
+        {busy ? "Waiting for sensor…" : "Enable fingerprint resume"}
       </button>
       <button
         type="button"
@@ -476,7 +489,7 @@ function BiometricEnrollBanner({
         onClick={onSkip}
         className="flex min-h-[44px] w-full items-center justify-center rounded-xl border border-zinc-700/80 text-sm font-semibold text-zinc-300 disabled:opacity-40"
       >
-        Skip for Now
+        Skip for now
       </button>
     </div>
   );
@@ -687,10 +700,9 @@ function UnlockForm({
   const [shake, setShake] = useState(false);
   const [busy, setBusy] = useState(false);
   const [showBiometric, setShowBiometric] = useState(false);
+  const submittingRef = useRef(false);
 
   useEffect(() => {
-    setSecret("");
-    setError(null);
     let cancelled = false;
     void (async () => {
       const available = await isPlatformAuthenticatorAvailable();
@@ -699,7 +711,8 @@ function UnlockForm({
       setShowBiometric(
         available &&
           Boolean(stored) &&
-          String(stored?.specialistId) === String(member.id)
+          String(stored?.specialistId) === String(member.id) &&
+          hasStoredSupabaseAuthHint()
       );
     })();
     return () => {
@@ -720,12 +733,14 @@ function UnlockForm({
       setError(pinMode ? "Enter PIN" : "Enter password");
       return;
     }
+    if (submittingRef.current) return;
+    submittingRef.current = true;
 
     setBusy(true);
     setError(null);
     try {
       // Prefer server Hub-bridge (source of truth). Local verify alone can be
-      // stale; master PIN also auto-provisions Super Admin on the server.
+      // stale; master PIN unlocks an existing Master Admin only.
       const bridge = await establishHubBridgeSession({
         username: member.username || member.name || "master_admin",
         specialist_id: member.id,
@@ -748,11 +763,13 @@ function UnlockForm({
       }
       fail(pinMode ? "Incorrect PIN" : "Incorrect password");
     } finally {
+      submittingRef.current = false;
       setBusy(false);
     }
   }
 
   function handleDigit(digit: string) {
+    if (busy || submittingRef.current) return;
     const next = secret.length >= 8 ? secret : secret + digit;
     setError(null);
     setSecret(next);
@@ -764,6 +781,8 @@ function UnlockForm({
   }
 
   async function handleBiometricUnlock() {
+    if (submittingRef.current) return;
+    submittingRef.current = true;
     setBusy(true);
     setError(null);
     try {
@@ -771,29 +790,28 @@ function UnlockForm({
       const match =
         roster.find((m) => String(m.id) === String(specialistId)) ?? member;
       if (String(match.id) !== String(member.id)) {
-        setError("Fingerprint login belongs to a different user");
+        setError("Fingerprint belongs to a different user");
         return;
       }
-      const supabase = getSupabase();
-      const { data } = supabase
-        ? await supabase.auth.getSession()
-        : { data: { session: null } };
-      if (!data.session?.access_token) {
+      const live = await resolveLiveSupabaseSession();
+      if (!live.hasAccessToken) {
+        setShowBiometric(false);
         setError(
-          "Enter your PIN/password once to unlock Store Ops, then fingerprint works again."
+          "Saved session expired. Enter your PIN to unlock Store Ops."
         );
         return;
       }
       onAuthenticated(match);
     } catch (err) {
       if (err instanceof DOMException && err.name === "NotAllowedError") {
-        setError("Fingerprint unlock cancelled");
+        setError("Fingerprint cancelled");
       } else {
         setError(
-          err instanceof Error ? err.message : "Fingerprint unlock failed"
+          err instanceof Error ? err.message : "Fingerprint resume failed"
         );
       }
     } finally {
+      submittingRef.current = false;
       setBusy(false);
     }
   }
@@ -806,8 +824,8 @@ function UnlockForm({
         {roleBadge(member)}
       </p>
       <p className="mb-3 text-center text-xs text-zinc-500">
-        Enter your Hub PIN/password to unlock Store Ops (map,
-        briefing).
+        Enter your PIN to unlock Store Ops. Fingerprint resumes a saved session
+        when it is still valid.
       </p>
 
       {showBiometric ? (
@@ -815,9 +833,9 @@ function UnlockForm({
           type="button"
           disabled={busy}
           onClick={() => void handleBiometricUnlock()}
-          className="mb-3 flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl border border-emerald-500/40 bg-emerald-950/50 text-sm font-bold text-emerald-200 shadow-[0_0_20px_-8px_rgba(16,185,129,0.55)] active:scale-[0.98] disabled:opacity-40"
+          className="mb-3 flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl border border-emerald-500/40 bg-emerald-950/50 text-sm font-bold text-emerald-200 active:scale-[0.98] disabled:opacity-40"
         >
-          👆 Unlock with Fingerprint / Touch ID
+          {busy ? "Resuming…" : "Resume with fingerprint"}
         </button>
       ) : null}
 
@@ -851,11 +869,12 @@ function UnlockForm({
                   <button
                     key={key}
                     type="button"
+                    disabled={busy}
                     onClick={() => {
                       setError(null);
                       setSecret((prev) => prev.slice(0, -1));
                     }}
-                    className="flex min-h-[44px] h-14 items-center justify-center rounded-xl border border-zinc-700/80 bg-zinc-950/80 text-lg font-semibold text-zinc-200 transition focus:outline-none focus:ring-2 focus:ring-emerald-500/50 active:scale-95"
+                    className="flex min-h-[44px] h-14 items-center justify-center rounded-xl border border-zinc-700/80 bg-zinc-950/80 text-lg font-semibold text-zinc-200 transition focus:outline-none focus:ring-2 focus:ring-emerald-500/50 active:scale-95 disabled:opacity-40"
                   >
                     ⌫
                   </button>
@@ -865,8 +884,9 @@ function UnlockForm({
                 <button
                   key={key}
                   type="button"
+                  disabled={busy}
                   onClick={() => handleDigit(key)}
-                  className="flex min-h-[44px] h-14 items-center justify-center rounded-xl border border-zinc-700/80 bg-zinc-950/80 font-mono text-xl font-bold text-white transition focus:outline-none focus:ring-2 focus:ring-emerald-500/50 active:scale-95"
+                  className="flex min-h-[44px] h-14 items-center justify-center rounded-xl border border-zinc-700/80 bg-zinc-950/80 font-mono text-xl font-bold text-white transition focus:outline-none focus:ring-2 focus:ring-emerald-500/50 active:scale-95 disabled:opacity-40"
                 >
                   {key}
                 </button>
@@ -908,9 +928,10 @@ function UnlockForm({
           ) : null}
           <button
             type="submit"
-            className="btn-primary-glow flex min-h-[44px] w-full items-center justify-center rounded-xl text-sm"
+            disabled={busy}
+            className="btn-primary-glow flex min-h-[44px] w-full items-center justify-center rounded-xl text-sm disabled:opacity-40"
           >
-            Unlock
+            {busy ? "Signing in…" : "Unlock"}
           </button>
         </form>
       )}
@@ -918,10 +939,11 @@ function UnlockForm({
       {pinMode ? (
         <button
           type="button"
+          disabled={busy}
           onClick={() => void submit()}
-          className="mt-3 btn-primary-glow flex min-h-[44px] w-full items-center justify-center rounded-xl text-sm"
+          className="mt-3 btn-primary-glow flex min-h-[44px] w-full items-center justify-center rounded-xl text-sm disabled:opacity-40"
         >
-          Unlock
+          {busy ? "Signing in…" : "Unlock"}
         </button>
       ) : null}
 

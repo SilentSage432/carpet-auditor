@@ -18,10 +18,10 @@ describe("SEC-OPS-007G hub page bootstrap contract", () => {
     expect(source).toMatch(/setGate\("unlock"\)/);
     expect(source).toMatch(/setGate\("login"\)/);
     expect(source).toMatch(/setRosterReady\(true\)/);
-    // Must not call fetchSpecialists before probing session in boot path.
+    // Must not call fetchSpecialists before probing live session in boot path.
     const bootStart = source.indexOf("const bootGen = ++bootGenRef.current");
     const fetchIdx = source.indexOf("fetchSpecialists()", bootStart);
-    const sessionIdx = source.indexOf("getSession()", bootStart);
+    const sessionIdx = source.indexOf("resolveLiveSupabaseSession()", bootStart);
     expect(bootStart).toBeGreaterThan(-1);
     expect(sessionIdx).toBeGreaterThan(-1);
     expect(fetchIdx).toBeGreaterThan(sessionIdx);
@@ -35,6 +35,7 @@ describe("SEC-OPS-007G hub page bootstrap contract", () => {
     expect(source).toMatch(/decideAccessGateBoot/);
     expect(source).toMatch(/bootGenRef/);
     expect(source).toMatch(/if \(hasJwt\)/);
+    expect(source).toMatch(/resolveLiveSupabaseSession/);
   });
 
   it("service worker cache bumped for auth-boot delivery", async () => {
@@ -42,6 +43,6 @@ describe("SEC-OPS-007G hub page bootstrap contract", () => {
       path.resolve(__dirname, "../../public/sw.js"),
       "utf8"
     );
-    expect(source).toMatch(/deptsync-shell-v7-auth-boot/);
+    expect(source).toMatch(/deptsync-shell-v8-auth-002/);
   });
 });

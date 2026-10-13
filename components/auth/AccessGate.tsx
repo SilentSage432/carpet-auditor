@@ -6,6 +6,7 @@
  *
  * SEC-OPS-007D: bootstrap always leaves "booting" — failures fail closed to
  * login/unlock and never grant workspace entry.
+ * AUTH-002: refreshable JWT resume, single hub-gate sync, gate failure surfaces.
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -13,6 +14,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { AuthWall, type AuthWallMode } from "@/components/auth/AuthWall";
 import { DeptSyncSplash } from "@/components/hub/DeptSyncSplash";
 import { decideAccessGateBoot } from "@/lib/auth/access-gate-bootstrap";
+import { resolveLiveSupabaseSession } from "@/lib/auth/live-session";
 import {
   clearAuthSession,
   isAuthSessionExpired,
@@ -22,6 +24,7 @@ import {
 } from "@/lib/auth-session";
 import { safeInternalNext } from "@/lib/auth-gate";
 import { syncHubGateCookie } from "@/lib/auth-gate-client";
+import { homeHrefForSpecialist } from "@/lib/nav-hub";
 import {
   needsCredentialSetup,
   fetchSpecialists,
@@ -38,20 +41,30 @@ export function AccessGate() {
   const [mode, setMode] = useState<AuthWallMode | "booting">("booting");
   const [roster, setRoster] = useState<StoreSpecialist[]>([]);
   const [member, setMember] = useState<StoreSpecialist | null>(null);
+  const [enterError, setEnterError] = useState<string | null>(null);
   const bootGenRef = useRef(0);
 
-  const destination = safeInternalNext(searchParams.get("next")) || "/dashboard";
+  const nextParam = safeInternalNext(searchParams.get("next"));
 
   const enterWorkspace = useCallback(
     async (nextMember: StoreSpecialist, bootGen: number) => {
       if (bootGenRef.current !== bootGen) return;
       startAuthSession(nextMember);
       if (bootGenRef.current !== bootGen) return;
-      await syncHubGateCookie();
+      const gated = await syncHubGateCookie();
       if (bootGenRef.current !== bootGen) return;
+      if (!gated) {
+        throw new Error(
+          "Could not open a secure hub session. Check your connection and try again."
+        );
+      }
+      const destination = nextParam || homeHrefForSpecialist(nextMember);
+      if (process.env.NODE_ENV !== "production") {
+        console.info("[auth-002] enter workspace", { destination });
+      }
       router.replace(destination);
     },
-    [destination, router]
+    [nextParam, router]
   );
 
   useEffect(() => {
@@ -83,18 +96,10 @@ export function AccessGate() {
           return;
         }
 
-        const supabase = getSupabase();
-        let hasJwt = false;
-        try {
-          const { data } = supabase
-            ? await supabase.auth.getSession()
-            : { data: { session: null } };
-          if (!stillActive()) return;
-          hasJwt = Boolean(data.session?.access_token);
-        } catch {
-          if (!stillActive()) return;
-          hasJwt = false;
-        }
+        // AUTH-002: attempt refresh before concluding no JWT.
+        const live = await resolveLiveSupabaseSession();
+        if (!stillActive()) return;
+        const hasJwt = live.hasAccessToken;
 
         let team: StoreSpecialist[] | null = null;
         let rosterError: unknown | null = null;
@@ -140,17 +145,20 @@ export function AccessGate() {
         }
 
         if (outcome.mode === "enter" && outcome.member) {
-          // Keep splash until navigation; recover to unlock if enter fails.
           updateAuthSessionSpecialist(outcome.member);
           setRoster(outcome.roster);
           setMember(outcome.member);
           try {
             await enterWorkspace(outcome.member, bootGen);
             if (!stillActive()) return;
-            // router.replace does not always unmount immediately — never stay booting.
             setMode((current) => (current === "booting" ? "unlock" : current));
-          } catch {
+          } catch (err) {
             if (!stillActive()) return;
+            setEnterError(
+              err instanceof Error
+                ? err.message
+                : "Could not resume your session. Unlock with PIN."
+            );
             setMode("unlock");
           }
           return;
@@ -161,7 +169,6 @@ export function AccessGate() {
         }
         setRoster(outcome.roster);
         setMember(outcome.member);
-        // enter is handled above — remaining modes are AuthWall modes only.
         setMode(
           outcome.mode === "login" ||
             outcome.mode === "unlock" ||
@@ -171,7 +178,6 @@ export function AccessGate() {
         );
       } catch {
         if (!stillActive()) return;
-        // Absolute fail-closed: never grant access; show full login.
         setRoster([]);
         setMember(null);
         setMode("login");
@@ -195,8 +201,14 @@ export function AccessGate() {
       nextMember = { ...incoming, store_number: active };
     }
     setRoster((prev) => dedupeRoster([nextMember, ...prev]));
+    setEnterError(null);
     const bootGen = bootGenRef.current;
-    void enterWorkspace(nextMember, bootGen).catch(() => {
+    void enterWorkspace(nextMember, bootGen).catch((err) => {
+      setEnterError(
+        err instanceof Error
+          ? err.message
+          : "Could not open workspace. Try signing in again."
+      );
       setMode("login");
     });
   }
@@ -206,15 +218,26 @@ export function AccessGate() {
   }
 
   return (
-    <AuthWall
-      mode={mode}
-      roster={roster}
-      member={member}
-      onAuthenticated={handleAuthenticated}
-      onRequestFullLogin={() => {
-        setMember(null);
-        setMode("login");
-      }}
-    />
+    <>
+      {enterError ? (
+        <p
+          role="alert"
+          className="fixed inset-x-0 top-3 z-[95] mx-auto w-[min(92vw,28rem)] rounded-xl border border-rose-500/40 bg-rose-950/95 px-3 py-2 text-center text-sm font-semibold text-rose-100"
+        >
+          {enterError}
+        </p>
+      ) : null}
+      <AuthWall
+        mode={mode}
+        roster={roster}
+        member={member}
+        onAuthenticated={handleAuthenticated}
+        onRequestFullLogin={() => {
+          setMember(null);
+          setEnterError(null);
+          setMode("login");
+        }}
+      />
+    </>
   );
 }

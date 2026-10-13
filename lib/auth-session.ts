@@ -11,7 +11,7 @@ import {
   setActiveSpecialist,
 } from "./specialists";
 import { getSupabase } from "./supabase";
-import { clearHubGateCookie, syncHubGateCookie } from "./auth-gate-client";
+import { clearHubGateCookie } from "./auth-gate-client";
 
 const SESSION_KEY = "deptsync_auth_session";
 /** Tab-scoped flag: user already unlocked this sessionToken in this browser tab. */
@@ -137,6 +137,11 @@ export function writeAuthSession(session: AuthSession): void {
   setActiveSpecialist(session.specialist);
 }
 
+/**
+ * Persist hub wall session (local identity + idle clock).
+ * AUTH-002: does NOT mint the hub-gate cookie — callers await syncHubGateCookie()
+ * once after a live Supabase JWT is present (AccessGate / hub enter paths).
+ */
 export function startAuthSession(specialist: StoreSpecialist): AuthSession {
   const session: AuthSession = {
     specialist,
@@ -145,7 +150,6 @@ export function startAuthSession(specialist: StoreSpecialist): AuthSession {
   };
   writeAuthSession(session);
   markWorkspaceUnlocked(session.sessionToken);
-  void syncHubGateCookie();
   return session;
 }
 

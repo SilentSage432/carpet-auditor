@@ -1,6 +1,8 @@
 # DeptSync Hub — Chat Handoff
 
 ## Latest (2026-10-13)
+- **DEPTSYNC-AUTH-002-RELEASE — AUTH RELIABILITY PRODUCTION RELEASE — GO TO DEPLOY / OPERATOR ACCEPTANCE PENDING.** Security-gated: PIN-before-mint; generateLink server-only; session identity binding; no migrations / no MasterAdmin reset. Canonical: [`docs/product/DEPTSYNC_AUTH_002_PRODUCTION_RELEASE.md`](docs/product/DEPTSYNC_AUTH_002_PRODUCTION_RELEASE.md). **Do not begin AUTH-003 or MAP-004.**
+- **DEPTSYNC-AUTH-002 — AUTH RELIABILITY + SESSION CORRECTION — COMPLETE (released via AUTH-002-RELEASE).** Canonical: [`docs/product/DEPTSYNC_AUTH_002_IMPLEMENTATION.md`](docs/product/DEPTSYNC_AUTH_002_IMPLEMENTATION.md). Audit: [`DEPTSYNC_AUTH_001_RELIABILITY_AUDIT.md`](docs/product/DEPTSYNC_AUTH_001_RELIABILITY_AUDIT.md).
 - **DEPTSYNC-MAP-003 — SUPERVISORY WEEKLY BAY PRIORITIES PRODUCTION RELEASE — RELEASED; AWAITING PHONE ACCEPTANCE.** Commit `bd9bbab`; migrate `20261019_…` COMMIT on `fmeinlwhixngednabhgy`; GitHub Production `7048524886`; Vercel `dpl_FV5t9Crxt9kuSRss7xgFdWLX2dWi` READY @ https://deptsync-hub.vercel.app. Priority API **401** unauth. Data preserved (sections 4×160; SBA 38; caps 4/sum 11; rotations 41; walkthroughs 1/1/0; priority rows 0). Auto-stage OFF. Canonical: [`docs/product/DEPTSYNC_MAP_003_PRODUCTION_RELEASE.md`](docs/product/DEPTSYNC_MAP_003_PRODUCTION_RELEASE.md). **STOP. Do not begin MAP-004.**
 - **DEPTSYNC-MAP-003 — SUPERVISORY BAY PRIORITY FOR WEEKLY ROTATION — COMPLETE (released via production release).** Canonical: [`docs/product/DEPTSYNC_MAP_003_IMPLEMENTATION.md`](docs/product/DEPTSYNC_MAP_003_IMPLEMENTATION.md).
 - **DEPTSYNC-MAP-002 — BAY CONTEXT AND ATTENTION PRODUCTION RELEASE — RELEASED; AWAITING PHONE ACCEPTANCE.** Commit `b9ae961`; Vercel Production `dpl_EE2iSwmSoY3JxCNk6sYnPksLszAJ` READY @ https://deptsync-hub.vercel.app. Canonical: [`docs/product/DEPTSYNC_MAP_002_PRODUCTION_RELEASE.md`](docs/product/DEPTSYNC_MAP_002_PRODUCTION_RELEASE.md).
@@ -303,9 +305,10 @@ DeptSync Hub — department-scoped inventory & SIMS audit platform for Lowe's st
 - **Phone recovery (optional):** "Forgot Access Code? Reset via Phone" → SMS one-time `/auth/verify/[token]` (legacy OTP confirm remains at `/api/auth/phone-reset/*`)
 - Setup requires verified mobile (`phone_number` on `store_specialists`)
 - Native keychain: form `autocomplete` username / current-password
-- Biometric: WebAuthn; requires an existing Store Ops Auth session (otherwise PIN once after fingerprint)
+- Biometric (AUTH-002): local WebAuthn **resume only** when a refreshable Auth session may exist; not independent server login (AUTH-003 deferred). Copy: “Resume with fingerprint.”
 - `must_change_credentials` → non-dismissible permanent credential setup
-- Session: `deptsync_auth_session` (hub UI) + `deptsync_hub_gate` HttpOnly cookie (edge gate) + Supabase Auth localStorage (API Bearer); 8h idle lock on hub session
+- Session: `deptsync_auth_session` (hub UI) + `deptsync_hub_gate` HttpOnly cookie (edge gate) + Supabase Auth localStorage (API Bearer); 8h idle lock on hub wall; JWT refresh via `resolveLiveSupabaseSession`; gate mint awaited once (fail → error, no redirect loop)
+- Hub-bridge mint (AUTH-002): `generateLink` + `verifyOtp` (no per-login password rotate); client `boundedFetch` 15s
 - **P0 boot:** `/login` does not fetch the roster until Hub-bridge JWT exists; `/` and `/dashboard` require the hub gate cookie. Catalog / remnants / appliance catalog load after unlock when the relevant section mounts; specialty scans + Snap Bay / SIMS / Audit Report / Settings tools are `next/dynamic`
 - **P0 indexes:** re-run `supabase/migrations/20260813_p0_query_indexes.sql` — hub tables use `store_number`; Store Ops locations/rotations use `store_id`; manager_notes Phase 2 uses `store_number`+`department` (legacy `store_id`+`department_code`). Script skips absent columns. Apply `20260815_performance_indexes.sql` for Map/copilot composites (`idx_store_locations_dept_aisle`, `idx_bay_service_logs_bay_time`, `idx_rotations_active`) on canonical columns (`aisle`/`bay`, `location_id`/`created_at`, `is_completed`).
 - **P1 Gemini/map:** Snap Bay 720p + compressed JPEG; Floor Pad Copilot strips HTML / 8k cap; `GET /api/store-locations` explicit Store Map columns (no `SELECT *`); Slice 1 `responseSchema` + per-route token budgets

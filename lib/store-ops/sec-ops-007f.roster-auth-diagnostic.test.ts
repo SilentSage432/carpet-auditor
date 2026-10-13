@@ -114,12 +114,12 @@ describe("SEC-OPS-007F SEC-OPS-002 anon containment contract", () => {
 });
 
 describe("SEC-OPS-007F bootstrap consumers", () => {
-  it("AccessGate only fetches roster after getSession when hasJwt", async () => {
+  it("AccessGate only fetches roster after live session probe when hasJwt", async () => {
     const source = await readFile(
       path.resolve(__dirname, "../../components/auth/AccessGate.tsx"),
       "utf8"
     );
-    expect(source.indexOf("getSession")).toBeLessThan(
+    expect(source.indexOf("resolveLiveSupabaseSession")).toBeLessThan(
       source.indexOf("fetchSpecialists()")
     );
     expect(source).toMatch(/if \(hasJwt\)/);
@@ -132,8 +132,8 @@ describe("SEC-OPS-007F bootstrap consumers", () => {
     );
     expect(source).toMatch(/canFetchProtectedRoster/);
     expect(source).toMatch(/decideHubPageBoot/);
-    expect(source).toMatch(/getSession/);
-    expect(source.indexOf("getSession")).toBeLessThan(
+    expect(source).toMatch(/resolveLiveSupabaseSession/);
+    expect(source.indexOf("resolveLiveSupabaseSession")).toBeLessThan(
       source.indexOf("fetchSpecialists()")
     );
   });

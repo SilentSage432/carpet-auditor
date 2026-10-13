@@ -99,7 +99,7 @@ describe("SEC-OPS-007E service worker stale-client risk", () => {
       "utf8"
     );
     // 007G bumps cache name so phones drop v6 shells after activate.
-    expect(source).toMatch(/deptsync-shell-v7-auth-boot/);
+    expect(source).toMatch(/deptsync-shell-v8-auth-002/);
     expect(source).toMatch(/"\/login"/);
     expect(source).toMatch(/path\.startsWith\("\/_next\/static\/"\)/);
     expect(source).toMatch(/async function cacheFirst/);

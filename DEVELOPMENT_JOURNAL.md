@@ -1,5 +1,13 @@
 # DeptSync Hub — Development Journal
 
+## 2026-10-13 — DEPTSYNC-AUTH-002-RELEASE production release
+
+**Security-gated production release.** Preflight: PIN-before-mint; server-only `generateLink`; session/userId binding; rate-limit; no credential reset; no migrations. Focused auth/security tests **146 PASS**; typecheck/build PASS. Shipping AUTH-002 reliability (bounded login, slim mint, single gate sync, honest biometric resume). Canonical: [`docs/product/DEPTSYNC_AUTH_002_PRODUCTION_RELEASE.md`](docs/product/DEPTSYNC_AUTH_002_PRODUCTION_RELEASE.md). **AUTH-003 / MAP-004 not started.** Operator phone acceptance pending.
+
+## 2026-10-13 — DEPTSYNC-AUTH-002 authentication reliability (local)
+
+**Local implementation** — Bounded 15s auth fetches; hub-bridge mint via `generateLink`+`verifyOtp` (no per-login password rotate / no `listUsers(1000)`); single awaited hub-gate sync; live JWT refresh resume; honest biometric “resume” UX (independent server WebAuthn **deferred** AUTH-003). SW `deptsync-shell-v8-auth-002`. Canonical: [`docs/product/DEPTSYNC_AUTH_002_IMPLEMENTATION.md`](docs/product/DEPTSYNC_AUTH_002_IMPLEMENTATION.md). Predecessor audit: [`DEPTSYNC_AUTH_001_RELIABILITY_AUDIT.md`](docs/product/DEPTSYNC_AUTH_001_RELIABILITY_AUDIT.md).
+
 ## 2026-10-13 — DEPTSYNC-MAP-003 supervisory bay priorities production release
 
 **Authorized controlled release.** Preflight **77 PASS**; `tsc` + `next build` PASS. Backup `tmp/production-backups/deptsync-fmeinlwhixngednabhgy-2026-10-13T19-45-55Z.dump` (647012 B / TOC 974). Applied `20261019_map_003_week_bay_priorities.sql` **COMMIT** on `fmeinlwhixngednabhgy` (RLS on; anon write denied; auth insert denied; unique active index present; priority rows **0**). Pushed `d30168b..bd9bbab`. GitHub Production deploy **`7048524886`**; Vercel **`dpl_FV5t9Crxt9kuSRss7xgFdWLX2dWi`** Ready @ https://deptsync-hub.vercel.app. Smoke: `/login` **200**; week-bay-priority GET/POST/DELETE **401**; bay-context/sections/capacity **401**. Data preserved: sections **4/160**; SBA **38**; caps **4/sum 11**; rotations **41**; walkthroughs **1/1/0**. Ownership+capacity RPC enforcement retained; auto-stage OFF. Canonical: [`docs/product/DEPTSYNC_MAP_003_PRODUCTION_RELEASE.md`](docs/product/DEPTSYNC_MAP_003_PRODUCTION_RELEASE.md). **RELEASED — AWAITING PHONE ACCEPTANCE.** **STOP. Do not begin MAP-004.**

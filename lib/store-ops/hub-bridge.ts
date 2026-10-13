@@ -18,7 +18,7 @@ import {
   HUB_MASTER_USERNAME,
   isHubMasterPin,
 } from "./bootstrap-admin";
-import { linkAuthUserToSpecialistProfile } from "./link-auth-profile";
+import { ensureAuthProfileLinked } from "./link-auth-profile";
 import { persistPinCredentialUpgrade } from "./pin-credential-upgrade";
 import type { StoreSpecialist } from "@/lib/types";
 
@@ -31,9 +31,17 @@ export type HubBridgeSession = {
   user: { id: string; email?: string | null };
 };
 
+/** Safe server timings (ms) — never includes credentials. */
+export type HubBridgeTimings = {
+  resolve_user_ms: number;
+  mint_session_ms: number;
+  total_ms: number;
+};
+
 export type HubBridgeResult = {
   specialist: StoreSpecialist;
   session: HubBridgeSession;
+  timings: HubBridgeTimings;
 };
 
 function hubBridgeEmail(specialistId: string): string {
@@ -156,7 +164,7 @@ async function ensureAuthUserForSpecialist(
     .maybeSingle();
 
   if (linkedProfile?.id) {
-    await linkAuthUserToSpecialistProfile(admin, {
+    await ensureAuthProfileLinked(admin, {
       authUserId: String(linkedProfile.id),
       email,
       specialist,
@@ -188,22 +196,29 @@ async function ensureAuthUserForSpecialist(
   });
 
   if (error || !data.user?.id) {
-    const listed = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
-    const existing = listed.data.users.find(
-      (u) => String(u.email ?? "").toLowerCase() === email.toLowerCase()
-    );
-    if (existing?.id) {
-      await linkAuthUserToSpecialistProfile(admin, {
-        authUserId: existing.id,
+    // AUTH-002: resolve existing Auth user via generateLink (no listUsers(1000)).
+    const { data: linkData, error: linkError } =
+      await admin.auth.admin.generateLink({
+        type: "magiclink",
         email,
-        specialist,
       });
-      return { userId: existing.id, email };
+    const existingId = linkData?.user?.id;
+    if (!existingId) {
+      throw new Error(
+        error?.message ||
+          linkError?.message ||
+          "Could not create Hub Auth user"
+      );
     }
-    throw new Error(error?.message || "Could not create Hub Auth user");
+    await ensureAuthProfileLinked(admin, {
+      authUserId: String(existingId),
+      email,
+      specialist,
+    });
+    return { userId: String(existingId), email };
   }
 
-  await linkAuthUserToSpecialistProfile(admin, {
+  await ensureAuthProfileLinked(admin, {
     authUserId: data.user.id,
     email,
     specialist,
@@ -212,6 +227,10 @@ async function ensureAuthUserForSpecialist(
   return { userId: data.user.id, email };
 }
 
+/**
+ * AUTH-002: mint session via admin magic-link + verifyOtp.
+ * Avoids per-login password rotation + signInWithPassword.
+ */
 async function mintSessionForSpecialist(
   specialist: StoreSpecialist
 ): Promise<HubBridgeResult> {
@@ -221,23 +240,32 @@ async function mintSessionForSpecialist(
     throw new Error("Supabase URL / anon key is not configured");
   }
 
+  const totalStarted = Date.now();
+  const resolveStarted = Date.now();
   const { userId, email } = await ensureAuthUserForSpecialist(specialist);
+  const resolve_user_ms = Date.now() - resolveStarted;
+
+  const mintStarted = Date.now();
   const admin = createAdminClient();
-  const password = randomBytes(24).toString("base64url");
+  // Server-only: magic link for the PIN-verified specialist's hub email.
+  // Never return action_link / hashed_token to the browser.
+  const { data: linkData, error: linkError } =
+    await admin.auth.admin.generateLink({
+      type: "magiclink",
+      email,
+    });
 
-  const { error: pwError } = await admin.auth.admin.updateUserById(userId, {
-    password,
-    email_confirm: true,
-  });
-  if (pwError) {
-    throw new Error(pwError.message || "Could not refresh Hub Auth credentials");
+  const hashedToken = String(linkData?.properties?.hashed_token ?? "").trim();
+  const linkUserId = String(linkData?.user?.id ?? "").trim();
+  if (linkError || !hashedToken) {
+    throw new Error(
+      linkError?.message || "Could not mint Hub Auth session link"
+    );
   }
-
-  await linkAuthUserToSpecialistProfile(admin, {
-    authUserId: userId,
-    email,
-    specialist,
-  });
+  // AUTH-002-RELEASE: link must bind to the already-resolved auth user.
+  if (!linkUserId || linkUserId !== String(userId)) {
+    throw new Error("Hub Auth identity mismatch during session mint");
+  }
 
   const browser = createClient(url, anon, {
     auth: {
@@ -247,14 +275,20 @@ async function mintSessionForSpecialist(
     },
   });
 
-  const { data, error } = await browser.auth.signInWithPassword({
-    email,
-    password,
+  const { data, error } = await browser.auth.verifyOtp({
+    token_hash: hashedToken,
+    type: "magiclink",
   });
 
-  if (error || !data.session?.access_token) {
+  if (error || !data.session?.access_token || !data.session.user?.id) {
     throw new Error(error?.message || "Could not establish Hub Auth session");
   }
+  // Session must belong to the PIN-verified specialist's auth user — never another identity.
+  if (String(data.session.user.id) !== String(userId)) {
+    throw new Error("Hub Auth session identity mismatch");
+  }
+
+  const mint_session_ms = Date.now() - mintStarted;
 
   return {
     specialist,
@@ -268,6 +302,11 @@ async function mintSessionForSpecialist(
         id: data.session.user.id,
         email: data.session.user.email,
       },
+    },
+    timings: {
+      resolve_user_ms,
+      mint_session_ms,
+      total_ms: Date.now() - totalStarted,
     },
   };
 }

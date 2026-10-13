@@ -24,6 +24,46 @@ function mapSpecialistRole(
 }
 
 /**
+ * AUTH-002: skip full profile upsert + claim when identity claims already match.
+ * Returns "synced" when a write ran, "current" when no write was needed.
+ */
+export async function ensureAuthProfileLinked(
+  admin: SupabaseClient,
+  input: {
+    authUserId: string;
+    email?: string | null;
+    specialist: StoreSpecialist;
+  }
+): Promise<"synced" | "current"> {
+  const role = mapSpecialistRole(input.specialist.role);
+  if (!role) return "current";
+
+  const storeNumber = normalizeStoreNumber(
+    String(input.specialist.store_number ?? "")
+  );
+  if (!storeNumber && role !== "super_admin") return "current";
+  const effectiveStore = storeNumber || "0001";
+
+  const { data: existing } = await admin
+    .from("profiles")
+    .select("id, role, store_number, specialist_id")
+    .eq("id", input.authUserId)
+    .maybeSingle();
+
+  if (
+    existing &&
+    String(existing.specialist_id ?? "") === String(input.specialist.id) &&
+    String(existing.role ?? "") === role &&
+    normalizeStoreNumber(String(existing.store_number ?? "")) === effectiveStore
+  ) {
+    return "current";
+  }
+
+  await linkAuthUserToSpecialistProfile(admin, input);
+  return "synced";
+}
+
+/**
  * Upsert profiles row for the Auth user and set raw_app_meta_data claims
  * (store_number, department, role) used by JWT RLS + resolveStoreOpsActor.
  */

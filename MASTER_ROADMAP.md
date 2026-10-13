@@ -39,6 +39,10 @@
 - [x] **DEPTSYNC-AUTH-HARDEN-001** — Privileged PIN scrypt + login upgrade + hub-bridge rate limit (**COMPLETE** local; prod migrate/deploy/commit **not** authorized) — [`DEPTSYNC_AUTH_HARDEN_001.md`](docs/product/DEPTSYNC_AUTH_HARDEN_001.md)
 - [x] **DEPTSYNC-AUTH-HARDEN-001A** — Fail-closed limiter + atomic admit + IP buckets (**COMPLETE**; released in 002)
 - [x] **DEPTSYNC-AUTH-HARDEN-002** — Controlled auth production release (**SHIPPED**; operator login upgrade pending manual verify) — [`DEPTSYNC_AUTH_HARDEN_002_PRODUCTION_RELEASE.md`](docs/product/DEPTSYNC_AUTH_HARDEN_002_PRODUCTION_RELEASE.md)
+- [x] **DEPTSYNC-AUTH-001** — Auth reliability audit (read-only) — [`DEPTSYNC_AUTH_001_RELIABILITY_AUDIT.md`](docs/product/DEPTSYNC_AUTH_001_RELIABILITY_AUDIT.md)
+- [x] **DEPTSYNC-AUTH-002** — Auth reliability + session correction — [`DEPTSYNC_AUTH_002_IMPLEMENTATION.md`](docs/product/DEPTSYNC_AUTH_002_IMPLEMENTATION.md)
+- [x] **DEPTSYNC-AUTH-002-RELEASE** — Auth reliability production release (**SHIPPED**; operator phone acceptance pending) — [`DEPTSYNC_AUTH_002_PRODUCTION_RELEASE.md`](docs/product/DEPTSYNC_AUTH_002_PRODUCTION_RELEASE.md)
+- [ ] **DEPTSYNC-AUTH-003** — Server-verified WebAuthn biometric session mint (security review required)
 - [x] **DEPTSYNC-SEC-OPS-004** — Legacy profile credential retirement discovery (read-only) — [`DEPTSYNC_SEC_OPS_004_LEGACY_CREDENTIAL_DISCOVERY.md`](docs/product/DEPTSYNC_SEC_OPS_004_LEGACY_CREDENTIAL_DISCOVERY.md); plaintext fallback removal **NO-GO**
 - [x] **DEPTSYNC-SEC-OPS-005** — Legacy credential write-path correction — [`DEPTSYNC_SEC_OPS_005_CREDENTIAL_WRITERS.md`](docs/product/DEPTSYNC_SEC_OPS_005_CREDENTIAL_WRITERS.md)
 - [x] **DEPTSYNC-SEC-OPS-006** — Credential writer production release (**SHIPPED** `e36bfb5` / `CkWcALCvQTJYbaEw9Xm49Yas8E3B`) — [`DEPTSYNC_SEC_OPS_006_PRODUCTION_RELEASE.md`](docs/product/DEPTSYNC_SEC_OPS_006_PRODUCTION_RELEASE.md)

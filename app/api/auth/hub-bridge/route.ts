@@ -87,6 +87,8 @@ export async function POST(request: Request) {
         store_number: result.specialist.store_number,
         specialist: toPublicSpecialist(result.specialist),
         session: result.session,
+        // AUTH-002 safe diagnostics — timings only, never credentials.
+        timings: result.timings,
       });
     } catch (authErr) {
       // Attempt slot already consumed — failed PIN stays counted.

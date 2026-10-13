@@ -1,7 +1,11 @@
 /**
  * Platform biometric (Touch ID / Face ID / Fingerprint) via WebAuthn.
- * Owns credential create/get + local binding only — AuthWall presents UI;
- * specialist session unlock stays in auth-session / page gate.
+ * Owns credential create/get + local binding only — AuthWall presents UI.
+ *
+ * AUTH-002: this is NOT independent server authentication. Biometric success
+ * only proves device binding; AuthWall must still resolve a live Supabase
+ * session (refresh) before admitting. Full server-verified WebAuthn login is
+ * deferred (see DEPTSYNC_AUTH_002_IMPLEMENTATION.md).
  */
 
 import type { StoreSpecialist } from "./types";
