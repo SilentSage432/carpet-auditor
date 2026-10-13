@@ -3,7 +3,14 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { X } from "lucide-react";
 import { HubPortal } from "@/components/hub/HubPortal";
-import { assignLocationsToWeek, logBayService, setPhysicalBayRotationPriority } from "@/lib/store-ops/client";
+import {
+  assignLocationsToWeek,
+  fetchWeekBayPriorityForBay,
+  logBayService,
+  prioritizeBayForNextWeek,
+  revokeBayWeekPriority,
+  setPhysicalBayRotationPriority,
+} from "@/lib/store-ops/client";
 import { toastError, toastSuccess } from "@/lib/toast";
 import { hapticSuccess, playErrorTone, playSuccessTone } from "@/lib/ui/feedback";
 import { recordBayTouch } from "@/lib/heatmap/bay-tracker";
@@ -45,10 +52,11 @@ import {
   type WalkthroughPlaceOwnership,
 } from "@/lib/store-ops/walkthroughs";
 import type { MapBayContext } from "@/lib/store-ops/map-bay-context";
+import type { WeekBayPriorityView } from "@/lib/store-ops/week-bay-priority";
 import { WalkthroughCaptureSheet } from "@/components/walkthroughs/WalkthroughCaptureSheet";
 import type { OperationalSectionView } from "@/lib/store-ops/operational-sections";
 import { dedupeRoster, fetchSpecialists, isSupervisor } from "@/lib/specialists";
-import { isoWeekLabel } from "@/lib/store-ops/week";
+import { isoWeekLabel, resolveNextRotationWeekLabel } from "@/lib/store-ops/week";
 import Link from "next/link";
 import { ChevronDown, ChevronUp } from "lucide-react";
 
@@ -137,6 +145,11 @@ export function WalkTheFloorSheet({
   const [captureSections, setCaptureSections] = useState<
     OperationalSectionView[]
   >([]);
+  const nextWeekLabel = useMemo(() => resolveNextRotationWeekLabel(), []);
+  const [weekPriority, setWeekPriority] = useState<WeekBayPriorityView | null>(
+    null
+  );
+  const [weekPriorityBusy, setWeekPriorityBusy] = useState(false);
   const canRecordObservation = isSupervisor(specialist);
   const placeOwnership: WalkthroughPlaceOwnership | null =
     bayContext?.place_ownership ?? null;
@@ -167,9 +180,38 @@ export function WalkTheFloorSheet({
     }
   }, [specialist, bay.departmentId, bay.aisle, bay.pair.bay]);
 
+  const reloadWeekPriority = useCallback(async () => {
+    if (!canMutateRotationPriority) {
+      setWeekPriority(null);
+      return;
+    }
+    try {
+      const { priority } = await fetchWeekBayPriorityForBay(specialist, {
+        department_id: bay.departmentId,
+        aisle: bay.aisle,
+        bay: bay.pair.bay,
+        week_label: nextWeekLabel,
+      });
+      setWeekPriority(priority);
+    } catch {
+      setWeekPriority(null);
+    }
+  }, [
+    canMutateRotationPriority,
+    specialist,
+    bay.departmentId,
+    bay.aisle,
+    bay.pair.bay,
+    nextWeekLabel,
+  ]);
+
   useEffect(() => {
     void reloadBayContext();
   }, [reloadBayContext]);
+
+  useEffect(() => {
+    void reloadWeekPriority();
+  }, [reloadWeekPriority]);
 
   async function openCapture() {
     setCaptureOpen(true);
@@ -263,6 +305,47 @@ export function WalkTheFloorSheet({
       toastError(msg);
     } finally {
       setPriorityBusy(false);
+    }
+  }
+
+  async function toggleWeekPriority() {
+    if (!canMutateRotationPriority || weekPriorityBusy) return;
+    setWeekPriorityBusy(true);
+    onError(null);
+    try {
+      if (weekPriority?.active) {
+        const result = await revokeBayWeekPriority(specialist, {
+          priority_id: weekPriority.id,
+          week_label: nextWeekLabel,
+          department_id: bay.departmentId,
+          aisle: bay.aisle,
+          bay: bay.pair.bay,
+        });
+        setWeekPriority(null);
+        toastSuccess(result.note);
+      } else {
+        const result = await prioritizeBayForNextWeek(specialist, {
+          department_id: bay.departmentId,
+          aisle: bay.aisle,
+          bay: bay.pair.bay,
+          week_label: nextWeekLabel,
+        });
+        setWeekPriority(result.priority);
+        toastSuccess(
+          `Prioritized for ${result.week_label} — not an assignment`
+        );
+      }
+      onChanged();
+    } catch (err) {
+      const msg =
+        err instanceof Error
+          ? err.message
+          : "Could not update week priority";
+      onError(msg);
+      toastError(msg);
+      playErrorTone();
+    } finally {
+      setWeekPriorityBusy(false);
     }
   }
 
@@ -856,6 +939,48 @@ export function WalkTheFloorSheet({
                   }`}
                 />
               </span>
+            </button>
+          </section>
+        ) : null}
+
+        {canMutateRotationPriority ? (
+          <section
+            className="mb-4 rounded-xl border border-teal-500/25 bg-teal-950/20 px-3 py-2.5"
+            data-testid="map-bay-week-priority"
+          >
+            <p className="font-mono text-[10px] font-bold uppercase tracking-[0.16em] text-teal-300">
+              Next week rotation
+            </p>
+            <p className="mt-1 text-xs text-zinc-400">
+              Supervisory intent for {nextWeekLabel}. Preferential consideration
+              only — not an assignment, capacity change, or ownership transfer.
+            </p>
+            {weekPriority?.active ? (
+              <p
+                className="mt-2 text-xs text-teal-100/85"
+                data-testid="map-bay-week-priority-active"
+              >
+                Priority requested
+                {weekPriority.section_name
+                  ? ` · ${weekPriority.section_name}`
+                  : ""}
+                {baySection?.primary_owner_name
+                  ? ` · ${baySection.primary_owner_name}`
+                  : ""}
+              </p>
+            ) : null}
+            <button
+              type="button"
+              data-testid="map-bay-week-priority-toggle"
+              disabled={weekPriorityBusy}
+              onClick={() => void toggleWeekPriority()}
+              className="mt-2 flex min-h-12 w-full items-center justify-center rounded-xl border border-teal-500/40 bg-teal-950/40 px-3 text-sm font-semibold text-teal-50 disabled:opacity-50"
+            >
+              {weekPriorityBusy
+                ? "Saving…"
+                : weekPriority?.active
+                  ? "Remove next-week priority"
+                  : "Prioritize for Next Week"}
             </button>
           </section>
         ) : null}

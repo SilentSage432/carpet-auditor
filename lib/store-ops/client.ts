@@ -1839,6 +1839,103 @@ export async function setPhysicalBayRotationPriority(
   return result;
 }
 
+/** MAP-003 — list active week-scoped supervisory bay priorities. */
+export async function fetchWeekBayPriorities(
+  specialist: StoreSpecialist,
+  input?: {
+    week_label?: string | null;
+    department_id?: string | null;
+  }
+): Promise<{
+  week_label: string;
+  priorities: import("./week-bay-priority").WeekBayPriorityView[];
+}> {
+  const qs = new URLSearchParams();
+  if (input?.week_label) qs.set("week_label", input.week_label);
+  if (input?.department_id) qs.set("department_id", input.department_id);
+  const suffix = qs.toString() ? `?${qs}` : "";
+  return storeOpsFetch<{
+    week_label: string;
+    priorities: import("./week-bay-priority").WeekBayPriorityView[];
+  }>(`/api/store-locations/week-bay-priority${suffix}`, specialist);
+}
+
+/** MAP-003 — active priority for one bay / week (or null). */
+export async function fetchWeekBayPriorityForBay(
+  specialist: StoreSpecialist,
+  input: {
+    department_id: string;
+    aisle: string;
+    bay: number | string;
+    week_label?: string | null;
+  }
+): Promise<{
+  week_label: string;
+  priority: import("./week-bay-priority").WeekBayPriorityView | null;
+}> {
+  const qs = new URLSearchParams({
+    department_id: input.department_id,
+    aisle: input.aisle,
+    bay: String(input.bay),
+  });
+  if (input.week_label) qs.set("week_label", input.week_label);
+  return storeOpsFetch<{
+    week_label: string;
+    priority: import("./week-bay-priority").WeekBayPriorityView | null;
+  }>(`/api/store-locations/week-bay-priority?${qs}`, specialist);
+}
+
+/** MAP-003 — prioritize bay for a target week (intent only). */
+export async function prioritizeBayForNextWeek(
+  specialist: StoreSpecialist,
+  input: {
+    department_id: string;
+    aisle: string;
+    bay: number | string;
+    week_label?: string | null;
+  }
+): Promise<{
+  ok: true;
+  week_label: string;
+  priority: import("./week-bay-priority").WeekBayPriorityView;
+  note: string;
+}> {
+  return storeOpsFetch<{
+    ok: true;
+    week_label: string;
+    priority: import("./week-bay-priority").WeekBayPriorityView;
+    note: string;
+  }>("/api/store-locations/week-bay-priority", specialist, {
+    method: "POST",
+    body: JSON.stringify(input),
+  });
+}
+
+/** MAP-003 — revoke an active week-scoped priority. */
+export async function revokeBayWeekPriority(
+  specialist: StoreSpecialist,
+  input: {
+    priority_id?: string | null;
+    department_id?: string | null;
+    aisle?: string | null;
+    bay?: number | string | null;
+    week_label?: string | null;
+  }
+): Promise<{
+  ok: true;
+  priority: import("./week-bay-priority").WeekBayPriorityView;
+  note: string;
+}> {
+  return storeOpsFetch<{
+    ok: true;
+    priority: import("./week-bay-priority").WeekBayPriorityView;
+    note: string;
+  }>("/api/store-locations/week-bay-priority", specialist, {
+    method: "DELETE",
+    body: JSON.stringify(input),
+  });
+}
+
 /** FS-002B Floor resolve — active seasons/events for a date + optional dept. */
 export type OperationalContextsResolveClient = {
   operational_date: string;

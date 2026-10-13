@@ -98,6 +98,23 @@ export function isoWeekToMondayDate(weekLabel: string): string {
 }
 
 /**
+ * Shift an ISO week label by N weeks (negative allowed).
+ * Uses Monday UTC arithmetic so year boundaries stay ISO-correct.
+ */
+export function addIsoWeeks(weekLabel: string, deltaWeeks: number): string {
+  const monday = isoWeekToMondayDate(weekLabel);
+  const [y, m, d] = monday.split("-").map(Number);
+  const cursor = new Date(Date.UTC(y!, m! - 1, d!));
+  cursor.setUTCDate(cursor.getUTCDate() + Math.trunc(deltaWeeks) * 7);
+  return isoWeekLabel(cursor);
+}
+
+/** Default Map “next week” target — the ISO week after today. */
+export function resolveNextRotationWeekLabel(now: Date = new Date()): string {
+  return addIsoWeeks(isoWeekLabel(now), 1);
+}
+
+/**
  * Monday–Sunday calendar dates (YYYY-MM-DD, UTC date parts) for an ISO week label.
  * Matches `sunday_bay_assignments.week_starting` (= Monday) through the following Sunday —
  * the seven days that operationally support staged rotations for `assigned_week`.

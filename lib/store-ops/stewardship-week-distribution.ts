@@ -45,6 +45,13 @@ import {
   BASE_WEEKLY_BAY_QUOTA,
   type ShiftRosterMember,
 } from "./weekly-rotations";
+import {
+  buildWeekBayPriorityDigest,
+  evaluateWeekBayPriorityOutcomes,
+  weekBayPriorityPhysicalKey,
+  type WeekBayPriorityOutcome,
+  type WeekBayPriorityView,
+} from "./week-bay-priority";
 
 export { SECTION_AWARE_ROTATION_AUTO_STAGE, BASE_WEEKLY_BAY_QUOTA };
 export { STRICT_SECTION_OWNERSHIP_AUTO_STAGE };
@@ -54,6 +61,7 @@ export const STEWARDSHIP_WEEK_DISTRIBUTION_AUTO_STAGE = false as const;
 
 export type SelectionExplanationCode =
   | "priority_tier"
+  | "supervisor_week_priority"
   | "steward_section_fill"
   | "aisle_diversity"
   | "section_ownership"
@@ -99,6 +107,9 @@ export type StewardshipWeeklyProposal = Omit<
   ownership_digest: string;
   associate_summaries: StewardshipAssociateSummary[];
   unfilled_capacity: UnfilledCapacityReason[];
+  /** MAP-003 week-scoped supervisory priorities for this proposal week. */
+  supervisor_priorities: WeekBayPriorityOutcome[];
+  supervisor_priority_digest: string;
 };
 
 /**
@@ -136,15 +147,22 @@ function buildExplanation(input: {
   remainingAfter: number;
   aisleAlreadyAssigned: number;
   sectionName: string | null;
+  supervisorPriority?: boolean;
 }): SelectionExplanation {
   const codes: SelectionExplanationCode[] = [];
   if (input.tier) codes.push("priority_tier");
+  if (input.supervisorPriority || input.tier === "supervisor") {
+    codes.push("supervisor_week_priority");
+  }
   codes.push("section_ownership");
   if (input.preference === "steward_match") codes.push("steward_section_fill");
   if (input.aisleAlreadyAssigned > 0) codes.push("aisle_diversity");
   codes.push("capacity_remaining");
 
-  const tierLabel = input.tier ?? "unspecified";
+  const tierLabel =
+    input.tier === "supervisor"
+      ? "supervisor week priority"
+      : input.tier ?? "unspecified";
   const sectionLabel = input.sectionName
     ? `owned section ${input.sectionName}`
     : "owned Operational Section";
@@ -152,7 +170,11 @@ function buildExplanation(input: {
     input.aisleAlreadyAssigned > 0
       ? ` Aisle ${normalizeAisle(input.aisle)} chosen with within-section distribution.`
       : "";
-  const summary = `${tierLabel} priority · ${sectionLabel}.${diversity} Remaining capacity after this pick: ${input.remainingAfter}.`;
+  const intentNote =
+    input.supervisorPriority || input.tier === "supervisor"
+      ? " Supervisor priority requested (not an assignment)."
+      : "";
+  const summary = `${tierLabel} · ${sectionLabel}.${intentNote}${diversity} Remaining capacity after this pick: ${input.remainingAfter}.`;
 
   return {
     codes,
@@ -194,10 +216,20 @@ export function composeStewardshipWeeklyProposal(input: {
     | "approved_by_specialist"
   >;
   knownHoursOnly?: boolean;
+  /** MAP-003 active week-scoped supervisory priorities for this week_label. */
+  supervisorPriorities?: readonly WeekBayPriorityView[];
 }): StewardshipWeeklyProposal {
   const ownershipDigest = buildSectionOwnershipDigest(input.baySectionByKey);
   const ownershipBySpecialist = indexOwnedBaysBySpecialist(
     input.baySectionByKey
+  );
+  const supervisorPriorities = (input.supervisorPriorities ?? []).filter(
+    (p) => p.active && p.week_label === input.week_label
+  );
+  const supervisorPriorityDigest =
+    buildWeekBayPriorityDigest(supervisorPriorities);
+  const supervisorKeySet = new Set(
+    supervisorPriorities.map((p) => weekBayPriorityPhysicalKey(p))
   );
 
   const approvalGate = assertApprovalsReadyForAssignment({
@@ -229,7 +261,9 @@ export function composeStewardshipWeeklyProposal(input: {
       approvalGate.error,
       remainingCaps,
       ownershipDigest,
-      ownershipBySpecialist
+      ownershipBySpecialist,
+      supervisorPriorities,
+      supervisorPriorityDigest
     );
   }
 
@@ -244,7 +278,9 @@ export function composeStewardshipWeeklyProposal(input: {
       evidence.issue.message,
       remainingCaps,
       ownershipDigest,
-      ownershipBySpecialist
+      ownershipBySpecialist,
+      supervisorPriorities,
+      supervisorPriorityDigest
     );
   }
 
@@ -252,11 +288,25 @@ export function composeStewardshipWeeklyProposal(input: {
   const refByKey = new Map(
     unownedRefs.map((b) => [sectionAwarePhysicalKey(b), b] as const)
   );
+  const ownedRefKeys = new Set(
+    input.bays
+      .filter((b) => owned.has(String(b.rotationId)))
+      .map((b) => sectionAwarePhysicalKey(b))
+  );
 
   // Prefer staged refs as the candidate pool; fall back to tier candidates.
+  // Supervisor week priorities elevate matching bays into the supervisor tier
+  // (after carry, before seasonal/high) without inventing candidates.
+  const markedRefs = unownedRefs.map((bay) => ({
+    ...bay,
+    supervisor_priority:
+      Boolean(
+        (bay as { supervisor_priority?: boolean | null }).supervisor_priority
+      ) || supervisorKeySet.has(sectionAwarePhysicalKey(bay)),
+  }));
   const tierSource =
-    unownedRefs.length > 0
-      ? classifyBayPriorityTier(unownedRefs)
+    markedRefs.length > 0
+      ? classifyBayPriorityTier(markedRefs)
       : input.tiers.map((bucket) => ({
           tier: bucket.tier,
           candidates: bucket.candidates.filter(
@@ -321,6 +371,9 @@ export function composeStewardshipWeeklyProposal(input: {
     remainingAfter.set(row.specialist_id, left);
     proposedBySpecialist[row.specialist_id] =
       (proposedBySpecialist[row.specialist_id] ?? 0) + 1;
+    const physical_key = bay
+      ? sectionAwarePhysicalKey(bay)
+      : `${department_id}|${aisle}|${row.bay}`;
     const tier = bay?.priority_tier ?? null;
     const explanation = buildExplanation({
       tier,
@@ -329,15 +382,14 @@ export function composeStewardshipWeeklyProposal(input: {
       remainingAfter: left,
       aisleAlreadyAssigned: priorAisle,
       sectionName: section?.section_name ?? null,
+      supervisorPriority: supervisorKeySet.has(physical_key),
     });
 
     return {
       ...row,
       state: "PROPOSED",
       department_id,
-      physical_key: bay
-        ? sectionAwarePhysicalKey(bay)
-        : `${department_id}|${aisle}|${row.bay}`,
+      physical_key,
       section_id: section?.section_id ?? null,
       section_name: section?.section_name ?? null,
       steward_specialist_id: section?.primary_owner_specialist_id ?? null,
@@ -357,7 +409,7 @@ export function composeStewardshipWeeklyProposal(input: {
     owned_total: input.capacity.owned_total,
     remaining_shared: input.capacity.remaining_shared,
     eligible_ids: input.capacity.eligible_specialist_ids,
-    ownership_digest: ownershipDigest,
+    ownership_digest: `${ownershipDigest}#prio:${supervisorPriorityDigest}`,
   });
 
   const aisle_counts: Record<string, number> = {};
@@ -378,6 +430,26 @@ export function composeStewardshipWeeklyProposal(input: {
     approvedBySpecialist: input.capacity.approved_by_specialist,
     ownershipBySpecialist,
     unfilled_capacity,
+  });
+
+  const memberNames = Object.fromEntries(
+    input.members.map((m) => [m.specialist_id, m.specialist_name] as const)
+  );
+  const stagedKeys = [
+    ...unownedRefs.map((b) => sectionAwarePhysicalKey(b)),
+    ...selected.map((c) => sectionAwarePhysicalKey(c)),
+  ];
+  const supervisor_priorities = evaluateWeekBayPriorityOutcomes({
+    week_label: input.week_label,
+    priorities: supervisorPriorities,
+    baySectionByKey: input.baySectionByKey,
+    stagedPhysicalKeys: stagedKeys,
+    assignedPhysicalKeys: [...ownedRefKeys],
+    proposedPhysicalKeys: items.map((i) => i.physical_key),
+    remainingBySpecialist: remainingCaps,
+    proposedBySpecialist,
+    eligibleSpecialistIds: input.capacity.eligible_specialist_ids,
+    memberNamesById: memberNames,
   });
 
   return {
@@ -404,10 +476,12 @@ export function composeStewardshipWeeklyProposal(input: {
     coverage_fallback_count: 0,
     aisle_counts,
     distribution_note:
-      "Each associate receives only bays inside their owned Operational Section, up to approved remaining capacity, with priority tiers and within-section aisle diversity. Unused capacity is never filled from another associate's section.",
+      "Each associate receives only bays inside their owned Operational Section, up to approved remaining capacity, with priority tiers (including week-scoped supervisor priorities) and within-section aisle diversity. Unused capacity is never filled from another associate's section. Supervisor priorities are intent only — not assignments.",
     ownership_digest: ownershipDigest,
     associate_summaries,
     unfilled_capacity,
+    supervisor_priorities,
+    supervisor_priority_digest: supervisorPriorityDigest,
   };
 }
 
@@ -492,11 +566,14 @@ function emptyBlockedProposal(
       | "approved_by_specialist"
     >;
     baySectionByKey: ReadonlyMap<string, BaySectionLookup>;
+    bays?: SectionAwareBayRef[];
   },
   reason: string,
   remainingCaps: Map<string, number>,
   ownershipDigest: string,
-  ownershipBySpecialist: ReturnType<typeof indexOwnedBaysBySpecialist>
+  ownershipBySpecialist: ReturnType<typeof indexOwnedBaysBySpecialist>,
+  supervisorPriorities: readonly WeekBayPriorityView[] = [],
+  supervisorPriorityDigest = ""
 ): StewardshipWeeklyProposal {
   const sectionKeys = [...input.baySectionByKey.keys()].sort();
   const members = (input.members ?? []).filter((m) => m.active);
@@ -507,6 +584,20 @@ function emptyBlockedProposal(
     approvedBySpecialist: input.capacity.approved_by_specialist,
     ownershipBySpecialist,
     blocked: true,
+  });
+  const memberNames = Object.fromEntries(
+    members.map((m) => [m.specialist_id, m.specialist_name] as const)
+  );
+  const stagedKeys = (input.bays ?? []).map((b) => sectionAwarePhysicalKey(b));
+  const supervisor_priorities = evaluateWeekBayPriorityOutcomes({
+    week_label: input.week_label,
+    priorities: supervisorPriorities,
+    baySectionByKey: input.baySectionByKey,
+    stagedPhysicalKeys: stagedKeys,
+    proposedPhysicalKeys: [],
+    remainingBySpecialist: remainingCaps,
+    eligibleSpecialistIds: input.capacity.eligible_specialist_ids,
+    memberNamesById: memberNames,
   });
   return {
     state: "PROPOSED",
@@ -521,7 +612,7 @@ function emptyBlockedProposal(
       owned_total: input.capacity.owned_total,
       remaining_shared: input.capacity.remaining_shared,
       eligible_ids: input.capacity.eligible_specialist_ids,
-      ownership_digest: ownershipDigest,
+      ownership_digest: `${ownershipDigest}#prio:${supervisorPriorityDigest}`,
     }),
     actionable: false,
     block_reason: reason,
@@ -548,6 +639,8 @@ function emptyBlockedProposal(
       unfilled_capacity,
     }),
     unfilled_capacity,
+    supervisor_priorities,
+    supervisor_priority_digest: supervisorPriorityDigest,
   };
 }
 
@@ -578,6 +671,8 @@ export function classifyBayPriorityTier(
       seasonal_high?: boolean | null;
       priority_override?: boolean | null;
       velocity_hot?: boolean | null;
+      /** MAP-003 week-scoped supervisory intent (not durable High). */
+      supervisor_priority?: boolean | null;
     }
   >
 ): Array<{
@@ -587,6 +682,7 @@ export function classifyBayPriorityTier(
   const buckets: Record<SectionAwarePriorityTier, SectionAwareBayCandidate[]> =
     {
       carry: [],
+      supervisor: [],
       seasonal: [],
       high: [],
       velocity: [],
@@ -600,12 +696,21 @@ export function classifyBayPriorityTier(
       rotationId: bay.rotationId,
       riskScore: bay.riskScore,
     };
+    // Carry always wins. Supervisor week intent elevates next, even when a
+    // lower explicit tier label was already stamped on the ref.
+    if (bay.carried_over || bay.priority_tier === "carry") {
+      buckets.carry.push(cand);
+      continue;
+    }
+    if (bay.supervisor_priority || bay.priority_tier === "supervisor") {
+      buckets.supervisor.push(cand);
+      continue;
+    }
     if (bay.priority_tier && SECTION_AWARE_TIER_ORDER.includes(bay.priority_tier)) {
       buckets[bay.priority_tier].push(cand);
       continue;
     }
-    if (bay.carried_over) buckets.carry.push(cand);
-    else if (bay.seasonal_high) buckets.seasonal.push(cand);
+    if (bay.seasonal_high) buckets.seasonal.push(cand);
     else if (bay.priority_override) buckets.high.push(cand);
     else if (bay.velocity_hot) buckets.velocity.push(cand);
     else buckets.aging.push(cand);

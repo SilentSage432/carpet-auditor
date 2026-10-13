@@ -38,6 +38,7 @@ export function isSectionAwarePreviewEnabled(
 /** Authoritative coverage priority tiers — never leapfrogged by section preference. */
 export type SectionAwarePriorityTier =
   | "carry"
+  | "supervisor"
   | "seasonal"
   | "high"
   | "velocity"
@@ -45,6 +46,7 @@ export type SectionAwarePriorityTier =
 
 export const SECTION_AWARE_TIER_ORDER: readonly SectionAwarePriorityTier[] = [
   "carry",
+  "supervisor",
   "seasonal",
   "high",
   "velocity",

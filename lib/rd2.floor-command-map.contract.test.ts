@@ -83,4 +83,19 @@ describe("RD-2 Floor Command Map", () => {
     expect(domain).toMatch(/Does not mutate ownership/);
     expect(domain).toMatch(/composeMapBayFollowUpAttention/);
   });
+
+  it("MAP-003 bay sheet prioritizes next week without assigning", () => {
+    const sheet = readSrc("components/admin/WalkTheFloorSheet.tsx");
+    expect(sheet).toMatch(/Prioritize for Next Week/);
+    expect(sheet).toMatch(/map-bay-week-priority/);
+    expect(sheet).toMatch(/prioritizeBayForNextWeek/);
+    expect(sheet).toMatch(/resolveNextRotationWeekLabel/);
+    expect(sheet).not.toMatch(/from\("sunday_bay_assignments"\)\.insert/);
+    const api = readSrc("app/api/store-locations/week-bay-priority/route.ts");
+    expect(api).toMatch(/requireSupervisorOrAdmin/);
+    expect(api).toMatch(/prioritizeBayForWeek/);
+    const dist = readSrc("lib/store-ops/stewardship-week-distribution.ts");
+    expect(dist).toMatch(/supervisorPriorities/);
+    expect(dist).toMatch(/STEWARDSHIP_WEEK_DISTRIBUTION_AUTO_STAGE = false/);
+  });
 });

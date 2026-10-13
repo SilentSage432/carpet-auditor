@@ -12,10 +12,12 @@ import {
   fetchDepartments,
   fetchOperationalSections,
   fetchThisWeekRotations,
+  fetchWeekBayPriorities,
   fetchWeekCapacityBoard,
   generateRotations,
   suggestExtraBay,
 } from "@/lib/store-ops/client";
+import type { WeekBayPriorityView } from "@/lib/store-ops/week-bay-priority";
 import type { WeekCapacityReviewBoard } from "@/lib/store-ops/approved-week-capacity";
 import {
   findActiveBayMembershipConflicts,
@@ -35,6 +37,7 @@ import {
   composeStewardshipWeeklyProposal,
   type StewardshipWeeklyProposal,
 } from "@/lib/store-ops/stewardship-week-distribution";
+import { sectionAwarePhysicalKey } from "@/lib/store-ops/section-aware-rotation";
 import { readableError } from "@/lib/store-ops/errors";
 import { playErrorTone, playSuccessTone, playTapTone } from "@/lib/ui/feedback";
 import { diagnoseBayHealth, type BayHealthFinding } from "@/lib/store-ops/bay-health";
@@ -173,6 +176,10 @@ export function SundayAuditAssignmentModal({
   );
   const [capacityBusy, setCapacityBusy] = useState(false);
   const [capacityError, setCapacityError] = useState<string | null>(null);
+  /** MAP-003 — week-scoped supervisory priorities for the planning week. */
+  const [supervisorPriorities, setSupervisorPriorities] = useState<
+    WeekBayPriorityView[]
+  >([]);
 
   const reload = useCallback(async () => {
     setLoading(true);
@@ -276,6 +283,17 @@ export function SundayAuditAssignmentModal({
           )
         );
       }
+
+      // MAP-003 supervisory priorities for this planning week (schema-missing → []).
+      try {
+        const pri = await fetchWeekBayPriorities(specialist, {
+          week_label: rotData.assigned_week,
+        });
+        setSupervisorPriorities(pri.priorities.filter((p) => p.active));
+      } catch (priErr) {
+        console.error("[SundayAudit] week bay priorities unavailable", priErr);
+        setSupervisorPriorities([]);
+      }
     } catch (err) {
       setError(
         readableError(err, "Could not load Sunday Flooring cycle audits")
@@ -283,6 +301,7 @@ export function SundayAuditAssignmentModal({
       setBays([]);
       setWeekLabor(null);
       setCapacityBoard(null);
+      setSupervisorPriorities([]);
     } finally {
       setLoading(false);
     }
@@ -486,19 +505,33 @@ export function SundayAuditAssignmentModal({
       ownedTotal,
       approvedBySpecialist,
     });
-    const bayRefs = bays.map((bay) => ({
-      rotationId: bay.rotation.id,
-      department_id: String(
+    const priorityKeys = new Set(
+      supervisorPriorities.map((p) => p.physical_key)
+    );
+    const bayRefs = bays.map((bay) => {
+      const department_id = String(
         bay.rotation.store_locations?.department_id ?? flooringDept?.id ?? ""
-      ).trim(),
-      aisle: bay.aisle,
-      bay: bay.bay,
-      riskScore: riskScoreFromFinding(healthByRotation.get(bay.rotation.id)),
-      priority_tier: undefined,
-      carried_over: Boolean(
-        (bay.rotation as { carried_over?: boolean }).carried_over
-      ),
-    }));
+      ).trim();
+      const ref = {
+        rotationId: bay.rotation.id,
+        department_id,
+        aisle: bay.aisle,
+        bay: bay.bay,
+        riskScore: riskScoreFromFinding(healthByRotation.get(bay.rotation.id)),
+        priority_tier: undefined as undefined,
+        carried_over: Boolean(
+          (bay.rotation as { carried_over?: boolean }).carried_over
+        ),
+        supervisor_priority: priorityKeys.has(
+          sectionAwarePhysicalKey({
+            department_id,
+            aisle: bay.aisle,
+            bay: bay.bay,
+          })
+        ),
+      };
+      return ref;
+    });
     return composeStewardshipWeeklyProposal({
       store_number: getStoreNumber(),
       week_label: week,
@@ -510,6 +543,7 @@ export function SundayAuditAssignmentModal({
       ownedRotationIds,
       capacity,
       knownHoursOnly: true,
+      supervisorPriorities,
     });
   }, [
     week,
@@ -520,6 +554,7 @@ export function SundayAuditAssignmentModal({
     sectionConflictKeys,
     healthByRotation,
     flooringDept?.id,
+    supervisorPriorities,
   ]);
 
   const selectionSummary = useMemo(
@@ -856,22 +891,35 @@ export function SundayAuditAssignmentModal({
         ownedTotal,
         approvedBySpecialist,
       });
-      const bayRefs = bays.map((bayRow) => ({
-        rotationId: bayRow.rotation.id,
-        department_id: String(
+      const priorityKeys = new Set(
+        supervisorPriorities.map((p) => p.physical_key)
+      );
+      const bayRefs = bays.map((bayRow) => {
+        const department_id = String(
           bayRow.rotation.store_locations?.department_id ??
             flooringDept?.id ??
             ""
-        ).trim(),
-        aisle: bayRow.aisle,
-        bay: bayRow.bay,
-        riskScore: riskScoreFromFinding(
-          healthByRotation.get(bayRow.rotation.id)
-        ),
-        carried_over: Boolean(
-          (bayRow.rotation as { carried_over?: boolean }).carried_over
-        ),
-      }));
+        ).trim();
+        return {
+          rotationId: bayRow.rotation.id,
+          department_id,
+          aisle: bayRow.aisle,
+          bay: bayRow.bay,
+          riskScore: riskScoreFromFinding(
+            healthByRotation.get(bayRow.rotation.id)
+          ),
+          carried_over: Boolean(
+            (bayRow.rotation as { carried_over?: boolean }).carried_over
+          ),
+          supervisor_priority: priorityKeys.has(
+            sectionAwarePhysicalKey({
+              department_id,
+              aisle: bayRow.aisle,
+              bay: bayRow.bay,
+            })
+          ),
+        };
+      });
       const recomputed = composeStewardshipWeeklyProposal({
         store_number: getStoreNumber(),
         week_label: week,
@@ -883,6 +931,7 @@ export function SundayAuditAssignmentModal({
         ownedRotationIds,
         capacity,
         knownHoursOnly: true,
+        supervisorPriorities,
       });
       if (!recomputed.actionable) {
         setError(
@@ -1322,6 +1371,52 @@ export function SundayAuditAssignmentModal({
                           {stewardshipProposal.block_reason}
                         </p>
                       ) : null}
+                      {stewardshipProposal.supervisor_priorities.length > 0 ? (
+                        <ul
+                          data-testid="supervisor-week-priorities"
+                          className="mt-2 space-y-1.5 text-[12px] text-teal-50"
+                        >
+                          <li className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-amber-200/90">
+                            Supervisor priorities (intent only)
+                          </li>
+                          {stewardshipProposal.supervisor_priorities.map(
+                            (prio) => {
+                              const statusLabel =
+                                prio.status === "included_in_proposal"
+                                  ? "Included in proposal"
+                                  : prio.status === "already_assigned"
+                                    ? "Already assigned"
+                                    : prio.status === "not_included"
+                                      ? "Not included"
+                                      : "Priority requested";
+                              return (
+                                <li
+                                  key={prio.physical_key}
+                                  data-testid="supervisor-week-priority-row"
+                                  data-status={prio.status}
+                                  className="rounded-md border border-amber-500/20 bg-amber-950/20 px-2 py-1.5"
+                                >
+                                  <div>
+                                    <span className="font-mono text-[9px] uppercase text-amber-200/90">
+                                      {statusLabel}
+                                    </span>{" "}
+                                    Aisle {prio.aisle} Bay {prio.bay}
+                                    {prio.section_name
+                                      ? ` · ${prio.section_name}`
+                                      : ""}
+                                    {prio.owner_name
+                                      ? ` · ${prio.owner_name}`
+                                      : ""}
+                                  </div>
+                                  <p className="mt-0.5 text-[10px] leading-snug text-amber-100/70">
+                                    {prio.reason}
+                                  </p>
+                                </li>
+                              );
+                            }
+                          )}
+                        </ul>
+                      ) : null}
                       {stewardshipProposal.actionable &&
                       stewardshipProposal.items.length > 0 ? (
                         <ul
@@ -1342,6 +1437,13 @@ export function SundayAuditAssignmentModal({
                                 {item.section_name
                                   ? ` · ${item.section_name}`
                                   : ""}
+                                {item.explanation.codes.includes(
+                                  "supervisor_week_priority"
+                                ) ? (
+                                  <span className="ml-1 font-mono text-[9px] uppercase text-amber-200/90">
+                                    · priority requested
+                                  </span>
+                                ) : null}
                               </div>
                               <p className="mt-0.5 text-[10px] leading-snug text-teal-100/65">
                                 {item.explanation.summary}
