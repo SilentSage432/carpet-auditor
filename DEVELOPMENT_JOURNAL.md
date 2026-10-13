@@ -1,8 +1,12 @@
 # DeptSync Hub — Development Journal
 
+## 2026-10-13 — DEPTSYNC-MAP-003 supervisory bay priorities production release
+
+**Authorized controlled release.** Preflight **77 PASS**; `tsc` + `next build` PASS. Backup `tmp/production-backups/deptsync-fmeinlwhixngednabhgy-2026-10-13T19-45-55Z.dump` (647012 B / TOC 974). Applied `20261019_map_003_week_bay_priorities.sql` **COMMIT** on `fmeinlwhixngednabhgy` (RLS on; anon write denied; auth insert denied; unique active index present; priority rows **0**). Pushed `d30168b..bd9bbab`. GitHub Production deploy **`7048524886`**; Vercel **`dpl_FV5t9Crxt9kuSRss7xgFdWLX2dWi`** Ready @ https://deptsync-hub.vercel.app. Smoke: `/login` **200**; week-bay-priority GET/POST/DELETE **401**; bay-context/sections/capacity **401**. Data preserved: sections **4/160**; SBA **38**; caps **4/sum 11**; rotations **41**; walkthroughs **1/1/0**. Ownership+capacity RPC enforcement retained; auto-stage OFF. Canonical: [`docs/product/DEPTSYNC_MAP_003_PRODUCTION_RELEASE.md`](docs/product/DEPTSYNC_MAP_003_PRODUCTION_RELEASE.md). **RELEASED — AWAITING PHONE ACCEPTANCE.** **STOP. Do not begin MAP-004.**
+
 ## 2026-10-13 — DEPTSYNC-MAP-003 supervisory bay priority for weekly rotation
 
-**Focused local implementation; no deploy / no prod migration.** Week-scoped `store_week_bay_priorities` (migration `20261019_map_003_week_bay_priorities.sql`) stores Supervisor/Master intent that a Map bay receive preferential consideration in the existing stewardship proposal for one ISO week. Map bay sheet **Prioritize for Next Week** / revoke; ownership resolved from Operational Sections; not an assignment. Composer elevates matching staged candidates into `supervisor` tier after carry; still hard-owned + capacity-gated; outcomes explained in Sunday proposal review. Durable High / Pin-to-week / Zebra / auto-stage untouched (OFF). Focused **77 PASS**; `tsc` PASS; lint clean; `next build` PASS (`/api/store-locations/week-bay-priority`). Canonical: [`docs/product/DEPTSYNC_MAP_003_IMPLEMENTATION.md`](docs/product/DEPTSYNC_MAP_003_IMPLEMENTATION.md). Release **CONDITIONAL GO** after migrate + phone review. **STOP. Do not deploy. Do not begin MAP-004.**
+**Focused local implementation; released via MAP-003 production release.** Week-scoped `store_week_bay_priorities` + Map **Prioritize for Next Week** + stewardship `supervisor` tier + Sunday intent/outcome review. Not an assignment; capacity/ownership guards preserved; auto-stage OFF. Focused **77 PASS**; `tsc` PASS; lint clean; `next build` PASS. Canonical: [`docs/product/DEPTSYNC_MAP_003_IMPLEMENTATION.md`](docs/product/DEPTSYNC_MAP_003_IMPLEMENTATION.md).
 
 ## 2026-10-12 — DEPTSYNC-MAP-002 bay context production release
 

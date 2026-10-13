@@ -1,9 +1,10 @@
 # DEPTSYNC-MAP-003 — Supervisory Bay Priority for Weekly Rotation
 
-**Status:** COMPLETE — local implementation only  
+**Status:** COMPLETE — **released via MAP-003 production release** (`bd9bbab`; migration applied)  
 **Date:** 2026-10-13  
-**Mode:** Focused implementation — no production deploy, no production migration  
-**Authority:** Mission brief · OPERATIONAL-011/012 · SECTION-ROTATION-005/006 · MAP-001/002 · PRIORITY-UX-002 (distinct durable High)
+**Mode:** Focused implementation → controlled production release  
+**Authority:** Mission brief · OPERATIONAL-011/012 · SECTION-ROTATION-005/006 · MAP-001/002 · PRIORITY-UX-002 (distinct durable High)  
+**Production:** [`DEPTSYNC_MAP_003_PRODUCTION_RELEASE.md`](./DEPTSYNC_MAP_003_PRODUCTION_RELEASE.md)
 
 Week-scoped supervisor intent that a Map bay receive preferential consideration in the existing ownership-bound weekly proposal. Not an assignment. Does not increase capacity, transfer ownership, or create Zebra tasks.
 

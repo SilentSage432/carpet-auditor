@@ -21,7 +21,7 @@
 | 2 | Production `pg_dump` backup | Recoverable restore point |
 | 3 | Apply `20261019_map_003_week_bay_priorities.sql` | Persist week-scoped priorities before app ships |
 | 4 | Schema/RLS/privilege verification | Fail-closed writes; store-scoped SELECT |
-| 5 | Push/deploy matching app commit | Map + proposal UI consume new table |
+| 5 | Push/deploy app commit `bd9bbab` | Map + proposal UI consume new table |
 
 ---
 
@@ -31,9 +31,11 @@
 |-------|--------|
 | Repository | `SilentSage432/carpet-auditor` |
 | Branch | `main` |
-| Commit | **TBD_AT_PUSH** |
+| Commit | **`bd9bbab`** (`bd9bbabf84700c4b689ff9c395a3e71c64936633`) |
 | Message | `MAP-003: supervisory week-scoped bay priorities` |
-| Scoped files | week-bay-priority domain/API/UI + stewardship integration + migration + docs |
+| Prior tip | `d30168b` |
+| Push | `d30168b..bd9bbab` → `origin/main` |
+| Scoped files | week-bay-priority domain/API/UI + stewardship integration + migration + MAP-003 docs + journal/handoff/roadmap/architecture |
 | Excluded dirt | SEC-OPS-010 / RD_6 / SEC-OPS-010A docs, `tmp/` |
 
 ---
@@ -42,9 +44,24 @@
 
 | Field | Value |
 |-------|--------|
-| Deployment | **TBD_AT_DEPLOY** |
+| GitHub Production deployment | **`7048524886`** (sha `bd9bbab`) |
+| Vercel deployment | **`dpl_FV5t9Crxt9kuSRss7xgFdWLX2dWi`** |
+| Vercel URL | https://deptsync-6minoyevw-tyson-zauggs-projects.vercel.app |
+| Status | **Ready** |
+| Created | 2026-10-13T19:49:23Z |
 | Production alias | https://deptsync-hub.vercel.app |
-| Alias commit match | **TBD** |
+| Alias match | Alias points at this Ready production deployment; `origin/main` = `bd9bbab` |
+
+HTTP smoke after deploy:
+
+| Check | Result |
+|-------|--------|
+| `GET /login` | **200** |
+| `GET /admin/store-map` (unauth) | **307** → login |
+| Unauth `GET/POST/DELETE /api/store-locations/week-bay-priority` | **401** `{"error":"Unauthorized"}` |
+| Unauth `GET /api/store-locations/bay-context` | **401** |
+| Unauth `GET /api/operational-sections` | **401** |
+| Unauth `GET /api/week-capacity?week=2026-W42` | **401** |
 
 ---
 
@@ -54,7 +71,8 @@
 |------|--------|
 | File | `supabase/migrations/20261019_map_003_week_bay_priorities.sql` |
 | Project | `fmeinlwhixngednabhgy` |
-| Apply | **COMMIT** |
+| Apply | **COMMIT** (`CREATE TABLE` + indexes + RLS + SELECT policy) |
+| Client | `psql` 17.11 over SSL as `postgres` |
 | Table | `public.store_week_bay_priorities` present |
 | RLS | **enabled** |
 | Policy | Authenticated SELECT via `jwt_matches_store(store_number)` |
@@ -75,7 +93,7 @@
 | Meta | `…19-45-55Z.meta.json` |
 | Size | **647012** bytes |
 | TOC entries | **974** |
-| TOC includes | operational_sections / members / sunday_bay_assignments / week capacity / weekly_rotations / walkthroughs / capacity RPC |
+| TOC includes | operational_sections / members / sunday_bay_assignments / week capacity / weekly_rotations / walkthroughs / capacity + ownership RPC |
 | Password persistence | **Not persisted / re-rotated after backup and after migrate** |
 
 ---
@@ -84,7 +102,7 @@
 
 | Check | Result |
 |-------|--------|
-| Unauth priority API | Expected **401** after deploy |
+| Unauth priority API | **401** |
 | Anon INSERT priority table | **DENIED** |
 | Authenticated INSERT/UPDATE/DELETE | **DENIED** (service-role API path only) |
 | Store isolation SELECT policy | `jwt_matches_store(store_number)` |
@@ -101,9 +119,10 @@
 | `STEWARDSHIP_WEEK_DISTRIBUTION_AUTO_STAGE = false` | **PASS** |
 | `STRICT_SECTION_OWNERSHIP_AUTO_STAGE = false` | **PASS** |
 | `SECTION_AWARE_ROTATION_AUTO_STAGE = false` | **PASS** |
-| Preferential `supervisor` tier after carry | Shipped in composer |
+| Preferential `supervisor` tier after carry | Shipped in `bd9bbab` |
 | Explainable outcomes in Sunday proposal | Shipped UI |
 | One Assign this week confirm | Preserved |
+| Carry-forward precedence | Carry still ahead of supervisor tier |
 
 ---
 
@@ -121,6 +140,8 @@
 | Walkthrough follow-ups | 0 | **0** |
 | Priority rows | (absent) | **0** |
 
+Zebra handoff columns remain on `sunday_bay_assignments` (no automatic Zebra integration). No automatic rotation approval.
+
 ---
 
 ## 8. Test results
@@ -136,11 +157,13 @@
 
 ## 9. Phone acceptance steps
 
+Target week shown on Map at release time: **2026-W43** (next ISO week after current **2026-W42**).
+
 1. Open Floor Command on phone.  
 2. Navigate to **Map**.  
 3. Select a bay inside an owned Operational Section.  
 4. Confirm **Prioritize for Next Week** appears (Supervisor/Master).  
-5. Verify the shown target week (next ISO week).  
+5. Verify the shown target week (**2026-W43** or the then-current next week).  
 6. Prioritize the bay.  
 7. Confirm “Priority requested” is visible on the sheet.  
 8. Revoke the priority if desired (leave no permanent test priority).  
@@ -161,6 +184,8 @@ Do **not** approve a weekly proposal solely for testing.
 
 ## 11. Release status
 
-**RELEASED — AWAITING PHONE ACCEPTANCE** (commit/deploy IDs filled at push).
+**RELEASED — AWAITING PHONE ACCEPTANCE.**
+
+Commit `bd9bbab` · Vercel `dpl_FV5t9Crxt9kuSRss7xgFdWLX2dWi` · GitHub deploy `7048524886` · migration **COMMIT** on `fmeinlwhixngednabhgy`.
 
 **STOP. Do not begin MAP-004.**
