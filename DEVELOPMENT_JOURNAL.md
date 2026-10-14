@@ -1,5 +1,9 @@
 # DeptSync Hub — Development Journal
 
+## 2026-10-14 — DEPTSYNC-RELEASE-006 AUTH-006 + MAP-004 production release
+
+**Authorized controlled release — SHIPPED; phone acceptance pending.** Preflight: ahead exactly `49f9b35`+`dcf6191`; no migrations/RLS/cred resets; AUTH-003 absent (`archive/auth-003-independent-webauthn` @ `a4ac66b` not merged). Focused tests **131 PASS**; tsc/lint(touched)/build PASS. Pushed `d54d968..dcf6191`. GitHub Production **`7068711232`**; Vercel **`DWpgp4AydN4hDy4W5uFFvPFvNzUH`** Ready @ https://deptsync-hub.vercel.app. Smoke: `/login` 200 PIN-only UI; fingerprint absent; protected **307**; APIs **401**; webauthn **404**; hub-bridge **400**. Read-only data: sections **4**/members **160**; SBA **38**; caps **4**/sum **11**; priorities **0**; named-zone bay rows **0**. Section-aware auto-stage hard OFF. Canonical: [`docs/product/DEPTSYNC_RELEASE_006_AUTH_MAP.md`](docs/product/DEPTSYNC_RELEASE_006_AUTH_MAP.md). **STOP.**
+
 ## 2026-10-14 — DEPTSYNC-MAP-004 named specialty zones (non-rotation defaults)
 
 **Focused implementation — no deploy / no migration.** Documented zone codes (`CARPET-WALL`, `SHOW-L`, `SHOW-R`, `CLOTHING`) default to `SHOWROOM_STACKOUT` on bulk/add-bay create so they do not silently enter weekly rotation. Numeric aisles remain `STANDARD`. Aisle/bay model, sections 4×160, ownership, capacity, MAP-002/003, auto-stage OFF preserved. Remnants/sheet-vinyl not invented as Map zones; carpet wall joint stewardship remains separate from rotation. Canonical: [`docs/product/DEPTSYNC_MAP_004_IMPLEMENTATION.md`](docs/product/DEPTSYNC_MAP_004_IMPLEMENTATION.md). **CONDITIONAL GO** app-only after authorize; **STOP — do not deploy automatically.**

@@ -1,8 +1,9 @@
 # DeptSync Hub — Chat Handoff
 
 ## Latest (2026-10-14)
-- **DEPTSYNC-MAP-004 — NAMED SPECIALTY ZONES + NON-ROTATION DEFAULTS — COMPLETE locally; DO NOT DEPLOY automatically.** Specialty codes default to `SHOWROOM_STACKOUT` on create; numeric aisles stay `STANDARD`. No migration; no ownership/rotation engine changes. Canonical: [`docs/product/DEPTSYNC_MAP_004_IMPLEMENTATION.md`](docs/product/DEPTSYNC_MAP_004_IMPLEMENTATION.md). **STOP.**
-- **DEPTSYNC-AUTH-006 — LOGIN SIMPLIFICATION (PIN-ONLY) — COMPLETE locally; DO NOT DEPLOY automatically.** Fingerprint UI removed; AUTH-002 PIN preserved. AUTH-003 WebAuthn archived on `archive/auth-003-independent-webauthn` @ `a4ac66b` (not on `main`). Canonical: [`docs/product/DEPTSYNC_AUTH_006_SIMPLIFICATION.md`](docs/product/DEPTSYNC_AUTH_006_SIMPLIFICATION.md).
+- **DEPTSYNC-RELEASE-006 — AUTH-006 + MAP-004 PRODUCTION RELEASE — RELEASED; AWAITING PHONE ACCEPTANCE.** Commits `49f9b35`+`dcf6191`; GitHub Production `7068711232`; Vercel `DWpgp4AydN4hDy4W5uFFvPFvNzUH` Ready @ https://deptsync-hub.vercel.app. No migrations. AUTH-003 excluded. Smoke PIN-only / APIs 401 / webauthn 404. Data preserved (4×160; SBA 38; caps sum 11). Canonical: [`docs/product/DEPTSYNC_RELEASE_006_AUTH_MAP.md`](docs/product/DEPTSYNC_RELEASE_006_AUTH_MAP.md). **STOP. Do not begin another feature tranche.**
+- **DEPTSYNC-MAP-004 — NAMED SPECIALTY ZONES — COMPLETE (released via RELEASE-006).** Canonical: [`docs/product/DEPTSYNC_MAP_004_IMPLEMENTATION.md`](docs/product/DEPTSYNC_MAP_004_IMPLEMENTATION.md).
+- **DEPTSYNC-AUTH-006 — LOGIN SIMPLIFICATION (PIN-ONLY) — COMPLETE (released via RELEASE-006).** AUTH-003 remains on `archive/auth-003-independent-webauthn` @ `a4ac66b`. Canonical: [`docs/product/DEPTSYNC_AUTH_006_SIMPLIFICATION.md`](docs/product/DEPTSYNC_AUTH_006_SIMPLIFICATION.md).
 - **DEPTSYNC-AUTH-002-RELEASE — SHIPPED.** Commit `483abae`; Vercel `7m7be8SYj9wMEKvNYowSH7BNKFF5`. Canonical: [`docs/product/DEPTSYNC_AUTH_002_PRODUCTION_RELEASE.md`](docs/product/DEPTSYNC_AUTH_002_PRODUCTION_RELEASE.md).
 - **AUTH-003/004/005 (unreleased WebAuthn)** — preserved on archive branch only; not production scope after AUTH-006.
 

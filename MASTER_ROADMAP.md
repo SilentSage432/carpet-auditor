@@ -30,7 +30,8 @@
 - [x] **DEPTSYNC-MAP-001** — Map vision + Floor Command roadmap reconciliation (**COMPLETE** read-only; **CONDITIONAL GO** MAP-002 affordances; **NO-GO** rewrite) — [`DEPTSYNC_MAP_001_ROADMAP_RECONCILIATION.md`](docs/product/DEPTSYNC_MAP_001_ROADMAP_RECONCILIATION.md)
 - [x] **DEPTSYNC-MAP-002** — Bay context and attention (**RELEASED**; phone acceptance pending) — [`DEPTSYNC_MAP_002_IMPLEMENTATION.md`](docs/product/DEPTSYNC_MAP_002_IMPLEMENTATION.md) · [`DEPTSYNC_MAP_002_PRODUCTION_RELEASE.md`](docs/product/DEPTSYNC_MAP_002_PRODUCTION_RELEASE.md)
 - [x] **DEPTSYNC-MAP-003** — Supervisory bay priority for weekly rotation (**RELEASED** `bd9bbab` / `dpl_FV5t9Crxt9kuSRss7xgFdWLX2dWi`; migration COMMIT; phone acceptance pending; MAP-001 walking-cues presentation deferred) — [`DEPTSYNC_MAP_003_IMPLEMENTATION.md`](docs/product/DEPTSYNC_MAP_003_IMPLEMENTATION.md) · [`DEPTSYNC_MAP_003_PRODUCTION_RELEASE.md`](docs/product/DEPTSYNC_MAP_003_PRODUCTION_RELEASE.md)
-- [x] **DEPTSYNC-MAP-004** — Named zone geography + specialty non-rotation defaults (**COMPLETE** locally; deploy only with authorize) — [`DEPTSYNC_MAP_004_IMPLEMENTATION.md`](docs/product/DEPTSYNC_MAP_004_IMPLEMENTATION.md)
+- [x] **DEPTSYNC-MAP-004** — Named zone geography + specialty non-rotation defaults (**RELEASED** via RELEASE-006; phone acceptance pending) — [`DEPTSYNC_MAP_004_IMPLEMENTATION.md`](docs/product/DEPTSYNC_MAP_004_IMPLEMENTATION.md)
+- [x] **DEPTSYNC-RELEASE-006** — AUTH-006 + MAP-004 production release (**SHIPPED**; phone acceptance pending) — [`DEPTSYNC_RELEASE_006_AUTH_MAP.md`](docs/product/DEPTSYNC_RELEASE_006_AUTH_MAP.md)
 - [x] **RD-6 Product completion discovery** — Read-only audit of remaining Floor Command work (**COMPLETE** docs only) — [`DEPTSYNC_RD_6_PRODUCT_COMPLETION_AUDIT.md`](docs/product/DEPTSYNC_RD_6_PRODUCT_COMPLETION_AUDIT.md)
 - [x] **DEPTSYNC-SEC-OPS-001** — Production security truth (read-only) — P0 open RLS found — [`DEPTSYNC_SEC_OPS_001_PRODUCTION_TRUST_REPORT.md`](docs/product/DEPTSYNC_SEC_OPS_001_PRODUCTION_TRUST_REPORT.md)
 - [x] **DEPTSYNC-SEC-OPS-002** — Contain open RLS + secret-column SELECT (prod applied) — [`DEPTSYNC_SEC_OPS_002_CONTAINMENT_REPORT.md`](docs/product/DEPTSYNC_SEC_OPS_002_CONTAINMENT_REPORT.md)
@@ -42,7 +43,7 @@
 - [x] **DEPTSYNC-AUTH-001** — Auth reliability audit (read-only) — [`DEPTSYNC_AUTH_001_RELIABILITY_AUDIT.md`](docs/product/DEPTSYNC_AUTH_001_RELIABILITY_AUDIT.md)
 - [x] **DEPTSYNC-AUTH-002** — Auth reliability + session correction — [`DEPTSYNC_AUTH_002_IMPLEMENTATION.md`](docs/product/DEPTSYNC_AUTH_002_IMPLEMENTATION.md)
 - [x] **DEPTSYNC-AUTH-002-RELEASE** — Auth reliability production release (**SHIPPED**; operator phone acceptance pending) — [`DEPTSYNC_AUTH_002_PRODUCTION_RELEASE.md`](docs/product/DEPTSYNC_AUTH_002_PRODUCTION_RELEASE.md)
-- [x] **DEPTSYNC-AUTH-006** — Login simplification: PIN-only AuthWall (**local COMPLETE**; deploy only with authorize) — [`DEPTSYNC_AUTH_006_SIMPLIFICATION.md`](docs/product/DEPTSYNC_AUTH_006_SIMPLIFICATION.md)
+- [x] **DEPTSYNC-AUTH-006** — Login simplification: PIN-only AuthWall (**RELEASED** via RELEASE-006; phone acceptance pending) — [`DEPTSYNC_AUTH_006_SIMPLIFICATION.md`](docs/product/DEPTSYNC_AUTH_006_SIMPLIFICATION.md)
 - [x] **DEPTSYNC-AUTH-003…005 (unreleased WebAuthn)** — Archived on `archive/auth-003-independent-webauthn` — **not production scope** (superseded by AUTH-006)
 - [ ] ~~DEPTSYNC-AUTH-003-RELEASE~~ — **Deferred / not current** (biometric product requirement withdrawn)
 - [x] **DEPTSYNC-SEC-OPS-004** — Legacy profile credential retirement discovery (read-only) — [`DEPTSYNC_SEC_OPS_004_LEGACY_CREDENTIAL_DISCOVERY.md`](docs/product/DEPTSYNC_SEC_OPS_004_LEGACY_CREDENTIAL_DISCOVERY.md); plaintext fallback removal **NO-GO**
