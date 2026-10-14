@@ -164,7 +164,7 @@ Covered: preferential inclusion, capacity exhaustion, not staged, ownership miss
 1. Local/production apply of `20261019_map_003_week_bay_priorities.sql` not authorized.  
 2. Phone acceptance of Map prioritize + Sunday priority review pending.  
 3. MAP-001 walking-cues presentation (optional aisle/bay markers) still deferred.  
-4. MAP-004 named zone geography — not started.  
+4. MAP-004 named zone geography — complete locally (see [`DEPTSYNC_MAP_004_IMPLEMENTATION.md`](./DEPTSYNC_MAP_004_IMPLEMENTATION.md)); deploy only with authorize.  
 5. Pin-to-week on Map remains gated (intentional).  
 
 **STOP. Do not deploy. Do not begin MAP-004.**

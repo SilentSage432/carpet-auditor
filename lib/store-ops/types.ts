@@ -218,6 +218,12 @@ export type BulkGenerateInput = {
   priority_override?: boolean;
   custom_decay_days?: number;
   workflow_type?: LocationWorkflowType;
+  /**
+   * MAP-004: when omitted, named specialty zones (CARPET-WALL, SHOW-*, CLOTHING)
+   * default to SHOWROOM_STACKOUT so they do not enter weekly bay rotation.
+   * Explicit STANDARD remains allowed for numeric aisles (and overrides).
+   */
+  location_type?: StoreLocationKind;
 };
 
 /** Compact bay tag for tabular mono display — `A14-B06`, `BW-B12`. */

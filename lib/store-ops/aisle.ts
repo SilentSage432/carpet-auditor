@@ -32,6 +32,27 @@ export function isNumericAisleCode(raw: unknown): boolean {
 }
 
 /**
+ * MAP-004 — known named specialty / showroom zone codes (operator convention).
+ * Not an exhaustive enum of all future zones; extend only with documented codes.
+ * These must not silently become weekly rotation-eligible when bay rows are added.
+ */
+export const NAMED_SPECIALTY_ZONE_CODES = [
+  "CARPET-WALL",
+  "SHOW-L",
+  "SHOW-R",
+  "CLOTHING",
+] as const;
+
+export type NamedSpecialtyZoneCode =
+  (typeof NAMED_SPECIALTY_ZONE_CODES)[number];
+
+/** True for documented specialty/showroom zone codes (vs numeric retail aisles). */
+export function isNamedSpecialtyZoneAisle(raw: unknown): boolean {
+  const code = normalizeAisle(raw);
+  return (NAMED_SPECIALTY_ZONE_CODES as readonly string[]).includes(code);
+}
+
+/**
  * Mobile-friendly label for numbered aisles vs named physical zones.
  * Codes stay canonical; this is presentation only.
  *

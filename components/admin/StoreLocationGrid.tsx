@@ -812,8 +812,10 @@ export function StoreLocationGrid({
                 {formatAisleBayCount(0)}
               </p>
               <p className="mt-2 text-sm text-zinc-400">
-                No physical bays documented yet. Coverage and weekly assignment
-                start when you add bays.
+                No physical bays documented yet. Named specialty zones can exist
+                as empty shells. If you add bays to CARPET-WALL, SHOW-L/R, or
+                CLOTHING, they are showroom stack-out by default — not weekly
+                rotation ownership.
               </p>
               {canSetupTopology ? (
                 <button

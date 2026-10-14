@@ -1,5 +1,9 @@
 # DeptSync Hub — Development Journal
 
+## 2026-10-14 — DEPTSYNC-MAP-004 named specialty zones (non-rotation defaults)
+
+**Focused implementation — no deploy / no migration.** Documented zone codes (`CARPET-WALL`, `SHOW-L`, `SHOW-R`, `CLOTHING`) default to `SHOWROOM_STACKOUT` on bulk/add-bay create so they do not silently enter weekly rotation. Numeric aisles remain `STANDARD`. Aisle/bay model, sections 4×160, ownership, capacity, MAP-002/003, auto-stage OFF preserved. Remnants/sheet-vinyl not invented as Map zones; carpet wall joint stewardship remains separate from rotation. Canonical: [`docs/product/DEPTSYNC_MAP_004_IMPLEMENTATION.md`](docs/product/DEPTSYNC_MAP_004_IMPLEMENTATION.md). **CONDITIONAL GO** app-only after authorize; **STOP — do not deploy automatically.**
+
 ## 2026-10-14 — DEPTSYNC-AUTH-006 login simplification (PIN-only)
 
 **Focused implementation — no deploy.** Operator confirmed PIN login reliable; independent biometric no longer a product requirement. Removed fingerprint login/resume/enroll from AuthWall (login, unlock, setup). AUTH-002 PIN path preserved. Unreleased AUTH-003 WebAuthn archived on `archive/auth-003-independent-webauthn` @ `a4ac66b` (absent from `main` — no routes/migration/deps). Auth regressions **46 PASS**; tsc/build PASS (no webauthn routes). Canonical: [`docs/product/DEPTSYNC_AUTH_006_SIMPLIFICATION.md`](docs/product/DEPTSYNC_AUTH_006_SIMPLIFICATION.md). **CONDITIONAL GO** app-only after authorize; **STOP — do not deploy automatically.**

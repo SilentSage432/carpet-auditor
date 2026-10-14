@@ -104,7 +104,9 @@ export function AddBaySheet({
           Add single bay
         </h2>
         <p className="mt-1 text-sm text-zinc-400">
-          Creates Selling + Topstock tags for one bay.
+          Creates Selling + Topstock tags for one bay. Named specialty zones
+          (CARPET-WALL, SHOW-L/R, CLOTHING) are stored as showroom stack-out —
+          not weekly rotation bays.
         </p>
         <div className="mt-4 space-y-3">
           <label className="block space-y-1.5">

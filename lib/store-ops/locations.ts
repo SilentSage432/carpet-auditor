@@ -2,7 +2,11 @@
  * Bulk store location generation + listing helpers (server).
  */
 
-import { isValidAisle, normalizeAisle } from "./aisle";
+import {
+  isNamedSpecialtyZoneAisle,
+  isValidAisle,
+  normalizeAisle,
+} from "./aisle";
 import {
   expandBayNumbers,
   parseBayNumberingPattern,
@@ -14,6 +18,7 @@ import type {
   BulkGenerateInput,
   LocationWorkflowType,
   StoreLocation,
+  StoreLocationKind,
   StoreLocationType,
 } from "./types";
 import { parseLocationWorkflowType } from "./types";
@@ -154,6 +159,17 @@ export function locationIdsInBayRange(
     .map((loc) => loc.id);
 }
 
+function resolveBulkLocationKind(
+  aisle: string,
+  explicit?: StoreLocationKind | null
+): StoreLocationKind {
+  if (explicit === "STANDARD" || explicit === "SHOWROOM_STACKOUT") {
+    return explicit;
+  }
+  // MAP-004: named specialty zones stay out of weekly bay rotation by default.
+  return isNamedSpecialtyZoneAisle(aisle) ? "SHOWROOM_STACKOUT" : "STANDARD";
+}
+
 export function buildBulkLocationRows(
   input: BulkGenerateInput & { store_id: string }
 ): Array<{
@@ -169,6 +185,7 @@ export function buildBulkLocationRows(
   priority_override: boolean;
   custom_decay_days: number;
   workflow_type: LocationWorkflowType;
+  location_type: StoreLocationKind;
 }> {
   const { store_id, department_id, start_bay, end_bay, types } = input;
   const aisle = normalizeAisle(input.aisle);
@@ -208,6 +225,7 @@ export function buildBulkLocationRows(
   const custom_decay_days =
     parseCustomDecayDays(input.custom_decay_days) ?? seed.custom_decay_days;
   const workflow_type = parseLocationWorkflowType(input.workflow_type);
+  const location_type = resolveBulkLocationKind(aisle, input.location_type);
 
   const rows: Array<{
     store_id: string;
@@ -222,6 +240,7 @@ export function buildBulkLocationRows(
     priority_override: boolean;
     custom_decay_days: number;
     workflow_type: LocationWorkflowType;
+    location_type: StoreLocationKind;
   }> = [];
 
   for (const bay of bays) {
@@ -239,6 +258,7 @@ export function buildBulkLocationRows(
         priority_override,
         custom_decay_days,
         workflow_type,
+        location_type,
       });
     }
   }
@@ -251,7 +271,11 @@ export async function bulkInsertLocations(
 ): Promise<StoreLocation[]> {
   try {
     let payload: Array<Record<string, unknown>> = buildBulkLocationRows(input);
-    const optional = ["workflow_type", "custom_decay_days"] as const;
+    const optional = [
+      "workflow_type",
+      "custom_decay_days",
+      "location_type",
+    ] as const;
     let lastError: unknown = null;
 
     for (let attempt = 0; attempt <= optional.length; attempt += 1) {

@@ -1,7 +1,8 @@
 # DeptSync Hub — Chat Handoff
 
 ## Latest (2026-10-14)
-- **DEPTSYNC-AUTH-006 — LOGIN SIMPLIFICATION (PIN-ONLY) — COMPLETE locally; DO NOT DEPLOY automatically.** Fingerprint UI removed; AUTH-002 PIN preserved. AUTH-003 WebAuthn archived on `archive/auth-003-independent-webauthn` @ `a4ac66b` (not on `main`). Canonical: [`docs/product/DEPTSYNC_AUTH_006_SIMPLIFICATION.md`](docs/product/DEPTSYNC_AUTH_006_SIMPLIFICATION.md). Next: MAP-004 named zones (separate commit).
+- **DEPTSYNC-MAP-004 — NAMED SPECIALTY ZONES + NON-ROTATION DEFAULTS — COMPLETE locally; DO NOT DEPLOY automatically.** Specialty codes default to `SHOWROOM_STACKOUT` on create; numeric aisles stay `STANDARD`. No migration; no ownership/rotation engine changes. Canonical: [`docs/product/DEPTSYNC_MAP_004_IMPLEMENTATION.md`](docs/product/DEPTSYNC_MAP_004_IMPLEMENTATION.md). **STOP.**
+- **DEPTSYNC-AUTH-006 — LOGIN SIMPLIFICATION (PIN-ONLY) — COMPLETE locally; DO NOT DEPLOY automatically.** Fingerprint UI removed; AUTH-002 PIN preserved. AUTH-003 WebAuthn archived on `archive/auth-003-independent-webauthn` @ `a4ac66b` (not on `main`). Canonical: [`docs/product/DEPTSYNC_AUTH_006_SIMPLIFICATION.md`](docs/product/DEPTSYNC_AUTH_006_SIMPLIFICATION.md).
 - **DEPTSYNC-AUTH-002-RELEASE — SHIPPED.** Commit `483abae`; Vercel `7m7be8SYj9wMEKvNYowSH7BNKFF5`. Canonical: [`docs/product/DEPTSYNC_AUTH_002_PRODUCTION_RELEASE.md`](docs/product/DEPTSYNC_AUTH_002_PRODUCTION_RELEASE.md).
 - **AUTH-003/004/005 (unreleased WebAuthn)** — preserved on archive branch only; not production scope after AUTH-006.
 

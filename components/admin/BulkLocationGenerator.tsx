@@ -377,7 +377,8 @@ export function BulkLocationGenerator({
         once, then create each aisle or named zone range. Codes may be numbered
         aisles (5, 41) or named zones (SHOW-L, SHOW-R, CLOTHING, CARPET-WALL).
         Each physical bay is created with selling and topstock automatically.
-        Re-running an existing bay updates it safely.
+        Named specialty zones default to showroom stack-out (not weekly
+        rotation). Re-running an existing bay updates it safely.
       </p>
 
       <div
