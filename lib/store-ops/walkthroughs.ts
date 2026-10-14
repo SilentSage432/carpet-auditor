@@ -94,6 +94,11 @@ export type WalkthroughFollowUpView = WalkthroughFollowUpRow & {
   needs_attention?: boolean;
   place_label?: string | null;
   section_name?: string | null;
+  /** Place keys from the linked observation (OPS-OVERVIEW / Map deep-links). */
+  section_id?: string | null;
+  department_id?: string | null;
+  aisle?: string | null;
+  bay?: number | null;
 };
 
 export type WalkthroughInbox = {
@@ -1270,9 +1275,13 @@ export async function listWalkthroughInbox(
       place_label: obs
         ? formatWalkthroughPlaceLabel({ aisle: obs.aisle, bay: obs.bay })
         : null,
+      section_id: obs?.section_id ?? null,
       section_name: obs?.section_id
         ? sections.get(obs.section_id) ?? null
         : null,
+      department_id: obs?.department_id ?? null,
+      aisle: obs?.aisle ?? null,
+      bay: obs?.bay ?? null,
     };
   });
 

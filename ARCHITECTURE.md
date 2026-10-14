@@ -64,6 +64,8 @@ lib/store-ops/roster-people-presentation.ts → Derived People captions (UX-REDU
 components/hub/tabs/MapTab.tsx    → Department coverage geography (physical bays; Advanced · Service cadence)
 components/admin/StoreLocationGrid.tsx → Physical-bay navigator + WalkTheFloorSheet (canMutate=false)
 lib/store-ops/department-alignment.ts → ALIGN-DEPT-001 merged Flooring/Home Decor contract + operational labels (no split engine)
+lib/store-ops/overview-command.ts → OPS-OVERVIEW-001 supervisory Overview composers (attention / follow-ups / priorities / people)
+components/hub/tabs/OverviewTab.tsx → Floor Command Overview command center (evidence-only; no urgency scores)
 lib/store-ops/map-coverage-presentation.ts → Derived Map physical-bay counts/labels/summary (UX-REDUCE-003)
 lib/store-ops/map-readiness.ts → Coverage readiness tones (Covered / This week / Needs attention / Remaining)
 components/admin/AisleBayManager.tsx → Settings Store Topology (aisle CRUD, batch, prune, bulk)

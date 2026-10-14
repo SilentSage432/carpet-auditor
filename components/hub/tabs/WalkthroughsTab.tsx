@@ -6,7 +6,8 @@
  */
 
 import Link from "next/link";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { HubIcon } from "@/components/hub/NavIcons";
 import type { WorkflowTabProps } from "@/components/hub/tabs/tab-props";
 import { WalkthroughCaptureSheet } from "@/components/walkthroughs/WalkthroughCaptureSheet";
@@ -186,6 +187,10 @@ function FollowUpCard({
 }
 
 export function WalkthroughsTab({ specialist }: WorkflowTabProps) {
+  const searchParams = useSearchParams();
+  const deepLinkObservationId = String(
+    searchParams.get("observation") ?? ""
+  ).trim();
   const canMutate = isSupervisor(specialist);
   const canOpenFloorPad = canMutate;
   const [loading, setLoading] = useState(true);
@@ -199,6 +204,7 @@ export function WalkthroughsTab({ specialist }: WorkflowTabProps) {
     null
   );
   const [ending, setEnding] = useState(false);
+  const deepLinkHandledRef = useRef<string | null>(null);
 
   const allFollowUps = useMemo(() => {
     if (!inbox) return [] as WalkthroughFollowUpView[];
@@ -247,6 +253,50 @@ export function WalkthroughsTab({ specialist }: WorkflowTabProps) {
           null;
         return refreshed;
       });
+      // OPS-OVERVIEW-001 — honor ?observation= deep-link after inbox load.
+      const deepId = deepLinkObservationId;
+      if (deepId && deepLinkHandledRef.current !== deepId) {
+        deepLinkHandledRef.current = deepId;
+        const found =
+          next.recent_observations.find((o) => o.id === deepId) ??
+          next.review_observations.find((o) => o.id === deepId) ??
+          null;
+        if (found) {
+          setViewing(found);
+        } else {
+          const fu = [
+            ...next.open_follow_ups,
+            ...next.completed_follow_ups,
+            ...next.attention_follow_ups,
+          ].find((f) => f.observation_id === deepId);
+          if (fu) {
+            setViewing({
+              id: deepId,
+              store_id: fu.store_id,
+              session_id: fu.session_id,
+              observation_type: fu.observation_type ?? "general",
+              body: fu.observation_body ?? "Observation",
+              associate_specialist_id: null,
+              section_id: fu.section_id ?? null,
+              department_id: fu.department_id ?? null,
+              aisle: fu.aisle ?? null,
+              bay: fu.bay ?? null,
+              observed_at: fu.created_at,
+              created_by_specialist_id: fu.created_by_specialist_id,
+              created_at: fu.created_at,
+              updated_at: fu.updated_at,
+              place_label: fu.place_label ?? null,
+              section_name: fu.section_name ?? null,
+              type_label: fu.observation_type
+                ? observationTypeLabel(fu.observation_type)
+                : undefined,
+              has_open_follow_up: fu.status === "open",
+              open_follow_up_count: fu.status === "open" ? 1 : 0,
+              done_follow_up_count: fu.status === "done" ? 1 : 0,
+            });
+          }
+        }
+      }
     } catch (err) {
       setInbox(null);
       const message =
@@ -255,7 +305,7 @@ export function WalkthroughsTab({ specialist }: WorkflowTabProps) {
     } finally {
       setLoading(false);
     }
-  }, [specialist]);
+  }, [specialist, deepLinkObservationId]);
 
   useEffect(() => {
     void reload();
@@ -284,40 +334,43 @@ export function WalkthroughsTab({ specialist }: WorkflowTabProps) {
     }
   }
 
-  function openObservationById(observationId: string) {
-    const found = observationsById.get(observationId);
-    if (found) {
-      setViewing(found);
-      return;
-    }
-    // Observation may be outside recent window — synthesize minimal view from follow-up.
-    const fu = allFollowUps.find((f) => f.observation_id === observationId);
-    if (!fu) return;
-    setViewing({
-      id: observationId,
-      store_id: fu.store_id,
-      session_id: fu.session_id,
-      observation_type: fu.observation_type ?? "general",
-      body: fu.observation_body ?? "Observation",
-      associate_specialist_id: null,
-      section_id: null,
-      department_id: null,
-      aisle: null,
-      bay: null,
-      observed_at: fu.created_at,
-      created_by_specialist_id: fu.created_by_specialist_id,
-      created_at: fu.created_at,
-      updated_at: fu.updated_at,
-      place_label: fu.place_label ?? null,
-      section_name: fu.section_name ?? null,
-      type_label: fu.observation_type
-        ? observationTypeLabel(fu.observation_type)
-        : undefined,
-      has_open_follow_up: fu.status === "open",
-      open_follow_up_count: fu.status === "open" ? 1 : 0,
-      done_follow_up_count: fu.status === "done" ? 1 : 0,
-    });
-  }
+  const openObservationById = useCallback(
+    (observationId: string) => {
+      const found = observationsById.get(observationId);
+      if (found) {
+        setViewing(found);
+        return;
+      }
+      // Observation may be outside recent window — synthesize minimal view from follow-up.
+      const fu = allFollowUps.find((f) => f.observation_id === observationId);
+      if (!fu) return;
+      setViewing({
+        id: observationId,
+        store_id: fu.store_id,
+        session_id: fu.session_id,
+        observation_type: fu.observation_type ?? "general",
+        body: fu.observation_body ?? "Observation",
+        associate_specialist_id: null,
+        section_id: fu.section_id ?? null,
+        department_id: fu.department_id ?? null,
+        aisle: fu.aisle ?? null,
+        bay: fu.bay ?? null,
+        observed_at: fu.created_at,
+        created_by_specialist_id: fu.created_by_specialist_id,
+        created_at: fu.created_at,
+        updated_at: fu.updated_at,
+        place_label: fu.place_label ?? null,
+        section_name: fu.section_name ?? null,
+        type_label: fu.observation_type
+          ? observationTypeLabel(fu.observation_type)
+          : undefined,
+        has_open_follow_up: fu.status === "open",
+        open_follow_up_count: fu.status === "open" ? 1 : 0,
+        done_follow_up_count: fu.status === "done" ? 1 : 0,
+      });
+    },
+    [observationsById, allFollowUps]
+  );
 
   const empty =
     !loading &&

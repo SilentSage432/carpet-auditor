@@ -1,5 +1,9 @@
 # DeptSync Hub — Development Journal
 
+## 2026-10-14 — DEPTSYNC-OPS-OVERVIEW-001 supervisor command center
+
+**Focused implementation — no deploy / no migration.** Evolved existing Overview into an actionable supervisory command center using This Week ownership, Walkthrough inbox (overdue ≠ review), Operational Section owners, and MAP-003 next-week priorities. Added `overview-command` composers, place-key enrichment on follow-up views, `/walkthroughs?observation=` deep-links, and honest follow-up/priority failure states (no fake zeros). Did not invent urgency scores, duplicate This Week, alter 4×160 sections, or enable auto-stage. Focused tests **51 PASS** with companions; tsc/build PASS. Canonical: [`docs/product/DEPTSYNC_OPS_OVERVIEW_001_IMPLEMENTATION.md`](docs/product/DEPTSYNC_OPS_OVERVIEW_001_IMPLEMENTATION.md). **CONDITIONAL GO** app-only after authorize; **STOP — do not deploy automatically.**
+
 ## 2026-10-14 — DEPTSYNC-ALIGN-DEPT-001-RELEASE production release
 
 **Authorized controlled release — SHIPPED.** Commit `57334ee` pushed `8405934..57334ee`. Focused tests **55 PASS**; tsc/build PASS. GitHub Production **`7070725323`** success; Vercel env https://deptsync-k7j62c0we-tyson-zauggs-projects.vercel.app; alias https://deptsync-hub.vercel.app. Smoke: `/login` 200 PIN-only; protected **307**; APIs **401**; hub-bridge **400**. Read-only data: sections **4**/members **160**; active dept `flooring` “Flooring / Home Decor”; `home_decor` **absent**; named-zone bay rows **0**; auto-stage OFF. No migrations. Canonical: [`docs/product/DEPTSYNC_ALIGN_DEPT_001_RELEASE.md`](docs/product/DEPTSYNC_ALIGN_DEPT_001_RELEASE.md). **STOP. Do not begin another feature tranche.**
