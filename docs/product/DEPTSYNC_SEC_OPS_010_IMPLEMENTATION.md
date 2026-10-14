@@ -1,6 +1,6 @@
 # DEPTSYNC-SEC-OPS-010 — Operational Authority and Accountability
 
-**Status:** COMPLETE — local implementation (no deploy / no migration)  
+**Status:** COMPLETE — **released** via [`DEPTSYNC_SEC_OPS_010_RELEASE.md`](./DEPTSYNC_SEC_OPS_010_RELEASE.md) (`0cad9e3`)  
 **Date:** 2026-10-14  
 **Mode:** Evidence-based security hardening  
 **Naming note:** Distinct from [`DEPTSYNC_SEC_OPS_010_FALLBACK_RETIREMENT.md`](./DEPTSYNC_SEC_OPS_010_FALLBACK_RETIREMENT.md) (plaintext PIN fallback config). This document is the **operational authorization** tranche deliverable requested as `DEPTSYNC_SEC_OPS_010_IMPLEMENTATION.md`.  
@@ -18,7 +18,7 @@
 | **Requires database migration** | 0 for this tranche | No append-only event platform; existing history patterns adequate |
 | **Requires operator decision** | Plaintext PIN fallback (separate 010) | Unrelated; still CONDITIONAL GO under FALLBACK_RETIREMENT |
 
-**Production GO / NO-GO for this tranche:** **CONDITIONAL GO** (app-only) after authorize — **NO-GO automatic deploy**. No migrations prepared or applied.
+**Production GO / NO-GO for this tranche:** **GO — RELEASED** via SEC-OPS-010-RELEASE (`0cad9e3`). No migrations prepared or applied.
 
 ---
 
