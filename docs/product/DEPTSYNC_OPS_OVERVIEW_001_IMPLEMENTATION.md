@@ -1,8 +1,8 @@
 # DEPTSYNC-OPS-OVERVIEW-001 — Supervisor Command Center
 
-**Status:** COMPLETE locally — **not deployed**  
+**Status:** COMPLETE — **released** via [`DEPTSYNC_OPS_OVERVIEW_001_RELEASE.md`](./DEPTSYNC_OPS_OVERVIEW_001_RELEASE.md) (`4023b0b`)  
 **Date:** 2026-10-14  
-**Mode:** Evidence-based implementation (no production deploy / no migrations)  
+**Mode:** Evidence-based implementation (no migrations)  
 **Authority:** Redesign-001 §D.1 · MAP-001 · ALIGN-DEPT-001 · WALK-005/006 · MAP-002/003/004 · RD-1 Overview  
 **Production baseline preserved:** store 2587 · merged `flooring` · 4 sections / 160 memberships · auto-stage OFF
 
@@ -178,14 +178,14 @@ Regression invariants checked via contracts: merged Flooring/Home Decor, auto-st
 
 | Gate | Verdict |
 |------|---------|
-| Implementation complete locally | **YES** |
+| Implementation complete | **YES** — production `4023b0b` |
 | Migrations | **None** |
 | Data mutations | **None** |
-| Deploy | **STOP — do not deploy automatically** |
-| Phone acceptance | Recommended after authorize (Overview mobile scan) |
+| Deploy | **DONE** — see OPS-OVERVIEW-001-RELEASE |
+| Phone acceptance | Checklist in release report |
 
-**CONDITIONAL GO** for later app-only release after authorize.  
-**NO-GO** auto-deploy, topology changes, or inventing urgency/ownership.
+**GO** for app-only supervisory Overview (released).  
+**NO-GO** topology changes or inventing urgency/ownership.
 
 ---
 
