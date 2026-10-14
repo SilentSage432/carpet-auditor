@@ -53,6 +53,7 @@ import {
 } from "@/lib/variance";
 
 import { formatAuditLocationBadge } from "@/lib/store-ops/audit-location-mode";
+import { resolveOperationalDepartmentLabel } from "@/lib/store-ops/department-alignment";
 import {
   REMNANT_CALCULATOR_OPEN_EVENT,
   isRemnantCalculatorHash,
@@ -311,7 +312,9 @@ export function CycleAuditSection({
             dismissKeyboard();
           }}
           kind="flooring"
-          departmentLabel="Flooring"
+          departmentLabel={resolveOperationalDepartmentLabel({
+            hubScope: "flooring",
+          })}
           audits={shiftAudits.length > 0 ? shiftAudits : audits}
           specialist={activeSpecialist}
           auditedBy={auditedBy}

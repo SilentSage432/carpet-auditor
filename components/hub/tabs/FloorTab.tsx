@@ -20,6 +20,7 @@ import { ThisWeekCommandSummaryCard } from "@/components/store-ops/ThisWeekComma
 import { ThisWeekOwnershipBoard } from "@/components/store-ops/ThisWeekOwnershipBoard";
 import { ExecutiveFloorPadIntentBridge } from "@/components/hub/ExecutiveFloorPadIntentBridge";
 import { workingDepartmentId } from "@/lib/admin-department-context";
+import { resolveOperationalDepartmentLabel } from "@/lib/store-ops/department-alignment";
 import { useWorkingDepartment } from "@/lib/use-working-department";
 import {
   isMasterAdmin,
@@ -95,7 +96,6 @@ import {
   composeThisWeekProgressLine,
 } from "@/lib/store-ops/this-week-ownership";
 import {
-  departmentMeta,
   specialistHomeDepartment,
   type StoreSpecialist,
 } from "@/lib/types";
@@ -185,9 +185,11 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
   const weekTitle =
     working === "all"
       ? "This Week"
-      : `${
-          activeDept?.name?.trim() || departmentMeta(working).shortLabel
-        } · This Week`;
+      : `${resolveOperationalDepartmentLabel({
+          departmentName: activeDept?.name,
+          departmentCode: activeDept?.code,
+          hubScope: working,
+        })} · This Week`;
 
   const storeToday = storeLocalWorkDate(clockNow, storeTimezone);
   const storeYesterday = previousStoreLocalWorkDate(clockNow, storeTimezone);
@@ -896,10 +898,13 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
             workingDepartment={working}
             departmentCode={activeDept?.code ?? null}
             departmentLabel={
-              activeDept?.name?.trim() ||
-              (working !== "all"
-                ? departmentMeta(working).shortLabel
-                : null)
+              working !== "all"
+                ? resolveOperationalDepartmentLabel({
+                    departmentName: activeDept?.name,
+                    departmentCode: activeDept?.code,
+                    hubScope: working,
+                  })
+                : null
             }
             refreshKey={healthKey}
             omitFiscal

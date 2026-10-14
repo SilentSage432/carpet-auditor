@@ -385,7 +385,7 @@ export const ROSTER_JOB_OPTIONS: RosterJobOption[] = [
   },
   {
     id: "flooring_csa",
-    label: "Flooring CSA",
+    label: "Flooring / Home Decor CSA",
     group: "specialty",
     platformRole: "Associate",
     floorTitle: "CSA",
@@ -562,13 +562,22 @@ export function rosterJobTitleLabel(
 ): string {
   if (member.role === "MasterAdmin") return "Master Admin";
   const dept = specialistHomeDepartment(member);
+  const title =
+    parseRosterFloorTitle(member.floor_title) ?? associateFloorTitle(dept);
+  // ALIGN-DEPT-001 — Constitution staffing under merged Flooring / Home Decor.
+  // Keep logic local to avoid a types ↔ store-ops import cycle.
+  if (dept === "flooring") {
+    if (member.role === "Supervisor") {
+      return `${DEPARTMENT_META.flooring.label} Supervisor`;
+    }
+    if (title === "CSA") return `${DEPARTMENT_META.flooring.label} CSA`;
+    if (title === "Specialist") return "Flooring Specialist";
+  }
   if (member.role === "Supervisor") {
     return dept && dept !== "all"
       ? `${departmentMeta(dept).shortLabel} Supervisor`
       : "Department Supervisor";
   }
-  const title =
-    parseRosterFloorTitle(member.floor_title) ?? associateFloorTitle(dept);
   if (title === "Cashier" || title === "Receiving") return title;
   return `${departmentMeta(dept).shortLabel} ${title}`;
 }

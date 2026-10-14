@@ -1,6 +1,7 @@
 # DeptSync Hub — Chat Handoff
 
 ## Latest (2026-10-14)
+- **DEPTSYNC-ALIGN-DEPT-001 — FLOORING + HOME DECOR OPERATIONAL ALIGNMENT — COMPLETE (local; no deploy).** Merged `flooring` architecture locked; Home Decor capabilities ALREADY_SUPPORTED under merge; separation OPERATOR-BLOCKED (aisle map + code). App-only label/contract coherence; sections 4×160 untouched; auto-stage OFF. Canonical: [`docs/product/DEPTSYNC_ALIGN_DEPT_001_IMPLEMENTATION.md`](docs/product/DEPTSYNC_ALIGN_DEPT_001_IMPLEMENTATION.md). **STOP. Do not deploy / do not invent topology.**
 - **DEPTSYNC-RELEASE-006 — AUTH-006 + MAP-004 PRODUCTION RELEASE — RELEASED; AWAITING PHONE ACCEPTANCE.** Commits `49f9b35`+`dcf6191`; GitHub Production `7068711232`; Vercel `DWpgp4AydN4hDy4W5uFFvPFvNzUH` Ready @ https://deptsync-hub.vercel.app. No migrations. AUTH-003 excluded. Smoke PIN-only / APIs 401 / webauthn 404. Data preserved (4×160; SBA 38; caps sum 11). Canonical: [`docs/product/DEPTSYNC_RELEASE_006_AUTH_MAP.md`](docs/product/DEPTSYNC_RELEASE_006_AUTH_MAP.md). **STOP. Do not begin another feature tranche.**
 - **DEPTSYNC-MAP-004 — NAMED SPECIALTY ZONES — COMPLETE (released via RELEASE-006).** Canonical: [`docs/product/DEPTSYNC_MAP_004_IMPLEMENTATION.md`](docs/product/DEPTSYNC_MAP_004_IMPLEMENTATION.md).
 - **DEPTSYNC-AUTH-006 — LOGIN SIMPLIFICATION (PIN-ONLY) — COMPLETE (released via RELEASE-006).** AUTH-003 remains on `archive/auth-003-independent-webauthn` @ `a4ac66b`. Canonical: [`docs/product/DEPTSYNC_AUTH_006_SIMPLIFICATION.md`](docs/product/DEPTSYNC_AUTH_006_SIMPLIFICATION.md).

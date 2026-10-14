@@ -63,6 +63,7 @@ components/hub/SpecialistEditSheet.tsx → Schedule → settings → DeptSync ac
 lib/store-ops/roster-people-presentation.ts → Derived People captions (UX-REDUCE-004)
 components/hub/tabs/MapTab.tsx    → Department coverage geography (physical bays; Advanced · Service cadence)
 components/admin/StoreLocationGrid.tsx → Physical-bay navigator + WalkTheFloorSheet (canMutate=false)
+lib/store-ops/department-alignment.ts → ALIGN-DEPT-001 merged Flooring/Home Decor contract + operational labels (no split engine)
 lib/store-ops/map-coverage-presentation.ts → Derived Map physical-bay counts/labels/summary (UX-REDUCE-003)
 lib/store-ops/map-readiness.ts → Coverage readiness tones (Covered / This week / Needs attention / Remaining)
 components/admin/AisleBayManager.tsx → Settings Store Topology (aisle CRUD, batch, prune, bulk)

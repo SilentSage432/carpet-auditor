@@ -12,8 +12,8 @@ import {
   isMasterAdmin,
   isSimplifiedAssociateView,
 } from "@/lib/rbac";
+import { resolveOperationalDepartmentLabel } from "@/lib/store-ops/department-alignment";
 import {
-  departmentMeta,
   rosterFloorBadgeLabel,
   type HubSection,
   type StoreSpecialist,
@@ -169,7 +169,8 @@ export function workflowTabTitle(
   const scope =
     working ?? (specialist ? workingDepartment(specialist) : "all");
   if (scope === "all") return "This Week";
-  return `${departmentMeta(scope).shortLabel} · This Week`;
+  // ALIGN-DEPT-001 — prefer full merged Flooring / Home Decor label.
+  return `${resolveOperationalDepartmentLabel({ hubScope: scope })} · This Week`;
 }
 
 export type NavHubLink = {

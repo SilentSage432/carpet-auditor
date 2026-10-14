@@ -37,6 +37,7 @@ import {
   formatAttentionAsOf,
   type MapAttentionClientStatus,
 } from "@/lib/store-ops/location-attention-presentation";
+import { resolveOperationalDepartmentLabel } from "@/lib/store-ops/department-alignment";
 import { composePhysicalBayManualPriority } from "@/lib/store-ops/physical-bay-priority";
 import {
   formatUnsectionedLabel,
@@ -278,7 +279,11 @@ export function WalkTheFloorSheet({
     attentionStatus === "NEEDS_DEPARTMENT";
   const dept = departments.find((d) => d.id === bay.departmentId);
   const deptCode = dept?.code ?? target?.department_code ?? "";
-  const deptName = dept?.name ?? bay.departmentName;
+  // ALIGN-DEPT-001 — show merged Flooring / Home Decor name when DB name is absent.
+  const deptName = resolveOperationalDepartmentLabel({
+    departmentName: dept?.name ?? bay.departmentName,
+    departmentCode: deptCode,
+  });
   const pinTargets = faces.filter(
     (loc) => (loc.location_type ?? "STANDARD") !== "SHOWROOM_STACKOUT"
   );

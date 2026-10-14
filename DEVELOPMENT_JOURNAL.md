@@ -1,5 +1,9 @@
 # DeptSync Hub — Development Journal
 
+## 2026-10-14 — DEPTSYNC-ALIGN-DEPT-001 Flooring + Home Decor operational alignment
+
+**Focused discovery + evidence-based implementation — no deploy / no migration / no topology mutation.** Confirmed production model remains merged `flooring` (“Flooring / Home Decor”); no persisted aisle Flooring-vs-Home-Decor ownership; Home Decor already rides Map / Sections / Rotation / Walkthroughs / priorities under that merge. Implemented `department-alignment` contract + capability matrix; Floor Command labels and roster CSA/Supervisor titles use the full merged name; Specialists stay “Flooring Specialist” per Constitution. Did **not** invent aisle maps, insert `home_decor`, redistribute 4×160 sections, or enable dual-dept auto-stage. Canonical: [`docs/product/DEPTSYNC_ALIGN_DEPT_001_IMPLEMENTATION.md`](docs/product/DEPTSYNC_ALIGN_DEPT_001_IMPLEMENTATION.md). **CONDITIONAL GO** app-only after authorize; separation remains **OPERATOR-BLOCKED** (TOPO-001 §L). **STOP — do not deploy automatically.**
+
 ## 2026-10-14 — DEPTSYNC-RELEASE-006 AUTH-006 + MAP-004 production release
 
 **Authorized controlled release — SHIPPED; phone acceptance pending.** Preflight: ahead exactly `49f9b35`+`dcf6191`; no migrations/RLS/cred resets; AUTH-003 absent (`archive/auth-003-independent-webauthn` @ `a4ac66b` not merged). Focused tests **131 PASS**; tsc/lint(touched)/build PASS. Pushed `d54d968..dcf6191`. GitHub Production **`7068711232`**; Vercel **`DWpgp4AydN4hDy4W5uFFvPFvNzUH`** Ready @ https://deptsync-hub.vercel.app. Smoke: `/login` 200 PIN-only UI; fingerprint absent; protected **307**; APIs **401**; webauthn **404**; hub-bridge **400**. Read-only data: sections **4**/members **160**; SBA **38**; caps **4**/sum **11**; priorities **0**; named-zone bay rows **0**. Section-aware auto-stage hard OFF. Canonical: [`docs/product/DEPTSYNC_RELEASE_006_AUTH_MAP.md`](docs/product/DEPTSYNC_RELEASE_006_AUTH_MAP.md). **STOP.**
