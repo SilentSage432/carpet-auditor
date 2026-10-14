@@ -29,7 +29,7 @@ async function resolveDepartmentForActor(
   departmentIdRaw: string,
   allowMissingForAdmin: boolean
 ): Promise<{ departmentId: string; expectedDepartmentId: string | null }> {
-  let departmentId = departmentIdRaw;
+  const departmentId = departmentIdRaw;
 
   if (isDeptFloorActor(actor)) {
     if (!actor.departmentCode) {
@@ -185,7 +185,7 @@ export async function POST(request: Request) {
       sundayStagingWeekLabel(new Date(), store.timezone) ||
       isoWeekLabel();
 
-    if (reviewAction === "verify") {
+    if (reviewAction === "verify" || reviewAction === "send_back") {
       const rotationId = body.rotation_id?.trim();
       if (!rotationId) {
         return NextResponse.json(
@@ -193,28 +193,67 @@ export async function POST(request: Request) {
           { status: 400 }
         );
       }
-      const result = await verifyPendingRotation(
-        supabase,
-        rotationId,
-        actor.specialistId,
-        scoped.expectedDepartmentId
-      );
-      return NextResponse.json({
-        ok: true,
-        action: "verify",
-        store_id: store.id,
-        rotation: result.rotation,
-      });
-    }
 
-    if (reviewAction === "send_back") {
-      const rotationId = body.rotation_id?.trim();
-      if (!rotationId) {
+      const { data: rotationRow, error: rotationLoadError } = await supabase
+        .from("weekly_rotations")
+        .select("id, store_id, store_number, department_id")
+        .eq("id", rotationId)
+        .maybeSingle();
+      if (rotationLoadError) {
         return NextResponse.json(
-          { error: "rotation_id is required" },
-          { status: 400 }
+          { error: rotationLoadError.message },
+          { status: 500 }
         );
       }
+      if (!rotationRow) {
+        return NextResponse.json(
+          { error: "Rotation not found" },
+          { status: 404 }
+        );
+      }
+      const rotationStoreId = String(rotationRow.store_id ?? "").trim();
+      const rotationStoreNumber = String(rotationRow.store_number ?? "").trim();
+      const storeMatches =
+        (rotationStoreId && rotationStoreId === store.id) ||
+        (rotationStoreNumber &&
+          rotationStoreNumber === String(store.store_number ?? "").trim());
+      if (!storeMatches) {
+        if (!rotationStoreId && !rotationStoreNumber) {
+          const { data: dept } = await supabase
+            .from("departments")
+            .select("id")
+            .eq("id", String(rotationRow.department_id ?? ""))
+            .eq("store_id", store.id)
+            .maybeSingle();
+          if (!dept) {
+            return NextResponse.json(
+              { error: "Rotation is outside your store" },
+              { status: 403 }
+            );
+          }
+        } else {
+          return NextResponse.json(
+            { error: "Rotation is outside your store" },
+            { status: 403 }
+          );
+        }
+      }
+
+      if (reviewAction === "verify") {
+        const result = await verifyPendingRotation(
+          supabase,
+          rotationId,
+          actor.specialistId,
+          scoped.expectedDepartmentId
+        );
+        return NextResponse.json({
+          ok: true,
+          action: "verify",
+          store_id: store.id,
+          rotation: result.rotation,
+        });
+      }
+
       const result = await sendBackWeeklyRotation(
         supabase,
         rotationId,

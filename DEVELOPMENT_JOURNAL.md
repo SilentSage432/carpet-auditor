@@ -1,5 +1,9 @@
 # DeptSync Hub — Development Journal
 
+## 2026-10-14 — DEPTSYNC-SEC-OPS-010 operational authority hardening
+
+**Focused security hardening — no deploy / no migration.** Audited Floor Command mutation authority (JWT→profiles actor; no client role/store trust). Corrected confirmed gaps: supervisor cross-dept assign/extra-bay (closes THESIS T-3); barrier location/rotation store+dept bind; bulk topology forged `store_id`; complete/verify store bind; week-priority revoke/list dept scope; section owner roster proof. Zebra/walkthrough/section-ownership RPC/auto-stage OFF preserved. Negative tests in `sec-ops-010.authz.test.ts` (20 PASS); focused ops + verification regressions PASS; tsc/lint/build PASS. Naming: distinct from plaintext FALLBACK_RETIREMENT 010. Canonical: [`docs/product/DEPTSYNC_SEC_OPS_010_IMPLEMENTATION.md`](docs/product/DEPTSYNC_SEC_OPS_010_IMPLEMENTATION.md). **CONDITIONAL GO** app-only after authorize; **STOP — do not deploy automatically.**
+
 ## 2026-10-14 — DEPTSYNC-OPS-OVERVIEW-001-RELEASE production release
 
 **Authorized controlled release — SHIPPED.** Commit `4023b0b` pushed `da9d303..4023b0b`. Focused tests **88 PASS**; tsc/build PASS. GitHub Production **`7071174830`** success; Vercel env https://deptsync-98pnrbu0r-tyson-zauggs-projects.vercel.app; alias https://deptsync-hub.vercel.app. Smoke: `/login` 200 PIN-only; `/overview`+peers **307**; APIs **401**; hub-bridge **400**. Read-only data: sections **4**/members **160**; active `flooring` “Flooring / Home Decor”; `home_decor` absent; auto-stage OFF. No migrations / no test mutations. Canonical: [`docs/product/DEPTSYNC_OPS_OVERVIEW_001_RELEASE.md`](docs/product/DEPTSYNC_OPS_OVERVIEW_001_RELEASE.md). **STOP. Do not begin another feature tranche.**

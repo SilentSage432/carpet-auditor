@@ -44,6 +44,8 @@ export const QUICK_BARRIER_REASONS: ExceptionReason[] = [
 
 export type ReportBarrierInput = {
   departmentId: string;
+  /** When set, every location (and optional rotation) must match this store. */
+  storeId?: string | null;
   assignedWeek: string;
   incomplete: Array<{
     rotationId: string;
@@ -101,6 +103,65 @@ async function insertRotationBarriers(
 ): Promise<{ exceptions: RotationException[] }> {
   const now = new Date().toISOString();
   const reportable = input.incomplete.filter((item) => item.locationId);
+
+  const storeId = String(input.storeId ?? "").trim();
+  if (storeId && reportable.length > 0) {
+    const locationIds = [...new Set(reportable.map((item) => item.locationId))];
+    const { data: locations, error: locLoadError } = await supabase
+      .from("store_locations")
+      .select("id, store_id, department_id")
+      .in("id", locationIds);
+    if (locLoadError) throw new Error(locLoadError.message);
+    const byId = new Map(
+      (locations ?? []).map((row) => [String(row.id), row] as const)
+    );
+    for (const item of reportable) {
+      const loc = byId.get(item.locationId);
+      if (
+        !loc ||
+        String(loc.store_id ?? "") !== storeId ||
+        String(loc.department_id ?? "") !== input.departmentId
+      ) {
+        throw new Error(
+          "Location is outside your store department scope"
+        );
+      }
+    }
+
+    const rotationIds = [
+      ...new Set(
+        reportable
+          .map((item) => String(item.rotationId ?? "").trim())
+          .filter(Boolean)
+      ),
+    ];
+    if (rotationIds.length > 0) {
+      const { data: rotations, error: rotLoadError } = await supabase
+        .from("weekly_rotations")
+        .select("id, store_id, department_id, location_id")
+        .in("id", rotationIds);
+      if (rotLoadError) throw new Error(rotLoadError.message);
+      const rotById = new Map(
+        (rotations ?? []).map((row) => [String(row.id), row] as const)
+      );
+      for (const item of reportable) {
+        const rotationId = String(item.rotationId ?? "").trim();
+        if (!rotationId) continue;
+        const rot = rotById.get(rotationId);
+        if (
+          !rot ||
+          String(rot.store_id ?? "") !== storeId ||
+          String(rot.department_id ?? "") !== input.departmentId ||
+          String(rot.location_id ?? "") !== item.locationId
+        ) {
+          throw new Error(
+            "Rotation is outside your store department scope"
+          );
+        }
+      }
+    }
+  }
+
   const exceptionRows = reportable.map((item) => ({
     rotation_id: item.rotationId || null,
     department_id: input.departmentId,

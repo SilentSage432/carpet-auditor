@@ -160,6 +160,7 @@ export async function POST(request: Request) {
 
     const result = await reportRotationBarriers(supabase, {
       departmentId,
+      storeId: store.id,
       assignedWeek: body.assigned_week?.trim() || isoWeekLabel(),
       incomplete,
       reportedBy: actor.specialistId,

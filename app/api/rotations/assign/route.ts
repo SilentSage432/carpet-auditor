@@ -4,6 +4,7 @@ import {
   requireSupervisorOrAdmin,
   StoreOpsAuthError,
 } from "@/lib/store-ops/auth-server";
+import { assertActorCanAccessDepartmentId } from "@/lib/store-ops/department-scope";
 import { assignLocationsToCurrentWeek } from "@/lib/store-ops/rotations";
 import { resolveStoreByNumber } from "@/lib/store-ops/stores";
 import { requireSupabaseAdmin } from "@/lib/supabase/admin-response";
@@ -72,6 +73,35 @@ export async function POST(request: Request) {
       return NextResponse.json(
         { error: "Department not found for this store" },
         { status: 404 }
+      );
+    }
+
+    await assertActorCanAccessDepartmentId(
+      supabase,
+      actor,
+      store.id,
+      departmentId
+    );
+
+    const { data: scopedLocations, error: locError } = await supabase
+      .from("store_locations")
+      .select("id")
+      .in("id", locationIds)
+      .eq("store_id", store.id)
+      .eq("department_id", departmentId);
+    if (locError) {
+      return NextResponse.json(
+        { error: readableError(locError, "Could not verify locations") },
+        { status: 500 }
+      );
+    }
+    const allowed = new Set(
+      (scopedLocations ?? []).map((row) => String(row.id))
+    );
+    if (locationIds.some((id) => !allowed.has(id))) {
+      return NextResponse.json(
+        { error: "One or more locations are outside your store department scope" },
+        { status: 403 }
       );
     }
 

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import {
+  actorAllowsDepartmentCode,
   resolveStoreOpsActor,
   requireSupervisorOrAdmin,
   StoreOpsAuthError,
@@ -67,6 +68,16 @@ export async function GET(request: Request) {
       });
     }
 
+    const store = await resolveStoreByNumber(supabase, actor.storeNumber);
+    if (departmentId) {
+      await assertActorCanAccessDepartmentId(
+        supabase,
+        actor,
+        store.id,
+        departmentId
+      );
+    }
+
     const listed = await listWeekBayPriorities(supabase, {
       store_number: actor.storeNumber,
       week_label: weekLabel,
@@ -79,9 +90,26 @@ export async function GET(request: Request) {
         { status: 400 }
       );
     }
+
+    let priorities = listed.value;
+    if (actor.role !== "super_admin") {
+      const { data: depts } = await supabase
+        .from("departments")
+        .select("id, code")
+        .eq("store_id", store.id);
+      const allowedDeptIds = new Set(
+        (depts ?? [])
+          .filter((d) => actorAllowsDepartmentCode(actor, String(d.code ?? "")))
+          .map((d) => String(d.id))
+      );
+      priorities = priorities.filter((p) =>
+        allowedDeptIds.has(String(p.department_id ?? ""))
+      );
+    }
+
     return NextResponse.json({
       week_label: weekLabel,
-      priorities: listed.value,
+      priorities,
     });
   } catch (err) {
     if (err instanceof StoreOpsAuthError) {
@@ -217,16 +245,50 @@ export async function DELETE(request: Request) {
       );
     }
 
-    const departmentId = String(body.department_id ?? "").trim();
-    if (departmentId) {
-      const store = await resolveStoreByNumber(supabase, actor.storeNumber);
-      await assertActorCanAccessDepartmentId(
-        supabase,
-        actor,
-        store.id,
-        departmentId
+    const store = await resolveStoreByNumber(supabase, actor.storeNumber);
+    let departmentId = String(body.department_id ?? "").trim();
+    const priorityId = String(body.priority_id ?? "").trim();
+
+    // Authority must come from the target row (or explicit place key), never an
+    // omitted department_id that would skip scope checks.
+    if (priorityId) {
+      const { data: target, error: targetError } = await supabase
+        .from("store_week_bay_priorities")
+        .select("id, department_id, store_number")
+        .eq("id", priorityId)
+        .eq("store_number", actor.storeNumber)
+        .maybeSingle();
+      if (targetError) {
+        return NextResponse.json(
+          { error: readableError(targetError, "Could not load priority") },
+          { status: 500 }
+        );
+      }
+      if (!target) {
+        return NextResponse.json(
+          { error: "Active priority not found", code: "not_found" },
+          { status: 404 }
+        );
+      }
+      departmentId = String(target.department_id ?? "").trim();
+    }
+
+    if (!departmentId) {
+      return NextResponse.json(
+        {
+          error:
+            "department_id is required when priority_id is not supplied",
+        },
+        { status: 400 }
       );
     }
+
+    await assertActorCanAccessDepartmentId(
+      supabase,
+      actor,
+      store.id,
+      departmentId
+    );
 
     const result = await revokeWeekBayPriority(supabase, {
       store_number: actor.storeNumber,

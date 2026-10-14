@@ -326,7 +326,8 @@ supabase/migrations/20260812_sunday_bay_assignments.sql → sunday specialist↔
 | Zero-access auth wall / idle lock | `lib/auth-session.ts`, `components/auth/AuthWall.tsx`, `components/auth/AccessGate.tsx` (`/login`) |
 | Edge auth + stealth gate | `lib/auth-gate.ts` + `proxy.ts` + `POST /api/auth/gate` (HttpOnly cookie) |
 | Enterprise ingest contracts | **RETIRED (REDUCE-003)** — Zod stubs + `/api/v1/topology/ingest` + `/api/v1/freight/stage` deleted; never wrote Store Ops tables |
-| Store Ops Auth (JWT → profiles) | `lib/store-ops/auth.ts`, `lib/supabase/server.ts`, `lib/supabase/browser.ts`, `link-auth-profile.ts` |
+| Store Ops Auth (JWT → profiles) | `lib/store-ops/auth.ts` + **`auth-server.ts`** (server actor); client headers not trusted. **SEC-OPS-010 operational authority:** dept-scoped assign/extra-bay; store-bound complete/verify/barriers/bulk; priority revoke from target row; section owner roster proof — [`docs/product/DEPTSYNC_SEC_OPS_010_IMPLEMENTATION.md`](docs/product/DEPTSYNC_SEC_OPS_010_IMPLEMENTATION.md) |
+| Store Ops session helpers | `lib/supabase/server.ts`, `lib/supabase/browser.ts`, `link-auth-profile.ts` |
 | JWT / RLS policies | `20260812_jwt_rls_policies.sql` + `20260814_multi_department_access.sql` (`jwt_matches_department_code` ORs `app_metadata.accessible_departments`) + **`20260817_rls_security_lockdown.sql`** (drop anon/open SELECT; authenticated store isolation). Supersedes `20260816_store_locations_read.sql` open reads. |
 | Phone SMS OTP recovery + profile link | `lib/phone-auth.ts`, `lib/phone.ts`, `POST /api/auth/phone-reset/*` |
 | Biometric / WebAuthn unlock | `lib/biometric-auth.ts`, `AuthWall` |

@@ -17,6 +17,7 @@ import {
   createOperationalSection,
   listOperationalSections,
 } from "@/lib/store-ops/operational-sections";
+import { assertRosterSpecialistForStore } from "@/lib/store-ops/walkthroughs";
 import { readableError } from "@/lib/store-ops/errors";
 
 export async function GET(request: Request) {
@@ -106,6 +107,17 @@ export async function POST(request: Request) {
       store.id,
       departmentId
     );
+
+    const ownerCheck = await assertRosterSpecialistForStore(supabase, {
+      specialist_id: body.primary_owner_specialist_id,
+      store_number: actor.storeNumber,
+    });
+    if (!ownerCheck.ok) {
+      return NextResponse.json(
+        { error: ownerCheck.message, code: ownerCheck.code },
+        { status: ownerCheck.code === "not_found" ? 404 : 400 }
+      );
+    }
 
     const result = await createOperationalSection(supabase, {
       store_id: store.id,

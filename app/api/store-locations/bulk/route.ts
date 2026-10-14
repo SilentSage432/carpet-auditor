@@ -66,11 +66,20 @@ export async function POST(request: Request) {
       );
     }
 
+    // Never trust client store_id — topology writes bind only to JWT actor store.
+    const clientStoreId = String(body.store_id ?? "").trim();
+    if (clientStoreId && clientStoreId !== store.id) {
+      return NextResponse.json(
+        { error: "store_id does not match authenticated store" },
+        { status: 403 }
+      );
+    }
+
     const { data: dept, error: deptError } = await supabase
       .from("departments")
       .select("id, store_id")
       .eq("id", departmentId)
-      .eq("store_id", body.store_id?.trim() || store.id)
+      .eq("store_id", store.id)
       .maybeSingle();
 
     if (deptError) {

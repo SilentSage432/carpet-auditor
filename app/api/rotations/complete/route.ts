@@ -61,7 +61,7 @@ export async function POST(request: Request) {
 
     const { data: rotation, error: rotationError } = await supabase
       .from("weekly_rotations")
-      .select("id, department_id, is_completed")
+      .select("id, department_id, is_completed, store_id, store_number")
       .eq("id", rotationId)
       .maybeSingle();
 
@@ -70,6 +70,35 @@ export async function POST(request: Request) {
     }
     if (!rotation) {
       return NextResponse.json({ error: "Rotation not found" }, { status: 404 });
+    }
+
+    const rotationStoreId = String(rotation.store_id ?? "").trim();
+    const rotationStoreNumber = String(rotation.store_number ?? "").trim();
+    const storeMatches =
+      (rotationStoreId && rotationStoreId === store.id) ||
+      (rotationStoreNumber &&
+        rotationStoreNumber === String(store.store_number ?? "").trim());
+    if (!storeMatches) {
+      // Legacy rows may omit store columns — bind via department → actor store.
+      if (!rotationStoreId && !rotationStoreNumber) {
+        const { data: dept } = await supabase
+          .from("departments")
+          .select("id")
+          .eq("id", String(rotation.department_id ?? ""))
+          .eq("store_id", store.id)
+          .maybeSingle();
+        if (!dept) {
+          return NextResponse.json(
+            { error: "Rotation is outside your store" },
+            { status: 403 }
+          );
+        }
+      } else {
+        return NextResponse.json(
+          { error: "Rotation is outside your store" },
+          { status: 403 }
+        );
+      }
     }
 
     if (isDeptFloorActor(actor)) {

@@ -19,6 +19,7 @@ import {
   retireOperationalSection,
   updateOperationalSection,
 } from "@/lib/store-ops/operational-sections";
+import { assertRosterSpecialistForStore } from "@/lib/store-ops/walkthroughs";
 import { readableError } from "@/lib/store-ops/errors";
 
 type PatchBody = {
@@ -88,6 +89,19 @@ export async function PATCH(request: Request, context: RouteContext) {
         );
       }
       return NextResponse.json({ ok: true, section: result.value });
+    }
+
+    if (body.primary_owner_specialist_id !== undefined) {
+      const ownerCheck = await assertRosterSpecialistForStore(supabase, {
+        specialist_id: body.primary_owner_specialist_id,
+        store_number: actor.storeNumber,
+      });
+      if (!ownerCheck.ok) {
+        return NextResponse.json(
+          { error: ownerCheck.message, code: ownerCheck.code },
+          { status: ownerCheck.code === "not_found" ? 404 : 400 }
+        );
+      }
     }
 
     const result = await updateOperationalSection(supabase, {

@@ -4,6 +4,7 @@ import {
   requireSupervisorOrAdmin,
   StoreOpsAuthError,
 } from "@/lib/store-ops/auth-server";
+import { assertActorCanAccessDepartmentId } from "@/lib/store-ops/department-scope";
 import {
   dispatchExtraPhysicalBay,
   suggestExtraPhysicalBay,
@@ -73,6 +74,13 @@ export async function POST(request: Request) {
         { status: 400 }
       );
     }
+
+    await assertActorCanAccessDepartmentId(
+      supabase,
+      actor,
+      store.id,
+      departmentId
+    );
 
     const weekLabel = sundayStagingWeekLabel(new Date(), store.timezone);
     const common = {
