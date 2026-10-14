@@ -1,12 +1,12 @@
 # DEPTSYNC-ALIGN-DEPT-001 — Flooring + Home Decor Operational Alignment
 
-**Status:** COMPLETE locally — **not deployed**  
+**Status:** COMPLETE — **released** via [`DEPTSYNC_ALIGN_DEPT_001_RELEASE.md`](./DEPTSYNC_ALIGN_DEPT_001_RELEASE.md) (`57334ee`)  
 **Date:** 2026-10-14  
 **Mode:** Focused discovery + evidence-based implementation  
 **Authority:** Mission brief · Redesign-001 · MAP-001/004 · TOPO-001 · CAPACITY-GUARD · Constitution Art. II-A · RELEASE-006 accepted baseline  
 **Production baseline:** store **2587** · four Operational Sections · **160** bay memberships · Sunday auto-stage **OFF**
 
-**Not authorized:** production deploy, production migrations, aisle redistribution, section rebuild, Home Decor department insert, dual-department auto-stage enablement.
+**Not authorized by the implementation tranche (release later separately):** production migrations, aisle redistribution, section rebuild, Home Decor department insert, dual-department auto-stage enablement.
 
 ---
 
@@ -201,14 +201,14 @@ Specialty boundaries preserved: `CARPET-WALL`, `SHOW-L`, `SHOW-R`, `CLOTHING` re
 | Gate | Verdict |
 |------|---------|
 | Discovery complete | **YES** |
-| Safe merged-model coherence shipped locally | **YES** |
+| Safe merged-model coherence shipped | **YES** — production `57334ee` |
 | Home Decor first-class separation | **NO** — blocked on operator §7 |
 | Migration review | N/A (none) |
-| Deploy | **STOP — do not deploy automatically** |
-| Phone / operator acceptance | Pending authorize for app-only release if desired |
+| Deploy | **DONE** — see ALIGN-DEPT-001-RELEASE |
+| Phone / operator acceptance | Optional for label UX; no data cutover |
 
-**CONDITIONAL GO** for later app-only deploy of label/contract coherence.  
-**NO-GO** for department split, topology rewrite, membership changes, or auto-deploy.
+**GO** for app-only merged-model coherence (released).  
+**NO-GO** for department split, topology rewrite, membership changes, or inventing aisle ownership.
 
 ### Completed implementation vs unresolved product decisions
 

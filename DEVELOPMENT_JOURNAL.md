@@ -1,8 +1,12 @@
 # DeptSync Hub — Development Journal
 
+## 2026-10-14 — DEPTSYNC-ALIGN-DEPT-001-RELEASE production release
+
+**Authorized controlled release — SHIPPED.** Commit `57334ee` pushed `8405934..57334ee`. Focused tests **55 PASS**; tsc/build PASS. GitHub Production **`7070725323`** success; Vercel env https://deptsync-k7j62c0we-tyson-zauggs-projects.vercel.app; alias https://deptsync-hub.vercel.app. Smoke: `/login` 200 PIN-only; protected **307**; APIs **401**; hub-bridge **400**. Read-only data: sections **4**/members **160**; active dept `flooring` “Flooring / Home Decor”; `home_decor` **absent**; named-zone bay rows **0**; auto-stage OFF. No migrations. Canonical: [`docs/product/DEPTSYNC_ALIGN_DEPT_001_RELEASE.md`](docs/product/DEPTSYNC_ALIGN_DEPT_001_RELEASE.md). **STOP. Do not begin another feature tranche.**
+
 ## 2026-10-14 — DEPTSYNC-ALIGN-DEPT-001 Flooring + Home Decor operational alignment
 
-**Focused discovery + evidence-based implementation — no deploy / no migration / no topology mutation.** Confirmed production model remains merged `flooring` (“Flooring / Home Decor”); no persisted aisle Flooring-vs-Home-Decor ownership; Home Decor already rides Map / Sections / Rotation / Walkthroughs / priorities under that merge. Implemented `department-alignment` contract + capability matrix; Floor Command labels and roster CSA/Supervisor titles use the full merged name; Specialists stay “Flooring Specialist” per Constitution. Did **not** invent aisle maps, insert `home_decor`, redistribute 4×160 sections, or enable dual-dept auto-stage. Canonical: [`docs/product/DEPTSYNC_ALIGN_DEPT_001_IMPLEMENTATION.md`](docs/product/DEPTSYNC_ALIGN_DEPT_001_IMPLEMENTATION.md). **CONDITIONAL GO** app-only after authorize; separation remains **OPERATOR-BLOCKED** (TOPO-001 §L). **STOP — do not deploy automatically.**
+**Focused discovery + evidence-based implementation — released via ALIGN-DEPT-001-RELEASE.** Confirmed production model remains merged `flooring` (“Flooring / Home Decor”); no persisted aisle Flooring-vs-Home-Decor ownership; Home Decor already rides Map / Sections / Rotation / Walkthroughs / priorities under that merge. Implemented `department-alignment` contract + capability matrix; Floor Command labels and roster CSA/Supervisor titles use the full merged name; Specialists stay “Flooring Specialist” per Constitution. Did **not** invent aisle maps, insert `home_decor`, redistribute 4×160 sections, or enable dual-dept auto-stage. Canonical: [`docs/product/DEPTSYNC_ALIGN_DEPT_001_IMPLEMENTATION.md`](docs/product/DEPTSYNC_ALIGN_DEPT_001_IMPLEMENTATION.md). Separation remains **OPERATOR-BLOCKED** (TOPO-001 §L).
 
 ## 2026-10-14 — DEPTSYNC-RELEASE-006 AUTH-006 + MAP-004 production release
 
