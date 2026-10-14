@@ -1,11 +1,12 @@
 /**
- * Platform biometric (Touch ID / Face ID / Fingerprint) via WebAuthn.
- * Owns credential create/get + local binding only — AuthWall presents UI.
+ * Platform biometric helpers (local WebAuthn binding).
  *
- * AUTH-002: this is NOT independent server authentication. Biometric success
- * only proves device binding; AuthWall must still resolve a live Supabase
- * session (refresh) before admitting. Full server-verified WebAuthn login is
- * deferred (see DEPTSYNC_AUTH_002_IMPLEMENTATION.md).
+ * AUTH-006: AuthWall no longer presents fingerprint login, resume, or enroll.
+ * PIN/password is the sole active authentication UX. This module remains for
+ * cleanup utilities and historical local bindings only — do not wire into UI.
+ *
+ * Unreleased AUTH-003 independent WebAuthn lives on branch
+ * `archive/auth-003-independent-webauthn` (not production scope).
  */
 
 import type { StoreSpecialist } from "./types";

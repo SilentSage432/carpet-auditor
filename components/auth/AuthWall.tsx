@@ -1,27 +1,14 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { DeptSyncBadge } from "@/components/hub/DeptSyncBadge";
 import { TextField } from "@/components/ui/NumberField";
-import {
-  hasStoredSupabaseAuthHint,
-  resolveLiveSupabaseSession,
-} from "@/lib/auth/live-session";
-import {
-  authenticateWithBiometric,
-  clearStoredBiometricCredential,
-  getStoredBiometricCredential,
-  hasBiometricForSpecialist,
-  isPlatformAuthenticatorAvailable,
-  registerBiometricCredential,
-} from "@/lib/biometric-auth";
 import {
   requestPinResetLink,
 } from "@/lib/phone-auth";
 import { formatStoreLabel, getStoreNumber } from "@/lib/store";
 import {
   findSpecialistByLogin,
-  getActiveSpecialist,
   hasQuickPin,
   needsCredentialSetup,
   roleBadge,
@@ -126,30 +113,10 @@ function LoginForm({
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [biometricReady, setBiometricReady] = useState(false);
-  const [hasPasskey, setHasPasskey] = useState(false);
-  const [sessionResumePossible, setSessionResumePossible] = useState(false);
-  const [enrollMember, setEnrollMember] = useState<StoreSpecialist | null>(null);
-  const [enrollBusy, setEnrollBusy] = useState(false);
   const [phoneResetOpen, setPhoneResetOpen] = useState(false);
   const submittingRef = useRef(false);
 
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      const available = await isPlatformAuthenticatorAvailable();
-      const stored = getStoredBiometricCredential();
-      if (cancelled) return;
-      setBiometricReady(available);
-      setHasPasskey(Boolean(stored));
-      // AUTH-002: fingerprint only when a refreshable Auth session may exist.
-      setSessionResumePossible(hasStoredSupabaseAuthHint());
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
+  // AUTH-006: PIN/password is the sole login path — no biometric enroll/resume.
   async function finishLogin(member: StoreSpecialist, pin?: string) {
     if (pin) {
       const bridgeError = await tryEstablishHubBridgeSession(member, pin);
@@ -157,12 +124,6 @@ function LoginForm({
         setError(bridgeError);
         return;
       }
-    }
-    const available =
-      biometricReady || (await isPlatformAuthenticatorAvailable());
-    if (available && !hasBiometricForSpecialist(member.id)) {
-      setEnrollMember(member);
-      return;
     }
     onAuthenticated(member);
   }
@@ -204,95 +165,6 @@ function LoginForm({
       submittingRef.current = false;
       setBusy(false);
     }
-  }
-
-  async function handleBiometricLogin() {
-    if (submittingRef.current) return;
-    submittingRef.current = true;
-    setBusy(true);
-    setError(null);
-    try {
-      const specialistId = await authenticateWithBiometric();
-      const match =
-        roster.find((m) => String(m.id) === String(specialistId)) ??
-        (() => {
-          const active = getActiveSpecialist();
-          return active && String(active.id) === String(specialistId)
-            ? active
-            : null;
-        })();
-      if (!match || match.is_active === false) {
-        clearStoredBiometricCredential();
-        setHasPasskey(false);
-        setError("Saved fingerprint is no longer valid. Sign in with your PIN.");
-        return;
-      }
-      // AUTH-002: try refresh — biometric alone does not mint a server session.
-      const live = await resolveLiveSupabaseSession();
-      if (!live.hasAccessToken) {
-        setSessionResumePossible(false);
-        setError(
-          "Saved session expired. Enter your PIN to unlock Store Ops, then fingerprint can resume again."
-        );
-        return;
-      }
-      onAuthenticated(match);
-    } catch (err) {
-      if (err instanceof DOMException && err.name === "NotAllowedError") {
-        setError("Fingerprint cancelled");
-      } else {
-        setError(
-          err instanceof Error ? err.message : "Fingerprint resume failed"
-        );
-      }
-    } finally {
-      submittingRef.current = false;
-      setBusy(false);
-    }
-  }
-
-  async function handleEnableBiometric() {
-    if (!enrollMember) return;
-    setEnrollBusy(true);
-    setError(null);
-    try {
-      await registerBiometricCredential(enrollMember);
-      setHasPasskey(true);
-      const member = enrollMember;
-      setEnrollMember(null);
-      onAuthenticated(member);
-    } catch (err) {
-      if (err instanceof DOMException && err.name === "NotAllowedError") {
-        setError("Fingerprint registration cancelled");
-      } else {
-        setError(
-          err instanceof Error
-            ? err.message
-            : "Could not enable fingerprint login"
-        );
-      }
-    } finally {
-      setEnrollBusy(false);
-    }
-  }
-
-  function handleSkipBiometric() {
-    if (!enrollMember) return;
-    const member = enrollMember;
-    setEnrollMember(null);
-    onAuthenticated(member);
-  }
-
-  if (enrollMember) {
-    return (
-      <BiometricEnrollBanner
-        memberName={enrollMember.name}
-        busy={enrollBusy}
-        error={error}
-        onEnable={() => void handleEnableBiometric()}
-        onSkip={handleSkipBiometric}
-      />
-    );
   }
 
   if (phoneResetOpen) {
@@ -342,16 +214,6 @@ function LoginForm({
       >
         {busy ? "Signing in…" : "Log In"}
       </button>
-      {hasPasskey && biometricReady && sessionResumePossible ? (
-        <button
-          type="button"
-          disabled={busy}
-          onClick={() => void handleBiometricLogin()}
-          className="flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl border border-emerald-500/40 bg-emerald-950/50 text-sm font-bold text-emerald-200 active:scale-[0.98] disabled:opacity-40"
-        >
-          {busy ? "Resuming…" : "Resume with fingerprint"}
-        </button>
-      ) : null}
       <button
         type="button"
         disabled={busy}
@@ -364,9 +226,7 @@ function LoginForm({
         Forgot Access Code? Reset via Phone
       </button>
       <p className="text-center text-[11px] leading-relaxed text-zinc-400">
-        PIN unlocks Store Ops. Idle lock is 8 hours. Fingerprint resumes a saved
-        session on this device when it is still valid — it is not a separate
-        password.
+        Sign in with your username and PIN or password. Idle lock is 8 hours.
       </p>
     </form>
   );
@@ -448,53 +308,6 @@ function PhoneResetPanel({
   );
 }
 
-function BiometricEnrollBanner({
-  memberName,
-  busy,
-  error,
-  onEnable,
-  onSkip,
-}: {
-  memberName: string;
-  busy: boolean;
-  error: string | null;
-  onEnable: () => void;
-  onSkip: () => void;
-}) {
-  return (
-    <div className="mt-5 space-y-3 rounded-2xl border border-emerald-500/30 bg-emerald-950/30 p-4">
-      <p className="text-sm font-semibold leading-relaxed text-emerald-100">
-        Enable fingerprint to resume your saved session faster on this phone?
-      </p>
-      <p className="text-xs text-zinc-400">
-        Signed in as {memberName}. Fingerprint resumes a valid saved session —
-        your PIN is still required after logout or when the session expires.
-      </p>
-      {error ? (
-        <p className="text-center text-sm font-semibold text-rose-400" role="alert">
-          {error}
-        </p>
-      ) : null}
-      <button
-        type="button"
-        disabled={busy}
-        onClick={onEnable}
-        className="btn-primary-glow flex min-h-[44px] w-full items-center justify-center rounded-xl text-sm disabled:opacity-40"
-      >
-        {busy ? "Waiting for sensor…" : "Enable fingerprint resume"}
-      </button>
-      <button
-        type="button"
-        disabled={busy}
-        onClick={onSkip}
-        className="flex min-h-[44px] w-full items-center justify-center rounded-xl border border-zinc-700/80 text-sm font-semibold text-zinc-300 disabled:opacity-40"
-      >
-        Skip for now
-      </button>
-    </div>
-  );
-}
-
 function SetupForm({
   member,
   onAuthenticated,
@@ -508,19 +321,6 @@ function SetupForm({
   const [phone, setPhone] = useState(member.phone_number ?? "");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
-  const [enrollMember, setEnrollMember] = useState<StoreSpecialist | null>(null);
-  const [enrollBusy, setEnrollBusy] = useState(false);
-  const [biometricReady, setBiometricReady] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-    void isPlatformAuthenticatorAvailable().then((ok) => {
-      if (!cancelled) setBiometricReady(ok);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
 
   async function handleSave() {
     if (username.trim().length < 3) {
@@ -556,10 +356,6 @@ function SetupForm({
         setError(bridgeError);
         return;
       }
-      if (biometricReady && !hasBiometricForSpecialist(record.id)) {
-        setEnrollMember(record);
-        return;
-      }
       onAuthenticated(record);
     } catch (err) {
       setError(
@@ -570,42 +366,6 @@ function SetupForm({
     } finally {
       setSaving(false);
     }
-  }
-
-  async function handleEnableBiometric() {
-    if (!enrollMember) return;
-    setEnrollBusy(true);
-    setError(null);
-    try {
-      await registerBiometricCredential(enrollMember);
-      const next = enrollMember;
-      setEnrollMember(null);
-      onAuthenticated(next);
-    } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Could not enable fingerprint login"
-      );
-    } finally {
-      setEnrollBusy(false);
-    }
-  }
-
-  if (enrollMember) {
-    return (
-      <BiometricEnrollBanner
-        memberName={enrollMember.name}
-        busy={enrollBusy}
-        error={error}
-        onEnable={() => void handleEnableBiometric()}
-        onSkip={() => {
-          const next = enrollMember;
-          setEnrollMember(null);
-          onAuthenticated(next);
-        }}
-      />
-    );
   }
 
   return (
@@ -699,26 +459,7 @@ function UnlockForm({
   const [error, setError] = useState<string | null>(null);
   const [shake, setShake] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [showBiometric, setShowBiometric] = useState(false);
   const submittingRef = useRef(false);
-
-  useEffect(() => {
-    let cancelled = false;
-    void (async () => {
-      const available = await isPlatformAuthenticatorAvailable();
-      const stored = getStoredBiometricCredential();
-      if (cancelled) return;
-      setShowBiometric(
-        available &&
-          Boolean(stored) &&
-          String(stored?.specialistId) === String(member.id) &&
-          hasStoredSupabaseAuthHint()
-      );
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [member.id]);
 
   function fail(message: string) {
     setShake(true);
@@ -780,42 +521,6 @@ function UnlockForm({
     }
   }
 
-  async function handleBiometricUnlock() {
-    if (submittingRef.current) return;
-    submittingRef.current = true;
-    setBusy(true);
-    setError(null);
-    try {
-      const specialistId = await authenticateWithBiometric();
-      const match =
-        roster.find((m) => String(m.id) === String(specialistId)) ?? member;
-      if (String(match.id) !== String(member.id)) {
-        setError("Fingerprint belongs to a different user");
-        return;
-      }
-      const live = await resolveLiveSupabaseSession();
-      if (!live.hasAccessToken) {
-        setShowBiometric(false);
-        setError(
-          "Saved session expired. Enter your PIN to unlock Store Ops."
-        );
-        return;
-      }
-      onAuthenticated(match);
-    } catch (err) {
-      if (err instanceof DOMException && err.name === "NotAllowedError") {
-        setError("Fingerprint cancelled");
-      } else {
-        setError(
-          err instanceof Error ? err.message : "Fingerprint resume failed"
-        );
-      }
-    } finally {
-      submittingRef.current = false;
-      setBusy(false);
-    }
-  }
-
   const keys = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "", "0", "⌫"];
 
   return (
@@ -824,20 +529,8 @@ function UnlockForm({
         {roleBadge(member)}
       </p>
       <p className="mb-3 text-center text-xs text-zinc-500">
-        Enter your PIN to unlock Store Ops. Fingerprint resumes a saved session
-        when it is still valid.
+        Enter your PIN to unlock Store Ops.
       </p>
-
-      {showBiometric ? (
-        <button
-          type="button"
-          disabled={busy}
-          onClick={() => void handleBiometricUnlock()}
-          className="mb-3 flex min-h-[44px] w-full items-center justify-center gap-2 rounded-xl border border-emerald-500/40 bg-emerald-950/50 text-sm font-bold text-emerald-200 active:scale-[0.98] disabled:opacity-40"
-        >
-          {busy ? "Resuming…" : "Resume with fingerprint"}
-        </button>
-      ) : null}
 
       {pinMode ? (
         <>

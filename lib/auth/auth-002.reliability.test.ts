@@ -106,7 +106,7 @@ describe("AUTH-002 hub-bridge mint slim path", () => {
   });
 });
 
-describe("AUTH-002 AuthWall terminal busy + honest biometric", () => {
+describe("AUTH-002 AuthWall terminal busy (AUTH-006: PIN-only UI)", () => {
   it("guards duplicate submission and clears busy in finally", async () => {
     const source = await readFile(
       path.resolve(__dirname, "../../components/auth/AuthWall.tsx"),
@@ -115,11 +115,12 @@ describe("AUTH-002 AuthWall terminal busy + honest biometric", () => {
     expect(source).toMatch(/submittingRef/);
     expect(source).toMatch(/finally \{\s*submittingRef\.current = false/);
     expect(source).toMatch(/setBusy\(false\)/);
-    expect(source).toMatch(/resolveLiveSupabaseSession/);
-    expect(source).toMatch(/hasStoredSupabaseAuthHint/);
-    expect(source).toMatch(/Resume with fingerprint/);
-    expect(source).toMatch(/not a separate\s+password/);
-    expect(source).not.toMatch(/Login with Fingerprint/);
+    // AUTH-006: biometric CTAs removed; PIN/password remains primary.
+    expect(source).not.toMatch(/Resume with fingerprint/);
+    expect(source).not.toMatch(/Sign in with fingerprint/);
+    expect(source).not.toMatch(/loginWithWebAuthn/);
+    expect(source).not.toMatch(/authenticateWithBiometric/);
+    expect(source).not.toMatch(/BiometricEnrollBanner/);
   });
 
   it("AccessGate fails closed when hub-gate mint fails", async () => {

@@ -1,8 +1,16 @@
 # DeptSync Hub — Development Journal
 
+## 2026-10-14 — DEPTSYNC-AUTH-006 login simplification (PIN-only)
+
+**Focused implementation — no deploy.** Operator confirmed PIN login reliable; independent biometric no longer a product requirement. Removed fingerprint login/resume/enroll from AuthWall (login, unlock, setup). AUTH-002 PIN path preserved. Unreleased AUTH-003 WebAuthn archived on `archive/auth-003-independent-webauthn` @ `a4ac66b` (absent from `main` — no routes/migration/deps). Auth regressions **46 PASS**; tsc/build PASS (no webauthn routes). Canonical: [`docs/product/DEPTSYNC_AUTH_006_SIMPLIFICATION.md`](docs/product/DEPTSYNC_AUTH_006_SIMPLIFICATION.md). **CONDITIONAL GO** app-only after authorize; **STOP — do not deploy automatically.**
+
+## 2026-10-14 — AUTH-003…005 archived (unreleased WebAuthn)
+
+Independent WebAuthn implementation + validation docs preserved only on branch `archive/auth-003-independent-webauthn` (not production scope). Product direction: PIN-only via AUTH-006.
+
 ## 2026-10-13 — DEPTSYNC-AUTH-002-RELEASE production release
 
-**Security-gated production release — SHIPPED.** Preflight: PIN-before-mint; server-only `generateLink`; session/userId binding; rate-limit; no credential reset; no migrations. Focused auth/security tests **146 PASS**; typecheck/build PASS. Commit `483abae`; GitHub Production `7049245786`; Vercel `7m7be8SYj9wMEKvNYowSH7BNKFF5` READY. Smoke: `/login` 200; hub-bridge 400/401; gate 401; SW `deptsync-shell-v8-auth-002`. Canonical: [`docs/product/DEPTSYNC_AUTH_002_PRODUCTION_RELEASE.md`](docs/product/DEPTSYNC_AUTH_002_PRODUCTION_RELEASE.md). **AUTH-003 / MAP-004 not started.** Operator phone acceptance pending.
+**Security-gated production release — SHIPPED.** Preflight: PIN-before-mint; server-only `generateLink`; session/userId binding; rate-limit; no credential reset; no migrations. Focused auth/security tests **146 PASS**; typecheck/build PASS. Commit `483abae`; GitHub Production `7049245786`; Vercel `7m7be8SYj9wMEKvNYowSH7BNKFF5` READY. Smoke: `/login` 200; hub-bridge 400/401; gate 401; SW `deptsync-shell-v8-auth-002`. Canonical: [`docs/product/DEPTSYNC_AUTH_002_PRODUCTION_RELEASE.md`](docs/product/DEPTSYNC_AUTH_002_PRODUCTION_RELEASE.md).
 
 ## 2026-10-13 — DEPTSYNC-AUTH-002 authentication reliability (local)
 
