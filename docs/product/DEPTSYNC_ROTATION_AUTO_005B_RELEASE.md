@@ -66,7 +66,7 @@ Production now runs the AUTO-005A shift-independence correction: weekly bay assi
 
 | Field | Value |
 |-------|--------|
-| Commit | *(this report + journal / handoff / roadmap — see tip after docs push)* |
+| Commit | **** () — ship report + journal / handoff / roadmap |
 | Contents | This report; AUTO-005A status mark-deployed; DEVELOPMENT_JOURNAL / CHAT_HANDOFF / MASTER_ROADMAP |
 
 ---
