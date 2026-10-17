@@ -32,7 +32,7 @@
 
 | Field | Value |
 |-------|--------|
-| Commit | **`5550c54`** (`5550c54` / `docs(release): record ROTATION-AUTO-005 Stage 1 production ship` on `main`) |
+| Commit | **`5550c54`** (`5550c549…` ship) + tip **`87e5bc8`** (SHA reference correction) on `main` |
 | Contents | This report + journal / handoff / roadmap Stage-1 ship note |
 
 ---
