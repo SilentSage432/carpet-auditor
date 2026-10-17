@@ -416,11 +416,13 @@ export function SundayAuditAssignmentModal({
     let ownedTotal = 0;
     const ownedRotationIds: string[] = [];
     for (const row of bays) {
+      const locked = row.assignment?.supervisor_locked === true;
       const owner = String(row.assignment?.specialist_id ?? "").trim();
+      if (locked) ownedRotationIds.push(String(row.rotation.id));
       if (!owner) continue;
       ownedTotal += 1;
       ownedBySpecialist[owner] = (ownedBySpecialist[owner] ?? 0) + 1;
-      ownedRotationIds.push(String(row.rotation.id));
+      if (!locked) ownedRotationIds.push(String(row.rotation.id));
     }
     const approvedBySpecialist: Record<string, number> = {};
     if (capacityBoard?.approvals_complete) {
@@ -483,11 +485,13 @@ export function SundayAuditAssignmentModal({
     let ownedTotal = 0;
     const ownedRotationIds: string[] = [];
     for (const row of bays) {
+      const locked = row.assignment?.supervisor_locked === true;
       const owner = String(row.assignment?.specialist_id ?? "").trim();
+      if (locked) ownedRotationIds.push(String(row.rotation.id));
       if (!owner) continue;
       ownedTotal += 1;
       ownedBySpecialist[owner] = (ownedBySpecialist[owner] ?? 0) + 1;
-      ownedRotationIds.push(String(row.rotation.id));
+      if (!locked) ownedRotationIds.push(String(row.rotation.id));
     }
     const approvedBySpecialist: Record<string, number> = {};
     for (const row of capacityBoard.associates) {
@@ -868,11 +872,13 @@ export function SundayAuditAssignmentModal({
       let ownedTotal = 0;
       const ownedRotationIds: string[] = [];
       for (const row of bays) {
+        const locked = row.assignment?.supervisor_locked === true;
         const owner = String(row.assignment?.specialist_id ?? "").trim();
+        if (locked) ownedRotationIds.push(String(row.rotation.id));
         if (!owner) continue;
         ownedTotal += 1;
         ownedBySpecialist[owner] = (ownedBySpecialist[owner] ?? 0) + 1;
-        ownedRotationIds.push(String(row.rotation.id));
+        if (!locked) ownedRotationIds.push(String(row.rotation.id));
       }
       const approvedBySpecialist: Record<string, number> = {};
       for (const row of capacityBoard.associates) {

@@ -18,6 +18,11 @@ import {
   recoverAutoVerifiedAttemptFromParent,
 } from "./completion-attempt-history";
 import { physicalBayKey, selectPhysicalBayCoverage } from "./physical-bay";
+import {
+  loadAuthoritativeStageContext,
+  runSectionBalancedStageSelection,
+  formatStageShortfallSummary,
+} from "./authoritative-week-cycle";
 import { loadActiveSeasonalHighPhysicalKeys } from "./seasonal-selection";
 import {
   isoWeekLabel,
@@ -51,6 +56,9 @@ export type GenerateRotationsResult = {
   skipped?: boolean;
   reason?: string;
   replaced?: number;
+  /** AUTO-002 — section-balanced vs legacy flat stage. */
+  stage_mode?: "section_balanced" | "flat_coverage";
+  stage_shortfalls?: string[];
 };
 
 export type GenerateRotationsOptions = {
@@ -1039,12 +1047,44 @@ async function finishGenerate(
     });
   }
 
-  const selected = selectPhysicalBayCoverage(
+  let selected = selectPhysicalBayCoverage(
     aislePending,
     aisleCarried,
     drawCount,
     { seasonalHighPhysicalKeys: seasonalKeys }
   );
+  let stageMode: "section_balanced" | "flat_coverage" = "flat_coverage";
+  let stageShortfalls: string[] = [];
+  let stageReason: string | undefined;
+
+  // AUTO-002: when approved capacity + section ownership exist, stage per
+  // steward remaining capacity inside each section (never cross-section).
+  if (storeScope.store_id && storeScope.store_number) {
+    try {
+      const stageCtx = await loadAuthoritativeStageContext(supabase, {
+        store_id: storeScope.store_id,
+        store_number: storeScope.store_number,
+        week_label: weekLabel,
+        department_id: departmentId,
+      });
+      if (stageCtx) {
+        const balanced = runSectionBalancedStageSelection({
+          pending: aislePending,
+          carried: aisleCarried,
+          context: stageCtx,
+          seasonalHighPhysicalKeys: seasonalKeys,
+        });
+        if (balanced.selected.length > 0) {
+          selected = balanced.selected;
+          stageMode = "section_balanced";
+          stageShortfalls = balanced.shortfalls.map((s) => s.reason);
+          stageReason = formatStageShortfallSummary(balanced);
+        }
+      }
+    } catch {
+      // Fall through to flat coverage — do not block stage on context load.
+    }
+  }
 
   if (selected.length === 0) {
     throw new Error(
@@ -1092,6 +1132,9 @@ async function finishGenerate(
     rotations: (rotations ?? []) as WeeklyRotation[],
     locations: (locations ?? []) as StoreLocation[],
     weekly_bay_target: dbTarget,
+    stage_mode: stageMode,
+    stage_shortfalls: stageShortfalls.length > 0 ? stageShortfalls : undefined,
+    reason: stageReason,
   };
 }
 

@@ -18,10 +18,11 @@ function authorizeCron(request: Request): boolean {
 /**
  * GET /api/cron/weekly-rotation
  * Vercel Cron — Sunday 11:00 UTC (Hobby: once per day ≈ 05:00 America/Denver MDT).
- * ENGINE-PROD-002: Stage+Assign zero-touch weekly plans (not stage-only).
+ * ENGINE-PROD-002 / ROTATION-AUTO-003: Stage+Assign orchestration (assign publish
+ * gated by product latch via resolveWeeklyRotationAutoPublishEnabled — never from
+ * query/body). Protected by CRON_SECRET (no client role bypass).
  * Per-store gate honors sunday_auto_stage_time + timezone, with cron-compatible
  * fallback when a late stage time can never be reached by this single cron.
- * Protected by CRON_SECRET.
  */
 export async function GET(request: Request) {
   try {

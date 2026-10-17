@@ -309,14 +309,17 @@ describe("ENGINE-PROD-002 source contracts", () => {
     expect(cron).toMatch(/Stage\+Assign/);
   });
 
-  it("sunday-dispatch owns flat quota and admin assignment writer", () => {
+  it("sunday-dispatch owns stewardship assign path and admin assignment writer", () => {
     const dispatch = readRepo("lib/store-ops/sunday-dispatch.ts");
     expect(dispatch).toMatch(/BASE_WEEKLY_BAY_QUOTA/);
-    expect(dispatch).toMatch(/planFlatBayAssignmentsWithCaps/);
+    expect(dispatch).toMatch(/composeAuthoritativeAssignmentProposal/);
     expect(dispatch).toMatch(/applySundayAssignmentPlanAdmin/);
+    expect(dispatch).toMatch(/WEEKLY_ROTATION_AUTO_PUBLISH/);
+    expect(dispatch).toMatch(/STAGED_AWAITING_ASSIGN/);
     expect(dispatch).toMatch(/ALREADY_COMPLETE/);
     expect(dispatch).toMatch(/INCOMPLETE_SCHEDULE/);
     expect(dispatch).toMatch(/INSUFFICIENT_BAYS/);
+    expect(dispatch).not.toMatch(/planFlatBayAssignmentsWithCaps/);
     expect(dispatch).not.toMatch(/planProportionalBayAssignments/);
     expect(dispatch).not.toMatch(/\blocalStorage\b/);
     expect(dispatch).not.toMatch(/DEFAULT_SHIFT_HOURS/);

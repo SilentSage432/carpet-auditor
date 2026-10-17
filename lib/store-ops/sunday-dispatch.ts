@@ -1,16 +1,28 @@
 /**
- * ENGINE-PROD-002 — Zero-touch Sunday Stage+Assign orchestration.
+ * ENGINE-PROD-002 + ROTATION-AUTO-002 — Sunday weekly orchestration.
  *
- * Normal automatic weekly dispatch:
- *   eligible associates (LAB-WEEK-002 evidence) × BASE_WEEKLY_BAY_QUOTA (3)
- *   → stage distinct physical bays → persist sunday_bay_assignments
+ * Stage: section-balanced when approved capacity + Operational Sections exist
+ * (via generateWeeklyRotations). Assign: stewardship / strict section ownership
+ * — same composer as Sunday UI. Flat cross-section assign retired.
  *
- * Staging without ownership is not a successful automatic dispatch.
- * No schema. No browser labor cache. No invented 8h.
+ * AUTO-003: WEEKLY_ROTATION_AUTO_PUBLISH product latch remains false. Cron never
+ * reads publish flags from the HTTP body. Tests may pass publishAssignments.
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { storeNumberQueryValues } from "@/lib/store";
+import { normalizeAisle } from "@/lib/store-ops/aisle";
+import {
+  clearSupervisorLocksForPublishedBays,
+  collectProtectedRotationIds,
+  composeAuthoritativeAssignmentProposal,
+  composeWeekPublicationVisibility,
+  filterProposalAwayFromProtected,
+  loadAuthoritativeStageContext,
+  resolveWeeklyRotationAutoPublishEnabled,
+  summarizePublicationResult,
+  WEEKLY_ROTATION_AUTO_PUBLISH,
+} from "@/lib/store-ops/authoritative-week-cycle";
 import { departmentCodeQueryValues } from "@/lib/store-ops/department-codes";
 import {
   composeWeekLaborAvailability,
@@ -32,8 +44,6 @@ import {
 } from "@/lib/store-ops/week";
 import {
   BASE_WEEKLY_BAY_QUOTA,
-  planFlatBayAssignmentsWithCaps,
-  type RotationBayRef,
   type ShiftRosterMember,
 } from "@/lib/store-ops/weekly-rotations";
 import type { Department } from "@/lib/store-ops/types";
@@ -41,13 +51,12 @@ import { assertApprovedCapacityReady } from "@/lib/store-ops/approved-week-capac
 import {
   filterPlanItemsToCapacity,
   loadStoreWeekCapacity,
-  remainingCapMapForEligible,
   resolveDepartmentStageDrawCount,
   writeSundayAssignmentsWithCapacity,
   type StoreWeekCapacitySnapshot,
 } from "@/lib/store-ops/shared-week-capacity";
 
-export { BASE_WEEKLY_BAY_QUOTA };
+export { BASE_WEEKLY_BAY_QUOTA, WEEKLY_ROTATION_AUTO_PUBLISH };
 
 export type SundayDispatchStatus =
   | "COMPLETE"
@@ -57,6 +66,7 @@ export type SundayDispatchStatus =
   | "NO_ELIGIBLE_WORKFORCE"
   | "NO_MAPPED_LOCATIONS"
   | "PARTIAL"
+  | "STAGED_AWAITING_ASSIGN"
   | "ERROR"
   | "SKIPPED_SCHEDULE";
 
@@ -89,6 +99,8 @@ export type SundayDispatchResult = {
   cycle_number?: number;
   cycle_reset?: boolean;
   loads?: SundayDispatchLoad[];
+  /** AUTO-003 honest post-stage/publish composition (no Zebra claims). */
+  publication_summary?: string;
 };
 
 type ActiveRotationRow = {
@@ -111,6 +123,8 @@ type AssignmentRow = {
   assigned_specialist_id?: string | null;
   specialist_name?: string | null;
   status?: string | null;
+  supervisor_locked?: boolean | null;
+  zebra_entered_at?: string | null;
 };
 
 function isOwnedAssignment(row: AssignmentRow | null | undefined): boolean {
@@ -168,18 +182,34 @@ async function loadWeekAssignments(
   const weekStarting = isoWeekToMondayDate(weekLabel);
   const storeKeys = storeNumberQueryValues(storeNumber);
   const deptKeys = departmentCodeQueryValues(departmentCode);
-  const { data, error } = await supabase
+  const primary = await supabase
     .from("sunday_bay_assignments")
     .select(
-      "bay_id, roster_specialist_id, assigned_specialist_id, specialist_name, status"
+      "bay_id, roster_specialist_id, assigned_specialist_id, specialist_name, status, supervisor_locked, zebra_entered_at"
     )
     .in("store_number", storeKeys)
     .in("department", deptKeys)
     .eq("week_starting", weekStarting);
 
-  if (error) throw new Error(error.message);
+  let rows = (primary.data ?? []) as AssignmentRow[];
+  if (primary.error) {
+    if (/supervisor_locked/i.test(primary.error.message)) {
+      const fallback = await supabase
+        .from("sunday_bay_assignments")
+        .select(
+          "bay_id, roster_specialist_id, assigned_specialist_id, specialist_name, status, zebra_entered_at"
+        )
+        .in("store_number", storeKeys)
+        .in("department", deptKeys)
+        .eq("week_starting", weekStarting);
+      if (fallback.error) throw new Error(fallback.error.message);
+      rows = (fallback.data ?? []) as AssignmentRow[];
+    } else {
+      throw new Error(primary.error.message);
+    }
+  }
   const map = new Map<string, AssignmentRow>();
-  for (const row of (data ?? []) as AssignmentRow[]) {
+  for (const row of rows) {
     const bayId = String(row.bay_id ?? "").trim();
     if (!bayId) continue;
     map.set(bayId, row);
@@ -350,19 +380,6 @@ async function loadShiftDays(
   }>;
 }
 
-function rotationsToBayRefs(rotations: ActiveRotationRow[]): RotationBayRef[] {
-  return rotations.map((row) => {
-    const loc = row.store_locations;
-    return {
-      rotationId: String(row.id),
-      aisle: String(loc?.aisle ?? ""),
-      bay: Number(loc?.bay) || 0,
-      type: loc?.type ?? null,
-      riskScore: 0,
-    };
-  });
-}
-
 function summarizeLoads(
   rotations: ActiveRotationRow[],
   assignments: Map<string, AssignmentRow>,
@@ -472,6 +489,11 @@ export type DispatchWeeklyPlanOptions = {
    */
   storeWeekCapacity?: StoreWeekCapacitySnapshot;
   participating_department_codes?: readonly string[];
+  /**
+   * Test/harness override only — never from cron HTTP body or client headers.
+   * Production activation uses resolveWeeklyRotationAutoPublishEnabled().
+   */
+  publishAssignments?: boolean;
 };
 
 /**
@@ -812,32 +834,72 @@ export async function dispatchWeeklyPlanForDepartment(
       };
     }
 
-    // Cross-department remaining caps (CAPACITY-GUARD-002).
-    const remainingCap = remainingCapMapForEligible(storeCapacity);
-    for (const member of plannerMembers) {
-      if (!remainingCap.has(member.specialist_id)) {
-        // Dept-eligible but not in shared eligible union — still cap at quota using store owned.
-        remainingCap.set(
-          member.specialist_id,
-          Math.max(
-            0,
-            BASE_WEEKLY_BAY_QUOTA -
-              (storeCapacity.owned_by_specialist[member.specialist_id] ?? 0)
-          )
-        );
-      }
-    }
-    const membersForPlan = plannerMembers.filter(
-      (m) => (remainingCap.get(m.specialist_id) ?? 0) > 0
+    const publishAssignments = resolveWeeklyRotationAutoPublishEnabled({
+      override: options.publishAssignments === true,
+    });
+
+    const protectedIds = collectProtectedRotationIds(assignments);
+    const fillableUnowned = unowned.filter(
+      (r) => !protectedIds.has(String(r.id))
     );
 
-    if (membersForPlan.length === 0) {
+    // AUTO-003: product latch OFF → stage only; preserve owners + supervisor locks.
+    if (!publishAssignments) {
+      const loads = summarizeLoads(rotations, assignments, plannerMembers);
+      const ownedCount = rotations.length - unowned.length;
+      const stageNote =
+        generated?.stage_mode === "section_balanced"
+          ? generated.reason || "section-balanced stage"
+          : "stage complete";
+      const visibility = composeWeekPublicationVisibility({
+        week_label: weekLabel,
+        staged: rotations.map((r) => ({
+          id: String(r.id),
+          aisle: normalizeAisle(r.store_locations?.aisle ?? ""),
+          bay: Number(r.store_locations?.bay) || 0,
+          is_completed: r.is_completed === true,
+        })),
+        assignmentsByBayId: assignments,
+        approved_capacity_total: storeCapacity.shared_target,
+        shortfall_notes: generated?.stage_shortfalls ?? [],
+      });
+      const publicationSummary = summarizePublicationResult({
+        visibility,
+        created_assignments: 0,
+        auto_publish_enabled: false,
+      });
+      return {
+        ...base,
+        status: "STAGED_AWAITING_ASSIGN",
+        ok: true,
+        reason: `${stageNote}. WEEKLY_ROTATION_AUTO_PUBLISH latch is OFF — confirm Assign this week (stewardship) to persist owners. ${publicationSummary}. Protected ${protectedIds.size}; fillable unowned ${fillableUnowned.length}.`,
+        publication_summary: publicationSummary,
+        staged_count: rotations.length,
+        owned_count: ownedCount,
+        owners: ownedCounts.size,
+        created_rotations: createdRotations,
+        created_assignments: 0,
+        loads,
+        cycle_number: generated?.cycle_number,
+        cycle_reset: generated?.cycle_reset,
+      };
+    }
+
+    // Authoritative assign path (same composer as Sunday UI Assign this week).
+    const stageCtx = await loadAuthoritativeStageContext(supabase, {
+      store_id: options.store_id,
+      store_number: storeNumber,
+      week_label: weekLabel,
+      department_id: department.id,
+      department_codes: participatingCodes,
+    });
+    if (!stageCtx) {
       return {
         ...base,
         status: "PARTIAL",
         ok: false,
         reason:
-          "Staged unowned bays remain but every eligible associate is already at the base quota of 3 — refusing silent extra dispatch",
+          "Cannot publish assignments — approved capacity and Operational Section ownership evidence required",
         staged_count: rotations.length,
         owned_count: rotations.length - unowned.length,
         owners: ownedCounts.size,
@@ -846,14 +908,73 @@ export async function dispatchWeeklyPlanForDepartment(
       };
     }
 
-    const plan = planFlatBayAssignmentsWithCaps(
-      rotationsToBayRefs(unowned),
-      membersForPlan,
-      remainingCap,
-      { knownHoursOnly: true }
+    if (fillableUnowned.length === 0) {
+      const loads = summarizeLoads(rotations, assignments, plannerMembers);
+      const ownedCount = rotations.filter((r) =>
+        isOwnedAssignment(assignments.get(String(r.id)))
+      ).length;
+      return {
+        ...base,
+        status: ownedCount === rotations.length ? "ALREADY_COMPLETE" : "PARTIAL",
+        ok: ownedCount === rotations.length,
+        skipped: ownedCount === rotations.length,
+        reason:
+          ownedCount === rotations.length
+            ? `Already complete weekly plan for ${weekLabel} (supervisor locks preserved)`
+            : `No fillable unowned bays remain (${protectedIds.size} protected by ownership/supervisor lock)`,
+        staged_count: rotations.length,
+        owned_count: ownedCount,
+        owners: loads.filter((l) => l.assigned > 0).length,
+        created_rotations: createdRotations,
+        created_assignments: 0,
+        loads,
+        cycle_number: generated?.cycle_number,
+        cycle_reset: generated?.cycle_reset,
+      };
+    }
+
+    const stagedForAssign = rotations.map((r) => {
+      const loc = r.store_locations;
+      return {
+        id: String(r.id),
+        department_id: String(loc?.department_id ?? department.id),
+        aisle: normalizeAisle(loc?.aisle ?? ""),
+        bay: Number(loc?.bay) || 0,
+      };
+    });
+
+    const proposal = composeAuthoritativeAssignmentProposal({
+      store_number: storeNumber,
+      week_label: weekLabel,
+      staged: stagedForAssign,
+      ownedRotationIds: protectedIds,
+      members: plannerMembers,
+      baySectionByKey: stageCtx.baySectionByKey,
+      capacity: storeCapacity,
+    });
+
+    const safeItems = filterProposalAwayFromProtected(
+      proposal.items,
+      protectedIds
     );
 
-    const filtered = filterPlanItemsToCapacity(plan.items, storeCapacity);
+    if (!proposal.actionable || safeItems.length === 0) {
+      return {
+        ...base,
+        status: "PARTIAL",
+        ok: false,
+        reason:
+          proposal.block_reason ||
+          "Stewardship proposal could not allocate owners for unowned staged bays (section capacity / eligibility)",
+        staged_count: rotations.length,
+        owned_count: rotations.length - unowned.length,
+        owners: ownedCounts.size,
+        created_rotations: createdRotations,
+        loads: summarizeLoads(rotations, assignments, plannerMembers),
+      };
+    }
+
+    const filtered = filterPlanItemsToCapacity(safeItems, storeCapacity);
     const filteredItems = filtered.accepted;
 
     let createdAssignments = 0;
@@ -870,6 +991,15 @@ export async function dispatchWeeklyPlanForDepartment(
           participating_department_codes: participatingCodes,
         }
       );
+      try {
+        await clearSupervisorLocksForPublishedBays(supabase, {
+          store_number: storeNumber,
+          week_starting: isoWeekToMondayDate(weekLabel),
+          bay_ids: filteredItems.map((i) => String(i.rotationId)),
+        });
+      } catch {
+        // Column may be absent pre-migrate — publish still succeeded.
+      }
     }
 
     await refreshState();
@@ -879,13 +1009,31 @@ export async function dispatchWeeklyPlanForDepartment(
     ).length;
     const unownedLeft = rotations.length - ownedCount;
     const distinctOwners = loads.filter((l) => l.assigned > 0).length;
+    const visibility = composeWeekPublicationVisibility({
+      week_label: weekLabel,
+      staged: rotations.map((r) => ({
+        id: String(r.id),
+        aisle: normalizeAisle(r.store_locations?.aisle ?? ""),
+        bay: Number(r.store_locations?.bay) || 0,
+        is_completed: r.is_completed === true,
+      })),
+      assignmentsByBayId: assignments,
+      approved_capacity_total: storeCapacity.shared_target,
+      shortfall_notes: generated?.stage_shortfalls ?? [],
+    });
+    const summary = summarizePublicationResult({
+      visibility,
+      created_assignments: createdAssignments,
+      auto_publish_enabled: true,
+    });
 
     if (unownedLeft > 0) {
       return {
         ...base,
         status: "PARTIAL",
         ok: false,
-        reason: `Partial ownership: ${ownedCount}/${rotations.length} staged physical bays owned`,
+        reason: `Partial ownership: ${ownedCount}/${rotations.length} staged physical bays owned (strict section ownership; no cross-section fill). ${summary}`,
+        publication_summary: summary,
         staged_count: rotations.length,
         owned_count: ownedCount,
         owners: distinctOwners,
@@ -912,7 +1060,8 @@ export async function dispatchWeeklyPlanForDepartment(
         ...base,
         status: "INSUFFICIENT_BAYS",
         ok: true,
-        reason: `Only ${rotations.length} owed physical bays available for ${eligibleCount} eligible associates (target ${targetBays}; shared ${storeCapacity.shared_target})`,
+        reason: `Only ${rotations.length} owed physical bays available for ${eligibleCount} eligible associates (target ${targetBays}; shared ${storeCapacity.shared_target}). ${summary}`,
+        publication_summary: summary,
         staged_count: rotations.length,
         owned_count: ownedCount,
         owners: distinctOwners,
@@ -934,7 +1083,8 @@ export async function dispatchWeeklyPlanForDepartment(
           ...base,
           status: "COMPLETE",
           ok: true,
-          reason: `Shared store-week capacity filled (${storeCapacity.owned_total}/${storeCapacity.shared_target})`,
+          reason: `Shared store-week capacity filled (${storeCapacity.owned_total}/${storeCapacity.shared_target}). ${summary}`,
+          publication_summary: summary,
           staged_count: rotations.length,
           owned_count: ownedCount,
           owners: distinctOwners,
@@ -949,8 +1099,8 @@ export async function dispatchWeeklyPlanForDepartment(
         ...base,
         status: "PARTIAL",
         ok: false,
-        reason:
-          "Ownership persisted but loads do not match the normal three-bay base quota",
+        reason: `Ownership persisted but loads do not match the normal three-bay base quota. ${summary}`,
+        publication_summary: summary,
         staged_count: rotations.length,
         owned_count: ownedCount,
         owners: distinctOwners,
@@ -966,7 +1116,8 @@ export async function dispatchWeeklyPlanForDepartment(
       ...base,
       status: "COMPLETE",
       ok: true,
-      reason: `Complete weekly plan: ${eligibleCount} × ${BASE_WEEKLY_BAY_QUOTA} physical bays (shared target ${storeCapacity.shared_target})`,
+      reason: `Complete weekly plan: ${eligibleCount} × ${BASE_WEEKLY_BAY_QUOTA} physical bays (shared target ${storeCapacity.shared_target}). ${summary}`,
+      publication_summary: summary,
       staged_count: rotations.length,
       owned_count: ownedCount,
       owners: distinctOwners,

@@ -29,6 +29,7 @@ import {
 } from "@/lib/store-ops/weekly-rotations";
 import { enqueueOrExecute } from "@/lib/sync-queue";
 import { assertApprovedCapacityReady } from "@/lib/store-ops/approved-week-capacity";
+import { stampSupervisorAssignmentLock } from "@/lib/store-ops/authoritative-week-cycle";
 import {
   loadStoreWeekCapacity,
   writeSundayAssignmentsWithCapacity,
@@ -77,6 +78,8 @@ export type SundayBayAssignment = {
   /** Operator-recorded Zebra handoff (ZEBRA-HANDOFF-002). Independent of complete/verify. */
   zebra_entered_at?: string | null;
   zebra_entered_by?: string | null;
+  /** AUTO-003: intentional supervisor edit/clear — auto-publish must not overwrite. */
+  supervisor_locked?: boolean;
 };
 
 export type SundayAssignmentMap = Record<string, SundayBayAssignment>;
@@ -104,6 +107,7 @@ type SundayBayAssignmentRow = {
   updated_at?: string | null;
   zebra_entered_at?: string | null;
   zebra_entered_by?: string | null;
+  supervisor_locked?: boolean | null;
 };
 
 function requireClient() {
@@ -131,7 +135,19 @@ function mapRow(row: SundayBayAssignmentRow): SundayBayAssignment | null {
     ? String(row.assigned_specialist_id)
     : "";
   const specialistId = rosterId || profileId;
-  if (!specialistId || row.status === "cleared") return null;
+  const locked = row.supervisor_locked === true;
+  if (row.status === "cleared") {
+    if (!locked) return null;
+    return {
+      specialist_id: "",
+      specialist_name: "",
+      assigned_at: String(row.updated_at ?? row.created_at),
+      assigned_specialist_id: null,
+      status: "cleared",
+      supervisor_locked: true,
+    };
+  }
+  if (!specialistId) return null;
   return {
     specialist_id: specialistId,
     specialist_name: String(row.specialist_name ?? "").trim() || "Specialist",
@@ -147,6 +163,7 @@ function mapRow(row: SundayBayAssignmentRow): SundayBayAssignment | null {
     zebra_entered_by: row.zebra_entered_by
       ? String(row.zebra_entered_by)
       : null,
+    supervisor_locked: locked,
   };
 }
 
@@ -203,8 +220,7 @@ export async function fetchSundayAssignments(
         .select("*")
         .in("store_number", keys.length ? keys : [store])
         .in("department", deptKeys.length ? deptKeys : [department])
-        .eq("week_starting", weekStarting)
-        .neq("status", "cleared");
+        .eq("week_starting", weekStarting);
 
       if (error) {
         throw new Error(error.message || "Could not load Sunday bay assignments");
@@ -308,6 +324,13 @@ export async function executeSundayAssignLive(
     if (!result.ok) {
       throw new Error(result.error || "Could not clear assignment");
     }
+    // AUTO-003: intentional clear must not be refilled by auto-publish.
+    await stampSupervisorAssignmentLock(supabase, {
+      store_number: store,
+      week_starting: isoWeekToMondayDate(week),
+      bay_id: bayId,
+      locked: true,
+    });
     emitSundayEvent();
     return;
   }
@@ -355,6 +378,13 @@ export async function executeSundayAssignLive(
   if (!result.ok) {
     throw new Error(result.error || "Could not save assignment");
   }
+  // AUTO-003: intentional supervisor reassignment survives auto-publish retries.
+  await stampSupervisorAssignmentLock(supabase, {
+    store_number: store,
+    week_starting: isoWeekToMondayDate(week),
+    bay_id: bayId,
+    locked: true,
+  });
   emitSundayEvent();
 }
 

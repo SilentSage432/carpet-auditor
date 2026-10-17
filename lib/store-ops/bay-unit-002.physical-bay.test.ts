@@ -211,9 +211,9 @@ describe("weekly target counts physical bays", () => {
     expect(generate).toMatch(
       /carried\.filter\(isStandardAisleLocation\)/
     );
-    expect(generate).toMatch(
-      /selectPhysicalBayCoverage\(\s*aislePending,\s*aisleCarried,\s*drawCount/
-    );
+    // Flat coverage remains the fallback; AUTO-002 may prefer section-balanced.
+    expect(generate).toMatch(/selectPhysicalBayCoverage\(/);
+    expect(generate).toMatch(/runSectionBalancedStageSelection|selectPhysicalBayCoverage/);
     const week = readRepo("lib/store-ops/week.ts");
     expect(week).toMatch(/distinct physical aisle\/bay/);
   });
