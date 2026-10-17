@@ -32,7 +32,7 @@
 
 | Field | Value |
 |-------|--------|
-| Commit | **`25d2739`** (`25d27395df87331f99879228648e122b057776ae`) |
+| Commit | **`5550c54`** (`5550c54` / `docs(release): record ROTATION-AUTO-005 Stage 1 production ship` on `main`) |
 | Contents | This report + journal / handoff / roadmap Stage-1 ship note |
 
 ---
