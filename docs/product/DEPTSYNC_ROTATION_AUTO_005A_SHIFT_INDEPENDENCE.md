@@ -1,12 +1,13 @@
 # DEPTSYNC-ROTATION-AUTO-005A — Shift-Independent Weekly Assignment Verification
 
-**Status:** COMPLETE locally — **not deployed**  
+**Status:** COMPLETE locally — **DEPLOYED via AUTO-005B** (`18f8d06`)  
 **Date:** 2026-10-16  
 **Mode:** Targeted verification + minimal correction  
 **Authority:** Operator requirement after AUTO-005 Stage 1  
-**Store context:** 2587 · capacity **Tyson 3 / Nate 3 / Nick 3 / Tracy 3 = 12**
+**Store context:** 2587 · capacity **Tyson 3 / Nate 3 / Nick 3 / Tracy 3 = 12**  
+**Production release:** [`DEPTSYNC_ROTATION_AUTO_005B_RELEASE.md`](DEPTSYNC_ROTATION_AUTO_005B_RELEASE.md)
 
-**Strict exclusions honored:** No deploy · no migrations · no production assignment writes · `WEEKLY_ROTATION_AUTO_PUBLISH = false` · AUTO-006 not started · specialty / Orient untouched.
+**Strict exclusions honored (005A tranche):** No deploy in 005A · no migrations · no production assignment writes · `WEEKLY_ROTATION_AUTO_PUBLISH = false` · AUTO-006 not started · specialty / Orient untouched.
 
 ---
 
@@ -98,7 +99,7 @@ Weekly bay assignment **was incorrectly gated** by shift-hour eligibility (`know
 
 ## 7. Remaining blockers
 
-1. **Not deployed** — production still runs pre-005A eligibility until an authorized app release.  
+1. ~~**Not deployed**~~ — **resolved by AUTO-005B** (`18f8d06` @ https://deptsync-hub.vercel.app).  
 2. **W43 Nate schedules** — capacity approval fingerprint can still go **stale** when shifts are later entered; Master must re-approve after schedule changes (unchanged product rule).  
 3. **Auto-publish** remains OFF until AUTO-006 (not started).  
 4. Flat schedule-balance recovery helper in the Sunday modal still uses hour-based planner members for a non-stewardship fallback path (not the authoritative Assign this week stewardship path).
@@ -110,12 +111,12 @@ Weekly bay assignment **was incorrectly gated** by shift-hour eligibility (`know
 | Decision | Verdict |
 |----------|---------|
 | Shift-independent weekly rotation (local) | **GO** |
-| Deploy this correction | **NO-GO** (await authorize) |
+| Deploy this correction | **GO — RELEASED via AUTO-005B** |
 | Enable automatic publication | **NO-GO** |
 | Begin AUTO-006 | **NO-GO** |
 
 ### Bottom line
 
-Zero / one / many shift rows now yield the same eligible bay assignment outcome when active status, sections, capacity **3/3/3/3**, and rotation rules are held constant. Shifts inform scheduling evidence; they no longer decide who may own weekly bays.
+Zero / one / many shift rows now yield the same eligible bay assignment outcome when active status, sections, capacity **3/3/3/3**, and rotation rules are held constant. Shifts inform scheduling evidence; they no longer decide who may own weekly bays. Production release: [`DEPTSYNC_ROTATION_AUTO_005B_RELEASE.md`](DEPTSYNC_ROTATION_AUTO_005B_RELEASE.md).
 
-**STOP.** Do not deploy. Do not enable automatic publication. Do not begin AUTO-006.
+**STOP.** Do not enable automatic publication. Do not begin AUTO-006.
