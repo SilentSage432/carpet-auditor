@@ -76,6 +76,7 @@ import {
 } from "@/lib/store-ops/weekly-rotations";
 import {
   composeWeekLaborAvailability,
+  weekLaborToAssignmentMembers,
   weekLaborToPlannerMembers,
   type LabPersistedShiftDayInput,
   type WeekLaborComposition,
@@ -410,7 +411,8 @@ export function SundayAuditAssignmentModal({
   const sectionAwarePreview: SectionAwareWeeklyPreview | null = useMemo(() => {
     if (!sectionAwarePreviewOn || !week || !weekLabor) return null;
     if (weekLabor.processing_status === "UNAVAILABLE") return null;
-    const members = weekLaborToPlannerMembers(weekLabor.allocatable);
+    // AUTO-005A: zero-shift active associates remain assignment-eligible.
+    const members = weekLaborToAssignmentMembers(weekLabor.members);
     if (members.length === 0) return null;
     const ownedBySpecialist: Record<string, number> = {};
     let ownedTotal = 0;
@@ -479,7 +481,8 @@ export function SundayAuditAssignmentModal({
     if (!week || !weekLabor || !capacityBoard) return null;
     if (!capacityBoard.approvals_complete) return null;
     if (weekLabor.processing_status === "UNAVAILABLE") return null;
-    const members = weekLaborToPlannerMembers(weekLabor.allocatable);
+    // AUTO-005A: zero-shift active associates remain assignment-eligible.
+    const members = weekLaborToAssignmentMembers(weekLabor.members);
     if (members.length === 0) return null;
     const ownedBySpecialist: Record<string, number> = {};
     let ownedTotal = 0;
@@ -859,15 +862,16 @@ export function SundayAuditAssignmentModal({
       });
       setWeekLabor(labor);
 
-      if (labor.allocatable.length === 0) {
+      if (labor.members.length === 0) {
         setError(
-          "This week cannot be assigned from known schedules. Complete associate start and end times for this week, then try again. Missing times are not treated as 8 hours."
+          "No active associates are available for weekly assignment (Master excluded; home department only)."
         );
         playErrorTone();
         return;
       }
 
-      const members = weekLaborToPlannerMembers(labor.allocatable);
+      // AUTO-005A: shift rows are not required for weekly bay assignment.
+      const members = weekLaborToAssignmentMembers(labor.members);
       const ownedBySpecialist: Record<string, number> = {};
       let ownedTotal = 0;
       const ownedRotationIds: string[] = [];

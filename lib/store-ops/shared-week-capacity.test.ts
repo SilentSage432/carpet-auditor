@@ -165,7 +165,7 @@ describe("CAPACITY-GUARD-002 composeStoreWeekCapacity", () => {
     expect(capacity.shared_target).toBe(12);
   });
 
-  it("missing schedule evidence does not archive — only omits from eligibility", () => {
+  it("missing schedule evidence does not archive — AUTO-005A keeps active associates eligible", () => {
     const capacity = composeStoreWeekCapacity({
       store_number: "2587",
       week_label: WEEK,
@@ -174,11 +174,12 @@ describe("CAPACITY-GUARD-002 composeStoreWeekCapacity", () => {
         member("nate", "Associate", null, "flooring"),
         member("tracy", "Associate", null, "flooring"),
       ],
+      // Only Tracy has shifts; Nate still remains weekly-assignment eligible.
       persisted_shift_days: shiftsFor("tracy"),
       assignments: [],
     });
-    expect(capacity.eligible_specialist_ids).toEqual(["tracy"]);
-    expect(capacity.shared_target).toBe(3);
+    expect(capacity.eligible_specialist_ids).toEqual(["nate", "tracy"]);
+    expect(capacity.shared_target).toBe(6);
   });
 
   it("completed assignments still consume capacity", () => {
@@ -301,7 +302,7 @@ describe("CAPACITY-GUARD-002 composeStoreWeekCapacity", () => {
       week_label: WEEK,
       department_codes: ["flooring"],
       workforce: [member("tracy", "Associate", "flooring")],
-      // No shifts now — not eligible going forward
+      // AUTO-005A: zero shifts still leave Tracy assignment-eligible (natural ×3).
       persisted_shift_days: [],
       assignments: [
         owned("r1", "tracy"),
@@ -310,8 +311,8 @@ describe("CAPACITY-GUARD-002 composeStoreWeekCapacity", () => {
         owned("r4", "tracy"),
       ],
     });
-    expect(capacity.eligible_count).toBe(0);
-    expect(capacity.shared_target).toBe(0);
+    expect(capacity.eligible_count).toBe(1);
+    expect(capacity.shared_target).toBe(3);
     expect(capacity.owned_total).toBe(4);
     expect(capacity.over_capacity).toBe(true);
     expect(capacity.owned_by_specialist.tracy).toBe(4);

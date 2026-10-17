@@ -406,11 +406,13 @@ export function planStrictSectionOwnershipAssignments(
 ): ProportionalAssignmentPlan & {
   preference_by_rotation: Record<string, "steward_match">;
 } {
-  const knownHoursOnly = options?.knownHoursOnly !== false;
+  // AUTO-005A: weekly ownership is gated by remaining approved capacity +
+  // section ownership, not by shift hours. knownHoursOnly retained for API
+  // parity but no longer excludes zero-hour associates from assignment.
+  void options?.knownHoursOnly;
   const active = members
     .filter((m) => {
       if (!m.active) return false;
-      if (resolvePlannerHours(m.hours) <= 0) return false;
       return Math.max(0, Math.floor(remainingCaps.get(m.specialist_id) ?? 0)) > 0;
     })
     .slice()
@@ -457,9 +459,6 @@ export function planStrictSectionOwnershipAssignments(
     });
     preference_by_rotation[bay.rotationId] = "steward_match";
   }
-
-  // Silence unused knownHoursOnly for API parity (filter already applied).
-  void knownHoursOnly;
 
   const loads: AssociateLoadPreview[] = active.map((member, i) => {
     const mine = items.filter((row) => row.specialist_id === member.specialist_id);

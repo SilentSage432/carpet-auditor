@@ -15,7 +15,6 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { storeNumberQueryValues } from "@/lib/store";
 import {
   composeWeekLaborAvailability,
-  weekLaborToPlannerMembers,
   type WeekLaborMemberInput,
 } from "@/lib/store-ops/labor-availability";
 import {
@@ -135,8 +134,9 @@ export function resolveCapacityOwnerId(
 
 /**
  * Pure store-week capacity composition.
- * MasterAdmin is already excluded by labor eligibility.
- * Missing schedules do not archive anyone — they simply omit from eligible set.
+ * MasterAdmin is already excluded by labor workforce membership.
+ * AUTO-005A: missing/zero shift rows do not omit active associates from the
+ * weekly assignment eligible set — shifts inform schedules/fingerprints only.
  */
 export function composeStoreWeekCapacity(
   input: ComposeStoreWeekCapacityInput
@@ -180,7 +180,8 @@ export function composeStoreWeekCapacity(
       as_of,
     });
     if (labor.processing_status === "UNAVAILABLE") continue;
-    for (const member of weekLaborToPlannerMembers(labor.allocatable)) {
+    // Use full active home-department membership — not shift-hour allocatable.
+    for (const member of labor.members) {
       const id = String(member.specialist_id ?? "").trim();
       if (id) eligible.add(id);
     }

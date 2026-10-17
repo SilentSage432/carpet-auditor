@@ -13,7 +13,6 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { storeNumberQueryValues } from "@/lib/store";
 import {
   composeWeekLaborAvailability,
-  weekLaborToPlannerMembers,
   type WeekLaborMemberInput,
 } from "@/lib/store-ops/labor-availability";
 import {
@@ -329,21 +328,15 @@ export function buildWeekCapacityReviewBoard(input: {
       (row) => String(row.specialist_id) === sid
     );
     const fingerprint = buildAssociateWeekScheduleFingerprint(shifts, sid);
-    const eligible = member.has_allocatable_hours;
-    const suggested: ApprovedCapacityValue = eligible
-      ? BASE_WEEKLY_BAY_QUOTA
-      : 0;
+    // AUTO-005A: active home-department associates are assignment-eligible
+    // regardless of shift rows. Shifts remain for fingerprint / display only.
+    const eligible = true;
+    const suggested: ApprovedCapacityValue = BASE_WEEKLY_BAY_QUOTA;
     const owned = Math.max(0, Math.floor(input.owned_by_specialist[sid] ?? 0));
     const approval = approvalById.get(sid);
     let approval_status: CapacityApprovalDraft["approval_status"] = "missing";
     let approved_capacity: number | null = null;
-    if (!eligible) {
-      approval_status = "ineligible";
-      approved_capacity =
-        approval && isApprovedCapacityValue(approval.approved_capacity)
-          ? approval.approved_capacity
-          : null;
-    } else if (approval) {
+    if (approval) {
       approved_capacity = approval.approved_capacity;
       approval_status =
         approval.schedule_fingerprint === fingerprint ? "approved" : "stale";
@@ -559,6 +552,8 @@ export async function loadApprovedStoreWeekCapacity(
     status: row.status as string | null | undefined,
   }));
 
+  // AUTO-005A: weekly assignment eligibility = active home-department associates
+  // (labor.members). Shift-hour allocatable set must not gate capacity or assign.
   const eligible = new Set<string>();
   for (const department of input.department_codes) {
     const labor = composeWeekLaborAvailability({
@@ -575,7 +570,7 @@ export async function loadApprovedStoreWeekCapacity(
       schedule_evidence_available: true,
       as_of: new Date().toISOString(),
     });
-    for (const member of weekLaborToPlannerMembers(labor.allocatable)) {
+    for (const member of labor.members) {
       eligible.add(String(member.specialist_id).trim());
     }
   }

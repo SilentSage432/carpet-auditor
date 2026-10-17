@@ -764,6 +764,9 @@ export function composeWeekLaborAvailability(
 /**
  * Map allocatable week-labor members into ShiftRosterMember shape for the
  * proportional planner (known hours only — never invent default daily hours).
+ *
+ * Prefer {@link weekLaborToAssignmentMembers} for weekly bay assignment paths
+ * (AUTO-005A): shift hours must not gate who may receive approved capacity.
  */
 export function weekLaborToPlannerMembers(
   allocatable: ReadonlyArray<WeekLaborMemberEvidence>
@@ -781,4 +784,27 @@ export function weekLaborToPlannerMembers(
       active: true,
       hours: m.known_available_hours,
     }));
+}
+
+/**
+ * AUTO-005A — weekly bay assignment members from week-labor evidence.
+ *
+ * Includes every active home-department associate in `members`, even when
+ * `known_available_hours` is 0. Shift rows remain informational (schedules,
+ * fingerprints, reminders); they do not gate weekly bay eligibility.
+ */
+export function weekLaborToAssignmentMembers(
+  members: ReadonlyArray<WeekLaborMemberEvidence>
+): Array<{
+  specialist_id: string;
+  specialist_name: string;
+  active: boolean;
+  hours: number;
+}> {
+  return members.map((m) => ({
+    specialist_id: m.specialist_id,
+    specialist_name: m.specialist_name,
+    active: true,
+    hours: m.known_available_hours,
+  }));
 }

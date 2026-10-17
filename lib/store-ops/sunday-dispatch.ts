@@ -26,7 +26,7 @@ import {
 import { departmentCodeQueryValues } from "@/lib/store-ops/department-codes";
 import {
   composeWeekLaborAvailability,
-  weekLaborToPlannerMembers,
+  weekLaborToAssignmentMembers,
   type WeekLaborMemberInput,
 } from "@/lib/store-ops/labor-availability";
 import { physicalBayKey } from "@/lib/store-ops/physical-bay";
@@ -499,9 +499,8 @@ export type DispatchWeeklyPlanOptions = {
 /**
  * Idempotent Stage+Assign for one department / ISO week.
  *
- * Insufficient-labor decision (ENGINE-PROD-002): no product-authoritative
- * minimum-hours threshold exists (CAP-001 rejected capacity models; no Planning
- * Allowance). Eligible = known_available_hours > 0 → strict base quota 3.
+ * AUTO-005A: weekly assignment eligibility is active home-department workforce
+ * (+ approved capacity when present). Shift hours do not gate bay assignment.
  */
 export async function dispatchWeeklyPlanForDepartment(
   supabase: SupabaseClient,
@@ -612,8 +611,8 @@ export async function dispatchWeeklyPlanForDepartment(
       };
     }
 
-    const plannerMembers = weekLaborToPlannerMembers(labor.allocatable);
-    const eligibleCount = plannerMembers.length;
+    // AUTO-005A: include zero-shift active associates for weekly bay assignment.
+    const plannerMembers = weekLaborToAssignmentMembers(labor.members);
 
     const participatingCodes =
       options.participating_department_codes &&
@@ -628,6 +627,12 @@ export async function dispatchWeeklyPlanForDepartment(
         week_label: weekLabel,
         department_codes: participatingCodes,
       }));
+
+    // Prefer capacity-backed eligible count (approvals / active workforce).
+    const eligibleCount =
+      storeCapacity.eligible_count > 0
+        ? storeCapacity.eligible_count
+        : plannerMembers.length;
 
     // Department eligibility still drives who can own this dept's bays;
     // shared remaining caps how many new bays this store-week may stage.
@@ -645,7 +650,7 @@ export async function dispatchWeeklyPlanForDepartment(
         status: "NO_ELIGIBLE_WORKFORCE",
         ok: false,
         reason:
-          "No eligible associates with known ON_DUTY weekly hours (Master excluded; home department only)",
+          "No eligible active associates for weekly assignment (Master excluded; home department only)",
       };
     }
 
