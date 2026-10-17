@@ -66,7 +66,7 @@ Production now runs the AUTO-005A shift-independence correction: weekly bay assi
 
 | Field | Value |
 |-------|--------|
-| Commit | **`219065b`** (ship report) · tip **`a500202`** on `main` (SHA pin) |
+| Commit | **`219065b`** (ship report) · tip **`26ddc0e`** on `main` |
 | Contents | This report; AUTO-005A status mark-deployed; DEVELOPMENT_JOURNAL / CHAT_HANDOFF / MASTER_ROADMAP |
 
 ---
