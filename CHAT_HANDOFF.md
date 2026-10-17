@@ -1,6 +1,7 @@
 # DeptSync Hub — Chat Handoff
 
 ## Latest (2026-10-16)
+- **DEPTSYNC-ROTATION-AUTO-005 — CONTROLLED PRODUCTION RELEASE STAGE 1 — RELEASED; AUTO-PUBLISH OFF.** App **`57e3ab3`**; migrate `20261021_…supervisor_lock` COMMIT on `fmeinlwhixngednabhgy`; GitHub Production **`7134860765`**; Vercel Ready @ https://deptsync-hub.vercel.app. Prospective **W43 capacity 3/3/3/3=12**; W42 assignments/capacity untouched; sections **4×160**; SBA **30**. Latch OFF → cron still `STAGED_AWAITING_ASSIGN`. Smoke: `/login` 200; protected 307; APIs 401. Canonical: [`docs/product/DEPTSYNC_ROTATION_AUTO_005_RELEASE.md`](docs/product/DEPTSYNC_ROTATION_AUTO_005_RELEASE.md). **STOP. Do not enable automatic publication. Do not begin AUTO-006 / specialty / Orient.**
 - **DEPTSYNC-ROTATION-AUTO-004 — AUTOMATIC WEEKLY ASSIGNMENT PRODUCTION READINESS — COMPLETE (docs + local fixture; no deploy/migrate/enable).** AUTO-002/003 path coherent; latch OFF; migration fixture PASS on disposable local DB; capacity still **11** (3/2/3/3); full-11 + 8/11 regressions PASS; suite **166 PASS**; tsc/build PASS. Verdict **CONDITIONAL GO**: migrate + latch-OFF deploy first; dual-gate enable only for a **future** Sunday week after phone acceptance. Prefer next Sunday (stages upcoming week via `sundayStagingWeekLabel`). SPECIALTY-OPS-001 paused. Canonical: [`docs/product/DEPTSYNC_ROTATION_AUTO_004_READINESS.md`](docs/product/DEPTSYNC_ROTATION_AUTO_004_READINESS.md). **STOP. Do not deploy, migrate production, or enable automatic publication.**
 
 ## Latest (2026-10-15)
