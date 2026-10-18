@@ -55,7 +55,7 @@
 
 | Field | Value |
 |-------|--------|
-| Commit | *(this docs tip — recorded after docs push)* |
+| Commit | **`30c6ffa`** (`30c6ffa71d3497ec8375c8f83d64e5a123fe5666`) · tip after pin commit |
 | Contents | This report; `DEPTSYNC_ROTATION_AUTO_006_ACTIVATION_READINESS.md`; DEVELOPMENT_JOURNAL / CHAT_HANDOFF / MASTER_ROADMAP |
 
 ---
