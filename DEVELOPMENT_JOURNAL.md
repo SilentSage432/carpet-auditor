@@ -1,5 +1,9 @@
 # DeptSync Hub — Development Journal
 
+## 2026-10-18 — DEPTSYNC-SECTION-OWNERSHIP-001 schedule-free roster & flexible section assignment
+
+**Discovery / design only — no impl, migrate, deploy, or production writes.** Mapped roster (`store_specialists` create/archive), permanent section owners (`primary_owner_specialist_id` + events + Sections UI), strict ownership stage/RPC, standing capacity, AUTO-008 path. Confirmed shifts already non-gating (AUTO-005A). Gap: **temporary week-specific section coverage**. Recommended model: effectiveOwner = cover(week) ?? permanent; capacity remains associate-scoped (no silent 6 when covering). Preserve AUTO-008 first run **2026-10-25Z → W44**. Next after acceptance: roster lifecycle polish then coverage spike. Canonical: [`docs/product/DEPTSYNC_SECTION_OWNERSHIP_001_DISCOVERY.md`](docs/product/DEPTSYNC_SECTION_OWNERSHIP_001_DISCOVERY.md). **STOP.**
+
 ## 2026-10-18 — DEPTSYNC-ROTATION-AUTO-008 automatic weekly publication activation
 
 **Controlled dual-gate enablement — ACTIVATION ENABLED; first scheduled publication not yet verified.** Standing policy v1 verified (MasterAdmin · Tyson/Nate/Nick/Tracy 3/3/3/3 = 12). Env gate key verified absent then added (`DEPTSYNC_WEEKLY_ROTATION_AUTO_PUBLISH` Production Secret; value not printed). Latch flipped `true` in **`a62084b`**; GitHub Production **`7159528967`**; Vercel Ready @ https://deptsync-hub.vercel.app. Focused **164 PASS**; tsc/build PASS. Pre/post SBA fingerprint `b0bd2882b3aba625` identical; sections **4×160**; W44 empty. Next cron **2026-10-25T12:00Z → 2026-W44**. Milestone **FIRST SCHEDULED PUBLICATION VERIFIED** remains open. Canonical: [`docs/product/DEPTSYNC_ROTATION_AUTO_008_ACTIVATION.md`](docs/product/DEPTSYNC_ROTATION_AUTO_008_ACTIVATION.md). **STOP — await Oct 25 cron evidence; do not manual Assign/Force Draw for “proof”.**
