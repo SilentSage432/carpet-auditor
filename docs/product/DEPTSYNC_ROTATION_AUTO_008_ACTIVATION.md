@@ -131,7 +131,7 @@ Safe gate order (when unblocked): set env `=1` while latch false (no-op) **or** 
 | Field | Value |
 |-------|--------|
 | Contents | This NO-GO report; journal / handoff / roadmap |
-| Commit | *(recorded on docs push)* |
+| Commit | **** () |
 
 ---
 
