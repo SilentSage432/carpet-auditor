@@ -1,5 +1,9 @@
 # DeptSync Hub — Development Journal
 
+## 2026-10-18 — DEPTSYNC-ROTATION-AUTO-008 automatic Sunday publication activation (NO-GO)
+
+**Operator-authorized activation preflight — stopped before gates; latch remains OFF.** Confirmed AUTO-007 on production, cron **`0 12 * * 0`**, supervisor locks live, sections **4×160**, W43 capacity/ownership **3/3/3/3**, next cron **2026-10-25T12:00Z → 2026-W44** (empty assignments — safe canvas). Exact blocker: **W44 has no `store_week_capacity_approvals` rows**; `loadAuthoritativeStageContext` fail-closes without `approvals_complete`. Did not flip `WEEKLY_ROTATION_AUTO_PUBLISH`, did not set Production env publish gate, did not write capacity/assignments. Verdict **NO-GO**. Canonical: [`docs/product/DEPTSYNC_ROTATION_AUTO_008_ACTIVATION.md`](docs/product/DEPTSYNC_ROTATION_AUTO_008_ACTIVATION.md). **STOP — Master-approve W44 3/3/3/3 then re-authorize activation.**
+
 ## 2026-10-18 — DEPTSYNC-ROTATION-AUTO-007 scheduler correction & observability release
 
 **Authorized controlled production release — auto-publish remains OFF; no migrations; no assignment writes.** Scoped to AUTO-006 engineering: Hobby cron **`0 12 * * 0`** (Denver MST 05:00 / MDT 06:00 year-round gate) + `auto_publish_enabled` dispatch field. Winter/summer timing verified (legacy 11:00 UTC = 04:00 MST skip documented). Focused suite **10 files / 180 PASS**; tsc PASS; eslint 0 errors; build PASS. Pre/post SBA fingerprint `b0bd2882b3aba625` identical; sections **4×160**; W43 **3/3/3/3=12**; latch false. App commit **`20dcc5f`**; GitHub Production **`7157155776`**; Vercel Ready `FdmqooBRSFqnKxaB3Eq1SaAcqBs3` @ https://deptsync-hub.vercel.app. Smoke: `/login` 200; protected 307; APIs 401. Canonical: [`docs/product/DEPTSYNC_ROTATION_AUTO_007_RELEASE.md`](docs/product/DEPTSYNC_ROTATION_AUTO_007_RELEASE.md). **STOP — do not enable automatic publication; do not begin AUTO-008.**
