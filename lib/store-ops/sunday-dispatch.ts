@@ -101,6 +101,12 @@ export type SundayDispatchResult = {
   loads?: SundayDispatchLoad[];
   /** AUTO-003 honest post-stage/publish composition (no Zebra claims). */
   publication_summary?: string;
+  /**
+   * AUTO-006 observability — whether ownership publication was attempted.
+   * false for STAGED_AWAITING_ASSIGN / schedule skips; true only when dual-gate
+   * publish path ran (or test override). Never inferred from staging alone.
+   */
+  auto_publish_enabled?: boolean;
 };
 
 type ActiveRotationRow = {
@@ -879,6 +885,7 @@ export async function dispatchWeeklyPlanForDepartment(
         ok: true,
         reason: `${stageNote}. WEEKLY_ROTATION_AUTO_PUBLISH latch is OFF — confirm Assign this week (stewardship) to persist owners. ${publicationSummary}. Protected ${protectedIds.size}; fillable unowned ${fillableUnowned.length}.`,
         publication_summary: publicationSummary,
+        auto_publish_enabled: false,
         staged_count: rotations.length,
         owned_count: ownedCount,
         owners: ownedCounts.size,
@@ -891,6 +898,10 @@ export async function dispatchWeeklyPlanForDepartment(
     }
 
     // Authoritative assign path (same composer as Sunday UI Assign this week).
+    const publishBase: SundayDispatchResult = {
+      ...base,
+      auto_publish_enabled: true,
+    };
     const stageCtx = await loadAuthoritativeStageContext(supabase, {
       store_id: options.store_id,
       store_number: storeNumber,
@@ -900,7 +911,7 @@ export async function dispatchWeeklyPlanForDepartment(
     });
     if (!stageCtx) {
       return {
-        ...base,
+        ...publishBase,
         status: "PARTIAL",
         ok: false,
         reason:
@@ -919,7 +930,7 @@ export async function dispatchWeeklyPlanForDepartment(
         isOwnedAssignment(assignments.get(String(r.id)))
       ).length;
       return {
-        ...base,
+        ...publishBase,
         status: ownedCount === rotations.length ? "ALREADY_COMPLETE" : "PARTIAL",
         ok: ownedCount === rotations.length,
         skipped: ownedCount === rotations.length,
@@ -965,7 +976,7 @@ export async function dispatchWeeklyPlanForDepartment(
 
     if (!proposal.actionable || safeItems.length === 0) {
       return {
-        ...base,
+        ...publishBase,
         status: "PARTIAL",
         ok: false,
         reason:
@@ -1034,7 +1045,7 @@ export async function dispatchWeeklyPlanForDepartment(
 
     if (unownedLeft > 0) {
       return {
-        ...base,
+        ...publishBase,
         status: "PARTIAL",
         ok: false,
         reason: `Partial ownership: ${ownedCount}/${rotations.length} staged physical bays owned (strict section ownership; no cross-section fill). ${summary}`,
@@ -1062,7 +1073,7 @@ export async function dispatchWeeklyPlanForDepartment(
 
     if (insufficient) {
       return {
-        ...base,
+        ...publishBase,
         status: "INSUFFICIENT_BAYS",
         ok: true,
         reason: `Only ${rotations.length} owed physical bays available for ${eligibleCount} eligible associates (target ${targetBays}; shared ${storeCapacity.shared_target}). ${summary}`,
@@ -1085,7 +1096,7 @@ export async function dispatchWeeklyPlanForDepartment(
         storeCapacity.owned_total >= storeCapacity.shared_target
       ) {
         return {
-          ...base,
+          ...publishBase,
           status: "COMPLETE",
           ok: true,
           reason: `Shared store-week capacity filled (${storeCapacity.owned_total}/${storeCapacity.shared_target}). ${summary}`,
@@ -1101,7 +1112,7 @@ export async function dispatchWeeklyPlanForDepartment(
         };
       }
       return {
-        ...base,
+        ...publishBase,
         status: "PARTIAL",
         ok: false,
         reason: `Ownership persisted but loads do not match the normal three-bay base quota. ${summary}`,
@@ -1118,7 +1129,7 @@ export async function dispatchWeeklyPlanForDepartment(
     }
 
     return {
-      ...base,
+      ...publishBase,
       status: "COMPLETE",
       ok: true,
       reason: `Complete weekly plan: ${eligibleCount} × ${BASE_WEEKLY_BAY_QUOTA} physical bays (shared target ${storeCapacity.shared_target}). ${summary}`,

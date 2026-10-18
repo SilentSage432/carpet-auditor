@@ -526,12 +526,13 @@ describe("CAPACITY-GUARD-002 writer fail-closed + contracts", () => {
     );
   });
 
-  it("does not activate second-department auto-stage or change cron schedule", () => {
+  it("does not activate second-department auto-stage; cron stays single Sunday Hobby hit", () => {
     const dispatch = readRepo("lib/store-ops/sunday-dispatch.ts");
     const vercel = readRepo("vercel.json");
     expect(dispatch).toMatch(/\.eq\("is_active", true\)/);
     expect(dispatch).not.toMatch(/home_decor.*is_active:\s*true/);
-    expect(vercel).toMatch(/"0 11 \* \* 0"/);
+    // AUTO-006: 12:00 UTC = Denver 05:00 MST / 06:00 MDT (year-round stage window)
+    expect(vercel).toMatch(/"0 12 \* \* 0"/);
   });
 
   it("retired bay eligibility still requires is_active (unchanged location gate)", () => {

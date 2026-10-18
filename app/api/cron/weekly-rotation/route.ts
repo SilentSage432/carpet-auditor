@@ -17,7 +17,9 @@ function authorizeCron(request: Request): boolean {
 
 /**
  * GET /api/cron/weekly-rotation
- * Vercel Cron — Sunday 11:00 UTC (Hobby: once per day ≈ 05:00 America/Denver MDT).
+ * Vercel Cron — Sunday 12:00 UTC (Hobby: once per day).
+ * America/Denver: 06:00 MDT / 05:00 MST — at or after DEFAULT_SUNDAY_AUTO_STAGE_TIME
+ * year-round (11:00 UTC was 04:00 MST and skipped the 05:00 gate every winter).
  * ENGINE-PROD-002 / ROTATION-AUTO-003: Stage+Assign orchestration (assign publish
  * gated by product latch via resolveWeeklyRotationAutoPublishEnabled — never from
  * query/body). Protected by CRON_SECRET (no client role bypass).

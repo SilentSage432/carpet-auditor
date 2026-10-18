@@ -226,9 +226,10 @@ export function isSundayInTimeZone(
  * Whether the scheduled runner should generate for this store right now.
  * Does not inspect existing rotations — callers skip-if-exists separately.
  *
- * ENGINE-PROD-002: Hobby Vercel fires one Sunday cron at 11:00 UTC
- * (`vercel.json`). A store stage time later than that Sunday local instant
- * (e.g. 23:59 America/Denver while cron is 05:00 local) can never open.
+ * ENGINE-PROD-002 / AUTO-006: Hobby Vercel fires one Sunday cron at 12:00 UTC
+ * (`vercel.json`) — America/Denver ≈ 06:00 MDT / 05:00 MST so the default
+ * 05:00 stage window opens year-round. A store stage time later than that
+ * Sunday local instant (e.g. 23:59) can never open on the single hit.
  * When the configured time is later than DEFAULT_SUNDAY_AUTO_STAGE_TIME and
  * local Sunday time has already reached the default window, open the gate so
  * automatic dispatch remains reachable before the DS needs the plan.

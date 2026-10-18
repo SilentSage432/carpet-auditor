@@ -255,9 +255,9 @@ describe("ENGINE-PROD-002 physical-bay integrity", () => {
 });
 
 describe("ENGINE-PROD-002 cron-compatible Sunday gate", () => {
-  it("opens at default window when configured 23:59 is unreachable by 11:00 UTC cron", () => {
-    // Sunday 2026-09-13 11:00 UTC = 05:00 America/Denver
-    const now = new Date("2026-09-13T11:00:00.000Z");
+  it("opens at default window when configured 23:59 is unreachable by 12:00 UTC cron", () => {
+    // Sunday 2026-09-13 12:00 UTC = 06:00 America/Denver MDT
+    const now = new Date("2026-09-13T12:00:00.000Z");
     const decision = evaluateSundayAutoRun(
       {
         timezone: "America/Denver",
@@ -273,7 +273,7 @@ describe("ENGINE-PROD-002 cron-compatible Sunday gate", () => {
   });
 
   it("still skips before default stage time", () => {
-    const now = new Date("2026-09-13T10:00:00.000Z"); // 04:00 Denver
+    const now = new Date("2026-09-13T10:00:00.000Z"); // 04:00 Denver MDT
     const decision = evaluateSundayAutoRun(
       {
         timezone: "America/Denver",
@@ -286,7 +286,7 @@ describe("ENGINE-PROD-002 cron-compatible Sunday gate", () => {
   });
 
   it("keeps configured early stage time when already past it", () => {
-    const now = new Date("2026-09-13T11:00:00.000Z");
+    const now = new Date("2026-09-13T12:00:00.000Z");
     const decision = evaluateSundayAutoRun(
       {
         timezone: "America/Denver",
