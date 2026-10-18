@@ -1,5 +1,9 @@
 # DeptSync Hub — Development Journal
 
+## 2026-10-18 — DEPTSYNC-SECTION-OWNERSHIP-002 associate roster lifecycle
+
+**Local implementation — PRODUCTION HOLD (do not deploy until AUTO-008 W44 verified).** Soft add/deactivate/reactivate on `store_specialists`; ownership transfer required before deactivate when associate owns sections; unfinished SBA warned not auto-reassigned; standing capacity untouched; add path `onDuty: false`. API `/api/roster/lifecycle`; More → Team panel. Tests **84 PASS** focused batch; tsc/build PASS. No temporary coverage. Canonical: [`docs/product/DEPTSYNC_SECTION_OWNERSHIP_002_IMPLEMENTATION.md`](docs/product/DEPTSYNC_SECTION_OWNERSHIP_002_IMPLEMENTATION.md). **STOP — do not push/deploy until W44 acceptance.**
+
 ## 2026-10-18 — DEPTSYNC-SECTION-OWNERSHIP-001 schedule-free roster & flexible section assignment
 
 **Discovery / design only — no impl, migrate, deploy, or production writes.** Mapped roster (`store_specialists` create/archive), permanent section owners (`primary_owner_specialist_id` + events + Sections UI), strict ownership stage/RPC, standing capacity, AUTO-008 path. Confirmed shifts already non-gating (AUTO-005A). Gap: **temporary week-specific section coverage**. Recommended model: effectiveOwner = cover(week) ?? permanent; capacity remains associate-scoped (no silent 6 when covering). Preserve AUTO-008 first run **2026-10-25Z → W44**. Next after acceptance: roster lifecycle polish then coverage spike. Canonical: [`docs/product/DEPTSYNC_SECTION_OWNERSHIP_001_DISCOVERY.md`](docs/product/DEPTSYNC_SECTION_OWNERSHIP_001_DISCOVERY.md). **STOP.**

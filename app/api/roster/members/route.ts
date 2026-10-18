@@ -51,6 +51,8 @@ export async function POST(request: Request) {
       role: body.role,
       floor_title: body.floor_title,
       sendInvite: false,
+      // SECTION-OWNERSHIP-002: schedule-free roster — do not require on-duty shift.
+      onDuty: false,
     });
 
     if (created.kind !== "roster") {

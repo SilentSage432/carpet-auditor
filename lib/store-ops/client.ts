@@ -2553,6 +2553,74 @@ export async function fetchStandingCapacityPolicy(
   }>("/api/standing-capacity", specialist, { method: "GET" });
 }
 
+/** SECTION-OWNERSHIP-002 — roster lifecycle list (active + inactive). */
+export async function fetchRosterLifecycle(
+  specialist: StoreSpecialist
+): Promise<{
+  store_number: string;
+  active: import("./roster-lifecycle").RosterLifecycleMember[];
+  inactive: import("./roster-lifecycle").RosterLifecycleMember[];
+  active_count: number;
+  inactive_count: number;
+}> {
+  return storeOpsFetch("/api/roster/lifecycle", specialist, { method: "GET" });
+}
+
+export async function fetchRosterDeactivateImpact(
+  specialist: StoreSpecialist,
+  memberId: string
+): Promise<{ impact: import("./roster-lifecycle").DeactivateImpact }> {
+  return storeOpsFetch(`/api/roster/lifecycle/${encodeURIComponent(memberId)}`, specialist, {
+    method: "GET",
+  });
+}
+
+export async function deactivateRosterMemberClient(
+  specialist: StoreSpecialist,
+  memberId: string,
+  transfers?: Array<{ section_id: string; new_owner_specialist_id: string }>
+): Promise<{
+  ok: boolean;
+  action: string;
+  specialist_id: string;
+  transferred_section_ids: string[];
+  impact: import("./roster-lifecycle").DeactivateImpact;
+  note?: string;
+}> {
+  const result = await storeOpsFetch<{
+    ok: boolean;
+    action: string;
+    specialist_id: string;
+    transferred_section_ids: string[];
+    impact: import("./roster-lifecycle").DeactivateImpact;
+    note?: string;
+  }>(`/api/roster/lifecycle/${encodeURIComponent(memberId)}`, specialist, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action: "deactivate", transfers: transfers ?? [] }),
+  });
+  invalidateRosterCache();
+  return result;
+}
+
+export async function reactivateRosterMemberClient(
+  specialist: StoreSpecialist,
+  memberId: string
+): Promise<{ ok: boolean; action: string; specialist_id: string; note?: string }> {
+  const result = await storeOpsFetch<{
+    ok: boolean;
+    action: string;
+    specialist_id: string;
+    note?: string;
+  }>(`/api/roster/lifecycle/${encodeURIComponent(memberId)}`, specialist, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ action: "reactivate" }),
+  });
+  invalidateRosterCache();
+  return result;
+}
+
 /** AUTO-008A — MasterAdmin establish/replace standing capacity policy. */
 export async function establishStandingCapacityPolicyClient(
   specialist: StoreSpecialist,

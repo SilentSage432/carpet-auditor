@@ -26,6 +26,7 @@ import {
   Users,
   type LucideIcon,
 } from "lucide-react";
+import { RosterLifecyclePanel } from "@/components/admin/RosterLifecyclePanel";
 import { PushNotificationsCard } from "@/components/hub/PushNotificationsCard";
 import { FloorTitleBadge } from "@/components/hub/SpecialistCard";
 import { ThemeSelector } from "@/components/settings/ThemeSelector";
@@ -393,8 +394,11 @@ export function SettingsSection({
           </button>
           <p className="text-[11px] leading-snug text-zinc-500">
             Roster remains available here while Overview and This Week absorb
-            everyday people views.
+            everyday people views. Shift schedules are not required for rotation.
           </p>
+          {masterSession && activeSpecialist ? (
+            <RosterLifecyclePanel specialist={activeSpecialist} />
+          ) : null}
         </SettingsCard>
       ) : null}
 
