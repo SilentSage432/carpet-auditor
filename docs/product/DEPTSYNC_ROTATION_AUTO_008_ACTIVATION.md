@@ -143,7 +143,10 @@ No new publisher. No RPC bypass. No SQL assignment writes. No Assign This Week /
 
 ### Documentation commit
 
-Recorded after this report (journal / handoff / roadmap + this file).
+| Field | Value |
+|-------|--------|
+| Commit | **`4332f21`** (`4332f212…` tip may advance with pin) |
+| Contents | This report; DEVELOPMENT_JOURNAL / CHAT_HANDOFF / MASTER_ROADMAP |
 
 ---
 
