@@ -1,275 +1,196 @@
-# DEPTSYNC-ROTATION-AUTO-008 — Automatic Sunday Publication Controlled Production Activation
+# DEPTSYNC-ROTATION-AUTO-008 — Automatic Weekly Publication Activation
 
-**Status:** **NO-GO — ACTIVATION NOT PERFORMED**  
+**Status:** **ACTIVATION ENABLED** — awaiting first scheduled Sunday run  
 **Date:** 2026-10-18  
-**Mode:** Operator-authorized production activation preflight (stopped before gate changes)  
+**Mode:** Controlled production activation  
 **Application:** https://deptsync-hub.vercel.app  
 **Supabase:** `fmeinlwhixngednabhgy`  
 **Store:** 2587 · Flooring / Home Decor  
 
-**Authority:** Operator authorization after AUTO-007 + phone acceptance · AUTO-006 activation runbook · this tranche  
+**Authority:** Operator-authorized AUTO-008 activation · standing capacity established via MasterAdmin UI (AUTO-008B) · AUTO-006 dual-gate runbook · this tranche  
 
-**Strict exclusions honored:** Automatic publication **LEFT OFF** · no latch flip · no Production env publish gate set · no migrations · no capacity writes · no assignment writes · no Assign This Week · no Force Draw · no manual cron · no specialty · no Orient.
-
----
-
-## 1. Executive summary
-
-Operator authorized dual-gate enablement. Preflight confirms AUTO-007 is on production, the Sunday scheduler is `0 12 * * 0`, supervisor locks are live, shift-independent eligibility is live, Operational Sections are intact, and the next cron is safely far enough away (**2026-10-25T12:00:00Z**).
-
-Activation **stopped** because the first automatic target week **`2026-W44` has zero capacity approvals**. Authoritative stage/publish requires `approvals_complete` for the target week (`loadAuthoritativeStageContext` returns `null` otherwise). Enabling gates now would leave the first scheduled Sunday fail-closed (no safe 3/3/3/3=12 publication).
-
-| Decision | Verdict |
-|----------|---------|
-| Operator authorization present | **Yes** |
-| AUTO-007 / scheduler / latch-OFF foundation | **PASS** |
-| Future-week isolation (W44 empty) | **PASS** |
-| Target-week capacity 3/3/3/3 for **W44** | **FAIL** |
-| Enable code latch + env gate | **NO-GO** |
-| Automatic publication | **REMAINS OFF** |
-
-**States (mission distinction):**
-
-| State | Status |
-|-------|--------|
-| ACTIVATED — AWAITING FIRST RUN | **Not reached** |
-| FIRST AUTOMATIC PUBLICATION VERIFIED | **Not reached** |
+**Strict exclusions honored:** No Assign This Week · no Force Draw · no manual cron trigger · no privileged SQL assignment fabrication · no standing-policy overwrite · no specialty · no Orient · no claim of first scheduled publication success.
 
 ---
 
-## 2. Operator authorization
+## Milestone distinction (mission-required)
 
-Operator explicitly authorized AUTO-008 activation following successful AUTO-007 release and phone acceptance. This report does **not** dispute authorization; it records a **blocking precondition** discovered during preflight.
+| Milestone | Status |
+|-----------|--------|
+| **ACTIVATION READY** | **YES** — standing v1 3/3/3/3; AUTO-008B healthy; W44 empty; tests PASS |
+| **ACTIVATION ENABLED** | **YES** — code latch `true` + Production env gate key present; deploy Ready |
+| **FIRST SCHEDULED PUBLICATION VERIFIED** | **NOT YET** — next cron **2026-10-25T12:00:00Z** → target **2026-W44** |
+
+Do **not** treat enablement as proof that Sunday publication already wrote W44 ownership.
 
 ---
 
-## 3. Preflight results
+## 1. Standing policy verification
 
 | Check | Result |
 |-------|--------|
-| Repo / branch | `SilentSage432/carpet-auditor` · `main` @ `0a62c7b` (docs tip; app AUTO-007 **`20dcc5f`**) |
-| AUTO-007 deployed | **PASS** — Production deploy `7157155776` / Vercel `FdmqooBRSFqnKxaB3Eq1SaAcqBs3` · latch false · cron `0 12 * * 0` |
-| Supervisor-lock migration | **PASS** — `supervisor_locked` readable on production SBA |
-| Shift-independent eligibility | **PASS** — shipped in AUTO-005B (`18f8d06`) |
-| W43 capacity 3/3/3/3 | **PASS** — approvals sum **12** |
-| W44 capacity 3/3/3/3 | **FAIL** — **0 approval rows** |
-| Operational Sections | **PASS** — active **4** · members **160** |
-| Scheduler | **PASS** — `vercel.json` `"0 12 * * 0"`; Vercel UTC; store `America/Denver`; `sunday_auto_generate=true` |
-| Publication currently OFF | **PASS** — `WEEKLY_ROTATION_AUTO_PUBLISH = false` in source + production tree |
-| Unrelated pending changes | **PASS** — only unrelated untracked docs (`RD_6`, `SEC_OPS_010A`, specialty); excluded |
+| Active policies (store 2587) | **Exactly 1** |
+| Policy version | **1** |
+| Policy id | `d8bd92ca-97d0-42ac-9126-b6ba2a16f561` |
+| Tyson / Nate / Nick / Tracy | **3 / 3 / 3 / 3** |
+| Shared capacity | **12** |
+| Store scope | **2587** |
+| Established by | `f9e36630-…` · **Master Admin** · role **MasterAdmin** · store **2587** |
+| Note | `Standing weekly capacity (AUTO-008A)` |
+| Effective at | `2026-10-18T19:17:05.127Z` |
+| Policy recreated/overwritten by agent | **No** |
+| Explicit weekly override precedence | Preserved (provenance `explicit` beats standing rematerialize) |
+| Future-week materialization supported | **Yes** (schema + active policy; W44/W45 approvals still 0 until Sunday materialize) |
 
 ---
 
-## 4. First scheduled execution
+## 2. Production safety
+
+| Check | Result |
+|-------|--------|
+| AUTO-008B app foundation | **PASS** — prior tip `5c36621` / standing schema live |
+| GitHub Production (enablement) | **`7159528967`** · SHA `a62084b` · **success** |
+| Vercel alias | https://deptsync-hub.vercel.app · **Ready** |
+| Cron | **`0 12 * * 0`** (unchanged) |
+| Local Denver stage window | Sunday ≥05:00 America/Denver at 12:00 UTC — **PASS** (AUTO-006/007) |
+| Shift rows required | **No** (AUTO-005A/005B) |
+| Section ownership authoritative | **Yes** |
+| Capacity RPC authoritative | **Yes** |
+| Pre-activation code latch | **`false`** (pre-`a62084b`) |
+| Pre-activation env gate | **Absent** from Production env key list (verified via `vercel env ls` — names only) |
+| Post-activation code latch | **`true`** in shipped `a62084b` |
+| Post-activation env gate | Key **`DEPTSYNC_WEEKLY_ROTATION_AUTO_PUBLISH`** present on Production (Secret; value not printed) |
+
+Env verification gap from AUTO-008B resolved by authorized Vercel CLI session (`silentsage432`) listing **key names only**.
+
+---
+
+## 3. Production baseline (read-only)
+
+Evidence: `tmp/auto008-activation-baseline.json` · post `tmp/auto008-activation-post.json`
+
+| Asset | Baseline | Post-enablement |
+|-------|----------|-----------------|
+| SBA fingerprint | `b0bd2882b3aba625` | **identical** |
+| SBA total / owned | 30 / 30 | 30 / 30 |
+| Supervisor locks | 0 | 0 |
+| Sections / members | 4 / 160 | 4 / 160 |
+| Standing active | v1 · sum 12 | v1 · sum 12 |
+| W43 capacity | sum **12** (4 rows) | sum **12** |
+| W44 capacity approvals | **0** | **0** (not preemptively written) |
+| W44 SBA | **0** | **0** |
+| W43 SBA (`week_starting` 2026-10-19) | **0** at activation time | **0** |
+
+**Note:** AUTO-008B baseline had fingerprint `22cd784c27273d93` with 12 W43 SBA rows. At activation preflight those W43 SBA rows were **already absent** (fingerprint returned to `b0bd2882b3aba625`). Agent did not delete them; activation did not rewrite them. W43 capacity approvals remain 3/3/3/3. First automatic target remains empty **W44**.
+
+---
+
+## 4. Next Sunday target
 
 | Field | Value |
 |-------|--------|
+| Activation clock (UTC) | ~2026-10-18T19:26Z (Sunday afternoon Denver) |
+| Today staging week | **2026-W43** |
 | Next Vercel cron | **2026-10-25T12:00:00.000Z** |
-| Local Denver | Sunday **2026-10-25 06:00 MDT** |
-| Distance from preflight | ~7 days (today’s Sunday cron already passed) |
-| Deploy-too-close deferral | **Not required** on timing alone |
+| Denver local | Sunday **2026-10-25 06:00 MDT** |
+| Intended target week | **`2026-W44`** (Monday **2026-10-26**) via `sundayStagingWeekLabel` |
+| Target eligibility | Empty owned assignments · standing policy can materialize 3/3/3/3 · first automatic publication canvas |
+
+No W44 hardcoding beyond calendar derivation. If calendar advances past this window, re-derive from the same helper.
 
 ---
 
-## 5. Target operational week
+## 5. Activation tests
 
-| Field | Value |
+| Suite | Result |
 |-------|--------|
-| First auto target | **`2026-W44`** (Monday **2026-10-26**) via `sundayStagingWeekLabel` |
-| Current Sunday staging week (2026-10-18) | **2026-W43** |
-| Do not modify current week | Honored — no writes |
+| AUTO-008A standing capacity | PASS |
+| AUTO-006 activation readiness (dual-gate + TZ) | PASS |
+| AUTO-003 publication / locks / protected ids | PASS |
+| AUTO-002 section-balanced | PASS |
+| AUTO-005A shift independence | PASS |
+| Approved week capacity | PASS |
+| Sunday dispatch | PASS |
+| SEC-OPS-010 authz | PASS |
+| Shared week capacity | PASS |
+| **Focused total** | **9 files / 164 PASS** |
+| `npx tsc --noEmit` | **PASS** |
+| ESLint (changed files) | **PASS** |
+| `npm run build` | **PASS** |
 
-### Target-week existing work (W44)
-
-| Asset | State |
-|-------|--------|
-| `weekly_rotations` active | **0** |
-| `sunday_bay_assignments` | **0** |
-| Manual / automatic owned | **None** |
-| Supervisor locks | **None** |
-| Completed / verified | **None** |
-
-Preservation of W44 work is vacuously safe (empty). Preservation of **W43** (already owned) is not at risk from the Oct 25 cron (different week).
-
-### Current week (W43) — already published manually / prior stage+assign
-
-| Asset | State |
-|-------|--------|
-| Active rotations | **12** |
-| Owned SBA (`week_starting` 2026-10-19) | **12** — Tracy 3 / Nate 3 / Nick 3 / Tyson 3 |
-| Locks / completed / verified | **0 / 0 / 0** |
-| Capacity approvals | **3/3/3/3 = 12** |
+Covered: standing materialization contracts · 3/3/3/3 · zero-shift eligibility · section-balanced stage · protected / locked / completed paths · dual-gate resolver · cron TZ · authz · explicit override provenance (008A suite).
 
 ---
 
-## 6. Activation changes
+## 6. Controlled activation changes
 
-**None.** Latch and env gate were **not** modified.
-
-Intended minimal change (deferred):
-
-1. `WEEKLY_ROTATION_AUTO_PUBLISH: boolean = true` in `authoritative-week-cycle.ts`
-2. Production env `DEPTSYNC_WEEKLY_ROTATION_AUTO_PUBLISH=1`
-3. Update tests that assert latch `false` → assert dual-gate still requires env when latch true
-4. Deploy enablement revision
-
-Safe gate order (when unblocked): set env `=1` while latch false (no-op) **or** deploy latch true with env unset (still off), then complete the other gate — never introduce a third bypass.
-
----
-
-## 7. App commit
-
-| Field | Value |
-|-------|--------|
-| Activation app commit | **None** (NO-GO) |
-| Production app remains | **`20dcc5f`** (AUTO-007) |
-
----
-
-## 8. Documentation commit
-
-| Field | Value |
-|-------|--------|
-| Contents | This NO-GO report; journal / handoff / roadmap |
-| Commit | **** () |
-
----
-
-## 9. GitHub workflow
-
-| Field | Value |
-|-------|--------|
-| Activation deployment | **Not run** |
-
----
-
-## 10. Vercel deployment
-
-| Field | Value |
-|-------|--------|
-| Activation deployment | **Not run** |
-| Production alias | Remains on AUTO-007 latch-OFF revision |
-
----
-
-## 11. Activation gate verification
-
-| Gate | Preflight | Post-attempt |
-|------|-----------|--------------|
-| Code latch `WEEKLY_ROTATION_AUTO_PUBLISH` | **`false`** | **`false`** (unchanged) |
-| Env `DEPTSYNC_WEEKLY_ROTATION_AUTO_PUBLISH` | Not enabled for publish | **Not set / not flipped** |
-| Dual-gate publish | OFF | OFF |
-
----
-
-## 12. Production baseline
-
-Captured read-only `tmp/auto008-baseline.json` (2026-10-18T16:49Z):
-
-| Asset | Value |
-|-------|--------|
-| SBA total / owned | **42 / 42** |
-| SBA fingerprint | `22cd784c27273d93` |
-| Supervisor locked | **0** |
-| Completed / verified | **0 / 0** |
-| Sections / members | **4 / 160** |
-| W43 capacity | **12** |
-| W44 capacity | **0** (blocker) |
-| W43 rotations / owned | **12 / 12** |
-| W44 rotations / owned | **0 / 0** |
-| Latch | OFF |
-| Cron | `0 12 * * 0` |
-
-Note: fingerprint differs from AUTO-007 (`b0bd2882b3aba625`) because W43 ownership was persisted after that release (phone Assign path). That is expected and not an activation mutation from this tranche.
-
----
-
-## 13. Assignment preservation evidence
-
-| Scope | Evidence | Verdict |
-|-------|----------|---------|
-| This tranche writes | None | **Preserved** |
-| W44 | Empty | **Safe first-run canvas if approvals exist** |
-| W43 owned 3/3/3/3 | Protected-id path would skip on retry | **Not targeted by next Sunday** |
-
----
-
-## 14. Validation results
-
-Preflight did **not** flip the latch; focused enablement suite was **not** re-run against a true latch (would require the deferred code change). Foundation already validated under AUTO-006/007:
-
-| Prior evidence | Result |
-|----------------|--------|
-| AUTO-006 / AUTO-007 suite | **180 PASS** |
-| Dual-gate contracts | Env alone ignored; cron cannot body-elevate |
-| Protected-id / stewardship / capacity RPC | Covered in AUTO-003/006 |
-| DB concurrency | `pg_advisory_xact_lock` inside `upsert_sunday_bay_assignments_with_capacity` |
-
----
-
-## 15. Emergency disable procedure
-
-*(Documented for when activation later succeeds; unused this tranche.)*
-
-| Step | Action | Effect |
+| Step | Action | Result |
 |------|--------|--------|
-| 1 Immediate | Set Production `DEPTSYNC_WEEKLY_ROTATION_AUTO_PUBLISH` ≠ `1` | Stops publish while latch true; **no redeploy** |
-| 2 Durable | Redeploy with `WEEKLY_ROTATION_AUTO_PUBLISH = false` | Latch hard-off |
-| Assignments | Leave published rows intact | No wipe |
-| Manual path | Assign this week / supervisor edit remain | Preserved |
+| 1 | Production env `DEPTSYNC_WEEKLY_ROTATION_AUTO_PUBLISH=1` (Secret) | **Added** via authorized `vercel env add` |
+| 2 | Code latch `WEEKLY_ROTATION_AUTO_PUBLISH = true` | Commit **`a62084b`** |
+| 3 | Deploy enablement revision | GitHub Production **`7159528967`** · Vercel **success** |
+| 4 | Verify both gates in deployed config | Latch **true** in shipped source · env **key present** on Production |
 
-Env disable is near-immediate after Vercel env propagation; latch disable waits for a production deploy.
+No new publisher. No RPC bypass. No SQL assignment writes. No Assign This Week / Force Draw.
 
----
+### App commit
 
-## 16. First-run verification plan
+| Field | Value |
+|-------|--------|
+| Commit | **`a62084b`** (`a62084b06c72061732f302978fac6b401b85c331`) |
+| Message | `feat(rotation): enable dual-gate automatic Sunday publication` |
+| Latch | `export const WEEKLY_ROTATION_AUTO_PUBLISH: boolean = true` |
 
-*(Deferred until activation unblocked.)*
+### Documentation commit
 
-After Master Admin approves **W44** capacity **Tyson 3 / Nate 3 / Nick 3 / Tracy 3 = 12** with fresh fingerprints:
-
-1. Re-run AUTO-008 preflight (confirm W44 `approvals_complete`).  
-2. Enable latch + env; deploy; verify both gates ON.  
-3. Do **not** manually invoke cron.  
-4. Observe Sunday **2026-10-25** cron → expect `auto_publish_enabled: true` and `COMPLETE` / honest `PARTIAL` for **W44**.  
-5. Read-only: owned counts ≤3 each; sections preserved; W43 fingerprint unchanged; Zebra still manual.  
-6. Only then mark **FIRST AUTOMATIC PUBLICATION VERIFIED**.
+Recorded after this report (journal / handoff / roadmap + this file).
 
 ---
 
-## 17. Remaining risks / exact blocker
+## 7. Post-activation verification
 
-### Exact blocker (STOP)
-
-**`2026-W44` has no rows in `store_week_capacity_approvals`.**  
-Automatic publication’s authoritative path requires `capacity.approvals_complete === true`. Without W44 approvals, Oct 25 cron cannot safely compose/persist a 3/3/3/3 week.
-
-### Operator action required (outside this agent tranche)
-
-1. In Floor Command Master capacity UI, approve **2026-W44** at **3/3/3/3 = 12**.  
-2. Confirm fingerprints are non-stale before Sunday 2026-10-25.  
-3. Re-authorize / re-run AUTO-008 activation (or a named AUTO-008B tranche).
-
-### Other residual risks (non-blocking once W44 approved)
-
-- Hobby cron may fire anywhere in the 12:00 UTC hour (still ≥05:00 MST / ≥06:00 MDT).  
-- Fingerprint drift after approval if schedules change before cron.  
-- Pacific multi-TZ residual (N/A for Denver-only store).
+| Check | Result |
+|-------|--------|
+| `/login` | **200** |
+| Protected routes | **307** → login |
+| Capacity APIs unauth | **401** |
+| Standing policy still v1 / 12 | **YES** |
+| Assignment fingerprint unchanged | **YES** (`b0bd2882b3aba625`) |
+| Unexpected assignment writes | **None observed** |
+| Automatic publication **enabled** (dual-gate) | **YES** |
+| First scheduled run executed | **NO** — pending **2026-10-25T12:00Z** |
+| Expected first outcome | Materialize W44 standing approvals → section-balanced stage → stewardship publish via capacity RPC → `auto_publish_enabled: true` · `COMPLETE` or honest `PARTIAL` |
 
 ---
 
-## 18. GO / NO-GO verdict
+## 8. Rollback (unchanged from AUTO-006)
+
+| Order | Action |
+|-------|--------|
+| 1 Immediate | Remove or set Production `DEPTSYNC_WEEKLY_ROTATION_AUTO_PUBLISH` ≠ `1` (stops publish without latch redeploy) |
+| 2 Durable | Redeploy with `WEEKLY_ROTATION_AUTO_PUBLISH = false` |
+
+---
+
+## 9. Blockers / residual notes
+
+1. **FIRST SCHEDULED PUBLICATION VERIFIED** still open until Oct 25 cron evidence.  
+2. W43 SBA rows were already gone at activation baseline (capacity approvals remain). Investigate separately if This Week W43 ownership UI is unexpected — outside this activation write path.  
+3. W44 weekly approvals remain 0 until Sunday materialization (by design; not pre-seeded).
+
+---
+
+## 10. GO / NO-GO verdict
 
 | Decision | Verdict |
 |----------|---------|
-| Activate automatic Sunday publication **now** | **NO-GO** |
-| Leave `WEEKLY_ROTATION_AUTO_PUBLISH = false` | **GO — honored** |
-| Leave Production env publish gate unset | **GO — honored** |
-| Migrations / capacity writes / assignment writes | **NO-GO** (honored) |
-| Specialty / Orient | **NO-GO** |
+| Standing policy 3/3/3/3 | **GO** |
+| Dual-gate enablement | **GO — ENABLED** |
+| Claim first auto publication already succeeded | **NO-GO** |
+| Manual Assign / Force Draw / SQL fabricate | **NO-GO** (honored) |
 
 ### Bottom line
 
-Automatic publication remains **OFF** on https://deptsync-hub.vercel.app. First eligible auto Sunday would target **2026-W44**, which is assignment-empty but **missing capacity approvals**. Do not enable gates until W44 is approved at **3/3/3/3 = 12**.
+Automatic weekly publication is **ACTIVATION ENABLED** on production: latch **true** + Production env gate present, deploy **`a62084b`**. Standing capacity **v1 = 12**. Next eligible Sunday **2026-10-25T12:00Z** should publish **2026-W44**. **FIRST SCHEDULED PUBLICATION VERIFIED** awaits that run.
 
-**STOP AFTER ACTIVATION REPORT.** Do not flip the latch. Do not set the env gate. Do not begin specialty or Orient work.
+**STOP AFTER REPORT.**
