@@ -69,7 +69,8 @@ Shipped surfaces: standing domain + API + Sunday drawer panel + Sunday materiali
 
 | Field | Value |
 |-------|--------|
-| Commit | This release report + journal / handoff / roadmap (committed after engineering release) |
+| Commit | **`1e5f728`** (`1e5f7282074a8575781197d34de65c572c50b873`) |
+| Contents | This report; AUTO-008A status update; DEVELOPMENT_JOURNAL / CHAT_HANDOFF / MASTER_ROADMAP |
 | Canonical | [`DEPTSYNC_ROTATION_AUTO_008B_RELEASE.md`](DEPTSYNC_ROTATION_AUTO_008B_RELEASE.md) |
 | Prior local | [`DEPTSYNC_ROTATION_AUTO_008A_STANDING_CAPACITY.md`](DEPTSYNC_ROTATION_AUTO_008A_STANDING_CAPACITY.md) |
 
