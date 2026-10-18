@@ -24,6 +24,10 @@ import {
   type OperationalSectionView,
 } from "./operational-sections";
 import {
+  applyWeekCoverageToBaySectionLookups,
+  loadCoverageOwnerBySectionId,
+} from "./section-week-coverage";
+import {
   selectSectionBalancedPhysicalBayCoverage,
   type SectionBalancedStageResult,
   type SectionBalancedStageSlot,
@@ -140,10 +144,20 @@ export async function loadAuthoritativeStageContext(
     return null;
   }
 
-  const baySectionByKey = indexBaySectionLookups(listed.value);
-  if (baySectionByKey.size === 0) {
+  const permanentBaySectionByKey = indexBaySectionLookups(listed.value);
+  if (permanentBaySectionByKey.size === 0) {
     return null;
   }
+
+  // SECTION-OWNERSHIP-003: week-effective owners (coverage ?? permanent).
+  const coverageBySection = await loadCoverageOwnerBySectionId(supabase, {
+    store_id: storeId,
+    week_label: weekLabel,
+  });
+  const baySectionByKey = applyWeekCoverageToBaySectionLookups(
+    permanentBaySectionByKey,
+    coverageBySection
+  );
 
   const nameById = new Map<string, string>();
   for (const section of listed.value) {
@@ -154,6 +168,12 @@ export async function loadAuthoritativeStageContext(
         String(section.primary_owner_name ?? "").trim() || oid
       );
     }
+  }
+  for (const [sectionId, coverId] of coverageBySection) {
+    if (!nameById.has(coverId)) {
+      nameById.set(coverId, coverId);
+    }
+    void sectionId;
   }
 
   const remaining = remainingCapMapForEligible(capacity);

@@ -2553,6 +2553,59 @@ export async function fetchStandingCapacityPolicy(
   }>("/api/standing-capacity", specialist, { method: "GET" });
 }
 
+/** SECTION-OWNERSHIP-003 — list active week coverage for a store week. */
+export async function fetchSectionWeekCoverage(
+  specialist: StoreSpecialist,
+  input: { week_label: string; section_id?: string }
+): Promise<{
+  week_label: string;
+  coverage: import("./section-week-coverage").SectionWeekCoverageRow[];
+  schema_ready: boolean;
+}> {
+  const params = new URLSearchParams({ week_label: input.week_label });
+  if (input.section_id) params.set("section_id", input.section_id);
+  return storeOpsFetch(
+    `/api/section-week-coverage?${params.toString()}`,
+    specialist,
+    { method: "GET" }
+  );
+}
+
+export async function establishSectionWeekCoverageClient(
+  specialist: StoreSpecialist,
+  input: {
+    section_id: string;
+    week_label: string;
+    covering_specialist_id: string;
+    note?: string;
+    acknowledge_published_week?: boolean;
+  }
+): Promise<{
+  ok: boolean;
+  coverage: import("./section-week-coverage").SectionWeekCoverageRow;
+  capacity_preview: ReturnType<
+    typeof import("./section-week-coverage").previewCoverageCapacityImpact
+  >;
+  note?: string;
+}> {
+  return storeOpsFetch("/api/section-week-coverage", specialist, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+}
+
+export async function revokeSectionWeekCoverageClient(
+  specialist: StoreSpecialist,
+  input: { section_id: string; week_label: string }
+): Promise<{ ok: boolean; revoked: boolean; note?: string }> {
+  return storeOpsFetch("/api/section-week-coverage", specialist, {
+    method: "DELETE",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(input),
+  });
+}
+
 /** SECTION-OWNERSHIP-002 — roster lifecycle list (active + inactive). */
 export async function fetchRosterLifecycle(
   specialist: StoreSpecialist

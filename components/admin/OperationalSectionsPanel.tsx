@@ -16,11 +16,16 @@ import { fetchSpecialists } from "@/lib/specialists";
 import {
   addOperationalSectionMembersClient,
   createOperationalSectionClient,
+  establishSectionWeekCoverageClient,
   fetchOperationalSections,
+  fetchSectionWeekCoverage,
   patchOperationalSectionClient,
   removeOperationalSectionMembersClient,
+  revokeSectionWeekCoverageClient,
   STORE_OPS_SECTIONS_CHANGED_EVENT,
 } from "@/lib/store-ops/client";
+import { resolveNextRotationWeekLabel } from "@/lib/store-ops/week";
+import type { SectionWeekCoverageRow } from "@/lib/store-ops/section-week-coverage";
 import {
   assertSectionAislePreviewFresh,
   composeDepartmentAisleIndexForSections,
@@ -92,6 +97,13 @@ export function OperationalSectionsPanel({
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [ownerId, setOwnerId] = useState<string>("");
+  const [coverageWeek, setCoverageWeek] = useState(
+    () => resolveNextRotationWeekLabel()
+  );
+  const [coverId, setCoverId] = useState("");
+  const [activeCoverage, setActiveCoverage] =
+    useState<SectionWeekCoverageRow | null>(null);
+  const [coverageNote, setCoverageNote] = useState<string | null>(null);
   const [pendingBays, setPendingBays] = useState<OperationalSectionBayRef[]>(
     []
   );
@@ -161,6 +173,33 @@ export function OperationalSectionsPanel({
     () => sections.find((s) => s.id === selectedId) ?? null,
     [sections, selectedId]
   );
+
+  useEffect(() => {
+    if (mode !== "detail" || !selected?.is_active || !coverageWeek) {
+      return;
+    }
+    const sectionId = selected.id;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const data = await fetchSectionWeekCoverage(specialist, {
+          week_label: coverageWeek,
+          section_id: sectionId,
+        });
+        if (cancelled) return;
+        const row = data.coverage[0] ?? null;
+        setActiveCoverage(row);
+        setCoverId(row?.covering_specialist_id ?? "");
+      } catch {
+        if (!cancelled) {
+          setActiveCoverage(null);
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [mode, selected, coverageWeek, specialist]);
 
   const aisleIndex = useMemo(
     () =>
@@ -605,6 +644,173 @@ export function OperationalSectionsPanel({
               ))}
             </select>
           </label>
+
+          {mode === "detail" && selected?.is_active ? (
+            <div
+              data-testid="sections-week-coverage"
+              className="space-y-2 rounded-xl border border-amber-500/25 bg-amber-950/20 p-3"
+            >
+              <p className="font-mono text-[10px] font-bold uppercase tracking-wide text-amber-200/90">
+                Temporary weekly coverage
+              </p>
+              <p className="text-[11px] leading-snug text-amber-100/70">
+                Does not change permanent ownership. Covering associate keeps
+                one personal capacity budget for the week.
+              </p>
+              <label className="block text-sm">
+                <span className="mb-1 block text-zinc-400">Week</span>
+                <input
+                  data-testid="sections-coverage-week"
+                  value={coverageWeek}
+                  onChange={(e) => setCoverageWeek(e.target.value.trim())}
+                  className="glass-input min-h-11 w-full font-mono text-sm"
+                  placeholder="2026-W45"
+                />
+              </label>
+              <p className="text-[11px] text-amber-50/80">
+                {activeCoverage
+                  ? `Covered by ${activeCoverage.covering_specialist_name ?? activeCoverage.covering_specialist_id}`
+                  : "No temporary cover for this week — permanent owner applies."}
+              </p>
+              {coverageNote ? (
+                <p className="text-[11px] text-amber-100/75">{coverageNote}</p>
+              ) : null}
+              <label className="block text-sm">
+                <span className="mb-1 block text-zinc-400">Covered by</span>
+                <select
+                  data-testid="sections-coverage-owner"
+                  value={coverId}
+                  onChange={(e) => setCoverId(e.target.value)}
+                  disabled={!canManage || busy}
+                  className="glass-input min-h-11 w-full"
+                >
+                  <option value="">Select associate…</option>
+                  {roster
+                    .filter((p) => p.is_active !== false && p.role !== "MasterAdmin")
+                    .map((person) => (
+                      <option key={person.id} value={person.id}>
+                        {person.name}
+                      </option>
+                    ))}
+                </select>
+              </label>
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  data-testid="sections-coverage-save"
+                  disabled={!canManage || busy || !coverId || !coverageWeek}
+                  onClick={() => {
+                    if (!selected) return;
+                    void (async () => {
+                      setBusy(true);
+                      setError(null);
+                      setCoverageNote(null);
+                      try {
+                        const save = (ack: boolean) =>
+                          establishSectionWeekCoverageClient(specialist, {
+                            section_id: selected.id,
+                            week_label: coverageWeek,
+                            covering_specialist_id: coverId,
+                            acknowledge_published_week: ack || undefined,
+                          });
+                        let result;
+                        try {
+                          result = await save(false);
+                        } catch (firstErr) {
+                          const msg =
+                            firstErr instanceof Error
+                              ? firstErr.message
+                              : String(firstErr);
+                          if (/acknowledge_published_week|published assignments/i.test(msg)) {
+                            const ok = window.confirm(
+                              `${msg}\n\nSave coverage without rewriting existing assignments?`
+                            );
+                            if (!ok) throw firstErr;
+                            result = await save(true);
+                          } else {
+                            throw firstErr;
+                          }
+                        }
+                        setActiveCoverage(result.coverage);
+                        setCoverageNote(result.capacity_preview.note);
+                      } catch (err) {
+                        setError(
+                          err instanceof Error
+                            ? err.message
+                            : "Could not save weekly coverage"
+                        );
+                      } finally {
+                        setBusy(false);
+                      }
+                    })();
+                  }}
+                  className="min-h-11 flex-1 rounded-lg border border-amber-400/40 bg-amber-950/40 text-xs font-bold text-amber-50 disabled:opacity-40"
+                >
+                  Save cover
+                </button>
+                <button
+                  type="button"
+                  data-testid="sections-coverage-revoke"
+                  disabled={!canManage || busy || !activeCoverage}
+                  onClick={() => {
+                    if (!selected) return;
+                    void (async () => {
+                      setBusy(true);
+                      setError(null);
+                      try {
+                        await revokeSectionWeekCoverageClient(specialist, {
+                          section_id: selected.id,
+                          week_label: coverageWeek,
+                        });
+                        setActiveCoverage(null);
+                        setCoverId("");
+                        setCoverageNote(null);
+                      } catch (err) {
+                        setError(
+                          err instanceof Error
+                            ? err.message
+                            : "Could not revoke coverage"
+                        );
+                      } finally {
+                        setBusy(false);
+                      }
+                    })();
+                  }}
+                  className="min-h-11 flex-1 rounded-lg border border-zinc-600 text-xs font-bold text-zinc-200 disabled:opacity-40"
+                >
+                  Revoke
+                </button>
+              </div>
+              <button
+                type="button"
+                data-testid="sections-coverage-refresh"
+                disabled={busy || !selected}
+                onClick={() => {
+                  if (!selected) return;
+                  void (async () => {
+                    try {
+                      const data = await fetchSectionWeekCoverage(specialist, {
+                        week_label: coverageWeek,
+                        section_id: selected.id,
+                      });
+                      const row = data.coverage[0] ?? null;
+                      setActiveCoverage(row);
+                      setCoverId(row?.covering_specialist_id ?? "");
+                    } catch (err) {
+                      setError(
+                        err instanceof Error
+                          ? err.message
+                          : "Could not load coverage"
+                      );
+                    }
+                  })();
+                }}
+                className="min-h-10 w-full text-[11px] font-semibold text-amber-200/80"
+              >
+                Refresh coverage for week
+              </button>
+            </div>
+          ) : null}
 
           {mode === "create" ? (
             <>

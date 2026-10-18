@@ -8,6 +8,8 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { updateOperationalSection } from "./operational-sections";
+import { listFutureCoverageForSpecialist } from "./section-week-coverage";
+import { isoWeekLabel } from "./week";
 import { storeNumberQueryValues } from "@/lib/store";
 
 export type RosterLifecycleMember = {
@@ -49,6 +51,7 @@ export type DeactivateImpact = {
   open_assignments: OpenAssignmentImpact[];
   open_assignment_count: number;
   standing_capacity: StandingCapacityImpact | null;
+  future_coverage_count: number;
   blocks_deactivation: boolean;
   block_reasons: string[];
   warnings: string[];
@@ -79,6 +82,7 @@ export function planDeactivateDecision(input: {
   transfers: readonly SectionOwnerTransfer[];
   open_assignment_count: number;
   standing_capacity: StandingCapacityImpact | null;
+  future_coverage_count?: number;
 }): {
   blocks_deactivation: boolean;
   block_reasons: string[];
@@ -120,6 +124,12 @@ export function planDeactivateDecision(input: {
   if (input.standing_capacity) {
     warnings.push(
       `Standing capacity still lists this associate at ${input.standing_capacity.approved_capacity}. Inactive associates are excluded from materialization; MasterAdmin should update standing policy when ready.`
+    );
+  }
+  const futureCoverage = Number(input.future_coverage_count ?? 0);
+  if (futureCoverage > 0) {
+    warnings.push(
+      `${futureCoverage} future temporary coverage assignment(s) name this associate. Revoke or reassign coverage before Sunday runs that week.`
     );
   }
 
@@ -238,12 +248,25 @@ export async function loadDeactivateImpact(
     }
   }
 
+  let future_coverage_count = 0;
+  try {
+    const future = await listFutureCoverageForSpecialist(supabase, {
+      store_id: input.store_id,
+      specialist_id: sid,
+      from_week_label: isoWeekLabel(new Date()),
+    });
+    future_coverage_count = future.length;
+  } catch {
+    future_coverage_count = 0;
+  }
+
   const decision = planDeactivateDecision({
     role: String(member.role ?? ""),
     owned_sections,
     transfers: input.transfers ?? [],
     open_assignment_count: open_assignments.length,
     standing_capacity,
+    future_coverage_count,
   });
 
   return {
@@ -255,6 +278,7 @@ export async function loadDeactivateImpact(
     open_assignments,
     open_assignment_count: open_assignments.length,
     standing_capacity,
+    future_coverage_count,
     blocks_deactivation: decision.blocks_deactivation,
     block_reasons: decision.block_reasons,
     warnings: decision.warnings,

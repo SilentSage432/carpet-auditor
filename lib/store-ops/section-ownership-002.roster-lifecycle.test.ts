@@ -70,6 +70,19 @@ describe("SECTION-OWNERSHIP-002 deactivate planner", () => {
     expect(result.warnings.length).toBe(1);
   });
 
+  it("warns about future temporary coverage without blocking", () => {
+    const result = planDeactivateDecision({
+      role: "Associate",
+      owned_sections: [],
+      transfers: [],
+      open_assignment_count: 0,
+      standing_capacity: null,
+      future_coverage_count: 1,
+    });
+    expect(result.can_deactivate).toBe(true);
+    expect(result.warnings.join(" ")).toMatch(/temporary coverage/i);
+  });
+
   it("allows deactivate with no sections and no open work", () => {
     const result = planDeactivateDecision({
       role: "Associate",
