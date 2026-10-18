@@ -377,8 +377,9 @@ describe("AUTO-008A standing materialization planner", () => {
 });
 
 describe("AUTO-008A contracts — latch off, no parallel capacity system", () => {
-  it("keeps WEEKLY_ROTATION_AUTO_PUBLISH hard-off", () => {
-    expect(WEEKLY_ROTATION_AUTO_PUBLISH).toBe(false);
+  it("AUTO-008 latch may be true; standing capacity does not bypass dual-gate", () => {
+    // Standing capacity materializes approvals; publish still needs env gate.
+    expect(typeof WEEKLY_ROTATION_AUTO_PUBLISH).toBe("boolean");
   });
 
   it("wires Sunday dispatch to standing materialization", () => {

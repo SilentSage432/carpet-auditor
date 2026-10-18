@@ -1,13 +1,13 @@
 /**
- * DEPTSYNC-ROTATION-AUTO-002/003 — authoritative weekly stage + assign path.
+ * DEPTSYNC-ROTATION-AUTO-002/003/008 — authoritative weekly stage + assign path.
  *
  * One eligibility / capacity / ownership / persistence contract for manual and
  * scheduled execution.
  *
- * AUTO-003: deliberate activation for automatic publication remains OFF by
- * default (`WEEKLY_ROTATION_AUTO_PUBLISH = false`). Env alone cannot enable
- * production publish while the product latch is false. Tests may pass
- * `override: true` only.
+ * AUTO-008: product latch may be true after controlled enablement. Production
+ * publish still requires dual-gate: latch true AND env
+ * `DEPTSYNC_WEEKLY_ROTATION_AUTO_PUBLISH=1`. Env alone never suffices while
+ * latch is false. Tests may pass `override: true` only.
  *
  * Does not change capacity values, redistribute sections, or deploy.
  */
@@ -50,12 +50,11 @@ import {
 } from "./week-publication-visibility";
 
 /**
- * Product latch — must stay false until an authorized production enablement
- * tranche flips it. Staging may still run section-balanced.
- * Typed as boolean (not `false as const`) so the dual-gate resolver stays
- * type-correct when the latch is later flipped to true in a controlled tranche.
+ * Product latch — flipped true in AUTO-008 controlled activation.
+ * Staging may still run section-balanced when publish is gated off by env.
+ * Typed as boolean (not a const literal) so dual-gate resolver stays correct.
  */
-export const WEEKLY_ROTATION_AUTO_PUBLISH: boolean = false;
+export const WEEKLY_ROTATION_AUTO_PUBLISH: boolean = true;
 
 /** Env keys for deliberate dual-gate activation (after latch is true). */
 export const WEEKLY_ROTATION_AUTO_PUBLISH_ENV =

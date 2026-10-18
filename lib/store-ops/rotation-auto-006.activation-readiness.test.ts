@@ -123,15 +123,20 @@ function proposalCounts(
   return { proposal, counts, total: proposal.items.length };
 }
 
-describe("ROTATION-AUTO-006 dual-gate activation (still OFF)", () => {
-  it("keeps product latch false", () => {
-    expect(WEEKLY_ROTATION_AUTO_PUBLISH).toBe(false);
+describe("ROTATION-AUTO-006 dual-gate activation (AUTO-008 enabled)", () => {
+  it("product latch is true after controlled enablement", () => {
+    expect(WEEKLY_ROTATION_AUTO_PUBLISH).toBe(true);
   });
 
-  it("env alone cannot enable publish while latch is false", () => {
+  it("publish requires latch true AND env=1; missing env stays off", () => {
     expect(
       resolveWeeklyRotationAutoPublishEnabled({
         env: { [WEEKLY_ROTATION_AUTO_PUBLISH_ENV]: "1" },
+      })
+    ).toBe(true);
+    expect(
+      resolveWeeklyRotationAutoPublishEnabled({
+        env: {},
       })
     ).toBe(false);
   });

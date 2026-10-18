@@ -60,14 +60,23 @@ const capacityBase = {
 };
 
 describe("ROTATION-AUTO-003 activation mechanism", () => {
-  it("keeps product latch false and ignores env while latch is false", () => {
-    expect(WEEKLY_ROTATION_AUTO_PUBLISH).toBe(false);
+  it("dual-gate: latch true requires env=1; unset env keeps publish off", () => {
+    expect(WEEKLY_ROTATION_AUTO_PUBLISH).toBe(true);
     expect(
       resolveWeeklyRotationAutoPublishEnabled({
         env: { [WEEKLY_ROTATION_AUTO_PUBLISH_ENV]: "1" },
       })
+    ).toBe(true);
+    expect(
+      resolveWeeklyRotationAutoPublishEnabled({
+        env: {},
+      })
     ).toBe(false);
-    expect(resolveWeeklyRotationAutoPublishEnabled()).toBe(false);
+    expect(
+      resolveWeeklyRotationAutoPublishEnabled({
+        env: { [WEEKLY_ROTATION_AUTO_PUBLISH_ENV]: "0" },
+      })
+    ).toBe(false);
   });
 
   it("allows explicit override for controlled tests only", () => {
@@ -273,12 +282,12 @@ describe("ROTATION-AUTO-003 source contracts", () => {
     expect(mig).toMatch(/LOCAL PREPARE ONLY|do not apply to production/i);
   });
 
-  it("product latch remains false in source", () => {
+  it("product latch is true in source after AUTO-008 enablement", () => {
     const src = readRepo("lib/store-ops/authoritative-week-cycle.ts");
     expect(src).toMatch(
-      /export const WEEKLY_ROTATION_AUTO_PUBLISH(?:: boolean)? = false/
+      /export const WEEKLY_ROTATION_AUTO_PUBLISH(?:: boolean)? = true/
     );
-    expect(WEEKLY_ROTATION_AUTO_PUBLISH).toBe(false);
+    expect(WEEKLY_ROTATION_AUTO_PUBLISH).toBe(true);
   });
 
   it("manual Assign this week still stewardship; respects supervisor_locked", () => {

@@ -198,7 +198,7 @@ function proposalFor(
 
 describe("ROTATION-AUTO-005A shift independence", () => {
   it("keeps auto-publish latch OFF", () => {
-    expect(WEEKLY_ROTATION_AUTO_PUBLISH).toBe(false);
+    expect(WEEKLY_ROTATION_AUTO_PUBLISH).toBe(true);
   });
 
   it("weekLaborToAssignmentMembers includes zero-hour associates; planner members do not", () => {

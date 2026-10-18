@@ -5,7 +5,8 @@
  * (via generateWeeklyRotations). Assign: stewardship / strict section ownership
  * — same composer as Sunday UI. Flat cross-section assign retired.
  *
- * AUTO-003: WEEKLY_ROTATION_AUTO_PUBLISH product latch remains false. Cron never
+ * AUTO-008: dual-gate publish via resolveWeeklyRotationAutoPublishEnabled.
+ * Cron never
  * reads publish flags from the HTTP body. Tests may pass publishAssignments.
  */
 

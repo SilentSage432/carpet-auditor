@@ -233,10 +233,11 @@ describe("ROTATION-AUTO-002 section-balanced stage", () => {
 });
 
 describe("ROTATION-AUTO-002 authoritative assign + auto-publish gate", () => {
-  it("keeps auto-publish hard-off", () => {
-    expect(WEEKLY_ROTATION_AUTO_PUBLISH).toBe(false);
-    expect(isWeeklyRotationAutoPublishEnabled()).toBe(false);
-    expect(isWeeklyRotationAutoPublishEnabled(true)).toBe(true);
+  it("AUTO-008 latch true; legacy stage flags remain hard-off", () => {
+    expect(WEEKLY_ROTATION_AUTO_PUBLISH).toBe(true);
+    // Deprecated helper mirrors latch only (not the dual-gate env).
+    expect(isWeeklyRotationAutoPublishEnabled()).toBe(true);
+    expect(isWeeklyRotationAutoPublishEnabled(false)).toBe(false);
     expect(STEWARDSHIP_WEEK_DISTRIBUTION_AUTO_STAGE).toBe(false);
     expect(STRICT_SECTION_OWNERSHIP_AUTO_STAGE).toBe(false);
     expect(SECTION_AWARE_ROTATION_AUTO_STAGE).toBe(false);
@@ -337,13 +338,13 @@ describe("ROTATION-AUTO-002 source contracts", () => {
     expect(rotations).toMatch(/selectPhysicalBayCoverage/);
   });
 
-  it("sunday-dispatch uses stewardship assign path and auto-publish OFF", () => {
+  it("sunday-dispatch uses stewardship assign path and dual-gate publish", () => {
     const dispatch = readRepo("lib/store-ops/sunday-dispatch.ts");
     expect(dispatch).toMatch(/composeAuthoritativeAssignmentProposal/);
     expect(dispatch).toMatch(/WEEKLY_ROTATION_AUTO_PUBLISH/);
+    expect(dispatch).toMatch(/resolveWeeklyRotationAutoPublishEnabled/);
     expect(dispatch).toMatch(/STAGED_AWAITING_ASSIGN/);
     expect(dispatch).not.toMatch(/planFlatBayAssignmentsWithCaps/);
-    expect(dispatch).toMatch(/WEEKLY_ROTATION_AUTO_PUBLISH = false|WEEKLY_ROTATION_AUTO_PUBLISH/);
   });
 
   it("manual Assign this week still uses stewardship composer", () => {
@@ -352,10 +353,10 @@ describe("ROTATION-AUTO-002 source contracts", () => {
     expect(modal).toMatch(/handleBalanceAssign/);
   });
 
-  it("auto-publish constant is false in authoritative module", () => {
+  it("auto-publish latch is true in authoritative module (AUTO-008)", () => {
     const src = readRepo("lib/store-ops/authoritative-week-cycle.ts");
     expect(src).toMatch(
-      /export const WEEKLY_ROTATION_AUTO_PUBLISH(?:: boolean)? = false/
+      /export const WEEKLY_ROTATION_AUTO_PUBLISH(?:: boolean)? = true/
     );
   });
 });
