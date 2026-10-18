@@ -55,7 +55,7 @@
 
 | Field | Value |
 |-------|--------|
-| Commit | **`30c6ffa`** (ship report) · tip **`841ca35`** on `main` |
+| Commit | **`30c6ffa`** (ship report) · tip **`d48f7e7`** on `main` |
 | Contents | This report; `DEPTSYNC_ROTATION_AUTO_006_ACTIVATION_READINESS.md`; DEVELOPMENT_JOURNAL / CHAT_HANDOFF / MASTER_ROADMAP |
 
 ---
