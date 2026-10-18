@@ -2539,3 +2539,38 @@ export async function approveWeekCapacity(
   });
   return result.board;
 }
+
+/** AUTO-008A — load active standing weekly capacity policy. */
+export async function fetchStandingCapacityPolicy(
+  specialist: StoreSpecialist
+): Promise<{
+  policy: import("./standing-week-capacity").StandingCapacityPolicy | null;
+  schema_ready: boolean;
+}> {
+  return storeOpsFetch<{
+    policy: import("./standing-week-capacity").StandingCapacityPolicy | null;
+    schema_ready: boolean;
+  }>("/api/standing-capacity", specialist, { method: "GET" });
+}
+
+/** AUTO-008A — MasterAdmin establish/replace standing capacity policy. */
+export async function establishStandingCapacityPolicyClient(
+  specialist: StoreSpecialist,
+  input: {
+    items: Array<{ specialist_id: string; approved_capacity: number }>;
+    note?: string;
+  }
+): Promise<import("./standing-week-capacity").StandingCapacityPolicy> {
+  const result = await storeOpsFetch<{
+    ok: boolean;
+    policy: import("./standing-week-capacity").StandingCapacityPolicy;
+  }>("/api/standing-capacity", specialist, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      items: input.items,
+      note: input.note,
+    }),
+  });
+  return result.policy;
+}

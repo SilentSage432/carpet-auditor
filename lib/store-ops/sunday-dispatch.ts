@@ -1206,6 +1206,31 @@ export async function runSundayDispatchForAllDepartments(
         .toLowerCase()
     );
 
+    // AUTO-008A: materialize standing capacity into weekly approvals for the
+    // target future week (idempotent; never overwrites explicit week approvals
+    // or weeks that already have owned assignments). Schema-missing → skip.
+    const {
+      loadActiveStandingCapacityPolicy,
+      materializeStandingCapacityForWeek,
+    } = await import("@/lib/store-ops/standing-week-capacity");
+    const standingLoad = await loadActiveStandingCapacityPolicy(
+      supabase,
+      store.store_number
+    );
+    if (standingLoad.ok && standingLoad.schema_ready && standingLoad.policy) {
+      const approvedBy = String(
+        standingLoad.policy.established_by_specialist_id ?? ""
+      ).trim();
+      if (approvedBy) {
+        await materializeStandingCapacityForWeek(supabase, {
+          store_number: store.store_number,
+          week_label: targetWeek,
+          department_codes: participatingCodes,
+          approved_by_specialist_id: approvedBy,
+        });
+      }
+    }
+
     // Shared capacity across all active departments for this store-week.
     // Does not activate inactive departments — only those already is_active.
     let storeWeekCapacity = await loadStoreWeekCapacity(supabase, {

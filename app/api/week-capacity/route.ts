@@ -248,6 +248,16 @@ export async function POST(request: Request) {
       );
     }
 
+    // AUTO-008A: explicit weekly approve is stronger than standing materialization.
+    const { recordWeekCapacityApprovalProvenance, STANDING_CAPACITY_SOURCE_EXPLICIT } =
+      await import("@/lib/store-ops/standing-week-capacity");
+    await recordWeekCapacityApprovalProvenance(supabase, {
+      store_number: actor.storeNumber,
+      week_label: weekLabel,
+      specialist_ids: validated.map((item) => item.specialist_id),
+      source: STANDING_CAPACITY_SOURCE_EXPLICIT,
+    });
+
     const refreshed = await loadReviewExtras(
       supabase,
       actor.storeNumber,

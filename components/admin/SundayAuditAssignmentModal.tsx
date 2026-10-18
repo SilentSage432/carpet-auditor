@@ -9,8 +9,10 @@ import { useCallback, useEffect, useMemo, useId, useState } from "react";
 import {
   approveWeekCapacity,
   dispatchExtraBay,
+  establishStandingCapacityPolicyClient,
   fetchDepartments,
   fetchOperationalSections,
+  fetchStandingCapacityPolicy,
   fetchThisWeekRotations,
   fetchWeekBayPriorities,
   fetchWeekCapacityBoard,
@@ -19,6 +21,7 @@ import {
 } from "@/lib/store-ops/client";
 import type { WeekBayPriorityView } from "@/lib/store-ops/week-bay-priority";
 import type { WeekCapacityReviewBoard } from "@/lib/store-ops/approved-week-capacity";
+import type { StandingCapacityPolicy } from "@/lib/store-ops/standing-week-capacity";
 import {
   findActiveBayMembershipConflicts,
   indexBaySectionLookups,
@@ -177,6 +180,11 @@ export function SundayAuditAssignmentModal({
   );
   const [capacityBusy, setCapacityBusy] = useState(false);
   const [capacityError, setCapacityError] = useState<string | null>(null);
+  /** AUTO-008A — standing weekly capacity (prospective until MasterAdmin changes). */
+  const [standingPolicy, setStandingPolicy] =
+    useState<StandingCapacityPolicy | null>(null);
+  const [standingSchemaReady, setStandingSchemaReady] = useState(false);
+  const [standingBusy, setStandingBusy] = useState(false);
   /** MAP-003 — week-scoped supervisory priorities for the planning week. */
   const [supervisorPriorities, setSupervisorPriorities] = useState<
     WeekBayPriorityView[]
@@ -285,6 +293,20 @@ export function SundayAuditAssignmentModal({
         );
       }
 
+      // AUTO-008A standing capacity (schema-missing → null / not ready).
+      try {
+        const standing = await fetchStandingCapacityPolicy(specialist);
+        setStandingSchemaReady(standing.schema_ready === true);
+        setStandingPolicy(standing.policy);
+      } catch (standingErr) {
+        console.error(
+          "[SundayAudit] standing capacity policy unavailable",
+          standingErr
+        );
+        setStandingSchemaReady(false);
+        setStandingPolicy(null);
+      }
+
       // MAP-003 supervisory priorities for this planning week (schema-missing → []).
       try {
         const pri = await fetchWeekBayPriorities(specialist, {
@@ -302,6 +324,8 @@ export function SundayAuditAssignmentModal({
       setBays([]);
       setWeekLabor(null);
       setCapacityBoard(null);
+      setStandingPolicy(null);
+      setStandingSchemaReady(false);
       setSupervisorPriorities([]);
     } finally {
       setLoading(false);
@@ -768,6 +792,57 @@ export function SundayAuditAssignmentModal({
     }
   }
 
+  async function handleEstablishStandingCapacity() {
+    if (!capacityBoard) return;
+    if (!isMasterAdmin(specialist)) {
+      setCapacityError("Only Master Admin can establish standing capacity.");
+      playErrorTone();
+      return;
+    }
+    if (!standingSchemaReady) {
+      setCapacityError(
+        "Standing capacity schema is not migrated yet — weekly approve still works."
+      );
+      playErrorTone();
+      return;
+    }
+    setStandingBusy(true);
+    setCapacityError(null);
+    try {
+      const items = capacityBoard.associates
+        .filter((row) => row.eligible)
+        .map((row) => ({
+          specialist_id: row.specialist_id,
+          approved_capacity: Math.max(
+            0,
+            Math.min(
+              3,
+              Math.floor(
+                capacityDraft[row.specialist_id] ?? row.suggested_capacity
+              )
+            )
+          ),
+        }));
+      const policy = await establishStandingCapacityPolicyClient(specialist, {
+        items,
+        note: "Standing weekly capacity (AUTO-008A)",
+      });
+      setStandingPolicy(policy);
+      const sum = policy.items.reduce((s, i) => s + i.approved_capacity, 0);
+      setStatus(
+        `Standing capacity established (v${policy.policy_version}) · shared ${sum}. Future weeks materialize without re-approval.`
+      );
+      playSuccessTone();
+    } catch (err) {
+      setCapacityError(
+        readableError(err, "Could not establish standing capacity policy")
+      );
+      playErrorTone();
+    } finally {
+      setStandingBusy(false);
+    }
+  }
+
   async function handleApproveWeekCapacity() {
     if (!week || !capacityBoard) return;
     if (!isMasterAdmin(specialist)) {
@@ -1186,6 +1261,47 @@ export function SundayAuditAssignmentModal({
                   ? "approved"
                   : "not approved yet"}
               </p>
+              <div
+                data-testid="standing-capacity-policy"
+                className="mt-2 rounded-lg border border-amber-500/25 bg-zinc-950/50 px-2.5 py-2"
+              >
+                <p className="font-mono text-[10px] font-bold uppercase tracking-[0.12em] text-amber-200/90">
+                  Standing capacity (future weeks)
+                </p>
+                <p className="mt-1 text-[11px] leading-snug text-amber-100/70">
+                  {!standingSchemaReady
+                    ? "Schema not migrated — standing policy unavailable."
+                    : standingPolicy
+                      ? `Active v${standingPolicy.policy_version} · ${standingPolicy.items
+                          .map((i) => `${i.approved_capacity}`)
+                          .join("/")} = ${standingPolicy.items.reduce(
+                          (s, i) => s + i.approved_capacity,
+                          0
+                        )} · prospective until Master changes it.`
+                      : "No active standing policy — future weeks still need weekly approve (or establish standing below)."}
+                </p>
+                {isMasterAdmin(specialist) ? (
+                  <button
+                    type="button"
+                    data-testid="standing-capacity-establish"
+                    disabled={
+                      standingBusy ||
+                      capacityBusy ||
+                      busy ||
+                      !standingSchemaReady ||
+                      capacityBoard.associates.every((r) => !r.eligible)
+                    }
+                    onClick={() => void handleEstablishStandingCapacity()}
+                    className="mt-2 flex min-h-[40px] w-full items-center justify-center rounded-lg border border-amber-400/40 bg-amber-950/40 px-3 text-[12px] font-bold text-amber-50 disabled:opacity-40"
+                  >
+                    {standingBusy
+                      ? "Saving standing…"
+                      : standingPolicy
+                        ? "Update standing from draft capacities"
+                        : "Establish standing from draft capacities"}
+                  </button>
+                ) : null}
+              </div>
               {capacityError ? (
                 <p
                   role="alert"
