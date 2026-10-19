@@ -1,8 +1,8 @@
 # DeptSync Hub — Chat Handoff
 
 ## Latest (2026-10-19)
-- **DEPTSYNC-SECTION-OWNERSHIP-002 — ASSOCIATE ROSTER LIFECYCLE PRODUCTION RELEASE — RELEASED (002 only).** App **`b03c15a`**; 003 excluded (no migration/coverage). AUTO-008 remains enabled; cron `0 12 * * 0`; standing **3/3/3/3**; fingerprint preflight `55dde8e86360caea`. Suite **173 PASS**. Canonical: [`docs/product/DEPTSYNC_SECTION_OWNERSHIP_002_RELEASE.md`](docs/product/DEPTSYNC_SECTION_OWNERSHIP_002_RELEASE.md). **STOP. Do not release 003. Phone-accept roster UI. Await Oct 25 AUTO-008 first-run.**
-- **DEPTSYNC-SECTION-OWNERSHIP-003 — still local only (`b834701`); not deployed.**
+- **DEPTSYNC-SECTION-OWNERSHIP-003 — TEMPORARY WEEKLY SECTION COVERAGE PRODUCTION RELEASE — RELEASED.** App **`9616cc8`**; migration `20261026_…week_coverage` **COMMIT**; fingerprint `55dde8e86360caea` preserved; standing **3/3/3/3**; AUTO-008 latch/cron unchanged; coverage rows **0**. Suite **173 PASS**. Canonical: [`docs/product/DEPTSYNC_SECTION_OWNERSHIP_003_RELEASE.md`](docs/product/DEPTSYNC_SECTION_OWNERSHIP_003_RELEASE.md). **STOP. Phone-accept coverage UI. Do not create test coverage in prod unless authorized. Await Oct 25 AUTO-008 first-run.**
+- **DEPTSYNC-SECTION-OWNERSHIP-002 — ASSOCIATE ROSTER LIFECYCLE PRODUCTION RELEASE — RELEASED.** App **`b03c15a`**. Canonical: [`docs/product/DEPTSYNC_SECTION_OWNERSHIP_002_RELEASE.md`](docs/product/DEPTSYNC_SECTION_OWNERSHIP_002_RELEASE.md).
 
 ## Latest (2026-10-18)
 - **DEPTSYNC-SECTION-OWNERSHIP-003 — TEMPORARY WEEKLY SECTION COVERAGE — COMPLETE LOCALLY; PRODUCTION HOLD (not in 002 release).** Canonical: [`docs/product/DEPTSYNC_SECTION_OWNERSHIP_003_IMPLEMENTATION.md`](docs/product/DEPTSYNC_SECTION_OWNERSHIP_003_IMPLEMENTATION.md). **STOP. Do not push/deploy/migrate 003.**
