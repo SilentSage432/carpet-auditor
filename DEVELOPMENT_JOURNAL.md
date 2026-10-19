@@ -1,8 +1,12 @@
 # DeptSync Hub — Development Journal
 
+## 2026-10-19 — DEPTSYNC-SECTION-OWNERSHIP-004 controlled production release
+
+**Authorized EXECUTE→VALIDATE→RELEASE→VERIFY complete.** Isolated candidate: baseline `4ca606d` + feature `a92d85d` + cherry-picked preview write-guard → **`d778eac`** (trees identical to preview `7ea148e`; not a blind preview-branch merge). Write-guard applies only when `VERCEL_ENV=preview`. Focused **109 PASS**; tsc/build PASS; no migrations. Pre/post SBA fingerprint **`55dde8e86360caea`** identical; sections **4×160**; standing v1 **12**; coverage **0**; W44 empty. Push `4ca606d..d778eac`; GitHub Production **`7187503796`** success; Vercel Ready @ https://deptsync-hub.vercel.app. AUTO-008 latch/cron untouched. Canonical: [`docs/product/DEPTSYNC_SECTION_OWNERSHIP_004_RELEASE.md`](docs/product/DEPTSYNC_SECTION_OWNERSHIP_004_RELEASE.md). **STOP — phone-accept 004 UX; await Oct 25 AUTO-008 first-run.**
+
 ## 2026-10-19 — DEPTSYNC-SECTION-OWNERSHIP-004 schedule-free supervisor experience
 
-**Local implementation — no push/deploy.** Coherent More workflow: Team → permanent ownership → temporary coverage → automatic rotation. Demoted shift schedules to optional disclosure; clarified permanent vs temporary labels; capacity explainer on coverage; roster Owns/Covering annotations; rotation status from latch + standing (MasterAdmin) + published counts. Focused **183 PASS**; tsc/build PASS. AUTO-008 latch/cron/standing untouched. Canonical: [`docs/product/DEPTSYNC_SECTION_OWNERSHIP_004_IMPLEMENTATION.md`](docs/product/DEPTSYNC_SECTION_OWNERSHIP_004_IMPLEMENTATION.md). **STOP — do not push/deploy; phone-accept 003/004 UX.**
+**Local implementation — released via `d778eac`.** Coherent More workflow: Team → permanent ownership → temporary coverage → automatic rotation. Demoted shift schedules; permanent vs temporary labels; capacity explainer; roster Owns/Covering; rotation status composed from latch + standing + published counts. Canonical: [`docs/product/DEPTSYNC_SECTION_OWNERSHIP_004_IMPLEMENTATION.md`](docs/product/DEPTSYNC_SECTION_OWNERSHIP_004_IMPLEMENTATION.md) · release [`DEPTSYNC_SECTION_OWNERSHIP_004_RELEASE.md`](docs/product/DEPTSYNC_SECTION_OWNERSHIP_004_RELEASE.md).
 
 ## 2026-10-19 — DEPTSYNC-SECTION-OWNERSHIP-003 controlled production release
 
