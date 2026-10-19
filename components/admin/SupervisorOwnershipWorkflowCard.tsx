@@ -103,11 +103,25 @@ export function SupervisorOwnershipWorkflowCard({
     };
   }, [specialist]);
 
+  const isPreview =
+    String(process.env.NEXT_PUBLIC_VERCEL_ENV ?? "").toLowerCase() ===
+    "preview";
+
   return (
     <section
       data-testid="supervisor-ownership-workflow"
       className="space-y-3 rounded-2xl border border-sky-500/25 bg-slate-900/90 p-4"
     >
+      {isPreview ? (
+        <p
+          data-testid="preview-read-only-banner"
+          className="rounded-lg border border-amber-500/40 bg-amber-950/40 px-2.5 py-2 text-[11px] leading-snug text-amber-100"
+        >
+          Preview is read-only against production data. You can review Team,
+          ownership, coverage UI, and rotation status — saves and publication
+          actions are blocked.
+        </p>
+      ) : null}
       <div>
         <p className="font-mono text-[10px] font-bold uppercase tracking-[0.14em] text-sky-300">
           Supervisor workflow

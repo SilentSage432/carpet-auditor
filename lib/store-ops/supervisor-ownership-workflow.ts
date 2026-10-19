@@ -64,8 +64,8 @@ export function composeRotationVisibilityStatus(input: {
   const summary_lines: string[] = [];
   summary_lines.push(
     automatic
-      ? "Automatic weekly rotation is configured on."
-      : "Automatic weekly rotation is configured off."
+      ? "Automatic publication scheduler is enabled (not proof this week was published)."
+      : "Automatic publication scheduler is disabled."
   );
   if (standing.established && standing.sum != null) {
     summary_lines.push(
