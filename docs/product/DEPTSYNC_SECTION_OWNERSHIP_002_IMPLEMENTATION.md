@@ -1,13 +1,13 @@
 # DEPTSYNC-SECTION-OWNERSHIP-002 — Associate Roster Lifecycle
 
-**Status:** COMPLETE locally — **PRODUCTION HOLD**  
-**Date:** 2026-10-18  
-**Mode:** Local implementation only  
+**Status:** COMPLETE locally — **RELEASED** via [`DEPTSYNC_SECTION_OWNERSHIP_002_RELEASE.md`](DEPTSYNC_SECTION_OWNERSHIP_002_RELEASE.md) (`b03c15a`)  
+**Date:** 2026-10-18 (impl) · 2026-10-19 (release)  
+**Mode:** Production release (002 only; 003 excluded)  
 **Canonical discovery:** [`DEPTSYNC_SECTION_OWNERSHIP_001_DISCOVERY.md`](DEPTSYNC_SECTION_OWNERSHIP_001_DISCOVERY.md)
 
-**Strict exclusions honored:** No production deploy · no production migrations · no production associate/section/assignment writes · standing capacity unchanged · AUTO-008 left enabled · cron unchanged · no temporary weekly coverage · no specialty · no Orient.
+**Strict exclusions honored at impl:** No production associate/section/assignment writes · standing capacity unchanged · AUTO-008 left enabled · cron unchanged · no temporary weekly coverage · no specialty · no Orient.
 
-**Automation boundary:** First AUTO-008 publication **2026-10-25T12:00:00Z → 2026-W44** must be independently verified before any production release of this tranche.
+**Automation note:** AUTO-008 first unattended publication **2026-10-25T12:00:00Z → 2026-W44** remains independently pending; this release does not claim that milestone.
 
 ---
 

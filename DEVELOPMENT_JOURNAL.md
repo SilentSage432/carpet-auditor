@@ -1,8 +1,12 @@
 # DeptSync Hub — Development Journal
 
+## 2026-10-19 — DEPTSYNC-SECTION-OWNERSHIP-002 controlled production release
+
+**Authorized production release — 002 only; 003 excluded.** Cherry-picked `a67af99` onto `origin/main` as **`b03c15a`** (no 003 migration/API/UI). Focused **173 PASS**; tsc/build PASS. Preflight fingerprint `55dde8e86360caea`; sections **4×160**; standing v1 **12**; W44 empty; coverage table absent; AUTO-008 latch/cron unchanged. No DB migration. Local 003 `b834701` preserved off this release. Canonical: [`docs/product/DEPTSYNC_SECTION_OWNERSHIP_002_RELEASE.md`](docs/product/DEPTSYNC_SECTION_OWNERSHIP_002_RELEASE.md). **STOP — do not release 003; await phone acceptance + Oct 25 AUTO-008 first-run evidence.**
+
 ## 2026-10-18 — DEPTSYNC-SECTION-OWNERSHIP-002 associate roster lifecycle
 
-**Local implementation — PRODUCTION HOLD (do not deploy until AUTO-008 W44 verified).** Soft add/deactivate/reactivate on `store_specialists`; ownership transfer required before deactivate when associate owns sections; unfinished SBA warned not auto-reassigned; standing capacity untouched; add path `onDuty: false`. API `/api/roster/lifecycle`; More → Team panel. Tests **84 PASS** focused batch; tsc/build PASS. No temporary coverage. Canonical: [`docs/product/DEPTSYNC_SECTION_OWNERSHIP_002_IMPLEMENTATION.md`](docs/product/DEPTSYNC_SECTION_OWNERSHIP_002_IMPLEMENTATION.md). **STOP — do not push/deploy until W44 acceptance.**
+**Local implementation — later released via SECTION-OWNERSHIP-002 production release (`b03c15a`).** Soft add/deactivate/reactivate on `store_specialists`; ownership transfer required before deactivate when associate owns sections; unfinished SBA warned not auto-reassigned; standing capacity untouched; add path `onDuty: false`. API `/api/roster/lifecycle`; More → Team panel. No temporary coverage. Canonical: [`docs/product/DEPTSYNC_SECTION_OWNERSHIP_002_IMPLEMENTATION.md`](docs/product/DEPTSYNC_SECTION_OWNERSHIP_002_IMPLEMENTATION.md).
 
 ## 2026-10-18 — DEPTSYNC-SECTION-OWNERSHIP-001 schedule-free roster & flexible section assignment
 
