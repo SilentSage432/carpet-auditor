@@ -10,6 +10,10 @@ import {
   safeInternalNext,
   verifyHubGateToken,
 } from "@/lib/auth-gate";
+import {
+  PREVIEW_MUTATION_BLOCKED_MESSAGE,
+  shouldBlockPreviewMutation,
+} from "@/lib/preview-safety";
 
 /**
  * Next.js 16 Proxy — auth middleware (middleware.ts is forbidden when proxy.ts exists).
@@ -39,6 +43,24 @@ function loginRedirect(request: NextRequest): NextResponse {
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
+
+  // Preview deployments share production Supabase — block writes/cron first.
+  if (
+    shouldBlockPreviewMutation({
+      method: request.method,
+      pathname,
+    })
+  ) {
+    return withStealthHeaders(
+      NextResponse.json(
+        {
+          error: PREVIEW_MUTATION_BLOCKED_MESSAGE,
+          code: "preview_read_only",
+        },
+        { status: 403 }
+      )
+    );
+  }
 
   if (isAuthGateStaticPath(pathname) || isCronApiPath(pathname)) {
     return withStealthHeaders(NextResponse.next());

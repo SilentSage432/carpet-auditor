@@ -66,6 +66,9 @@ describe("SECTION-OWNERSHIP-004 standing + rotation visibility", () => {
     expect(status.assignment_state).toBe("pending");
     expect(status.summary_lines.join(" ")).toMatch(/2026-W44/);
     expect(status.summary_lines.join(" ")).toMatch(/not yet published/i);
+    expect(status.summary_lines.join(" ")).toMatch(
+      /not proof this week was published/i
+    );
   });
 
   it("marks published when assignment count is positive", () => {
