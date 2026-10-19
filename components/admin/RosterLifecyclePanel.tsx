@@ -10,14 +10,17 @@ import { suggestUsername, isMasterAdmin } from "@/lib/rbac";
 import {
   createRosterMember,
   deactivateRosterMemberClient,
+  fetchOperationalSections,
   fetchRosterDeactivateImpact,
   fetchRosterLifecycle,
+  fetchSectionWeekCoverage,
   reactivateRosterMemberClient,
 } from "@/lib/store-ops/client";
 import type {
   DeactivateImpact,
   RosterLifecycleMember,
 } from "@/lib/store-ops/roster-lifecycle";
+import { resolveNextRotationWeekLabel } from "@/lib/store-ops/week";
 import { toastError, toastSuccess } from "@/lib/toast";
 import type { DepartmentScope, StoreSpecialist } from "@/lib/types";
 
@@ -38,6 +41,44 @@ export function RosterLifecyclePanel({ specialist }: Props) {
   const [transferOwnerBySection, setTransferOwnerBySection] = useState<
     Record<string, string>
   >({});
+  const [ownedBySpecialist, setOwnedBySpecialist] = useState<
+    Record<string, string[]>
+  >({});
+  const [coveringBySpecialist, setCoveringBySpecialist] = useState<
+    Record<string, string[]>
+  >({});
+  const coverageWeek = resolveNextRotationWeekLabel();
+
+  const refreshAnnotations = useCallback(async () => {
+    try {
+      const [{ sections }, coverage] = await Promise.all([
+        fetchOperationalSections(specialist, { includeMembers: false }),
+        fetchSectionWeekCoverage(specialist, { week_label: coverageWeek }),
+      ]);
+      const owned: Record<string, string[]> = {};
+      for (const section of sections) {
+        if (!section.is_active) continue;
+        const ownerId = String(section.primary_owner_specialist_id ?? "").trim();
+        if (!ownerId) continue;
+        owned[ownerId] = [...(owned[ownerId] ?? []), section.name];
+      }
+      const covering: Record<string, string[]> = {};
+      const nameBySection = new Map(
+        sections.map((s) => [String(s.id), s.name] as const)
+      );
+      for (const row of coverage.coverage) {
+        const coverId = String(row.covering_specialist_id ?? "").trim();
+        if (!coverId) continue;
+        const label = `${nameBySection.get(String(row.section_id)) ?? "Section"} (${row.week_label})`;
+        covering[coverId] = [...(covering[coverId] ?? []), label];
+      }
+      setOwnedBySpecialist(owned);
+      setCoveringBySpecialist(covering);
+    } catch {
+      setOwnedBySpecialist({});
+      setCoveringBySpecialist({});
+    }
+  }, [coverageWeek, specialist]);
 
   const refresh = useCallback(async () => {
     if (!canManage) return;
@@ -46,12 +87,13 @@ export function RosterLifecyclePanel({ specialist }: Props) {
       const data = await fetchRosterLifecycle(specialist);
       setActive(data.active);
       setInactive(data.inactive);
+      await refreshAnnotations();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Could not load roster");
     } finally {
       setLoading(false);
     }
-  }, [canManage, specialist]);
+  }, [canManage, specialist, refreshAnnotations]);
 
   useEffect(() => {
     let cancelled = false;
@@ -65,6 +107,7 @@ export function RosterLifecyclePanel({ specialist }: Props) {
         setActive(data.active);
         setInactive(data.inactive);
         setError(null);
+        await refreshAnnotations();
       } catch (err) {
         if (cancelled) return;
         setError(err instanceof Error ? err.message : "Could not load roster");
@@ -75,7 +118,7 @@ export function RosterLifecyclePanel({ specialist }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [canManage, specialist]);
+  }, [canManage, specialist, refreshAnnotations]);
 
   const replacementCandidates = useMemo(
     () => active.filter((m) => m.role === "Associate" || m.role === "Supervisor"),
@@ -200,7 +243,9 @@ export function RosterLifecyclePanel({ specialist }: Props) {
         </p>
         <p className="mt-1 text-[11px] leading-snug text-zinc-400">
           Add, deactivate, or reactivate associates without shift schedules.
-          Standing capacity and historical assignments are never silently rewritten.
+          Deactivate never silently clears permanent ownership — transfer first.
+          Reactivate does not restore prior ownership. Standing capacity stays
+          unchanged until MasterAdmin updates it.
         </p>
       </div>
 
@@ -259,6 +304,22 @@ export function RosterLifecyclePanel({ specialist }: Props) {
                 <p className="font-mono text-[10px] uppercase text-zinc-500">
                   {member.role} · {member.home_department || member.assigned_department || "—"}
                 </p>
+                {(ownedBySpecialist[member.id] ?? []).length > 0 ? (
+                  <p
+                    data-testid={`roster-lifecycle-owns-${member.id}`}
+                    className="mt-0.5 text-[10px] leading-snug text-sky-200/85"
+                  >
+                    Owns: {(ownedBySpecialist[member.id] ?? []).join(", ")}
+                  </p>
+                ) : null}
+                {(coveringBySpecialist[member.id] ?? []).length > 0 ? (
+                  <p
+                    data-testid={`roster-lifecycle-covers-${member.id}`}
+                    className="mt-0.5 text-[10px] leading-snug text-amber-200/85"
+                  >
+                    Covering: {(coveringBySpecialist[member.id] ?? []).join(", ")}
+                  </p>
+                ) : null}
               </div>
               <button
                 type="button"

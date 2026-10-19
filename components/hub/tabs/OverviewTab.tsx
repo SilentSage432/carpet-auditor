@@ -367,7 +367,7 @@ export function OverviewTab({ specialist }: WorkflowTabProps) {
               <div className="rounded-xl border border-zinc-800 bg-zinc-950/60 px-3 py-3 text-sm text-zinc-400">
                 <p>No owned bays in the current week plan.</p>
                 <Link
-                  href="/roster"
+                  href="/settings#team"
                   className="mt-2 inline-flex min-h-11 items-center font-semibold text-accent"
                 >
                   Open Team in More

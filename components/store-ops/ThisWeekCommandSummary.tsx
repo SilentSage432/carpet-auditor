@@ -84,7 +84,8 @@ export function ThisWeekCommandSummaryCard({
           {summary.baysPerPerson} = {summary.sharedCapacityBays} when four
           associates are eligible. Sunday stages eligible ×{" "}
           {summary.baysPerPerson} (not a fixed {summary.sharedCapacityBays}
-          -bay lock). One pool across Flooring and Home Decor.
+          -bay lock). One pool across Flooring and Home Decor. Counts below are
+          authoritative evidence — not simulated plans.
         </p>
       </header>
 

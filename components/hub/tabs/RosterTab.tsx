@@ -545,13 +545,17 @@ export function RosterTab({ specialist, storeNumber }: WorkflowTabProps) {
           <h1 className="text-base font-bold tracking-tight text-white">
             People
           </h1>
-          <p className="mt-1 font-mono text-[11px] text-zinc-400">
-            Schedule &amp; availability · {storeToday}
+          <p className="mt-1 text-[11px] leading-snug text-zinc-400">
+            Active associates
             {displayGroups.length > 0
               ? ` · ${formatPeopleCount(
                   displayGroups.reduce((n, g) => n + g.members.length, 0)
                 )}`
               : ""}
+            . Shifts are optional and do not gate weekly rotation.
+          </p>
+          <p className="mt-0.5 font-mono text-[10px] text-zinc-600">
+            {storeToday}
           </p>
         </div>
         {canManage ? (

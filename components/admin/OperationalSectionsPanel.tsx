@@ -27,6 +27,11 @@ import {
 import { resolveNextRotationWeekLabel } from "@/lib/store-ops/week";
 import type { SectionWeekCoverageRow } from "@/lib/store-ops/section-week-coverage";
 import {
+  COVERAGE_CAPACITY_EXPLAINER,
+  PERMANENT_OWNER_LABEL,
+  TEMPORARY_COVERAGE_LABEL,
+} from "@/lib/store-ops/supervisor-ownership-workflow";
+import {
   assertSectionAislePreviewFresh,
   composeDepartmentAisleIndexForSections,
   composeSectionAisleMembershipPreview,
@@ -104,6 +109,9 @@ export function OperationalSectionsPanel({
   const [activeCoverage, setActiveCoverage] =
     useState<SectionWeekCoverageRow | null>(null);
   const [coverageNote, setCoverageNote] = useState<string | null>(null);
+  const [listCoverageBySection, setListCoverageBySection] = useState<
+    Record<string, SectionWeekCoverageRow>
+  >({});
   const [pendingBays, setPendingBays] = useState<OperationalSectionBayRef[]>(
     []
   );
@@ -173,6 +181,32 @@ export function OperationalSectionsPanel({
     () => sections.find((s) => s.id === selectedId) ?? null,
     [sections, selectedId]
   );
+
+  useEffect(() => {
+    if (mode !== "list" || !coverageWeek) {
+      setListCoverageBySection({});
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const data = await fetchSectionWeekCoverage(specialist, {
+          week_label: coverageWeek,
+        });
+        if (cancelled) return;
+        const next: Record<string, SectionWeekCoverageRow> = {};
+        for (const row of data.coverage) {
+          next[String(row.section_id)] = row;
+        }
+        setListCoverageBySection(next);
+      } catch {
+        if (!cancelled) setListCoverageBySection({});
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [mode, coverageWeek, specialist, sections.length]);
 
   useEffect(() => {
     if (mode !== "detail" || !selected?.is_active || !coverageWeek) {
@@ -479,10 +513,9 @@ export function OperationalSectionsPanel({
   return (
     <div className="space-y-3" data-testid="operational-sections-panel">
       <p className="text-[11px] leading-snug text-zinc-500">
-        Persistent bay stewardship. Not weekly assignment and not proof of work.
-        A bay belongs to at most one active section. Numbered aisles and named
-        zones (e.g. SHOW-L, CARPET-WALL) appear together — select the whole
-        aisle/zone to include its currently documented active bays.
+        Permanent ownership is the lasting steward. Temporary weekly coverage
+        only applies to its chosen operational week and never becomes permanent
+        ownership. A bay belongs to at most one active section.
         {listFilter.storeWide
           ? " Full Store pin lists every department’s sections."
           : null}
@@ -554,36 +587,69 @@ export function OperationalSectionsPanel({
               again.
             </p>
           ) : sections.length === 0 ? null : (
-            <ul className="space-y-2" data-testid="sections-list">
-              {sections.map((section) => (
-                <li key={section.id}>
-                  <button
-                    type="button"
-                    onClick={() => openDetail(section.id)}
-                    className="flex min-h-14 w-full items-center justify-between gap-3 rounded-xl border border-zinc-800/80 bg-zinc-950/50 px-3 py-2 text-left active:scale-[0.99]"
-                    data-testid="sections-list-item"
-                  >
-                    <span className="min-w-0">
-                      <span className="block truncate text-sm font-semibold text-zinc-100">
-                        {section.name}
-                        {!section.is_active ? (
-                          <span className="ml-2 font-mono text-[10px] text-zinc-500">
-                            Retired
+            <>
+              <label className="block text-sm">
+                <span className="mb-1 block text-zinc-400">
+                  Coverage week (list view)
+                </span>
+                <input
+                  data-testid="sections-list-coverage-week"
+                  value={coverageWeek}
+                  onChange={(e) => setCoverageWeek(e.target.value.trim())}
+                  className="glass-input min-h-11 w-full font-mono text-sm"
+                  placeholder="2026-W45"
+                />
+              </label>
+              <ul className="space-y-2" data-testid="sections-list">
+                {sections.map((section) => {
+                  const cover = listCoverageBySection[section.id];
+                  return (
+                    <li key={section.id}>
+                      <button
+                        type="button"
+                        onClick={() => openDetail(section.id)}
+                        className="flex min-h-14 w-full items-center justify-between gap-3 rounded-xl border border-zinc-800/80 bg-zinc-950/50 px-3 py-2 text-left active:scale-[0.99]"
+                        data-testid="sections-list-item"
+                      >
+                        <span className="min-w-0">
+                          <span className="block truncate text-sm font-semibold text-zinc-100">
+                            {section.name}
+                            {!section.is_active ? (
+                              <span className="ml-2 font-mono text-[10px] text-zinc-500">
+                                Retired
+                              </span>
+                            ) : null}
                           </span>
-                        ) : null}
-                      </span>
-                      <span className="mt-0.5 block font-mono text-[10px] text-zinc-500">
-                        {section.member_count} bay
-                        {section.member_count === 1 ? "" : "s"}
-                        {section.primary_owner_name
-                          ? ` · ${section.primary_owner_name}`
-                          : " · No owner"}
-                      </span>
-                    </span>
-                  </button>
-                </li>
-              ))}
-            </ul>
+                          <span className="mt-0.5 block text-[11px] text-zinc-400">
+                            Permanent:{" "}
+                            {section.primary_owner_name ?? "No owner"}
+                            <span className="text-zinc-600">
+                              {" "}
+                              · {section.member_count} bay
+                              {section.member_count === 1 ? "" : "s"}
+                            </span>
+                          </span>
+                          {cover ? (
+                            <span
+                              data-testid={`sections-list-cover-${section.id}`}
+                              className="mt-0.5 block text-[11px] text-amber-200/85"
+                            >
+                              Covering {cover.week_label}:{" "}
+                              {cover.covering_specialist_name ??
+                                cover.covering_specialist_id}
+                            </span>
+                          ) : (
+                            <span className="mt-0.5 block text-[10px] text-zinc-600">
+                              No temporary cover for {coverageWeek}
+                            </span>
+                          )}
+                        </span>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
+            </>
           )}
         </>
       ) : null}
@@ -627,7 +693,7 @@ export function OperationalSectionsPanel({
           </label>
 
           <label className="block text-sm">
-            <span className="mb-1 block text-zinc-400">Primary owner</span>
+            <span className="mb-1 block text-zinc-400">{PERMANENT_OWNER_LABEL}</span>
             <select
               value={ownerId}
               onChange={(e) => setOwnerId(e.target.value)}
@@ -643,6 +709,9 @@ export function OperationalSectionsPanel({
                 </option>
               ))}
             </select>
+            <span className="mt-1 block text-[10px] leading-snug text-zinc-500">
+              Lasting stewardship. Temporary coverage never overwrites this field.
+            </span>
           </label>
 
           {mode === "detail" && selected?.is_active ? (
@@ -651,14 +720,13 @@ export function OperationalSectionsPanel({
               className="space-y-2 rounded-xl border border-amber-500/25 bg-amber-950/20 p-3"
             >
               <p className="font-mono text-[10px] font-bold uppercase tracking-wide text-amber-200/90">
-                Temporary weekly coverage
+                {TEMPORARY_COVERAGE_LABEL}
               </p>
               <p className="text-[11px] leading-snug text-amber-100/70">
-                Does not change permanent ownership. Covering associate keeps
-                one personal capacity budget for the week.
+                {COVERAGE_CAPACITY_EXPLAINER}
               </p>
               <label className="block text-sm">
-                <span className="mb-1 block text-zinc-400">Week</span>
+                <span className="mb-1 block text-zinc-400">Operational week</span>
                 <input
                   data-testid="sections-coverage-week"
                   value={coverageWeek}
@@ -669,7 +737,7 @@ export function OperationalSectionsPanel({
               </label>
               <p className="text-[11px] text-amber-50/80">
                 {activeCoverage
-                  ? `Covered by ${activeCoverage.covering_specialist_name ?? activeCoverage.covering_specialist_id}`
+                  ? `Covered by ${activeCoverage.covering_specialist_name ?? activeCoverage.covering_specialist_id} for ${activeCoverage.week_label}`
                   : "No temporary cover for this week — permanent owner applies."}
               </p>
               {coverageNote ? (
@@ -746,7 +814,7 @@ export function OperationalSectionsPanel({
                   }}
                   className="min-h-11 flex-1 rounded-lg border border-amber-400/40 bg-amber-950/40 text-xs font-bold text-amber-50 disabled:opacity-40"
                 >
-                  Save cover
+                  Save temporary cover
                 </button>
                 <button
                   type="button"
@@ -778,7 +846,7 @@ export function OperationalSectionsPanel({
                   }}
                   className="min-h-11 flex-1 rounded-lg border border-zinc-600 text-xs font-bold text-zinc-200 disabled:opacity-40"
                 >
-                  Revoke
+                  Remove cover
                 </button>
               </div>
               <button

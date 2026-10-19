@@ -1,5 +1,9 @@
 # DeptSync Hub — Development Journal
 
+## 2026-10-19 — DEPTSYNC-SECTION-OWNERSHIP-004 schedule-free supervisor experience
+
+**Local implementation — no push/deploy.** Coherent More workflow: Team → permanent ownership → temporary coverage → automatic rotation. Demoted shift schedules to optional disclosure; clarified permanent vs temporary labels; capacity explainer on coverage; roster Owns/Covering annotations; rotation status from latch + standing (MasterAdmin) + published counts. Focused **183 PASS**; tsc/build PASS. AUTO-008 latch/cron/standing untouched. Canonical: [`docs/product/DEPTSYNC_SECTION_OWNERSHIP_004_IMPLEMENTATION.md`](docs/product/DEPTSYNC_SECTION_OWNERSHIP_004_IMPLEMENTATION.md). **STOP — do not push/deploy; phone-accept 003/004 UX.**
+
 ## 2026-10-19 — DEPTSYNC-SECTION-OWNERSHIP-003 controlled production release
 
 **Authorized VALIDATE→MIGRATE→RELEASE→VERIFY complete.** Candidate **`9616cc8`**. Isolated migration harness + SQL capacity invariant PASS; default-behavior equivalence PASS; focused **173 PASS**; tsc/build PASS. Preflight fingerprint `55dde8e86360caea` matched SO-002. Backup `tmp/production-backups/deptsync-fmeinlwhixngednabhgy-2026-10-19T15-28-11Z.dump` then migration **COMMIT**; post fingerprint/owners/standing **preserved**; coverage rows **0**. Push `867c23b..9616cc8`; Vercel Ready. AUTO-008 latch/cron/standing untouched; W44 still empty. Canonical: [`docs/product/DEPTSYNC_SECTION_OWNERSHIP_003_RELEASE.md`](docs/product/DEPTSYNC_SECTION_OWNERSHIP_003_RELEASE.md). **STOP — phone-accept coverage UI; await Oct 25 AUTO-008 first-run.**

@@ -27,6 +27,7 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { RosterLifecyclePanel } from "@/components/admin/RosterLifecyclePanel";
+import { SupervisorOwnershipWorkflowCard } from "@/components/admin/SupervisorOwnershipWorkflowCard";
 import { PushNotificationsCard } from "@/components/hub/PushNotificationsCard";
 import { FloorTitleBadge } from "@/components/hub/SpecialistCard";
 import { ThemeSelector } from "@/components/settings/ThemeSelector";
@@ -240,6 +241,13 @@ export function SettingsSection({
         hash === "bay-setup"
       ) {
         setOpenSection("bulk");
+      } else if (hash === "team") {
+        window.setTimeout(() => {
+          document.getElementById("team")?.scrollIntoView({
+            behavior: "smooth",
+            block: "start",
+          });
+        }, 50);
       } else if (
         hash === "operational-sections" ||
         hash === "sections"
@@ -367,38 +375,77 @@ export function SettingsSection({
       <header className="px-0.5">
         <h1 className="text-lg font-bold tracking-tight text-zinc-50">More</h1>
         <p className="mt-0.5 text-sm text-zinc-500">
-          Team, setup, and administration
+          Team, section ownership, and administration
         </p>
       </header>
+
+      {supervisorSession || masterSession ? (
+        activeSpecialist ? (
+          <SupervisorOwnershipWorkflowCard
+            specialist={activeSpecialist}
+            onOpenTeam={() => {
+              document.getElementById("team")?.scrollIntoView({
+                behavior: "smooth",
+                block: "start",
+              });
+            }}
+            onOpenSections={() => {
+              setOpenSection("sections");
+              window.setTimeout(() => {
+                document
+                  .getElementById("operational-sections")
+                  ?.scrollIntoView({ behavior: "smooth", block: "start" });
+              }, 50);
+            }}
+          />
+        ) : null
+      ) : null}
 
       {supervisorSession || masterSession ? (
         <SettingsCard
           id="team"
           title="Team"
-          subtitle="People, schedules, and availability"
+          subtitle="Active associates · schedule-free lifecycle"
           icons={[Users]}
           data-testid="more-team"
         >
-          <button
-            type="button"
-            data-testid="more-open-team"
-            onClick={() => router.push("/roster")}
-            className="flex min-h-12 w-full items-center justify-center gap-2 rounded-xl border border-zinc-600/50 bg-zinc-900/70 px-3 text-sm font-semibold text-zinc-100"
-          >
-            <Users
-              className="h-4 w-4"
-              strokeWidth={ICON_STROKE}
-              aria-hidden
-            />
-            Open Team
-          </button>
           <p className="text-[11px] leading-snug text-zinc-500">
-            Roster remains available here while Overview and This Week absorb
-            everyday people views. Shift schedules are not required for rotation.
+            Manage who is on the roster here. Shift schedules are optional and
+            do not gate weekly rotation, ownership, or coverage.
           </p>
           {masterSession && activeSpecialist ? (
             <RosterLifecyclePanel specialist={activeSpecialist} />
-          ) : null}
+          ) : (
+            <p className="rounded-xl border border-zinc-800 bg-zinc-950/50 px-3 py-2 text-[11px] leading-snug text-zinc-400">
+              MasterAdmin adds, deactivates, and reactivates associates without
+              shift entry. Supervisors manage permanent ownership and weekly
+              coverage under Operational Sections.
+            </p>
+          )}
+          <details className="rounded-xl border border-zinc-800/80 bg-zinc-950/40 px-3 py-2">
+            <summary
+              data-testid="more-optional-schedules"
+              className="cursor-pointer list-none text-sm font-semibold text-zinc-300"
+            >
+              Optional schedules
+            </summary>
+            <p className="mt-2 text-[11px] leading-snug text-zinc-500">
+              Availability evidence only. Not required for rotation eligibility.
+            </p>
+            <button
+              type="button"
+              data-testid="more-open-team"
+              onClick={() => router.push("/roster")}
+              className="mt-2 flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-zinc-600/50 bg-zinc-900/70 px-3 text-sm font-semibold text-zinc-100"
+            >
+              <Users
+                className="h-4 w-4"
+                strokeWidth={ICON_STROKE}
+                aria-hidden
+              />
+              Open schedule board
+            </button>
+          </details>
         </SettingsCard>
       ) : null}
 
@@ -432,7 +479,7 @@ export function SettingsSection({
       {showDepartmentSetup && activeSpecialist ? (
         <SettingsCard
           title="Department Setup"
-          subtitle="Aisles and physical bays the coverage engine uses"
+          subtitle="Sections, permanent owners, and weekly coverage"
           icons={[Layers]}
           data-testid="more-department-setup"
         >
@@ -466,7 +513,7 @@ export function SettingsSection({
           <Accordion
             id="operational-sections"
             title="Operational Sections"
-            subtitle="Persistent bay stewardship · not weekly assignment"
+            subtitle="Permanent owners · temporary weekly coverage"
             open={openSection === "sections"}
             onToggle={() => toggleSection("sections")}
           >
@@ -481,7 +528,8 @@ export function SettingsSection({
               />
             ) : (
               <p className="text-xs text-zinc-500">
-                Open to create sections, assign owners, and pick member bays.
+                Open to set permanent owners and temporary weekly coverage.
+                Coverage never silently becomes permanent ownership.
               </p>
             )}
           </Accordion>
