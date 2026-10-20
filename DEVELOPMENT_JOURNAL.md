@@ -1,8 +1,12 @@
 # DeptSync Hub — Development Journal
 
+## 2026-10-19 — DEPTSYNC-SECTION-OWNERSHIP-005 controlled production release
+
+**Authorized VALIDATE→RELEASE→VERIFY complete.** Candidate **`ea898d2`** isolated (nav/UX only; no migrations). Focused **120 PASS**; tsc/build PASS. Pre/post SBA fingerprint **`55dde8e86360caea`** identical; sections **4×160**; standing **12**; coverage **0**; W44 empty. Push `fafac97..ea898d2`; GitHub Production **`7188220431`** success; Vercel Ready @ https://deptsync-hub.vercel.app. AUTO-008 latch/cron untouched. Canonical: [`docs/product/DEPTSYNC_SECTION_OWNERSHIP_005_RELEASE.md`](docs/product/DEPTSYNC_SECTION_OWNERSHIP_005_RELEASE.md). **STOP — phone-accept focused Open/Back; await Oct 25 AUTO-008 first-run.**
+
 ## 2026-10-19 — DEPTSYNC-SECTION-OWNERSHIP-005 focused supervisor navigation
 
-**Local implementation — no push/deploy.** Replaced scroll-as-Open on More with focused `/settings?manage=` views (team, ownership, coverage, rotation). Back returns to hub; refresh preserves focus; legacy hashes redirect. Reuses RosterLifecyclePanel, OperationalSectionsPanel (emphasis banners), rotation status composition. Focused **120 PASS**; tsc/build PASS. AUTO-008 latch/cron/standing untouched. Canonical: [`docs/product/DEPTSYNC_SECTION_OWNERSHIP_005_IMPLEMENTATION.md`](docs/product/DEPTSYNC_SECTION_OWNERSHIP_005_IMPLEMENTATION.md). **STOP — do not push/deploy.**
+**Local implementation — released via `ea898d2`.** Replaced scroll-as-Open on More with focused `/settings?manage=` views (team, ownership, coverage, rotation). Back returns to hub; refresh preserves focus; legacy hashes redirect. Reuses RosterLifecyclePanel, OperationalSectionsPanel (emphasis banners), rotation status composition. Canonical: [`docs/product/DEPTSYNC_SECTION_OWNERSHIP_005_IMPLEMENTATION.md`](docs/product/DEPTSYNC_SECTION_OWNERSHIP_005_IMPLEMENTATION.md) · release [`DEPTSYNC_SECTION_OWNERSHIP_005_RELEASE.md`](docs/product/DEPTSYNC_SECTION_OWNERSHIP_005_RELEASE.md).
 
 ## 2026-10-19 — DEPTSYNC-SECTION-OWNERSHIP-004 controlled production release
 
