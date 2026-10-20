@@ -62,6 +62,10 @@ type Props = {
   onChanged?: () => void;
   /** Deep-link focus from Map bay sheet */
   focusSectionId?: string | null;
+  /** SECTION-OWNERSHIP-005 — emphasize permanent owners vs weekly coverage */
+  emphasis?: "ownership" | "coverage" | null;
+  /** True while create/detail/pick-aisles may hold unsaved edits */
+  onEditingChange?: (editing: boolean) => void;
 };
 
 type DraftMode = "list" | "create" | "detail" | "pick-aisles";
@@ -73,6 +77,8 @@ export function OperationalSectionsPanel({
   registryAisles = [],
   onChanged,
   focusSectionId = null,
+  emphasis = null,
+  onEditingChange,
 }: Props) {
   const canManage = canManageOperationalSections(specialist);
   const working = useWorkingDepartment(specialist);
@@ -176,6 +182,10 @@ export function OperationalSectionsPanel({
     setSelectedId(focusSectionId);
     setMode("detail");
   }, [focusSectionId]);
+
+  useEffect(() => {
+    onEditingChange?.(mode === "create" || mode === "detail" || mode === "pick-aisles");
+  }, [mode, onEditingChange]);
 
   const selected = useMemo(
     () => sections.find((s) => s.id === selectedId) ?? null,
@@ -520,6 +530,25 @@ export function OperationalSectionsPanel({
           ? " Full Store pin lists every department’s sections."
           : null}
       </p>
+
+      {emphasis === "ownership" ? (
+        <p
+          data-testid="sections-emphasis-ownership"
+          className="rounded-lg border border-sky-500/30 bg-sky-950/30 px-2.5 py-2 text-[11px] leading-snug text-sky-100/90"
+        >
+          Focus: {PERMANENT_OWNER_LABEL}. Set lasting stewards for each
+          Operational Section. Temporary cover lives under Weekly Coverage.
+        </p>
+      ) : null}
+      {emphasis === "coverage" ? (
+        <p
+          data-testid="sections-emphasis-coverage"
+          className="rounded-lg border border-amber-500/35 bg-amber-950/35 px-2.5 py-2 text-[11px] leading-snug text-amber-100/90"
+        >
+          Focus: {TEMPORARY_COVERAGE_LABEL}. {COVERAGE_CAPACITY_EXPLAINER} Open
+          a section to save or revoke cover for the selected week.
+        </p>
+      ) : null}
 
       {error ? (
         <p className="text-sm text-rose-300" role="alert">

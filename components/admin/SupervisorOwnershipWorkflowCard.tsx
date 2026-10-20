@@ -1,8 +1,8 @@
 "use client";
 
 /**
- * DEPTSYNC-SECTION-OWNERSHIP-004 — schedule-free supervisor workflow orientation.
- * Composes existing Team / Sections / coverage / rotation status. No new publisher.
+ * DEPTSYNC-SECTION-OWNERSHIP-004/005 — schedule-free supervisor workflow hub.
+ * Open actions navigate to focused manage views (005) — never page-anchor scrolling.
  */
 
 import { useEffect, useState } from "react";
@@ -19,18 +19,21 @@ import {
   composeRotationVisibilityStatus,
   type RotationVisibilityStatus,
 } from "@/lib/store-ops/supervisor-ownership-workflow";
+import {
+  supervisorManageHref,
+  type SupervisorManageView,
+} from "@/lib/store-ops/supervisor-management-nav";
 import { canManageOperationalSections, isMasterAdmin } from "@/lib/rbac";
 
 type Props = {
   specialist: StoreSpecialist;
-  onOpenSections?: () => void;
-  onOpenTeam?: () => void;
+  /** Optional override (tests). Default navigates via /settings?manage=. */
+  onOpenManage?: (view: SupervisorManageView) => void;
 };
 
 export function SupervisorOwnershipWorkflowCard({
   specialist,
-  onOpenSections,
-  onOpenTeam,
+  onOpenManage,
 }: Props) {
   const router = useRouter();
   const canSections = canManageOperationalSections(specialist);
@@ -38,12 +41,19 @@ export function SupervisorOwnershipWorkflowCard({
   const [status, setStatus] = useState<RotationVisibilityStatus | null>(null);
   const [error, setError] = useState<string | null>(null);
 
+  function openManage(view: SupervisorManageView) {
+    if (onOpenManage) {
+      onOpenManage(view);
+      return;
+    }
+    router.push(supervisorManageHref(view));
+  }
+
   useEffect(() => {
     let cancelled = false;
     void (async () => {
       try {
         const week = sundayStagingWeekLabel(new Date(), DEFAULT_STORE_TIMEZONE);
-        // Standing capacity API is MasterAdmin-gated — supervisors still see latch/week/publish.
         let standing: {
           schema_ready: boolean;
           policy: Parameters<
@@ -128,7 +138,7 @@ export function SupervisorOwnershipWorkflowCard({
         </p>
         <p className="mt-1 text-[11px] leading-snug text-zinc-400">
           Team → permanent ownership → temporary weekly coverage → automatic
-          rotation. Shifts are not required.
+          rotation. Each Open opens a focused view. Shifts are not required.
         </p>
       </div>
 
@@ -137,10 +147,7 @@ export function SupervisorOwnershipWorkflowCard({
           <button
             type="button"
             data-testid="workflow-open-team"
-            onClick={() => {
-              if (onOpenTeam) onOpenTeam();
-              else document.getElementById("team")?.scrollIntoView({ behavior: "smooth" });
-            }}
+            onClick={() => openManage("team")}
             className="flex min-h-11 w-full items-center justify-between gap-2 rounded-xl border border-zinc-700/80 bg-zinc-950/60 px-3 text-left"
           >
             <span>
@@ -161,14 +168,7 @@ export function SupervisorOwnershipWorkflowCard({
             type="button"
             data-testid="workflow-open-sections"
             disabled={!canSections}
-            onClick={() => {
-              if (onOpenSections) onOpenSections();
-              else {
-                document
-                  .getElementById("operational-sections")
-                  ?.scrollIntoView({ behavior: "smooth" });
-              }
-            }}
+            onClick={() => openManage("ownership")}
             className="flex min-h-11 w-full items-center justify-between gap-2 rounded-xl border border-zinc-700/80 bg-zinc-950/60 px-3 text-left disabled:opacity-40"
           >
             <span>
@@ -187,14 +187,7 @@ export function SupervisorOwnershipWorkflowCard({
             type="button"
             data-testid="workflow-open-coverage"
             disabled={!canSections}
-            onClick={() => {
-              if (onOpenSections) onOpenSections();
-              else {
-                document
-                  .getElementById("operational-sections")
-                  ?.scrollIntoView({ behavior: "smooth" });
-              }
-            }}
+            onClick={() => openManage("coverage")}
             className="flex min-h-11 w-full items-center justify-between gap-2 rounded-xl border border-amber-500/30 bg-amber-950/20 px-3 text-left disabled:opacity-40"
           >
             <span>
@@ -212,7 +205,7 @@ export function SupervisorOwnershipWorkflowCard({
           <button
             type="button"
             data-testid="workflow-open-this-week"
-            onClick={() => router.push("/dashboard")}
+            onClick={() => openManage("rotation")}
             className="flex min-h-11 w-full items-center justify-between gap-2 rounded-xl border border-zinc-700/80 bg-zinc-950/60 px-3 text-left"
           >
             <span>
@@ -220,10 +213,10 @@ export function SupervisorOwnershipWorkflowCard({
                 4. Automatic rotation
               </span>
               <span className="block text-[11px] text-zinc-500">
-                This Week shows published work · not simulated plans
+                Status, standing capacity, and This Week
               </span>
             </span>
-            <span className="font-mono text-[10px] text-sky-300">This Week</span>
+            <span className="font-mono text-[10px] text-sky-300">Open</span>
           </button>
         </li>
       </ol>

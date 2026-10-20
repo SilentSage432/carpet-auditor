@@ -1,5 +1,9 @@
 # DeptSync Hub — Development Journal
 
+## 2026-10-19 — DEPTSYNC-SECTION-OWNERSHIP-005 focused supervisor navigation
+
+**Local implementation — no push/deploy.** Replaced scroll-as-Open on More with focused `/settings?manage=` views (team, ownership, coverage, rotation). Back returns to hub; refresh preserves focus; legacy hashes redirect. Reuses RosterLifecyclePanel, OperationalSectionsPanel (emphasis banners), rotation status composition. Focused **120 PASS**; tsc/build PASS. AUTO-008 latch/cron/standing untouched. Canonical: [`docs/product/DEPTSYNC_SECTION_OWNERSHIP_005_IMPLEMENTATION.md`](docs/product/DEPTSYNC_SECTION_OWNERSHIP_005_IMPLEMENTATION.md). **STOP — do not push/deploy.**
+
 ## 2026-10-19 — DEPTSYNC-SECTION-OWNERSHIP-004 controlled production release
 
 **Authorized EXECUTE→VALIDATE→RELEASE→VERIFY complete.** Isolated candidate: baseline `4ca606d` + feature `a92d85d` + cherry-picked preview write-guard → **`d778eac`** (trees identical to preview `7ea148e`; not a blind preview-branch merge). Write-guard applies only when `VERCEL_ENV=preview`. Focused **109 PASS**; tsc/build PASS; no migrations. Pre/post SBA fingerprint **`55dde8e86360caea`** identical; sections **4×160**; standing v1 **12**; coverage **0**; W44 empty. Push `4ca606d..d778eac`; GitHub Production **`7187503796`** success; Vercel Ready @ https://deptsync-hub.vercel.app. AUTO-008 latch/cron untouched. Canonical: [`docs/product/DEPTSYNC_SECTION_OWNERSHIP_004_RELEASE.md`](docs/product/DEPTSYNC_SECTION_OWNERSHIP_004_RELEASE.md). **STOP — phone-accept 004 UX; await Oct 25 AUTO-008 first-run.**

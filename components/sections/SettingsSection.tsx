@@ -10,7 +10,7 @@
  */
 
 import dynamic from "next/dynamic";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import {
   ChevronDown,
@@ -27,7 +27,18 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { RosterLifecyclePanel } from "@/components/admin/RosterLifecyclePanel";
+import { SupervisorFocusedManagementView } from "@/components/admin/SupervisorFocusedManagementView";
 import { SupervisorOwnershipWorkflowCard } from "@/components/admin/SupervisorOwnershipWorkflowCard";
+import { SupervisorRotationStatusPanel } from "@/components/admin/SupervisorRotationStatusPanel";
+import {
+  canAccessSupervisorManageView,
+  legacyHashToManageView,
+  parseSupervisorManageView,
+  SUPERVISOR_MANAGE_PARAM,
+  supervisorManageHref,
+  supervisorManageHubHref,
+  type SupervisorManageView,
+} from "@/lib/store-ops/supervisor-management-nav";
 import { PushNotificationsCard } from "@/components/hub/PushNotificationsCard";
 import { FloorTitleBadge } from "@/components/hub/SpecialistCard";
 import { ThemeSelector } from "@/components/settings/ThemeSelector";
@@ -155,6 +166,7 @@ export function SettingsSection({
   const [cleanupOpen, setCleanupOpen] = useState(false);
   const [adminGraphLoaded, setAdminGraphLoaded] = useState(false);
   const [focusSectionId, setFocusSectionId] = useState<string | null>(null);
+  const [manageEditing, setManageEditing] = useState(false);
 
   const configured = isSupabaseConfigured();
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
@@ -167,12 +179,21 @@ export function SettingsSection({
   const syncSummary = useSyncQueueSummary(storeNumber);
   const pathname = usePathname();
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const manageView = parseSupervisorManageView(
+    searchParams.get(SUPERVISOR_MANAGE_PARAM)
+  );
+  const manageAuthorized =
+    manageView != null &&
+    canAccessSupervisorManageView(manageView, activeSpecialist);
 
   const needTopologyGraph =
     openSection === "bulk" ||
     openSection === "sections" ||
     forceOpen ||
-    (masterOpen && masterSession);
+    (masterOpen && masterSession) ||
+    manageView === "ownership" ||
+    manageView === "coverage";
 
   const reloadDepts = useCallback(async () => {
     if (!activeSpecialist || (!masterSession && !mapConsole)) return;
@@ -231,9 +252,27 @@ export function SettingsSection({
   }, [reloadDepts, adminGraphLoaded, needTopologyGraph]);
 
   useEffect(() => {
+    if (manageView && !manageAuthorized) {
+      router.replace(supervisorManageHubHref());
+    }
+  }, [manageView, manageAuthorized, router]);
+
+  useEffect(() => {
     if (typeof window === "undefined") return;
     function applyHash() {
       const hash = window.location.hash.replace(/^#/, "");
+      const focused = legacyHashToManageView(hash);
+      if (focused) {
+        let sid: string | null = null;
+        try {
+          sid = new URLSearchParams(window.location.search).get("section");
+        } catch {
+          sid = null;
+        }
+        if (sid) setFocusSectionId(sid);
+        router.replace(supervisorManageHref(focused, { section: sid }));
+        return;
+      }
       if (
         hash === "bulk-generate" ||
         hash === "map-management" ||
@@ -241,26 +280,6 @@ export function SettingsSection({
         hash === "bay-setup"
       ) {
         setOpenSection("bulk");
-      } else if (hash === "team") {
-        window.setTimeout(() => {
-          document.getElementById("team")?.scrollIntoView({
-            behavior: "smooth",
-            block: "start",
-          });
-        }, 50);
-      } else if (
-        hash === "operational-sections" ||
-        hash === "sections"
-      ) {
-        setOpenSection("sections");
-        try {
-          const sid = new URLSearchParams(window.location.search).get(
-            "section"
-          );
-          setFocusSectionId(sid);
-        } catch {
-          setFocusSectionId(null);
-        }
       } else if (hash === "weekly-rotation") {
         setMasterOpen(true);
         setForceOpen(true);
@@ -370,6 +389,101 @@ export function SettingsSection({
     if (showRotationSetup) setSeasonalMounted(true);
   }, [showRotationSetup]);
 
+  function openManageView(view: SupervisorManageView) {
+    router.push(supervisorManageHref(view));
+  }
+
+  function leaveManageView() {
+    if (
+      manageEditing &&
+      typeof window !== "undefined" &&
+      !window.confirm("Leave this management view? Unsaved edits may be lost.")
+    ) {
+      return;
+    }
+    setManageEditing(false);
+    router.push(supervisorManageHubHref());
+  }
+
+  if (manageAuthorized && manageView && activeSpecialist) {
+    return (
+      <div className="space-y-4">
+        <SupervisorFocusedManagementView
+          view={manageView}
+          onBack={leaveManageView}
+        >
+          {manageView === "team" ? (
+            <>
+              <p className="text-[11px] leading-snug text-zinc-500">
+                Manage who is on the roster here. Shift schedules are optional
+                and do not gate weekly rotation, ownership, or coverage.
+              </p>
+              {masterSession ? (
+                <RosterLifecyclePanel specialist={activeSpecialist} />
+              ) : (
+                <p className="rounded-xl border border-zinc-800 bg-zinc-950/50 px-3 py-2 text-[11px] leading-snug text-zinc-400">
+                  MasterAdmin adds, deactivates, and reactivates associates
+                  without shift entry. Supervisors manage permanent ownership
+                  and weekly coverage under Section Ownership / Weekly Coverage.
+                </p>
+              )}
+              <details className="rounded-xl border border-zinc-800/80 bg-zinc-950/40 px-3 py-2">
+                <summary
+                  data-testid="more-optional-schedules"
+                  className="cursor-pointer list-none text-sm font-semibold text-zinc-300"
+                >
+                  Optional schedules
+                </summary>
+                <p className="mt-2 text-[11px] leading-snug text-zinc-500">
+                  Availability evidence only. Not required for rotation
+                  eligibility.
+                </p>
+                <button
+                  type="button"
+                  data-testid="more-open-team"
+                  onClick={() => router.push("/roster")}
+                  className="mt-2 flex min-h-11 w-full items-center justify-center gap-2 rounded-xl border border-zinc-600/50 bg-zinc-900/70 px-3 text-sm font-semibold text-zinc-100"
+                >
+                  <Users
+                    className="h-4 w-4"
+                    strokeWidth={ICON_STROKE}
+                    aria-hidden
+                  />
+                  Open schedule board
+                </button>
+              </details>
+            </>
+          ) : null}
+
+          {manageView === "ownership" || manageView === "coverage" ? (
+            adminGraphLoaded || needTopologyGraph ? (
+              <OperationalSectionsPanel
+                specialist={activeSpecialist}
+                departments={departments}
+                locations={locations}
+                registryAisles={registryAisles}
+                focusSectionId={
+                  searchParams.get("section") ?? focusSectionId
+                }
+                emphasis={
+                  manageView === "coverage" ? "coverage" : "ownership"
+                }
+                onEditingChange={setManageEditing}
+                onChanged={() => void reloadDepts()}
+              />
+            ) : (
+              <p className="text-sm text-zinc-400">Loading sections…</p>
+            )
+          ) : null}
+
+          {manageView === "rotation" ? (
+            <SupervisorRotationStatusPanel specialist={activeSpecialist} />
+          ) : null}
+        </SupervisorFocusedManagementView>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
       <header className="px-0.5">
@@ -383,20 +497,7 @@ export function SettingsSection({
         activeSpecialist ? (
           <SupervisorOwnershipWorkflowCard
             specialist={activeSpecialist}
-            onOpenTeam={() => {
-              document.getElementById("team")?.scrollIntoView({
-                behavior: "smooth",
-                block: "start",
-              });
-            }}
-            onOpenSections={() => {
-              setOpenSection("sections");
-              window.setTimeout(() => {
-                document
-                  .getElementById("operational-sections")
-                  ?.scrollIntoView({ behavior: "smooth", block: "start" });
-              }, 50);
-            }}
+            onOpenManage={openManageView}
           />
         ) : null
       ) : null}

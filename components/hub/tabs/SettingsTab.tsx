@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { SettingsSection } from "@/components/sections/SettingsSection";
 import type { WorkflowTabProps } from "@/components/hub/tabs/tab-props";
 
@@ -28,12 +28,18 @@ export function SettingsTab({
 
   return (
     <main className="hub-main">
-      <SettingsSection
-        activeSpecialist={member}
-        onOpenChangePin={() => onChangePin?.()}
-        storeNumber={storeNumber}
-        onStoreNumberChange={handleStoreNumberChange}
-      />
+      <Suspense
+        fallback={
+          <p className="px-1 text-sm text-zinc-500">Loading More…</p>
+        }
+      >
+        <SettingsSection
+          activeSpecialist={member}
+          onOpenChangePin={() => onChangePin?.()}
+          storeNumber={storeNumber}
+          onStoreNumberChange={handleStoreNumberChange}
+        />
+      </Suspense>
     </main>
   );
 }
