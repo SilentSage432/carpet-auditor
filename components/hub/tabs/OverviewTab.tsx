@@ -28,7 +28,8 @@ import {
   fetchSundayAssignments,
   type SundayAssignmentMap,
 } from "@/lib/store-ops/sunday-audit";
-import { isoWeekLabel } from "@/lib/store-ops/week";
+import { isoWeekCalendarRange, isoWeekLabel } from "@/lib/store-ops/week";
+import { fetchShiftDaysRange } from "@/lib/store-ops/shift-status";
 import { resolveNextRotationWeekLabel } from "@/lib/store-ops/week-bay-priority";
 import { formatMapCalendarWeekChrome } from "@/lib/store-ops/week-copy";
 import type { WeeklyRotationWithLocation } from "@/lib/store-ops/types";
@@ -44,7 +45,12 @@ import {
   composeOverviewPeopleRows,
   composeOverviewPriorityRows,
   composeOverviewReviewRows,
+  type OverviewCallOutRow,
 } from "@/lib/store-ops/overview-command";
+import {
+  canAccessSupervisorManageView,
+  supervisorManageHref,
+} from "@/lib/store-ops/supervisor-management-nav";
 
 export function OverviewTab({ specialist }: WorkflowTabProps) {
   const week = isoWeekLabel();
@@ -58,12 +64,16 @@ export function OverviewTab({ specialist }: WorkflowTabProps) {
   const [sections, setSections] = useState<OperationalSectionView[]>([]);
   const [priorities, setPriorities] = useState<WeekBayPriorityView[]>([]);
   const [priorityWeek, setPriorityWeek] = useState(nextWeek);
+  const [callOuts, setCallOuts] = useState<OverviewCallOutRow[]>([]);
+  const [weekDates, setWeekDates] = useState<string[]>([]);
+  const [callOutError, setCallOutError] = useState<string | null>(null);
 
   const reload = useCallback(async () => {
     setLoading(true);
     setError(null);
     setWalkError(null);
     setPriorityError(null);
+    setCallOutError(null);
     try {
       const weekPayload = await fetchThisWeekRotations(specialist);
       const rotations = weekPayload.rotations as WeeklyRotationWithLocation[];
@@ -80,6 +90,7 @@ export function OverviewTab({ specialist }: WorkflowTabProps) {
         (s) => s.is_active
       );
       setSections(activeSections);
+      const operationalWeekLabel = weekPayload.assigned_week || week;
       setPlan(
         composeThisWeekOwnership({
           rotations,
@@ -87,6 +98,31 @@ export function OverviewTab({ specialist }: WorkflowTabProps) {
           baySectionByKey: indexBaySectionLookups(activeSections),
         })
       );
+
+      try {
+        const range = isoWeekCalendarRange(operationalWeekLabel);
+        const storeNumber = specialist.store_number?.trim() || "";
+        const days = await fetchShiftDaysRange(
+          range.startDate,
+          range.endDate,
+          storeNumber || undefined
+        );
+        setWeekDates(range.dates);
+        setCallOuts(
+          Object.values(days).map((day) => ({
+            specialistId: day.specialist_id,
+            workDate: day.work_date,
+            isCallOut: day.is_call_out === true,
+            storeNumber: storeNumber || null,
+          }))
+        );
+      } catch (err) {
+        setCallOuts([]);
+        setWeekDates([]);
+        setCallOutError(
+          err instanceof Error ? err.message : "Could not load call-outs"
+        );
+      }
 
       try {
         const { inbox } = await fetchWalkthroughInbox(specialist);
@@ -112,6 +148,8 @@ export function OverviewTab({ specialist }: WorkflowTabProps) {
       }
     } catch (err) {
       setPlan(null);
+      setCallOuts([]);
+      setWeekDates([]);
       setError(err instanceof Error ? err.message : "Could not load Overview");
     } finally {
       setLoading(false);
@@ -119,6 +157,8 @@ export function OverviewTab({ specialist }: WorkflowTabProps) {
   }, [specialist, week, nextWeek]);
 
   useEffect(() => {
+    // Established Floor Command mount load. The same call exists on the other tabs.
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- fetch overview evidence on mount
     void reload();
   }, [reload]);
 
@@ -141,8 +181,11 @@ export function OverviewTab({ specialist }: WorkflowTabProps) {
         plan,
         inbox: walkInbox,
         sections,
+        callOuts: callOutError ? null : callOuts,
+        operationalWeekDates: callOutError ? null : weekDates,
+        storeNumber: specialist.store_number?.trim() || null,
       }),
-    [plan, walkInbox, sections]
+    [plan, walkInbox, sections, callOuts, weekDates, callOutError, specialist.store_number]
   );
   const openFollowUps = useMemo(
     () => composeOverviewOpenFollowUps({ inbox: walkInbox, sections }),
@@ -243,7 +286,7 @@ export function OverviewTab({ specialist }: WorkflowTabProps) {
                   </li>
                 ))}
               </ul>
-            ) : plan?.isHealthyOwnedPlan && !walkError ? (
+            ) : plan?.isHealthyOwnedPlan && !walkError && !callOutError ? (
               <p className="rounded-xl border border-emerald-500/20 bg-emerald-950/20 px-3 py-3 text-sm text-emerald-100/90">
                 Week on track — no attention items from current plan evidence.
               </p>
@@ -252,6 +295,15 @@ export function OverviewTab({ specialist }: WorkflowTabProps) {
                 No attention signals from loaded week evidence.
               </p>
             )}
+            {callOutError ? (
+              <p
+                className="rounded-xl border border-zinc-800 bg-zinc-950/60 px-3 py-3 text-sm text-zinc-400"
+                role="status"
+                data-testid="overview-callouts-unavailable"
+              >
+                Call-outs unavailable — not shown as zero.
+              </p>
+            ) : null}
           </section>
 
           <section
@@ -330,6 +382,15 @@ export function OverviewTab({ specialist }: WorkflowTabProps) {
               <HubIcon id="notes" className="h-4 w-4" />
               Walkthroughs
             </Link>
+            {canAccessSupervisorManageView("rotation", specialist) ? (
+              <Link
+                href={supervisorManageHref("rotation")}
+                data-testid="overview-automatic-rotation"
+                className="flex min-h-12 items-center justify-center gap-2 rounded-xl border border-zinc-700/80 bg-zinc-900/70 px-3 text-sm font-semibold text-zinc-100 sm:col-span-3"
+              >
+                Automatic Rotation
+              </Link>
+            ) : null}
           </section>
         </div>
 

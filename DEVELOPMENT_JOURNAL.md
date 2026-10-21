@@ -1,5 +1,13 @@
 # DeptSync Hub — Development Journal
 
+## 2026-10-20 — DEPTSYNC-OPS-OVERVIEW-002 operational attention completeness
+
+**Local implementation only — not pushed, not deployed.** Overview now shows a called-out associate who still owns this week's unverified bays, and assigned bays whose rotation is `PENDING` with a send-back `review_note`. Both link to This Week. Supervisors and MasterAdmin get a navigation link to `/settings?manage=rotation`. No assignment, coverage, publication, or schema writes. Focused tests **22 PASS** (`ops-overview-001` + `ops-overview-002`). `tsc`, ESLint on touched files, and `npm run build` PASS. AUTO-008 latch and cron unchanged. Canonical: [`docs/product/DEPTSYNC_OPS_OVERVIEW_002_IMPLEMENTATION.md`](docs/product/DEPTSYNC_OPS_OVERVIEW_002_IMPLEMENTATION.md). **STOP — do not push or deploy until release authorization.**
+
+## 2026-10-20 — DEPTSYNC-ALIGN-002 remaining redesign reconciliation
+
+**Repository audit only — no implementation, migration, deploy, or production writes.** Reconstructed the Floor Command redesign from Redesign-001, RD-1…RD-6, and the later MAP, WALK, ZEBRA, ALIGN-DEPT, AUTO, and SECTION-OWNERSHIP releases. Production tip `233f7da`. AUTO-008 remains enabled (`WEEKLY_ROTATION_AUTO_PUBLISH = true`, cron `0 12 * * 0`, standing 3/3/3/3). First unattended publication is still unverified; next cron **2026-10-25T12:00Z → 2026-W44**. AUTO-009 isolated acceptance stands (`deptsync_auto009_accept_53992`, 2026-10-19); it is not a production publication. Operator phone acceptance of SECTION-OWNERSHIP-002…005 is recorded in this reconciliation; those release docs were not rewritten. Next authorized implementation, when requested: OPS-OVERVIEW-002, then SECTION-OWNERSHIP-006, then MAP-WALK-CUES-001. Canonical: [`docs/product/DEPTSYNC_ALIGN_002_REDESIGN_RECONCILIATION.md`](docs/product/DEPTSYNC_ALIGN_002_REDESIGN_RECONCILIATION.md). **STOP — do not implement from this audit.**
+
 ## 2026-10-19 — DEPTSYNC-SECTION-OWNERSHIP-005 controlled production release
 
 **Authorized VALIDATE→RELEASE→VERIFY complete.** Candidate **`ea898d2`** isolated (nav/UX only; no migrations). Focused **120 PASS**; tsc/build PASS. Pre/post SBA fingerprint **`55dde8e86360caea`** identical; sections **4×160**; standing **12**; coverage **0**; W44 empty. Push `fafac97..ea898d2`; GitHub Production **`7188220431`** success; Vercel Ready @ https://deptsync-hub.vercel.app. AUTO-008 latch/cron untouched. Canonical: [`docs/product/DEPTSYNC_SECTION_OWNERSHIP_005_RELEASE.md`](docs/product/DEPTSYNC_SECTION_OWNERSHIP_005_RELEASE.md). **STOP — phone-accept focused Open/Back; await Oct 25 AUTO-008 first-run.**

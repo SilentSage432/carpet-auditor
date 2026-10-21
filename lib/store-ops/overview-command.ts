@@ -7,8 +7,12 @@
  */
 
 import { buildMapBayFocusHref } from "./map-bay-focus";
-import { formatBayTag } from "./types";
-import type { ThisWeekOwnershipPlan, ThisWeekOwner } from "./this-week-ownership";
+import { formatBayTag, resolveVerificationStatus } from "./types";
+import type {
+  ThisWeekOwnedBay,
+  ThisWeekOwnershipPlan,
+  ThisWeekOwner,
+} from "./this-week-ownership";
 import type {
   WalkthroughFollowUpView,
   WalkthroughInbox,
@@ -22,7 +26,21 @@ export type OverviewAttentionKind =
   | "week_unowned"
   | "week_verify"
   | "week_barrier"
+  | "week_call_out"
+  | "week_sent_back"
   | "followup_overdue";
+
+/**
+ * One persisted associate_shift_days call-out fact.
+ * Store and week filters are applied here so Overview does not invent absence.
+ */
+export type OverviewCallOutRow = {
+  specialistId: string;
+  workDate: string;
+  isCallOut: boolean;
+  /** When set, must match `storeNumber` or the row is ignored. */
+  storeNumber?: string | null;
+};
 
 export type OverviewAttentionItem = {
   id: string;
@@ -161,6 +179,20 @@ export function composeOverviewAttention(input: {
       "id" | "name" | "primary_owner_name" | "primary_owner_specialist_id"
     >
   >;
+  /**
+   * Call-out rows already loaded for the actor's store.
+   * Omitted or empty week dates → no call-out items (do not guess).
+   */
+  callOuts?: ReadonlyArray<OverviewCallOutRow> | null;
+  /** Monday–Sunday dates (YYYY-MM-DD) of the operational week the plan belongs to. */
+  operationalWeekDates?: readonly string[] | null;
+  /** When set, call-out rows for any other store are ignored. */
+  storeNumber?: string | null;
+  /**
+   * When set, only bays in these department ids count.
+   * The weekly-rotations API already scopes the plan; this is a second check.
+   */
+  departmentIds?: readonly string[] | null;
 }): OverviewAttentionItem[] {
   const items: OverviewAttentionItem[] = [];
   const plan = input.plan;
@@ -215,12 +247,169 @@ export function composeOverviewAttention(input: {
     });
   }
 
+  items.push(
+    ...composeCallOutAttention({
+      plan,
+      callOuts: input.callOuts,
+      operationalWeekDates: input.operationalWeekDates,
+      storeNumber: input.storeNumber,
+      departmentIds: input.departmentIds,
+    })
+  );
+  items.push(
+    ...composeSentBackAttention({
+      plan,
+      departmentIds: input.departmentIds,
+    })
+  );
+
   const sectionsById = sectionOwnerById(input.sections ?? []);
   const overdue = input.inbox?.attention_follow_ups ?? [];
   for (const fu of overdue.slice(0, 6)) {
     items.push(followUpToAttention(fu, sectionsById));
   }
   return items;
+}
+
+const THIS_WEEK_HREF = "/dashboard";
+
+function weekDateSet(dates: readonly string[] | null | undefined): Set<string> {
+  const set = new Set<string>();
+  for (const date of dates ?? []) {
+    const trimmed = String(date ?? "").trim();
+    if (trimmed) set.add(trimmed);
+  }
+  return set;
+}
+
+function departmentAllowed(
+  departmentId: string | null | undefined,
+  departmentIds: readonly string[] | null | undefined
+): boolean {
+  if (!departmentIds || departmentIds.length === 0) return true;
+  const id = String(departmentId ?? "").trim();
+  return departmentIds.some((allowed) => allowed === id);
+}
+
+function bayInDepartments(
+  bay: ThisWeekOwnedBay,
+  departmentIds: readonly string[] | null | undefined
+): boolean {
+  return departmentAllowed(bay.rotation.department_id, departmentIds);
+}
+
+/** Assigned work that is not yet verified. Verified bays are no longer owed. */
+function bayStillOwed(bay: ThisWeekOwnedBay): boolean {
+  return bay.isAssigned && bay.lifecycle !== "verified";
+}
+
+/**
+ * Send-back leaves verification_status PENDING and a coaching review_note.
+ * Re-report moves the bay to PENDING_VERIFICATION and clears the note.
+ * Verify clears the note and sets VERIFIED_COMPLETE.
+ * Those later states stay in the existing verify category or drop out.
+ */
+function bayNeedsSentBackCorrection(bay: ThisWeekOwnedBay): boolean {
+  if (!bay.isAssigned) return false;
+  if (resolveVerificationStatus(bay.rotation) !== "PENDING") return false;
+  return String(bay.rotation.review_note ?? "").trim().length > 0;
+}
+
+function bayMapHref(bay: ThisWeekOwnedBay): string | null {
+  return overviewPlaceMapHref({
+    department_id: bay.rotation.department_id,
+    aisle: bay.aisle,
+    bay: bay.bay,
+  });
+}
+
+function joinBayLabels(bays: readonly ThisWeekOwnedBay[]): string {
+  const labels = bays.map((bay) => bay.label);
+  if (labels.length <= 4) return labels.join(" · ");
+  return `${labels.slice(0, 4).join(" · ")} · and ${labels.length - 4} more`;
+}
+
+function composeCallOutAttention(input: {
+  plan: ThisWeekOwnershipPlan | null;
+  callOuts?: ReadonlyArray<OverviewCallOutRow> | null;
+  operationalWeekDates?: readonly string[] | null;
+  storeNumber?: string | null;
+  departmentIds?: readonly string[] | null;
+}): OverviewAttentionItem[] {
+  const plan = input.plan;
+  const dates = weekDateSet(input.operationalWeekDates);
+  if (!plan || dates.size === 0) return [];
+
+  const expectedStore = String(input.storeNumber ?? "").trim();
+  const calledOut = new Set<string>();
+  for (const row of input.callOuts ?? []) {
+    if (row.isCallOut !== true) continue;
+    const workDate = String(row.workDate ?? "").trim();
+    if (!dates.has(workDate)) continue;
+    const rowStore = String(row.storeNumber ?? "").trim();
+    if (expectedStore && rowStore !== expectedStore) continue;
+    if (!expectedStore && rowStore) continue;
+    const specialistId = String(row.specialistId ?? "").trim();
+    if (specialistId) calledOut.add(specialistId);
+  }
+  if (calledOut.size === 0) return [];
+
+  const items: OverviewAttentionItem[] = [];
+  const owners = [...plan.owners].sort((a, b) =>
+    a.specialistName.localeCompare(b.specialistName)
+  );
+  for (const owner of owners) {
+    if (!calledOut.has(owner.specialistId)) continue;
+    const owed = owner.bays.filter(
+      (bay) => bayStillOwed(bay) && bayInDepartments(bay, input.departmentIds)
+    );
+    if (owed.length === 0) continue;
+    const bayWord = owed.length === 1 ? "bay" : "bays";
+    items.push({
+      id: `call-out-${owner.specialistId}`,
+      kind: "week_call_out",
+      label: `${owner.specialistName} is called out and still owns ${owed.length} ${bayWord}`,
+      detail: `Called out this week. Ownership stays until you reassign on This Week. ${joinBayLabels(owed)}`,
+      ownerLabel: owner.specialistName,
+      href: THIS_WEEK_HREF,
+      mapHref: owed.length === 1 ? bayMapHref(owed[0]!) : null,
+    });
+  }
+  return items;
+}
+
+function composeSentBackAttention(input: {
+  plan: ThisWeekOwnershipPlan | null;
+  departmentIds?: readonly string[] | null;
+}): OverviewAttentionItem[] {
+  const plan = input.plan;
+  if (!plan) return [];
+  const bays: ThisWeekOwnedBay[] = [];
+  for (const owner of plan.owners) {
+    for (const bay of owner.bays) {
+      if (!bayInDepartments(bay, input.departmentIds)) continue;
+      if (!bayNeedsSentBackCorrection(bay)) continue;
+      bays.push(bay);
+    }
+  }
+  bays.sort((a, b) => {
+    const aisle = a.aisle.localeCompare(b.aisle, undefined, { numeric: true });
+    if (aisle !== 0) return aisle;
+    return a.bay - b.bay;
+  });
+  if (bays.length === 0) return [];
+  const bayWord = bays.length === 1 ? "bay was" : "bays were";
+  return [
+    {
+      id: "sent-back",
+      kind: "week_sent_back",
+      label: `${bays.length} ${bayWord} sent back for correction`,
+      detail: joinBayLabels(bays),
+      ownerLabel: null,
+      href: THIS_WEEK_HREF,
+      mapHref: bays.length === 1 ? bayMapHref(bays[0]!) : null,
+    },
+  ];
 }
 
 function followUpToAttention(
