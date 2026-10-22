@@ -69,6 +69,8 @@ describe("SECTION-OWNERSHIP-005 manage URL helpers", () => {
     expect(canAccessSupervisorManageView("ownership", supervisor)).toBe(true);
     expect(canAccessSupervisorManageView("coverage", supervisor)).toBe(true);
     expect(canAccessSupervisorManageView("rotation", supervisor)).toBe(true);
+    expect(canAccessSupervisorManageView("rotation", master)).toBe(true);
+    expect(canAccessSupervisorManageView("rotation", associate)).toBe(false);
     expect(canAccessSupervisorManageView("ownership", associate)).toBe(false);
     expect(canAccessSupervisorManageView("team", associate)).toBe(false);
     expect(canAccessSupervisorManageView("team", null)).toBe(false);

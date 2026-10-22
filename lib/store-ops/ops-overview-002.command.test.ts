@@ -93,7 +93,10 @@ describe("OPS-OVERVIEW-002 attention", () => {
       departmentIds: ["dept-f"],
     });
     const item = attention.find((row) => row.kind === "week_call_out");
-    expect(item?.label).toBe("Nate is called out and still owns 1 bay");
+    expect(item?.label).toBe(
+      "Nate has a call-out this week and still owns 1 bay"
+    );
+    expect(item?.label).not.toMatch(/absent today|is called out/i);
     expect(item?.detail).toMatch(/Ownership stays/);
     expect(item?.detail).toContain("A5-B01");
     expect(item?.ownerLabel).toBe("Nate");
@@ -158,7 +161,9 @@ describe("OPS-OVERVIEW-002 attention", () => {
       storeNumber: "2587",
     });
     const item = attention.find((row) => row.kind === "week_call_out");
-    expect(item?.label).toBe("Tracy is called out and still owns 2 bays");
+    expect(item?.label).toBe(
+      "Tracy has a call-out this week and still owns 2 bays"
+    );
     expect(item?.detail).toContain("A7-B02");
     expect(item?.detail).toContain("A7-B04");
     expect(item?.detail).not.toContain("A7-B09");
@@ -199,7 +204,9 @@ describe("OPS-OVERVIEW-002 attention", () => {
       departmentIds: ["dept-f"],
     });
     const item = scoped.find((row) => row.kind === "week_call_out");
-    expect(item?.label).toBe("Nick is called out and still owns 1 bay");
+    expect(item?.label).toBe(
+      "Nick has a call-out this week and still owns 1 bay"
+    );
     expect(item?.detail).toContain("A5-B03");
     expect(item?.detail).not.toContain("A41-B01");
   });

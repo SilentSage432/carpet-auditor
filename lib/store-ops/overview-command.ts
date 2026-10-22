@@ -368,8 +368,8 @@ function composeCallOutAttention(input: {
     items.push({
       id: `call-out-${owner.specialistId}`,
       kind: "week_call_out",
-      label: `${owner.specialistName} is called out and still owns ${owed.length} ${bayWord}`,
-      detail: `Called out this week. Ownership stays until you reassign on This Week. ${joinBayLabels(owed)}`,
+      label: `${owner.specialistName} has a call-out this week and still owns ${owed.length} ${bayWord}`,
+      detail: `A call-out is recorded during this operational week. Ownership stays until you reassign on This Week. ${joinBayLabels(owed)}`,
       ownerLabel: owner.specialistName,
       href: THIS_WEEK_HREF,
       mapHref: owed.length === 1 ? bayMapHref(owed[0]!) : null,
