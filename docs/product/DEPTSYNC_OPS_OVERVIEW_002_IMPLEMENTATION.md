@@ -1,7 +1,7 @@
 # DEPTSYNC-OPS-OVERVIEW-002 — Operational Attention Completeness
 
-**Status:** COMPLETE locally — **not pushed, not deployed**  
-**Date:** 2026-10-20  
+**Status:** COMPLETE — released in [`DEPTSYNC_OPS_OVERVIEW_002_RELEASE.md`](./DEPTSYNC_OPS_OVERVIEW_002_RELEASE.md) (`4c29cf6`, includes `154a8c2`)  
+**Date:** 2026-10-20 · released 2026-10-22  
 **Mode:** Implement → test → local validation  
 **Scope:** [`DEPTSYNC_ALIGN_002_REDESIGN_RECONCILIATION.md`](./DEPTSYNC_ALIGN_002_REDESIGN_RECONCILIATION.md) tranche OPS-OVERVIEW-002  
 **Prior surface:** [`DEPTSYNC_OPS_OVERVIEW_001_IMPLEMENTATION.md`](./DEPTSYNC_OPS_OVERVIEW_001_IMPLEMENTATION.md)
@@ -39,7 +39,8 @@ An item is added when all of these are true:
 
 One item per associate. Several call-out days in the same week do not create several items. Verified bays are not counted. A call-out with no owned bays is omitted. A call-out outside the week is omitted. Missing week dates or a failed call-out read produce no call-out items, and the screen says call-outs are unavailable rather than zero.
 
-Label: “{Name} is called out and still owns {n} bay(s).”  
+Label: “{Name} has a call-out this week and still owns {n} bay(s).”  
+The earlier “is called out” wording was corrected before deploy so the label does not read as absence today.  
 Detail names the bays and says ownership stays until someone reassigns on This Week.  
 Link: `/dashboard`. One bay also links to Map.
 
