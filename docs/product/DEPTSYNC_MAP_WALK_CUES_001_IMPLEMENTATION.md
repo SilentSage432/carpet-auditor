@@ -29,11 +29,16 @@ A bay row may show neither chip, **Assigned**, **Follow-up**, or both. There is 
 
 | Evidence | Chip |
 |----------|------|
-| A non-superseded rotation whose `assigned_week` equals the operational week, with a Sunday row for that rotation id in this store and `week_starting`, and a non-empty specialist id | **Assigned**. Accessible name adds “Assigned this week”. |
-| Rotation in another week, cleared assignment, empty specialist id, missing aisle or bay, or a failed assignment read | No Assigned chip. That does not say the bay is unavailable. |
+| A non-superseded rotation whose `assigned_week` equals the operational week, with a Sunday row for that rotation id in this store and `week_starting`, and either a non-empty specialist id or a non-empty stored associate name | **Assigned**. Accessible name adds “Assigned this week”. |
+| Name-only legacy row (`specialist_name` set, no roster or profile id, status not cleared) | **Assigned**. Same display rule as the bay sheet (`assigneeName` counts). No id is invented. |
+| Rotation in another week, status `cleared`, blank id and blank name, missing aisle or bay, or a failed assignment read | No Assigned chip. That does not say the bay is unavailable. |
 | At least one open follow-up whose observation is this department, aisle, and bay | **Follow-up**. Accessible name adds “Open follow-up”. Several open rows on one bay stay one chip. |
 | Closed follow-up, or an observation with no follow-up row | No Follow-up chip. A note is not an open task. |
 | Failed follow-up read | No Follow-up chip. A successful assignment cue can still show. |
+
+The bay sheet is the Map display contract: `composeMapBayWeekContext` marks the week assigned when a stored name or a specialist id is present. `mapRow`, which This Week uses, still requires a specialist id and drops a name-only row. The Map cue keeps that name. This Week is unchanged, so a name-only legacy row can show **Assigned** on the Map and stay off This Week’s assignment card. Current writers clear the name when they clear the row or when they have no specialist id, so new writes do not create name-only rows.
+
+A cleared row is not an assignment, even if a name is still stored. The sheet loader does not read `status`, so a cleared row that still has a name could say assigned on the sheet. The cue follows the status. Live clears blank the name before that can happen.
 
 Selling and topstock share one physical key (`department`, deduped aisle, bay). Numeric aisle `01` and `1` are the same key. A department’s assignment does not mark another department’s bay.
 
@@ -45,13 +50,15 @@ Readiness tones stay as they were. “This week” on the row still means the lo
 
 `StoreLocationGrid` bay rows (`data-testid="map-bay-row"`) render `map-cue-assigned` and `map-cue-follow-up` beside the existing High, seasonal, and attention chips. The row button still calls `onOpenWalk`, which opens `WalkTheFloorSheet`. Aisle tiles do not gain section chips. Map does not create or close follow-ups.
 
+When an assignment read or a follow-up read fails, one line sits above the aisle index and stays visible inside an aisle (`data-testid="map-cue-availability"`). It names only the read that failed. It is not repeated on each bay. A read that is still pending, or that returned an empty set, stays silent. Navigation is not blocked. The cue that did load still renders.
+
 ---
 
 ## 4. Performance
 
 Map reload still uses one `Promise.all`. After the week payload returns, it issues one Sunday assignment query for the store and `week_starting` (no department filter, no per-bay request). Open places are one follow-up query (`observation_id`, `status` only) and then observation place columns (`id`, `department_id`, `aisle`, `bay`) in chunks of 100 ids. Observation bodies are not selected. The sheet’s per-place `GET /api/store-locations/bay-context` is not called while painting the aisle.
 
-A failed assignment or follow-up read is caught and withholds that cue. The rest of the map still paints.
+A failed assignment or follow-up read is caught on its own. The failed cue is withheld. The other cue still paints. The map-level line says which information could not be loaded, so a missing chip is not presented as confirmed absence.
 
 Cues refresh when locations, sections, walkthroughs, or Sunday assignments change, through the existing reload. Those listeners do not write.
 
@@ -61,19 +68,31 @@ Cues refresh when locations, sections, walkthroughs, or Sunday assignments chang
 
 | Suite | Result |
 |-------|--------|
-| `map-walk-cues.test.ts` | **14 PASS** |
+| `map-walk-cues.test.ts` | **16 PASS** |
 | `map-bay-context.test.ts` | **5 PASS** |
 | `rd2.floor-command-map.contract` | **7 PASS** |
 | `rd5.walkthroughs.contract` | **11 PASS** |
 | `walkthroughs.test.ts` | **13 PASS** |
 | `walkthroughs.authz.test.ts` | **10 PASS** |
+| This Week ownership and command (`ux-reduce-002`, `rd4` unit and contract) | **28 PASS** |
+| `sec-ops-010.authz` + `operational-sections.authz` | **31 PASS** |
+| **Total** | **121 PASS** (12 files) |
 | TypeScript `tsc --noEmit` | **PASS** |
-| ESLint on cue module, MapTab, walkthrough route, client, and the new Sunday read | **PASS** (no new findings) |
-| `npm run build` | **PASS** |
+| ESLint on cue module, MapTab, walkthrough route, client, and the new Sunday read | **PASS** for new code |
+| `npm run build` | **PASS** (Next.js 16.2.12) |
 
-`StoreLocationGrid.tsx` still reports four pre-existing `react-hooks` findings (a ref write during render, and three effects that set state). This tranche did not change those effects. `sunday-audit.ts` still warns on the unused argument of the existing `getSundayAssignments` stub.
+ESLint on `StoreLocationGrid.tsx` reports four findings that already exist on `origin/main` (`8d7f026`). This change does not edit those statements. They are not a release blocker.
 
-Covered cases: neither cue, current-week assignment, previous week only, open follow-up, closed follow-up, both, several opens as one chip, operational-week selection, missing or partial rows, department separation, empty specialist id, store-scoped queries, `requireStoreOpsActor` before the open-places branch, existing bay navigation, no writes in the cue path, no per-bay bay-context fan-out, cron `0 12 * * 0`, and `WEEKLY_ROTATION_AUTO_PUBLISH = true`.
+| Finding | Location | Disposition |
+|---------|----------|-------------|
+| `react-hooks/refs` — `activeOverlayRef.current = activeOverlay` during render | `StoreLocationGrid.tsx` | Pre-existing. The ref lets a later click read the latest active overlay. Not introduced by the chips. Left as-is. |
+| `react-hooks/set-state-in-effect` — clear a selected aisle that disappeared | same file | Pre-existing aisle navigation. Left as-is. |
+| `react-hooks/set-state-in-effect` — reset the bay page when the aisle changes | same file | Pre-existing. Left as-is. |
+| `react-hooks/set-state-in-effect` — apply a This Week focus once | same file | Pre-existing RD-4 focus. Left as-is. |
+
+`sunday-audit.ts` still warns that `_storeNumber` is unused on the existing `getSundayAssignments` stub. That stub was not part of this change.
+
+Covered cases: neither cue, current-week assignment, previous week only, open follow-up, closed follow-up, both, several opens as one chip, operational-week selection, missing or partial rows, department separation, empty specialist id, name-only legacy row, cleared row that still has a name, independent read failure, store-scoped queries, `requireStoreOpsActor` before the open-places branch, existing bay navigation, no writes in the cue path, no per-bay bay-context fan-out, cron `0 12 * * 0`, and `WEEKLY_ROTATION_AUTO_PUBLISH = true`.
 
 Signed-in aisle navigation was not exercised in a browser. The Map route requires an operator session, and this environment has no signed-in session.
 
@@ -89,12 +108,12 @@ The chip carries no follow-up text and no observation body. Opening the bay stil
 
 ## 7. Known limitations
 
-- A withheld cue and a bay with no evidence look the same: no chip. The row does not claim “none” in words.
-- This Week’s assignment fetch can be limited to the working department code. The Map cue loads every Sunday row for the store-week, then keeps only rotations in the actor’s week payload. A pinned department on This Week can therefore show a narrower assignment set than the Map.
-- The bay sheet treats a non-empty `specialist_name` as assigned. `mapRow` drops a row that has a name but no roster or profile id, so that rare row does not cue. Cleared rows do not cue.
+- A missing chip after a failed read is not “none.” The map-level line names the failed read. A successful empty read stays quiet, and the row still has no chip.
+- This Week’s assignment fetch can be limited to the working department code, and `mapRow` still drops a name-only row. The Map cue loads every Sunday row for the store-week, keeps a stored name without inventing an id, then joins only rotations in the actor’s week payload. A pinned department on This Week can therefore show a narrower assignment set than the Map.
 - The first cached paint of the aisle can appear before the cue reload finishes.
 - Open follow-ups are presence only. The chip does not say how many are open.
 - Historical walkthrough notes and closed follow-ups stay off the row.
+- Four pre-existing React hook findings in `StoreLocationGrid.tsx` remain. They do not change cue correctness.
 
 ---
 

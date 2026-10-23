@@ -22,6 +22,9 @@ export type MapWalkAssignmentRotation = {
 
 export type MapWalkAssignmentRow = {
   specialist_id?: string | null;
+  /** Stored associate name. The bay sheet treats a name as assigned even when no id is stored. */
+  specialist_name?: string | null;
+  status?: string | null;
 };
 
 export type MapWalkFollowUpPlace = {
@@ -37,6 +40,23 @@ export function mapWalkCueKey(input: {
   bay: number;
 }): string {
   return `${String(input.departmentId).trim()}|${locationDedupeAisleKey(input.aisle)}|${Number(input.bay) || 0}`;
+}
+
+/**
+ * A Sunday row counts when it is not cleared and still names an associate.
+ * A specialist id or a stored name is enough. Cleared rows do not count.
+ * This matches the bay sheet, which treats a stored name as assigned, and
+ * This Week, which treats a specialist id as assigned. It does not invent
+ * either fact from section ownership or coverage.
+ */
+export function persistedSundayAssignmentCounts(
+  row: MapWalkAssignmentRow | null | undefined
+): boolean {
+  if (!row) return false;
+  if (String(row.status ?? "").trim().toLowerCase() === "cleared") return false;
+  const specialistId = String(row.specialist_id ?? "").trim();
+  const specialistName = String(row.specialist_name ?? "").trim();
+  return Boolean(specialistId || specialistName);
 }
 
 /**
@@ -56,10 +76,9 @@ export function indexAssignedThisWeekBays(input: {
   for (const rotation of input.rotations) {
     if (rotation.superseded_at) continue;
     if (String(rotation.assigned_week ?? "").trim() !== week) continue;
-    const specialistId = String(
-      input.assignments[rotation.id]?.specialist_id ?? ""
-    ).trim();
-    if (!specialistId) continue;
+    if (!persistedSundayAssignmentCounts(input.assignments[rotation.id])) {
+      continue;
+    }
     const loc = rotation.store_locations;
     const departmentId = String(
       rotation.department_id || loc?.department_id || ""
@@ -90,6 +109,26 @@ export function indexOpenFollowUpBays(
     keys.add(mapWalkCueKey({ departmentId, aisle, bay }));
   }
   return keys;
+}
+
+export type MapCueReadState = "pending" | "ready" | "failed";
+
+/**
+ * One map-level sentence when a cue read failed.
+ * Pending and ready stay quiet. A failed read is not described as "no cues".
+ */
+export function mapCueAvailabilityMessage(input: {
+  assignments: MapCueReadState;
+  followUps: MapCueReadState;
+}): string | null {
+  const assignmentFailed = input.assignments === "failed";
+  const followFailed = input.followUps === "failed";
+  if (assignmentFailed && followFailed) {
+    return "Assignment and follow-up information could not be loaded.";
+  }
+  if (assignmentFailed) return "Assignment information could not be loaded.";
+  if (followFailed) return "Follow-up information could not be loaded.";
+  return null;
 }
 
 export function mapBayWalkCues(input: {

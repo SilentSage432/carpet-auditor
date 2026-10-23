@@ -9,8 +9,11 @@ import {
   indexAssignedThisWeekBays,
   indexOpenFollowUpBays,
   mapBayWalkCues,
+  mapCueAvailabilityMessage,
   mapWalkCueKey,
+  persistedSundayAssignmentCounts,
   type MapWalkAssignmentRotation,
+  type MapWalkAssignmentRow,
 } from "./map-walk-cues";
 
 const root = join(__dirname, "../..");
@@ -30,7 +33,7 @@ function rotation(
 
 function cues(input: {
   rotations?: MapWalkAssignmentRotation[];
-  assignments?: Record<string, { specialist_id?: string | null }> | null;
+  assignments?: Record<string, MapWalkAssignmentRow | undefined> | null;
   places?: Parameters<typeof indexOpenFollowUpBays>[0];
   week?: string;
   aisle?: string;
@@ -194,6 +197,76 @@ describe("MAP-WALK-CUES-001 bay row cues", () => {
     ).toBe(false);
   });
 
+  it("treats a legacy name-only Sunday row as assigned and ignores a cleared name", () => {
+    expect(
+      persistedSundayAssignmentCounts({
+        specialist_id: "",
+        specialist_name: "Nate",
+        status: "assigned",
+      })
+    ).toBe(true);
+    expect(
+      cues({
+        rotations: [rotation({ id: "rot-name" })],
+        assignments: {
+          "rot-name": {
+            specialist_id: "",
+            specialist_name: "Nate",
+            status: "assigned",
+          },
+        },
+      }).assignedThisWeek
+    ).toBe(true);
+    expect(
+      cues({
+        rotations: [rotation({ id: "rot-cleared-name" })],
+        assignments: {
+          "rot-cleared-name": {
+            specialist_id: "spec-1",
+            specialist_name: "Nate",
+            status: "cleared",
+          },
+        },
+      }).assignedThisWeek
+    ).toBe(false);
+    expect(
+      persistedSundayAssignmentCounts({
+        specialist_id: "",
+        specialist_name: "   ",
+        status: "assigned",
+      })
+    ).toBe(false);
+  });
+
+  it("names a failed cue read without calling the other read absent", () => {
+    expect(
+      mapCueAvailabilityMessage({ assignments: "pending", followUps: "pending" })
+    ).toBeNull();
+    expect(
+      mapCueAvailabilityMessage({ assignments: "ready", followUps: "ready" })
+    ).toBeNull();
+    expect(
+      mapCueAvailabilityMessage({ assignments: "failed", followUps: "ready" })
+    ).toBe("Assignment information could not be loaded.");
+    expect(
+      mapCueAvailabilityMessage({ assignments: "ready", followUps: "failed" })
+    ).toBe("Follow-up information could not be loaded.");
+    expect(
+      mapCueAvailabilityMessage({ assignments: "failed", followUps: "failed" })
+    ).toBe("Assignment and follow-up information could not be loaded.");
+    expect(
+      mapBayWalkCues({
+        departmentId: DEPT,
+        aisle: "12",
+        bay: 4,
+        assignedKeys: null,
+        followUpKeys: indexOpenFollowUpBays([
+          { department_id: DEPT, aisle: "12", bay: 4, status: "open" },
+        ]),
+      })
+    ).toEqual({ assignedThisWeek: false, openFollowUp: true });
+  });
+
   it("keeps department places apart and shares one physical bay across faces", () => {
     const keys = indexAssignedThisWeekBays({
       operationalWeek: WEEK,
@@ -275,6 +348,10 @@ describe("MAP-WALK-CUES-001 read and navigation contracts", () => {
     expect(grid).toMatch(/data-testid="map-bay-row"/);
     expect(grid).toMatch(/data-testid="map-cue-assigned"/);
     expect(grid).toMatch(/data-testid="map-cue-follow-up"/);
+    expect(grid).toMatch(/data-testid="map-cue-availability"/);
+    expect(grid.slice(grid.indexOf("const BayRow"))).not.toMatch(
+      /map-cue-availability/
+    );
     expect(grid).not.toMatch(/>Unassigned</);
   });
 
@@ -310,6 +387,8 @@ describe("MAP-WALK-CUES-001 read and navigation contracts", () => {
     );
     expect(fn).toMatch(/week_starting/);
     expect(fn).toMatch(/store_number/);
+    expect(fn).toMatch(/specialist_id: ""/);
+    expect(fn).toMatch(/specialist_name: name/);
     expect(fn).not.toMatch(/\.eq\("department"|\.in\("department"/);
     expect(fn).not.toMatch(/insert\(|update\(|upsert\(|delete\(/);
     expect(cuesSrc).not.toMatch(

@@ -92,6 +92,8 @@ type Props = {
   /** MAP-WALK-CUES-001. Null withholds the cue (read failed). */
   assignedCueKeys?: readonly string[] | null;
   followUpCueKeys?: readonly string[] | null;
+  /** One map-level note when a cue read failed. Not a per-bay warning. */
+  cueNotice?: string | null;
   barrierLocationIds?: string[];
   /** FS-003B batched seasonal views by location id (read-only). */
   seasonalByLocationId?: Map<string, MapLocationSeasonalView>;
@@ -242,6 +244,7 @@ export function StoreLocationGrid({
   weekRotationLocations = [],
   assignedCueKeys = null,
   followUpCueKeys = null,
+  cueNotice = null,
   barrierLocationIds = [],
   seasonalByLocationId,
   attentionByLocationId,
@@ -609,6 +612,16 @@ export function StoreLocationGrid({
       {error ? (
         <p className="text-sm font-medium text-red-300" role="alert">
           {error}
+        </p>
+      ) : null}
+
+      {cueNotice ? (
+        <p
+          className="px-1 font-mono text-[11px] leading-snug text-zinc-400"
+          data-testid="map-cue-availability"
+          role="status"
+        >
+          {cueNotice}
         </p>
       ) : null}
 

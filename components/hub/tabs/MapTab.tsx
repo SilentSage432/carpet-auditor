@@ -54,6 +54,8 @@ import {
 import {
   indexAssignedThisWeekBays,
   indexOpenFollowUpBays,
+  mapCueAvailabilityMessage,
+  type MapCueReadState,
 } from "@/lib/store-ops/map-walk-cues";
 import { formatMapCalendarWeekChrome } from "@/lib/store-ops/week-copy";
 import { isSupervisor } from "@/lib/specialists";
@@ -100,6 +102,10 @@ export function MapTab({ specialist }: WorkflowTabProps) {
   const [followUpCueKeys, setFollowUpCueKeys] = useState<string[] | null>(
     null
   );
+  const [assignmentCueState, setAssignmentCueState] =
+    useState<MapCueReadState>("pending");
+  const [followUpCueState, setFollowUpCueState] =
+    useState<MapCueReadState>("pending");
   const [barrierLocationIds, setBarrierLocationIds] = useState<string[]>([]);
   const [seasonalByLocationId, setSeasonalByLocationId] = useState<
     Map<string, MapLocationSeasonalView>
@@ -364,6 +370,10 @@ export function MapTab({ specialist }: WorkflowTabProps) {
         setFollowUpCueKeys((prev) =>
           fingerprintsEqual(prev, nextFollow) ? prev : nextFollow
         );
+        setAssignmentCueState(
+          weekBundle.assignments == null ? "failed" : "ready"
+        );
+        setFollowUpCueState(openPlaces == null ? "failed" : "ready");
         setBarrierLocationIds((prev) =>
           fingerprintsEqual(prev, nextBarriers) ? prev : nextBarriers
         );
@@ -447,6 +457,8 @@ export function MapTab({ specialist }: WorkflowTabProps) {
           setRegistryAisles([]);
           setAssignedCueKeys(null);
           setFollowUpCueKeys(null);
+          setAssignmentCueState("pending");
+          setFollowUpCueState("pending");
           setAttentionStatus("IDLE");
           clearAttentionPaint();
         } else {
@@ -680,6 +692,10 @@ export function MapTab({ specialist }: WorkflowTabProps) {
               weekRotationLocations={weekRotationLocations}
               assignedCueKeys={assignedCueKeys}
               followUpCueKeys={followUpCueKeys}
+              cueNotice={mapCueAvailabilityMessage({
+                assignments: assignmentCueState,
+                followUps: followUpCueState,
+              })}
               barrierLocationIds={barrierLocationIds}
               seasonalByLocationId={seasonalByLocationId}
               attentionByLocationId={attentionByLocationId}

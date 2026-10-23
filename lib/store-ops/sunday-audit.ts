@@ -270,7 +270,25 @@ export async function fetchStoreWeekSundayAssignments(
       const map: SundayAssignmentMap = {};
       for (const row of (data as SundayBayAssignmentRow[] | null) ?? []) {
         const assignment = mapRow(row);
-        if (assignment) map[String(row.bay_id)] = assignment;
+        if (assignment) {
+          map[String(row.bay_id)] = assignment;
+          continue;
+        }
+        // mapRow drops a stored name that has no specialist id. The bay sheet
+        // still treats that name as assigned. Keep it for the Map cue only.
+        // Do not invent an id, and do not keep a cleared row.
+        if (String(row.status ?? "").trim().toLowerCase() === "cleared") {
+          continue;
+        }
+        const name = String(row.specialist_name ?? "").trim();
+        if (!name) continue;
+        map[String(row.bay_id)] = {
+          specialist_id: "",
+          specialist_name: name,
+          assigned_at: String(row.updated_at ?? row.created_at ?? ""),
+          status: row.status,
+          supervisor_locked: row.supervisor_locked === true,
+        };
       }
       return map;
     }
