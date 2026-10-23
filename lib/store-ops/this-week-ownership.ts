@@ -55,8 +55,13 @@ export type ThisWeekOwnedBay = {
   hasBarrier: boolean;
   /** True when sunday_bay_assignments names an owner for this rotation. */
   isAssigned: boolean;
-  /** RD-3 stewardship overlay — independent of weekly assignee. */
+  /** RD-3 stewardship overlay — independent of weekly assignee. Permanent owner, never the week cover. */
   section?: BaySectionLookup | null;
+  /**
+   * SECTION-OWNERSHIP-006 — presentation only.
+   * Absent coverage stays `none` so a normal assignment keeps its existing line.
+   */
+  coveragePresentation: ThisWeekCoveragePresentation;
   /** ZEBRA-HANDOFF-002 — operator-recorded Zebra entry (not completion). */
   zebraEnteredAt: string | null;
   zebraEnteredBy: string | null;
@@ -118,8 +123,14 @@ export type ComposeThisWeekOwnershipInput = {
    * roster rows even if they own zero bays — coordination, not scoring.
    */
   includeUnassignedRoster?: boolean;
-  /** RD-3 physicalBayKey → section lookup (optional). */
+  /** RD-3 physicalBayKey → section lookup (optional). Permanent owners only. */
   baySectionByKey?: Map<string, BaySectionLookup>;
+  /**
+   * Active coverage rows for `weekLabel` only.
+   * Null or omitted withholds cover labels. Never used to choose the assignee.
+   */
+  weekCoverage?: readonly ThisWeekCoverageRecord[] | null;
+  weekLabel?: string | null;
   /**
    * OPERATIONAL-009 — when capacity approvals set a shared target, ownership
    * recovery is complete once owned >= min(staged, approvedSharedTarget).
@@ -185,6 +196,134 @@ function ownerNameFromAssignment(
   return fromAssignment || "Team member";
 }
 
+export type ThisWeekCoverageRecord = {
+  section_id: string;
+  week_label: string;
+  covering_specialist_id: string;
+  covering_specialist_name?: string | null;
+};
+
+export type ThisWeekCoveragePresentation =
+  | { kind: "none" }
+  | { kind: "withheld"; reason: ThisWeekCoverageWithholdReason }
+  | {
+      kind: "covering";
+      assignedName: string;
+      permanentOwnerName: string | null;
+    }
+  | {
+      kind: "assigned_while_other_covers";
+      assignedName: string;
+      permanentOwnerName: string | null;
+      coveringName: string;
+    };
+
+export type ThisWeekCoverageWithholdReason =
+  | "ambiguous_coverage"
+  | "missing_cover_name";
+
+/**
+ * One active cover per section for the selected week.
+ * Other weeks are ignored. Two rows for the same section are ambiguous.
+ */
+export function indexWeekCoverageForLabel(
+  records: readonly ThisWeekCoverageRecord[] | null | undefined,
+  weekLabel: string | null | undefined
+): Map<string, ThisWeekCoverageRecord | "ambiguous"> | null {
+  if (records == null) return null;
+  const week = String(weekLabel ?? "").trim();
+  const map = new Map<string, ThisWeekCoverageRecord | "ambiguous">();
+  if (!week) return map;
+  for (const raw of records) {
+    if (String(raw.week_label ?? "").trim() !== week) continue;
+    const sectionId = String(raw.section_id ?? "").trim();
+    const coverId = String(raw.covering_specialist_id ?? "").trim();
+    if (!sectionId || !coverId) continue;
+    if (map.has(sectionId)) {
+      map.set(sectionId, "ambiguous");
+      continue;
+    }
+    const name = String(raw.covering_specialist_name ?? "").trim();
+    map.set(sectionId, {
+      section_id: sectionId,
+      week_label: week,
+      covering_specialist_id: coverId,
+      covering_specialist_name: name || null,
+    });
+  }
+  return map;
+}
+
+/**
+ * Label temporary coverage without changing who is assigned.
+ * A cover row is not an assignment. The permanent owner field is not replaced.
+ */
+export function presentTemporaryCoverage(input: {
+  isAssigned: boolean;
+  assignedSpecialistId: string;
+  assignedName: string;
+  section: BaySectionLookup | null | undefined;
+  coverage: ThisWeekCoverageRecord | "ambiguous" | null | undefined;
+}): ThisWeekCoveragePresentation {
+  if (!input.isAssigned) return { kind: "none" };
+  const assignedId = String(input.assignedSpecialistId ?? "").trim();
+  if (!assignedId) return { kind: "none" };
+  if (input.coverage === "ambiguous") {
+    return { kind: "withheld", reason: "ambiguous_coverage" };
+  }
+  if (!input.coverage || !input.section) return { kind: "none" };
+
+  const permanentId = String(input.section.primary_owner_specialist_id ?? "").trim();
+  const permanentName = String(input.section.primary_owner_name ?? "").trim();
+  const coverId = String(input.coverage.covering_specialist_id ?? "").trim();
+  if (!coverId) return { kind: "none" };
+  if (permanentId && coverId === permanentId) return { kind: "none" };
+
+  const assignedName = String(input.assignedName ?? "").trim() || "Team member";
+  if (coverId === assignedId) {
+    return {
+      kind: "covering",
+      assignedName,
+      permanentOwnerName: permanentName || null,
+    };
+  }
+
+  const coverName = String(input.coverage.covering_specialist_name ?? "").trim();
+  if (!coverName) return { kind: "withheld", reason: "missing_cover_name" };
+  return {
+    kind: "assigned_while_other_covers",
+    assignedName,
+    permanentOwnerName: permanentName || null,
+    coveringName: coverName,
+  };
+}
+
+/** Lines shown on a bay only when temporary coverage changes the label. */
+export function temporaryCoverageLines(
+  presentation: ThisWeekCoveragePresentation,
+  assignedName: string
+): string[] | null {
+  const name = String(assignedName ?? "").trim() || "Team member";
+  if (presentation.kind === "covering") {
+    return [
+      `Assigned to ${name}`,
+      presentation.permanentOwnerName
+        ? `Permanent owner ${presentation.permanentOwnerName}`
+        : "Permanent owner unavailable",
+      "Covering this week",
+    ];
+  }
+  if (presentation.kind === "assigned_while_other_covers") {
+    const lines = [`Assigned to ${name}`];
+    if (presentation.permanentOwnerName) {
+      lines.push(`Permanent owner ${presentation.permanentOwnerName}`);
+    }
+    lines.push(`${presentation.coveringName} covering this week`);
+    return lines;
+  }
+  return null;
+}
+
 function roleLabelFor(
   specialistId: string,
   rosterById: Map<string, StoreSpecialist>
@@ -208,6 +347,10 @@ export function composeThisWeekOwnership(
   );
   const rosterById = new Map(
     (input.roster ?? []).map((m) => [String(m.id), m] as const)
+  );
+  const coverageBySection = indexWeekCoverageForLabel(
+    input.weekCoverage,
+    input.weekLabel
   );
 
   const byPhysical = new Map<string, ThisWeekOwnedBay>();
@@ -234,6 +377,16 @@ export function composeThisWeekOwnership(
       String(assignmentRow?.specialist_id ?? "").trim()
     );
     const section = input.baySectionByKey?.get(key) ?? null;
+    const assignedId = String(assignmentRow?.specialist_id ?? "").trim();
+    const coveragePresentation = presentTemporaryCoverage({
+      isAssigned: assigned,
+      assignedSpecialistId: assignedId,
+      assignedName: ownerNameFromAssignment(assignmentRow, rosterById),
+      section,
+      coverage: section
+        ? coverageBySection?.get(String(section.section_id)) ?? null
+        : null,
+    });
     const next: ThisWeekOwnedBay = {
       physicalKey: key,
       aisle,
@@ -244,6 +397,7 @@ export function composeThisWeekOwnership(
       hasBarrier,
       isAssigned: assigned,
       section,
+      coveragePresentation,
       zebraEnteredAt: assigned
         ? assignmentRow?.zebra_entered_at
           ? String(assignmentRow.zebra_entered_at)

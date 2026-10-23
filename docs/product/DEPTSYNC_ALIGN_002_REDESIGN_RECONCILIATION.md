@@ -11,7 +11,7 @@
 
 **Operator acceptance recorded here:** Phone acceptance of SECTION-OWNERSHIP-002 through 005 is confirmed by the operator for this reconciliation (2026-10-20). The 002–005 release documents still say acceptance was outstanding on 2026-10-19. Those release documents were not rewritten.
 
-**Follow-up:** OPS-OVERVIEW-002 was released on 2026-10-22 (`4c29cf6`). See [`DEPTSYNC_OPS_OVERVIEW_002_RELEASE.md`](./DEPTSYNC_OPS_OVERVIEW_002_RELEASE.md). The matrix below records the gap as it was found on 2026-10-20.
+**Follow-up:** OPS-OVERVIEW-002 was released on 2026-10-22 (`4c29cf6`). SECTION-OWNERSHIP-006 is implemented locally and not released. See [`DEPTSYNC_SECTION_OWNERSHIP_006_IMPLEMENTATION.md`](./DEPTSYNC_SECTION_OWNERSHIP_006_IMPLEMENTATION.md). The matrix below records the gaps as they were found on 2026-10-20.
 
 ---
 

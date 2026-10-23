@@ -36,6 +36,7 @@ import { formatUnsectionedLabel } from "@/lib/store-ops/operational-sections";
 import {
   assignmentResponsibilityLabel,
   completionEvidenceLabel,
+  temporaryCoverageLines,
   zebraHandoffEvidenceLabel,
   type ThisWeekOwnedBay,
   type ThisWeekOwner,
@@ -548,6 +549,10 @@ function ThisWeekBayDetail({
     bay: bay.bay,
     departmentId: bay.rotation.department_id,
   });
+  const coverageLines = temporaryCoverageLines(
+    bay.coveragePresentation,
+    associateName
+  );
   const sectionName = bay.section?.section_name?.trim();
   const sectionOwner = bay.section?.primary_owner_name?.trim();
 
@@ -561,9 +566,22 @@ function ThisWeekBayDetail({
           <p className="font-mono text-sm font-bold tabular-nums text-zinc-50">
             {bay.label}
           </p>
-          <p className="mt-0.5 text-[11px] text-zinc-400">
-            {assignmentResponsibilityLabel(bay)}
-          </p>
+          {coverageLines ? (
+            <div
+              className="mt-0.5 space-y-0.5"
+              data-testid={`floor-bay-coverage-${bay.physicalKey}`}
+            >
+              {coverageLines.map((line) => (
+                <p key={line} className="text-[11px] text-zinc-300">
+                  {line}
+                </p>
+              ))}
+            </div>
+          ) : (
+            <p className="mt-0.5 text-[11px] text-zinc-400">
+              {assignmentResponsibilityLabel(bay)}
+            </p>
+          )}
           <p className={`mt-0.5 text-[11px] font-semibold ${evidenceTone}`}>
             {completionEvidenceLabel(bay.lifecycle)}
           </p>
@@ -586,7 +604,7 @@ function ThisWeekBayDetail({
             <span className="text-zinc-300">
               {sectionName || formatUnsectionedLabel()}
             </span>
-            {sectionOwner ? (
+            {sectionOwner && !coverageLines ? (
               <span className="text-zinc-500">
                 {" "}
                 · steward {sectionOwner}

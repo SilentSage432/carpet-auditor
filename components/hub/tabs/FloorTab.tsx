@@ -33,6 +33,7 @@ import {
   fetchExceptionSummary,
   fetchLocationAttention,
   fetchOperationalSections,
+  fetchSectionWeekCoverage,
   fetchStoreLocationsDetailed,
   fetchThisWeekRotations,
   fetchWeekCapacityBoard,
@@ -94,6 +95,7 @@ import {
   composeThisWeekCommandSummary,
   composeThisWeekOwnership,
   composeThisWeekProgressLine,
+  type ThisWeekCoverageRecord,
 } from "@/lib/store-ops/this-week-ownership";
 import {
   specialistHomeDepartment,
@@ -154,6 +156,10 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
   const [baySectionByKey, setBaySectionByKey] = useState<
     Map<string, BaySectionLookup>
   >(() => new Map());
+  const [weekCoverage, setWeekCoverage] = useState<{
+    weekLabel: string;
+    records: ThisWeekCoverageRecord[];
+  } | null>(null);
   /** OPERATIONAL-009 — approved shared target for ownership recovery goal. */
   const [approvedSharedTarget, setApprovedSharedTarget] = useState<
     number | null
@@ -366,6 +372,22 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
             console.error("[FloorTab] sections failed (non-blocking)", err);
             setBaySectionByKey(new Map());
           });
+        if (nextWeek) {
+          void fetchSectionWeekCoverage(member, { week_label: nextWeek })
+            .then((payload) => {
+              if (payload.week_label !== nextWeek) return;
+              setWeekCoverage({
+                weekLabel: payload.week_label,
+                records: payload.coverage ?? [],
+              });
+            })
+            .catch((err) => {
+              console.error("[FloorTab] week coverage failed (non-blocking)", err);
+              setWeekCoverage(null);
+            });
+        } else {
+          setWeekCoverage(null);
+        }
 
         // P0 ownership: await authoritative sunday_bay_assignments before unlock.
         if (nextWeek) {
@@ -567,6 +589,8 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
 
   useEffect(() => {
     if (!supervisor || simplified) {
+      // Existing barrier reset. Async fetches below already set state in callbacks.
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- clear barriers when this view cannot read them
       setBarrierRotationIds([]);
       return;
     }
@@ -625,6 +649,11 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
         barrierRotationIds,
         includeUnassignedRoster: !simplified && supervisor,
         baySectionByKey,
+        weekLabel: week || null,
+        weekCoverage:
+          weekCoverage && weekCoverage.weekLabel === week
+            ? weekCoverage.records
+            : null,
         approvedSharedTarget:
           supervisor && !simplified && week ? approvedSharedTarget : null,
       }),
@@ -637,6 +666,7 @@ export function FloorTab({ specialist, storeNumber }: WorkflowTabProps) {
       supervisor,
       baySectionByKey,
       approvedSharedTarget,
+      weekCoverage,
       week,
     ]
   );
