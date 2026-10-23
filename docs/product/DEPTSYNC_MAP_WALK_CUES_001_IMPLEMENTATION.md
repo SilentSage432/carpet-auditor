@@ -1,6 +1,6 @@
 # DEPTSYNC-MAP-WALK-CUES-001 — Weekly Assignment and Follow-Up Cues in Map
 
-**Status:** COMPLETE locally — not pushed, not deployed  
+**Status:** RELEASED — see [`DEPTSYNC_MAP_WALK_CUES_001_RELEASE.md`](./DEPTSYNC_MAP_WALK_CUES_001_RELEASE.md) (`0d45489`)  
 **Date:** 2026-10-23  
 **Mode:** Implement → test → local validation  
 **Scope:** Read-only chips on Map aisle bay rows  
@@ -119,4 +119,4 @@ The chip carries no follow-up text and no observation body. Opening the bay stil
 
 ## 8. Release readiness
 
-Local implementation and validation are complete. **Not released.** Do not push or deploy until a later release authorization. Do not publish W44. Do not change AUTO-008 or the Sunday cron.
+Released. Evidence is in [`DEPTSYNC_MAP_WALK_CUES_001_RELEASE.md`](./DEPTSYNC_MAP_WALK_CUES_001_RELEASE.md). App commit `0d45489`. Do not publish W44. Do not change AUTO-008 or the Sunday cron.
