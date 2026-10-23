@@ -76,6 +76,7 @@ import {
   sectionBayKey,
   type BaySectionLookup,
 } from "@/lib/store-ops/operational-sections";
+import { mapBayWalkCues } from "@/lib/store-ops/map-walk-cues";
 
 const BAY_CHUNK = 36;
 
@@ -88,6 +89,9 @@ type Props = {
   onChanged: () => void;
   assignedWeek?: string;
   weekRotationLocations?: Array<{ locationId: string; completed: boolean }>;
+  /** MAP-WALK-CUES-001. Null withholds the cue (read failed). */
+  assignedCueKeys?: readonly string[] | null;
+  followUpCueKeys?: readonly string[] | null;
   barrierLocationIds?: string[];
   /** FS-003B batched seasonal views by location id (read-only). */
   seasonalByLocationId?: Map<string, MapLocationSeasonalView>;
@@ -236,6 +240,8 @@ export function StoreLocationGrid({
   onChanged,
   assignedWeek,
   weekRotationLocations = [],
+  assignedCueKeys = null,
+  followUpCueKeys = null,
   barrierLocationIds = [],
   seasonalByLocationId,
   attentionByLocationId,
@@ -275,6 +281,15 @@ export function StoreLocationGrid({
   } | null>(null);
   const allowRotationPriority = canMutateRotationPriority(specialist);
   const canSetupTopology = canManageMapConsole(specialist);
+
+  const assignedCueSet = useMemo(
+    () => (assignedCueKeys == null ? null : new Set(assignedCueKeys)),
+    [assignedCueKeys]
+  );
+  const followUpCueSet = useMemo(
+    () => (followUpCueKeys == null ? null : new Set(followUpCueKeys)),
+    [followUpCueKeys]
+  );
 
   const weekByLocation = useMemo(() => {
     const map = new Map<string, { assigned: boolean; completed: boolean }>();
@@ -843,6 +858,13 @@ export function StoreLocationGrid({
               >
                 {visibleBays.map((pair) => {
                   const active = isMapBayPairActive(pair, activeOverlay);
+                  const walkCues = mapBayWalkCues({
+                    departmentId: selectedAisle.departmentId,
+                    aisle: selectedAisle.aisle,
+                    bay: pair.bay,
+                    assignedKeys: assignedCueSet,
+                    followUpKeys: followUpCueSet,
+                  });
                   return (
                     <BayRow
                       key={`${selectedAisle.key}-bay-${pair.bay}`}
@@ -896,6 +918,8 @@ export function StoreLocationGrid({
                       }
                       departmentId={selectedAisle.departmentId}
                       departmentName={selectedAisle.departmentName}
+                      assignedThisWeek={walkCues?.assignedThisWeek ?? false}
+                      openFollowUp={walkCues?.openFollowUp ?? false}
                       onOpenWalk={openWalkSheet}
                       onToggle={toggleActive}
                     />
@@ -1040,6 +1064,8 @@ const BayRow = memo(function BayRow({
   attentionMarker,
   emphasizeAttention = false,
   highPriority = false,
+  assignedThisWeek = false,
+  openFollowUp = false,
   departmentId,
   departmentName,
   onOpenWalk,
@@ -1058,6 +1084,8 @@ const BayRow = memo(function BayRow({
   attentionMarker?: ReturnType<typeof attentionCellMarkerForPair>;
   emphasizeAttention?: boolean;
   highPriority?: boolean;
+  assignedThisWeek?: boolean;
+  openFollowUp?: boolean;
   departmentId: string;
   departmentName: string;
   onOpenWalk: (bay: SheetBay) => void;
@@ -1098,6 +1126,8 @@ const BayRow = memo(function BayRow({
         aria-label={`Bay ${pair.bay} ${rowToneLabel}${
           retired ? " · Retired" : ""
         }${highPriority ? " · High priority" : ""}${
+          assignedThisWeek ? " · Assigned this week" : ""
+        }${openFollowUp ? " · Open follow-up" : ""}${
           seasonalBadge ? ` · ${seasonalBadge}` : ""
         }${attentionMarker ? ` · ${attentionMarker.a11y_suffix}` : ""}`}
         data-testid="map-bay-row"
@@ -1122,6 +1152,24 @@ const BayRow = memo(function BayRow({
               className="shrink-0 rounded-full border border-amber-500/35 bg-amber-950/30 px-1.5 py-0.5 font-mono text-[9px] font-bold tracking-tight text-amber-200/90"
             >
               High
+            </span>
+          ) : null}
+          {assignedThisWeek ? (
+            <span
+              title="Assigned this week"
+              data-testid="map-cue-assigned"
+              className="shrink-0 rounded-full border border-emerald-500/35 bg-emerald-950/30 px-1.5 py-0.5 font-mono text-[9px] font-bold tracking-tight text-emerald-200/90"
+            >
+              Assigned
+            </span>
+          ) : null}
+          {openFollowUp ? (
+            <span
+              title="Open follow-up"
+              data-testid="map-cue-follow-up"
+              className="shrink-0 rounded-full border border-orange-500/35 bg-orange-950/30 px-1.5 py-0.5 font-mono text-[9px] font-bold tracking-tight text-orange-200/90"
+            >
+              Follow-up
             </span>
           ) : null}
           {seasonalBadge ? (

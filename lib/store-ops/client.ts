@@ -2237,6 +2237,17 @@ export async function fetchWalkthroughInbox(
   );
 }
 
+/** MAP-WALK-CUES-001 — open follow-up places only. No observation bodies. */
+export async function fetchWalkthroughOpenPlaces(
+  specialist: StoreSpecialist
+): Promise<{
+  places: import("./walkthroughs").OpenFollowUpPlace[];
+}> {
+  return storeOpsFetch<{
+    places: import("./walkthroughs").OpenFollowUpPlace[];
+  }>("/api/walkthroughs?view=open-places", specialist);
+}
+
 export async function fetchWalkthroughPlaceHistory(
   specialist: StoreSpecialist,
   input: { departmentId: string; aisle: string; bay: number }

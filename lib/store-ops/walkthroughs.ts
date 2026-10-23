@@ -1181,6 +1181,107 @@ export async function completeWalkthroughFollowUp(
   return { ok: true, value: data as WalkthroughFollowUpRow };
 }
 
+export type OpenFollowUpPlace = {
+  department_id: string;
+  aisle: string;
+  bay: number;
+  open_count: number;
+};
+
+/**
+ * Open follow-up places for one store.
+ * Two queries: open follow-up ids, then place columns on those observations.
+ * Does not load observation bodies, sessions, or closed follow-ups.
+ */
+export async function listOpenFollowUpPlaces(
+  supabase: SupabaseClient,
+  input: { store_id: string }
+): Promise<WalkthroughMutationResult<OpenFollowUpPlace[]>> {
+  const storeId = String(input.store_id ?? "").trim();
+  if (!storeId) {
+    return { ok: false, code: "invalid", message: "store_id is required" };
+  }
+
+  const { data: followUps, error: followError } = await supabase
+    .from("walkthrough_follow_ups")
+    .select("observation_id, status")
+    .eq("store_id", storeId)
+    .eq("status", "open");
+
+  if (followError) {
+    if (isMissingRelation(followError)) {
+      return { ok: true, value: [] };
+    }
+    return {
+      ok: false,
+      code: "list_failed",
+      message: followError.message,
+      details: followError,
+    };
+  }
+
+  const observationIds = [
+    ...new Set(
+      (followUps ?? [])
+        .map((row) => String(row.observation_id ?? "").trim())
+        .filter(Boolean)
+    ),
+  ];
+  if (observationIds.length === 0) return { ok: true, value: [] };
+
+  const openCountByObservation = new Map<string, number>();
+  for (const follow of followUps ?? []) {
+    if (String(follow.status ?? "") !== "open") continue;
+    const observationId = String(follow.observation_id ?? "").trim();
+    if (!observationId) continue;
+    openCountByObservation.set(
+      observationId,
+      (openCountByObservation.get(observationId) ?? 0) + 1
+    );
+  }
+
+  const places = new Map<string, OpenFollowUpPlace>();
+  const chunkSize = 100;
+  for (let offset = 0; offset < observationIds.length; offset += chunkSize) {
+    const chunk = observationIds.slice(offset, offset + chunkSize);
+    const { data: observations, error: obsError } = await supabase
+      .from("walkthrough_observations")
+      .select("id, department_id, aisle, bay")
+      .eq("store_id", storeId)
+      .in("id", chunk);
+    if (obsError) {
+      if (isMissingRelation(obsError)) return { ok: true, value: [] };
+      return {
+        ok: false,
+        code: "list_failed",
+        message: obsError.message,
+        details: obsError,
+      };
+    }
+    for (const obs of observations ?? []) {
+      const openCount = openCountByObservation.get(String(obs.id)) ?? 0;
+      if (openCount < 1) continue;
+      const departmentId = String(obs.department_id ?? "").trim();
+      const aisle = normalizeAisle(obs.aisle);
+      const bay = Number(obs.bay);
+      if (!departmentId || !aisle || !Number.isFinite(bay)) continue;
+      const key = `${departmentId}|${aisle}|${bay}`;
+      const existing = places.get(key);
+      if (existing) existing.open_count += openCount;
+      else {
+        places.set(key, {
+          department_id: departmentId,
+          aisle,
+          bay,
+          open_count: openCount,
+        });
+      }
+    }
+  }
+
+  return { ok: true, value: [...places.values()] };
+}
+
 export async function listWalkthroughInbox(
   supabase: SupabaseClient,
   input: { store_id: string; todayIsoDate: string }

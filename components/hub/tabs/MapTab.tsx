@@ -19,6 +19,7 @@ import {
   fetchStoreAisles,
   fetchStoreLocationsDetailed,
   fetchThisWeekRotations,
+  fetchWalkthroughOpenPlaces,
   fetchOperationalSections,
   invalidateStoreOpsListCaches,
   peekCachedDepartments,
@@ -26,6 +27,7 @@ import {
   peekCachedStoreLocations,
   STORE_OPS_LOCATIONS_CHANGED_EVENT,
   STORE_OPS_SECTIONS_CHANGED_EVENT,
+  STORE_OPS_WALKTHROUGHS_CHANGED_EVENT,
 } from "@/lib/store-ops/client";
 import type { StoreAisle } from "@/lib/store-ops/store-aisles";
 import {
@@ -45,6 +47,14 @@ import { readableError, isExistingDepartmentConflict } from "@/lib/store-ops/err
 import type { Department, StoreLocation } from "@/lib/store-ops/types";
 import { isWeekVerifiedForMapOverlay } from "@/lib/store-ops/rotation-metrics";
 import { isoWeekLabel } from "@/lib/store-ops/week";
+import {
+  fetchStoreWeekSundayAssignments,
+  SUNDAY_AUDIT_EVENT,
+} from "@/lib/store-ops/sunday-audit";
+import {
+  indexAssignedThisWeekBays,
+  indexOpenFollowUpBays,
+} from "@/lib/store-ops/map-walk-cues";
 import { formatMapCalendarWeekChrome } from "@/lib/store-ops/week-copy";
 import { isSupervisor } from "@/lib/specialists";
 import type { WorkflowTabProps } from "@/components/hub/tabs/tab-props";
@@ -84,6 +94,12 @@ export function MapTab({ specialist }: WorkflowTabProps) {
   const [weekRotationLocations, setWeekRotationLocations] = useState<
     Array<{ locationId: string; completed: boolean }>
   >([]);
+  const [assignedCueKeys, setAssignedCueKeys] = useState<string[] | null>(
+    null
+  );
+  const [followUpCueKeys, setFollowUpCueKeys] = useState<string[] | null>(
+    null
+  );
   const [barrierLocationIds, setBarrierLocationIds] = useState<string[]>([]);
   const [seasonalByLocationId, setSeasonalByLocationId] = useState<
     Map<string, MapLocationSeasonalView>
@@ -233,8 +249,16 @@ export function MapTab({ specialist }: WorkflowTabProps) {
                 .catch((err: unknown) => ({ ok: false as const, err }))
             : Promise.resolve(null);
 
-        const [locs, aislesResult, weekData, exceptions, seasonalResult, attentionResult, sectionsResult] =
-          await Promise.all([
+        const [
+          locs,
+          aislesResult,
+          weekBundle,
+          openPlaces,
+          exceptions,
+          seasonalResult,
+          attentionResult,
+          sectionsResult,
+        ] = await Promise.all([
             fetchStoreLocationsDetailed(member),
             fetchStoreAisles(member, { includeRetired: true }).catch((err) => {
               console.warn(
@@ -243,7 +267,35 @@ export function MapTab({ specialist }: WorkflowTabProps) {
               );
               return { items: [] as StoreAisle[], authRequired: false };
             }),
-            fetchThisWeekRotations(member),
+            fetchThisWeekRotations(member).then(async (weekData) => {
+          const operationalWeek = String(weekData.assigned_week ?? "").trim();
+          let assignments: Awaited<
+            ReturnType<typeof fetchStoreWeekSundayAssignments>
+          > | null = null;
+          if (operationalWeek) {
+            try {
+              assignments = await fetchStoreWeekSundayAssignments(
+                operationalWeek,
+                member.store_number
+              );
+            } catch (assignErr) {
+              console.error(
+                "[StoreMap] week assignments failed (non-blocking)",
+                assignErr
+              );
+            }
+          } else {
+            assignments = {};
+          }
+          return { weekData, operationalWeek, assignments };
+        }),
+        fetchWalkthroughOpenPlaces(member).catch((followErr) => {
+          console.error(
+            "[StoreMap] open follow-ups failed (non-blocking)",
+            followErr
+          );
+          return null;
+        }),
             fetchExceptionSummary(member),
             canReadSeasonal
               ? fetchOperationalContextLocationRelevanceResolve(member).catch(
@@ -269,6 +321,7 @@ export function MapTab({ specialist }: WorkflowTabProps) {
             }),
           ]);
 
+        const weekData = weekBundle.weekData;
         const nextWeek = (weekData.rotations ?? [])
           .map((row) => ({
             locationId: String(
@@ -294,6 +347,22 @@ export function MapTab({ specialist }: WorkflowTabProps) {
         );
         setWeekRotationLocations((prev) =>
           fingerprintsEqual(prev, nextWeek) ? prev : nextWeek
+        );
+        const assignedKeys = indexAssignedThisWeekBays({
+          operationalWeek: weekBundle.operationalWeek,
+          rotations: weekData.rotations ?? [],
+          assignments: weekBundle.assignments,
+        });
+        const followKeys = indexOpenFollowUpBays(
+          openPlaces ? openPlaces.places : null
+        );
+        const nextAssigned = assignedKeys ? [...assignedKeys].sort() : null;
+        const nextFollow = followKeys ? [...followKeys].sort() : null;
+        setAssignedCueKeys((prev) =>
+          fingerprintsEqual(prev, nextAssigned) ? prev : nextAssigned
+        );
+        setFollowUpCueKeys((prev) =>
+          fingerprintsEqual(prev, nextFollow) ? prev : nextFollow
         );
         setBarrierLocationIds((prev) =>
           fingerprintsEqual(prev, nextBarriers) ? prev : nextBarriers
@@ -376,6 +445,8 @@ export function MapTab({ specialist }: WorkflowTabProps) {
           setDepartments([]);
           setLocations([]);
           setRegistryAisles([]);
+          setAssignedCueKeys(null);
+          setFollowUpCueKeys(null);
           setAttentionStatus("IDLE");
           clearAttentionPaint();
         } else {
@@ -440,9 +511,16 @@ export function MapTab({ specialist }: WorkflowTabProps) {
     }
     window.addEventListener(STORE_OPS_LOCATIONS_CHANGED_EVENT, onLocations);
     window.addEventListener(STORE_OPS_SECTIONS_CHANGED_EVENT, onLocations);
+    window.addEventListener(STORE_OPS_WALKTHROUGHS_CHANGED_EVENT, onLocations);
+    window.addEventListener(SUNDAY_AUDIT_EVENT, onLocations);
     return () => {
       window.removeEventListener(STORE_OPS_LOCATIONS_CHANGED_EVENT, onLocations);
       window.removeEventListener(STORE_OPS_SECTIONS_CHANGED_EVENT, onLocations);
+      window.removeEventListener(
+        STORE_OPS_WALKTHROUGHS_CHANGED_EVENT,
+        onLocations
+      );
+      window.removeEventListener(SUNDAY_AUDIT_EVENT, onLocations);
     };
   }, [reload, specialist]);
 
@@ -600,6 +678,8 @@ export function MapTab({ specialist }: WorkflowTabProps) {
               registryAisles={registryAisles}
               assignedWeek={currentWeek}
               weekRotationLocations={weekRotationLocations}
+              assignedCueKeys={assignedCueKeys}
+              followUpCueKeys={followUpCueKeys}
               barrierLocationIds={barrierLocationIds}
               seasonalByLocationId={seasonalByLocationId}
               attentionByLocationId={attentionByLocationId}

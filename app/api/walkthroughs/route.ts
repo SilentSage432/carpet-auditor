@@ -11,6 +11,7 @@ import {
 import { requireSupabaseAdmin } from "@/lib/supabase/admin-response";
 import { resolveStoreByNumber } from "@/lib/store-ops/stores";
 import {
+  listOpenFollowUpPlaces,
   listWalkthroughInbox,
   todayIsoDateInTimeZone,
 } from "@/lib/store-ops/walkthroughs";
@@ -23,9 +24,27 @@ export async function GET(request: Request) {
     if (!supabase) return response;
 
     const store = await resolveStoreByNumber(supabase, actor.storeNumber);
+    const url = new URL(request.url);
     const timezone = String(
       (store as { timezone?: string | null }).timezone ?? "UTC"
     );
+    if (url.searchParams.get("view") === "open-places") {
+      const places = await listOpenFollowUpPlaces(supabase, {
+        store_id: store.id,
+      });
+      if (!places.ok) {
+        const status = places.code === "list_failed" ? 500 : 400;
+        return NextResponse.json(
+          { error: places.message, code: places.code },
+          { status }
+        );
+      }
+      return NextResponse.json({
+        places: places.value,
+        store_id: store.id,
+      });
+    }
+
     const result = await listWalkthroughInbox(supabase, {
       store_id: store.id,
       todayIsoDate: todayIsoDateInTimeZone(new Date(), timezone),

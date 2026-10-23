@@ -1,5 +1,9 @@
 # DeptSync Hub — Development Journal
 
+## 2026-10-23 — DEPTSYNC-MAP-WALK-CUES-001 aisle assignment and follow-up cues
+
+**Local implementation only — not pushed, not deployed.** Map bay rows now show **Assigned** when the operational week has a persisted Sunday assignee, and **Follow-up** when that place has an open walkthrough follow-up. Neither chip means the work is done or that an unmarked bay is unavailable. Reads are one store-week assignment query and one open-place batch, not a request per bay. No migration. Cue suite plus Map and walkthrough regressions **60 PASS**. TypeScript and `next build` PASS. AUTO-008 latch and cron unchanged. Canonical: [`docs/product/DEPTSYNC_MAP_WALK_CUES_001_IMPLEMENTATION.md`](docs/product/DEPTSYNC_MAP_WALK_CUES_001_IMPLEMENTATION.md). **STOP — do not push or deploy until release authorization. Do not publish W44.**
+
 ## 2026-10-22 — DEPTSYNC-SECTION-OWNERSHIP-006 controlled production release
 
 **Authorized PREFLIGHT→VALIDATE→RELEASE→VERIFY complete. GO.** App **`22aa4ff`**. Focused suites **133 PASS**; tsc / ESLint / build PASS. No migrations. Pre/post SBA fingerprint **`55dde8e86360caea`** identical; active sections **4×160**; coverage **0**; standing v1 **3/3/3/3**; W44 empty. Push `e5c22c5..22aa4ff`; GitHub Production **`7269014678`** success; Vercel Ready `dpl_xg42BbAAtTrVKCR5zTk6VpFLk8sk` @ https://deptsync-hub.vercel.app. AUTO-008 latch and cron untouched. Revoked covers and historical permanent owners remain unread. Phone acceptance outstanding. Canonical: [`docs/product/DEPTSYNC_SECTION_OWNERSHIP_006_RELEASE.md`](docs/product/DEPTSYNC_SECTION_OWNERSHIP_006_RELEASE.md). **STOP — phone-accept cover labels when a cover exists; await Oct 25 AUTO-008 first-run. Do not publish W44.**

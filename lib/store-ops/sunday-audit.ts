@@ -236,6 +236,47 @@ export async function fetchSundayAssignments(
   );
 }
 
+/**
+ * MAP-WALK-CUES-001 — every persisted assignment for the store operational week.
+ * One query. No department filter, so aisle rows outside the working department
+ * still see their own Sunday row. Does not write.
+ */
+export async function fetchStoreWeekSundayAssignments(
+  week: string,
+  storeNumber = getStoreNumber()
+): Promise<SundayAssignmentMap> {
+  const store = String(storeNumber ?? "").trim();
+  const weekLabel = String(week ?? "").trim();
+  if (!store || !weekLabel) return {};
+
+  return sundayAssignmentsCache.get(
+    `store-week:${store}:${weekLabel}`,
+    async () => {
+      const supabase = requireClient();
+      const weekStarting = isoWeekToMondayDate(weekLabel);
+      const keys = storeNumberQueryValues(store);
+      const { data, error } = await supabase
+        .from("sunday_bay_assignments")
+        .select(
+          "bay_id, roster_specialist_id, assigned_specialist_id, specialist_name, status, supervisor_locked, is_carried_over, updated_at, created_at"
+        )
+        .in("store_number", keys.length ? keys : [store])
+        .eq("week_starting", weekStarting);
+
+      if (error) {
+        throw new Error(error.message || "Could not load Sunday bay assignments");
+      }
+
+      const map: SundayAssignmentMap = {};
+      for (const row of (data as SundayBayAssignmentRow[] | null) ?? []) {
+        const assignment = mapRow(row);
+        if (assignment) map[String(row.bay_id)] = assignment;
+      }
+      return map;
+    }
+  );
+}
+
 /** @deprecated Prefer fetchSundayAssignments — sync local overlay removed. */
 export function getSundayAssignments(
   _week: string,
