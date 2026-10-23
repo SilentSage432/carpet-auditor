@@ -1,6 +1,6 @@
 # DEPTSYNC-SECTION-OWNERSHIP-006 — Temporary Coverage Visibility on This Week
 
-**Status:** COMPLETE locally — **not pushed, not deployed**  
+**Status:** COMPLETE — released in [`DEPTSYNC_SECTION_OWNERSHIP_006_RELEASE.md`](./DEPTSYNC_SECTION_OWNERSHIP_006_RELEASE.md) (`22aa4ff`)  
 **Date:** 2026-10-22  
 **Mode:** Implement → test → local validation  
 **Scope:** Cover versus permanent-owner label on This Week  
@@ -109,8 +109,4 @@ Capacity check in the new suite: Tracy owning Section D and covering Section B s
 
 ## 8. Release readiness
 
-**CONDITIONAL GO** for a later app-only release. The diff is presentation and a read of coverage that already exists.
-
-Not verified here: a signed-in phone session on This Week. Production coverage was 0 at the last fingerprint, so the new lines stay quiet until a cover exists.
-
-**Do not push or deploy until release authorization. Do not publish W44 or change AUTO-008.**
+Released. See [`DEPTSYNC_SECTION_OWNERSHIP_006_RELEASE.md`](./DEPTSYNC_SECTION_OWNERSHIP_006_RELEASE.md). Phone acceptance of the cover lines is still outstanding. A signed-in This Week session was not part of this implementation note.

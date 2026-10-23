@@ -1,5 +1,9 @@
 # DeptSync Hub — Development Journal
 
+## 2026-10-22 — DEPTSYNC-SECTION-OWNERSHIP-006 controlled production release
+
+**Authorized PREFLIGHT→VALIDATE→RELEASE→VERIFY complete. GO.** App **`22aa4ff`**. Focused suites **133 PASS**; tsc / ESLint / build PASS. No migrations. Pre/post SBA fingerprint **`55dde8e86360caea`** identical; active sections **4×160**; coverage **0**; standing v1 **3/3/3/3**; W44 empty. Push `e5c22c5..22aa4ff`; GitHub Production **`7269014678`** success; Vercel Ready `dpl_xg42BbAAtTrVKCR5zTk6VpFLk8sk` @ https://deptsync-hub.vercel.app. AUTO-008 latch and cron untouched. Revoked covers and historical permanent owners remain unread. Phone acceptance outstanding. Canonical: [`docs/product/DEPTSYNC_SECTION_OWNERSHIP_006_RELEASE.md`](docs/product/DEPTSYNC_SECTION_OWNERSHIP_006_RELEASE.md). **STOP — phone-accept cover labels when a cover exists; await Oct 25 AUTO-008 first-run. Do not publish W44.**
+
 ## 2026-10-22 — DEPTSYNC-SECTION-OWNERSHIP-006 temporary coverage visibility
 
 **Local implementation only — not pushed, not deployed.** This Week names the assigned associate, the permanent section owner, and “Covering this week” when that week’s active coverage row identifies the assignee as the cover. A different assignee stays the assignee. Coverage does not assign unowned bays or replace `primary_owner`. No migration. Label suite plus ownership, capacity, and authz regressions **111 PASS**. TypeScript, ESLint, and `next build` PASS. AUTO-008 latch and cron unchanged. Canonical: [`docs/product/DEPTSYNC_SECTION_OWNERSHIP_006_IMPLEMENTATION.md`](docs/product/DEPTSYNC_SECTION_OWNERSHIP_006_IMPLEMENTATION.md). **STOP — do not push or deploy until release authorization. Do not publish W44.**
